@@ -287,6 +287,9 @@ from wwise_waapi.debug_business_cli import (  # noqa: E402  # pyright: ignore[re
     add_debug_intent_arguments,
     debug_intent_from_namespace,
 )
+from wwise_waapi.compound_undo_business import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    build_compound_undo_child_snapshot,
+)
 from wwise_waapi.operation_composer import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     MAX_TYPED_ACTIONS_PER_APPLY,
     OperationComposerError,
@@ -372,7 +375,6 @@ OFFLINE_COMMANDS = frozenset(
         "describe",
         "operations",
         "operation-schema",
-        "undo-child-schema",
         "request-schema",
         "request-map-container",
         "request-array-item",
@@ -1743,11 +1745,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Describe one closed operation request shape, versioned CLI templates when applicable, and its execution boundary offline",
     )
     operation_schema.add_argument("operation")
-    undo_child_schema = subparsers.add_parser(
-        "undo-child-schema",
-        help="Describe one approved exact-version typed Undo Group child offline",
-    )
-    undo_child_schema.add_argument("child_operation")
     query_schema = subparsers.add_parser(
         "query-schema",
         help=(
@@ -2113,6 +2110,23 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_business_draft_binding_arguments(draft_declare_debug_intent)
     add_debug_intent_arguments(draft_declare_debug_intent)
+
+    draft_declare_undo_plan = subparsers.add_parser(
+        "draft-declare-undo-plan",
+        help=(
+            "Declare one display name and an ordered list of checked child "
+            "Business Draft snapshots"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_declare_undo_plan)
+    draft_declare_undo_plan.add_argument("--display-name", required=True)
+    draft_declare_undo_plan.add_argument(
+        "--child-draft",
+        action="append",
+        nargs=2,
+        required=True,
+        metavar=("DRAFT_ID", "TASK_AUTHORITY"),
+    )
 
     draft_declare_field_change = subparsers.add_parser(
         "draft-declare-field-change",
@@ -4834,24 +4848,6 @@ def operation_composer_input_contract(
             operation_name: generic_typed_action_argv
             for operation_name in DRAFT_TYPED_OPERATIONS
         },
-        "waapi.undoGroup": {
-            "set_display_name": ["--display-name", "VALUE"],
-            "add_child_call": ["--child-operation", "OPERATION"],
-            "add_child_typed_fact": [
-                "--child-handle", "HANDLE", "--fact-action", "ACTION",
-                "--field-handle", "HANDLE", "[--value-type TYPE]",
-                "[--fact-value VALUE]", "[--key KEY]",
-            ],
-            "correct_child_typed_fact": [
-                "--child-handle", "HANDLE", "--fact-handle", "HANDLE",
-                "--fact-action", "ACTION", "--field-handle", "HANDLE",
-                "[--value-type TYPE]", "[--fact-value VALUE]", "[--key KEY]",
-            ],
-            "remove_child_typed_fact": [
-                "--child-handle", "HANDLE", "--fact-handle", "HANDLE",
-            ],
-            "remove_child_call": ["--child-handle", "HANDLE"],
-        },
     }
     operation_argv = action_argv_by_operation[operation]
     if not set(contract["actions"]).issubset(operation_argv):
@@ -4888,7 +4884,6 @@ def operation_composer_input_contract(
         **(
             {"fact_action_argv": fact_action_argv}
             if "add_typed_fact" in action_argv
-            or "add_child_typed_fact" in action_argv
             else {}
         ),
         "scalar_types": ["string", "number", "integer", "boolean"],
@@ -5077,12 +5072,6 @@ def public_typed_contract(version: str, api: str) -> Any:
     if api.startswith(TOPIC_MATCH_OPERATION_PREFIX):
         return topic_match_contract(
             version, api.removeprefix(TOPIC_MATCH_OPERATION_PREFIX)
-        )
-    if api.startswith("undo-child:"):
-        from wwise_waapi.typed_operations import compound_child_request_contract
-
-        return compound_child_request_contract(
-            api.removeprefix("undo-child:"), version
         )
     if api in DRAFT_TYPED_OPERATIONS:
         return draft_operation_request_contract(api, version)
@@ -5380,7 +5369,6 @@ def _bind_dynamic_branch_facts(
     *,
     child_handle: str,
     draft_shape: bool,
-    undo_child_shape: bool,
     query_shape: bool,
     topic_prefix: str | None,
 ) -> None:
@@ -5408,7 +5396,6 @@ def _bind_dynamic_branch_facts(
                         "<business-value>",
                     ],
                     draft_shape=draft_shape,
-                    undo_child_shape=undo_child_shape,
                     query_shape=query_shape,
                     topic_prefix=topic_prefix,
                 )
@@ -5447,7 +5434,6 @@ def _bind_dynamic_branch_facts(
             deferred = _deferred_dynamic_fact_payload(
                 ["--map-put", child_handle, key, value_type, value],
                 draft_shape=draft_shape,
-                undo_child_shape=undo_child_shape,
                 query_shape=query_shape,
                 topic_prefix=topic_prefix,
             )
@@ -5505,19 +5491,10 @@ def _bind_dynamic_branch_facts(
                 "next_branch_blocked_until_complete": True,
             }
         )
-        if (
-            (draft_shape or undo_child_shape)
-            and not query_shape
-            and topic_prefix is None
-        ):
+        if draft_shape and not query_shape and topic_prefix is None:
             action_prefix = [
                 "--action",
-                "add_child_typed_fact" if undo_child_shape else "add_typed_fact",
-                *(
-                    ["--child-handle", "<child_handle>"]
-                    if undo_child_shape
-                    else []
-                ),
+                "add_typed_fact",
             ]
             choose_argv = [
                 *action_prefix,
@@ -5619,7 +5596,6 @@ def _bind_dynamic_scalar_array_facts(
     *,
     child_handle: str,
     draft_shape: bool,
-    undo_child_shape: bool,
     query_shape: bool,
     topic_prefix: str | None,
 ) -> None:
@@ -5638,7 +5614,6 @@ def _bind_dynamic_scalar_array_facts(
         deferred = _deferred_dynamic_fact_payload(
             ["--append", child_handle, value_type, "<business-value>"],
             draft_shape=draft_shape,
-            undo_child_shape=undo_child_shape,
             query_shape=query_shape,
             topic_prefix=topic_prefix,
         ).get("deferred_fact")
@@ -5739,23 +5714,12 @@ def _deferred_dynamic_fact_payload(
     fact: Sequence[str],
     *,
     draft_shape: bool,
-    undo_child_shape: bool,
     query_shape: bool,
     topic_prefix: str | None,
 ) -> dict[str, Any]:
     """Describe one returned-handle fact without presenting it as the next command."""
 
-    if undo_child_shape:
-        argv = [
-            "--action", "add_child_typed_fact",
-            "--child-handle", "<child_handle>",
-            "--fact-action", fact[0].removeprefix("--"),
-            "--field-handle", str(fact[1]),
-            "--value-type", str(fact[-2]),
-            "--fact-value", str(fact[-1]),
-            *(["--key", str(fact[2])] if fact[0] == "--map-put" else []),
-        ]
-    elif draft_shape and not query_shape and topic_prefix is None:
+    if draft_shape and not query_shape and topic_prefix is None:
         argv = [
             "--action", "add_typed_fact",
             "--fact-action", fact[0].removeprefix("--"),
@@ -5799,7 +5763,6 @@ def _selected_parent_branch_fact_payload(
     *,
     parent_handle: str,
     draft_shape: bool,
-    undo_child_shape: bool,
     query_shape: bool,
     topic_prefix: str | None,
 ) -> dict[str, Any]:
@@ -5811,16 +5774,7 @@ def _selected_parent_branch_fact_payload(
         or not isinstance(choice_handle, str)
     ):
         return {}
-    if undo_child_shape:
-        argv = [
-            "--action", "add_child_typed_fact",
-            "--child-handle", "<child_handle>",
-            "--fact-action", "choose-dynamic",
-            "--field-handle", parent_handle,
-            "--fact-value", choice_handle,
-            "--key", args.key,
-        ]
-    elif draft_shape and not query_shape and topic_prefix is None:
+    if draft_shape and not query_shape and topic_prefix is None:
         argv = [
             "--action", "add_typed_fact",
             "--fact-action", "choose-dynamic",
@@ -5866,7 +5820,6 @@ def _root_fact_queue_anchor(
     lineage_token: str,
     outermost_disclosed_root_pointer: str | None,
     draft_shape: bool,
-    undo_child_shape: bool,
     query_shape: bool,
     topic_prefix: str | None,
 ) -> dict[str, Any]:
@@ -5897,7 +5850,6 @@ def _root_fact_queue_anchor(
     payload = _deferred_dynamic_fact_payload(
         fact,
         draft_shape=draft_shape,
-        undo_child_shape=undo_child_shape,
         query_shape=query_shape,
         topic_prefix=topic_prefix,
     ).get("deferred_fact")
@@ -6639,10 +6591,6 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
         if len(versions) != 1:
             raise GatewayInputError(f"{args.command} requires one exact Wwise version")
         contract = public_typed_contract(versions[0], args.api)
-        if args.command == "request-schema" and args.api.startswith("undo-child:"):
-            raise GatewayInputError(
-                "Undo Group child contracts use undo-child-schema as their single schema entry."
-            )
         if args.command == "request-schema" and args.api in {
             STRUCTURED_TYPED_QUERY_OPERATION,
             ADVANCED_TYPED_QUERY_OPERATION,
@@ -6670,7 +6618,6 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
         if args.command == "request-schema":
             return contract.as_gateway_payload()
         draft_shape = contract.as_gateway_payload()["input_shape"] == "draft"
-        undo_child_shape = args.api.startswith("undo-child:")
         query_shape = args.api in {
             STRUCTURED_TYPED_QUERY_OPERATION,
             ADVANCED_TYPED_QUERY_OPERATION,
@@ -6856,7 +6803,6 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             child_contract,
             child_handle=child_handle,
             draft_shape=draft_shape,
-            undo_child_shape=undo_child_shape,
             query_shape=query_shape,
             topic_prefix=topic_prefix,
         )
@@ -6864,7 +6810,6 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             child_contract,
             child_handle=child_handle,
             draft_shape=draft_shape,
-            undo_child_shape=undo_child_shape,
             query_shape=query_shape,
             topic_prefix=topic_prefix,
         )
@@ -6987,7 +6932,6 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
         deferred_fact = _deferred_dynamic_fact_payload(
             fact,
             draft_shape=draft_shape,
-            undo_child_shape=undo_child_shape,
             query_shape=query_shape,
             topic_prefix=topic_prefix,
         )
@@ -6995,7 +6939,6 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             args,
             parent_handle=parent_handle,
             draft_shape=draft_shape,
-            undo_child_shape=undo_child_shape,
             query_shape=query_shape,
             topic_prefix=topic_prefix,
         )
@@ -7095,16 +7038,13 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                         outermost_disclosed_root_pointer
                     ),
                     draft_shape=draft_shape,
-                    undo_child_shape=undo_child_shape,
                     query_shape=query_shape,
                     topic_prefix=topic_prefix,
                 ),
                 **selected_parent_branch_fact,
                 **_dynamic_next_command_decision(
                     draft_shape=(
-                        (draft_shape or undo_child_shape)
-                        and not query_shape
-                        and topic_prefix is None
+                        draft_shape and not query_shape and topic_prefix is None
                     ),
                     outermost_disclosed_root_pointer=(
                         outermost_disclosed_root_pointer
@@ -7148,7 +7088,6 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     "query-object"
                     if query_shape
                     else "topic-input-fact" if topic_prefix is not None
-                    else "draft-apply" if undo_child_shape
                     else "draft-apply" if draft_shape else "typed-call"
                 ),
                 **(
@@ -7181,7 +7120,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                             "copy_returned_handles_exactly": True,
                         }
                     }
-                    if (draft_shape or undo_child_shape)
+                    if draft_shape
                     and not query_shape
                     and topic_prefix is None
                     else {}
@@ -7209,11 +7148,9 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             # decision even when a shell tool renders only an output prefix.
             "child_contract": child_contract,
         }
-        if draft_shape or undo_child_shape:
+        if draft_shape:
             read_only_draft = (
-                draft_shape
-                and not undo_child_shape
-                and args.api.startswith("ak.")
+                args.api.startswith("ak.")
                 and contract.effect == "read"
             )
             response["construction_state"] = {
@@ -7674,26 +7611,6 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             "count": len(operations),
             "implemented_count": sum(item["implemented"] is True for item in operations),
             "operations": operations,
-        }
-    if args.command == "undo-child-schema":
-        (version,) = resolve_catalog_versions(args, env=env)
-        from wwise_waapi.typed_operations import compound_child_request_contract
-
-        contract = compound_child_request_contract(args.child_operation, version)
-        return {
-            "contract": GATEWAY_RESULT_CONTRACT,
-            "ok": True,
-            "status": "ok",
-            "command": "undo-child-schema",
-            "offline": True,
-            "child_operation": args.child_operation,
-            "version": version,
-            "typed_request": contract.as_gateway_payload(),
-            "fact_actions": [
-                "add_child_typed_fact",
-                "correct_child_typed_fact",
-                "remove_child_typed_fact",
-            ],
         }
     if args.command == "operation-schema":
         if args.operation == "waapi.call":
@@ -8689,6 +8606,16 @@ def dispatch_command(
         )
     if args.command == "draft-declare-debug-intent":
         return dispatch_business_debug_intent(
+            args,
+            env=env,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+        )
+    if args.command == "draft-declare-undo-plan":
+        return dispatch_business_compound_undo_plan(
             args,
             env=env,
             connection=connection,
@@ -11801,6 +11728,180 @@ def dispatch_business_debug_intent(
 
     def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
         candidate = current.with_settings({"debug_intent": intent})
+        parse_operation_request(
+            adapter.materialize(candidate),
+            expected_version=detected_version,
+        )
+        return candidate
+
+    record = binding.store.apply_business_update(
+        args.draft_id,
+        task_authority=args.task_authority,
+        expected_revision=args.expected_revision,
+        schema_digest=operation_draft_schema_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        composer_digest=operation_composer_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        context=binding.context,
+        update=update,
+        event_type="settings.revised",
+    )
+    payload = operation_draft_payload(
+        args.command,
+        record,
+        offline=False,
+        task_authority=args.task_authority,
+    )
+    payload.update(
+        {
+            "endpoint": dict(common["endpoint"]),
+            "detected_version": detected_version,
+            "project_call": dispatch_call_summary(binding.project_call),
+        }
+    )
+    return payload
+
+
+def dispatch_business_compound_undo_plan(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Snapshot one ordered list of already checked child Business Drafts."""
+
+    binding = _open_business_binding(
+        args,
+        env=env,
+        connection=connection,
+        detected_version=detected_version,
+        live_info=live_info,
+        dispatcher=dispatcher,
+    )
+    adapter = business_adapter(binding.record.operation)
+    if adapter.family != "compound-undo-business" or not adapter.accepts_update_command(
+        args.command
+    ):
+        raise GatewayInputError(
+            f"{binding.record.operation} does not expose {args.command}"
+        )
+    child_bindings = args.child_draft
+    if not isinstance(child_bindings, list) or not 1 <= len(child_bindings) <= 32:
+        raise GatewayInputError(
+            "Compound Undo requires between 1 and 32 checked child Business Drafts"
+        )
+    current_project_guard = build_project_guard(
+        endpoint=common["endpoint"],
+        version=detected_version,
+        live_info=live_info,
+        project=binding.project,
+    )
+    snapshots: list[dict[str, Any]] = []
+    for index, pair in enumerate(child_bindings):
+        if not isinstance(pair, list) or len(pair) != 2:
+            raise GatewayInputError(
+                f"Compound Undo child {index} binding is malformed"
+            )
+        child_draft_id, child_authority = pair
+        child_record = binding.store.inspect(
+            child_draft_id,
+            task_authority=child_authority,
+        )
+        if child_record.draft_id == binding.record.draft_id:
+            raise GatewayInputError("A Compound Undo plan cannot include itself")
+        child_is_business = operation_uses_business_declaration(
+            child_record.operation,
+            child_record.version,
+        )
+        if not child_is_business and not child_record.operation.startswith("ak."):
+            raise GatewayInputError(
+                "Compound Undo children must use a checked closed child Draft"
+            )
+        check = child_record.check
+        if (
+            not isinstance(check, Mapping)
+            or check.get("source_revision") != child_record.revision - 1
+            or check.get("schema_digest") != child_record.schema_digest
+            or check.get("composer_digest") != child_record.composer_digest
+            or check.get("live_version") != child_record.version
+            or check.get("project_guard") != current_project_guard
+        ):
+            raise GatewayInputError(
+                f"Compound Undo child {index} must be checked at its current revision"
+            )
+        materialized = binding.store.materialize_request(
+            child_record.draft_id,
+            task_authority=child_authority,
+            expected_revision=child_record.revision,
+            schema_digest=operation_draft_schema_digest(
+                child_record.operation,
+                child_record.version,
+            ),
+            composer_digest=operation_composer_digest(
+                child_record.operation,
+                child_record.version,
+            ),
+        )
+        if (
+            check.get("request_digest") != materialized.request_digest
+        ):
+            raise GatewayInputError(
+                f"Compound Undo child {index} must be checked at its current revision"
+            )
+        raw_composition = child_record.composition
+        raw_session = (
+            raw_composition.get("business_session")
+            if isinstance(raw_composition, Mapping)
+            else None
+        )
+        if child_is_business:
+            if not isinstance(raw_session, Mapping):
+                raise GatewayInputError(
+                    f"Compound Undo child {index} lacks a Business Declaration session"
+                )
+            child_context = BusinessDeclarationSession.from_dict(raw_session).context
+            if any(
+                getattr(child_context, field) != getattr(binding.context, field)
+                for field in (
+                    "project_id",
+                    "project_path",
+                    "wwise_version",
+                    "wwise_build",
+                )
+            ):
+                raise OperationDraftBindingDrift(
+                    f"Compound Undo child {index} belongs to another live project or Wwise build."
+                )
+        try:
+            snapshot = build_compound_undo_child_snapshot(
+                version=detected_version,
+                source_draft_id=child_record.draft_id,
+                source_revision=child_record.revision,
+                request=materialized.request,
+            )
+        except BusinessDeclarationError as exc:
+            raise GatewayInputError(
+                f"Compound Undo child {index} is not an eligible checked business mutation: {exc}"
+            ) from exc
+        snapshots.append(snapshot)
+
+    def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
+        candidate = current.with_settings(
+            {
+                "undo_plan": {
+                    "display_name": args.display_name,
+                    "children": snapshots,
+                }
+            }
+        )
         parse_operation_request(
             adapter.materialize(candidate),
             expected_version=detected_version,
@@ -17079,6 +17180,11 @@ def _business_next_action_binding(
         "draft-declare-debug-intent",
         *binding,
     ]
+    declare_undo_plan_prefix = [
+        *base,
+        "draft-declare-undo-plan",
+        *binding,
+    ]
     revise_prefix = [*base, "draft-revise-declaration", *binding]
     remove_prefix = [*base, "draft-remove-declaration", *binding]
     check = [*base, "draft-check", *binding]
@@ -17162,6 +17268,61 @@ def _business_next_action_binding(
                 "bind_each_required_role_then_copy_its_returned_handle_into_"
                 "the_same_named_declaration_field"
             ),
+        }
+    if adapter.family == "compound-undo-business":
+        shared = {
+            "contract": "waapi-skill.business-draft-next-action/v1",
+            "responsibility_split": business_contract["responsibility_split"],
+            "business_contract": business_contract,
+            "forbidden_inputs": [
+                *forbidden_inputs,
+                "child_call_handle",
+                "child_schema_digest",
+                "child_native_request",
+                "action_ordering_grammar",
+                "begin_group_call",
+                "end_group_call",
+                "cancel_group_call",
+                "revision_arithmetic",
+            ],
+            "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+            "then_read_next_response": True,
+            "precompute_or_increment_revision": False,
+        }
+        if session is not None and adapter.is_complete(session):
+            return {
+                **shared,
+                "required_next_phase": "check_complete_compound_undo_plan",
+                "check": {
+                    **operation_draft_prefix_copy_binding(check),
+                    "append": [],
+                },
+            }
+        return {
+            **shared,
+            "required_next_phase": "declare_ordered_checked_child_business_drafts",
+            "declaration": {
+                **operation_draft_prefix_copy_binding(
+                    declare_undo_plan_prefix,
+                    append_action=(
+                        "copy_verbatim_then_append_display_name_and_each_checked_"
+                        "child_draft_in_user_requested_order"
+                    ),
+                ),
+                "append": [
+                    "--display-name <user-facing-Wwise-Undo-step-name>",
+                    "--child-draft <checked-child-draft-id> <its-task-authority> [--child-draft ...]",
+                ],
+                "order_rule": "repeat_child_draft_in_exact_user_requested_execution_order",
+                "child_prerequisite": (
+                    "each_child_is_a_current_revision_draft-check-passed_closed_"
+                    "draft_for_this_project_and_version; named_children_use_their_"
+                    "business_declaration_and_generic_children_retain_their_separate_"
+                    "interface_depth_boundary"
+                ),
+                "submit_once": True,
+                "native_request_input": "forbidden",
+            },
         }
     if adapter.family == "debug-host-control":
         shared = {

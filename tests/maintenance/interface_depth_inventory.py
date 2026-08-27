@@ -874,6 +874,8 @@ def _operation_model_values(
                 }
                 for field_name in declaration["public_fields"]
             ]
+        if name == "waapi.undoGroup":
+            return _compound_undo_model_values(business_contract)
         declaration = business_contract["declaration"]
         required = set(declaration["required_fields"])
         if name in {
@@ -955,6 +957,43 @@ def _operation_model_values(
                 )
             )
     return rows
+
+
+def _compound_undo_model_values(
+    contract: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    """Project only the display name and checked child Draft capabilities."""
+
+    values = (
+        (("display_name",), "scalar", "stable_business_declaration"),
+        (("child_drafts",), "array", "stable_business_declaration"),
+        (("child_drafts", "[]", "draft_id"), "scalar", "live_bound_handle"),
+        (
+            ("child_drafts", "[]", "task_authority"),
+            "scalar",
+            "live_bound_handle",
+        ),
+    )
+    return [
+        {
+            "path": ["undo_plan", *path],
+            "name": path[-1],
+            "shape": shape,
+            "required": True,
+            "value_ownership": ownership,
+            "transport_ownership": "gateway_derivation",
+            "schema_sha256": canonical_sha256(
+                {
+                    "operation": "waapi.undoGroup",
+                    "path": path,
+                    "shape": shape,
+                    "ownership": ownership,
+                    "business_contract": contract["contract"],
+                }
+            ),
+        }
+        for path, shape, ownership in values
+    ]
 
 
 def _authoring_ui_model_values(

@@ -13,6 +13,9 @@ from .exact_artifact_business_contracts import (
 from .business_declaration_state import BusinessDeclarationSession
 from .business_declarations import ExistingObjectTarget, business_repair
 from .debug_business_contracts import debug_business_contract_data
+from .compound_undo_business_contracts import (
+    compound_undo_business_contract_data,
+)
 from .object_lifecycle_business_contracts import (
     object_lifecycle_business_contract_data,
 )
@@ -94,6 +97,12 @@ def _authoring_ui_contract(operation: str, version: str) -> dict[str, Any]:
 
 def _debug_contract(operation: str, version: str) -> dict[str, Any]:
     return debug_business_contract_data(operation, version)
+
+
+def _compound_undo_contract(operation: str, version: str) -> dict[str, Any]:
+    if operation != "waapi.undoGroup":  # pragma: no cover - registry invariant
+        raise ValueError("compound Undo Adapter received the wrong operation")
+    return compound_undo_business_contract_data(version)
 
 
 def _object_lifecycle_contract(operation: str, version: str) -> dict[str, Any]:
@@ -244,6 +253,15 @@ def _materialize_debug(
     from .debug_business import materialize_debug_business_request
 
     return materialize_debug_business_request(operation, session)
+
+
+def _materialize_compound_undo(
+    operation: str,
+    session: BusinessDeclarationSession,
+) -> Mapping[str, Any]:
+    from .compound_undo_business import materialize_compound_undo_business_request
+
+    return materialize_compound_undo_business_request(operation, session)
 
 
 def _authoring_ui_is_complete(
@@ -681,6 +699,26 @@ _DEBUG_DEFINITION = {
     "settings_are_complete_declaration": True,
 }
 
+_COMPOUND_UNDO_DEFINITION = {
+    "family": "compound-undo-business",
+    "contract_builder": _compound_undo_contract,
+    "materializer": _materialize_compound_undo,
+    "update_commands": frozenset({"draft-declare-undo-plan"}),
+    "initial_projection_actions": (
+        "declare-undo-plan",
+        "inspect",
+        "cancel",
+    ),
+    "active_projection_actions": (
+        "declare-undo-plan",
+        "check",
+        "inspect",
+        "cancel",
+    ),
+    "auto_apply_preview": True,
+    "settings_are_complete_declaration": True,
+}
+
 
 def _bind_adapter(operation: str, definition: Mapping[str, Any]) -> BusinessAdapter:
     values = dict(definition)
@@ -731,6 +769,10 @@ _BUSINESS_ADAPTERS = {
             "debug.testCrash",
         )
     },
+    "waapi.undoGroup": _bind_adapter(
+        "waapi.undoGroup",
+        _COMPOUND_UNDO_DEFINITION,
+    ),
     "object.create": _bind_adapter("object.create", _OBJECT_GRAPH_DEFINITION),
     "object.createPlugin": _bind_adapter(
         "object.createPlugin", _OBJECT_PLUGIN_DEFINITION

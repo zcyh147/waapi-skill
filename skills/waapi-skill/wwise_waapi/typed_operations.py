@@ -47,11 +47,7 @@ INLINE_OPERATIONS = frozenset(
         "object.move",
     }
 )
-DRAFT_TYPED_OPERATIONS = frozenset(
-    {
-        "waapi.undoGroup",
-    }
-)
+DRAFT_TYPED_OPERATIONS = frozenset()
 _MAX_SELECTOR_DEPTH = 8
 MAX_INLINE_OPERATION_VALUE_BYTES = 32 * 1024
 MAX_INLINE_OPERATION_REQUEST_BYTES = 64 * 1024

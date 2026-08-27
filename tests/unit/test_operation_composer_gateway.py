@@ -2039,9 +2039,7 @@ def test_registry_composer_lanes_and_real_adapters_are_one_to_one() -> None:
                 adapter_lanes.add(lane)
 
     assert adapter_lanes == composer_lanes
-    assert {operation for operation, _version in composer_lanes} == {
-        "waapi.undoGroup",
-    }
+    assert composer_lanes == set()
 
 
 def test_soundbank_generate_shallow_composer_is_removed() -> None:

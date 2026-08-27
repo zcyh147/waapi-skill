@@ -378,6 +378,28 @@ def _continuation_error(
                                 or not contract.get("gateway_derivations")
                             ):
                                 return "business declaration Adapter is incomplete"
+                        elif operation == "waapi.undoGroup":
+                            if (
+                                not isinstance(declaration, Mapping)
+                                or declaration.get("subcommand")
+                                != "draft-declare-undo-plan"
+                                or declaration.get("required_fields")
+                                != ["display_name", "child_drafts"]
+                                or declaration.get("child_input")
+                                != "ordered_checked_closed_draft_snapshot"
+                                or declaration.get("native_request_input")
+                                != "forbidden"
+                                or declaration.get("child_call_handle_input")
+                                != "forbidden"
+                                or declaration.get("action_ordering_grammar")
+                                != "forbidden"
+                                or contract.get("legacy_composer_public")
+                                is not False
+                                or contract.get("legacy_child_schema_public")
+                                is not False
+                                or not contract.get("gateway_derivations")
+                            ):
+                                return "business declaration Adapter is incomplete"
                         elif (
                             not isinstance(declaration, Mapping)
                             or not declaration.get("required_fields")

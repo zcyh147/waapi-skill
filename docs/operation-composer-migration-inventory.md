@@ -57,7 +57,7 @@ planning; the Registry remains authoritative during implementation.
 | `ui.commands.register` | 2021.1–2025.1 | Business declaration | count-bound commands, exact handler paths, menu outcomes | Gateway-derived IDs, authority, platform, native descriptors, and paired cleanup | wave 05 deep cutover complete |
 | `ui.commands.unregister` | 2021.1–2025.1 | Business declaration | owned registration keys or confirmed existing IDs | Gateway-derived IDs and hidden unknown-ownership acknowledgement | wave 05 deep cutover complete |
 | `waapi.call` | 2021.1–2025.1 | Internal canonical | Gateway-materialized exact URI request | heterogeneous internal transaction representation | not model-facing |
-| `waapi.undoGroup` | 2021.1–2025.1 | Composer | name and ordered typed child handles | nested routes and cancellation journal | wave 06 complete |
+| `waapi.undoGroup` | 2021.1–2025.1 | Business declaration | name and ordered checked child Drafts | nested routes, stale child snapshots, and cancellation journal | wave 06 deep cutover complete |
 
 ## Migration order
 
@@ -66,7 +66,7 @@ cover object batches, imports, single-object edits, recursive creation, object
 lifecycle, plug-in topology, RTPC curves, Switch Container assignments, and
 SoundBank/isolated-file workflows, Authoring-only UI operations, caller-owned table
 imports, exact user-authored Lua with bounded strict-JSON argument maps, and compound Undo
-Groups whose ordered children are disclosed from their exact typed contracts.
+Groups whose ordered child requests are snapshotted only after their own closed Draft checks.
 
 Each operation owns its action vocabulary and verifier. A wave reuses deep
 Draft, canonical parsing, and Preview modules without inventing a generic

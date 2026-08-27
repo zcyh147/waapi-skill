@@ -9,20 +9,15 @@ from typing import Any, Mapping
 
 import pytest  # pyright: ignore[reportMissingImports]
 
+from tests.support.compound_undo import compound_undo_request
+
 from wwise_waapi.builders.common import SemanticValidationError  # pyright: ignore[reportMissingImports]
 from wwise_waapi.operation_import import (  # pyright: ignore[reportMissingImports]
     allowed_import_hierarchy_roots,
 )
-from wwise_waapi.operation_composer import (  # pyright: ignore[reportMissingImports]
-    OPERATION_DRAFT_ACTION_CONTRACT,
-    OperationComposerError,
-    apply_composer_action,
-    materialize_operation_request,
-    new_composition,
-)
-from wwise_waapi.typed_operations import (  # pyright: ignore[reportMissingImports]
-    compound_child_request_contract,
-)
+from wwise_waapi.business_declarations import BusinessDeclarationError
+from wwise_waapi.compound_undo_business import build_compound_undo_child_snapshot
+from wwise_waapi.typed_operations import compound_child_request_contract
 from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImports]
     BUSINESS_DECLARATION_INPUT_MODE,
     COMPOSER_INPUT_MODE,
@@ -83,46 +78,26 @@ EXPECTED_ACTOR_MIXER_METADATA_TYPES = {
 
 
 def _typed_undo_group_request(version: str) -> dict[str, Any]:
-    composition = new_composition("waapi.undoGroup", version)
-    for action, handle in (
-        ({"action": "set_display_name", "display_name": "Batch edit"}, "unused"),
-        ({"action": "add_child_call", "child_operation": "ak.wwise.core.object.setRandomizer"}, "uch1-111111111111111111111111"),
-    ):
-        composition, _ = apply_composer_action(
-            "waapi.undoGroup", version, composition,
-            {"contract": OPERATION_DRAFT_ACTION_CONTRACT, **action},
-            handle_factory=lambda value=handle: value,
-        )
-    contract = compound_child_request_contract(
-        "ak.wwise.core.object.setRandomizer", version
+    return compound_undo_request(
+        version=version,
+        display_name="Batch edit",
+        child_requests=[
+            {
+                "contract": OPERATION_REQUEST_CONTRACT,
+                "version": version,
+                "operation": "waapi.call",
+                "arguments": {
+                    "api": "ak.wwise.core.object.setRandomizer",
+                    "args": {
+                        "object": r"\Actor-Mixer Hierarchy\A",
+                        "property": "Volume",
+                        "enabled": True,
+                    },
+                    "options": {},
+                },
+            }
+        ],
     )
-    object_field = next(
-        field for field in contract.fields
-        if field.path == ("object",) and field.shape == "scalar"
-        and any(variant.get("pattern") == r"^\\" for variant in field.variants)
-    )
-    facts = (
-        ("choose", object_field.parent_handle, None, object_field.handle),
-        ("set", object_field.handle, "string", r"\Actor-Mixer Hierarchy\A"),
-        ("set", next(field.handle for field in contract.fields if field.path == ("property",) and field.shape == "scalar"), "string", "Volume"),
-        ("set", next(field.handle for field in contract.fields if field.path == ("enabled",) and field.shape == "scalar"), "boolean", "true"),
-    )
-    for index, (fact_action, field_handle, value_type, value) in enumerate(facts):
-        action = {
-            "contract": OPERATION_DRAFT_ACTION_CONTRACT,
-            "action": "add_child_typed_fact",
-            "child_handle": "uch1-111111111111111111111111",
-            "fact_action": fact_action,
-            "field_handle": field_handle,
-            "value": value,
-        }
-        if value_type is not None:
-            action["value_type"] = value_type
-        composition, _ = apply_composer_action(
-            "waapi.undoGroup", version, composition, action,
-            handle_factory=lambda index=index: f"tdh1-{index + 1:024x}",
-        )
-    return materialize_operation_request("waapi.undoGroup", version, composition)
 
 
 def test_every_supported_operation_version_has_one_explicit_normal_input_mode() -> None:
@@ -139,6 +114,7 @@ def test_every_supported_operation_version_has_one_explicit_normal_input_mode() 
             in {
                     "audio.import",
                     "audio.importTabDelimited",
+                    "waapi.undoGroup",
                     "debug.restartWaapiServers",
                     "debug.setAsserts",
                     "debug.setAutomationMode",
@@ -170,8 +146,6 @@ def test_every_supported_operation_version_has_one_explicit_normal_input_mode() 
                 "ui.commands.register",
                 "ui.commands.unregister",
             }
-            else COMPOSER_INPUT_MODE
-            if name in {"waapi.undoGroup"}
             else INTERNAL_CANONICAL_INPUT_MODE
         )
         assert operation_input_modes_by_version(name) == {
@@ -1721,19 +1695,32 @@ def test_undo_group_rejects_independent_members_version_drift_and_large_requests
     assert independent.value.error_code == "UNDO_GROUP_COMPOSITE_REQUIRED"
     assert independent.value.details["required_operation"] == "waapi.undoGroup"
 
-    composition = new_composition("waapi.undoGroup", "2022.1")
-    with pytest.raises(OperationComposerError):
-        apply_composer_action(
-            "waapi.undoGroup",
-            "2022.1",
-            composition,
-            {
-                "contract": OPERATION_DRAFT_ACTION_CONTRACT,
-                "action": "add_child_call",
-                "child_operation": "ak.wwise.core.object.setStateGroups",
+    with pytest.raises(BusinessDeclarationError):
+        build_compound_undo_child_snapshot(
+            version="2022.1",
+            source_draft_id="od1-11111111111111111111111111111111",
+            source_revision=1,
+            request={
+                "contract": OPERATION_REQUEST_CONTRACT,
+                "version": "2022.1",
+                "operation": "waapi.call",
+                "arguments": {
+                    "api": "ak.wwise.core.object.setStateGroups",
+                    "args": {},
+                    "options": {},
+                },
             },
         )
 
+    child_request = {
+        "contract": OPERATION_REQUEST_CONTRACT,
+        "version": "2022.1",
+        "operation": "object.setNotes",
+        "arguments": {
+            "object": {"kind": "id", "value": GUID},
+            "value": "x" * (129 * 1024),
+        },
+    }
     with pytest.raises(OperationContractError) as oversized:
         parse_operation_request(
             request(
@@ -1742,8 +1729,10 @@ def test_undo_group_rejects_independent_members_version_drift_and_large_requests
                     "display_name": "Oversized",
                     "calls": [
                         {
-                            "api": "ak.wwise.core.object.setNotes",
-                            "args": {"object": GUID, "value": "x" * (129 * 1024)},
+                            "schema_digest": compound_child_request_contract(
+                                "object.setNotes", "2022.1"
+                            ).schema_digest,
+                            "request": child_request,
                         }
                     ],
                 },

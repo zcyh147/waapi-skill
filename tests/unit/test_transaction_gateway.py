@@ -15,6 +15,7 @@ from typing import Any, Mapping, Sequence
 
 import pytest  # pyright: ignore[reportMissingImports]
 from tests.support.canonical_preview import bind_canonical_preview_fixture
+from tests.support.compound_undo import compound_undo_request
 
 from wwise_waapi.builders.schema import validate_semantic_payload  # pyright: ignore[reportMissingImports]
 from wwise_waapi.execution_contracts import (  # pyright: ignore[reportMissingImports]
@@ -42,15 +43,6 @@ from wwise_waapi.platform_commands import (  # pyright: ignore[reportMissingImpo
 from wwise_waapi.typed_requests import (  # pyright: ignore[reportMissingImports]
     expand_gateway_field_table,
     request_contract,
-)
-from wwise_waapi.operation_composer import (  # pyright: ignore[reportMissingImports]
-    OPERATION_DRAFT_ACTION_CONTRACT,
-    apply_composer_action,
-    materialize_operation_request,
-    new_composition,
-)
-from wwise_waapi.typed_operations import (  # pyright: ignore[reportMissingImports]
-    compound_child_request_contract,
 )
 from wwise_waapi.transactions import TransactionState, TransactionStore
 
@@ -617,53 +609,19 @@ def migrate_call_request(io_root: Path) -> dict[str, Any]:
 
 
 def undo_group_request(*, version: str = "2023.1") -> dict[str, Any]:
-    composition = new_composition("waapi.undoGroup", version)
-    for action, handle in (
-        ({"action": "set_display_name", "display_name": "Program Undo Group"}, "unused"),
-        ({"action": "add_child_call", "child_operation": "object.setNotes"}, "uch1-111111111111111111111111"),
-    ):
-        composition, _ = apply_composer_action(
-            "waapi.undoGroup", version, composition,
-            {"contract": OPERATION_DRAFT_ACTION_CONTRACT, **action},
-            handle_factory=lambda value=handle: value,
-        )
-    child = compound_child_request_contract("object.setNotes", version)
-    branch = next(field for field in child.fields if field.path == ("object",) and field.shape == "branch")
-    id_object = next(
-        field for field in child.fields
-        if field.path == ("object",) and field.shape == "object"
-        and any(
-            nested.parent_handle == field.handle
-            and nested.path == ("object", "kind")
-            and any(variant.get("const") == "id" for variant in nested.variants)
-            for nested in child.fields
-        )
+    child_request = {
+        "contract": OPERATION_REQUEST_CONTRACT,
+        "version": version,
+        "operation": "object.setNotes",
+        "arguments": {
+            "object": {"kind": "id", "value": OBJECT_GUID},
+            "value": "after",
+        },
+    }
+    return compound_undo_request(
+        version=version,
+        child_requests=[child_request],
     )
-    id_kind = next(field for field in child.fields if field.parent_handle == id_object.handle and field.path == ("object", "kind"))
-    id_value = next(field for field in child.fields if field.parent_handle == id_object.handle and field.path == ("object", "value"))
-    notes_value = next(field for field in child.fields if field.path == ("value",) and field.shape == "scalar")
-    facts = (
-        ("choose", branch.handle, None, id_object.handle),
-        ("set", id_kind.handle, "string", "id"),
-        ("set", id_value.handle, "string", OBJECT_GUID),
-        ("set", notes_value.handle, "string", "after"),
-    )
-    for index, (fact_action, field_handle, value_type, value) in enumerate(facts):
-        action = {
-            "contract": OPERATION_DRAFT_ACTION_CONTRACT,
-            "action": "add_child_typed_fact",
-            "child_handle": "uch1-111111111111111111111111",
-            "fact_action": fact_action,
-            "field_handle": field_handle,
-            "value": value,
-        }
-        if value_type is not None:
-            action["value_type"] = value_type
-        composition, _ = apply_composer_action(
-            "waapi.undoGroup", version, composition, action,
-            handle_factory=lambda index=index: f"tdh1-{index + 1:024x}",
-        )
-    return materialize_operation_request("waapi.undoGroup", version, composition)
 
 
 def preview_and_confirm_undo_group(*, tmp_path: Path, state_dir: Path) -> dict[str, Any]:
@@ -1627,7 +1585,7 @@ def test_soundbank_inclusion_schema_exposes_one_scoped_replace_for_complete_post
 
 
 @pytest.mark.parametrize("version", tuple(UNDO_GROUP_INNER_URIS_BY_VERSION))
-def test_operation_schema_discloses_exact_undo_inner_contracts_offline(
+def test_operation_schema_discloses_checked_child_business_contract_offline(
     tmp_path: Path,
     version: str,
 ) -> None:
@@ -1638,14 +1596,19 @@ def test_operation_schema_discloses_exact_undo_inner_contracts_offline(
     )
 
     assert exit_code == 0
-    composer = payload["composer"]
-    assert composer["operation"] == "waapi.undoGroup"
-    assert composer["typed_request_schema_digest"]
-    assert composer["child_operations"]
-    assert composer["child_contract_discovery"]["subcommand"] == "undo-child-schema"
+    adapter = payload["business_adapter"]
+    assert adapter["operation"] == "waapi.undoGroup"
+    assert adapter["input_mode"] == "business_declaration"
+    assert adapter["declaration"]["subcommand"] == "draft-declare-undo-plan"
+    assert adapter["declaration"]["child_input"] == (
+        "ordered_checked_closed_draft_snapshot"
+    )
+    assert adapter["legacy_composer_public"] is False
+    assert adapter["legacy_child_schema_public"] is False
+    assert "composer" not in payload
     assert all(
         not operation.startswith("ak.wwise.core.object.setNotes")
-        for operation in composer["child_operations"]
+        for operation in adapter["declaration"]["generic_typed_child_operations"]
     )
 
 

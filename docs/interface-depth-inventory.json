@@ -2672,72 +2672,59 @@
     {
       "model_values": [
         {
-          "name": "calls",
-          "path": [
-            "arguments",
-            "calls"
-          ],
-          "required": true,
-          "schema_sha256": "fcb3b3496cc9743b2c824093116d647d2d412afcd8bbe42987f7affaf178d8a3",
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "calls",
-          "path": [
-            "arguments",
-            "calls",
-            "[]"
-          ],
-          "required": true,
-          "schema_sha256": "e84d60356391e374845a5d341a3fcb4e28e72c8abea3aee09246d2e0e68be5e1",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "request",
-          "path": [
-            "arguments",
-            "calls",
-            "[]",
-            "request"
-          ],
-          "required": true,
-          "schema_sha256": "a2c799262a3ce3c19ef5cdd983bf3d12b43ab3c426227091b909dcb7054738c0",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "schema_digest",
-          "path": [
-            "arguments",
-            "calls",
-            "[]",
-            "schema_digest"
-          ],
-          "required": true,
-          "schema_sha256": "67f459c542f6ec4afe79b51471d533c7b954d14e76adcfb186445758052e48d2",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
           "name": "display_name",
           "path": [
-            "arguments",
+            "undo_plan",
             "display_name"
           ],
           "required": true,
-          "schema_sha256": "22ccdeb48f624bafdacfb712e743ec4657e45ec75873bfb84d42d95a29ada24c",
+          "schema_sha256": "fbffa1ba27d038b598f8c421ffa75f07aa4cf9fb0148a63b2c0acb00b765479e",
           "shape": "scalar",
           "transport_ownership": "gateway_derivation",
           "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "child_drafts",
+          "path": [
+            "undo_plan",
+            "child_drafts"
+          ],
+          "required": true,
+          "schema_sha256": "858d44815df98651596f7e316e02ea811b8cb1359b78e9cd59d14e23aa3ce9d5",
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "draft_id",
+          "path": [
+            "undo_plan",
+            "child_drafts",
+            "[]",
+            "draft_id"
+          ],
+          "required": true,
+          "schema_sha256": "7427657a0861d56d5f241033c314e7bf0118962408ce65aa517e8b17b224617e",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "live_bound_handle"
+        },
+        {
+          "name": "task_authority",
+          "path": [
+            "undo_plan",
+            "child_drafts",
+            "[]",
+            "task_authority"
+          ],
+          "required": true,
+          "schema_sha256": "02c2b73e41fc76952a5a0ec5324dbeedbe1670dca6569a58ed4b21eb77a40da5",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "live_bound_handle"
         }
       ],
-      "sha256": "c612a7ac64a630e531e4e38892c3dd7fea49447bf9079cacb15f01d80691a0f5"
+      "sha256": "c6045ce498260deea17abbadb38b8f701a21164fa97491e0d158400a1519430c"
     },
     {
       "model_values": [
@@ -155011,7 +154998,7 @@
     "contract": "waapi-skill.typed-request-surface/v1",
     "total_lanes": 824
   },
-  "inventory_sha256": "a5f8a7c5a9f54b79137ef42e15bfb8b0b58e0d741ed3215e2b9c756c6c86203f",
+  "inventory_sha256": "82f2c0a2d4000a02201e6781bf6a1b08a7e6e1de0f2dfc9f4ec95cde633b0808",
   "mechanic_owners": {
     "ambiguous_continuation_selection": "gateway_derivation",
     "batch_layout": "gateway_derivation",
@@ -187633,162 +187620,127 @@
       "version": "2025.1"
     },
     {
-      "argument_contract_sha256": "c612a7ac64a630e531e4e38892c3dd7fea49447bf9079cacb15f01d80691a0f5",
-      "audit_evidence": null,
+      "argument_contract_sha256": "c6045ce498260deea17abbadb38b8f701a21164fa97491e0d158400a1519430c",
+      "audit_evidence": "The public compound-undo-business/v1 Adapter accepts one display name plus an ordered list of already checked closed child Draft capabilities; snapshots each exact child request and schema at declaration time; derives child bindings, dependency order, revisions, begin/end/cancel phases, and one immutable Preview inside the Gateway; and removes public Undo child schemas, call handles, native request fragments, and Composer action ordering grammar for all five lanes. Generic child request depth remains assigned to #57 rather than leaking through the compound parent.",
       "classification": "named-compound-undo",
-      "contract_sha256": "1bf7ed37a0e81105ac016b544adde68f68832e48935c74e5f40a78b22e5b5573",
-      "disposition": "migration_required",
-      "input_mode": "composer",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "dependency_order",
-        "batch_layout",
-        "revision_arithmetic",
-        "request_fragment"
-      ],
+      "contract_sha256": "225931e90ad42d4a73439cea81b55bef47c7b2f0029b6b725a70f17cadd93fa2",
+      "disposition": "already_deep",
+      "input_mode": "business_declaration",
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
-        "batch_layout": "model_owned_leak",
-        "dependency_order": "model_owned_leak",
+        "batch_layout": "gateway_owned",
+        "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
-        "revision_arithmetic": "model_owned_leak",
+        "request_fragment": "gateway_owned",
+        "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
       "operation": "waapi.undoGroup",
-      "owner_issue": 56,
+      "owner_issue": null,
       "uri": "ak.wwise.core.undo.beginGroup",
       "version": "2021.1"
     },
     {
-      "argument_contract_sha256": "c612a7ac64a630e531e4e38892c3dd7fea49447bf9079cacb15f01d80691a0f5",
-      "audit_evidence": null,
+      "argument_contract_sha256": "c6045ce498260deea17abbadb38b8f701a21164fa97491e0d158400a1519430c",
+      "audit_evidence": "The public compound-undo-business/v1 Adapter accepts one display name plus an ordered list of already checked closed child Draft capabilities; snapshots each exact child request and schema at declaration time; derives child bindings, dependency order, revisions, begin/end/cancel phases, and one immutable Preview inside the Gateway; and removes public Undo child schemas, call handles, native request fragments, and Composer action ordering grammar for all five lanes. Generic child request depth remains assigned to #57 rather than leaking through the compound parent.",
       "classification": "named-compound-undo",
-      "contract_sha256": "1bf7ed37a0e81105ac016b544adde68f68832e48935c74e5f40a78b22e5b5573",
-      "disposition": "migration_required",
-      "input_mode": "composer",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "dependency_order",
-        "batch_layout",
-        "revision_arithmetic",
-        "request_fragment"
-      ],
+      "contract_sha256": "cb68ab89222aba3c723bf98066cd146122e6ebffdfdd72c3ca1c6cac53f1dc76",
+      "disposition": "already_deep",
+      "input_mode": "business_declaration",
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
-        "batch_layout": "model_owned_leak",
-        "dependency_order": "model_owned_leak",
+        "batch_layout": "gateway_owned",
+        "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
-        "revision_arithmetic": "model_owned_leak",
+        "request_fragment": "gateway_owned",
+        "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
       "operation": "waapi.undoGroup",
-      "owner_issue": 56,
+      "owner_issue": null,
       "uri": "ak.wwise.core.undo.beginGroup",
       "version": "2022.1"
     },
     {
-      "argument_contract_sha256": "c612a7ac64a630e531e4e38892c3dd7fea49447bf9079cacb15f01d80691a0f5",
-      "audit_evidence": null,
+      "argument_contract_sha256": "c6045ce498260deea17abbadb38b8f701a21164fa97491e0d158400a1519430c",
+      "audit_evidence": "The public compound-undo-business/v1 Adapter accepts one display name plus an ordered list of already checked closed child Draft capabilities; snapshots each exact child request and schema at declaration time; derives child bindings, dependency order, revisions, begin/end/cancel phases, and one immutable Preview inside the Gateway; and removes public Undo child schemas, call handles, native request fragments, and Composer action ordering grammar for all five lanes. Generic child request depth remains assigned to #57 rather than leaking through the compound parent.",
       "classification": "named-compound-undo",
-      "contract_sha256": "1bf7ed37a0e81105ac016b544adde68f68832e48935c74e5f40a78b22e5b5573",
-      "disposition": "migration_required",
-      "input_mode": "composer",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "dependency_order",
-        "batch_layout",
-        "revision_arithmetic",
-        "request_fragment"
-      ],
+      "contract_sha256": "81413b90f4eee5cf9580ca3609266b1ae70cd300c41850e3e7399a73fd63bc9d",
+      "disposition": "already_deep",
+      "input_mode": "business_declaration",
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
-        "batch_layout": "model_owned_leak",
-        "dependency_order": "model_owned_leak",
+        "batch_layout": "gateway_owned",
+        "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
-        "revision_arithmetic": "model_owned_leak",
+        "request_fragment": "gateway_owned",
+        "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
       "operation": "waapi.undoGroup",
-      "owner_issue": 56,
+      "owner_issue": null,
       "uri": "ak.wwise.core.undo.beginGroup",
       "version": "2023.1"
     },
     {
-      "argument_contract_sha256": "c612a7ac64a630e531e4e38892c3dd7fea49447bf9079cacb15f01d80691a0f5",
-      "audit_evidence": null,
+      "argument_contract_sha256": "c6045ce498260deea17abbadb38b8f701a21164fa97491e0d158400a1519430c",
+      "audit_evidence": "The public compound-undo-business/v1 Adapter accepts one display name plus an ordered list of already checked closed child Draft capabilities; snapshots each exact child request and schema at declaration time; derives child bindings, dependency order, revisions, begin/end/cancel phases, and one immutable Preview inside the Gateway; and removes public Undo child schemas, call handles, native request fragments, and Composer action ordering grammar for all five lanes. Generic child request depth remains assigned to #57 rather than leaking through the compound parent.",
       "classification": "named-compound-undo",
-      "contract_sha256": "1bf7ed37a0e81105ac016b544adde68f68832e48935c74e5f40a78b22e5b5573",
-      "disposition": "migration_required",
-      "input_mode": "composer",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "dependency_order",
-        "batch_layout",
-        "revision_arithmetic",
-        "request_fragment"
-      ],
+      "contract_sha256": "f432fbdfa85ac4fae58e9555e8962dae73be6e5358ccd4639b8de5f935a78586",
+      "disposition": "already_deep",
+      "input_mode": "business_declaration",
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
-        "batch_layout": "model_owned_leak",
-        "dependency_order": "model_owned_leak",
+        "batch_layout": "gateway_owned",
+        "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
-        "revision_arithmetic": "model_owned_leak",
+        "request_fragment": "gateway_owned",
+        "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
       "operation": "waapi.undoGroup",
-      "owner_issue": 56,
+      "owner_issue": null,
       "uri": "ak.wwise.core.undo.beginGroup",
       "version": "2024.1"
     },
     {
-      "argument_contract_sha256": "c612a7ac64a630e531e4e38892c3dd7fea49447bf9079cacb15f01d80691a0f5",
-      "audit_evidence": null,
+      "argument_contract_sha256": "c6045ce498260deea17abbadb38b8f701a21164fa97491e0d158400a1519430c",
+      "audit_evidence": "The public compound-undo-business/v1 Adapter accepts one display name plus an ordered list of already checked closed child Draft capabilities; snapshots each exact child request and schema at declaration time; derives child bindings, dependency order, revisions, begin/end/cancel phases, and one immutable Preview inside the Gateway; and removes public Undo child schemas, call handles, native request fragments, and Composer action ordering grammar for all five lanes. Generic child request depth remains assigned to #57 rather than leaking through the compound parent.",
       "classification": "named-compound-undo",
-      "contract_sha256": "1bf7ed37a0e81105ac016b544adde68f68832e48935c74e5f40a78b22e5b5573",
-      "disposition": "migration_required",
-      "input_mode": "composer",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "dependency_order",
-        "batch_layout",
-        "revision_arithmetic",
-        "request_fragment"
-      ],
+      "contract_sha256": "823139b4b2377f4e1513d92c17624d76220cc0a911d284b34c4ba93b634c9268",
+      "disposition": "already_deep",
+      "input_mode": "business_declaration",
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
-        "batch_layout": "model_owned_leak",
-        "dependency_order": "model_owned_leak",
+        "batch_layout": "gateway_owned",
+        "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
-        "revision_arithmetic": "model_owned_leak",
+        "request_fragment": "gateway_owned",
+        "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
       "operation": "waapi.undoGroup",
-      "owner_issue": 56,
+      "owner_issue": null,
       "uri": "ak.wwise.core.undo.beginGroup",
       "version": "2025.1"
     }
@@ -187803,13 +187755,13 @@
     "stable_business_declaration": "A prompt-derived business value remains visible in the public request."
   },
   "source_contracts": {
-    "gateway_parser_sha256": "6a04c0fe5803a1caaef74f2918fac1703723e3ea2845cf9046477952ede11cf7",
-    "operation_contract_sha256": "8e05cf1e6fae2a50def2a53aa2bdcb26d8df779120fdc331797e80f2e5f53ec7",
+    "gateway_parser_sha256": "78007b801e768a0fba9ef8e64fbf0614118620dd81f16352b3015970b9f77a2f",
+    "operation_contract_sha256": "89b30fa11cbe0bbd3263841e60bb171e685018c43f298fd032da2fddbdcd97fa",
     "public_continuation_sha256": "2fa739b8ede432490e6474de7477fb77a933cd99f5d57a8e07a5e7e2fd365e52",
     "typed_request_surface_sha256": "6d05d64e95a6e0f7099ddd03f1da42c763e9c06f33f93cac7581c7c061a83af8"
   },
   "summary": {
-    "migration_ticket_families": 10,
+    "migration_ticket_families": 9,
     "native_dispositions": {
       "already_deep": 72,
       "migration_required": 613,
@@ -187817,8 +187769,7 @@
     },
     "native_lanes": 824,
     "operation_dispositions": {
-      "already_deep": 143,
-      "migration_required": 5,
+      "already_deep": 148,
       "prohibited_boundary": 5
     },
     "operation_lanes": 153,
@@ -188572,26 +188523,6 @@
       ],
       "rows_sha256": "48f62fffb957f2ed581bee75cb11ddd6624411b77fc307813d1984b5ce015982",
       "title": "Deepen every Topic subscription, match, wait, and stream continuation"
-    },
-    {
-      "blocked_by_family": "named-dangerous-debug-controls",
-      "deterministic_tests": "Five-version heterogeneous child goldens, nested-route prohibitions, limits, stale child handles, cancel/end failures, no retry, exact-name isolation, and one-outcome verification.",
-      "github_issue": 83,
-      "id": "named-compound-undo",
-      "parent_issue": 56,
-      "proportional_evidence": "One successful and one cancellation/failure shape on matching real hosts, then one representative macOS and Windows Fresh Agent compound workflow.",
-      "public_behavior": "Accept a bounded ordered list of closed business-operation declarations and one display name; derive child handles, dependency order, batch/revision mechanics, begin/end/cancel calls, and one Preview.",
-      "removal_boundary": "Delete public Composer call handles and action ordering grammar after every eligible child family has parity.",
-      "row_count": 5,
-      "rows": [
-        "2021.1|operation|waapi.undoGroup",
-        "2022.1|operation|waapi.undoGroup",
-        "2023.1|operation|waapi.undoGroup",
-        "2024.1|operation|waapi.undoGroup",
-        "2025.1|operation|waapi.undoGroup"
-      ],
-      "rows_sha256": "a2d96ad477515f9533aff9f9dc5950b2f043100faf32cdf5d77b3abb1b3a4e85",
-      "title": "Compile compound Undo Groups from ordered business operations"
     }
   ],
   "uniform_migration_invariant": {

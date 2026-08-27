@@ -11,6 +11,7 @@ from tests.support.public_route_probes import (
     request_and_result_from_schema,
     synthesize_schema_value,
 )
+from tests.support.compound_undo import compound_undo_request
 from wwise_waapi.builders.schema import (
     validate_semantic_event,
     validate_semantic_payload,
@@ -28,14 +29,8 @@ from wwise_waapi.operation_registry import (
     validate_prepared_roles,
     verify_prepared_operation,
 )
-from wwise_waapi.operation_composer import (
-    OPERATION_DRAFT_ACTION_CONTRACT,
-    apply_composer_action,
-    materialize_operation_request,
-    new_composition,
-)
 from wwise_waapi.typed_operations import compound_child_request_contract
-from wwise_waapi.typed_requests import TypedRequestFact
+from wwise_waapi.typed_requests import TypedRequestFact, materialize_typed_request
 from wwise_waapi.transaction_cleanup import CLEANUP_SPEC_CONTRACT
 from wwise_waapi.versions import SUPPORTED_WWISE_VERSION_KEYS
 
@@ -173,33 +168,27 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
             TypedRequestFact("set", next(field.handle for field in child_contract.fields if field.path == ("property",) and field.shape == "scalar"), "string", "Volume"),
             TypedRequestFact("set", next(field.handle for field in child_contract.fields if field.path == ("enabled",)), "boolean", "true"),
         ]
-        composition = new_composition("waapi.undoGroup", entry.version)
-        for action, handle in (
-            ({"action": "set_display_name", "display_name": "Program probe"}, "unused"),
-            ({"action": "add_child_call", "child_operation": inner_operation}, "uch1-111111111111111111111111"),
-        ):
-            composition, _ = apply_composer_action(
-                "waapi.undoGroup", entry.version, composition,
-                {"contract": OPERATION_DRAFT_ACTION_CONTRACT, **action},
-                handle_factory=lambda value=handle: value,
-            )
-        for index, fact in enumerate(child_facts):
-            action = {
-                "contract": OPERATION_DRAFT_ACTION_CONTRACT,
-                "action": "add_child_typed_fact",
-                "child_handle": "uch1-111111111111111111111111",
-                "fact_action": fact.action,
-                "field_handle": fact.handle,
-                "value": fact.value,
-            }
-            if fact.action != "choose":
-                action["value_type"] = fact.value_type
-            composition, _ = apply_composer_action(
-                "waapi.undoGroup", entry.version, composition, action,
-                handle_factory=lambda index=index: f"tdh1-{index + 1:024x}",
-            )
+        materialized = materialize_typed_request(
+            child_contract,
+            schema_digest=child_contract.schema_digest,
+            facts=child_facts,
+        )
+        child_request = {
+            "contract": OPERATION_REQUEST_CONTRACT,
+            "version": entry.version,
+            "operation": "waapi.call",
+            "arguments": {
+                "api": inner_operation,
+                "args": dict(materialized.args),
+                "options": dict(materialized.options),
+            },
+        }
         undo_request = parse_operation_request(
-            materialize_operation_request("waapi.undoGroup", entry.version, composition)
+            compound_undo_request(
+                version=entry.version,
+                child_requests=[child_request],
+                display_name="Program probe",
+            )
         )
         undo_prepared = prepare_operation(
             undo_request,

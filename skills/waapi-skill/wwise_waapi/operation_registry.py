@@ -3547,7 +3547,7 @@ _OPERATION_INPUT_MODE_DECLARATIONS: tuple[
     ("ui.commands.register", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
     ("ui.commands.unregister", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
     ("waapi.call", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), INTERNAL_CANONICAL_INPUT_MODE),
-    ("waapi.undoGroup", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), COMPOSER_INPUT_MODE),
+    ("waapi.undoGroup", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
 )
 
 OPERATION_INPUT_MODE_LANES: tuple[OperationInputModeLane, ...] = tuple(

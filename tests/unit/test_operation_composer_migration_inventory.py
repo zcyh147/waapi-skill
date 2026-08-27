@@ -61,6 +61,7 @@ def test_inventory_exactly_covers_every_registry_operation_and_version_lane() ->
         if name in {
             "audio.import",
             "audio.importTabDelimited",
+            "waapi.undoGroup",
             "debug.restartWaapiServers",
             "debug.setAsserts",
             "debug.setAutomationMode",
@@ -99,7 +100,6 @@ def test_inventory_exactly_covers_every_registry_operation_and_version_lane() ->
             or name == "object.create"
             or assignments[name][1] == "wave-05-file-lua"
             and name.startswith("lua.")
-            or assignments[name][1] == "wave-06-compound-undo"
         ):
             expected_mode = COMPOSER_INPUT_MODE
         elif assignments[name][1] in {

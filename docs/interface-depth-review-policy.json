@@ -16,8 +16,8 @@
     ]
   },
   "source_contracts": {
-    "gateway_parser_sha256": "6a04c0fe5803a1caaef74f2918fac1703723e3ea2845cf9046477952ede11cf7",
-    "operation_contract_sha256": "8e05cf1e6fae2a50def2a53aa2bdcb26d8df779120fdc331797e80f2e5f53ec7",
+    "gateway_parser_sha256": "78007b801e768a0fba9ef8e64fbf0614118620dd81f16352b3015970b9f77a2f",
+    "operation_contract_sha256": "89b30fa11cbe0bbd3263841e60bb171e685018c43f298fd032da2fddbdcd97fa",
     "public_continuation_sha256": "2fa739b8ede432490e6474de7477fb77a933cd99f5d57a8e07a5e7e2fd365e52",
     "typed_request_surface_sha256": "6d05d64e95a6e0f7099ddd03f1da42c763e9c06f33f93cac7581c7c061a83af8"
   },
@@ -125,10 +125,11 @@
     },
     {
       "id": "named-compound-undo",
-      "disposition": "migration_required",
-      "owner_issue": 56,
+      "disposition": "already_deep",
+      "owner_issue": null,
       "operations": ["waapi.undoGroup"],
-      "leaked_mechanics": ["native_object_path", "wire_type", "dependency_order", "batch_layout", "revision_arithmetic", "request_fragment"]
+      "leaked_mechanics": [],
+      "audit_evidence": "The public compound-undo-business/v1 Adapter accepts one display name plus an ordered list of already checked closed child Draft capabilities; snapshots each exact child request and schema at declaration time; derives child bindings, dependency order, revisions, begin/end/cancel phases, and one immutable Preview inside the Gateway; and removes public Undo child schemas, call handles, native request fragments, and Composer action ordering grammar for all five lanes. Generic child request depth remains assigned to #57 rather than leaking through the compound parent."
     }
   ],
   "native_lane_rules": [
@@ -221,15 +222,6 @@
     }
   ],
   "ticket_blueprints": {
-    "named-compound-undo": {
-      "title": "Compile compound Undo Groups from ordered business operations",
-      "parent_issue": 56,
-      "blocked_by_family": "named-dangerous-debug-controls",
-      "public_behavior": "Accept a bounded ordered list of closed business-operation declarations and one display name; derive child handles, dependency order, batch/revision mechanics, begin/end/cancel calls, and one Preview.",
-      "deterministic_tests": "Five-version heterogeneous child goldens, nested-route prohibitions, limits, stale child handles, cancel/end failures, no retry, exact-name isolation, and one-outcome verification.",
-      "removal_boundary": "Delete public Composer call handles and action ordering grammar after every eligible child family has parity.",
-      "proportional_evidence": "One successful and one cancellation/failure shape on matching real hosts, then one representative macOS and Windows Fresh Agent compound workflow."
-    },
     "generic-fixed-query-metadata": {
       "title": "Migrate fixed query, metadata, selection, profiler, and debug commands to deep declarations",
       "parent_issue": 57,
@@ -314,7 +306,6 @@
   },
   "ticket_issue_numbers": {
     "generic-fixed-query-metadata": 96,
-    "named-compound-undo": 83,
     "generic-core-project-object": 84,
     "generic-core-media-build": 85,
     "generic-core-remaining": 86,
