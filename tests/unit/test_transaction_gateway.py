@@ -858,7 +858,7 @@ def test_debug_test_crash_is_confirmed_dispatched_once_and_terminal_indeterminat
         "contract": OPERATION_REQUEST_CONTRACT,
         "version": "2022.1",
         "operation": "debug.testCrash",
-        "arguments": {"acknowledge": "crash_wwise_process"},
+        "arguments": {},
     }
     transaction = preview(
         request,
@@ -899,6 +899,12 @@ def test_debug_test_crash_is_confirmed_dispatched_once_and_terminal_indeterminat
     assert payload["expected_disconnect"] is True
     assert payload["dispatch_delivery"] == "waapi_result_returned"
     assert payload["dispatch_accepted"] is True
+    assert payload["terminal_journal"] == {
+        "classification": "dispatch_accepted_effect_unverified",
+        "effect_verified": False,
+        "durable_state": TransactionState.INDETERMINATE.value,
+        "retry_allowed": False,
+    }
     assert payload["process_lifecycle"] == {
         "expected": "wwise_process_termination",
         "observed": "not_observed_by_gateway",
@@ -922,7 +928,7 @@ def test_allow_changes_keeps_dangerous_host_control_on_confirmation_path(
         "contract": OPERATION_REQUEST_CONTRACT,
         "version": "2022.1",
         "operation": "debug.testCrash",
-        "arguments": {"acknowledge": "crash_wwise_process"},
+        "arguments": {},
     }
 
     exit_code, payload = execute(

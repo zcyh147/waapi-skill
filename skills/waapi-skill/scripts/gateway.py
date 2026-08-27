@@ -282,6 +282,11 @@ from wwise_waapi.authoring_ui_business import (  # noqa: E402  # pyright: ignore
     append_authoring_ui_command,
     validate_authoring_ui_business_session,
 )
+from wwise_waapi.debug_business_cli import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    DebugBusinessCliError,
+    add_debug_intent_arguments,
+    debug_intent_from_namespace,
+)
 from wwise_waapi.operation_composer import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     MAX_TYPED_ACTIONS_PER_APPLY,
     OperationComposerError,
@@ -2098,6 +2103,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_business_draft_binding_arguments(draft_add_ui_command)
     add_authoring_ui_command_arguments(draft_add_ui_command)
+
+    draft_declare_debug_intent = subparsers.add_parser(
+        "draft-declare-debug-intent",
+        help=(
+            "Declare one stable Debug mode outcome or one zero-value "
+            "deliberate host-control intent"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_declare_debug_intent)
+    add_debug_intent_arguments(draft_declare_debug_intent)
 
     draft_declare_field_change = subparsers.add_parser(
         "draft-declare-field-change",
@@ -4020,7 +4035,7 @@ def preflight_typed_zero_input(
     if dedicated_zero is not None:
         raise GatewayInputError(
             "This dangerous host control uses operation-schema "
-            f"{dedicated_zero} and typed-operation as its single entry."
+            f"{dedicated_zero} and its Gateway-owned business Draft as its single entry."
         )
     if contract.schema_digest != args.schema_digest:
         raise GatewayInputError("Typed request schema digest is stale")
@@ -6650,7 +6665,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             if dedicated_zero is not None:
                 raise GatewayInputError(
                     "This dangerous host control uses operation-schema "
-                    f"{dedicated_zero} as its single typed entry."
+                    f"{dedicated_zero} as its single business entry."
                 )
         if args.command == "request-schema":
             return contract.as_gateway_payload()
@@ -8664,6 +8679,16 @@ def dispatch_command(
         )
     if args.command in {"draft-declare-ui-plan", "draft-add-ui-command"}:
         return dispatch_business_authoring_ui_update(
+            args,
+            env=env,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+        )
+    if args.command == "draft-declare-debug-intent":
+        return dispatch_business_debug_intent(
             args,
             env=env,
             connection=connection,
@@ -11725,6 +11750,95 @@ def dispatch_business_authoring_ui_update(
     return payload
 
 
+def dispatch_business_debug_intent(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Record one closed Debug business intent without native request fields."""
+
+    binding = _open_business_binding(
+        args,
+        env=env,
+        connection=connection,
+        detected_version=detected_version,
+        live_info=live_info,
+        dispatcher=dispatcher,
+    )
+    adapter = business_adapter(binding.record.operation)
+    if adapter.family != "debug-host-control" or not adapter.accepts_update_command(
+        args.command
+    ):
+        raise GatewayInputError(
+            f"{binding.record.operation} does not expose {args.command}"
+        )
+    raw_session = (
+        binding.record.composition.get("business_session")
+        if binding.record.composition is not None
+        else None
+    )
+    session = (
+        BusinessDeclarationSession.create(binding.context)
+        if raw_session is None
+        else BusinessDeclarationSession.from_dict(raw_session)
+    )
+    if session.context != binding.context:
+        raise OperationDraftBindingDrift(
+            "Live project or Wwise build differs from the Debug intent binding."
+        )
+    try:
+        intent = debug_intent_from_namespace(
+            args,
+            operation=binding.record.operation,
+        )
+    except DebugBusinessCliError as exc:
+        raise GatewayInputError(str(exc)) from exc
+
+    def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
+        candidate = current.with_settings({"debug_intent": intent})
+        parse_operation_request(
+            adapter.materialize(candidate),
+            expected_version=detected_version,
+        )
+        return candidate
+
+    record = binding.store.apply_business_update(
+        args.draft_id,
+        task_authority=args.task_authority,
+        expected_revision=args.expected_revision,
+        schema_digest=operation_draft_schema_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        composer_digest=operation_composer_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        context=binding.context,
+        update=update,
+        event_type="settings.revised",
+    )
+    payload = operation_draft_payload(
+        args.command,
+        record,
+        offline=False,
+        task_authority=args.task_authority,
+    )
+    payload.update(
+        {
+            "endpoint": dict(common["endpoint"]),
+            "detected_version": detected_version,
+            "project_call": dispatch_call_summary(binding.project_call),
+        }
+    )
+    return payload
+
+
 def _business_context_from_live(
     *,
     task_authority: str,
@@ -14278,6 +14392,7 @@ def dispatch_host_control_transaction(
     if dispatch_accepted:
         delivery = "waapi_result_returned"
         disconnect_observation = "not_observed_before_result"
+        terminal_classification = "dispatch_accepted_effect_unverified"
     elif result is not None:
         delivery = "indeterminate_after_dispatch_attempt"
         disconnect_observation = (
@@ -14285,12 +14400,22 @@ def dispatch_host_control_transaction(
             if expected_disconnect
             else "unexpected_call_failure_observed"
         )
+        terminal_classification = (
+            "expected_disconnect_delivery_indeterminate"
+            if expected_disconnect
+            else "dispatch_failed"
+        )
     else:
         delivery = "exception_after_dispatch_started"
         disconnect_observation = (
             "exception_compatible_with_expected_disconnect"
             if expected_disconnect
             else "unexpected_exception_observed"
+        )
+        terminal_classification = (
+            "expected_disconnect_delivery_indeterminate"
+            if expected_disconnect
+            else "dispatch_failed"
         )
     lifecycle = {
         "expected": process_expectation,
@@ -14308,6 +14433,12 @@ def dispatch_host_control_transaction(
         "dispatch_result": dict(result) if result is not None else None,
         "exception": dict(exception_evidence) if exception_evidence else None,
         "automatic_retry": False,
+        "terminal_journal": {
+            "classification": terminal_classification,
+            "effect_verified": False,
+            "durable_state": TransactionState.INDETERMINATE.value,
+            "retry_allowed": False,
+        },
     }
     indeterminate = store.mark_execution_indeterminate(
         transaction_id,
@@ -14329,6 +14460,7 @@ def dispatch_host_control_transaction(
         "disconnect_observation": disconnect_observation,
         "dispatch_delivery": delivery,
         "dispatch_accepted": dispatch_accepted,
+        "terminal_journal": durable_details["terminal_journal"],
         "process_lifecycle": lifecycle,
         "call": (
             dispatch_call_summary(result)
@@ -16923,6 +17055,11 @@ def _business_next_action_binding(
     ]
     declare_ui_plan_prefix = [*base, "draft-declare-ui-plan", *binding]
     add_ui_command_prefix = [*base, "draft-add-ui-command", *binding]
+    declare_debug_intent_prefix = [
+        *base,
+        "draft-declare-debug-intent",
+        *binding,
+    ]
     revise_prefix = [*base, "draft-revise-declaration", *binding]
     remove_prefix = [*base, "draft-remove-declaration", *binding]
     check = [*base, "draft-check", *binding]
@@ -17006,6 +17143,57 @@ def _business_next_action_binding(
                 "bind_each_required_role_then_copy_its_returned_handle_into_"
                 "the_same_named_declaration_field"
             ),
+        }
+    if adapter.family == "debug-host-control":
+        shared = {
+            "contract": "waapi-skill.business-draft-next-action/v1",
+            "responsibility_split": business_contract["responsibility_split"],
+            "business_contract": business_contract,
+            "forbidden_inputs": [
+                *forbidden_inputs,
+                "acknowledgement_literal",
+                "native_uri",
+                "native_request",
+                "waapi_args",
+                "waapi_options",
+                "disconnect_classification",
+                "retry_or_reconnect_plan",
+            ],
+            "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+            "then_read_next_response": True,
+            "precompute_or_increment_revision": False,
+        }
+        if session is not None and adapter.is_complete(session):
+            return {
+                **shared,
+                "required_next_phase": "check_complete_debug_business_intent",
+                "check": {
+                    **operation_draft_prefix_copy_binding(check),
+                    "append": [],
+                },
+            }
+        append = (
+            ["exactly one of --enable or --disable"]
+            if record.operation
+            in {"debug.setAsserts", "debug.setAutomationMode"}
+            else []
+        )
+        return {
+            **shared,
+            "required_next_phase": "declare_debug_business_intent",
+            "declaration": {
+                **operation_draft_prefix_copy_binding(
+                    declare_debug_intent_prefix,
+                    append_action=(
+                        "copy_verbatim_then_append_the_stable_boolean_outcome"
+                        if append
+                        else "copy_and_execute_verbatim_once"
+                    ),
+                ),
+                "append": append,
+                "submit_once": True,
+                "native_request_input": "forbidden",
+            },
         }
     if adapter.family == "authoring-ui-business":
         shared = {

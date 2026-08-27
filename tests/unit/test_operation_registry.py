@@ -137,8 +137,13 @@ def test_every_supported_operation_version_has_one_explicit_normal_input_mode() 
             BUSINESS_DECLARATION_INPUT_MODE
             if name
             in {
-                "audio.import",
-                "audio.importTabDelimited",
+                    "audio.import",
+                    "audio.importTabDelimited",
+                    "debug.restartWaapiServers",
+                    "debug.setAsserts",
+                    "debug.setAutomationMode",
+                    "debug.testAssert",
+                    "debug.testCrash",
                 "lua.executeCliFile",
                 "lua.executeCoreFile",
                 "lua.executeCoreInline",
@@ -167,15 +172,6 @@ def test_every_supported_operation_version_has_one_explicit_normal_input_mode() 
             }
             else COMPOSER_INPUT_MODE
             if name in {"waapi.undoGroup"}
-            else "inline_typed"
-            if name
-            in {
-                "debug.restartWaapiServers",
-                "debug.setAsserts",
-                "debug.setAutomationMode",
-                "debug.testAssert",
-                "debug.testCrash",
-            }
             else INTERNAL_CANONICAL_INPUT_MODE
         )
         assert operation_input_modes_by_version(name) == {

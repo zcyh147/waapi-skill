@@ -18,7 +18,6 @@ from tests.unit.test_transaction_gateway import (
 from wwise_waapi.builders.debug_lua import LUA_SOURCE_AUTHORITY
 from wwise_waapi.operation_registry import (
     OPERATION_REQUEST_CONTRACT,
-    operation_request_schema_digest,
 )
 from wwise_waapi.transactions import TransactionState, TransactionStore
 
@@ -55,22 +54,69 @@ def _preview_and_confirm(
     )
     operation = str(request["operation"])
     if operation.startswith("debug."):
+        code, started = execute(
+            ["draft-start", operation],
+            tmp_path=tmp_path,
+            state_dir=state_dir,
+            version=version,
+        )
+        assert code == 0, started
         argv = [
-            "typed-operation",
-            operation,
-            "--schema-digest",
-            operation_request_schema_digest(operation, version),
-            "--apply",
+            "draft-declare-debug-intent",
+            started["draft"]["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            "1",
         ]
         if operation in {"debug.setAsserts", "debug.setAutomationMode"}:
-            argv.extend(
-                ["--enable", "true" if request["arguments"]["enable"] else "false"]
-            )
-        code, transaction = execute(
+            argv.append("--enable" if request["arguments"]["enable"] else "--disable")
+        code, declared = execute(
             argv,
             tmp_path=tmp_path,
             state_dir=state_dir,
             client=client,
+            version=version,
+        )
+        assert code == 0, declared
+        code, checked = execute(
+            [
+                "draft-check",
+                started["draft"]["draft_id"],
+                "--task-authority",
+                started["task_authority"],
+                "--expected-revision",
+                str(declared["draft"]["revision"]),
+            ],
+            tmp_path=tmp_path,
+            state_dir=state_dir,
+            client=FakeClient(
+                {
+                    "ak.wwise.core.getInfo": [live_info(year=year), live_info(year=year)],
+                    "ak.wwise.core.getProjectInfo": [active_project],
+                }
+            ),
+            version=version,
+        )
+        assert code == 0, checked
+        code, transaction = execute(
+            [
+                "preview-from-draft",
+                started["draft"]["draft_id"],
+                "--task-authority",
+                started["task_authority"],
+                "--expected-revision",
+                str(checked["draft"]["revision"]),
+                "--apply",
+            ],
+            tmp_path=tmp_path,
+            state_dir=state_dir,
+            client=FakeClient(
+                {
+                    "ak.wwise.core.getInfo": [live_info(year=year), live_info(year=year)],
+                    "ak.wwise.core.getProjectInfo": [active_project],
+                }
+            ),
             version=version,
         )
         assert code == 0, transaction
@@ -378,7 +424,6 @@ def test_automation_mode_runs_once_then_finishes_at_result_schema_only(
     (
         "operation",
         "version",
-        "acknowledgement",
         "uri",
         "expected_disconnect",
         "process_expectation",
@@ -388,7 +433,6 @@ def test_automation_mode_runs_once_then_finishes_at_result_schema_only(
         (
             "debug.restartWaapiServers",
             "2023.1",
-            "restart_waapi_servers",
             "ak.wwise.debug.restartWaapiServers",
             True,
             "wwise_process_remains_running_waapi_servers_restart",
@@ -397,7 +441,6 @@ def test_automation_mode_runs_once_then_finishes_at_result_schema_only(
         (
             "debug.testAssert",
             "2022.1",
-            "trigger_debug_assert",
             "ak.wwise.debug.testAssert",
             False,
             "assert_handler_or_dialog_is_host_build_dependent",
@@ -406,7 +449,6 @@ def test_automation_mode_runs_once_then_finishes_at_result_schema_only(
         (
             "debug.testCrash",
             "2022.1",
-            "crash_wwise_process",
             "ak.wwise.debug.testCrash",
             True,
             "wwise_process_termination",
@@ -418,7 +460,6 @@ def test_host_controls_are_single_dispatch_terminal_and_never_retried(
     tmp_path: Path,
     operation: str,
     version: str,
-    acknowledgement: str,
     uri: str,
     expected_disconnect: bool,
     process_expectation: str,
@@ -427,7 +468,7 @@ def test_host_controls_are_single_dispatch_terminal_and_never_retried(
     state_dir = tmp_path / operation.replace(".", "-")
     request = _request(
         operation,
-        {"acknowledge": acknowledgement},
+        {},
         version=version,
     )
     transaction = _preview_and_confirm(
@@ -470,6 +511,18 @@ def test_host_controls_are_single_dispatch_terminal_and_never_retried(
         else "waapi_result_returned"
     )
     assert terminal["dispatch_accepted"] is (not dispatch_loses_connection)
+    assert terminal["terminal_journal"] == {
+        "classification": (
+            "expected_disconnect_delivery_indeterminate"
+            if dispatch_loses_connection and expected_disconnect
+            else "dispatch_failed"
+            if dispatch_loses_connection
+            else "dispatch_accepted_effect_unverified"
+        ),
+        "effect_verified": False,
+        "durable_state": TransactionState.INDETERMINATE.value,
+        "retry_allowed": False,
+    }
     assert terminal["process_lifecycle"] == {
         "expected": process_expectation,
         "observed": "not_observed_by_gateway",

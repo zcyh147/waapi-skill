@@ -61,6 +61,11 @@ def test_inventory_exactly_covers_every_registry_operation_and_version_lane() ->
         if name in {
             "audio.import",
             "audio.importTabDelimited",
+            "debug.restartWaapiServers",
+            "debug.setAsserts",
+            "debug.setAutomationMode",
+            "debug.testAssert",
+            "debug.testCrash",
             "lua.executeCliFile",
             "lua.executeCoreFile",
             "lua.executeCoreInline",
@@ -104,7 +109,6 @@ def test_inventory_exactly_covers_every_registry_operation_and_version_lane() ->
             "wave-04-soundbank-and-files",
             "wave-05-authoring-ui",
             "wave-05-file-lua",
-            "wave-05-debug-host-control",
         }:
             expected_mode = INLINE_TYPED_INPUT_MODE
         assert modes == {expected_mode}
@@ -175,6 +179,11 @@ def test_human_inventory_does_not_label_business_cutovers_as_inline_typed() -> N
         "object.move",
         "object.setName",
         "object.setNotes",
+        "debug.restartWaapiServers",
+        "debug.setAsserts",
+        "debug.setAutomationMode",
+        "debug.testAssert",
+        "debug.testCrash",
         "soundbank.convertExternalSources",
         "soundbank.generate",
         "soundbank.processDefinitionFiles",

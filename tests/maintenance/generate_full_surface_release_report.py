@@ -358,6 +358,26 @@ def _continuation_error(
                                 or not contract.get("gateway_derivations")
                             ):
                                 return "business declaration Adapter is incomplete"
+                        elif operation in {
+                            "debug.restartWaapiServers",
+                            "debug.setAsserts",
+                            "debug.setAutomationMode",
+                            "debug.testAssert",
+                            "debug.testCrash",
+                        }:
+                            if (
+                                not isinstance(declaration, Mapping)
+                                or declaration.get("subcommand")
+                                != "draft-declare-debug-intent"
+                                or declaration.get("native_request_fields")
+                                != "forbidden"
+                                or contract.get("legacy_composer_public")
+                                is not False
+                                or contract.get("legacy_inline_typed_public")
+                                is not False
+                                or not contract.get("gateway_derivations")
+                            ):
+                                return "business declaration Adapter is incomplete"
                         elif (
                             not isinstance(declaration, Mapping)
                             or not declaration.get("required_fields")

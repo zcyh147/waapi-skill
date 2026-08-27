@@ -2938,13 +2938,10 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         DEBUG_RESTART_WAAPI_SERVERS_URI,
         "dangerous-host-control",
         "Request a WAAPI server restart and terminate the transaction without reconnecting.",
-        ("acknowledge",),
-        argument_contract=_object_contract(
-            ("acknowledge",),
-            {"acknowledge": {"const": "restart_waapi_servers"}},
-        ),
+        (),
+        argument_contract=_object_contract((), {}),
         constraints=(
-            "the immutable acknowledgement distinguishes this from an ordinary WAAPI call",
+            "the Gateway-owned business route distinguishes this from an ordinary WAAPI call",
             "disconnect is expected; delivery and server restart completion may remain indeterminate",
             "the Wwise process is expected to remain running, but this gateway does not claim lifecycle observation",
             "there is no automatic retry, reconnect, or generic verify phase",
@@ -2956,13 +2953,10 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         DEBUG_TEST_ASSERT_URI,
         "dangerous-host-control",
         "Deliberately trigger Wwise's private test assertion after explicit confirmation.",
-        ("acknowledge",),
-        argument_contract=_object_contract(
-            ("acknowledge",),
-            {"acknowledge": {"const": "trigger_debug_assert"}},
-        ),
+        (),
+        argument_contract=_object_contract((), {}),
         constraints=(
-            "the immutable acknowledgement distinguishes this deliberate failure from an ordinary call",
+            "the Gateway-owned business route distinguishes this deliberate failure from an ordinary call",
             "an assertion dialog, assertFailed event, disconnect, or continued process are host-build dependent",
             "there is no automatic retry, cleanup promise, or business-state verification",
         ),
@@ -2972,13 +2966,10 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         DEBUG_TEST_CRASH_URI,
         "dangerous-host-control",
         "Deliberately request Wwise process termination after explicit confirmation.",
-        ("acknowledge",),
-        argument_contract=_object_contract(
-            ("acknowledge",),
-            {"acknowledge": {"const": "crash_wwise_process"}},
-        ),
+        (),
+        argument_contract=_object_contract((), {}),
         constraints=(
-            "the immutable acknowledgement distinguishes this deliberate crash from an ordinary call",
+            "the Gateway-owned business route distinguishes this deliberate crash from an ordinary call",
             "disconnect and process termination are expected, but delivery and lifecycle completion may remain indeterminate",
             "there is no automatic retry, reconnect, cleanup promise, or generic verify phase",
         ),
@@ -3525,11 +3516,11 @@ _OPERATION_INPUT_MODE_DECLARATIONS: tuple[
 ] = (
     ("audio.import", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
     ("audio.importTabDelimited", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
-    ("debug.restartWaapiServers", ("2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
-    ("debug.setAsserts", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
-    ("debug.setAutomationMode", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
-    ("debug.testAssert", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
-    ("debug.testCrash", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
+    ("debug.restartWaapiServers", ("2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
+    ("debug.setAsserts", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
+    ("debug.setAutomationMode", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
+    ("debug.testAssert", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
+    ("debug.testCrash", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
     ("lua.executeCliFile", ("2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
     ("lua.executeCoreFile", ("2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
     ("lua.executeCoreInline", ("2025.1",), BUSINESS_DECLARATION_INPUT_MODE),
@@ -8913,14 +8904,10 @@ def _prepare_debug_host_control(
             "process_expectation": "wwise_process_termination",
         },
     }[request.operation]
-    if arguments.get("acknowledge") != contract["acknowledge"]:
+    if arguments:
         raise OperationContractError(
-            "DANGEROUS_HOST_CONTROL_ACKNOWLEDGEMENT_REQUIRED",
-            f"{request.operation} requires its exact immutable acknowledgement.",
-            details={
-                "expected": contract["acknowledge"],
-                "actual": arguments.get("acknowledge"),
-            },
+            "INVALID_ARGUMENT",
+            f"{request.operation} accepts no caller-authored native fields.",
         )
     preview = _closed_operation_preview(
         uri=str(contract["uri"]),
@@ -18524,16 +18511,10 @@ def _validate_nested_request_shape(
         "debug.testAssert",
         "debug.testCrash",
     }:
-        expected = {
-            "debug.restartWaapiServers": "restart_waapi_servers",
-            "debug.testAssert": "trigger_debug_assert",
-            "debug.testCrash": "crash_wwise_process",
-        }[operation]
-        if arguments.get("acknowledge") != expected:
+        if arguments:
             raise OperationContractError(
-                "DANGEROUS_HOST_CONTROL_ACKNOWLEDGEMENT_REQUIRED",
-                f"{operation} requires its exact immutable acknowledgement.",
-                details={"expected": expected, "actual": arguments.get("acknowledge")},
+                "INVALID_ARGUMENT",
+                f"{operation} accepts no caller-authored native fields.",
             )
         return
     if operation == "audio.import":

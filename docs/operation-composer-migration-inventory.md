@@ -26,11 +26,11 @@ planning; the Registry remains authoritative during implementation.
 | --- | --- | --- | --- | --- | --- |
 | `audio.import` | 2021.1–2025.1 | Business declaration | bound objects, semantic kinds, stable fields, custom Field Handles | Gateway-derived rows, paths, types, metadata scopes, side effects | deep cutover complete |
 | `audio.importTabDelimited` | 2021.1–2025.1 | Business declaration | exact table, bound location, language, stable mode/source-control | Gateway-derived native selector, loader fields, and request order | wave 05 deep cutover complete |
-| `debug.restartWaapiServers` | 2023.1–2025.1 | Inline typed (zero value) | Gateway-owned acknowledgement | expected connection loss | wave 05 debug complete |
-| `debug.setAsserts` | 2021.1–2025.1 | Inline typed | boolean enable | process-wide ref-count state | wave 05 debug complete |
-| `debug.setAutomationMode` | 2021.1–2025.1 | Inline typed | boolean enable | process-wide host mode | wave 05 debug complete |
-| `debug.testAssert` | 2021.1–2025.1 | Inline typed (zero value) | Gateway-owned acknowledgement | deliberate assertion | wave 05 debug complete |
-| `debug.testCrash` | 2021.1–2025.1 | Inline typed (zero value) | Gateway-owned acknowledgement | deliberate termination | wave 05 debug complete |
+| `debug.restartWaapiServers` | 2023.1–2025.1 | Business declaration | zero-value deliberate restart intent | expected connection loss and terminal journal | wave 05 deep cutover complete |
+| `debug.setAsserts` | 2021.1–2025.1 | Business declaration | stable enabled/disabled outcome | process-wide ref-count state | wave 05 deep cutover complete |
+| `debug.setAutomationMode` | 2021.1–2025.1 | Business declaration | stable enabled/disabled outcome | process-wide host mode | wave 05 deep cutover complete |
+| `debug.testAssert` | 2021.1–2025.1 | Business declaration | zero-value deliberate assertion intent | host-dependent assertion and terminal journal | wave 05 deep cutover complete |
+| `debug.testCrash` | 2021.1–2025.1 | Business declaration | zero-value deliberate crash intent | deliberate termination and terminal journal | wave 05 deep cutover complete |
 | `lua.executeCliFile` | 2023.1–2025.1 | Business declaration | exact script; optional strict-JSON arguments/watchdog | Gateway-derived root, authority, loader, and serialization | wave 05 deep cutover complete |
 | `lua.executeCoreFile` | 2023.1–2025.1 | Business declaration | exact script; optional strict-JSON arguments | Gateway-derived root, authority, loader, and serialization | wave 05 deep cutover complete |
 | `lua.executeCoreInline` | 2025.1 | Business declaration | exact source/root; optional strict-JSON arguments | Gateway-derived authority, loader, and serialization | wave 05 deep cutover complete |
@@ -72,7 +72,9 @@ Each operation owns its action vocabulary and verifier. A wave reuses deep
 Draft, canonical parsing, and Preview modules without inventing a generic
 business schema.
 
-Debug/host controls use their closed typed operations. Generic `waapi.call` is
+Debug/host controls use their closed business declarations; the Gateway owns
+fixed internal host-control markers, native envelopes, terminal journals, and
+non-retry interpretation. Generic `waapi.call` is
 an internal canonical transaction representation produced only after an exact
 typed request has been validated and materialized. `object.copy` and
 `object.move` use closed business declarations with operation-specific

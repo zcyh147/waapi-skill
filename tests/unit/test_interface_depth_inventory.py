@@ -177,7 +177,7 @@ def test_stable_scalars_artifacts_expressions_and_bound_handles_remain_distinct(
         if row["operation"] == "debug.testCrash"
     )
     assert crash["disposition"] == "migration_required"
-    assert argument_contracts[crash["argument_contract_sha256"]][0]["value_ownership"] == "gateway_derivation"
+    assert argument_contracts[crash["argument_contract_sha256"]] == []
 
 
 def test_nested_operation_values_and_exact_paths_are_explicitly_classified() -> None:

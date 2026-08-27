@@ -853,6 +853,27 @@ def _operation_model_values(
             return _soundbank_model_values(name)
         if name.startswith("ui."):
             return _authoring_ui_model_values(name, business_contract)
+        if name.startswith("debug."):
+            declaration = business_contract["declaration"]
+            return [
+                {
+                    "path": ["debug_intent", field_name],
+                    "name": field_name,
+                    "shape": "scalar",
+                    "required": True,
+                    "value_ownership": "stable_business_declaration",
+                    "transport_ownership": "gateway_derivation",
+                    "schema_sha256": canonical_sha256(
+                        {
+                            "operation": name,
+                            "field": field_name,
+                            "type": "boolean",
+                            "business_contract": business_contract["contract"],
+                        }
+                    ),
+                }
+                for field_name in declaration["public_fields"]
+            ]
         declaration = business_contract["declaration"]
         required = set(declaration["required_fields"])
         if name in {

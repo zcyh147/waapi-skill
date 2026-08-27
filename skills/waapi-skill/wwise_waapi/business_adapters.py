@@ -12,6 +12,7 @@ from .exact_artifact_business_contracts import (
 )
 from .business_declaration_state import BusinessDeclarationSession
 from .business_declarations import ExistingObjectTarget, business_repair
+from .debug_business_contracts import debug_business_contract_data
 from .object_lifecycle_business_contracts import (
     object_lifecycle_business_contract_data,
 )
@@ -89,6 +90,10 @@ def _audio_import_contract(operation: str, version: str) -> dict[str, Any]:
 
 def _authoring_ui_contract(operation: str, version: str) -> dict[str, Any]:
     return authoring_ui_business_contract_data(operation, version)
+
+
+def _debug_contract(operation: str, version: str) -> dict[str, Any]:
+    return debug_business_contract_data(operation, version)
 
 
 def _object_lifecycle_contract(operation: str, version: str) -> dict[str, Any]:
@@ -230,6 +235,15 @@ def _materialize_authoring_ui(
     from .authoring_ui_business import materialize_authoring_ui_business_request
 
     return materialize_authoring_ui_business_request(operation, session)
+
+
+def _materialize_debug(
+    operation: str,
+    session: BusinessDeclarationSession,
+) -> Mapping[str, Any]:
+    from .debug_business import materialize_debug_business_request
+
+    return materialize_debug_business_request(operation, session)
 
 
 def _authoring_ui_is_complete(
@@ -647,6 +661,26 @@ _AUTHORING_UI_REGISTER_DEFINITION = {
     ),
 }
 
+_DEBUG_DEFINITION = {
+    "family": "debug-host-control",
+    "contract_builder": _debug_contract,
+    "materializer": _materialize_debug,
+    "update_commands": frozenset({"draft-declare-debug-intent"}),
+    "initial_projection_actions": (
+        "declare-debug-intent",
+        "inspect",
+        "cancel",
+    ),
+    "active_projection_actions": (
+        "declare-debug-intent",
+        "check",
+        "inspect",
+        "cancel",
+    ),
+    "auto_apply_preview": True,
+    "settings_are_complete_declaration": True,
+}
+
 
 def _bind_adapter(operation: str, definition: Mapping[str, Any]) -> BusinessAdapter:
     values = dict(definition)
@@ -687,6 +721,16 @@ _BUSINESS_ADAPTERS = {
         "ui.commands.register",
         _AUTHORING_UI_REGISTER_DEFINITION,
     ),
+    **{
+        operation: _bind_adapter(operation, _DEBUG_DEFINITION)
+        for operation in (
+            "debug.restartWaapiServers",
+            "debug.setAsserts",
+            "debug.setAutomationMode",
+            "debug.testAssert",
+            "debug.testCrash",
+        )
+    },
     "object.create": _bind_adapter("object.create", _OBJECT_GRAPH_DEFINITION),
     "object.createPlugin": _bind_adapter(
         "object.createPlugin", _OBJECT_PLUGIN_DEFINITION
