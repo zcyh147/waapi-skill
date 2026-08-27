@@ -650,6 +650,22 @@ def test_rejected_indeterminate_and_repreview_paths(tmp_path) -> None:
     )
     assert store.mark_execution_indeterminate("tx-indeterminate").state is TransactionState.INDETERMINATE
 
+    created = store.create_preview("tx-execution-failed", {"x": 4})
+    store.submit_for_confirmation("tx-execution-failed")
+    store.confirm("tx-execution-failed", artifact_hash=created.artifact_hash)
+    store.begin_execution(
+        "tx-execution-failed",
+        expected_authorization=TransactionState.CONFIRMED,
+    )
+    failed = store.mark_execution_failed(
+        "tx-execution-failed",
+        details={"error_code": "CALL_REJECTED"},
+    )
+    assert failed.state is TransactionState.EXECUTION_FAILED
+    assert store.read_events("tx-execution-failed")[-1]["event_type"] == (
+        "execution_failed"
+    )
+
     created = store.create_preview("tx-repreview", {"x": 3})
     store.submit_for_confirmation("tx-repreview")
     store.confirm("tx-repreview", artifact_hash=created.artifact_hash)

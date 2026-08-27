@@ -58,18 +58,29 @@ def debug_business_contract_data(operation: str, version: str) -> dict[str, Any]
                 else "select_the_exact_deliberate_host_control_requested_by_the_user"
             ),
             "gateway": (
-                "derive_fixed_native_envelope_authorization_terminal_journal_"
+                "derive_native_boolean_envelope_result_schema_boundary_and_nonretry_policy"
+                if boolean
+                else "derive_fixed_native_envelope_authorization_terminal_journal_"
                 "disconnect_interpretation_and_nonretry_boundary"
             ),
         },
-        "gateway_derivations": [
-            "native_uri_and_empty_options",
-            "fixed_internal_host_control_marker",
-            "explicit_confirmation_boundary",
-            "terminal_dispatch_journal",
-            "disconnect_interpretation",
-            "automatic_retry_forbidden",
-        ],
+        "gateway_derivations": (
+            [
+                "native_uri_boolean_args_and_empty_options",
+                "process_wide_no_state_getter_boundary",
+                "result_schema_verification",
+                "automatic_retry_forbidden",
+            ]
+            if boolean
+            else [
+                "native_uri_and_empty_options",
+                "fixed_internal_host_control_marker",
+                "explicit_confirmation_boundary",
+                "terminal_dispatch_journal",
+                "disconnect_interpretation",
+                "automatic_retry_forbidden",
+            ]
+        ),
         "legacy_inline_typed_public": False,
         "legacy_composer_public": False,
         "safety": {

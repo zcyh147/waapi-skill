@@ -155011,7 +155011,7 @@
     "contract": "waapi-skill.typed-request-surface/v1",
     "total_lanes": 824
   },
-  "inventory_sha256": "9e982c273161ecb41c591b6ce9252ee20c68a82d810e6588326e03455063aae1",
+  "inventory_sha256": "a5f8a7c5a9f54b79137ef42e15bfb8b0b58e0d741ed3215e2b9c756c6c86203f",
   "mechanic_owners": {
     "ambiguous_continuation_selection": "gateway_derivation",
     "batch_layout": "gateway_derivation",
@@ -184184,15 +184184,12 @@
     },
     {
       "argument_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "audit_evidence": null,
+      "audit_evidence": "The public debug-business/v1 Adapter accepts only stable enabled/disabled outcomes for asserts and automation mode, or a zero-value deliberate restart/assert/crash intent; derives the exact versioned URI, boolean or empty native args, fixed internal host-control marker, explicit-confirmation boundary, terminal accepted/indeterminate/failure journal, disconnect interpretation, and non-retry behavior inside the Gateway; and removes all 23 legacy Debug inline_typed lanes and acknowledgement guidance. #82 retains five-version deterministic, generic non-bypass, closed state-machine, explicit returned-failure, normalized expected-disconnect, and accepted-return coverage. Program and Non-live are the primary proportional evidence; no deliberate real crash, assert, or server restart was executed.",
       "classification": "named-dangerous-debug-controls",
       "contract_sha256": "d69a016614ccb8145bb9396cf9ebf874a9fb83410b60bbcdc7d71639d5739fa2",
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "input_mode": "business_declaration",
-      "leaked_mechanics": [
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
@@ -184200,27 +184197,24 @@
         "metadata_scope": "gateway_owned",
         "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
       "operation": "debug.restartWaapiServers",
-      "owner_issue": 56,
+      "owner_issue": null,
       "uri": "ak.wwise.debug.restartWaapiServers",
       "version": "2023.1"
     },
     {
       "argument_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "audit_evidence": null,
+      "audit_evidence": "The public debug-business/v1 Adapter accepts only stable enabled/disabled outcomes for asserts and automation mode, or a zero-value deliberate restart/assert/crash intent; derives the exact versioned URI, boolean or empty native args, fixed internal host-control marker, explicit-confirmation boundary, terminal accepted/indeterminate/failure journal, disconnect interpretation, and non-retry behavior inside the Gateway; and removes all 23 legacy Debug inline_typed lanes and acknowledgement guidance. #82 retains five-version deterministic, generic non-bypass, closed state-machine, explicit returned-failure, normalized expected-disconnect, and accepted-return coverage. Program and Non-live are the primary proportional evidence; no deliberate real crash, assert, or server restart was executed.",
       "classification": "named-dangerous-debug-controls",
       "contract_sha256": "526b81a708674e0210b7791e96836d793228e476d7fd4981d2a5fcc87fc9c246",
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "input_mode": "business_declaration",
-      "leaked_mechanics": [
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
@@ -184228,27 +184222,24 @@
         "metadata_scope": "gateway_owned",
         "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
       "operation": "debug.restartWaapiServers",
-      "owner_issue": 56,
+      "owner_issue": null,
       "uri": "ak.wwise.debug.restartWaapiServers",
       "version": "2024.1"
     },
     {
       "argument_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "audit_evidence": null,
+      "audit_evidence": "The public debug-business/v1 Adapter accepts only stable enabled/disabled outcomes for asserts and automation mode, or a zero-value deliberate restart/assert/crash intent; derives the exact versioned URI, boolean or empty native args, fixed internal host-control marker, explicit-confirmation boundary, terminal accepted/indeterminate/failure journal, disconnect interpretation, and non-retry behavior inside the Gateway; and removes all 23 legacy Debug inline_typed lanes and acknowledgement guidance. #82 retains five-version deterministic, generic non-bypass, closed state-machine, explicit returned-failure, normalized expected-disconnect, and accepted-return coverage. Program and Non-live are the primary proportional evidence; no deliberate real crash, assert, or server restart was executed.",
       "classification": "named-dangerous-debug-controls",
       "contract_sha256": "2c2673121357d459957e9b4365ef41f4831e3ded639e0f7c637b0dc38bd3c325",
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "input_mode": "business_declaration",
-      "leaked_mechanics": [
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
@@ -184256,27 +184247,24 @@
         "metadata_scope": "gateway_owned",
         "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
       "operation": "debug.restartWaapiServers",
-      "owner_issue": 56,
+      "owner_issue": null,
       "uri": "ak.wwise.debug.restartWaapiServers",
       "version": "2025.1"
     },
     {
       "argument_contract_sha256": "b5f2c1f346d6c89abefcc5644cfc55e70938d77226ce535de7e5ec153a3a9566",
-      "audit_evidence": null,
+      "audit_evidence": "The public debug-business/v1 Adapter accepts only stable enabled/disabled outcomes for asserts and automation mode, or a zero-value deliberate restart/assert/crash intent; derives the exact versioned URI, boolean or empty native args, fixed internal host-control marker, explicit-confirmation boundary, terminal accepted/indeterminate/failure journal, disconnect interpretation, and non-retry behavior inside the Gateway; and removes all 23 legacy Debug inline_typed lanes and acknowledgement guidance. #82 retains five-version deterministic, generic non-bypass, closed state-machine, explicit returned-failure, normalized expected-disconnect, and accepted-return coverage. Program and Non-live are the primary proportional evidence; no deliberate real crash, assert, or server restart was executed.",
       "classification": "named-dangerous-debug-controls",
-      "contract_sha256": "cbe4d0d35d264ff7aa5d26bad9c042d84561bd21430668048f38086e0c2aeffc",
-      "disposition": "migration_required",
+      "contract_sha256": "df652510e63193ac2808119c1c5ae129c9d94b1e70771c57bc71df1afdb57980",
+      "disposition": "already_deep",
       "input_mode": "business_declaration",
-      "leaked_mechanics": [
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
@@ -184284,27 +184272,24 @@
         "metadata_scope": "gateway_owned",
         "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
       "operation": "debug.setAsserts",
-      "owner_issue": 56,
+      "owner_issue": null,
       "uri": "ak.wwise.debug.enableAsserts",
       "version": "2021.1"
     },
     {
       "argument_contract_sha256": "b5f2c1f346d6c89abefcc5644cfc55e70938d77226ce535de7e5ec153a3a9566",
-      "audit_evidence": null,
+      "audit_evidence": "The public debug-business/v1 Adapter accepts only stable enabled/disabled outcomes for asserts and automation mode, or a zero-value deliberate restart/assert/crash intent; derives the exact versioned URI, boolean or empty native args, fixed internal host-control marker, explicit-confirmation boundary, terminal accepted/indeterminate/failure journal, disconnect interpretation, and non-retry behavior inside the Gateway; and removes all 23 legacy Debug inline_typed lanes and acknowledgement guidance. #82 retains five-version deterministic, generic non-bypass, closed state-machine, explicit returned-failure, normalized expected-disconnect, and accepted-return coverage. Program and Non-live are the primary proportional evidence; no deliberate real crash, assert, or server restart was executed.",
       "classification": "named-dangerous-debug-controls",
-      "contract_sha256": "96145f60b39bd6d32d355840f8a03521e662a761a47cbb340b72266474a5a46a",
-      "disposition": "migration_required",
+      "contract_sha256": "d974fcbae563e414d97c475030d7c1ccd59e19d4d4e53a4fd5acd69b417e6f55",
+      "disposition": "already_deep",
       "input_mode": "business_declaration",
-      "leaked_mechanics": [
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
@@ -184312,27 +184297,24 @@
         "metadata_scope": "gateway_owned",
         "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
       "operation": "debug.setAsserts",
-      "owner_issue": 56,
+      "owner_issue": null,
       "uri": "ak.wwise.debug.enableAsserts",
       "version": "2022.1"
     },
     {
       "argument_contract_sha256": "b5f2c1f346d6c89abefcc5644cfc55e70938d77226ce535de7e5ec153a3a9566",
-      "audit_evidence": null,
+      "audit_evidence": "The public debug-business/v1 Adapter accepts only stable enabled/disabled outcomes for asserts and automation mode, or a zero-value deliberate restart/assert/crash intent; derives the exact versioned URI, boolean or empty native args, fixed internal host-control marker, explicit-confirmation boundary, terminal accepted/indeterminate/failure journal, disconnect interpretation, and non-retry behavior inside the Gateway; and removes all 23 legacy Debug inline_typed lanes and acknowledgement guidance. #82 retains five-version deterministic, generic non-bypass, closed state-machine, explicit returned-failure, normalized expected-disconnect, and accepted-return coverage. Program and Non-live are the primary proportional evidence; no deliberate real crash, assert, or server restart was executed.",
       "classification": "named-dangerous-debug-controls",
-      "contract_sha256": "54c1de54b53b2f910b9d322e4fe5c4d8905d2923c808468c53557d2c54981f5b",
-      "disposition": "migration_required",
+      "contract_sha256": "bb230c1b08932397dc4017bdec91fda7bc86b05a44989288718029ff4395c897",
+      "disposition": "already_deep",
       "input_mode": "business_declaration",
-      "leaked_mechanics": [
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
@@ -184340,27 +184322,24 @@
         "metadata_scope": "gateway_owned",
         "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
       "operation": "debug.setAsserts",
-      "owner_issue": 56,
+      "owner_issue": null,
       "uri": "ak.wwise.debug.enableAsserts",
       "version": "2023.1"
     },
     {
       "argument_contract_sha256": "b5f2c1f346d6c89abefcc5644cfc55e70938d77226ce535de7e5ec153a3a9566",
-      "audit_evidence": null,
+      "audit_evidence": "The public debug-business/v1 Adapter accepts only stable enabled/disabled outcomes for asserts and automation mode, or a zero-value deliberate restart/assert/crash intent; derives the exact versioned URI, boolean or empty native args, fixed internal host-control marker, explicit-confirmation boundary, terminal accepted/indeterminate/failure journal, disconnect interpretation, and non-retry behavior inside the Gateway; and removes all 23 legacy Debug inline_typed lanes and acknowledgement guidance. #82 retains five-version deterministic, generic non-bypass, closed state-machine, explicit returned-failure, normalized expected-disconnect, and accepted-return coverage. Program and Non-live are the primary proportional evidence; no deliberate real crash, assert, or server restart was executed.",
       "classification": "named-dangerous-debug-controls",
-      "contract_sha256": "e2cefcdc97a939ff45bb476c5615175f45e5434b82b6c567cc96b0f26d61f940",
-      "disposition": "migration_required",
+      "contract_sha256": "dc1e17acc2f7aab618b222101496bf09f5416f8f0d11d7d12315eb3318220274",
+      "disposition": "already_deep",
       "input_mode": "business_declaration",
-      "leaked_mechanics": [
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
@@ -184368,27 +184347,24 @@
         "metadata_scope": "gateway_owned",
         "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
       "operation": "debug.setAsserts",
-      "owner_issue": 56,
+      "owner_issue": null,
       "uri": "ak.wwise.debug.enableAsserts",
       "version": "2024.1"
     },
     {
       "argument_contract_sha256": "b5f2c1f346d6c89abefcc5644cfc55e70938d77226ce535de7e5ec153a3a9566",
-      "audit_evidence": null,
+      "audit_evidence": "The public debug-business/v1 Adapter accepts only stable enabled/disabled outcomes for asserts and automation mode, or a zero-value deliberate restart/assert/crash intent; derives the exact versioned URI, boolean or empty native args, fixed internal host-control marker, explicit-confirmation boundary, terminal accepted/indeterminate/failure journal, disconnect interpretation, and non-retry behavior inside the Gateway; and removes all 23 legacy Debug inline_typed lanes and acknowledgement guidance. #82 retains five-version deterministic, generic non-bypass, closed state-machine, explicit returned-failure, normalized expected-disconnect, and accepted-return coverage. Program and Non-live are the primary proportional evidence; no deliberate real crash, assert, or server restart was executed.",
       "classification": "named-dangerous-debug-controls",
-      "contract_sha256": "68d3e77ae8eacc81453549542aa684124d271ff5237df45781779164cc5ff9f1",
-      "disposition": "migration_required",
+      "contract_sha256": "4d10d3758e88e5865cc6314b54fc7e7a0dc57a7b0942ff604980c55888781d05",
+      "disposition": "already_deep",
       "input_mode": "business_declaration",
-      "leaked_mechanics": [
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
@@ -184396,27 +184372,24 @@
         "metadata_scope": "gateway_owned",
         "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
       "operation": "debug.setAsserts",
-      "owner_issue": 56,
+      "owner_issue": null,
       "uri": "ak.wwise.debug.enableAsserts",
       "version": "2025.1"
     },
     {
       "argument_contract_sha256": "02184a4144961265a016a6944700fc368fef6afbc895c6fd195bcb03e8d1406f",
-      "audit_evidence": null,
+      "audit_evidence": "The public debug-business/v1 Adapter accepts only stable enabled/disabled outcomes for asserts and automation mode, or a zero-value deliberate restart/assert/crash intent; derives the exact versioned URI, boolean or empty native args, fixed internal host-control marker, explicit-confirmation boundary, terminal accepted/indeterminate/failure journal, disconnect interpretation, and non-retry behavior inside the Gateway; and removes all 23 legacy Debug inline_typed lanes and acknowledgement guidance. #82 retains five-version deterministic, generic non-bypass, closed state-machine, explicit returned-failure, normalized expected-disconnect, and accepted-return coverage. Program and Non-live are the primary proportional evidence; no deliberate real crash, assert, or server restart was executed.",
       "classification": "named-dangerous-debug-controls",
-      "contract_sha256": "720ddb0b8d6b48848732a622ccff7bffc441fa52c1c912463c5b37ce3f422141",
-      "disposition": "migration_required",
+      "contract_sha256": "a04b1255adb7ba611db11e6b5b4bc81faf1092117474372bcc99486faeeaad49",
+      "disposition": "already_deep",
       "input_mode": "business_declaration",
-      "leaked_mechanics": [
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
@@ -184424,27 +184397,24 @@
         "metadata_scope": "gateway_owned",
         "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
       "operation": "debug.setAutomationMode",
-      "owner_issue": 56,
+      "owner_issue": null,
       "uri": "ak.wwise.debug.enableAutomationMode",
       "version": "2021.1"
     },
     {
       "argument_contract_sha256": "02184a4144961265a016a6944700fc368fef6afbc895c6fd195bcb03e8d1406f",
-      "audit_evidence": null,
+      "audit_evidence": "The public debug-business/v1 Adapter accepts only stable enabled/disabled outcomes for asserts and automation mode, or a zero-value deliberate restart/assert/crash intent; derives the exact versioned URI, boolean or empty native args, fixed internal host-control marker, explicit-confirmation boundary, terminal accepted/indeterminate/failure journal, disconnect interpretation, and non-retry behavior inside the Gateway; and removes all 23 legacy Debug inline_typed lanes and acknowledgement guidance. #82 retains five-version deterministic, generic non-bypass, closed state-machine, explicit returned-failure, normalized expected-disconnect, and accepted-return coverage. Program and Non-live are the primary proportional evidence; no deliberate real crash, assert, or server restart was executed.",
       "classification": "named-dangerous-debug-controls",
-      "contract_sha256": "fa6ca4720236a93df41128274e372dc76f911ce3ce2d02c2dbc0bbd988bbaccb",
-      "disposition": "migration_required",
+      "contract_sha256": "49ca19b4338a1b1bd1eae285cf48207d51678bbb4aeb9ad13f03870b7319f9e4",
+      "disposition": "already_deep",
       "input_mode": "business_declaration",
-      "leaked_mechanics": [
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
@@ -184452,27 +184422,24 @@
         "metadata_scope": "gateway_owned",
         "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
       "operation": "debug.setAutomationMode",
-      "owner_issue": 56,
+      "owner_issue": null,
       "uri": "ak.wwise.debug.enableAutomationMode",
       "version": "2022.1"
     },
     {
       "argument_contract_sha256": "02184a4144961265a016a6944700fc368fef6afbc895c6fd195bcb03e8d1406f",
-      "audit_evidence": null,
+      "audit_evidence": "The public debug-business/v1 Adapter accepts only stable enabled/disabled outcomes for asserts and automation mode, or a zero-value deliberate restart/assert/crash intent; derives the exact versioned URI, boolean or empty native args, fixed internal host-control marker, explicit-confirmation boundary, terminal accepted/indeterminate/failure journal, disconnect interpretation, and non-retry behavior inside the Gateway; and removes all 23 legacy Debug inline_typed lanes and acknowledgement guidance. #82 retains five-version deterministic, generic non-bypass, closed state-machine, explicit returned-failure, normalized expected-disconnect, and accepted-return coverage. Program and Non-live are the primary proportional evidence; no deliberate real crash, assert, or server restart was executed.",
       "classification": "named-dangerous-debug-controls",
-      "contract_sha256": "8cbcd0342c35430ee524a3174c3dc02e73bb7b79109c155c5ebdf21ae19663c3",
-      "disposition": "migration_required",
+      "contract_sha256": "67668440556333018d0edde5e76fb1c6d9fe3ac7ef09ef2895def7e90a85d190",
+      "disposition": "already_deep",
       "input_mode": "business_declaration",
-      "leaked_mechanics": [
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
@@ -184480,27 +184447,24 @@
         "metadata_scope": "gateway_owned",
         "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
       "operation": "debug.setAutomationMode",
-      "owner_issue": 56,
+      "owner_issue": null,
       "uri": "ak.wwise.debug.enableAutomationMode",
       "version": "2023.1"
     },
     {
       "argument_contract_sha256": "02184a4144961265a016a6944700fc368fef6afbc895c6fd195bcb03e8d1406f",
-      "audit_evidence": null,
+      "audit_evidence": "The public debug-business/v1 Adapter accepts only stable enabled/disabled outcomes for asserts and automation mode, or a zero-value deliberate restart/assert/crash intent; derives the exact versioned URI, boolean or empty native args, fixed internal host-control marker, explicit-confirmation boundary, terminal accepted/indeterminate/failure journal, disconnect interpretation, and non-retry behavior inside the Gateway; and removes all 23 legacy Debug inline_typed lanes and acknowledgement guidance. #82 retains five-version deterministic, generic non-bypass, closed state-machine, explicit returned-failure, normalized expected-disconnect, and accepted-return coverage. Program and Non-live are the primary proportional evidence; no deliberate real crash, assert, or server restart was executed.",
       "classification": "named-dangerous-debug-controls",
-      "contract_sha256": "2761fce6068e5dbb736a1338e3ca4e7809323c15b9d988223e0c39dc07d42eb7",
-      "disposition": "migration_required",
+      "contract_sha256": "d1a02634e4de97eed76ccbf05dc135a2c6e9c5ee4b1435d33d767a28d066103b",
+      "disposition": "already_deep",
       "input_mode": "business_declaration",
-      "leaked_mechanics": [
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
@@ -184508,27 +184472,24 @@
         "metadata_scope": "gateway_owned",
         "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
       "operation": "debug.setAutomationMode",
-      "owner_issue": 56,
+      "owner_issue": null,
       "uri": "ak.wwise.debug.enableAutomationMode",
       "version": "2024.1"
     },
     {
       "argument_contract_sha256": "02184a4144961265a016a6944700fc368fef6afbc895c6fd195bcb03e8d1406f",
-      "audit_evidence": null,
+      "audit_evidence": "The public debug-business/v1 Adapter accepts only stable enabled/disabled outcomes for asserts and automation mode, or a zero-value deliberate restart/assert/crash intent; derives the exact versioned URI, boolean or empty native args, fixed internal host-control marker, explicit-confirmation boundary, terminal accepted/indeterminate/failure journal, disconnect interpretation, and non-retry behavior inside the Gateway; and removes all 23 legacy Debug inline_typed lanes and acknowledgement guidance. #82 retains five-version deterministic, generic non-bypass, closed state-machine, explicit returned-failure, normalized expected-disconnect, and accepted-return coverage. Program and Non-live are the primary proportional evidence; no deliberate real crash, assert, or server restart was executed.",
       "classification": "named-dangerous-debug-controls",
-      "contract_sha256": "ddcd04a1512524c8ae93a3a0133feb19018ea3561cccccce423690284f557a0a",
-      "disposition": "migration_required",
+      "contract_sha256": "7f43ae70184c35f53fff6bf959027bc76b2fe8a756ea80d143107b2c9de44a91",
+      "disposition": "already_deep",
       "input_mode": "business_declaration",
-      "leaked_mechanics": [
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
@@ -184536,27 +184497,24 @@
         "metadata_scope": "gateway_owned",
         "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
       "operation": "debug.setAutomationMode",
-      "owner_issue": 56,
+      "owner_issue": null,
       "uri": "ak.wwise.debug.enableAutomationMode",
       "version": "2025.1"
     },
     {
       "argument_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "audit_evidence": null,
+      "audit_evidence": "The public debug-business/v1 Adapter accepts only stable enabled/disabled outcomes for asserts and automation mode, or a zero-value deliberate restart/assert/crash intent; derives the exact versioned URI, boolean or empty native args, fixed internal host-control marker, explicit-confirmation boundary, terminal accepted/indeterminate/failure journal, disconnect interpretation, and non-retry behavior inside the Gateway; and removes all 23 legacy Debug inline_typed lanes and acknowledgement guidance. #82 retains five-version deterministic, generic non-bypass, closed state-machine, explicit returned-failure, normalized expected-disconnect, and accepted-return coverage. Program and Non-live are the primary proportional evidence; no deliberate real crash, assert, or server restart was executed.",
       "classification": "named-dangerous-debug-controls",
       "contract_sha256": "055ba65bda87139b6ebcd32e22e8b08725fc199dfb12838576a50a0f0668521d",
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "input_mode": "business_declaration",
-      "leaked_mechanics": [
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
@@ -184564,27 +184522,24 @@
         "metadata_scope": "gateway_owned",
         "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
       "operation": "debug.testAssert",
-      "owner_issue": 56,
+      "owner_issue": null,
       "uri": "ak.wwise.debug.testAssert",
       "version": "2021.1"
     },
     {
       "argument_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "audit_evidence": null,
+      "audit_evidence": "The public debug-business/v1 Adapter accepts only stable enabled/disabled outcomes for asserts and automation mode, or a zero-value deliberate restart/assert/crash intent; derives the exact versioned URI, boolean or empty native args, fixed internal host-control marker, explicit-confirmation boundary, terminal accepted/indeterminate/failure journal, disconnect interpretation, and non-retry behavior inside the Gateway; and removes all 23 legacy Debug inline_typed lanes and acknowledgement guidance. #82 retains five-version deterministic, generic non-bypass, closed state-machine, explicit returned-failure, normalized expected-disconnect, and accepted-return coverage. Program and Non-live are the primary proportional evidence; no deliberate real crash, assert, or server restart was executed.",
       "classification": "named-dangerous-debug-controls",
       "contract_sha256": "c720a312e441cfd1b2d4a07c34821bd87ff4cc9e9e7a118c75866d823d80d12a",
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "input_mode": "business_declaration",
-      "leaked_mechanics": [
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
@@ -184592,27 +184547,24 @@
         "metadata_scope": "gateway_owned",
         "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
       "operation": "debug.testAssert",
-      "owner_issue": 56,
+      "owner_issue": null,
       "uri": "ak.wwise.debug.testAssert",
       "version": "2022.1"
     },
     {
       "argument_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "audit_evidence": null,
+      "audit_evidence": "The public debug-business/v1 Adapter accepts only stable enabled/disabled outcomes for asserts and automation mode, or a zero-value deliberate restart/assert/crash intent; derives the exact versioned URI, boolean or empty native args, fixed internal host-control marker, explicit-confirmation boundary, terminal accepted/indeterminate/failure journal, disconnect interpretation, and non-retry behavior inside the Gateway; and removes all 23 legacy Debug inline_typed lanes and acknowledgement guidance. #82 retains five-version deterministic, generic non-bypass, closed state-machine, explicit returned-failure, normalized expected-disconnect, and accepted-return coverage. Program and Non-live are the primary proportional evidence; no deliberate real crash, assert, or server restart was executed.",
       "classification": "named-dangerous-debug-controls",
       "contract_sha256": "b3141bea360ce9a759976380b3d13c3e537e30c01b6750d66098183b0fdaad5c",
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "input_mode": "business_declaration",
-      "leaked_mechanics": [
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
@@ -184620,27 +184572,24 @@
         "metadata_scope": "gateway_owned",
         "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
       "operation": "debug.testAssert",
-      "owner_issue": 56,
+      "owner_issue": null,
       "uri": "ak.wwise.debug.testAssert",
       "version": "2023.1"
     },
     {
       "argument_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "audit_evidence": null,
+      "audit_evidence": "The public debug-business/v1 Adapter accepts only stable enabled/disabled outcomes for asserts and automation mode, or a zero-value deliberate restart/assert/crash intent; derives the exact versioned URI, boolean or empty native args, fixed internal host-control marker, explicit-confirmation boundary, terminal accepted/indeterminate/failure journal, disconnect interpretation, and non-retry behavior inside the Gateway; and removes all 23 legacy Debug inline_typed lanes and acknowledgement guidance. #82 retains five-version deterministic, generic non-bypass, closed state-machine, explicit returned-failure, normalized expected-disconnect, and accepted-return coverage. Program and Non-live are the primary proportional evidence; no deliberate real crash, assert, or server restart was executed.",
       "classification": "named-dangerous-debug-controls",
       "contract_sha256": "776bc83ca4f9ffce2f50c42e3deb58eb9d6bf8884797fe029327f70cc912a811",
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "input_mode": "business_declaration",
-      "leaked_mechanics": [
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
@@ -184648,27 +184597,24 @@
         "metadata_scope": "gateway_owned",
         "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
       "operation": "debug.testAssert",
-      "owner_issue": 56,
+      "owner_issue": null,
       "uri": "ak.wwise.debug.testAssert",
       "version": "2024.1"
     },
     {
       "argument_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "audit_evidence": null,
+      "audit_evidence": "The public debug-business/v1 Adapter accepts only stable enabled/disabled outcomes for asserts and automation mode, or a zero-value deliberate restart/assert/crash intent; derives the exact versioned URI, boolean or empty native args, fixed internal host-control marker, explicit-confirmation boundary, terminal accepted/indeterminate/failure journal, disconnect interpretation, and non-retry behavior inside the Gateway; and removes all 23 legacy Debug inline_typed lanes and acknowledgement guidance. #82 retains five-version deterministic, generic non-bypass, closed state-machine, explicit returned-failure, normalized expected-disconnect, and accepted-return coverage. Program and Non-live are the primary proportional evidence; no deliberate real crash, assert, or server restart was executed.",
       "classification": "named-dangerous-debug-controls",
       "contract_sha256": "2919548e8a635a14e1838773d78f91bbb94afaae77941720bab857c9258325f2",
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "input_mode": "business_declaration",
-      "leaked_mechanics": [
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
@@ -184676,27 +184622,24 @@
         "metadata_scope": "gateway_owned",
         "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
       "operation": "debug.testAssert",
-      "owner_issue": 56,
+      "owner_issue": null,
       "uri": "ak.wwise.debug.testAssert",
       "version": "2025.1"
     },
     {
       "argument_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "audit_evidence": null,
+      "audit_evidence": "The public debug-business/v1 Adapter accepts only stable enabled/disabled outcomes for asserts and automation mode, or a zero-value deliberate restart/assert/crash intent; derives the exact versioned URI, boolean or empty native args, fixed internal host-control marker, explicit-confirmation boundary, terminal accepted/indeterminate/failure journal, disconnect interpretation, and non-retry behavior inside the Gateway; and removes all 23 legacy Debug inline_typed lanes and acknowledgement guidance. #82 retains five-version deterministic, generic non-bypass, closed state-machine, explicit returned-failure, normalized expected-disconnect, and accepted-return coverage. Program and Non-live are the primary proportional evidence; no deliberate real crash, assert, or server restart was executed.",
       "classification": "named-dangerous-debug-controls",
       "contract_sha256": "f5e43c7fdfdbd384048969f02b01256e4a5df6c208f0e8064a142ac7b57fe206",
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "input_mode": "business_declaration",
-      "leaked_mechanics": [
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
@@ -184704,27 +184647,24 @@
         "metadata_scope": "gateway_owned",
         "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
       "operation": "debug.testCrash",
-      "owner_issue": 56,
+      "owner_issue": null,
       "uri": "ak.wwise.debug.testCrash",
       "version": "2021.1"
     },
     {
       "argument_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "audit_evidence": null,
+      "audit_evidence": "The public debug-business/v1 Adapter accepts only stable enabled/disabled outcomes for asserts and automation mode, or a zero-value deliberate restart/assert/crash intent; derives the exact versioned URI, boolean or empty native args, fixed internal host-control marker, explicit-confirmation boundary, terminal accepted/indeterminate/failure journal, disconnect interpretation, and non-retry behavior inside the Gateway; and removes all 23 legacy Debug inline_typed lanes and acknowledgement guidance. #82 retains five-version deterministic, generic non-bypass, closed state-machine, explicit returned-failure, normalized expected-disconnect, and accepted-return coverage. Program and Non-live are the primary proportional evidence; no deliberate real crash, assert, or server restart was executed.",
       "classification": "named-dangerous-debug-controls",
       "contract_sha256": "f4a2e34cd868f5b0cbe0610e2b96323dfd710e0170fc4870ff4706e5ca80a73b",
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "input_mode": "business_declaration",
-      "leaked_mechanics": [
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
@@ -184732,27 +184672,24 @@
         "metadata_scope": "gateway_owned",
         "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
       "operation": "debug.testCrash",
-      "owner_issue": 56,
+      "owner_issue": null,
       "uri": "ak.wwise.debug.testCrash",
       "version": "2022.1"
     },
     {
       "argument_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "audit_evidence": null,
+      "audit_evidence": "The public debug-business/v1 Adapter accepts only stable enabled/disabled outcomes for asserts and automation mode, or a zero-value deliberate restart/assert/crash intent; derives the exact versioned URI, boolean or empty native args, fixed internal host-control marker, explicit-confirmation boundary, terminal accepted/indeterminate/failure journal, disconnect interpretation, and non-retry behavior inside the Gateway; and removes all 23 legacy Debug inline_typed lanes and acknowledgement guidance. #82 retains five-version deterministic, generic non-bypass, closed state-machine, explicit returned-failure, normalized expected-disconnect, and accepted-return coverage. Program and Non-live are the primary proportional evidence; no deliberate real crash, assert, or server restart was executed.",
       "classification": "named-dangerous-debug-controls",
       "contract_sha256": "f28314358a7ba1bdf259fab0df6a51a7ecf9732e946e16d3f75c00b245ba5e34",
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "input_mode": "business_declaration",
-      "leaked_mechanics": [
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
@@ -184760,27 +184697,24 @@
         "metadata_scope": "gateway_owned",
         "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
       "operation": "debug.testCrash",
-      "owner_issue": 56,
+      "owner_issue": null,
       "uri": "ak.wwise.debug.testCrash",
       "version": "2023.1"
     },
     {
       "argument_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "audit_evidence": null,
+      "audit_evidence": "The public debug-business/v1 Adapter accepts only stable enabled/disabled outcomes for asserts and automation mode, or a zero-value deliberate restart/assert/crash intent; derives the exact versioned URI, boolean or empty native args, fixed internal host-control marker, explicit-confirmation boundary, terminal accepted/indeterminate/failure journal, disconnect interpretation, and non-retry behavior inside the Gateway; and removes all 23 legacy Debug inline_typed lanes and acknowledgement guidance. #82 retains five-version deterministic, generic non-bypass, closed state-machine, explicit returned-failure, normalized expected-disconnect, and accepted-return coverage. Program and Non-live are the primary proportional evidence; no deliberate real crash, assert, or server restart was executed.",
       "classification": "named-dangerous-debug-controls",
       "contract_sha256": "76602029634c85843939c3a84916512b5e7abad9cfaecd8bfbe505115f8e149e",
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "input_mode": "business_declaration",
-      "leaked_mechanics": [
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
@@ -184788,27 +184722,24 @@
         "metadata_scope": "gateway_owned",
         "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
       "operation": "debug.testCrash",
-      "owner_issue": 56,
+      "owner_issue": null,
       "uri": "ak.wwise.debug.testCrash",
       "version": "2024.1"
     },
     {
       "argument_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "audit_evidence": null,
+      "audit_evidence": "The public debug-business/v1 Adapter accepts only stable enabled/disabled outcomes for asserts and automation mode, or a zero-value deliberate restart/assert/crash intent; derives the exact versioned URI, boolean or empty native args, fixed internal host-control marker, explicit-confirmation boundary, terminal accepted/indeterminate/failure journal, disconnect interpretation, and non-retry behavior inside the Gateway; and removes all 23 legacy Debug inline_typed lanes and acknowledgement guidance. #82 retains five-version deterministic, generic non-bypass, closed state-machine, explicit returned-failure, normalized expected-disconnect, and accepted-return coverage. Program and Non-live are the primary proportional evidence; no deliberate real crash, assert, or server restart was executed.",
       "classification": "named-dangerous-debug-controls",
       "contract_sha256": "9cd422cad6535b03c6d2bc2db494d8053a3c0fe14cb55686f2e73762a8823635",
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "input_mode": "business_declaration",
-      "leaked_mechanics": [
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
@@ -184816,13 +184747,13 @@
         "metadata_scope": "gateway_owned",
         "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
       "operation": "debug.testCrash",
-      "owner_issue": 56,
+      "owner_issue": null,
       "uri": "ak.wwise.debug.testCrash",
       "version": "2025.1"
     },
@@ -187873,12 +187804,12 @@
   },
   "source_contracts": {
     "gateway_parser_sha256": "6a04c0fe5803a1caaef74f2918fac1703723e3ea2845cf9046477952ede11cf7",
-    "operation_contract_sha256": "e3538cd9b6ffcda4e6e969b44124d2bfcd1e7cea1fd708000519885487304f49",
+    "operation_contract_sha256": "8e05cf1e6fae2a50def2a53aa2bdcb26d8df779120fdc331797e80f2e5f53ec7",
     "public_continuation_sha256": "2fa739b8ede432490e6474de7477fb77a933cd99f5d57a8e07a5e7e2fd365e52",
     "typed_request_surface_sha256": "6d05d64e95a6e0f7099ddd03f1da42c763e9c06f33f93cac7581c7c061a83af8"
   },
   "summary": {
-    "migration_ticket_families": 11,
+    "migration_ticket_families": 10,
     "native_dispositions": {
       "already_deep": 72,
       "migration_required": 613,
@@ -187886,8 +187817,8 @@
     },
     "native_lanes": 824,
     "operation_dispositions": {
-      "already_deep": 120,
-      "migration_required": 28,
+      "already_deep": 143,
+      "migration_required": 5,
       "prohibited_boundary": 5
     },
     "operation_lanes": 153,
@@ -188661,44 +188592,6 @@
       ],
       "rows_sha256": "a2d96ad477515f9533aff9f9dc5950b2f043100faf32cdf5d77b3abb1b3a4e85",
       "title": "Compile compound Undo Groups from ordered business operations"
-    },
-    {
-      "blocked_by_family": "named-authoring-ui-registration",
-      "deterministic_tests": "Exact five-version availability, boolean schemas, explicit-confirmation-only dangerous policy, no-ack public schemas, terminal success/indeterminate/failure journals, no retry continuation, generic non-bypass, and no legacy inline_typed normal input.",
-      "github_issue": 82,
-      "id": "named-dangerous-debug-controls",
-      "parent_issue": 56,
-      "proportional_evidence": "Program and Non-live evidence is primary; no deliberate crash is required. Use only a reviewed matching-host representative if needed, without claiming target effects that were not exercised.",
-      "public_behavior": "Expose stable enable booleans for asserts/automation and zero-business-value restart/assert/crash intents; the Gateway owns fixed acknowledgements, native envelopes, terminal journals, disconnect interpretation, and non-retry semantics.",
-      "removal_boundary": "Remove all old named Debug inline_typed inputs and acknowledgement guidance; preserve boolean brevity, dangerous-operation boundaries, and never add a raw escape hatch.",
-      "row_count": 23,
-      "rows": [
-        "2021.1|operation|debug.setAsserts",
-        "2021.1|operation|debug.setAutomationMode",
-        "2021.1|operation|debug.testAssert",
-        "2021.1|operation|debug.testCrash",
-        "2022.1|operation|debug.setAsserts",
-        "2022.1|operation|debug.setAutomationMode",
-        "2022.1|operation|debug.testAssert",
-        "2022.1|operation|debug.testCrash",
-        "2023.1|operation|debug.restartWaapiServers",
-        "2023.1|operation|debug.setAsserts",
-        "2023.1|operation|debug.setAutomationMode",
-        "2023.1|operation|debug.testAssert",
-        "2023.1|operation|debug.testCrash",
-        "2024.1|operation|debug.restartWaapiServers",
-        "2024.1|operation|debug.setAsserts",
-        "2024.1|operation|debug.setAutomationMode",
-        "2024.1|operation|debug.testAssert",
-        "2024.1|operation|debug.testCrash",
-        "2025.1|operation|debug.restartWaapiServers",
-        "2025.1|operation|debug.setAsserts",
-        "2025.1|operation|debug.setAutomationMode",
-        "2025.1|operation|debug.testAssert",
-        "2025.1|operation|debug.testCrash"
-      ],
-      "rows_sha256": "cf601f60fc5cddb76dd2468d16730b2929fed354bbadfee899a071f36c0777c8",
-      "title": "Migrate every named Debug host control to the unified business compiler"
     }
   ],
   "uniform_migration_invariant": {

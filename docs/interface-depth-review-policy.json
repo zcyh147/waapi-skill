@@ -17,7 +17,7 @@
   },
   "source_contracts": {
     "gateway_parser_sha256": "6a04c0fe5803a1caaef74f2918fac1703723e3ea2845cf9046477952ede11cf7",
-    "operation_contract_sha256": "e3538cd9b6ffcda4e6e969b44124d2bfcd1e7cea1fd708000519885487304f49",
+    "operation_contract_sha256": "8e05cf1e6fae2a50def2a53aa2bdcb26d8df779120fdc331797e80f2e5f53ec7",
     "public_continuation_sha256": "2fa739b8ede432490e6474de7477fb77a933cd99f5d57a8e07a5e7e2fd365e52",
     "typed_request_surface_sha256": "6d05d64e95a6e0f7099ddd03f1da42c763e9c06f33f93cac7581c7c061a83af8"
   },
@@ -117,10 +117,11 @@
     },
     {
       "id": "named-dangerous-debug-controls",
-      "disposition": "migration_required",
-      "owner_issue": 56,
+      "disposition": "already_deep",
+      "owner_issue": null,
       "operations": ["debug.restartWaapiServers", "debug.setAsserts", "debug.setAutomationMode", "debug.testAssert", "debug.testCrash"],
-      "leaked_mechanics": ["wire_type", "request_fragment"]
+      "leaked_mechanics": [],
+      "audit_evidence": "The public debug-business/v1 Adapter accepts only stable enabled/disabled outcomes for asserts and automation mode, or a zero-value deliberate restart/assert/crash intent; derives the exact versioned URI, boolean or empty native args, fixed internal host-control marker, explicit-confirmation boundary, terminal accepted/indeterminate/failure journal, disconnect interpretation, and non-retry behavior inside the Gateway; and removes all 23 legacy Debug inline_typed lanes and acknowledgement guidance. #82 retains five-version deterministic, generic non-bypass, closed state-machine, explicit returned-failure, normalized expected-disconnect, and accepted-return coverage. Program and Non-live are the primary proportional evidence; no deliberate real crash, assert, or server restart was executed."
     },
     {
       "id": "named-compound-undo",
@@ -220,15 +221,6 @@
     }
   ],
   "ticket_blueprints": {
-    "named-dangerous-debug-controls": {
-      "title": "Migrate every named Debug host control to the unified business compiler",
-      "parent_issue": 56,
-      "blocked_by_family": "named-authoring-ui-registration",
-      "public_behavior": "Expose stable enable booleans for asserts/automation and zero-business-value restart/assert/crash intents; the Gateway owns fixed acknowledgements, native envelopes, terminal journals, disconnect interpretation, and non-retry semantics.",
-      "deterministic_tests": "Exact five-version availability, boolean schemas, explicit-confirmation-only dangerous policy, no-ack public schemas, terminal success/indeterminate/failure journals, no retry continuation, generic non-bypass, and no legacy inline_typed normal input.",
-      "removal_boundary": "Remove all old named Debug inline_typed inputs and acknowledgement guidance; preserve boolean brevity, dangerous-operation boundaries, and never add a raw escape hatch.",
-      "proportional_evidence": "Program and Non-live evidence is primary; no deliberate crash is required. Use only a reviewed matching-host representative if needed, without claiming target effects that were not exercised."
-    },
     "named-compound-undo": {
       "title": "Compile compound Undo Groups from ordered business operations",
       "parent_issue": 56,
@@ -322,7 +314,6 @@
   },
   "ticket_issue_numbers": {
     "generic-fixed-query-metadata": 96,
-    "named-dangerous-debug-controls": 82,
     "named-compound-undo": 83,
     "generic-core-project-object": 84,
     "generic-core-media-build": 85,

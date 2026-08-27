@@ -14,6 +14,7 @@ from tests.unit.test_transaction_gateway import (
     local_project,
     preview,
     project,
+    waapi_gateway,
 )
 from wwise_waapi.builders.debug_lua import LUA_SOURCE_AUTHORITY
 from wwise_waapi.operation_registry import (
@@ -560,3 +561,62 @@ def test_host_controls_are_single_dispatch_terminal_and_never_retried(
         TransactionStore(state_dir).load(transaction["transaction_id"]).state
         is TransactionState.INDETERMINATE
     )
+
+
+def test_host_control_explicit_non_ok_result_is_terminal_execution_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    operation = "debug.restartWaapiServers"
+    version = "2023.1"
+    uri = "ak.wwise.debug.restartWaapiServers"
+    state_dir = tmp_path / "explicit-failure"
+    transaction = _preview_and_confirm(
+        _request(operation, {}, version=version),
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+    )
+    original = waapi_gateway.WwiseDispatcher.dispatch
+
+    def explicit_failure(self, api, **kwargs):
+        if api == uri:
+            return {
+                "ok": False,
+                "api": uri,
+                "version": version,
+                "result": None,
+                "error_code": "WAAPI_REQUEST_REJECTED",
+                "message": "synthetic explicit rejection",
+            }
+        return original(self, api, **kwargs)
+
+    monkeypatch.setattr(
+        waapi_gateway.WwiseDispatcher,
+        "dispatch",
+        explicit_failure,
+    )
+    code, payload = execute(
+        ["execute", transaction["transaction_id"]],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        version=version,
+        client=FakeClient(
+            {
+                "ak.wwise.core.getInfo": [live_info(year=2023)],
+                "ak.wwise.core.getProjectInfo": [project()],
+            }
+        ),
+    )
+
+    assert code == 2
+    assert payload["status"] == "host_control_dispatch_failed"
+    assert payload["state"] == TransactionState.EXECUTION_FAILED.value
+    assert payload["terminal_journal"] == {
+        "classification": "dispatch_failed",
+        "effect_verified": False,
+        "durable_state": TransactionState.EXECUTION_FAILED.value,
+        "retry_allowed": False,
+    }
+    events = TransactionStore(state_dir).read_events(transaction["transaction_id"])
+    assert [event["event_type"] for event in events].count("execution_failed") == 1
+    assert "next_command" not in payload

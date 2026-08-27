@@ -246,6 +246,7 @@ class TransactionState(str, Enum):
     REJECTED = "rejected"
     EXECUTING = "executing"
     EXECUTION_CANCELLED = "execution_cancelled"
+    EXECUTION_FAILED = "execution_failed"
     EXECUTED_UNVERIFIED = "executed_unverified"
     RESULT_SCHEMA_CHECKED = "result_schema_checked"
     VERIFIED = "verified"
@@ -274,11 +275,13 @@ ALLOWED_TRANSITIONS: Mapping[TransactionState, frozenset[TransactionState]] = {
     TransactionState.EXECUTING: frozenset(
         {
             TransactionState.EXECUTION_CANCELLED,
+            TransactionState.EXECUTION_FAILED,
             TransactionState.EXECUTED_UNVERIFIED,
             TransactionState.INDETERMINATE,
         }
     ),
     TransactionState.EXECUTION_CANCELLED: frozenset(),
+    TransactionState.EXECUTION_FAILED: frozenset(),
     TransactionState.EXECUTED_UNVERIFIED: frozenset(
         {
             TransactionState.VERIFIED,
@@ -995,6 +998,19 @@ class TransactionStore:
             TransactionState.EXECUTION_CANCELLED,
             expected_state=TransactionState.EXECUTING,
             event_type="execution_cancelled",
+            details=details,
+        )
+
+    def mark_execution_failed(
+        self, transaction_id: str, *, details: Mapping[str, Any] | None = None
+    ) -> TransactionRecord:
+        """Record one explicit non-OK dispatch result as a terminal failure."""
+
+        return self.transition(
+            transaction_id,
+            TransactionState.EXECUTION_FAILED,
+            expected_state=TransactionState.EXECUTING,
+            event_type="execution_failed",
             details=details,
         )
 

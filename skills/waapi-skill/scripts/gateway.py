@@ -14389,6 +14389,14 @@ def dispatch_host_control_transaction(
         }
 
     dispatch_accepted = bool(result is not None and result.get("ok") is True)
+    normalized_exception = (
+        result is not None and result.get("failure_origin") == "exception"
+    )
+    explicit_dispatch_failure = (
+        result is not None
+        and not dispatch_accepted
+        and not (expected_disconnect and normalized_exception)
+    )
     if dispatch_accepted:
         delivery = "waapi_result_returned"
         disconnect_observation = "not_observed_before_result"
@@ -14401,9 +14409,9 @@ def dispatch_host_control_transaction(
             else "unexpected_call_failure_observed"
         )
         terminal_classification = (
-            "expected_disconnect_delivery_indeterminate"
-            if expected_disconnect
-            else "dispatch_failed"
+            "dispatch_failed"
+            if explicit_dispatch_failure
+            else "expected_disconnect_delivery_indeterminate"
         )
     else:
         delivery = "exception_after_dispatch_started"
@@ -14423,6 +14431,11 @@ def dispatch_host_control_transaction(
         "gateway_process_action": "none",
         "reconnect_attempted": False,
     }
+    durable_state = (
+        TransactionState.EXECUTION_FAILED
+        if explicit_dispatch_failure
+        else TransactionState.INDETERMINATE
+    )
     durable_details = {
         "host_control": call_uri,
         "expected_disconnect": expected_disconnect,
@@ -14436,24 +14449,30 @@ def dispatch_host_control_transaction(
         "terminal_journal": {
             "classification": terminal_classification,
             "effect_verified": False,
-            "durable_state": TransactionState.INDETERMINATE.value,
+            "durable_state": durable_state.value,
             "retry_allowed": False,
         },
     }
-    indeterminate = store.mark_execution_indeterminate(
-        transaction_id,
-        details=durable_details,
+    terminal_record = (
+        store.mark_execution_failed(transaction_id, details=durable_details)
+        if explicit_dispatch_failure
+        else store.mark_execution_indeterminate(
+            transaction_id,
+            details=durable_details,
+        )
     )
     return {
         "ok": False,
         "status": (
-            "expected_disconnect_indeterminate"
+            "host_control_dispatch_failed"
+            if explicit_dispatch_failure
+            else "expected_disconnect_indeterminate"
             if expected_disconnect
             else "host_control_effect_indeterminate"
         ),
         **common,
         "transaction_id": transaction_id,
-        "state": indeterminate.state.value,
+        "state": terminal_record.state.value,
         "artifact_hash": artifact_hash,
         "host_control": call_uri,
         "expected_disconnect": expected_disconnect,
@@ -19925,6 +19944,7 @@ def transaction_show_summary(
     cleanup_phase = {
         TransactionState.EXECUTING.value: "indeterminate",
         TransactionState.INDETERMINATE.value: "indeterminate",
+        TransactionState.EXECUTION_FAILED.value: "indeterminate",
         TransactionState.EXECUTED_UNVERIFIED.value: "executed",
         TransactionState.VERIFIED.value: "verified",
         TransactionState.RESULT_SCHEMA_CHECKED.value: "verified",

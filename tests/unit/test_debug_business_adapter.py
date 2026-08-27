@@ -67,6 +67,19 @@ def test_every_debug_lane_uses_one_gateway_owned_business_intent(
     adapter = business_adapter(operation)
     assert adapter.family == "debug-host-control"
     assert adapter.accepts_update_command("draft-declare-debug-intent")
+    if operation in {"debug.setAsserts", "debug.setAutomationMode"}:
+        assert contract["gateway_derivations"] == [
+            "native_uri_boolean_args_and_empty_options",
+            "process_wide_no_state_getter_boundary",
+            "result_schema_verification",
+            "automatic_retry_forbidden",
+        ]
+        assert contract["safety"]["explicit_confirmation_only"] is False
+        assert contract["safety"]["terminal_result"] is False
+    else:
+        assert "terminal_dispatch_journal" in contract["gateway_derivations"]
+        assert contract["safety"]["explicit_confirmation_only"] is True
+        assert contract["safety"]["terminal_result"] is True
 
 
 @pytest.mark.parametrize("operation", OPERATIONS)
