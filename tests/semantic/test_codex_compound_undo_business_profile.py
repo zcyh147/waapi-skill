@@ -66,7 +66,6 @@ def test_unit_checks_children_then_emits_only_parent_preview(tmp_path: Path) -> 
     steps = build_preview_only_compound_undo_steps(runtime)
 
     assert [step.name for step in steps] == [
-        "tx03.operations",
         "tx03.operation-schema",
         "tx03.draft-start",
         "tx01.operation-schema",

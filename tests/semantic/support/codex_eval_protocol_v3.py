@@ -1558,10 +1558,7 @@ def build_compound_undo_business_transaction_steps(
         raise V3ProtocolError(f"compound Undo request is invalid: {exc}") from exc
 
     parent = _BusinessDraftSteps.start(operation="waapi.undoGroup", label=label)
-    steps: list[ExpectedGatewayStep] = [
-        ExpectedGatewayStep(name=f"{label}.operations", subcommand="operations"),
-        *parent.steps,
-    ]
+    steps: list[ExpectedGatewayStep] = list(parent.steps)
     checked_child_labels: list[str] = []
     for index, request in enumerate(normalized_children, start=1):
         child_label = f"tx{index:02d}"

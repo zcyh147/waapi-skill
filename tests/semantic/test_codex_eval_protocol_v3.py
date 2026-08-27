@@ -275,9 +275,10 @@ def test_compound_undo_steps_check_children_before_one_parent_preview() -> None:
         label="tx03",
     )
     validate_operation_draft_protocol_steps(steps)
+    assert steps[0].name == "tx03.operation-schema"
+    assert steps[0].arguments == ("waapi.undoGroup",)
 
     assert [step.subcommand for step in steps] == [
-        "operations",
         "operation-schema",
         "draft-start",
         "operation-schema",
