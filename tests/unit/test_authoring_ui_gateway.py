@@ -240,8 +240,38 @@ def test_public_operation_schema_exposes_only_the_authoring_ui_business_adapter(
     assert payload["business_adapter"]["declaration"]["subcommand"] == (
         "draft-declare-ui-plan"
     )
+    if operation == "ui.commands.execute":
+        assert payload["business_adapter"]["safety"][
+            "fresh_command_inventory_owner"
+        ] == "gateway_pre_dispatch"
     assert "typed_operation" not in payload
     assert "composer" not in payload
+
+
+def test_execute_start_keeps_fresh_command_inventory_gateway_owned(
+    tmp_path: Path,
+) -> None:
+    code, payload = execute(
+        ["draft-start", "ui.commands.execute"],
+        tmp_path=tmp_path,
+        version="2025.1",
+        state_dir=tmp_path / "state",
+    )
+
+    assert code == 0, payload
+    next_action = payload["draft"]["next_action_binding"]
+    assert next_action["fresh_command_inventory"] == {
+        "owner": "gateway",
+        "agent_action": (
+            "declare_the_user_requested_business_choice_without_an_extra_"
+            "getCommands_or_request_schema_call"
+        ),
+        "validation_timing": "immediately_before_dispatch",
+    }
+    assert next_action["declaration"]["append"][0] == (
+        "--command-id <exact-user-requested-command-choice>"
+    )
+    assert "fresh-getCommands" not in json.dumps(next_action)
 
 
 def test_offline_capability_profile_is_explicit_and_defaults_to_console(

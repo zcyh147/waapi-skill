@@ -73,6 +73,12 @@ def authoring_ui_business_contract_data(
             "authoring_host_required": True,
             "fresh_command_inventory": operation
             in {"ui.commands.execute", "ui.commands.register", "ui.commands.unregister"},
+            "fresh_command_inventory_owner": (
+                "gateway_pre_dispatch"
+                if operation
+                in {"ui.commands.execute", "ui.commands.register", "ui.commands.unregister"}
+                else "not_applicable"
+            ),
             "immutable_preview": True,
             "single_execute": True,
             "paired_unregister": operation == "ui.commands.register",
@@ -98,12 +104,13 @@ def _ownership(operation: str) -> tuple[dict[str, str], list[str]]:
         return (
             {
                 "agent": (
-                    "choose_one_id_from_fresh_command_inventory_and_bounded_"
-                    "command_operands_or_exact_files"
+                    "provide_the_exact_user_requested_command_choice_and_"
+                    "bounded_command_operands_or_exact_files"
                 ),
                 "gateway": (
                     "derive_authoring_host_guard_native_command_payload_"
-                    "fresh_inventory_precondition_and_revision"
+                    "and_revision_then_revalidate_fresh_inventory_"
+                    "immediately_before_dispatch"
                 ),
             },
             [*shared, "fresh_inventory_precondition", "bounded_command_operands"],

@@ -91,6 +91,18 @@ def test_every_authoring_ui_lane_has_one_deep_business_entry(
     assert contract["legacy_inline_typed_public"] is False
     assert contract["legacy_composer_public"] is False
     assert contract["binding"]["available"] is False
+    assert contract["safety"]["fresh_command_inventory_owner"] == (
+        "not_applicable"
+        if operation == "ui.captureScreen"
+        else "gateway_pre_dispatch"
+    )
+    if operation == "ui.commands.execute":
+        assert "fresh_command_inventory" not in contract["responsibility_split"][
+            "agent"
+        ]
+        assert "revalidate_fresh_inventory" in contract["responsibility_split"][
+            "gateway"
+        ]
     adapter = business_adapter(operation)
     assert adapter.family == "authoring-ui-business"
     assert adapter.accepts_update_command("draft-declare-ui-plan")

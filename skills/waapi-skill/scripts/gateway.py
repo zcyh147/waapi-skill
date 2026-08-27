@@ -17032,6 +17032,19 @@ def _business_next_action_binding(
             "then_read_next_response": True,
             "precompute_or_increment_revision": False,
         }
+        if record.operation in {
+            "ui.commands.execute",
+            "ui.commands.register",
+            "ui.commands.unregister",
+        }:
+            shared["fresh_command_inventory"] = {
+                "owner": "gateway",
+                "agent_action": (
+                    "declare_the_user_requested_business_choice_without_an_"
+                    "extra_getCommands_or_request_schema_call"
+                ),
+                "validation_timing": "immediately_before_dispatch",
+            }
         if session is not None and adapter.is_complete(session):
             return {
                 **shared,
@@ -17086,7 +17099,7 @@ def _business_next_action_binding(
                 "[--rect <x> <y> <width> <height>]",
             ],
             "ui.commands.execute": [
-                "--command-id <exact-id-from-fresh-getCommands-choice>",
+                "--command-id <exact-user-requested-command-choice>",
                 "[--command-object <exact-object-guid-or-command-operand>]...",
                 "[--command-platform <exact-project-platform>]...",
                 "[--value string|boolean|integer|number|null <exact-value>]",
