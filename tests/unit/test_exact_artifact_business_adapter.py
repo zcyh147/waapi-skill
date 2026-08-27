@@ -235,10 +235,36 @@ def test_lua_contract_discloses_recursive_strict_json_values() -> None:
 
 
 @pytest.mark.parametrize(
+    ("operation", "reserved_key"),
+    (
+        ("lua.executeCliFile", "lua-script"),
+        ("lua.executeCoreFile", "luaScript"),
+        ("lua.executeCoreInline", "requires"),
+    ),
+)
+def test_lua_contract_discloses_bounded_operation_specific_argument_keys(
+    operation: str,
+    reserved_key: str,
+) -> None:
+    schema = exact_artifact_business_contract_data(
+        operation,
+        "2025.1",
+    )["declaration"]["schema"]
+    key_schema = schema["properties"]["arguments"]["propertyNames"]
+
+    assert key_schema["minLength"] == 1
+    assert key_schema["maximumBytes"] == 128
+    assert reserved_key in key_schema["not"]["enum"]
+
+
+@pytest.mark.parametrize(
     ("script_file", "sealed_io_root"),
     (
         ("/owned/sub/../script.lua", "/owned"),
         (r"C:\owned\script.lua", r"C:\owned"),
+        (r"C:\Owned\SCRIPT.lua", r"C:\Owned"),
+        (r"C:\owned/mixed\script.lua", r"C:\owned\mixed"),
+        (r"C:\owned dir\天气 & $x;[]\script.lua", r"C:\owned dir\天气 & $x;[]"),
         (r"\\server\share\owned\script.lua", r"\\server\share\owned"),
     ),
 )

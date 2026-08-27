@@ -3,6 +3,47 @@
     {
       "model_values": [
         {
+          "name": "lua_source",
+          "path": [
+            "declaration",
+            "lua_source"
+          ],
+          "required": true,
+          "schema_sha256": "d80b4c3f15e1df8c955c901fbdc093f124a71be7452b58a461d7f383dcbae834",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "exact_user_artifact"
+        },
+        {
+          "name": "io_root",
+          "path": [
+            "declaration",
+            "io_root"
+          ],
+          "required": true,
+          "schema_sha256": "9ac136edb99a2063b3091602181c8d2022fdccb5b514991319d58544c2e57e95",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "exact_user_artifact"
+        },
+        {
+          "name": "arguments",
+          "path": [
+            "declaration",
+            "arguments"
+          ],
+          "required": false,
+          "schema_sha256": "477e45bdba8179ea4abc65533e956a374d861de5ef284a1e05c9ba6ed1dbef22",
+          "shape": "map",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "exact_user_artifact"
+        }
+      ],
+      "sha256": "004028243cfbcac2e105fd21aecbdb322f4eb8da2d34d7fab27e10de5588d687"
+    },
+    {
+      "model_values": [
+        {
           "name": "add_to_source_control",
           "path": [
             "settings",
@@ -772,6 +813,47 @@
         }
       ],
       "sha256": "14c79ef254c97578426a42f57dfa19418d07762c408a9c078001c5f4b6a9e85b"
+    },
+    {
+      "model_values": [
+        {
+          "name": "script_file",
+          "path": [
+            "declaration",
+            "script_file"
+          ],
+          "required": true,
+          "schema_sha256": "9ac136edb99a2063b3091602181c8d2022fdccb5b514991319d58544c2e57e95",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "exact_user_artifact"
+        },
+        {
+          "name": "arguments",
+          "path": [
+            "declaration",
+            "arguments"
+          ],
+          "required": false,
+          "schema_sha256": "111229435ece255c37300efd76f528551bee64adc1dd117b35a4b5119873e1c0",
+          "shape": "map",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "exact_user_artifact"
+        },
+        {
+          "name": "watchdog_seconds",
+          "path": [
+            "declaration",
+            "watchdog_seconds"
+          ],
+          "required": false,
+          "schema_sha256": "0d3ac1e9e006c0119b57d0512759bd7e261ea0d8cb38951a5183d17cdb4391f0",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        }
+      ],
+      "sha256": "17034867ac6e5b8ba0a21774ad477c7c5c53804baaee8c5c1fa944b36267205a"
     },
     {
       "model_values": [
@@ -1624,35 +1706,6 @@
     {
       "model_values": [
         {
-          "name": "script_file",
-          "path": [
-            "declaration",
-            "script_file"
-          ],
-          "required": true,
-          "schema_sha256": "9ac136edb99a2063b3091602181c8d2022fdccb5b514991319d58544c2e57e95",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "exact_user_artifact"
-        },
-        {
-          "name": "arguments",
-          "path": [
-            "declaration",
-            "arguments"
-          ],
-          "required": false,
-          "schema_sha256": "014e7fc901faaacee4e11f3edc9634e5caccee9ea8eee2d6bd0ef0965ca7a49d",
-          "shape": "map",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "exact_user_artifact"
-        }
-      ],
-      "sha256": "39195dce3ec4289e5d1ab4525be0195c4002cb10d5480546a86774a1fd37c1fa"
-    },
-    {
-      "model_values": [
-        {
           "name": "commands",
           "path": [
             "arguments",
@@ -2269,22 +2322,10 @@
     {
       "model_values": [
         {
-          "name": "lua_source",
+          "name": "script_file",
           "path": [
             "declaration",
-            "lua_source"
-          ],
-          "required": true,
-          "schema_sha256": "d80b4c3f15e1df8c955c901fbdc093f124a71be7452b58a461d7f383dcbae834",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "exact_user_artifact"
-        },
-        {
-          "name": "io_root",
-          "path": [
-            "declaration",
-            "io_root"
+            "script_file"
           ],
           "required": true,
           "schema_sha256": "9ac136edb99a2063b3091602181c8d2022fdccb5b514991319d58544c2e57e95",
@@ -2299,13 +2340,13 @@
             "arguments"
           ],
           "required": false,
-          "schema_sha256": "014e7fc901faaacee4e11f3edc9634e5caccee9ea8eee2d6bd0ef0965ca7a49d",
+          "schema_sha256": "477e45bdba8179ea4abc65533e956a374d861de5ef284a1e05c9ba6ed1dbef22",
           "shape": "map",
           "transport_ownership": "gateway_derivation",
           "value_ownership": "exact_user_artifact"
         }
       ],
-      "sha256": "4de8c28e93926c5e24fb209cf5a96214be2e5cba14c5b78071198920375d12f5"
+      "sha256": "49f8dbd003ce549687d191be12c431ee6db39e011451800787f9806ccddd3880"
     },
     {
       "model_values": [
@@ -2588,47 +2629,6 @@
         }
       ],
       "sha256": "6082513bdce5ae47199a65fd5872fed1a376432c4de197700c5f6d1b03b41ff7"
-    },
-    {
-      "model_values": [
-        {
-          "name": "script_file",
-          "path": [
-            "declaration",
-            "script_file"
-          ],
-          "required": true,
-          "schema_sha256": "9ac136edb99a2063b3091602181c8d2022fdccb5b514991319d58544c2e57e95",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "exact_user_artifact"
-        },
-        {
-          "name": "arguments",
-          "path": [
-            "declaration",
-            "arguments"
-          ],
-          "required": false,
-          "schema_sha256": "014e7fc901faaacee4e11f3edc9634e5caccee9ea8eee2d6bd0ef0965ca7a49d",
-          "shape": "map",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "exact_user_artifact"
-        },
-        {
-          "name": "watchdog_seconds",
-          "path": [
-            "declaration",
-            "watchdog_seconds"
-          ],
-          "required": false,
-          "schema_sha256": "0d3ac1e9e006c0119b57d0512759bd7e261ea0d8cb38951a5183d17cdb4391f0",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        }
-      ],
-      "sha256": "62773e914053f94aa1c27a3487fef4263e8d84482420e57b83c34253d435e3ff"
     },
     {
       "model_values": [
@@ -3403,6 +3403,35 @@
         }
       ],
       "sha256": "8ac0604951d1b39bf081bd919d99866ffe54a4c1fe66cc74f3463efa2f36c88e"
+    },
+    {
+      "model_values": [
+        {
+          "name": "script_file",
+          "path": [
+            "declaration",
+            "script_file"
+          ],
+          "required": true,
+          "schema_sha256": "9ac136edb99a2063b3091602181c8d2022fdccb5b514991319d58544c2e57e95",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "exact_user_artifact"
+        },
+        {
+          "name": "arguments",
+          "path": [
+            "declaration",
+            "arguments"
+          ],
+          "required": false,
+          "schema_sha256": "111229435ece255c37300efd76f528551bee64adc1dd117b35a4b5119873e1c0",
+          "shape": "map",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "exact_user_artifact"
+        }
+      ],
+      "sha256": "90de14852292ad44e66e2b6502fa9f28653474f5055f14eca051e37948816f83"
     },
     {
       "model_values": [
@@ -156715,7 +156744,7 @@
     "contract": "waapi-skill.typed-request-surface/v1",
     "total_lanes": 824
   },
-  "inventory_sha256": "3feb4218e75b7029395d36d7aa4e0332a53501b2c339074110e463b18a3cc4c8",
+  "inventory_sha256": "c492155c0775a37855a9058b14678dad177e2c8da98c7da0015e4839f8fcdbcd",
   "mechanic_owners": {
     "ambiguous_continuation_selection": "gateway_derivation",
     "batch_layout": "gateway_derivation",
@@ -186531,10 +186560,10 @@
       "version": "2025.1"
     },
     {
-      "argument_contract_sha256": "39195dce3ec4289e5d1ab4525be0195c4002cb10d5480546a86774a1fd37c1fa",
+      "argument_contract_sha256": "90de14852292ad44e66e2b6502fa9f28653474f5055f14eca051e37948816f83",
       "audit_evidence": "The public exact-artifact-business/v1 Adapters accept exact tabular files, Lua files or source, bounded script argument maps, live-bound import locations, and stable language/mode/source-control/watchdog values; derive source authority, I/O roots, native loader fields, import identity/mode, request order, serialization, revisions, and the one immutable Preview inside the Gateway; and remove normal tabular inline_typed and Lua Composer ingress for all 12 lanes. #80 retains five-version deterministic and non-bypass coverage, exact macOS/native-Windows Wwise 2025.1 inline/Core/tab execution, an explicit dual-host CLI Lua transport boundary, and cumulative native-Windows Terra Fresh Agent PASS for all four targeted tab/Lua units on the same packaged Skill candidate.",
       "classification": "named-exact-artifact-code",
-      "contract_sha256": "aafb0b9179e77eedaec80d59d8ed0a2c138864dbd25a2029c0ae6bc18b771e8d",
+      "contract_sha256": "cc9f1b9c2394bf8783e9456c42cc6cb9e8bc490a35c9bc1957a4c551704858af",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -186556,10 +186585,10 @@
       "version": "2023.1"
     },
     {
-      "argument_contract_sha256": "62773e914053f94aa1c27a3487fef4263e8d84482420e57b83c34253d435e3ff",
+      "argument_contract_sha256": "17034867ac6e5b8ba0a21774ad477c7c5c53804baaee8c5c1fa944b36267205a",
       "audit_evidence": "The public exact-artifact-business/v1 Adapters accept exact tabular files, Lua files or source, bounded script argument maps, live-bound import locations, and stable language/mode/source-control/watchdog values; derive source authority, I/O roots, native loader fields, import identity/mode, request order, serialization, revisions, and the one immutable Preview inside the Gateway; and remove normal tabular inline_typed and Lua Composer ingress for all 12 lanes. #80 retains five-version deterministic and non-bypass coverage, exact macOS/native-Windows Wwise 2025.1 inline/Core/tab execution, an explicit dual-host CLI Lua transport boundary, and cumulative native-Windows Terra Fresh Agent PASS for all four targeted tab/Lua units on the same packaged Skill candidate.",
       "classification": "named-exact-artifact-code",
-      "contract_sha256": "85788ba7d492efb1637be37c6176171c7453de3ac427013f4f92adc4df813abf",
+      "contract_sha256": "e598b0143ff27ee75f0ce82d4b35b23a61469deba0d1226aff3cf788823f4514",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -186581,10 +186610,10 @@
       "version": "2024.1"
     },
     {
-      "argument_contract_sha256": "62773e914053f94aa1c27a3487fef4263e8d84482420e57b83c34253d435e3ff",
+      "argument_contract_sha256": "17034867ac6e5b8ba0a21774ad477c7c5c53804baaee8c5c1fa944b36267205a",
       "audit_evidence": "The public exact-artifact-business/v1 Adapters accept exact tabular files, Lua files or source, bounded script argument maps, live-bound import locations, and stable language/mode/source-control/watchdog values; derive source authority, I/O roots, native loader fields, import identity/mode, request order, serialization, revisions, and the one immutable Preview inside the Gateway; and remove normal tabular inline_typed and Lua Composer ingress for all 12 lanes. #80 retains five-version deterministic and non-bypass coverage, exact macOS/native-Windows Wwise 2025.1 inline/Core/tab execution, an explicit dual-host CLI Lua transport boundary, and cumulative native-Windows Terra Fresh Agent PASS for all four targeted tab/Lua units on the same packaged Skill candidate.",
       "classification": "named-exact-artifact-code",
-      "contract_sha256": "20d6812898aa6cdc51fecd81f7a0d821af2ace0d3d1cc11aa8adb615fe871288",
+      "contract_sha256": "3552cd6e71a52683eb0f162d50be6c17a4ee963f6d6667281fd87682f8835e28",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -186606,10 +186635,10 @@
       "version": "2025.1"
     },
     {
-      "argument_contract_sha256": "39195dce3ec4289e5d1ab4525be0195c4002cb10d5480546a86774a1fd37c1fa",
+      "argument_contract_sha256": "49f8dbd003ce549687d191be12c431ee6db39e011451800787f9806ccddd3880",
       "audit_evidence": "The public exact-artifact-business/v1 Adapters accept exact tabular files, Lua files or source, bounded script argument maps, live-bound import locations, and stable language/mode/source-control/watchdog values; derive source authority, I/O roots, native loader fields, import identity/mode, request order, serialization, revisions, and the one immutable Preview inside the Gateway; and remove normal tabular inline_typed and Lua Composer ingress for all 12 lanes. #80 retains five-version deterministic and non-bypass coverage, exact macOS/native-Windows Wwise 2025.1 inline/Core/tab execution, an explicit dual-host CLI Lua transport boundary, and cumulative native-Windows Terra Fresh Agent PASS for all four targeted tab/Lua units on the same packaged Skill candidate.",
       "classification": "named-exact-artifact-code",
-      "contract_sha256": "badb7e8d3c2250459af4b14c052939b9838644c7e5ff4fa81def5f73307d4790",
+      "contract_sha256": "3dccdcd1b0361e0513dff65b91640a5f9c87eb06b6b764b30c5c372420d3efe6",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -186631,10 +186660,10 @@
       "version": "2023.1"
     },
     {
-      "argument_contract_sha256": "39195dce3ec4289e5d1ab4525be0195c4002cb10d5480546a86774a1fd37c1fa",
+      "argument_contract_sha256": "49f8dbd003ce549687d191be12c431ee6db39e011451800787f9806ccddd3880",
       "audit_evidence": "The public exact-artifact-business/v1 Adapters accept exact tabular files, Lua files or source, bounded script argument maps, live-bound import locations, and stable language/mode/source-control/watchdog values; derive source authority, I/O roots, native loader fields, import identity/mode, request order, serialization, revisions, and the one immutable Preview inside the Gateway; and remove normal tabular inline_typed and Lua Composer ingress for all 12 lanes. #80 retains five-version deterministic and non-bypass coverage, exact macOS/native-Windows Wwise 2025.1 inline/Core/tab execution, an explicit dual-host CLI Lua transport boundary, and cumulative native-Windows Terra Fresh Agent PASS for all four targeted tab/Lua units on the same packaged Skill candidate.",
       "classification": "named-exact-artifact-code",
-      "contract_sha256": "6b35795a798eaad2cc0c1c056f832815eafbb246f53658640fdf02863e91d428",
+      "contract_sha256": "212b68f7bf9eaab96f552bd4a9362f8651021f8c4a0b7ec13dfac5a3a9eaebb2",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -186656,10 +186685,10 @@
       "version": "2024.1"
     },
     {
-      "argument_contract_sha256": "39195dce3ec4289e5d1ab4525be0195c4002cb10d5480546a86774a1fd37c1fa",
+      "argument_contract_sha256": "49f8dbd003ce549687d191be12c431ee6db39e011451800787f9806ccddd3880",
       "audit_evidence": "The public exact-artifact-business/v1 Adapters accept exact tabular files, Lua files or source, bounded script argument maps, live-bound import locations, and stable language/mode/source-control/watchdog values; derive source authority, I/O roots, native loader fields, import identity/mode, request order, serialization, revisions, and the one immutable Preview inside the Gateway; and remove normal tabular inline_typed and Lua Composer ingress for all 12 lanes. #80 retains five-version deterministic and non-bypass coverage, exact macOS/native-Windows Wwise 2025.1 inline/Core/tab execution, an explicit dual-host CLI Lua transport boundary, and cumulative native-Windows Terra Fresh Agent PASS for all four targeted tab/Lua units on the same packaged Skill candidate.",
       "classification": "named-exact-artifact-code",
-      "contract_sha256": "f1ed169195a8667c5d18403cd85967a279048ca0d7cf337b826a13b192ff6036",
+      "contract_sha256": "6d3ddf4725fdbd5d92b99dea32a37b6ce7eaf9471f153e0b6e1db5f787259f42",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -186681,10 +186710,10 @@
       "version": "2025.1"
     },
     {
-      "argument_contract_sha256": "4de8c28e93926c5e24fb209cf5a96214be2e5cba14c5b78071198920375d12f5",
+      "argument_contract_sha256": "004028243cfbcac2e105fd21aecbdb322f4eb8da2d34d7fab27e10de5588d687",
       "audit_evidence": "The public exact-artifact-business/v1 Adapters accept exact tabular files, Lua files or source, bounded script argument maps, live-bound import locations, and stable language/mode/source-control/watchdog values; derive source authority, I/O roots, native loader fields, import identity/mode, request order, serialization, revisions, and the one immutable Preview inside the Gateway; and remove normal tabular inline_typed and Lua Composer ingress for all 12 lanes. #80 retains five-version deterministic and non-bypass coverage, exact macOS/native-Windows Wwise 2025.1 inline/Core/tab execution, an explicit dual-host CLI Lua transport boundary, and cumulative native-Windows Terra Fresh Agent PASS for all four targeted tab/Lua units on the same packaged Skill candidate.",
       "classification": "named-exact-artifact-code",
-      "contract_sha256": "8bcd2cec9778ee30c255b0a5166177514dcc8113743840245432b9d2d89d29dd",
+      "contract_sha256": "02027a4d5cdd13cda9d881d9414e12bd162836b56a703aa8eb7cea0374e50c31",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -189697,7 +189726,7 @@
   },
   "source_contracts": {
     "gateway_parser_sha256": "89c08dbc56e1fab6a60b23eb2c817ad37d68c99502b94816cf4007179758e86a",
-    "operation_contract_sha256": "37545e2a6fb504e9110267fd8b406479ed1494c1687bcf98a0a4d10abee44d3e",
+    "operation_contract_sha256": "57248841f36779de4ebfd08a9bb2716d29e7a4acdd2600df227f968484297ce5",
     "public_continuation_sha256": "20e1eb8e2426240eb29faac3ed197d7578a971cf312bceb05c8a31ba24de8812",
     "typed_request_surface_sha256": "6d05d64e95a6e0f7099ddd03f1da42c763e9c06f33f93cac7581c7c061a83af8"
   },

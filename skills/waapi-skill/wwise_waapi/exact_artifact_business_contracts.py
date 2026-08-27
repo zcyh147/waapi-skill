@@ -6,6 +6,8 @@ from copy import deepcopy
 from typing import Any
 
 from .builders.debug_lua import (
+    CLI_LUA_RESERVED_FIELDS,
+    CORE_LUA_RESERVED_FIELDS,
     MAX_LUA_SOURCE_BYTES,
     MAX_LUA_WA_ARGS_BYTES,
     MAX_LUA_WA_ARGS_KEYS,
@@ -151,11 +153,22 @@ def _schema(operation: str, version: str) -> dict[str, Any]:
         if version in {"2023.1", "2024.1", "2025.1"}:
             properties["check_out_from_source_control"] = {"type": "boolean"}
     else:
+        reserved_fields = (
+            CLI_LUA_RESERVED_FIELDS
+            if operation == "lua.executeCliFile"
+            else CORE_LUA_RESERVED_FIELDS
+        )
         properties = {
             "arguments": {
                 "type": "object",
                 "maxProperties": MAX_LUA_WA_ARGS_KEYS,
                 "maximumBytes": MAX_LUA_WA_ARGS_BYTES,
+                "propertyNames": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maximumBytes": 128,
+                    "not": {"enum": sorted(reserved_fields)},
+                },
                 "additionalProperties": {
                     "$ref": "#/$defs/strictJsonValue",
                 },
