@@ -8036,6 +8036,11 @@ def test_heavy_codex_probe_denial_precedes_campaign_root_and_child(
 
     monkeypatch.setattr(campaign, "load_heavy_v3_campaign_units", lambda _options: units)
     monkeypatch.setattr(
+        campaign,
+        "require_skill_local_campaign_interpreter",
+        lambda _skill_source: Path(sys.executable),
+    )
+    monkeypatch.setattr(
         campaign.subprocess,
         "run",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(denied),
