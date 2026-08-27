@@ -6,7 +6,7 @@ This report is generated from the exact five-version public surface and the revi
 
 - Native function/Topic lanes: **824**
 - Named-operation lanes: **153**
-- Migration families: **13**
+- Migration families: **12**
 - Unowned migration rows: **0**
 
 Every exact row, version, schema digest, continuation command, field ownership, disposition, and owner is recorded in `interface-depth-inventory.json`.
@@ -41,7 +41,6 @@ Business scalar values remain visible. Native paths, metadata scope, property/re
 | [`named-authoring-ui-registration`](https://github.com/zcyh147/waapi-skill/issues/81) | #56 | 20 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 4 | `1b3b5a4a221d4ace2fcb897c15fc3f0076aea91a7c363831c02c043ef1942b52` |
 | [`named-compound-undo`](https://github.com/zcyh147/waapi-skill/issues/83) | #56 | 5 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 1 | `a2d96ad477515f9533aff9f9dc5950b2f043100faf32cdf5d77b3abb1b3a4e85` |
 | [`named-dangerous-debug-controls`](https://github.com/zcyh147/waapi-skill/issues/82) | #56 | 23 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 5 | `cf601f60fc5cddb76dd2468d16730b2929fed354bbadfee899a071f36c0777c8` |
-| [`named-exact-artifact-code`](https://github.com/zcyh147/waapi-skill/issues/80) | #56 | 12 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 4 | `bc7b0e8add73f09f4eec32a7bc31e2ceb3ff04ca04673f77874ae91bfb8f33f1` |
 
 ## Already-deep and boundary evidence
 
@@ -51,6 +50,7 @@ Business scalar values remain visible. Native paths, metadata scope, property/re
 | `generic-fixed-command-audited-deep` | `already_deep` | 9 | The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior. The object.get rows additionally inventory the preferred simple flags, the complete structured Builder contract, and the separately disclosed bounded advanced WAQL contract. |
 | `generic-zero-input-audited-deep` | `already_deep` | 63 | The reflected request accepts no model-authored values; the Gateway owns the complete zero-input envelope, authorization/effect policy, dispatch, result bound, and any project guard. |
 | `named-audio-import-audited-deep` | `already_deep` | 5 | The public audio-import-business/v1 contract exposes semantic kinds and stable declaration values, binds objects and fields live, derives native paths/types/order/batches/continuation, preserves media artifacts exactly, and has complete #54 five-version Program plus macOS/Windows Fresh and real-host evidence. |
+| `named-exact-artifact-code` | `already_deep` | 12 | The public exact-artifact-business/v1 Adapters accept exact tabular files, Lua files or source, bounded script argument maps, live-bound import locations, and stable language/mode/source-control/watchdog values; derive source authority, I/O roots, native loader fields, import identity/mode, request order, serialization, revisions, and the one immutable Preview inside the Gateway; and remove normal tabular inline_typed and Lua Composer ingress for all 12 lanes. #80 retains five-version deterministic and non-bypass coverage, exact macOS/native-Windows Wwise 2025.1 inline/Core/tab execution, an explicit dual-host CLI Lua transport boundary, and cumulative native-Windows Terra Fresh Agent PASS for all four targeted tab/Lua units on the same packaged Skill candidate. |
 | `named-internal-canonical-boundary` | `prohibited_boundary` | 5 | waapi.call is an internal canonical transaction representation, absent from normal operation discovery, and cannot accept a model-authored native request document. |
 | `named-object-creation-graph` | `already_deep` | 17 | The public object-graph-business/v1 Adapters accept named hierarchy outcomes, plug-in roles, stable business fields, exact user artifacts, references, and RTPC points; bind opaque object, field, plug-in-type, control-input, and output-bus handles; compile exact Wwise types, paths, metadata scope/tokens, dependency order, batching, revisions, native requests, and the one Preview continuation inside the Gateway; and retain #78 five-version deterministic, exact macOS/Windows 2022.1 and 2025.1 real-host, and current-v3 Terra Fresh Agent Weather evidence. The pre-#78 Composer action vocabulary and normal fallback are removed. |
 | `named-object-lifecycle` | `already_deep` | 25 | The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence. |

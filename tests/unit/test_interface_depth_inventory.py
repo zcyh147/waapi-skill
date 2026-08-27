@@ -342,7 +342,7 @@ def test_every_migration_row_has_exactly_one_rollup_and_ticket_family() -> None:
     assert {family["github_issue"] for family in inventory["ticket_families"]} == {
         *range(77, 94),
         96,
-    } - {77, 78, 79, 92, 93}
+    } - {77, 78, 79, 80, 92, 93}
     assert all(
         row["owner_issue"] in {56, 57}
         for row in (*inventory["native_lanes"], *inventory["operation_lanes"])
@@ -354,8 +354,8 @@ def test_every_migration_row_has_exactly_one_rollup_and_ticket_family() -> None:
 def test_every_supported_named_operation_uses_or_migrates_to_the_business_path() -> None:
     inventory = _inventory()
     assert inventory["summary"]["operation_dispositions"] == {
-        "already_deep": 88,
-        "migration_required": 60,
+        "already_deep": 100,
+        "migration_required": 48,
         "prohibited_boundary": 5,
     }
     for row in inventory["operation_lanes"]:
@@ -381,6 +381,10 @@ def test_every_supported_named_operation_uses_or_migrates_to_the_business_path()
                 "soundbank.generate",
                 "soundbank.processDefinitionFiles",
                 "soundbank.setInclusions",
+                "audio.importTabDelimited",
+                "lua.executeCliFile",
+                "lua.executeCoreFile",
+                "lua.executeCoreInline",
             }:
             assert row["disposition"] == "already_deep"
             assert row["input_mode"] == "business_declaration"

@@ -101,10 +101,11 @@
     },
     {
       "id": "named-exact-artifact-code",
-      "disposition": "migration_required",
-      "owner_issue": 56,
+      "disposition": "already_deep",
+      "owner_issue": null,
       "operations": ["audio.importTabDelimited", "lua.executeCliFile", "lua.executeCoreFile", "lua.executeCoreInline"],
-      "leaked_mechanics": ["wire_type", "dependency_order", "batch_layout", "revision_arithmetic", "request_fragment"]
+      "leaked_mechanics": [],
+      "audit_evidence": "The public exact-artifact-business/v1 Adapters accept exact tabular files, Lua files or source, bounded script argument maps, live-bound import locations, and stable language/mode/source-control/watchdog values; derive source authority, I/O roots, native loader fields, import identity/mode, request order, serialization, revisions, and the one immutable Preview inside the Gateway; and remove normal tabular inline_typed and Lua Composer ingress for all 12 lanes. #80 retains five-version deterministic and non-bypass coverage, exact macOS/native-Windows Wwise 2025.1 inline/Core/tab execution, an explicit dual-host CLI Lua transport boundary, and cumulative native-Windows Terra Fresh Agent PASS for all four targeted tab/Lua units on the same packaged Skill candidate."
     },
     {
       "id": "named-authoring-ui-registration",
@@ -218,15 +219,6 @@
     }
   ],
   "ticket_blueprints": {
-    "named-exact-artifact-code": {
-      "title": "Wrap tabular import and Lua artifacts in deep Gateway envelopes",
-      "parent_issue": 56,
-      "blocked_by_family": "named-soundbank-planning",
-      "public_behavior": "Keep TSV files, Lua source, paths, and bounded argument maps exact and user-owned while the Gateway derives loader fields, request ordering, limits, source authority, and serialization.",
-      "deterministic_tests": "Exact-byte preservation, five-version availability, hostile paths and Unicode, open-map bounds, reserved-key rejection, repair, stale source authority, and non-bypass.",
-      "removal_boundary": "Remove model-authored Composer handles and loader/request fragments; never rewrite exact code or artifact bytes.",
-      "proportional_evidence": "Representative tab import and each distinct Lua host/version shape, with native-Windows filesystem transport probes and targeted Fresh Agent routing only where model behavior changes."
-    },
     "named-authoring-ui-registration": {
       "title": "Migrate Authoring UI capture and command lifecycles to business declarations",
       "parent_issue": 56,
@@ -338,7 +330,6 @@
   },
   "ticket_issue_numbers": {
     "generic-fixed-query-metadata": 96,
-    "named-exact-artifact-code": 80,
     "named-authoring-ui-registration": 81,
     "named-dangerous-debug-controls": 82,
     "named-compound-undo": 83,
