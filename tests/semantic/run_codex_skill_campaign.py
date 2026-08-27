@@ -764,7 +764,39 @@ def main(argv: Sequence[str] | None = None) -> int:
         return EXIT_BLOCKED
 
 
+def require_skill_local_campaign_interpreter(
+    skill_source: Path,
+    *,
+    interpreter: str | Path | None = None,
+    platform_name: str | None = None,
+) -> Path:
+    """Fail before Codex if the candidate's packaged runtime is not active."""
+
+    active_platform = os.name if platform_name is None else platform_name
+    expected = (
+        skill_source / ".venv" / "Scripts" / "python.exe"
+        if active_platform == "nt" or active_platform.startswith("win")
+        else skill_source / ".venv" / "bin" / "python"
+    )
+    expected_lexical = Path(os.path.abspath(os.fspath(expected)))
+    if not expected_lexical.is_file():
+        raise CampaignEvidenceError(
+            "candidate Skill-local interpreter is missing; run this candidate's "
+            f"scripts/setup_environment.py before the campaign: {expected_lexical}"
+        )
+    observed = Path(
+        os.path.abspath(os.fspath(interpreter or sys.executable))
+    )
+    if os.path.normcase(str(observed)) != os.path.normcase(str(expected_lexical)):
+        raise CampaignEvidenceError(
+            "formal campaign must run with the exact candidate Skill-local "
+            f"interpreter {expected_lexical}; received {observed}"
+        )
+    return expected_lexical
+
+
 def run_campaign(options: CampaignOptions) -> int:
+    require_skill_local_campaign_interpreter(options.skill_source)
     if options.profile in EXECUTABLE_V3_PROFILE_IDS:
         return run_heavy_v3_campaign(options)
     try:

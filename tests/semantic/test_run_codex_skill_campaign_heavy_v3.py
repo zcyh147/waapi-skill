@@ -8071,6 +8071,50 @@ def test_runtime_distribution_fingerprint_permission_error_names_interpreter(
     assert "PermissionError" in str(captured.value)
 
 
+@pytest.mark.parametrize(
+    "platform_name,relative_interpreter",
+    (
+        ("posix", Path(".venv/bin/python")),
+        ("nt", Path(".venv/Scripts/python.exe")),
+    ),
+)
+def test_formal_campaign_requires_the_candidate_skill_local_interpreter(
+    tmp_path: Path,
+    platform_name: str,
+    relative_interpreter: Path,
+) -> None:
+    skill = tmp_path / "waapi-skill"
+    expected = skill / relative_interpreter
+    expected.parent.mkdir(parents=True)
+
+    with pytest.raises(
+        campaign.CampaignEvidenceError,
+        match="candidate Skill-local interpreter is missing",
+    ):
+        campaign.require_skill_local_campaign_interpreter(
+            skill,
+            interpreter=expected,
+            platform_name=platform_name,
+        )
+
+    expected.write_bytes(b"candidate interpreter")
+    assert campaign.require_skill_local_campaign_interpreter(
+        skill,
+        interpreter=expected,
+        platform_name=platform_name,
+    ) == expected
+
+    with pytest.raises(
+        campaign.CampaignEvidenceError,
+        match="exact candidate Skill-local interpreter",
+    ):
+        campaign.require_skill_local_campaign_interpreter(
+            skill,
+            interpreter=tmp_path / "other" / relative_interpreter.name,
+            platform_name=platform_name,
+        )
+
+
 def test_heavy_fingerprint_rejects_source_project_and_launcher_drift(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -8150,6 +8194,11 @@ def test_heavy_resume_verify_only_and_resume_schedule_only_pending(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     options = _options(tmp_path)
+    monkeypatch.setattr(
+        campaign,
+        "require_skill_local_campaign_interpreter",
+        lambda _skill_source: Path(sys.executable),
+    )
     units = (_unit(1), _unit(2))
     effective = {
         "candidate": {
@@ -8232,6 +8281,11 @@ def test_heavy_resume_retries_in_original_suite_order(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     options = _options(tmp_path)
+    monkeypatch.setattr(
+        campaign,
+        "require_skill_local_campaign_interpreter",
+        lambda _skill_source: Path(sys.executable),
+    )
     units = (_unit(1), _unit(2), _unit(3))
     effective = {
         "candidate": {
@@ -8296,6 +8350,11 @@ def test_heavy_campaign_attributes_later_evidence_error_to_that_unit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     options = _options(tmp_path)
+    monkeypatch.setattr(
+        campaign,
+        "require_skill_local_campaign_interpreter",
+        lambda _skill_source: Path(sys.executable),
+    )
     units = (_unit(1), _unit(2), _unit(3))
     effective = {
         "candidate": {

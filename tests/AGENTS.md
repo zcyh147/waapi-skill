@@ -245,6 +245,11 @@ Append pytest args after `--`:
 
 ## Fresh-Codex semantic suites and the 40 / 98 / 168 numbers
 
+Before preparing a new formal Fresh root or diagnosing a repeated Broker,
+launcher, interpreter, or evidence-classification failure, read
+`tests/semantic/HARNESS_PITFALLS.md`. It is the incident ledger and preflight
+checklist; this file remains the authoritative rule set.
+
 `skills/waapi-skill/evals/evals-v2.json` is the frozen historical semantic
 suite. Its three profile names are also their exact fresh-Codex session totals:
 
