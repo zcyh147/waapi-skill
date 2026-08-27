@@ -33,8 +33,7 @@ When this change uses a subset that the user selected from a previous multi-resu
 
 After a selected-subset gate, choose one first transaction-contract branch:
 
-A natural-language outcome, familiar Wwise wording, or apparent API spelling does not establish an exact operation identifier. Unless the user supplied that identifier or a visible Gateway result in this conversation already returned it, run compact `operations` exactly once, select one exact matching `name`, and use that unchanged with `operation-schema`. Never guess, translate, expand, specialize, or repair an operation name. When the exact identifier is already visible, skip the inventory and open its schema directly. The ordinary compact inventory is the bounded tool-selection surface; `operations --detail` remains only for an explicit full-catalog audit.
-
+A natural-language outcome is not an exact operation name. Unless the user supplied that name or a visible Gateway result returned it, run compact `operations` once and copy one matching `name`; never invent, translate, specialize, or repair it. When the exact name is visible, open its schema directly. `operations --detail` is audit-only.
 | Request | First transaction-contract sequence |
 |---|---|
 | `object.create` | Preflight: explicit pre-Preview same-name-root type/path only; not parent/sibling or later verification. Then `operation-schema`; metadata. |
