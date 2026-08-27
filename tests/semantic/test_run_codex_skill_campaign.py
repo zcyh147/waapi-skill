@@ -293,6 +293,11 @@ def _install_synthetic_execution(
     monkeypatch.setattr(campaign, "WORKSPACE_ROOT", options.campaign_root.parent)
     monkeypatch.setattr(
         campaign,
+        "require_skill_local_campaign_interpreter",
+        lambda _skill_source: Path(campaign.sys.executable),
+    )
+    monkeypatch.setattr(
+        campaign,
         "build_effective_config",
         lambda _options, *, sessions, required_units: effective,
     )
@@ -597,6 +602,11 @@ def test_candidate_drift_during_child_is_sealed_as_blocked(
     options = _options(tmp_path)
     effective = _effective_for(options)
     monkeypatch.setattr(campaign, "WORKSPACE_ROOT", options.campaign_root.parent)
+    monkeypatch.setattr(
+        campaign,
+        "require_skill_local_campaign_interpreter",
+        lambda _skill_source: Path(campaign.sys.executable),
+    )
     monkeypatch.setattr(
         campaign,
         "build_effective_config",

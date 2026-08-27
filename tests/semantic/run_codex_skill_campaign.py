@@ -796,7 +796,6 @@ def require_skill_local_campaign_interpreter(
 
 
 def run_campaign(options: CampaignOptions) -> int:
-    require_skill_local_campaign_interpreter(options.skill_source)
     if options.profile in EXECUTABLE_V3_PROFILE_IDS:
         return run_heavy_v3_campaign(options)
     try:
@@ -812,6 +811,7 @@ def run_campaign(options: CampaignOptions) -> int:
         raise CampaignConfigError(str(exc)) from exc
     if not sessions:
         raise CampaignConfigError("no semantic sessions matched the requested filters")
+    require_skill_local_campaign_interpreter(options.skill_source)
     required_units = required_unit_map(sessions)
     windows_path_budget = None
     if (
@@ -1063,6 +1063,7 @@ def run_heavy_v3_campaign(options: CampaignOptions) -> int:
     except (SystemExit, ValueError) as exc:
         raise CampaignConfigError(str(exc)) from exc
     required_units = {str(unit.unit_id): (HEAVY_V3_PHASE,) for unit in units}
+    require_skill_local_campaign_interpreter(options.skill_source)
     windows_path_budget = None
     if not options.verify_only:
         try:
