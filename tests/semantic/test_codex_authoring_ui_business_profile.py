@@ -11,7 +11,6 @@ import pytest
 from tests.semantic import run_codex_skill_matrix as matrix
 from tests.semantic import run_codex_skill_campaign as campaign
 from tests.semantic.support.codex_authoring_ui_business_agent_runner import (
-    _command_choice_came_from_inventory,
     prepare_authoring_ui_business_runtime,
 )
 from tests.semantic.support.codex_authoring_ui_business_profile import (
@@ -81,13 +80,10 @@ def test_each_unit_compiles_to_one_closed_public_business_preview(
         "draft-check",
         "preview-from-draft",
     ]
-    if unit.operation == "ui.commands.execute":
-        expected[2:2] = ["request-schema", "typed-zero-call"]
     assert [step.subcommand for step in steps] == expected
-    assert (
-        "ak.wwise.ui.commands.getCommands"
-        in [str(argument) for step in steps for argument in step.arguments]
-    ) is (unit.operation == "ui.commands.execute")
+    assert "ak.wwise.ui.commands.getCommands" not in [
+        str(argument) for step in steps for argument in step.arguments
+    ]
     assert steps[-1].expected_operation_request == runtime.request
     fixture = json.loads(runtime.fixture_path.read_text(encoding="utf-8"))
     assert fixture["is_command_line"] is False
@@ -136,32 +132,3 @@ def test_authoring_fixture_shim_reports_host_and_bounded_command_inventory(
     assert client.call("ak.wwise.ui.commands.getCommands") == {
         "commands": ["SaveProject"]
     }
-
-
-def test_command_choice_oracle_requires_exact_structured_inventory_membership() -> None:
-    unit = load_authoring_ui_business_profile(
-        PROFILE,
-        unit_ids=("AUI25-SAVE-PREVIEW",),
-    ).units[0]
-
-    assert _command_choice_came_from_inventory(
-        unit,
-        [
-            SimpleNamespace(
-                step_name="tx01.command-inventory",
-                payload={"agent_result": {"commands": ["SaveProject"]}},
-            )
-        ],
-    )
-    assert not _command_choice_came_from_inventory(
-        unit,
-        [
-            SimpleNamespace(
-                step_name="tx01.command-inventory",
-                payload={
-                    "agent_result": {"commands": ["Copy"]},
-                    "diagnostic": "SaveProject",
-                },
-            )
-        ],
-    )

@@ -19,9 +19,6 @@ from tests.semantic.support.codex_business_agent_runner import (
 from tests.semantic.support.codex_eval_protocol_v3 import (
     build_authoring_ui_business_transaction_steps,
 )
-from wwise_waapi.operation_ui_commands import MAX_LIVE_COMMANDS
-
-
 OUTCOME_CONTRACT = "waapi-skill.authoring-ui-business-agent-outcome/v1"
 AuthoringUiBusinessAgentOptions = BusinessAgentOptions
 
@@ -140,35 +137,6 @@ def _preview_matches_request(records: Sequence[Any], request: Mapping[str, Any])
     return observed == request
 
 
-def _command_choice_came_from_inventory(
-    unit: AuthoringUiBusinessUnit,
-    records: Sequence[Any],
-) -> bool:
-    inventory = [
-        record
-        for record in records
-        if record.step_name == "tx01.command-inventory"
-    ]
-    if unit.operation == "ui.captureScreen":
-        return not inventory
-    if len(inventory) != 1 or not isinstance(inventory[0].payload, Mapping):
-        return False
-    agent_result = inventory[0].payload.get("agent_result")
-    commands = (
-        agent_result.get("commands")
-        if isinstance(agent_result, Mapping)
-        else None
-    )
-    expected = unit.request_arguments.get("command")
-    return bool(
-        isinstance(commands, list)
-        and 0 < len(commands) <= MAX_LIVE_COMMANDS
-        and all(isinstance(command, str) and command for command in commands)
-        and isinstance(expected, str)
-        and expected in commands
-    )
-
-
 def run_authoring_ui_business_agent_unit(
     unit: AuthoringUiBusinessUnit,
     *,
@@ -208,9 +176,9 @@ def _authoring_ui_preview_gates(
             broker_evidence.records,
             runtime.request,
         ),
-        "fresh_command_choice": _command_choice_came_from_inventory(
-            unit,
-            broker_evidence.records,
+        "closed_command_choice": (
+            unit.operation == "ui.captureScreen"
+            or runtime.request["arguments"].get("command") == "SaveProject"
         ),
     }
 

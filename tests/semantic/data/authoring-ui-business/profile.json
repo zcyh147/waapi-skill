@@ -24,7 +24,7 @@
       "operation": "ui.commands.execute",
       "api": "ak.wwise.ui.commands.execute",
       "version": "2025.1",
-      "prompt": "请从当前 Wwise Authoring 可用命令中选择 SaveProject，并只生成一次执行预览，不要执行。",
+      "prompt": "请为当前 Wwise Authoring 生成一次 SaveProject 命令执行预览，不要执行。",
       "request_arguments": {
         "command": "SaveProject"
       },

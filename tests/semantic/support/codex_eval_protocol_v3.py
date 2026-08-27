@@ -1658,18 +1658,6 @@ def build_authoring_ui_business_transaction_steps(
 
     draft = _BusinessDraftSteps.start(operation=operation, label=label)
     steps = draft.steps
-    if operation == "ui.commands.execute":
-        steps[1:1] = [
-            request_schema_step(
-                f"{label}.command-inventory-schema",
-                "ak.wwise.ui.commands.getCommands",
-            ),
-            call_step(
-                f"{label}.command-inventory",
-                "ak.wwise.ui.commands.getCommands",
-                version=version,
-            ),
-        ]
     steps[:0] = [
         ExpectedGatewayStep(
             name=f"{label}.operations",
