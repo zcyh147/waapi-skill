@@ -2040,8 +2040,6 @@ def test_registry_composer_lanes_and_real_adapters_are_one_to_one() -> None:
 
     assert adapter_lanes == composer_lanes
     assert {operation for operation, _version in composer_lanes} == {
-        "ui.commands.register",
-        "ui.commands.unregister",
         "waapi.undoGroup",
     }
 

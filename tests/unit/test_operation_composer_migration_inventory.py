@@ -82,20 +82,20 @@ def test_inventory_exactly_covers_every_registry_operation_and_version_lane() ->
             "soundbank.setInclusions",
             "switchContainer.addAssignment",
             "switchContainer.removeAssignment",
+            "ui.captureScreen",
+            "ui.commands.execute",
+            "ui.commands.register",
+            "ui.commands.unregister",
         }:
             expected_mode = BUSINESS_DECLARATION_INPUT_MODE
         elif (
             assignments[name][1]
             in {"wave-00-complete", "wave-02-object-graph"}
             or name == "object.create"
-            or (
-                assignments[name][1] == "wave-05-authoring-ui"
-                and name in {"ui.commands.register", "ui.commands.unregister"}
-            )
-                or assignments[name][1] == "wave-05-file-lua"
-                and name.startswith("lua.")
-                or assignments[name][1] == "wave-06-compound-undo"
-            ):
+            or assignments[name][1] == "wave-05-file-lua"
+            and name.startswith("lua.")
+            or assignments[name][1] == "wave-06-compound-undo"
+        ):
             expected_mode = COMPOSER_INPUT_MODE
         elif assignments[name][1] in {
             "wave-01-single-object-edits",

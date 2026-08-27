@@ -160,14 +160,13 @@ def test_every_supported_operation_version_has_one_explicit_normal_input_mode() 
                 "soundbank.setInclusions",
                 "switchContainer.addAssignment",
                 "switchContainer.removeAssignment",
-            }
-            else COMPOSER_INPUT_MODE
-            if name
-            in {
+                "ui.captureScreen",
+                "ui.commands.execute",
                 "ui.commands.register",
                 "ui.commands.unregister",
-                "waapi.undoGroup",
             }
+            else COMPOSER_INPUT_MODE
+            if name in {"waapi.undoGroup"}
             else "inline_typed"
             if name
             in {
@@ -176,8 +175,6 @@ def test_every_supported_operation_version_has_one_explicit_normal_input_mode() 
                 "debug.setAutomationMode",
                 "debug.testAssert",
                 "debug.testCrash",
-                "ui.captureScreen",
-                "ui.commands.execute",
             }
             else INTERNAL_CANONICAL_INPUT_MODE
         )

@@ -4108,6 +4108,8 @@ def _compile_integration_workflow_plan(
         "draft-declare-switch-assignment": "operation_compose",
         "draft-declare-soundbank-plan": "operation_compose",
         "draft-declare-artifact-plan": "operation_compose",
+        "draft-declare-ui-plan": "operation_compose",
+        "draft-add-ui-command": "operation_compose",
         "draft-business-configure": "operation_compose",
         "draft-declare-import-batch": "operation_compose",
         "draft-declare-new": "operation_compose",

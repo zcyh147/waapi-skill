@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Mapping
 
 from .audio_import_business_contracts import audio_import_business_contract_data
+from .authoring_ui_business_contracts import authoring_ui_business_contract_data
 from .exact_artifact_business_contracts import (
     exact_artifact_business_contract_data,
 )
@@ -33,6 +34,7 @@ PreviewCompiler = Callable[
     [BusinessDeclarationSession, Callable[..., Mapping[str, Any]]],
     Any,
 ]
+CompletenessCheck = Callable[[str, BusinessDeclarationSession], bool]
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,6 +85,10 @@ def _audio_import_contract(operation: str, version: str) -> dict[str, Any]:
     if operation != "audio.import":  # pragma: no cover - registry invariant
         raise ValueError("audio-import Adapter received the wrong operation")
     return audio_import_business_contract_data(version)
+
+
+def _authoring_ui_contract(operation: str, version: str) -> dict[str, Any]:
+    return authoring_ui_business_contract_data(operation, version)
 
 
 def _object_lifecycle_contract(operation: str, version: str) -> dict[str, Any]:
@@ -217,6 +223,24 @@ def _materialize_exact_artifact_with_cleaned_file_evidence(
     )
 
 
+def _materialize_authoring_ui(
+    operation: str,
+    session: BusinessDeclarationSession,
+) -> Mapping[str, Any]:
+    from .authoring_ui_business import materialize_authoring_ui_business_request
+
+    return materialize_authoring_ui_business_request(operation, session)
+
+
+def _authoring_ui_is_complete(
+    operation: str,
+    session: BusinessDeclarationSession,
+) -> bool:
+    from .authoring_ui_business import authoring_ui_business_is_complete
+
+    return authoring_ui_business_is_complete(operation, session)
+
+
 def _compile_audio_import_preview(
     session: BusinessDeclarationSession,
     build_continuation: Callable[..., Mapping[str, Any]],
@@ -242,6 +266,7 @@ class BusinessAdapter:
     active_projection_actions: tuple[str, ...]
     _cleaned_file_evidence_materializer: Materializer | None = None
     _preview_compiler: PreviewCompiler | None = None
+    _completeness_check: CompletenessCheck | None = None
     requires_sound_subtype: bool = False
     supports_field_binding: bool = False
     supports_field_discovery: bool = False
@@ -294,6 +319,15 @@ class BusinessAdapter:
         if self._preview_compiler is None:
             return None
         return self._preview_compiler(session, build_continuation)
+
+    def is_complete(self, session: BusinessDeclarationSession) -> bool:
+        if self._completeness_check is not None:
+            return self._completeness_check(self.operation, session)
+        return (
+            bool(session.settings)
+            if self.settings_are_complete_declaration
+            else bool(session.declarations)
+        )
 
 
 _AUDIO_IMPORT_DEFINITION = {
@@ -578,6 +612,30 @@ _EXACT_ARTIFACT_CODE_DEFINITION = {
     ),
 }
 
+_AUTHORING_UI_DEFINITION = {
+    "family": "authoring-ui-business",
+    "contract_builder": _authoring_ui_contract,
+    "materializer": _materialize_authoring_ui,
+    "completeness_check": _authoring_ui_is_complete,
+    "update_commands": frozenset(
+        {"draft-declare-ui-plan", "draft-add-ui-command"}
+    ),
+    "initial_projection_actions": (
+        "declare-ui-plan",
+        "inspect",
+        "cancel",
+    ),
+    "active_projection_actions": (
+        "declare-ui-plan",
+        "add-ui-command",
+        "check",
+        "inspect",
+        "cancel",
+    ),
+    "auto_apply_preview": True,
+    "settings_are_complete_declaration": True,
+}
+
 
 def _bind_adapter(operation: str, definition: Mapping[str, Any]) -> BusinessAdapter:
     values = dict(definition)
@@ -588,6 +646,7 @@ def _bind_adapter(operation: str, definition: Mapping[str, Any]) -> BusinessAdap
         None,
     )
     values["_preview_compiler"] = values.pop("preview_compiler", None)
+    values["_completeness_check"] = values.pop("completeness_check", None)
     return BusinessAdapter(operation=operation, **values)
 
 
@@ -603,6 +662,15 @@ _BUSINESS_ADAPTERS = {
             "lua.executeCliFile",
             "lua.executeCoreFile",
             "lua.executeCoreInline",
+        )
+    },
+    **{
+        operation: _bind_adapter(operation, _AUTHORING_UI_DEFINITION)
+        for operation in (
+            "ui.captureScreen",
+            "ui.commands.execute",
+            "ui.commands.register",
+            "ui.commands.unregister",
         )
     },
     "object.create": _bind_adapter("object.create", _OBJECT_GRAPH_DEFINITION),

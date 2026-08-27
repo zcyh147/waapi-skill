@@ -27,6 +27,13 @@ from tests.semantic.support.codex_gateway_broker import (
     TypedRequestFactsArgument,
 )
 from wwise_waapi.operation_composer import typed_action_cli_arguments
+from wwise_waapi.authoring_ui_business_cli import (
+    AuthoringUiBusinessCliError,
+    add_authoring_ui_command_arguments,
+    add_authoring_ui_plan_arguments,
+    authoring_ui_command_from_namespace,
+    authoring_ui_plan_from_namespace,
+)
 from wwise_waapi.exact_artifact_business_cli import (
     ExactArtifactBusinessCliError,
     add_exact_artifact_plan_arguments,
@@ -464,6 +471,31 @@ def _business_copy_binding_was_used(
             ):
                 return True
             continue
+        if command[0] == "draft-declare-ui-plan":
+            contract = binding.get("business_contract")
+            operation = (
+                contract.get("operation")
+                if isinstance(contract, Mapping)
+                else None
+            )
+            if isinstance(operation, str) and _authoring_ui_plan_suffix_matches(
+                operation,
+                suffix,
+            ):
+                return True
+            continue
+        if command[0] == "draft-add-ui-command":
+            contract = binding.get("business_contract")
+            operation = (
+                contract.get("operation")
+                if isinstance(contract, Mapping)
+                else None
+            )
+            if operation == "ui.commands.register" and (
+                _authoring_ui_command_suffix_matches(suffix)
+            ):
+                return True
+            continue
         if _business_binding_suffix_matches(candidate, suffix):
             return True
     return False
@@ -492,6 +524,49 @@ def _exact_artifact_plan_suffix_matches(
         "lua.executeCoreInline": {"lua_source", "io_root"},
     }.get(operation)
     return required is not None and all(plan.get(field) is not None for field in required)
+
+
+def _authoring_ui_plan_suffix_matches(
+    operation: str,
+    suffix: list[str],
+) -> bool:
+    parser = argparse.ArgumentParser(add_help=False, exit_on_error=False)
+    add_authoring_ui_plan_arguments(parser)
+    try:
+        namespace, unknown = parser.parse_known_args(suffix)
+        if unknown:
+            return False
+        plan = authoring_ui_plan_from_namespace(
+            namespace,
+            operation=operation,
+        )
+    except (argparse.ArgumentError, AuthoringUiBusinessCliError, SystemExit):
+        return False
+    if operation == "ui.captureScreen":
+        return True
+    if operation == "ui.commands.execute":
+        return isinstance(plan.get("command_id"), str)
+    if operation == "ui.commands.register":
+        return isinstance(plan.get("command_count"), int)
+    if operation == "ui.commands.unregister":
+        return bool(
+            plan.get("registered_command_keys")
+            or plan.get("existing_command_ids")
+        )
+    return False
+
+
+def _authoring_ui_command_suffix_matches(suffix: list[str]) -> bool:
+    parser = argparse.ArgumentParser(add_help=False, exit_on_error=False)
+    add_authoring_ui_command_arguments(parser)
+    try:
+        namespace, unknown = parser.parse_known_args(suffix)
+        if unknown:
+            return False
+        command = authoring_ui_command_from_namespace(namespace)
+    except (argparse.ArgumentError, AuthoringUiBusinessCliError, SystemExit):
+        return False
+    return bool(command.get("key") and command.get("display_name"))
 
 
 def _soundbank_plan_suffix_matches(

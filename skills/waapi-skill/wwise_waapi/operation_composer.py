@@ -2181,11 +2181,7 @@ def _business_composition_projection(
         }
     session = BusinessDeclarationSession.from_dict(raw_session)
     adapter = business_adapter(operation)
-    complete = (
-        bool(session.settings)
-        if adapter.settings_are_complete_declaration
-        else bool(session.declarations)
-    )
+    complete = adapter.is_complete(session)
     return {
         "business_revision": session.revision,
         "declarations": [row.as_dict() for row in session.declarations],

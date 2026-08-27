@@ -271,6 +271,17 @@ from wwise_waapi.exact_artifact_business_cli import (  # noqa: E402  # pyright: 
 from wwise_waapi.exact_artifact_business import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     exact_artifact_evidence_from_request,
 )
+from wwise_waapi.authoring_ui_business_cli import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    AuthoringUiBusinessCliError,
+    add_authoring_ui_command_arguments,
+    add_authoring_ui_plan_arguments,
+    authoring_ui_command_from_namespace,
+    authoring_ui_plan_from_namespace,
+)
+from wwise_waapi.authoring_ui_business import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    append_authoring_ui_command,
+    validate_authoring_ui_business_session,
+)
 from wwise_waapi.operation_composer import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     MAX_TYPED_ACTIONS_PER_APPLY,
     OperationComposerError,
@@ -2067,6 +2078,26 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_business_draft_binding_arguments(draft_declare_artifact_plan)
     add_exact_artifact_plan_arguments(draft_declare_artifact_plan)
+
+    draft_declare_ui_plan = subparsers.add_parser(
+        "draft-declare-ui-plan",
+        help=(
+            "Declare one closed Authoring UI capture, execute, register header, "
+            "or unregister business plan"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_declare_ui_plan)
+    add_authoring_ui_plan_arguments(draft_declare_ui_plan)
+
+    draft_add_ui_command = subparsers.add_parser(
+        "draft-add-ui-command",
+        help=(
+            "Append the next complete high-level command descriptor to a "
+            "count-bound Authoring UI registration plan"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_add_ui_command)
+    add_authoring_ui_command_arguments(draft_add_ui_command)
 
     draft_declare_field_change = subparsers.add_parser(
         "draft-declare-field-change",
@@ -8631,6 +8662,16 @@ def dispatch_command(
             dispatcher=dispatcher,
             common=common,
         )
+    if args.command in {"draft-declare-ui-plan", "draft-add-ui-command"}:
+        return dispatch_business_authoring_ui_update(
+            args,
+            env=env,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+        )
     if args.command == "draft-bind-field":
         return dispatch_business_field_binding(
             args,
@@ -11524,6 +11565,134 @@ def dispatch_business_exact_artifact_plan(
         adapter.materialize(candidate)
         return candidate
 
+    record = binding.store.apply_business_update(
+        args.draft_id,
+        task_authority=args.task_authority,
+        expected_revision=args.expected_revision,
+        schema_digest=operation_draft_schema_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        composer_digest=operation_composer_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        context=binding.context,
+        update=update,
+        event_type="settings.revised",
+    )
+    payload = operation_draft_payload(
+        args.command,
+        record,
+        offline=False,
+        task_authority=args.task_authority,
+    )
+    payload.update(
+        {
+            "endpoint": dict(common["endpoint"]),
+            "detected_version": detected_version,
+            "project_call": dispatch_call_summary(binding.project_call),
+        }
+    )
+    return payload
+
+
+def dispatch_business_authoring_ui_update(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Record one closed Authoring UI plan stage on an Authoring host."""
+
+    state_dir = resolve_transaction_state_directory(args, env=env)
+    pending = OperationDraftStore(state_dir).inspect(
+        args.draft_id,
+        task_authority=args.task_authority,
+    )
+    if live_info.get("isCommandLine") is not False:
+        return authoring_host_required_payload(
+            api=None,
+            command=args.command,
+            live_info=live_info,
+            common=common,
+            operation=pending.operation,
+        )
+    binding = _open_business_binding(
+        args,
+        env=env,
+        connection=connection,
+        detected_version=detected_version,
+        live_info=live_info,
+        dispatcher=dispatcher,
+    )
+    adapter = business_adapter(binding.record.operation)
+    if adapter.family != "authoring-ui-business" or not adapter.accepts_update_command(
+        args.command
+    ):
+        raise GatewayInputError(
+            f"{binding.record.operation} does not expose {args.command}"
+        )
+    raw_session = (
+        binding.record.composition.get("business_session")
+        if binding.record.composition is not None
+        else None
+    )
+    session = (
+        BusinessDeclarationSession.create(binding.context)
+        if raw_session is None
+        else BusinessDeclarationSession.from_dict(raw_session)
+    )
+    if session.context != binding.context:
+        raise OperationDraftBindingDrift(
+            "Live project or Wwise build differs from the Authoring UI plan binding."
+        )
+    try:
+        if args.command == "draft-declare-ui-plan":
+            plan = authoring_ui_plan_from_namespace(
+                args,
+                operation=binding.record.operation,
+            )
+
+            def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
+                candidate = current.with_settings({"ui_plan": plan})
+                validate_authoring_ui_business_session(
+                    binding.record.operation,
+                    candidate,
+                )
+                if adapter.is_complete(candidate):
+                    parse_operation_request(
+                        adapter.materialize(candidate),
+                        expected_version=detected_version,
+                    )
+                return candidate
+
+        else:
+            if binding.record.operation != "ui.commands.register":
+                raise GatewayInputError(
+                    "draft-add-ui-command is available only for ui.commands.register"
+                )
+            command = authoring_ui_command_from_namespace(args)
+
+            def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
+                candidate = append_authoring_ui_command(current, command)
+                validate_authoring_ui_business_session(
+                    binding.record.operation,
+                    candidate,
+                )
+                if adapter.is_complete(candidate):
+                    parse_operation_request(
+                        adapter.materialize(candidate),
+                        expected_version=detected_version,
+                    )
+                return candidate
+
+    except AuthoringUiBusinessCliError as exc:
+        raise GatewayInputError(str(exc)) from exc
     record = binding.store.apply_business_update(
         args.draft_id,
         task_authority=args.task_authority,
@@ -16752,6 +16921,8 @@ def _business_next_action_binding(
         "draft-declare-artifact-plan",
         *binding,
     ]
+    declare_ui_plan_prefix = [*base, "draft-declare-ui-plan", *binding]
+    add_ui_command_prefix = [*base, "draft-add-ui-command", *binding]
     revise_prefix = [*base, "draft-revise-declaration", *binding]
     remove_prefix = [*base, "draft-remove-declaration", *binding]
     check = [*base, "draft-check", *binding]
@@ -16835,6 +17006,111 @@ def _business_next_action_binding(
                 "bind_each_required_role_then_copy_its_returned_handle_into_"
                 "the_same_named_declaration_field"
             ),
+        }
+    if adapter.family == "authoring-ui-business":
+        shared = {
+            "contract": "waapi-skill.business-draft-next-action/v1",
+            "responsibility_split": operation_business_contract(
+                record.operation,
+                record.version,
+            )["responsibility_split"],
+            "business_contract": operation_business_contract(
+                record.operation,
+                record.version,
+            ),
+            "forbidden_inputs": [
+                *forbidden_inputs,
+                "native_command_id_for_registration",
+                "source_authority",
+                "host_platform",
+                "acknowledgement_literal",
+                "native_request",
+                "revision_arithmetic",
+                "request_fragment",
+            ],
+            "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+            "then_read_next_response": True,
+            "precompute_or_increment_revision": False,
+        }
+        if session is not None and adapter.is_complete(session):
+            return {
+                **shared,
+                "required_next_phase": "check_complete_authoring_ui_plan",
+                "check": {
+                    **operation_draft_prefix_copy_binding(check),
+                    "append": [],
+                },
+            }
+        if record.operation == "ui.commands.register" and session is not None:
+            raw_plan = session.settings.get("ui_plan")
+            commands = raw_plan.get("commands") if isinstance(raw_plan, Mapping) else None
+            expected = raw_plan.get("command_count") if isinstance(raw_plan, Mapping) else None
+            next_index = len(commands) if isinstance(commands, list) else 0
+            handler_kinds = ["notification", "program"]
+            if record.version in {"2023.1", "2024.1", "2025.1"}:
+                handler_kinds.append("lua_script")
+            return {
+                **shared,
+                "required_next_phase": "add_next_complete_ui_command",
+                "command_index": next_index,
+                "expected_command_count": expected,
+                "declaration": {
+                    **operation_draft_prefix_copy_binding(
+                        add_ui_command_prefix,
+                        append_action="copy_verbatim_then_append_one_complete_ui_command",
+                    ),
+                    "append": [
+                        "--key <stable-business-command-key>",
+                        "--display-name <user-facing-name>",
+                        f"--handler-kind {'|'.join(handler_kinds)}",
+                        "[--handler-path <exact-user-supplied-existing-path>]",
+                        "[--argument-token <one-exact-token>]... (lua_script only)",
+                        "[--working-directory <exact-existing-directory>]",
+                        "[--start-mode SingleSelectionSingleProcess|MultipleSelectionSingleProcessSpaceSeparated|MultipleSelectionMultipleProcesses]",
+                        "[--redirect-outputs] (program/Windows only)",
+                        "[--lua-module-directory <exact-existing-directory>]...",
+                        "[--lua-selected-return <field>]...",
+                        "[--default-shortcut <shortcut>]",
+                        "[--context-menu-segment <Wwise-menu-segment>]...",
+                        "[--context-visible-for <Wwise-object-type>]...",
+                        "[--context-enabled-for <Wwise-object-type>]...",
+                        "[--main-menu-segment <Wwise-menu-segment>]...",
+                    ],
+                    "submit_once": True,
+                },
+            }
+        shapes = {
+            "ui.captureScreen": [
+                "[--view-name <exact-Wwise-view-name>]",
+                "[--view-channel 1|2|3|4]",
+                "[--rect <x> <y> <width> <height>]",
+            ],
+            "ui.commands.execute": [
+                "--command-id <exact-id-from-fresh-getCommands-choice>",
+                "[--command-object <exact-object-guid-or-command-operand>]...",
+                "[--command-platform <exact-project-platform>]...",
+                "[--value string|boolean|integer|number|null <exact-value>]",
+                "[--command-file <exact-user-supplied-file>]... (2025.1 only)",
+            ],
+            "ui.commands.register": [
+                "--command-count <number-of-user-requested-commands-1-to-32>",
+            ],
+            "ui.commands.unregister": [
+                "either --registered-command-key <Gateway-derived-registration-key> [...]",
+                "or --existing-command-id <exact-id-from-fresh-getCommands-choice> [...] --confirm-unknown-ownership",
+            ],
+        }
+        return {
+            **shared,
+            "required_next_phase": "declare_authoring_ui_business_plan",
+            "declaration": {
+                **operation_draft_prefix_copy_binding(
+                    declare_ui_plan_prefix,
+                    append_action="copy_verbatim_then_append_one_complete_ui_business_plan",
+                ),
+                "append": shapes[record.operation],
+                "submit_once": True,
+            },
         }
     if adapter.family == "exact-artifact-code":
         shared = {

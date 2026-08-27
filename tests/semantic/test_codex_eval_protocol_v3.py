@@ -45,6 +45,8 @@ from tests.semantic.support.codex_typed_input_profile import (
     load_typed_input_profile,
 )
 from tests.semantic.support.typed_gateway_input import (
+    _authoring_ui_command_suffix_matches,
+    _authoring_ui_plan_suffix_matches,
     _soundbank_plan_suffix_matches,
 )
 from wwise_waapi.operation_composer import typed_action_cli_arguments
@@ -63,6 +65,51 @@ def _request(index: int = 1) -> dict[str, object]:
             "source_authority": LUA_SOURCE_AUTHORITY,
         },
     }
+
+
+def test_authoring_ui_business_suffixes_match_only_closed_public_flags() -> None:
+    assert _authoring_ui_plan_suffix_matches(
+        "ui.commands.execute",
+        ["--command-id", "SaveProject", "--value", "boolean", "true"],
+    )
+    assert _authoring_ui_plan_suffix_matches(
+        "ui.commands.register",
+        ["--command-count", "2"],
+    )
+    assert _authoring_ui_plan_suffix_matches(
+        "ui.commands.unregister",
+        ["--registered-command-key", "notify-selection"],
+    )
+    assert _authoring_ui_command_suffix_matches(
+        [
+            "--key",
+            "notify-selection",
+            "--display-name",
+            "Notify",
+            "--handler-kind",
+            "notification",
+        ]
+    )
+
+
+def test_authoring_ui_business_suffixes_reject_native_or_unsafe_inputs() -> None:
+    assert not _authoring_ui_plan_suffix_matches(
+        "ui.commands.register",
+        ["--command-count", "1", "--source-authority", "user_supplied_verbatim"],
+    )
+    assert not _authoring_ui_command_suffix_matches(
+        [
+            "--key",
+            "program",
+            "--display-name",
+            "Program",
+            "--handler-kind",
+            "program",
+            "--handler-path",
+            "/owned/tool",
+            "--argument-token=--unsafe",
+        ]
+    )
 
 
 def test_exact_artifact_business_steps_hide_lua_loader_fields(

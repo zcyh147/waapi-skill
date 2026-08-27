@@ -52,10 +52,10 @@ planning; the Registry remains authoritative during implementation.
 | `soundbank.setInclusions` | 2021.1–2025.1 | Business declaration | bound Bank/object handles, add/remove/replace intent, and inclusion meanings | Gateway-owned GUID rows, normalized pre-state, and exact replacement | wave 04 deep cutover complete |
 | `switchContainer.addAssignment` | 2021.1–2025.1 | Business declaration | bound container, child, and state-or-switch handles | Gateway-derived GUID relationship, opposite precondition, and pair readback | wave 03 deep cutover complete |
 | `switchContainer.removeAssignment` | 2021.1–2025.1 | Business declaration | bound container, child, and state-or-switch handles | Gateway-derived GUID relationship, opposite precondition, and absence readback | wave 03 deep cutover complete |
-| `ui.captureScreen` | 2021.1–2025.1 | Inline typed | optional view/channel/rectangle | Authoring and output confinement | wave 05 complete |
-| `ui.commands.execute` | 2021.1–2025.1 | Inline typed | command; optional targets/values/files | fresh command inventory | wave 05 complete |
-| `ui.commands.register` | 2021.1–2025.1 | Composer | descriptors; optional authority | ownership and registration readback | wave 05 complete |
-| `ui.commands.unregister` | 2021.1–2025.1 | Composer | descriptors or acknowledged IDs | ownership cannot be inferred | wave 05 complete |
+| `ui.captureScreen` | 2021.1–2025.1 | Business declaration | optional view/channel/rectangle outcome | Gateway-owned version fields, Authoring guard, and output confinement | wave 05 deep cutover complete |
+| `ui.commands.execute` | 2021.1–2025.1 | Business declaration | live command choice; optional targets/values/files | fresh command inventory and exact file proofs | wave 05 deep cutover complete |
+| `ui.commands.register` | 2021.1–2025.1 | Business declaration | count-bound commands, exact handler paths, menu outcomes | Gateway-derived IDs, authority, platform, native descriptors, and paired cleanup | wave 05 deep cutover complete |
+| `ui.commands.unregister` | 2021.1–2025.1 | Business declaration | owned registration keys or confirmed existing IDs | Gateway-derived IDs and hidden unknown-ownership acknowledgement | wave 05 deep cutover complete |
 | `waapi.call` | 2021.1–2025.1 | Internal canonical | Gateway-materialized exact URI request | heterogeneous internal transaction representation | not model-facing |
 | `waapi.undoGroup` | 2021.1–2025.1 | Composer | name and ordered typed child handles | nested routes and cancellation journal | wave 06 complete |
 

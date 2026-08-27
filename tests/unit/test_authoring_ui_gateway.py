@@ -14,16 +14,6 @@ from tests.support.canonical_preview import bind_canonical_preview_fixture
 from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImports]
     OPERATION_REQUEST_CONTRACT,
 )
-from wwise_waapi.typed_operations import (  # pyright: ignore[reportMissingImports]
-    draft_operation_request_contract,
-    inline_operation_contract,
-)
-from wwise_waapi.typed_requests import (  # pyright: ignore[reportMissingImports]
-    TypedRequestFact,
-    dynamic_array_item_handle,
-    dynamic_container_disclosure,
-    dynamic_map_entry_handle,
-)
 from wwise_waapi.transactions import (  # pyright: ignore[reportMissingImports]
     TransactionState,
 )
@@ -220,84 +210,38 @@ def operation_request(
     }
 
 
-def notification_descriptor_facts(operation: str) -> tuple[Any, list[TypedRequestFact]]:
-    contract = draft_operation_request_contract(operation, "2024.1")
-    commands = next(field for field in contract.fields if field.path == ("commands",))
-    row = dynamic_array_item_handle(
-        contract, array_handle=commands.handle, index=0, shape="object"
-    )
-    disclosure = dynamic_container_disclosure(
-        contract,
-        parent_handle=commands.handle,
-        key="0",
-        shape="object",
-        child_handle=row,
-    )
-    choice = next(
-        item["handle"]
-        for branch in disclosure["branch_choices"]
-        if branch["key"] == "handler"
-        for item in branch["choices"]
-        if item["constant_fields"] == {"kind": "notification"}
-    )
-    handler = dynamic_map_entry_handle(
-        contract,
-        map_handle=row,
-        key="handler",
-        shape="object",
-        choice_handle=choice,
-        parent_schema=disclosure["schema_lineage"],
-    )
-    return contract, [
-        TypedRequestFact("append", commands.handle, "object", row),
-        TypedRequestFact("map-put", row, "string", "example.notify", key="id"),
-        TypedRequestFact("map-put", row, "string", "Notify", key="display_name"),
-        TypedRequestFact("choose-dynamic", row, "choice", choice, key="handler"),
-        TypedRequestFact("map-put", row, "object", handler, key="handler"),
-        TypedRequestFact("map-put", handler, "string", "notification", key="kind"),
-    ]
-
-
-def apply_typed_draft_facts(
-    *,
+@pytest.mark.parametrize(
+    "operation",
+    (
+        "ui.captureScreen",
+        "ui.commands.execute",
+        "ui.commands.register",
+        "ui.commands.unregister",
+    ),
+)
+@pytest.mark.parametrize(
+    "version",
+    ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"),
+)
+def test_public_operation_schema_exposes_only_the_authoring_ui_business_adapter(
     tmp_path: Path,
-    state_dir: Path,
-    started: Mapping[str, Any],
-    facts: Sequence[TypedRequestFact],
-) -> int:
-    revision = 1
-    for fact in facts:
-        argv = [
-            "draft-apply",
-            started["draft"]["draft_id"],
-            "--task-authority",
-            started["task_authority"],
-            "--expected-revision",
-            str(revision),
-            "--compact",
-            "--facts",
-            "--action",
-            "add_typed_fact",
-            "--fact-action",
-            fact.action,
-            "--field-handle",
-            fact.handle,
-        ]
-        if fact.key is not None:
-            argv.extend(["--key", fact.key])
-        if fact.action in {"choose", "choose-dynamic"}:
-            argv.extend(["--fact-value", fact.value])
-        elif fact.action != "present":
-            argv.extend(["--value-type", fact.value_type, "--fact-value", fact.value])
-        code, payload = execute(
-            argv,
-            tmp_path=tmp_path,
-            version="2024.1",
-            state_dir=state_dir,
-        )
-        assert code == 0, payload
-        revision = payload["draft"]["revision"]
-    return revision
+    operation: str,
+    version: str,
+) -> None:
+    code, payload = execute(
+        ["operation-schema", operation],
+        tmp_path=tmp_path,
+        version=version,
+    )
+
+    assert code == 0, payload
+    assert payload["operation"]["input_mode"] == "business_declaration"
+    assert payload["business_adapter"]["operation"] == operation
+    assert payload["business_adapter"]["declaration"]["subcommand"] == (
+        "draft-declare-ui-plan"
+    )
+    assert "typed_operation" not in payload
+    assert "composer" not in payload
 
 
 def test_offline_capability_profile_is_explicit_and_defaults_to_console(
@@ -634,39 +578,11 @@ def test_console_rejects_all_ui_command_previews_before_project_read(
 
 
 @pytest.mark.parametrize("operation", ("ui.captureScreen", "ui.commands.execute"))
-def test_typed_inline_ui_operations_reject_console_before_project_read(
+def test_business_ui_declaration_rejects_console_before_project_read(
     tmp_path: Path,
     operation: str,
 ) -> None:
-    contract = inline_operation_contract(operation, "2024.1")
-    argv = [
-        "typed-operation",
-        operation,
-        "--schema-digest",
-        contract["schema_digest"],
-        "--apply",
-    ]
-    if operation == "ui.commands.execute":
-        argv.extend(["--command", "SaveProject"])
-    client = FakeClient({GET_INFO_URI: [live_info(command_line=True)]})
-    code, payload = execute(
-        argv,
-        tmp_path=tmp_path,
-        version="2024.1",
-        state_dir=tmp_path / operation,
-        client=client,
-    )
-    assert code == 2
-    assert payload["error_code"] == "AUTHORING_HOST_REQUIRED"
-    assert [row[0] for row in client.calls] == [GET_INFO_URI]
-
-
-def test_typed_register_draft_seals_preview_and_fresh_inventory_remains_authoritative(
-    tmp_path: Path,
-) -> None:
-    operation = "ui.commands.register"
-    state_dir = tmp_path / "typed-register"
-    contract, facts = notification_descriptor_facts(operation)
+    state_dir = tmp_path / operation
     code, started = execute(
         ["draft-start", operation],
         tmp_path=tmp_path,
@@ -674,13 +590,91 @@ def test_typed_register_draft_seals_preview_and_fresh_inventory_remains_authorit
         state_dir=state_dir,
     )
     assert code == 0, started
-    revision = apply_typed_draft_facts(
+    argv = [
+        "draft-declare-ui-plan",
+        started["draft"]["draft_id"],
+        "--task-authority",
+        started["task_authority"],
+        "--expected-revision",
+        "1",
+    ]
+    if operation == "ui.commands.execute":
+        argv.extend(["--command-id", "SaveProject"])
+    client = FakeClient({GET_INFO_URI: [live_info(command_line=True)]})
+    code, payload = execute(
+        argv,
         tmp_path=tmp_path,
+        version="2024.1",
         state_dir=state_dir,
-        started=started,
-        facts=facts,
+        client=client,
     )
+    assert code == 2
+    assert payload["error_code"] == "AUTHORING_HOST_REQUIRED"
+    assert [row[0] for row in client.calls] == [GET_INFO_URI]
+
+
+def test_business_register_draft_seals_gateway_id_and_fresh_inventory_is_authoritative(
+    tmp_path: Path,
+) -> None:
+    operation = "ui.commands.register"
+    state_dir = tmp_path / "typed-register"
+    code, started = execute(
+        ["draft-start", operation],
+        tmp_path=tmp_path,
+        version="2024.1",
+        state_dir=state_dir,
+    )
+    assert code == 0, started
     info = live_info()
+    code, declared = execute(
+        [
+            "draft-declare-ui-plan",
+            started["draft"]["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            "1",
+            "--command-count",
+            "1",
+        ],
+        tmp_path=tmp_path,
+        version="2024.1",
+        state_dir=state_dir,
+        client=FakeClient(
+            {
+                GET_INFO_URI: [info],
+                GET_PROJECT_INFO_URI: [project(tmp_path)],
+            }
+        ),
+    )
+    assert code == 0, declared
+    code, completed = execute(
+        [
+            "draft-add-ui-command",
+            started["draft"]["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            str(declared["draft"]["revision"]),
+            "--key",
+            "notify-selection",
+            "--display-name",
+            "Notify",
+            "--handler-kind",
+            "notification",
+        ],
+        tmp_path=tmp_path,
+        version="2024.1",
+        state_dir=state_dir,
+        client=FakeClient(
+            {
+                GET_INFO_URI: [info],
+                GET_PROJECT_INFO_URI: [project(tmp_path)],
+            }
+        ),
+    )
+    assert code == 0, completed
+    revision = completed["draft"]["revision"]
     preview_client = FakeClient(
         {
             GET_INFO_URI: [info, info],
@@ -719,9 +713,9 @@ def test_typed_register_draft_seals_preview_and_fresh_inventory_remains_authorit
         ),
     )
     assert code == 0, preview
-    assert preview["agent_result"]["request"]["arguments"]["commands"][0]["id"] == (
-        "example.notify"
-    )
+    command_id = preview["agent_result"]["request"]["arguments"]["commands"][0]["id"]
+    assert command_id.startswith("waapi.skill.notify.selection.")
+    assert command_id != "notify-selection"
     assert preview["state"] == TransactionState.AWAITING_CONFIRMATION.value
 
     code, _confirmed = execute(
@@ -735,7 +729,7 @@ def test_typed_register_draft_seals_preview_and_fresh_inventory_remains_authorit
         {
             GET_INFO_URI: [info, info],
             GET_PROJECT_INFO_URI: [project(tmp_path)],
-            GET_COMMANDS_URI: [{"commands": ["Copy", "example.notify"]}],
+            GET_COMMANDS_URI: [{"commands": ["Copy", command_id]}],
         }
     )
     code, rejected = execute(
@@ -752,21 +746,28 @@ def test_typed_register_draft_seals_preview_and_fresh_inventory_remains_authorit
     ]
 
 
-def test_typed_capture_screen_finishes_as_result_schema_only(
+def test_business_capture_screen_finishes_as_result_schema_only(
     tmp_path: Path,
 ) -> None:
     version = "2024.1"
     operation = "ui.captureScreen"
     state_dir = tmp_path / "typed-capture"
-    contract = inline_operation_contract(operation, version)
     info = live_info()
-    code, preview = execute(
+    code, started = execute(
+        ["draft-start", operation],
+        tmp_path=tmp_path,
+        version=version,
+        state_dir=state_dir,
+    )
+    assert code == 0, started
+    code, declared = execute(
         [
-            "typed-operation",
-            operation,
-            "--schema-digest",
-            contract["schema_digest"],
-            "--apply",
+            "draft-declare-ui-plan",
+            started["draft"]["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            "1",
             "--view-name",
             "Project Explorer",
         ],
@@ -776,6 +777,47 @@ def test_typed_capture_screen_finishes_as_result_schema_only(
         client=FakeClient(
             {
                 GET_INFO_URI: [info],
+                GET_PROJECT_INFO_URI: [project(tmp_path)],
+            }
+        ),
+    )
+    assert code == 0, declared
+    code, checked = execute(
+        [
+            "draft-check",
+            started["draft"]["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            str(declared["draft"]["revision"]),
+        ],
+        tmp_path=tmp_path,
+        version=version,
+        state_dir=state_dir,
+        client=FakeClient(
+            {
+                GET_INFO_URI: [info, info],
+                GET_PROJECT_INFO_URI: [project(tmp_path)],
+            }
+        ),
+    )
+    assert code == 0, checked
+    code, preview = execute(
+        [
+            "preview-from-draft",
+            started["draft"]["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            str(checked["draft"]["revision"]),
+            "--apply",
+        ],
+        tmp_path=tmp_path,
+        version=version,
+        state_dir=state_dir,
+        client=FakeClient(
+            {
+                GET_INFO_URI: [info, info],
                 GET_PROJECT_INFO_URI: [project(tmp_path)],
             }
         ),
@@ -837,6 +879,218 @@ def test_typed_capture_screen_finishes_as_result_schema_only(
         GET_INFO_URI,
         GET_PROJECT_INFO_URI,
     ]
+
+
+@pytest.mark.parametrize(
+    ("operation", "declaration_argv"),
+    (
+        (
+            "ui.commands.execute",
+            ("--command-id", "SaveProject", "--value", "boolean", "true"),
+        ),
+        (
+            "ui.commands.unregister",
+            ("--registered-command-key", "notify-selection"),
+        ),
+    ),
+)
+def test_public_business_execute_and_unregister_run_one_full_gateway_chain(
+    tmp_path: Path,
+    operation: str,
+    declaration_argv: Sequence[str],
+) -> None:
+    version = "2024.1"
+    state_dir = tmp_path / f"business-{operation}"
+    info = live_info()
+    code, started = execute(
+        ["draft-start", operation],
+        tmp_path=tmp_path,
+        version=version,
+        state_dir=state_dir,
+    )
+    assert code == 0, started
+    code, declared = execute(
+        [
+            "draft-declare-ui-plan",
+            started["draft"]["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            str(started["draft"]["revision"]),
+            *declaration_argv,
+        ],
+        tmp_path=tmp_path,
+        version=version,
+        state_dir=state_dir,
+        client=FakeClient(
+            {
+                GET_INFO_URI: [info],
+                GET_PROJECT_INFO_URI: [project(tmp_path)],
+            }
+        ),
+    )
+    assert code == 0, declared
+    code, checked = execute(
+        [
+            "draft-check",
+            started["draft"]["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            str(declared["draft"]["revision"]),
+        ],
+        tmp_path=tmp_path,
+        version=version,
+        state_dir=state_dir,
+        client=FakeClient(
+            {
+                GET_INFO_URI: [info, info],
+                GET_PROJECT_INFO_URI: [project(tmp_path)],
+            }
+        ),
+    )
+    assert code == 0, checked
+    code, preview = execute(
+        [
+            "preview-from-draft",
+            started["draft"]["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            str(checked["draft"]["revision"]),
+            "--apply",
+        ],
+        tmp_path=tmp_path,
+        version=version,
+        state_dir=state_dir,
+        client=FakeClient(
+            {
+                GET_INFO_URI: [info, info],
+                GET_PROJECT_INFO_URI: [project(tmp_path)],
+            }
+        ),
+    )
+    assert code == 0, preview
+    request = preview["agent_result"]["request"]
+    assert request["operation"] == operation
+    command_id = (
+        "SaveProject"
+        if operation == "ui.commands.execute"
+        else request["arguments"]["command_ids"][0]
+    )
+    if operation == "ui.commands.execute":
+        assert request["arguments"]["value"] is True
+    else:
+        assert command_id.startswith("waapi.skill.notify.selection.")
+        assert request["arguments"]["acknowledgement"] == (
+            "unregister_existing_commands_without_definition"
+        )
+
+    code, confirmed = execute(
+        [
+            "confirm",
+            preview["transaction_id"],
+            "--artifact-hash",
+            preview["artifact_hash"],
+        ],
+        tmp_path=tmp_path,
+        version=version,
+        state_dir=state_dir,
+    )
+    assert code == 0, confirmed
+    mutation_uri = {
+        "ui.commands.execute": "ak.wwise.ui.commands.execute",
+        "ui.commands.unregister": "ak.wwise.ui.commands.unregister",
+    }[operation]
+    execute_client = FakeClient(
+        {
+            GET_INFO_URI: [info],
+            GET_PROJECT_INFO_URI: [project(tmp_path)],
+            GET_COMMANDS_URI: [{"commands": ["Copy", command_id]}],
+            mutation_uri: [{}],
+        }
+    )
+    code, executed = execute(
+        ["execute", preview["transaction_id"]],
+        tmp_path=tmp_path,
+        version=version,
+        state_dir=state_dir,
+        client=execute_client,
+    )
+    assert code == 0, executed
+    assert [row[0] for row in execute_client.calls].count(mutation_uri) == 1
+
+    verify_responses: dict[str, Sequence[Any]] = {
+        GET_INFO_URI: [info],
+        GET_PROJECT_INFO_URI: [project(tmp_path)],
+    }
+    if operation == "ui.commands.unregister":
+        verify_responses[GET_COMMANDS_URI] = [{"commands": ["Copy"]}]
+    code, verified = execute(
+        ["verify", preview["transaction_id"]],
+        tmp_path=tmp_path,
+        version=version,
+        state_dir=state_dir,
+        client=FakeClient(verify_responses),
+    )
+    assert code == 0, verified
+    if operation == "ui.commands.execute":
+        assert verified["state"] == TransactionState.RESULT_SCHEMA_CHECKED.value
+        assert verified["verified"] is False
+    else:
+        assert verified["state"] == TransactionState.VERIFIED.value
+        assert verified["verified"] is True
+
+
+def test_register_header_limit_fails_without_advancing_the_business_draft(
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "register-limit"
+    code, started = execute(
+        ["draft-start", "ui.commands.register"],
+        tmp_path=tmp_path,
+        version="2024.1",
+        state_dir=state_dir,
+    )
+    assert code == 0, started
+    client = FakeClient(
+        {
+            GET_INFO_URI: [live_info()],
+            GET_PROJECT_INFO_URI: [project(tmp_path)],
+        }
+    )
+    code, rejected = execute(
+        [
+            "draft-declare-ui-plan",
+            started["draft"]["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            str(started["draft"]["revision"]),
+            "--command-count",
+            "33",
+        ],
+        tmp_path=tmp_path,
+        version="2024.1",
+        state_dir=state_dir,
+        client=client,
+    )
+
+    assert code == 2, rejected
+    assert rejected["error_code"] == "INVALID_ARGUMENT"
+    code, inspected = execute(
+        [
+            "draft-inspect",
+            started["draft"]["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+        ],
+        tmp_path=tmp_path,
+        version="2024.1",
+        state_dir=state_dir,
+    )
+    assert code == 0, inspected
+    assert inspected["draft"]["revision"] == started["draft"]["revision"]
 
 
 @pytest.mark.parametrize("platform", ("linux", None, "windows"))

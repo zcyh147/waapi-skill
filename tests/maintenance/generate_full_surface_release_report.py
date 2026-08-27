@@ -327,6 +327,37 @@ def _continuation_error(
                                 or not contract.get("gateway_derivations")
                             ):
                                 return "business declaration Adapter is incomplete"
+                        elif operation in {
+                            "ui.captureScreen",
+                            "ui.commands.execute",
+                            "ui.commands.register",
+                            "ui.commands.unregister",
+                        }:
+                            has_closed_shape = (
+                                isinstance(declaration.get("schema"), Mapping)
+                                or (
+                                    isinstance(
+                                        declaration.get("header_schema"),
+                                        Mapping,
+                                    )
+                                    and isinstance(
+                                        declaration.get("item_schema"),
+                                        Mapping,
+                                    )
+                                )
+                            ) if isinstance(declaration, Mapping) else False
+                            if (
+                                not isinstance(declaration, Mapping)
+                                or declaration.get("subcommand")
+                                != "draft-declare-ui-plan"
+                                or not has_closed_shape
+                                or contract.get("legacy_composer_public")
+                                is not False
+                                or contract.get("legacy_inline_typed_public")
+                                is not False
+                                or not contract.get("gateway_derivations")
+                            ):
+                                return "business declaration Adapter is incomplete"
                         elif (
                             not isinstance(declaration, Mapping)
                             or not declaration.get("required_fields")

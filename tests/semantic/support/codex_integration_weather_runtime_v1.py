@@ -1390,6 +1390,8 @@ def _workflow_plan_steps(
         "draft-declare-field-change": "operation_compose",
         "draft-declare-new": "operation_compose",
         "draft-declare-existing": "operation_compose",
+        "draft-declare-ui-plan": "operation_compose",
+        "draft-add-ui-command": "operation_compose",
         "draft-revise-declaration": "operation_compose",
         "draft-remove-declaration": "operation_compose",
         "draft-check": "operation_compose_check",

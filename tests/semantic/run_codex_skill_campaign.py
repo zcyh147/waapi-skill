@@ -7291,6 +7291,8 @@ def _validate_integration_workflow_business_plan(
         "draft-declare-switch-assignment": "operation_compose",
         "draft-declare-soundbank-plan": "operation_compose",
         "draft-declare-artifact-plan": "operation_compose",
+        "draft-declare-ui-plan": "operation_compose",
+        "draft-add-ui-command": "operation_compose",
         "draft-declare-new": "operation_compose",
         "draft-declare-existing": "operation_compose",
         "draft-revise-declaration": "operation_compose",

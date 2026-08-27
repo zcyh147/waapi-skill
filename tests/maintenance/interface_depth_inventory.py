@@ -851,6 +851,8 @@ def _operation_model_values(
             return _object_graph_model_values(name, business_contract)
         if name.startswith("soundbank."):
             return _soundbank_model_values(name)
+        if name.startswith("ui."):
+            return _authoring_ui_model_values(name, business_contract)
         declaration = business_contract["declaration"]
         required = set(declaration["required_fields"])
         if name in {
@@ -931,6 +933,112 @@ def _operation_model_values(
                     policy=policy,
                 )
             )
+    return rows
+
+
+def _authoring_ui_model_values(
+    name: str,
+    contract: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    """Project only high-level Authoring UI choices, never native fields."""
+
+    rows: list[dict[str, Any]] = []
+
+    def add(
+        path: tuple[str, ...],
+        *,
+        shape: str,
+        required: bool,
+        ownership: str,
+    ) -> None:
+        rows.append(
+            {
+                "path": ["ui_plan", *path],
+                "name": path[-1],
+                "shape": shape,
+                "required": required,
+                "value_ownership": ownership,
+                "transport_ownership": "gateway_derivation",
+                "schema_sha256": canonical_sha256(
+                    {
+                        "operation": name,
+                        "path": path,
+                        "shape": shape,
+                        "ownership": ownership,
+                        "business_contract": contract["contract"],
+                    }
+                ),
+            }
+        )
+
+    if name == "ui.captureScreen":
+        for path, shape in (
+            (("view_name",), "scalar"),
+            (("view_channel",), "scalar"),
+            (("rectangle",), "map"),
+            (("rectangle", "x"), "scalar"),
+            (("rectangle", "y"), "scalar"),
+            (("rectangle", "width"), "scalar"),
+            (("rectangle", "height"), "scalar"),
+        ):
+            add(
+                path,
+                shape=shape,
+                required=False,
+                ownership="stable_business_declaration",
+            )
+        return rows
+    if name == "ui.commands.execute":
+        properties = contract["declaration"]["schema"]["properties"]
+        for field_name, schema in properties.items():
+            add(
+                (field_name,),
+                shape=("array" if schema.get("type") == "array" else "scalar"),
+                required=field_name == "command_id",
+                ownership=(
+                    "exact_user_artifact"
+                    if field_name == "files"
+                    else "stable_business_declaration"
+                ),
+            )
+        return rows
+    if name == "ui.commands.register":
+        values = (
+            (("command_count",), "scalar", True, "stable_business_declaration"),
+            (("commands",), "array", True, "gateway_derivation"),
+            (("commands", "[]", "key"), "scalar", True, "stable_business_declaration"),
+            (("commands", "[]", "display_name"), "scalar", True, "stable_business_declaration"),
+            (("commands", "[]", "handler"), "branch", True, "gateway_derivation"),
+            (("commands", "[]", "handler", "kind"), "scalar", True, "stable_business_declaration"),
+            (("commands", "[]", "handler", "program_path"), "scalar", False, "exact_user_artifact"),
+            (("commands", "[]", "handler", "lua_script_path"), "scalar", False, "exact_user_artifact"),
+            (("commands", "[]", "handler", "argument_tokens"), "array", False, "exact_user_artifact"),
+            (("commands", "[]", "handler", "working_directory"), "scalar", False, "exact_user_artifact"),
+            (("commands", "[]", "handler", "start_mode"), "scalar", False, "stable_business_declaration"),
+            (("commands", "[]", "handler", "redirect_outputs"), "scalar", False, "stable_business_declaration"),
+            (("commands", "[]", "handler", "lua_module_directories"), "array", False, "exact_user_artifact"),
+            (("commands", "[]", "handler", "lua_selected_return"), "array", False, "stable_business_declaration"),
+            (("commands", "[]", "default_shortcut"), "scalar", False, "stable_business_declaration"),
+            (("commands", "[]", "context_menu"), "map", False, "gateway_derivation"),
+            (("commands", "[]", "context_menu", "base_path"), "array", False, "stable_business_declaration"),
+            (("commands", "[]", "context_menu", "visible_for"), "array", False, "stable_business_declaration"),
+            (("commands", "[]", "context_menu", "enabled_for"), "array", False, "stable_business_declaration"),
+            (("commands", "[]", "main_menu"), "map", False, "gateway_derivation"),
+            (("commands", "[]", "main_menu", "base_path"), "array", False, "stable_business_declaration"),
+        )
+    else:
+        values = (
+            (("registered_command_keys",), "array", False, "stable_business_declaration"),
+            (("existing_command_ids",), "array", False, "stable_business_declaration"),
+            (("confirm_unknown_ownership",), "scalar", False, "stable_business_declaration"),
+        )
+    for path, shape, required, ownership in values:
+        add(
+            path,
+            shape=shape,
+            required=required,
+            ownership=ownership,
+        )
     return rows
 
 

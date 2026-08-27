@@ -194,6 +194,8 @@ EXPECTED_DRAFT_REVISION_SUBCOMMANDS = frozenset(
         "draft-declare-switch-assignment",
         "draft-declare-soundbank-plan",
         "draft-declare-artifact-plan",
+        "draft-declare-ui-plan",
+        "draft-add-ui-command",
         "draft-discover-fields",
         "draft-discover-types",
         "draft-remove-declaration",
