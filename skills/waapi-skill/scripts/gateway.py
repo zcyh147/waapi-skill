@@ -6879,6 +6879,16 @@ def query_business_schema_payload(
             "sound-sfx": "only Sound objects whose source language is SFX",
             "sound-voice": "only Sound objects whose source language is not SFX",
         },
+        "source_rules": {
+            "exactly_one_source": True,
+            "common_kind_is_a_source": (
+                "--kind is valid only when no path, id, search, or Query Editor "
+                "source is present"
+            ),
+            "kind_filter_after_another_source": (
+                "--predicate kind-is <business-kind>"
+            ),
+        },
         "predicates": {
             name: {"value_type": value_type}
             for name, (_field, _operator, value_type) in sorted(

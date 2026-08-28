@@ -4215,6 +4215,21 @@ def build_direct_protocol(
     return V3GatewayProtocol(values, (len(values),))
 
 
+def build_optional_query_schema_protocol(
+    query_step: ExpectedGatewayStep,
+) -> V3GatewayProtocol:
+    """Allow either a direct closed query or one exact schema read before it."""
+
+    if query_step.subcommand != "query-object":
+        raise V3ProtocolError("optional query schema must precede query-object")
+    return V3GatewayProtocol(
+        steps=(query_schema_step(), query_step),
+        turn_prefix_counts=(2,),
+        allowed_turn_prefix_counts=((1, 2),),
+        terminal_prefix_counts=(1, 2),
+    )
+
+
 def build_modification_policy_protocol(
     base: V3GatewayProtocol,
     *,
@@ -4574,6 +4589,7 @@ __all__ = [
     "V3GatewayProtocol",
     "V3ProtocolError",
     "build_direct_protocol",
+    "build_optional_query_schema_protocol",
     "build_audio_import_composer_protocol",
     "build_audio_import_composer_transaction_steps",
     "build_authoring_ui_business_transaction_steps",

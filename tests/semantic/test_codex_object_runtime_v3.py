@@ -578,6 +578,8 @@ def test_business_query_protocol_reads_schema_before_the_closed_declaration(
         "query-object",
     )
     assert protocol.turn_prefix_counts == (2,)
+    assert protocol.allowed_turn_prefix_counts == ((1, 2),)
+    assert protocol.terminal_prefix_counts == (1, 2)
     assert "--max-results" in protocol.steps[-1].arguments
     assert "--where" not in protocol.steps[-1].arguments
 

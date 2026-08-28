@@ -58,9 +58,9 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_direct_protocol,
     build_metadata_transaction_protocol,
     build_object_set_composer_transaction_steps,
+    build_optional_query_schema_protocol,
     build_transaction_protocol,
     query_object_step,
-    query_schema_step,
     topic_schema_step,
     wait_topic_step,
     _typed_fact_cli_arguments,
@@ -2250,11 +2250,11 @@ def _synthetic_protocol(
         if isinstance(recipe.request, OperationRequestSpec):
             return build_transaction_protocol((recipe.request.as_dict(),))
         if isinstance(recipe.request, QueryObjectRequestSpec):
-            return build_direct_protocol(
-                ([query_schema_step()] if "--max-results" in recipe.request.argv else [])
-                + [
-                    query_object_step("query-object", recipe.request.argv[3:]),
-                ]
+            query = query_object_step("query-object", recipe.request.argv[3:])
+            return (
+                build_optional_query_schema_protocol(query)
+                if "--max-results" in recipe.request.argv
+                else build_direct_protocol((query,))
             )
         raise AssertionError("synthetic object recipe request is not closed")
     if api == "ak.wwise.core.audio.convert":

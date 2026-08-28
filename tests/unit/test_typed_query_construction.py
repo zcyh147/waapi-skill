@@ -479,6 +479,14 @@ def test_query_schema_discloses_one_business_continuation_without_typed_facts(
             "sound-sfx": "only Sound objects whose source language is SFX",
             "sound-voice": "only Sound objects whose source language is not SFX",
         }
+        assert payload["source_rules"] == {
+            "exactly_one_source": True,
+            "common_kind_is_a_source": (
+                "--kind is valid only when no path, id, search, or Query Editor "
+                "source is present"
+            ),
+            "kind_filter_after_another_source": "--predicate kind-is <business-kind>",
+        }
         assert payload["presentation_boundary"] == {
             "sort_or_group_complete_result": "agent-owned presentation",
             "advanced_required_only_when": (

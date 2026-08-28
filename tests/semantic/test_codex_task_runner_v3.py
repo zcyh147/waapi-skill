@@ -19,7 +19,9 @@ from tests.semantic.support.codex_business_oracle_plan_v3 import (
 from tests.semantic.support import codex_task_runner_v3 as task_runner
 from tests.semantic.support.codex_eval_protocol_v3 import (
     V3GatewayProtocol,
+    build_optional_query_schema_protocol,
     build_transaction_protocol,
+    query_object_step,
 )
 from tests.semantic.support.codex_gateway_broker import (
     ExpectedGatewayStep,
@@ -100,6 +102,38 @@ def test_common_grade_accepts_first_and_resumed_turn_shapes() -> None:
         )
         assert errors == ()
         assert all(gates.values())
+
+
+@pytest.mark.parametrize(
+    "selected_names",
+    (("query",), ("query-schema", "query")),
+)
+def test_optional_query_schema_terminal_accepts_only_complete_selected_protocol(
+    selected_names: tuple[str, ...],
+) -> None:
+    protocol = build_optional_query_schema_protocol(
+        query_object_step(
+            "query",
+            ("query-object", "--kind", "all-sounds", "--max-results", "12"),
+        )
+    )
+    evidence = SimpleNamespace(
+        expected_step_names=selected_names,
+        consumed_step_names=selected_names,
+        records=tuple(
+            SimpleNamespace(step_name=name, succeeded=True)
+            for name in selected_names
+        ),
+        rejected_records=(),
+        complete=True,
+        passed=True,
+        terminal_state="COMPLETE",
+    )
+
+    assert task_runner._broker_terminal_protocol_passed(protocol, evidence)
+
+    evidence.complete = False
+    assert not task_runner._broker_terminal_protocol_passed(protocol, evidence)
 
 
 def test_common_grade_ignores_one_identical_windows_preprocess_failure() -> None:

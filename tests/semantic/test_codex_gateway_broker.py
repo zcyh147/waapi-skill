@@ -10076,6 +10076,61 @@ def test_broker_compares_business_query_meaning_not_option_group_order(
     assert broker.evidence().passed
 
 
+@pytest.mark.parametrize("read_schema", (False, True))
+def test_broker_accepts_one_optional_initial_query_schema(
+    tmp_path: Path,
+    read_schema: bool,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    query_arguments = ("--kind", "all-sounds", "--max-results", "12")
+    steps = (
+        ExpectedGatewayStep("query-schema", "query-schema"),
+        ExpectedGatewayStep("query", "query-object", query_arguments),
+    )
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=steps,
+        optional_initial_query_schema=True,
+        transport="tcp",
+    ) as broker:
+        completed = []
+        if read_schema:
+            completed.append(run_model_command(broker, ["query-schema"]))
+        completed.append(
+            run_model_command(broker, ["query-object", *query_arguments])
+        )
+
+    assert all(result.returncode == 0 for result in completed)
+    evidence = broker.evidence()
+    assert evidence.passed
+    assert evidence.expected_step_names == (
+        ("query-schema", "query") if read_schema else ("query",)
+    )
+
+
+def test_broker_optional_query_schema_rejects_the_advanced_contract(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(
+            ExpectedGatewayStep("query-schema", "query-schema"),
+            ExpectedGatewayStep(
+                "query",
+                "query-object",
+                ("--kind", "all-sounds", "--max-results", "12"),
+            ),
+        ),
+        optional_initial_query_schema=True,
+        transport="tcp",
+    ) as broker:
+        result = run_model_command(broker, ["query-schema", "--advanced"])
+
+    assert result.returncode != 0
+    assert broker.evidence().passed is False
+
+
 def test_broker_rejects_a_different_business_query_predicate(
     tmp_path: Path,
 ) -> None:

@@ -7857,6 +7857,7 @@ class CodexGatewayBroker:
             Mapping[str, Mapping[str, Any]] | None
         ) = None,
         optional_initial_operations_discovery_operation: str | None = None,
+        optional_initial_query_schema: bool = False,
     ) -> None:
         self.skill_source = _absolute_lexical(skill_source)
         self.runner_path = self.skill_source / "scripts" / "run.py"
@@ -7894,6 +7895,9 @@ class CodexGatewayBroker:
             optional_initial_operations_discovery_operation
         )
         self._optional_initial_operations_step: ExpectedGatewayStep | None = None
+        if type(optional_initial_query_schema) is not bool:
+            raise TypeError("optional_initial_query_schema must be a boolean")
+        self.optional_initial_query_schema = optional_initial_query_schema
         self._commutative_read_only_step_sets = tuple(
             frozenset(group)
             for group in self.commutative_read_only_step_groups
@@ -8016,6 +8020,16 @@ class CodexGatewayBroker:
                     "required step"
                 )
             self._optional_initial_operations_step = discovery
+        if self.optional_initial_query_schema:
+            if (
+                len(self.expected_steps) < 2
+                or self.expected_steps[0].subcommand != "query-schema"
+                or self.expected_steps[0].arguments
+                or self.expected_steps[1].subcommand != "query-object"
+            ):
+                raise ValueError(
+                    "optional query schema must be the exact first step before query-object"
+                )
         validate_operation_draft_protocol_steps(self.expected_steps)
         terminal_execute_steps = tuple(
             index
@@ -9011,6 +9025,15 @@ class CodexGatewayBroker:
                         0,
                         self._optional_initial_operations_step,
                     )
+                if (
+                    self._next_step == 0
+                    and not self._records
+                    and self.optional_initial_query_schema
+                    and resolved.gateway_arguments
+                    and resolved.gateway_arguments[0] == "query-object"
+                ):
+                    self._execution_steps.pop(0)
+                    self._selected_expected_steps.pop(0)
                 step = self._execution_steps[self._next_step]
                 step = self._rebase_business_draft_revision(step)
                 step = self._bind_task_local_declaration_id(
