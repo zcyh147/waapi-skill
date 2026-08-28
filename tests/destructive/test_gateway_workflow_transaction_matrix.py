@@ -416,12 +416,16 @@ def _discover_business_field(
     *,
     object_handle: str,
     meaning: str,
+    platform: str | None = None,
 ) -> str:
+    arguments = ["--object-handle", object_handle, "--meaning", meaning]
+    if platform is not None:
+        arguments.extend(("--platform", platform))
     payload = _update_business_draft(
         runtime,
         draft,
         "draft-discover-fields",
-        ["--object-handle", object_handle, "--meaning", meaning],
+        arguments,
         live=True,
     )
     candidates = payload.get("field_candidates")
@@ -1980,12 +1984,14 @@ def test_core_business_public_read_and_result_schema_mutation(
             object_type="ActorMixer",
             name=f"WAAPI_CORE_TARGET_{suffix}",
         )
-        notes = f"Core business paste {runtime.version} {suffix}"
-        _complete_object_lifecycle_business_transaction(
+        volume_db = -7.25
+        _complete_object_metadata_business_transaction(
             runtime,
-            operation="object.setNotes",
+            operation="object.setProperty",
             object_id=source_id,
-            notes=notes,
+            field_name="Volume",
+            value=volume_db,
+            platform="Windows",
         )
 
         diff = runtime.gateway(
@@ -2016,6 +2022,13 @@ def test_core_business_public_read_and_result_schema_mutation(
             object_id=source_id,
             role="source",
         )
+        volume_field = _discover_business_field(
+            runtime,
+            draft,
+            object_handle=source_handle,
+            meaning="volume",
+            platform="Windows",
+        )
         target_handle = _bind_business_object(
             runtime,
             draft,
@@ -2033,9 +2046,9 @@ def test_core_business_public_read_and_result_schema_mutation(
                 "--role",
                 "target_handles",
                 target_handle,
-                "--item",
-                "include_fields",
-                "notes",
+                "--field",
+                "include_field_handles",
+                volume_field,
                 "--value",
                 "list_mode",
                 "merge-replace",
@@ -2052,12 +2065,12 @@ def test_core_business_public_read_and_result_schema_mutation(
                 "--exact-id",
                 target_id,
                 "--include",
-                "notes",
+                "volume-db",
             ],
             live=True,
         )
         assert readback["count"] == 1, readback
-        assert readback["objects"][0]["notes"] == notes, readback
+        assert float(readback["objects"][0]["volume_db"]) == volume_db, readback
         runtime.category_results.append(
             {
                 "category": "core-business-public-seam",

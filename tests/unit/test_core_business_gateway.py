@@ -221,24 +221,6 @@ def test_project_save_draft_start_returns_only_core_business_continuation(
     assert "draft-apply" not in json.dumps(payload, sort_keys=True)
 
 
-def test_core_plan_parser_accepts_only_disclosed_repeatable_paste_business_fields() -> None:
-    parsed = gateway.build_parser().parse_args(
-        [
-            "draft-declare-core-plan",
-            "od1-" + "1" * 32,
-            "--task-authority",
-            "da1-" + "2" * 40,
-            "--expected-revision",
-            "4",
-            "--item",
-            "include_fields",
-            "notes",
-        ]
-    )
-
-    assert parsed.item == [["include_fields", "notes"]]
-
-
 def test_project_save_core_plan_closes_business_draft_without_dispatch(
     tmp_path: Path,
 ) -> None:

@@ -60,18 +60,10 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
         "versions": ("2022.1", "2023.1", "2024.1", "2025.1"),
         "roles": ("source", "target"),
         "required_fields": ("source_handle", "target_handles"),
-        "optional_fields": (
-            "include_fields",
-            "exclude_fields",
-            "include_field_handles",
-            "exclude_field_handles",
-            "list_mode",
-        ),
+        "optional_fields": ("include_field_handles", "exclude_field_handles", "list_mode"),
         "field_types": {
             "source_handle": "bound_object_handle",
             "target_handles": "bound_object_handle_list",
-            "include_fields": "paste_business_field_list",
-            "exclude_fields": "paste_business_field_list",
             "include_field_handles": "bound_field_handle_list",
             "exclude_field_handles": "bound_field_handle_list",
             "list_mode": "paste_list_mode",
@@ -279,11 +271,7 @@ def _mutation_input_form(value_type: str) -> dict[str, Any]:
         return {"flag": "--field", "repeatable": False, "arguments": ["FIELD", "HANDLE"]}
     if value_type == "bound_field_handle_list":
         return {"flag": "--field", "repeatable": True, "arguments": ["FIELD", "HANDLE"]}
-    if value_type in {
-        "platform_name_list",
-        "language_name_list",
-        "paste_business_field_list",
-    }:
+    if value_type in {"platform_name_list", "language_name_list"}:
         return {"flag": "--item", "repeatable": True, "arguments": ["FIELD", "VALUE"]}
     if value_type == "attenuation_curve_points":
         return {"flag": "--curve-point", "repeatable": True, "arguments": ["X", "Y", "SHAPE"]}
