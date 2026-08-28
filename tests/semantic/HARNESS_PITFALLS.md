@@ -197,6 +197,11 @@ prevention checks that are expensive to rediscover.
   instead of upgrading `result_schema_checked` to business verification. A run
   that reached Wwise but failed these test-only checks remains FAIL and receives
   no semantic or real-host PASS credit.
+- A later #84 attempt also proved why that weak boundary matters:
+  `pasteProperties` returned a schema-valid success on both Wwise versions, but
+  omitted inclusion did not copy Notes. Real effect proof must discover the
+  live Notes Field Handle, include it in the business plan, and read Notes back;
+  a valid result alone is not upgraded to business success.
 
 ## New-root preflight
 
