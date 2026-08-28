@@ -6874,6 +6874,11 @@ def query_business_schema_payload(
             "query_id": "--query-id <canonical GUID>",
             "query_path": "--query-path-segment <one literal name> (repeat)",
         },
+        "kind_semantics": {
+            "all-sounds": "every Wwise Sound, including SFX and Voice",
+            "sound-sfx": "only Sound objects whose source language is SFX",
+            "sound-voice": "only Sound objects whose source language is not SFX",
+        },
         "predicates": {
             name: {"value_type": value_type}
             for name, (_field, _operator, value_type) in sorted(
@@ -6894,12 +6899,20 @@ def query_business_schema_payload(
             "result_bound": f"--max-results <1..{MAX_QUERY_TAKE}>",
             "business_output": "--include <business-field> (repeat)",
         },
+        "presentation_boundary": {
+            "sort_or_group_complete_result": "agent-owned presentation",
+            "advanced_required_only_when": (
+                "server-side ordering, skip, distinct, regex, or another native "
+                "construct changes which rows enter the bounded result"
+            ),
+        },
         "advanced_fallback": {
             "available": True,
             "disclose_with": "query-schema --advanced",
             "use_only_when": (
-                "the business declaration cannot express the requested "
-                "read-only WAQL construct"
+                "server-side query semantics require a read-only WAQL construct "
+                "that the business declaration cannot express; final answer sorting "
+                "or grouping does not qualify"
             ),
         },
     }

@@ -1880,7 +1880,7 @@ def _get_03() -> ObjectHeavyRecipe:
                 ("included-is", "true"),
             ),
             take=12,
-            includes=("volume-db", "notes", "output-bus", "included"),
+            includes=("volume-db", "notes", "output-bus"),
             return_fields=return_fields,
             strategy="exact_rows",
             exact_keys=exact_keys,
@@ -2268,7 +2268,7 @@ def _validate_query_request(recipe: ObjectHeavyRecipe) -> None:
             for index, item in enumerate(argv)
             if item == "--include"
         )
-        if argv_includes != ("volume-db", "notes", "output-bus", "included"):
+        if argv_includes != ("volume-db", "notes", "output-bus"):
             raise ObjectHeavyRecipeError(
                 f"{recipe.scenario_id} business query outputs are inconsistent"
             )

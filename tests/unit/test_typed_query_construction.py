@@ -474,6 +474,21 @@ def test_query_schema_discloses_one_business_continuation_without_typed_facts(
         assert payload["query_contract"] == "waapi-skill.object-query-business/v1"
         assert payload["identity_projection"] == ["id", "name", "type", "path"]
         assert "volume-db" in payload["business_outputs"]
+        assert payload["kind_semantics"] == {
+            "all-sounds": "every Wwise Sound, including SFX and Voice",
+            "sound-sfx": "only Sound objects whose source language is SFX",
+            "sound-voice": "only Sound objects whose source language is not SFX",
+        }
+        assert payload["presentation_boundary"] == {
+            "sort_or_group_complete_result": "agent-owned presentation",
+            "advanced_required_only_when": (
+                "server-side ordering, skip, distinct, regex, or another native "
+                "construct changes which rows enter the bounded result"
+            ),
+        }
+        assert payload["advanced_fallback"]["use_only_when"].startswith(
+            "server-side query semantics"
+        )
         assert payload["continuation"]["predicate"] == (
             "--predicate <business-condition> <value>"
         )

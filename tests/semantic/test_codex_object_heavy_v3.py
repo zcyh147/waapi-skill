@@ -331,8 +331,6 @@ def test_query_recipes_keep_historical_and_business_declarations_explicit() -> N
         "notes",
         "--include",
         "output-bus",
-        "--include",
-        "included",
     )
 @pytest.mark.parametrize(
     "case_id",

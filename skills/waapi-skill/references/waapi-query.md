@@ -139,6 +139,13 @@ repeated `--relationship` for `descendants`, `ancestors`, `references-to`,
 `--max-results`; exact path/GUID identity may omit it. There is no unbounded
 mode.
 
+`all-sounds` means every Wwise `Sound`, including SFX and Voice. Use
+`sound-sfx` only when the user explicitly limits the request to SFX, and
+`sound-voice` only for Voice. Sorting or grouping a complete bounded result for
+the final answer is presentation and stays outside the query. Disclose advanced
+WAQL only when server-side ordering, skip, distinct, regex, or another native
+construct changes which rows enter the bounded result.
+
 The Gateway always returns `id,name,type,path`. Add requested report data with
 repeated `--include <business-field>`; `query-schema` lists the closed names.
 For a custom plug-in field, use `--include-field` with the user's short field
