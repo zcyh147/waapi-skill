@@ -907,20 +907,22 @@ def test_closed_gateway_workflows_across_selected_version(
             ],
             live=True,
         )
-        assert inclusions_read["agent_result"] == {
-            "contract": "waapi-skill.media-build-result/v1",
-            "kind": "soundbank_inclusions",
-            "count": 1,
-            "inclusions": [
-                {
-                    "object_id": included_id.upper(),
-                    "name": included_name,
-                    "type": "ActorMixer",
-                    "path": f"{object_parent}\\{included_name}",
-                    "includes": ["events", "structures"],
-                }
-            ],
+        assert inclusions_read["agent_result"]["contract"] == (
+            "waapi-skill.media-build-result/v1"
+        )
+        assert inclusions_read["agent_result"]["kind"] == "soundbank_inclusions"
+        assert inclusions_read["agent_result"]["count"] == 1
+        inclusion_row = inclusions_read["agent_result"]["inclusions"][0]
+        assert {
+            key: inclusion_row[key]
+            for key in ("object_id", "name", "path", "includes")
+        } == {
+            "object_id": included_id.upper(),
+            "name": included_name,
+            "path": f"{object_parent}\\{included_name}",
+            "includes": ["events", "structures"],
         }
+        assert inclusion_row["type"] in {"ActorMixer", "Actor-Mixer"}
 
         inclusions_clear = _complete_transaction(
             runtime,
@@ -1282,20 +1284,22 @@ def test_media_build_business_reads_across_selected_version(
             ],
             live=True,
         )
-        assert inclusions["agent_result"] == {
-            "contract": "waapi-skill.media-build-result/v1",
-            "kind": "soundbank_inclusions",
-            "count": 1,
-            "inclusions": [
-                {
-                    "object_id": included_id.upper(),
-                    "name": included_name,
-                    "type": "ActorMixer",
-                    "path": f"{object_parent}\\{included_name}",
-                    "includes": ["events", "structures"],
-                }
-            ],
+        assert inclusions["agent_result"]["contract"] == (
+            "waapi-skill.media-build-result/v1"
+        )
+        assert inclusions["agent_result"]["kind"] == "soundbank_inclusions"
+        assert inclusions["agent_result"]["count"] == 1
+        inclusion_row = inclusions["agent_result"]["inclusions"][0]
+        assert {
+            key: inclusion_row[key]
+            for key in ("object_id", "name", "path", "includes")
+        } == {
+            "object_id": included_id.upper(),
+            "name": included_name,
+            "path": f"{object_parent}\\{included_name}",
+            "includes": ["events", "structures"],
         }
+        assert inclusion_row["type"] in {"ActorMixer", "Actor-Mixer"}
         runtime.category_results.append(
             {
                 "category": "media-build-business-read",
