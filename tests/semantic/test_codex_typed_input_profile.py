@@ -141,6 +141,7 @@ def test_business_query_prompt_requires_one_live_kind_repair_before_main_read() 
     assert "实时类型目录返回多个候选" in unit.scenario.prompt
     assert "候选列表中的第一个精确类型" in unit.scenario.prompt
     assert "完成这次修复后" in unit.scenario.prompt
+    assert unit.scenario.render_prompt({}) == unit.scenario.prompt
     assert all(
         command not in unit.scenario.prompt
         for command in ("query-schema", "query-object", "--custom-kind")
