@@ -370,6 +370,8 @@ def test_metadata_attenuation_compiles_business_curve_role(
             "Outdoor",
             "--curve-role",
             "volume-dry",
+            "--platform",
+            "Windows",
         ],
         env=_gateway_env(tmp_path, version=version),
         client_factory=lambda _url: client,
@@ -386,9 +388,55 @@ def test_metadata_attenuation_compiles_business_curve_role(
         {
             "object": r"\Attenuations\Default Work Unit\Outdoor",
             "curveType": "VolumeDryUsage",
+            "platform": "Windows",
         },
         {},
     )
+
+
+@pytest.mark.parametrize(
+    ("operation_argv", "invalid_platform"),
+    (
+        (("property-state", "--meaning", "Volume"), " Windows "),
+        (("property-state", "--meaning", "Volume"), "Windows\x00"),
+        (("attenuation", "--curve-role", "volume-dry"), "\nWindows"),
+        (("attenuation", "--curve-role", "volume-dry"), "W" * 257),
+    ),
+)
+def test_metadata_business_platform_rejects_hostile_text_before_connecting(
+    tmp_path: Path,
+    operation_argv: tuple[str, ...],
+    invalid_platform: str,
+) -> None:
+    connected = False
+
+    def client_factory(_url: str) -> FakeClient:
+        nonlocal connected
+        connected = True
+        raise AssertionError("invalid business platform must fail before WAAPI")
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "metadata",
+            operation_argv[0],
+            "--path-segment",
+            "Actor-Mixer Hierarchy",
+            "--path-segment",
+            "Default Work Unit",
+            "--path-segment",
+            "Rain",
+            *operation_argv[1:],
+            "--platform",
+            invalid_platform,
+        ],
+        env=_gateway_env(tmp_path),
+        client_factory=client_factory,
+    )
+
+    assert exit_code == 2
+    assert connected is False
+    assert payload["error_code"] == "GatewayInputError"
+    assert "bounded, trimmed, control-free --platform" in payload["message"]
 
 
 def test_metadata_property_state_never_dispatches_a_reference_as_property(

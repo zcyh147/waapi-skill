@@ -53,9 +53,9 @@ for Wwise Authoring. Read this file before changing the Skill or running tests.
     virtual environment.
 - `skills/waapi-skill/scripts/gateway.py`
   - the public CLI contract: offline catalog/config commands, bounded live
-    reads, the progressively disclosed structured and advanced `query-schema`
-    contracts behind `query-object`, subscriptions, transaction phases, result
-    ceilings, and `session_context`.
+    reads, the closed business-declaration and separately disclosed advanced
+    `query-schema` contracts behind `query-object`, subscriptions, transaction
+    phases, result ceilings, and `session_context`.
 - `skills/waapi-skill/wwise_waapi/`
   - implementation library. Important seams include `capabilities.py`,
     `execution_contracts.py`, `operation_registry.py`, `transactions.py`,
@@ -171,11 +171,14 @@ user's approval.
   version-aware `operation-schema` or `describe` result; do not add per-API
   Markdown merely to repeat structured gateway contracts.
 - Keep mutation identities free of caller- or model-authored raw WAQL. Object
-  reads use three progressive layers: closed `query-object` flags, the
-  versioned `waapi-skill.object-query/v1` Builder from offline `query-schema`,
-  then—only when that schema cannot express a required read—the bounded
+  reads use two public layers: the closed business declaration returned by
+  offline `query-schema`, then—only when that declaration cannot express a
+  required server-side read semantic—the bounded
   `waapi-skill.advanced-object-query/v1` contract disclosed by
-  `query-schema --advanced`. The advanced contract fixes
+  `query-schema --advanced`. The business declaration subsumes the former
+  shortcut and structured-Builder inputs; do not restore a public
+  `waapi-skill.object-query/v1`, raw predicate/return grammar, or typed-
+  structured fallback. The advanced contract fixes
   `ak.wwise.core.object.get`, owns its return projection and final `take`, and
   never becomes a raw args/options or mutation path. Mutation identities remain
   limited to `id`, `path`, `exact-type-name`, `direct-child`, and
@@ -187,9 +190,9 @@ user's approval.
   name/type/path or the workflow stops. The advanced schema is explicit about
   UTF-8 byte limits and one trimmed, single-line frame: comments, semicolons,
   and unclosed string or slash-regex literals are rejected before dispatch.
-  The same per-object exact-ID readback applies when a broad ordinary or
-  structured query returns multiple candidates and the user later selects only
-  a subset for mutation. It does not apply to a canonical relationship GUID
+  The same per-object exact-ID readback applies when a broad business or
+  advanced query returns multiple candidates and the user later selects only a
+  subset for mutation. It does not apply to a canonical relationship GUID
   used directly as the next read-only hop.
 - Keep successful ordinary `query-object` replies compact by default. The
   compiled semantic preview and dispatch evidence are an explicit `--detail`
@@ -205,9 +208,9 @@ user's approval.
   property metadata by its exact object/class scope and field token, reset both
   caches for every new preview, and never let either replace execution-time or
   verification-time live state checks.
-- Generalize “shortcut flags → structured contract → controlled native
-  expression” only to fixed read-only APIs with a declarative DSL whose time,
-  row, and byte boundaries remain Gateway-owned. Do not copy the native
+- Generalize “business declaration → controlled native expression” only to
+  fixed read-only APIs with a declarative DSL whose time, row, and byte
+  boundaries remain Gateway-owned. Do not copy the native
   expression fallback to project mutations, SoundEngine commands, topics,
   SoundBanks, imports, UI commands, or Lua/code execution; extend their closed
   contracts instead.
@@ -272,10 +275,11 @@ ci/test.sh --mode program -- -q -ra
 This gate uses fake clients and must not start Codex, WwiseConsole, or
 a network client. For ordinary API-surface expansion, this is the required main
 gate; do not spend tokens on a full semantic matrix merely because rows were
-added to the same established mechanism. For the structured query Builder,
+added to the same established mechanism. For the business query compiler,
 five-version Python validation, compiler goldens, gateway fake-dispatch tests,
-and fail-closed negatives prove the compilation contract. They do not prove
-that a newly added WAQL construct has been accepted by a real Wwise process.
+and fail-closed negatives prove the closed declaration contract. They do not
+prove that a newly added advanced WAQL construct has been accepted by a real
+Wwise process.
 
 ### 2. Broad non-live regression
 

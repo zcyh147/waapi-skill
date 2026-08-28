@@ -61,6 +61,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_direct_protocol,
     build_metadata_transaction_protocol,
     build_modification_policy_protocol,
+    build_optional_query_repair_protocol,
     build_transaction_protocol,
     call_step,
     query_object_step,
@@ -169,6 +170,7 @@ from tests.semantic.support.codex_object_heavy_v3 import (
 from tests.semantic.support.codex_object_business_plan_v3 import (
     ObjectBusinessPlanSections,
     TYPED_PROFILE_OBJECT_METADATA_UNITS,
+    TYPED_PROFILE_QUERY_REPAIR_UNIT_ID,
     TYPED_PROFILE_RENAME_UNIT_ID,
     TYPED_PROFILE_SET03_UNIT_ID,
     build_object_merge_query_protocol,
@@ -4779,6 +4781,16 @@ def _prepare_case(
                 )
             if protocol is None:
                 protocol = object_runtime.gateway_protocol()
+        if unit_id == TYPED_PROFILE_QUERY_REPAIR_UNIT_ID:
+            if (
+                len(protocol.steps) != 2
+                or protocol.steps[0].subcommand != "query-schema"
+                or protocol.steps[1].subcommand != "query-object"
+            ):
+                raise HeavyProjectRunnerError(
+                    "query repair unit requires one optional-schema business query"
+                )
+            protocol = build_optional_query_repair_protocol(protocol.steps[1])
         if project_modification_policy is not None:
             if _compound_object_metadata_binding(
                 scenario,
@@ -4802,7 +4814,11 @@ def _prepare_case(
         input_file_manifest = seal_object_input_file_manifest(object_input_files)
         business_plan_profile_unit_id = (
             unit_id
-            if unit_id == TYPED_PROFILE_RENAME_UNIT_ID
+            if unit_id
+            in {
+                TYPED_PROFILE_QUERY_REPAIR_UNIT_ID,
+                TYPED_PROFILE_RENAME_UNIT_ID,
+            }
             else metadata_profile_unit_id
         )
         typed_sections = compile_object_business_plan(

@@ -65,11 +65,11 @@ inventory can therefore describe only the test fixture, not the candidate.
 Wait for pytest to exit, confirm that no owned test process remains, and only
 then read the worktree or regenerate sealed artifacts.
 
-For the structured object-query lane, this gate proves the versioned
-`waapi-skill.object-query/v1` request/schema contract, deterministic Python
-compilation, exact fake dispatch, and fail-closed rejection. It does not prove
-that a newly added WAQL construct executes successfully in Wwise; record that
-only from the matching real read-only lane.
+For the business object-query lane, this gate proves the versioned closed
+business declaration, deterministic Python compilation, exact fake dispatch,
+and fail-closed rejection. It does not prove that a newly added advanced WAQL
+construct executes successfully in Wwise; record that only from the matching
+real read-only lane.
 
 ## New Wwise version checklist
 
@@ -87,10 +87,10 @@ a version string:
    operations, `skills/waapi-skill/wwise_waapi/operation_registry.py` is
    authoritative; a builder implementation by itself is not a public operation
    contract.
-4. Review the default structured `query-schema` and the separately disclosed
-   `query-schema --advanced` contract against the new reflection. Extend
-   five-version Builder compiler goldens, advanced fixed-URI/final-cap tests,
-   schema parity, UTF-8 byte/framing disclosure, request ceilings, and
+4. Review the default business-declaration `query-schema` and the separately
+   disclosed `query-schema --advanced` contract against the new reflection.
+   Extend five-version business compiler goldens, advanced fixed-URI/final-cap
+   tests, schema parity, UTF-8 byte/framing disclosure, request ceilings, and
    mutation-isolation negatives whenever either query layer changes. Native
    advanced syntax is accepted or rejected
    by the matching live Wwise version; program tests must not claim otherwise.

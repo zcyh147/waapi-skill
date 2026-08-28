@@ -133,6 +133,11 @@ path separator, native type discriminator, predicate accessor, or relationship
 token. The Gateway constructs the exact Wwise path and separators from the
 literal hierarchy names.
 
+When a custom kind meaning matches zero or multiple live types, use the
+structured candidate list to refine `--custom-kind` to one exact returned type
+name, then continue the original bounded read. Do not invent a type token or
+skip the requested query after the repair probe.
+
 Use repeated `--predicate BUSINESS_CONDITION VALUE` for flat AND conditions and
 repeated `--relationship` for `descendants`, `ancestors`, `references-to`,
 `children`, or `parent`. A broad or expanding source requires the user's

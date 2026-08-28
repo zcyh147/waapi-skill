@@ -3462,6 +3462,21 @@ class V3GatewayProtocol:
             return self.terminal_prefix_counts
         return (len(self.steps),)
 
+    @property
+    def optional_initial_query_schema(self) -> bool:
+        """Whether this seal permits omitting one initial query-schema read."""
+
+        maximum = len(self.steps)
+        return bool(
+            maximum >= 2
+            and self.steps[0].subcommand == "query-schema"
+            and not self.steps[0].arguments
+            and self.steps[1].subcommand == "query-object"
+            and self.turn_prefix_counts == (maximum,)
+            and self.allowed_turn_prefix_counts == ((maximum - 1, maximum),)
+            and self.terminal_prefix_counts == (maximum - 1, maximum)
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class StructuredRefusal:
@@ -4230,6 +4245,40 @@ def build_optional_query_schema_protocol(
     )
 
 
+def build_optional_query_repair_protocol(
+    query_step: ExpectedGatewayStep,
+) -> V3GatewayProtocol:
+    """Seal one live kind-clarification repair before the reviewed query."""
+
+    if query_step.subcommand != "query-object":
+        raise V3ProtocolError("query repair must finish with query-object")
+    ambiguous = query_object_step(
+        "query-repair.ambiguous-kind",
+        ("query-object", "--custom-kind", "Music", "--max-results", "1"),
+    )
+    refined = ExpectedGatewayStep(
+        name="query-repair.refined-kind",
+        subcommand="query-object",
+        arguments=(
+            "--custom-kind",
+            ResponseBinding(
+                ambiguous.name,
+                "/agent_result/candidates/0/name",
+            ),
+            "--max-results",
+            "1",
+        ),
+    )
+    steps = (query_schema_step(), ambiguous, refined, query_step)
+    maximum = len(steps)
+    return V3GatewayProtocol(
+        steps=steps,
+        turn_prefix_counts=(maximum,),
+        allowed_turn_prefix_counts=((maximum - 1, maximum),),
+        terminal_prefix_counts=(maximum - 1, maximum),
+    )
+
+
 def build_modification_policy_protocol(
     base: V3GatewayProtocol,
     *,
@@ -4589,6 +4638,7 @@ __all__ = [
     "V3GatewayProtocol",
     "V3ProtocolError",
     "build_direct_protocol",
+    "build_optional_query_repair_protocol",
     "build_optional_query_schema_protocol",
     "build_audio_import_composer_protocol",
     "build_audio_import_composer_transaction_steps",

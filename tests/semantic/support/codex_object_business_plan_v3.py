@@ -29,6 +29,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_direct_protocol,
     build_metadata_transaction_protocol,
     build_modification_policy_protocol,
+    build_optional_query_repair_protocol,
     build_optional_query_schema_protocol,
     build_schema_query_transaction_protocol,
     build_transaction_protocol,
@@ -65,6 +66,7 @@ OBJECT_APIS = frozenset(
     }
 )
 TYPED_PROFILE_SET03_UNIT_ID = "TYP22-METADATA-OBJECT-SET"
+TYPED_PROFILE_QUERY_REPAIR_UNIT_ID = "TYP22-GENERIC-OBJECT-QUERY"
 TYPED_PROFILE_RENAME_UNIT_ID = "TYP23-DEDICATED-OBJECT-CREATE"
 TYPED_PROFILE_OBJECT_METADATA_UNITS = MappingProxyType(
     {
@@ -1598,6 +1600,20 @@ def _compound_metadata_protocol(
 ) -> V3GatewayProtocol | None:
     if profile_unit_id == TYPED_PROFILE_RENAME_UNIT_ID:
         return None
+    if profile_unit_id == TYPED_PROFILE_QUERY_REPAIR_UNIT_ID:
+        if (
+            recipe.scenario_id,
+            recipe.api,
+            recipe.version,
+        ) != (
+            "OBJ22-F-GET-03",
+            "ak.wwise.core.object.get",
+            "2022.1",
+        ):
+            raise ObjectBusinessPlanError(
+                "query repair profile unit is outside its reviewed lane"
+            )
+        return None
     if profile_unit_id is not None:
         reviewed = TYPED_PROFILE_OBJECT_METADATA_UNITS.get(profile_unit_id)
         if reviewed is None or (
@@ -1878,10 +1894,15 @@ def _validate_protocol(
             )
     elif isinstance(request, QueryObjectRequestSpec):
         query = query_object_step("query-object", request.argv[3:])
-        expected_protocols = (
+        base = (
             build_optional_query_schema_protocol(query)
             if "--max-results" in request.argv
-            else build_direct_protocol((query,)),
+            else build_direct_protocol((query,))
+        )
+        expected_protocols = (
+            build_optional_query_repair_protocol(query)
+            if profile_unit_id == TYPED_PROFILE_QUERY_REPAIR_UNIT_ID
+            else base,
         )
     else:  # pragma: no cover - recipe union is closed
         raise ObjectBusinessPlanError("object recipe request type is unsupported")

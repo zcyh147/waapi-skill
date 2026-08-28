@@ -12,6 +12,7 @@ from tests.support.platform_filesystem import create_symlink_or_skip
 from tests.semantic.support.codex_eval_protocol_v3 import (
     build_direct_protocol,
     build_metadata_transaction_protocol,
+    build_optional_query_repair_protocol,
     build_schema_query_transaction_protocol,
     build_transaction_protocol,
     query_object_step,
@@ -30,6 +31,7 @@ from tests.semantic.support.codex_gateway_broker import (
 )
 from tests.semantic.support.codex_object_business_plan_v3 import (
     ObjectBusinessPlanError,
+    TYPED_PROFILE_QUERY_REPAIR_UNIT_ID,
     build_object_merge_query_protocol,
     compile_object_business_plan,
     parse_object_business_plan_sections,
@@ -302,6 +304,48 @@ def test_typed_profile_set03_metadata_protocol_binds_exact_unit_in_archive(
             recipe=recipe,
             protocol=protocol,
             verify_files=False,
+        )
+
+
+def test_typed_profile_query_repair_protocol_binds_exact_unit_in_archive(
+    tmp_path: Path,
+) -> None:
+    scenario, recipe, _base, before, manifest = _case(
+        "OBJ22-F-GET-03",
+        tmp_path,
+    )
+    assert isinstance(recipe.request, QueryObjectRequestSpec)
+    protocol = build_optional_query_repair_protocol(
+        query_object_step("query-object", recipe.request.argv[3:])
+    )
+
+    sections = compile_object_business_plan(
+        scenario,
+        recipe,
+        protocol,
+        before,
+        manifest,
+        profile_unit_id=TYPED_PROFILE_QUERY_REPAIR_UNIT_ID,
+    )
+    archived = validate_archived_object_business_plan(
+        sections.writer_kwargs(),
+        scenario=scenario,
+        recipe=recipe,
+        protocol=protocol,
+        verify_files=True,
+        profile_unit_id=TYPED_PROFILE_QUERY_REPAIR_UNIT_ID,
+    )
+
+    assert archived.static_expectation["profile_unit_id"] == (
+        TYPED_PROFILE_QUERY_REPAIR_UNIT_ID
+    )
+    with pytest.raises(ObjectBusinessPlanError, match="exact reviewed request"):
+        validate_archived_object_business_plan(
+            sections.writer_kwargs(),
+            scenario=scenario,
+            recipe=recipe,
+            protocol=protocol,
+            verify_files=True,
         )
 @pytest.mark.parametrize(
     "case_id",

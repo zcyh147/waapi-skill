@@ -416,6 +416,7 @@ GATEWAY_SESSION_INTRODUCTION_CONTRACT = "waapi-skill.session-introduction/v2"
 GATEWAY_DEADLINE_PROVENANCE = "waapi-skill.gateway-deadline/v1"
 GATEWAY_RESULT_CEILING_PROVENANCE = "waapi-skill.gateway-live-result-json-ceiling/v1"
 MEDIA_POOL_POST_FILTER_CONTRACT = "waapi-skill.media-pool-post-filter/v1"
+MAX_METADATA_PLATFORM_NAME_CHARS = 256
 ORIGINAL_FILE_REFERENCE_MATCH_CONTRACT = (
     "waapi-skill.original-file-reference-match/v1"
 )
@@ -4650,10 +4651,7 @@ def preflight_metadata_input(
             raise GatewayInputError(
                 "metadata property-state requires exactly one --meaning"
             )
-        if not isinstance(args.platform, str) or not args.platform.strip():
-            raise GatewayInputError(
-                "metadata property-state requires one non-empty --platform name"
-            )
+        args.platform = validate_metadata_platform_name(args.platform)
         if args.curve_role is not None:
             raise GatewayInputError(
                 "metadata property-state does not accept --curve-role"
@@ -4677,9 +4675,38 @@ def preflight_metadata_input(
                 "metadata attenuation requires one disclosed --curve-role"
             )
         args.curve_type = METADATA_CURVE_ROLES[args.curve_role]
+        if args.platform is not None:
+            args.platform = validate_metadata_platform_name(args.platform)
         return
 
     raise GatewayInputError(f"unsupported metadata operation: {args.operation}")
+
+
+def validate_metadata_platform_name(value: Any) -> str:
+    """Return one exact bounded project-platform name before live dispatch."""
+
+    invalid = (
+        not isinstance(value, str)
+        or not value
+        or value != value.strip()
+        or len(value) > MAX_METADATA_PLATFORM_NAME_CHARS
+        or any(
+            ord(character) < 32
+            or ord(character) == 127
+            or character in {"\u2028", "\u2029"}
+            for character in value
+        )
+    )
+    try:
+        value.encode("utf-8") if isinstance(value, str) else None
+    except UnicodeEncodeError:
+        invalid = True
+    if invalid:
+        raise GatewayInputError(
+            "metadata requires one bounded, trimmed, control-free --platform "
+            f"name of at most {MAX_METADATA_PLATFORM_NAME_CHARS} characters"
+        )
+    return value
 
 
 def preflight_stable_read_input(

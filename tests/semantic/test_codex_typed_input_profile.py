@@ -129,6 +129,24 @@ def test_bounded_query_prompt_keeps_boolean_filtering_in_the_returned_inventory(
     )
 
 
+def test_business_query_prompt_requires_one_live_kind_repair_before_main_read() -> None:
+    profile = load_typed_input_profile(PROFILE_PATH)
+    unit = next(
+        unit
+        for unit in profile.units
+        if unit.unit_id == "TYP22-GENERIC-OBJECT-QUERY"
+    )
+
+    assert "自定义类型含义 `Music`" in unit.scenario.prompt
+    assert "实时类型目录返回多个候选" in unit.scenario.prompt
+    assert "候选列表中的第一个精确类型" in unit.scenario.prompt
+    assert "完成这次修复后" in unit.scenario.prompt
+    assert all(
+        command not in unit.scenario.prompt
+        for command in ("query-schema", "query-object", "--custom-kind")
+    )
+
+
 def test_parent_child_query_prompt_keeps_join_logic_after_one_bounded_inventory() -> None:
     profile = load_typed_input_profile(PROFILE_PATH)
     unit = next(

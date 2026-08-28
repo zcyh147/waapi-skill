@@ -355,9 +355,7 @@ def run_v3_codex_task(
         trusted_step_observer=trusted_step_observer,
         trusted_subscription_ack=trusted_subscription_ack,
         trusted_subscription_ack_observer=trusted_subscription_ack_observer,
-        optional_initial_query_schema=_has_optional_initial_query_schema(
-            protocol
-        ),
+        optional_initial_query_schema=protocol.optional_initial_query_schema,
     )
     try:
         with broker:
@@ -650,7 +648,7 @@ def _broker_terminal_protocol_passed(
     consumed_count = len(evidence.consumed_step_names)
     if consumed_count not in protocol.accepted_terminal_prefixes:
         return False
-    if _has_optional_initial_query_schema(protocol):
+    if protocol.optional_initial_query_schema:
         protocol_names = tuple(step.name for step in protocol.steps)
         selected_names = evidence.expected_step_names
         if selected_names not in {protocol_names, protocol_names[1:]}:
@@ -693,18 +691,6 @@ def _broker_terminal_protocol_passed(
         protocol.allowed_turn_prefix_counts
         and not evidence.complete
         and evidence.terminal_state == "RUNNING"
-    )
-
-
-def _has_optional_initial_query_schema(protocol: V3GatewayProtocol) -> bool:
-    return bool(
-        len(protocol.steps) == 2
-        and protocol.steps[0].subcommand == "query-schema"
-        and not protocol.steps[0].arguments
-        and protocol.steps[1].subcommand == "query-object"
-        and protocol.turn_prefix_counts == (2,)
-        and protocol.allowed_turn_prefix_counts == ((1, 2),)
-        and protocol.terminal_prefix_counts == (1, 2)
     )
 
 

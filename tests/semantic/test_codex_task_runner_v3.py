@@ -20,6 +20,7 @@ from tests.semantic.support import codex_task_runner_v3 as task_runner
 from tests.semantic.support.codex_eval_protocol_v3 import (
     V3GatewayProtocol,
     build_optional_query_schema_protocol,
+    build_optional_query_repair_protocol,
     build_transaction_protocol,
     query_object_step,
 )
@@ -134,6 +135,36 @@ def test_optional_query_schema_terminal_accepts_only_complete_selected_protocol(
 
     evidence.complete = False
     assert not task_runner._broker_terminal_protocol_passed(protocol, evidence)
+
+
+@pytest.mark.parametrize("include_schema", (False, True))
+def test_optional_query_repair_protocol_accepts_one_sealed_repair_chain(
+    include_schema: bool,
+) -> None:
+    protocol = build_optional_query_repair_protocol(
+        query_object_step(
+            "query",
+            ("query-object", "--kind", "all-sounds", "--max-results", "12"),
+        )
+    )
+    names = tuple(step.name for step in protocol.steps)
+    selected_names = names if include_schema else names[1:]
+    evidence = SimpleNamespace(
+        expected_step_names=selected_names,
+        consumed_step_names=selected_names,
+        records=tuple(
+            SimpleNamespace(step_name=name, succeeded=True)
+            for name in selected_names
+        ),
+        rejected_records=(),
+        complete=True,
+        passed=True,
+        terminal_state="COMPLETE",
+    )
+
+    assert protocol.optional_initial_query_schema is True
+    assert protocol.accepted_terminal_prefixes == (3, 4)
+    assert task_runner._broker_terminal_protocol_passed(protocol, evidence)
 
 
 def test_common_grade_ignores_one_identical_windows_preprocess_failure() -> None:
