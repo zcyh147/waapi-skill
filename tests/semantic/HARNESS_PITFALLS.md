@@ -37,6 +37,24 @@ prevention checks that are expensive to rediscover.
   omits the campaign token. Require zero matching descendants plus the sealed
   summary and attempt manifest before unregistering the task.
 
+### Windows task registration guessed the desktop environment
+
+- Evidence: #96 query `r6` launcher probes stopped before campaign-root
+  creation when the cmdlet rejected `InteractiveToken`, SSH reported
+  `USERDOMAIN=WORKGROUP`, and a clean worktree lacked its ignored live config.
+  A direct Python task action then returned code 2 without useful task output.
+- Cause: Task Scheduler XML names the logon type `InteractiveToken`, while
+  `New-ScheduledTaskPrincipal` spells the enum `Interactive`; SSH environment
+  identity and a Git worktree are not the logged-on desktop identity or the
+  machine-local test configuration.
+- Prevention: obtain `UserId` from `Win32_ComputerSystem.UserName`, register
+  `-LogonType Interactive -RunLevel Limited`, and attest `InteractiveToken` in
+  exported XML. Before registration, require the candidate-local Python,
+  absolute campaign path, action script, and copied ignored
+  `live-environment.json`. Run the original campaign inside a profile-free
+  PowerShell action wrapper that records stdout, stderr, and exit code; SSH only
+  registers, starts, polls, reads, and removes it.
+
 ### macOS foreground ownership and TCC
 
 - Symptom: a unified shell receives `SIGTERM`, a `nohup` child outlives its
@@ -118,7 +136,9 @@ prevention checks that are expensive to rediscover.
   `POETRY_KEYRING_ENABLED=false` and a null keyring backend, then run
   `ci\test.bat` directly through SSH. This is not a Fresh campaign and does not
   use Task Scheduler. Require the test-context header before counting an
-  attempt; launcher failures receive no test result or retry number.
+  attempt; launcher failures receive no test result or retry number. From Git
+  Bash, invoke the batch file through `cmd.exe //d //s //c`; `/c` may be path-
+  converted into an interactive prompt and must not receive test credit.
 
 ### A rejected runner path can be a real Agent error
 
