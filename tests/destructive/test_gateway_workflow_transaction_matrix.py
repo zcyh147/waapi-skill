@@ -248,6 +248,46 @@ def _complete_business_draft(
     return {"preview": preview, "execute": executed, "verify": verified}
 
 
+def _complete_core_result_schema_draft(
+    runtime: _WorkflowSandboxRuntime,
+    draft: _BusinessDraft,
+) -> dict[str, Mapping[str, Any]]:
+    """Execute one Core business Draft and retain its explicit weak boundary."""
+
+    _update_business_draft(runtime, draft, "draft-check", live=True)
+    preview = _update_business_draft(
+        runtime,
+        draft,
+        "preview-from-draft",
+        live=True,
+    )
+    transaction_id = _required_string(preview, "transaction_id")
+    shown = runtime.gateway(
+        ["transaction-show", transaction_id, "--summary-only"],
+        live=False,
+    )
+    confirmation = shown.get("confirmation")
+    assert isinstance(confirmation, Mapping), shown
+    runtime.gateway(
+        [
+            "confirm",
+            transaction_id,
+            "--confirmation-token",
+            _required_string(confirmation, "token"),
+        ],
+        live=False,
+    )
+    executed = runtime.gateway(["execute", transaction_id], live=True)
+    verified = runtime.gateway(["verify", transaction_id], live=True)
+    assert executed["state"] == TransactionState.EXECUTED_UNVERIFIED.value, executed
+    assert verified["state"] == TransactionState.VERIFIED.value, verified
+    verification = verified.get("verification")
+    assert isinstance(verification, Mapping), verified
+    assert verification["status"] == "result_schema_checked", verification
+    assert verification["business_state_verified"] is False, verification
+    return {"preview": preview, "execute": executed, "verify": verified}
+
+
 def _checked_object_lifecycle_child(
     runtime: _WorkflowSandboxRuntime,
     *,
@@ -1919,6 +1959,123 @@ def test_object_metadata_business_draft_executes_field_verifiers(
     finally:
         if source_id is not None:
             _delete_if_present_via_transaction(runtime, source_id)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_core_business_public_read_and_result_schema_mutation(
+    workflow_sandbox_runtime: _WorkflowSandboxRuntime,
+) -> None:
+    runtime = workflow_sandbox_runtime
+    if runtime.version not in {"2022.1", "2025.1"}:
+        pytest.skip("Core business evidence targets Wwise 2022.1 and 2025.1")
+    parent = CONTAINERS_PARENT if runtime.version == "2025.1" else ACTOR_MIXER_PARENT
+    suffix = uuid.uuid4().hex[:12]
+    source_id: str | None = None
+    target_id: str | None = None
+    try:
+        source_id = _create_object(
+            runtime,
+            parent=parent,
+            object_type="ActorMixer",
+            name=f"WAAPI_CORE_SOURCE_{suffix}",
+        )
+        target_id = _create_object(
+            runtime,
+            parent=parent,
+            object_type="ActorMixer",
+            name=f"WAAPI_CORE_TARGET_{suffix}",
+        )
+        notes = f"Core business paste {runtime.version} {suffix}"
+        _complete_object_lifecycle_business_transaction(
+            runtime,
+            operation="object.setNotes",
+            object_id=source_id,
+            notes=notes,
+        )
+
+        diff = runtime.gateway(
+            [
+                "core-call",
+                "ak.wwise.core.object.diff",
+                "--source-id",
+                source_id,
+                "--target-id",
+                target_id,
+            ],
+            live=True,
+        )
+        assert isinstance(diff.get("agent_result"), Mapping), diff
+        assert diff["api_attempted"] == "ak.wwise.core.object.diff", diff
+        assert diff["business_request"]["roles"] == {
+            "source": source_id,
+            "target": target_id,
+        }
+
+        draft = _start_business_draft(
+            runtime,
+            "ak.wwise.core.object.pasteProperties",
+        )
+        source_handle = _bind_business_object(
+            runtime,
+            draft,
+            object_id=source_id,
+            role="source",
+        )
+        target_handle = _bind_business_object(
+            runtime,
+            draft,
+            object_id=target_id,
+            role="target",
+        )
+        _update_business_draft(
+            runtime,
+            draft,
+            "draft-declare-core-plan",
+            [
+                "--role",
+                "source_handle",
+                source_handle,
+                "--role",
+                "target_handles",
+                target_handle,
+                "--value",
+                "list_mode",
+                "merge-replace",
+            ],
+            live=True,
+        )
+        completed = _complete_core_result_schema_draft(runtime, draft)
+        assert completed["verify"]["verification"]["operation"] == (
+            "waapi.call"
+        )
+        readback = runtime.gateway(
+            [
+                "query-object",
+                "--object-id",
+                target_id,
+                "--return-field",
+                "id",
+                "--return-field",
+                "notes",
+            ],
+            live=True,
+        )
+        assert readback["count"] == 1, readback
+        assert readback["objects"][0]["notes"] == notes, readback
+        runtime.category_results.append(
+            {
+                "category": "core-business-public-seam",
+                "status": "PASS",
+                "verifier_strength": (
+                    "bounded_read_plus_result_schema_and_manual_state_readback"
+                ),
+            }
+        )
+    finally:
+        for object_id in (target_id, source_id):
+            if object_id is not None:
+                _delete_if_present_via_transaction(runtime, object_id)
 
 
 @pytest.mark.live
