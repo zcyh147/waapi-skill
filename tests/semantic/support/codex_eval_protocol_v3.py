@@ -1703,6 +1703,67 @@ def build_switch_assignment_business_transaction_steps(
     return tuple(steps)
 
 
+def build_core_business_transaction_steps(
+    *,
+    api: str,
+    version: str,
+    label: str,
+) -> tuple[ExpectedGatewayStep, ...]:
+    """Seal one zero-input raw-Core business Draft through one Preview."""
+
+    if api != "ak.wwise.core.project.save" or version != "2025.1":
+        raise V3ProtocolError("Core business Fresh proof supports exact 2025.1 project.save")
+    if not isinstance(label, str) or not re.fullmatch(r"tx[0-9]{2}", label):
+        raise V3ProtocolError("business transaction label must be txNN")
+    draft_start = f"{label}.draft-start"
+    declaration = f"{label}.declare-core-plan"
+    check = f"{label}.check"
+
+    def prefix(revision_step: str) -> tuple[Any, ...]:
+        return (
+            ResponseBinding(draft_start, "/draft/draft_id"),
+            "--task-authority",
+            ResponseBinding(draft_start, "/task_authority"),
+            "--expected-revision",
+            ResponseBinding(revision_step, "/draft/revision"),
+        )
+
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": version,
+        "operation": "waapi.call",
+        "arguments": {"api": api, "args": {}, "options": {}},
+    }
+    return (
+        ExpectedGatewayStep(
+            name=f"{label}.request-schema",
+            subcommand="request-schema",
+            arguments=(api,),
+        ),
+        ExpectedGatewayStep(
+            name=draft_start,
+            subcommand="draft-start",
+            arguments=(api,),
+        ),
+        ExpectedGatewayStep(
+            name=declaration,
+            subcommand="draft-declare-core-plan",
+            arguments=prefix(draft_start),
+        ),
+        ExpectedGatewayStep(
+            name=check,
+            subcommand="draft-check",
+            arguments=prefix(declaration),
+        ),
+        ExpectedGatewayStep(
+            name=f"{label}.preview",
+            subcommand="preview-from-draft",
+            arguments=prefix(check),
+            expected_operation_request=request,
+        ),
+    )
+
+
 def build_authoring_ui_business_transaction_steps(
     request: Mapping[str, Any],
     *,
@@ -4643,6 +4704,7 @@ __all__ = [
     "build_audio_import_composer_protocol",
     "build_audio_import_composer_transaction_steps",
     "build_authoring_ui_business_transaction_steps",
+    "build_core_business_transaction_steps",
     "build_compound_undo_business_transaction_steps",
     "OBJECT_LIFECYCLE_BUSINESS_OPERATIONS",
     "build_object_lifecycle_business_transaction_steps",

@@ -397,6 +397,9 @@ BUSINESS_AGENT_OUTCOME_CONTRACTS = {
     matrix.SWITCH_ASSIGNMENT_BUSINESS_PROFILE_ID: (
         "waapi-skill.switch-assignment-business-agent-outcome/v1"
     ),
+    matrix.CORE_BUSINESS_PROFILE_ID: (
+        "waapi-skill.core-business-agent-outcome/v1"
+    ),
     matrix.COMPOUND_UNDO_BUSINESS_PROFILE_ID: (
         "waapi-skill.compound-undo-business-agent-outcome/v1"
     ),
@@ -3413,6 +3416,17 @@ def _validate_bound_business_agent_protocol(
             steps[-1].expected_operation_request,
             objects=tuple(expected_unit.objects.values()),
         )
+    elif profile == matrix.CORE_BUSINESS_PROFILE_ID:
+        from tests.semantic.support.codex_eval_protocol_v3 import (
+            build_core_business_transaction_steps,
+        )
+
+        steps = build_core_business_transaction_steps(
+            api=expected_unit.operation,
+            version=expected_unit.version,
+            label="tx01",
+        )
+        preview_request = steps[-1].expected_operation_request
     elif profile == matrix.COMPOUND_UNDO_BUSINESS_PROFILE_ID:
         from tests.semantic.support.codex_compound_undo_business_agent_runner import (
             compound_undo_business_child_expectations,

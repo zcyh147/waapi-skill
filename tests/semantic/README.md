@@ -559,6 +559,7 @@ The separately approved V3 executable profiles are:
 | `integration` | 12 | 36 | Six cross-operation workflows on Wwise 2022.1 and 2025.1; 20 previewed transactions and no additional per-API coverage credit |
 | `modification_policy_9` | 9 | 15 | Three isolated repetitions of each canonical project-modification policy on one reviewed object.create business case |
 | `switch_assignment_business_1` | 1 | 1 | Preview-only routing proof for one independent Switch assignment through three opaque business-object handles and Gateway-owned native materialization |
+| `core_business_1` | 1 | 1 | Preview-only routing proof that a zero-input Core mutation follows `request-schema` into one Gateway-owned Core business plan and immutable Preview |
 | `compound_undo_business_1` | 1 | 1 | Preview-only routing proof that two checked child business changes become one Gateway-compiled Undo Group and one immutable Preview |
 
 The two older six-task integration profile IDs remain internal compatibility
@@ -586,6 +587,7 @@ skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py -
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile integration --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-integration-new-candidate-r1
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile modification_policy_9 --campaign-root skills/waapi-skill-workspace/campaign-modification-policy-9
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile switch_assignment_business_1 --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-switch-assignment-business
+skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile core_business_1 --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-core-business
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile compound_undo_business_1 --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-compound-undo-business
 ```
 
@@ -607,6 +609,13 @@ It starts no Wwise process and grants no real-host coverage credit. The Agent
 receives only the Switch Container, direct child, and Switch paths; the
 production Gateway must bind all three identities and own the exact GUID
 relationship, opposite precondition, native request, and immutable Preview.
+
+`core_business_1` is a single 2025.1 preview-only routing probe. It starts no
+Wwise process and grants no real-host coverage credit. The prompt contains only
+the save intent and no Gateway mechanics. The Agent must follow the raw Core
+URI's `request-schema` continuation, declare the complete zero-input Core plan,
+and stop at one immutable Preview without `typed-call`, `draft-apply`, or
+execution.
 
 `compound_undo_business_1` is a single 2022.1 preview-only routing probe. It
 starts no Wwise process and grants no real-host coverage credit. The Agent

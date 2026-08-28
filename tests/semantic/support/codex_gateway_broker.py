@@ -1703,11 +1703,18 @@ class ExpectedGatewayStep:
                 raise ValueError(
                     "ExpectedGatewayStep operation request witness must be an object"
                 )
+            operation = normalized_request.get("operation")
+            arguments = normalized_request.get("arguments")
+            business_operations = business_adapter_operations()
+            is_business_request = operation in business_operations or (
+                operation == "waapi.call"
+                and isinstance(arguments, Mapping)
+                and arguments.get("api") in business_operations
+            )
             if (
                 normalized_request.get("contract")
                 != "waapi-skill.operation-request/v1"
-                or normalized_request.get("operation")
-                not in business_adapter_operations()
+                or not is_business_request
             ):
                 raise ValueError(
                     "ExpectedGatewayStep operation request witness is limited to "
