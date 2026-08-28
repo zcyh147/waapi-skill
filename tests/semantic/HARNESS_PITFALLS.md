@@ -67,6 +67,20 @@ prevention checks that are expensive to rediscover.
   the exact `waapi.undoGroup` schema. Repeated, late, or differently bound
   discovery remains terminal.
 
+### The archive validator inferred optional protocol from task policy
+
+- Evidence: #96 query `r5` completed the reviewed query and produced a passing
+  task result on both hosts, but the outer campaign reclassified each unit as
+  BLOCKED because the valid terminal prefixes were `[1, 2]` rather than the
+  older hard-coded `[1]`.
+- Cause: task execution correctly sealed an optional `query-schema` protocol,
+  while archive validation guessed optionality from project modification policy
+  and knew only the older single-step read protocol.
+- Prevention: derive optionality and accepted terminal prefixes from the sealed
+  prompt protocol, never from unit metadata or a fixed prefix. Provisionally
+  accept the optional result keys only until the seal is loaded, then require an
+  exact match and reject missing, shortened, reordered, or invented prefixes.
+
 ### Interleaved Drafts leaked the most recent flow
 
 - Evidence: #83 `r4` rejected the correct parent revision `1`; `r5` accepted

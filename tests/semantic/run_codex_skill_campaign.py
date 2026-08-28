@@ -5554,24 +5554,20 @@ def _validate_heavy_v3_task_result(
         "broker",
         "turn_grades",
     }
-    is_optional_protocol = (
-        getattr(expected_unit, "project_modification_policy", None)
-        == "read_only"
+    optional_protocol_keys = {
+        "protocol_terminal_passed",
+        "accepted_terminal_prefixes",
+    }
+    provisionally_allowed_shapes = (
+        required_keys,
+        required_keys | {"composer_evidence"},
+        required_keys | optional_protocol_keys,
+        required_keys | optional_protocol_keys | {"composer_evidence"},
     )
-    if is_optional_protocol:
-        required_keys.update(
-            {
-                "protocol_terminal_passed",
-                "accepted_terminal_prefixes",
-            }
-        )
     expected_turn_count = getattr(expected_unit, "user_turn_count", None)
     if (
         not isinstance(value, Mapping)
-        or set(value) not in (
-            required_keys,
-            required_keys | {"composer_evidence"},
-        )
+        or set(value) not in provisionally_allowed_shapes
         or value.get("contract") != HEAVY_V3_TASK_RESULT_CONTRACT
         or value.get("scenario_id")
         != _heavy_v3_base_scenario_id(expected_unit)
@@ -5581,13 +5577,6 @@ def _validate_heavy_v3_task_result(
         or expected_turn_count < 1
         or value.get("turn_count") != expected_turn_count
         or value.get("passed") is not True
-        or (
-            is_optional_protocol
-            and (
-                value.get("protocol_terminal_passed") is not True
-                or value.get("accepted_terminal_prefixes") != [1]
-            )
-        )
         or not isinstance(value.get("prompt_materialization_sha256"), str)
         or _SHA256_RE.fullmatch(
             str(value.get("prompt_materialization_sha256"))
@@ -5604,6 +5593,17 @@ def _validate_heavy_v3_task_result(
         protocol_manifest_revision=options.protocol_manifest_revision,
     )
     protocol = prompt_evidence.provenance.protocol
+    is_optional_protocol = bool(protocol.allowed_turn_prefix_counts)
+    if is_optional_protocol:
+        required_keys.update(optional_protocol_keys)
+        if (
+            value.get("protocol_terminal_passed") is not True
+            or value.get("accepted_terminal_prefixes")
+            != list(protocol.accepted_terminal_prefixes)
+        ):
+            raise CampaignEvidenceError(
+                "passing heavy task-result optional protocol is invalid"
+            )
     is_composer_protocol = any(
         step.subcommand.startswith("draft-")
         or step.subcommand == "preview-from-draft"

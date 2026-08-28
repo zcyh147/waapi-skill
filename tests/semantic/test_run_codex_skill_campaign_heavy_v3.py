@@ -6193,6 +6193,11 @@ def _write_passing_project_outcome(
             "broker": broker,
             "turn_grades": grades,
         }
+    if protocol.allowed_turn_prefix_counts:
+        task_result["protocol_terminal_passed"] = True
+        task_result["accepted_terminal_prefixes"] = list(
+            protocol.accepted_terminal_prefixes
+        )
     if composer_evidence is not None:
         task_result["composer_evidence"] = composer_evidence
     matrix.write_json(
@@ -6714,6 +6719,76 @@ def test_heavy_validator_accepts_frozen_materialized_request_prompt(
         / "prompt.txt"
     ).read_text(encoding="utf-8")
     assert archived == f"请把目标音频转换到 {io_root} 并汇总。\n"
+
+
+def test_heavy_validator_accepts_sealed_optional_query_schema_terminal_prefixes(
+    tmp_path: Path,
+) -> None:
+    options = _options(tmp_path)
+    units = (_unit(3),)
+    root = tmp_path / "matrix"
+    _write_matrix_evidence(
+        root,
+        options=options,
+        units=units,
+        statuses=("PASS",),
+    )
+
+    result = campaign.validate_heavy_v3_child_run(
+        root,
+        expected_units=units,
+        options=options,
+        returncode=0,
+    )
+
+    assert [row["status"] for row in result.observations] == ["PASS"], "\n".join(
+        verdict.reason for verdict in result.phase_verdicts
+    )
+
+
+@pytest.mark.parametrize(
+    ("field", "replacement"),
+    (
+        ("protocol_terminal_passed", False),
+        ("accepted_terminal_prefixes", [1]),
+        ("accepted_terminal_prefixes", [2]),
+    ),
+)
+def test_heavy_validator_rejects_optional_protocol_claims_that_drift_from_seal(
+    tmp_path: Path,
+    field: str,
+    replacement: Any,
+) -> None:
+    options = _options(tmp_path)
+    units = (_unit(3),)
+    root = tmp_path / "matrix"
+    _write_matrix_evidence(
+        root,
+        options=options,
+        units=units,
+        statuses=("PASS",),
+    )
+    task_result_path = (
+        root
+        / "scenarios"
+        / "001-OBJ22-F-GET-03"
+        / "evidence"
+        / "codex-task"
+        / "task-result.json"
+    )
+    task_result = json.loads(task_result_path.read_text(encoding="utf-8"))
+    task_result[field] = replacement
+    matrix.write_json(task_result_path, task_result)
+
+    result = campaign.validate_heavy_v3_child_run(
+        root,
+        expected_units=units,
+        options=options,
+        returncode=0,
+    )
+
+    assert [row["status"] for row in result.observations] == ["BLOCKED"]
+    assert "optional protocol is invalid" in result.phase_verdicts[0].reason
 
 
 def _archive_test_heavy_validator_accepts_reviewed_confirmation_prompt(
