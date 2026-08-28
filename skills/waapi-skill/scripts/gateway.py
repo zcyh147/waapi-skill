@@ -9108,6 +9108,23 @@ def dispatch_debug_validation(
         result_limit_bytes=int(capability.execution_contract["result_limit_bytes"]),
         operation_timeout=float(capability.execution_contract["timeout_seconds"]),
     )
+    if result.get("waapi_error_uri") == "ak.wwise.invalid_procedure_uri":
+        return {
+            "ok": True,
+            "status": "unsupported_boundary",
+            **dict(common),
+            "api_attempted": api,
+            "validated_api": normalized_args["id"],
+            "supplied_sections": supplied_sections,
+            "error_code": "DEBUG_BUILD_REQUIRED",
+            "message": (
+                "The running Wwise build does not register this Debug read; "
+                "use a matching Debug-capable Authoring build for live execution proof."
+            ),
+            "executed": False,
+            "call": dispatch_call_summary(result),
+            "agent_result": None,
+        }
     result_validation = (
         validate_semantic_result(api, result.get("result"), version=detected_version)
         if result.get("ok")
@@ -9752,6 +9769,25 @@ def dispatch_command(
                 capability.execution_contract["timeout_seconds"]
             ),
         )
+        if result.get("waapi_error_uri") == "ak.wwise.invalid_procedure_uri":
+            return {
+                "ok": True,
+                "status": "unsupported_boundary",
+                **common,
+                "api_attempted": api,
+                "error_code": "DEBUG_BUILD_REQUIRED",
+                "message": (
+                    "The running Wwise build does not register this Debug read; "
+                    "use a matching Debug-capable Authoring build for live execution proof."
+                ),
+                "executed": False,
+                "call": dispatch_call_summary(result),
+                "schema_validation": {
+                    "request": request_validation.as_dict(),
+                    "result": None,
+                },
+                "agent_result": None,
+            }
         if not result.get("ok"):
             return {
                 "ok": False,
@@ -10117,10 +10153,12 @@ def dispatch_command(
                     "metadata_authority": "live-waapi",
                     "agent_result": custom_kind_clarification,
                 }
+            metadata_calls: list[dict[str, Any]] = []
             read_call = transaction_read_call(
                 dispatcher,
                 connection=connection,
                 version=detected_version,
+                call_sink=metadata_calls,
             )
             project: Mapping[str, Any] | None
             try:
@@ -10171,6 +10209,7 @@ def dispatch_command(
                     **common,
                     "operation": args.operation,
                     "metadata_authority": "live-waapi",
+                    **metadata_call_evidence_projection(metadata_calls),
                 }
                 payload["agent_result"] = discovery.as_dict(detail=False)
                 return payload
@@ -10182,6 +10221,7 @@ def dispatch_command(
                     **common,
                     "operation": args.operation,
                     "metadata_authority": "live-waapi",
+                    **metadata_call_evidence_projection(metadata_calls),
                     "agent_result": {
                         "meaning": args.queries[0],
                         "candidate_count": len(candidates),
@@ -10218,6 +10258,7 @@ def dispatch_command(
                     **common,
                     "operation": args.operation,
                     "metadata_authority": "live-waapi",
+                    **metadata_call_evidence_projection(metadata_calls),
                     "agent_result": {
                         "meaning": args.queries[0],
                         "candidate_count": 1,
@@ -10258,6 +10299,7 @@ def dispatch_command(
                 **common,
                 "operation": args.operation,
                 "metadata_authority": "live-waapi",
+                **metadata_call_evidence_projection(metadata_calls),
                 "semantic_preview": preview.as_dict(),
                 "call": dispatch_call_summary(result),
                 "agent_result": (
@@ -16668,6 +16710,18 @@ def selected_ui_boundary(result: Mapping[str, Any], *, live_info: Mapping[str, A
     return unavailable and bool(live_info.get("isCommandLine"))
 
 
+def metadata_call_evidence_projection(
+    calls: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Keep metadata stdout bounded while pointing to complete dispatcher evidence."""
+
+    return {
+        "metadata_call_count": len(calls),
+        "calls": [dict(calls[-1])] if calls else [],
+        "metadata_evidence_scope": "all calls retained in dispatcher evidence directory",
+    }
+
+
 def dispatch_call_summary(result: Mapping[str, Any]) -> dict[str, Any]:
     """Keep audit identity and evidence without duplicating a potentially huge WAAPI result."""
 
@@ -21597,6 +21651,7 @@ def transaction_read_call(
     *,
     connection: GatewayConnection,
     version: str,
+    call_sink: list[dict[str, Any]] | None = None,
 ) -> Callable[[str, Mapping[str, Any], Mapping[str, Any]], Mapping[str, Any]]:
     def read(uri: str, args: Mapping[str, Any], options: Mapping[str, Any]) -> Mapping[str, Any]:
         if uri not in PACKAGED_TRANSACTION_READBACK_URIS:
@@ -21624,6 +21679,8 @@ def transaction_read_call(
                 f"Read-only transaction preflight failed for {uri}.",
                 details={"call": result},
             )
+        if call_sink is not None:
+            call_sink.append(dispatch_call_summary(result))
         payload = result.get("result")
         if not isinstance(payload, Mapping):
             raise OperationContractError(

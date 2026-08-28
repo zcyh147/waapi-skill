@@ -27,8 +27,14 @@ SPEC.loader.exec_module(waapi_gateway)
 
 
 class FakeClient:
-    def __init__(self, responses: Mapping[str, Any]) -> None:
+    def __init__(
+        self,
+        responses: Mapping[str, Any],
+        *,
+        errors: Mapping[str, BaseException] | None = None,
+    ) -> None:
         self.responses = dict(responses)
+        self.errors = dict(errors or {})
         self.calls: list[
             tuple[str, Mapping[str, Any] | None, Mapping[str, Any] | None]
         ] = []
@@ -41,10 +47,19 @@ class FakeClient:
         options: Mapping[str, Any] | None = None,
     ) -> Any:
         self.calls.append((uri, args, options))
+        if uri in self.errors:
+            raise self.errors[uri]
         return self.responses[uri]
 
     def disconnect(self) -> None:
         self.disconnected = True
+
+
+class WaapiRequestFailed(Exception):
+    def __init__(self, uri: str, kwargs: Mapping[str, Any] | None = None) -> None:
+        super().__init__("untrusted rendered application error")
+        self.uri = uri
+        self.kwargs = kwargs
 
 
 def _live_info(version: str) -> dict[str, Any]:
@@ -187,6 +202,54 @@ def test_debug_validate_call_validates_target_without_executing_it(
             {},
         ),
     ]
+
+
+@pytest.mark.parametrize(
+    ("version", "command", "uri"),
+    (
+        ("2023.1", ["debug-wal-tree", "--max-nodes", "1"], "ak.wwise.debug.getWalTree"),
+        (
+            "2025.1",
+            ["debug-validate-call", "ak.wwise.core.getProjectInfo"],
+            "ak.wwise.debug.validateCall",
+        ),
+    ),
+)
+def test_debug_reads_report_release_build_boundary(
+    tmp_path: Path,
+    version: str,
+    command: list[str],
+    uri: str,
+) -> None:
+    client = FakeClient(
+        {"ak.wwise.core.getInfo": _live_info(version)},
+        errors={
+            uri: WaapiRequestFailed(
+                "ak.wwise.invalid_procedure_uri",
+                {
+                    "details": {"procedureUri": uri},
+                    "message": "The procedure URI is unknown.",
+                },
+            )
+        },
+    )
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        command,
+        env=_gateway_env(tmp_path, version),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 0, payload
+    assert payload["ok"] is True
+    assert payload["status"] == "unsupported_boundary"
+    assert payload["error_code"] == "DEBUG_BUILD_REQUIRED"
+    assert payload["executed"] is False
+    assert payload["call"]["waapi_error_uri"] == "ak.wwise.invalid_procedure_uri"
+    assert payload["agent_result"] is None
+    assert list(payload)[-1] == "agent_result"
+    assert client.calls[-1][0] == uri
+    assert client.disconnected is True
 
 
 def test_debug_validate_call_preserves_user_owned_exact_artifact(

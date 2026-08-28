@@ -538,12 +538,10 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
                             env=env,
                         )
                     )
-                    debug_validation = _require_gateway_success(
+                    debug_validation = _assert_debug_read_result(
                         debug_result,
-                        command="debug-validate-call",
                         version=version,
                     )
-                    assert debug_validation["agent_result"]["accepted_by_wwise"] is True
                 performance_result = {
                     "wwise_ready_seconds": sandbox.metadata.ready_duration_seconds,
                     "gateway_matrix_seconds": round(time.monotonic() - gateway_matrix_started, 6),
@@ -669,7 +667,11 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
                         else {"status": "unavailable_in_version"}
                     ),
                     "debug_validate_call": (
-                        debug_validation["agent_result"]
+                        {
+                            "status": debug_validation["status"],
+                            "error_code": debug_validation.get("error_code"),
+                            "agent_result": debug_validation.get("agent_result"),
+                        }
                         if debug_validation is not None
                         else {"status": "unavailable_in_version"}
                     ),
@@ -808,6 +810,27 @@ def _require_offline_schema_success(
     assert payload.get("ok") is True
     assert payload.get("status") == "ok"
     assert payload.get("version") == version
+    return payload
+
+
+def _assert_debug_read_result(
+    result: tuple[int, dict[str, Any]],
+    *,
+    version: str,
+) -> dict[str, Any]:
+    exit_code, payload = result
+    assert exit_code == 0, payload
+    assert payload.get("ok") is True
+    assert payload.get("detected_version") == version
+    if payload.get("status") == "ok":
+        assert payload["agent_result"]["accepted_by_wwise"] is True
+        return payload
+    assert payload.get("status") == "unsupported_boundary"
+    assert payload.get("error_code") == "DEBUG_BUILD_REQUIRED"
+    assert payload.get("executed") is False
+    call = payload.get("call")
+    assert isinstance(call, Mapping)
+    assert call.get("waapi_error_uri") == "ak.wwise.invalid_procedure_uri"
     return payload
 
 
