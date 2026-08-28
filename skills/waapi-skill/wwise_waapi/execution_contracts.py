@@ -214,9 +214,9 @@ TOPIC_TIMEOUT_OVERRIDES: Mapping[str, float] = MappingProxyType(
 )
 
 
-# These functions have a small, side-effect-free request/result contract and
-# may use ``gateway call`` directly. Broader reads intentionally use a reviewed
-# transaction so the operator sees and confirms their exact payload first.
+# These functions have a small, side-effect-free request/result contract. The
+# Core business reads add their closed identity seam to the same bounded lane;
+# broader reads intentionally use a reviewed transaction.
 BOUNDED_DIRECT_CALL_URIS = frozenset(
     {
         "ak.soundengine.getState",
@@ -236,7 +236,7 @@ BOUNDED_DIRECT_CALL_URIS = frozenset(
         "ak.wwise.waapi.getSchema",
         "ak.wwise.waapi.getTopics",
     }
-)
+) | core_business_read_operations()
 
 
 FILESYSTEM_OR_EXTERNAL_PREFIXES = (

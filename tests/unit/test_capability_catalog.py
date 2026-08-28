@@ -279,7 +279,7 @@ def test_semantic_inventory_is_version_aware_and_bounded_reads_are_public() -> N
     assert linked.safety.read_only is True
     assert linked.safety.interface_status == "available"
     assert linked.preferred_route == "manifest_dispatch"
-    assert linked.gateway_commands == ("request-schema",)
+    assert linked.gateway_commands == ("request-schema", "core-call")
     assert linked.execution_contract["timeout_seconds"] == 10.0
     assert linked.execution_contract["result_limit_bytes"] == 256 * 1024
 
@@ -292,15 +292,15 @@ def test_catalog_summary_reconciles_all_five_version_totals() -> None:
     assert summary["totals"]["total"] == 814
     assert summary["totals"]["schema_status"] == {"ok": 814}
     assert summary["totals"]["interface_status"] == {
-        "available": 268,
-        "available_via_transaction": 540,
+        "available": 275,
+        "available_via_transaction": 533,
         "unsupported_by_skill_interface": 6,
     }
     assert summary["totals"]["preferred_routes"] == {
         "bounded_topic_wait": 152,
         "fixed_command": 56,
-        "manifest_dispatch": 60,
-        "transaction_operation": 540,
+        "manifest_dispatch": 67,
+        "transaction_operation": 533,
         "unsupported_boundary": 6,
     }
     assert "semantic_builder" not in summary["totals"]["preferred_routes"]
@@ -335,8 +335,8 @@ def test_all_semantic_read_records_resolve_to_public_gateway_routes() -> None:
     assert len(semantic_reads) == 71
     assert sum(entry.preferred_route == "fixed_command" for entry in semantic_reads) == 30
     assert sum(entry.preferred_route == "bounded_topic_wait" for entry in semantic_reads) == 25
-    assert sum(entry.preferred_route == "manifest_dispatch" for entry in semantic_reads) == 6
-    assert sum(entry.preferred_route == "transaction_operation" for entry in semantic_reads) == 10
+    assert sum(entry.preferred_route == "manifest_dispatch" for entry in semantic_reads) == 11
+    assert sum(entry.preferred_route == "transaction_operation" for entry in semantic_reads) == 5
     assert all(entry.preferred_route != "semantic_builder" for entry in entries)
     assert all(
         entry.gateway_commands
@@ -375,6 +375,7 @@ def test_public_manifest_dispatch_is_exactly_the_immutable_reviewed_call_allowli
             "ak.soundengine.getSwitch",
             "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
             "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion",
+            "ak.wwise.core.blendContainer.getAssignments",
             "ak.wwise.core.mediaPool.get",
             "ak.wwise.core.mediaPool.getFields",
             "ak.wwise.core.object.diff",
@@ -382,6 +383,7 @@ def test_public_manifest_dispatch_is_exactly_the_immutable_reviewed_call_allowli
             "ak.wwise.core.ping",
             "ak.wwise.core.profiler.getCursorTime",
             "ak.wwise.core.remote.getConnectionStatus",
+            "ak.wwise.core.switchContainer.getAssignments",
             "ak.wwise.core.transport.getState",
             "ak.wwise.ui.commands.getCommands",
             "ak.wwise.waapi.getFunctions",
@@ -394,7 +396,8 @@ def test_public_manifest_dispatch_is_exactly_the_immutable_reviewed_call_allowli
     assert public_topics == REVIEWED_TOPIC_URIS
     assert frozenset(FIXED_COMMANDS_BY_URI) == REVIEWED_FIXED_FUNCTION_URIS
     assert all(
-        entry.gateway_commands == ("request-schema",)
+        entry.gateway_commands
+        in {("request-schema",), ("request-schema", "core-call")}
         for entry in entries
         if entry.preferred_route == "manifest_dispatch"
     )

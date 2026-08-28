@@ -183,7 +183,7 @@ Compact 2022 materialization rules not yet represented structurally:
 
 ### Authoring audio conversion
 
-For exact `ak.wwise.core.audio.convert` in `2024.1`/`2025.1`, run `request-schema ak.wwise.core.audio.convert` and follow its `core-business/v1` Draft. Bind each `audio_object` role, copy the returned handles into `audio_object_handles`, add non-empty platform and language names, and pass the user's exact absolute `io_root` in the same complete Core plan. Explicit SFX targets use `SFX`; explicit localized languages replace it. Never return to `typed-call` or typed facts. Ask when a required input remains ambiguous.
+For exact `ak.wwise.core.audio.convert` in `2024.1`/`2025.1`, run `request-schema ak.wwise.core.audio.convert` and follow its `core-business/v1` Draft. Its public business inputs are object identities, platforms, languages, and the absolute `io_root`. Bind each `audio_object` role and copy the returned handles into `audio_object_handles`. Explicit SFX targets use `SFX`; explicit localized languages replace it. Never return to `typed-call` or typed facts. Ask when a required input remains ambiguous.
 
 ## Closed input, preview, and policy
 

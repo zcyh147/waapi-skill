@@ -352,9 +352,9 @@ def test_public_readmes_route_users_only_through_the_packaged_gateway() -> None:
             assert operation_specific_field not in readme
 
     assert "Manifest reflection is discovery, not permission" in readmes[0]
-    assert "request-schema` exposes only reviewed exact-version typed routes" in readmes[0]
+    assert "request-schema` exposes only reviewed exact-version continuations" in readmes[0]
     assert "Manifest 反射只用于发现能力，不等于授权执行" in readmes[1]
-    assert "request-schema` 只开放经过审核、精确版本绑定且结果有界的 typed route" in readmes[1]
+    assert "request-schema` 只开放经过审核、精确版本绑定且结果有界的唯一 continuation" in readmes[1]
 
 
 def test_public_readmes_publish_exact_five_version_api_coverage() -> None:
@@ -377,7 +377,7 @@ def test_public_readmes_publish_exact_five_version_api_coverage() -> None:
         assert "**656**" in readme
         assert "**152**" in readme
         assert "**6**" in readme
-        assert "3811" in readme
+        assert "3968" in readme
         assert "./skills/waapi-skill/references/waapi-coverage.md" in readme
 
     assert "198 unique routed WAAPI URIs" in english
@@ -386,7 +386,7 @@ def test_public_readmes_publish_exact_five_version_api_coverage() -> None:
     assert "仍要求实时宿主为 Authoring" in " ".join(chinese.split())
     assert "not a claim that all 808 rows have been exercised against a real Wwise process" in english
     assert "不等于已经在真实 Wwise 进程中逐一运行了全部 808 行" in chinese
-    assert "currently contains 3811 passing tests" in coverage_contract
+    assert "currently contains 3968 passing tests" in coverage_contract
     for readme in (english, chinese):
         assert "--path-segment" in readme
         assert "--advanced-waql" in readme

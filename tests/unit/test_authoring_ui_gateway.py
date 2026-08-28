@@ -320,16 +320,16 @@ def test_offline_capability_profile_is_explicit_and_defaults_to_console(
     assert default_payload["summary"]["profile"] == "wwise-console"
     assert default_payload["summary"]["totals"]["total"] == 814
     assert default_payload["summary"]["totals"]["interface_status"] == {
-        "available": 268,
-        "available_via_transaction": 540,
+        "available": 275,
+        "available_via_transaction": 533,
         "unsupported_by_skill_interface": 6,
     }
     assert authoring_payload["profile"] == "wwise-authoring-ui"
     assert authoring_payload["summary"]["profile"] == "wwise-authoring-ui"
     assert authoring_payload["summary"]["totals"]["total"] == 824
     assert authoring_payload["summary"]["totals"]["interface_status"] == {
-        "available": 272,
-        "available_via_transaction": 552,
+        "available": 279,
+        "available_via_transaction": 545,
     }
     assert authoring_payload["filters"]["profile"] == "wwise-authoring-ui"
 
