@@ -922,7 +922,9 @@ def test_closed_gateway_workflows_across_selected_version(
             "path": f"{object_parent}\\{included_name}",
             "includes": ["events", "structures"],
         }
-        assert inclusion_row["type"] in {"ActorMixer", "Actor-Mixer"}
+        assert inclusion_row["type"] == (
+            "PropertyContainer" if runtime.version == "2025.1" else "ActorMixer"
+        )
 
         inclusions_clear = _complete_transaction(
             runtime,
@@ -1299,7 +1301,9 @@ def test_media_build_business_reads_across_selected_version(
             "path": f"{object_parent}\\{included_name}",
             "includes": ["events", "structures"],
         }
-        assert inclusion_row["type"] in {"ActorMixer", "Actor-Mixer"}
+        assert inclusion_row["type"] == (
+            "PropertyContainer" if runtime.version == "2025.1" else "ActorMixer"
+        )
         runtime.category_results.append(
             {
                 "category": "media-build-business-read",
