@@ -105,6 +105,19 @@ def test_campaign_uses_same_profile_and_disables_same_root_retry(
         "default",
     )
 
+    selected = campaign.parse_args(
+        [
+            "--profile",
+            PROFILE_ID,
+            "--campaign-root",
+            str(tmp_path / "selected-campaign"),
+            "--case-id",
+            "TYP22-GENERIC-OBJECT-QUERY",
+            *_dependencies(tmp_path),
+        ]
+    )
+    assert selected.case_ids == ("TYP22-GENERIC-OBJECT-QUERY",)
+
     with pytest.raises(SystemExit):
         campaign.parse_args(
             [
@@ -114,6 +127,18 @@ def test_campaign_uses_same_profile_and_disables_same_root_retry(
                 str(tmp_path / "bad-campaign"),
                 "--max-pre-action-retries",
                 "1",
+                *_dependencies(tmp_path),
+            ]
+        )
+    with pytest.raises(SystemExit):
+        campaign.parse_args(
+            [
+                "--profile",
+                PROFILE_ID,
+                "--campaign-root",
+                str(tmp_path / "bad-pair-campaign"),
+                "--pair-id",
+                "TYP22-GENERIC-OBJECT-QUERY",
                 *_dependencies(tmp_path),
             ]
         )

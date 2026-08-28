@@ -559,6 +559,28 @@ def test_read_only_object_protocol_uses_the_existing_simple_typed_flags(
     )
 
 
+def test_business_query_protocol_reads_schema_before_the_closed_declaration(
+    tmp_path: Path,
+) -> None:
+    scenario = _scenario("OBJ22-F-GET-03")
+    recipe = build_object_heavy_v3_recipe(scenario.id, version="2022.1")
+    runtime = PreparedObjectRuntime(
+        scenario=scenario,
+        recipe=recipe,
+        backend=_StateBackend(_fixture_objects(scenario.id, "2022.1")),
+        asset_root=tmp_path,
+    )
+
+    protocol = runtime.gateway_protocol()
+
+    assert tuple(step.subcommand for step in protocol.steps) == (
+        "query-schema",
+        "query-object",
+    )
+    assert protocol.turn_prefix_counts == (2,)
+    assert "--max-results" in protocol.steps[-1].arguments
+    assert "--where" not in protocol.steps[-1].arguments
+
 @pytest.mark.parametrize(
     "mutation, match",
     (
