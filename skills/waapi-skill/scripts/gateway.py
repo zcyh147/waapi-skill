@@ -242,6 +242,7 @@ from wwise_waapi.core_business_contracts import (  # noqa: E402  # pyright: igno
     core_business_catalog_rows,
     core_business_contract_data,
     core_business_operations,
+    core_business_versions,
 )
 from wwise_waapi.core_business import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     materialize_core_business_request,
@@ -254,6 +255,7 @@ from wwise_waapi.media_build_business_contracts import (  # noqa: E402  # pyrigh
     media_build_business_catalog_rows,
     media_build_business_contract_data,
     media_build_business_operations,
+    media_build_business_versions,
 )
 from wwise_waapi.media_build_business import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     MediaBuildBusinessError,
@@ -4086,7 +4088,7 @@ def preflight_typed_request_input(
     versions = resolve_catalog_versions(args, env=env)
     if len(versions) != 1:
         raise GatewayInputError("typed-call requires one exact Wwise version")
-    if args.api in core_business_operations() | media_build_business_operations():
+    if core_business_route_available(args.api, versions[0]):
         raise GatewayInputError(
             f"{args.api} uses request-schema and its closed Core business continuation"
         )
@@ -5710,6 +5712,14 @@ def core_business_route_payload(version: str, api: str) -> dict[str, Any]:
             ),
         },
     }
+
+
+def core_business_route_available(api: str, version: str) -> bool:
+    if api in media_build_business_operations():
+        return version in media_build_business_versions(api)
+    if api in core_business_operations():
+        return version in core_business_versions(api)
+    return False
 
 
 def typed_topic_contract_payload(contract: Any) -> dict[str, Any]:
@@ -7386,10 +7396,10 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             return fixed_command_route_payload(capability)
         if (
             args.command == "request-schema"
-            and args.api in core_business_operations() | media_build_business_operations()
+            and core_business_route_available(args.api, versions[0])
         ):
             return core_business_route_payload(versions[0], args.api)
-        if args.api in core_business_operations() | media_build_business_operations():
+        if core_business_route_available(args.api, versions[0]):
             raise GatewayInputError(
                 f"{args.api} uses its closed Core business declaration; "
                 "typed field and container construction are not public"

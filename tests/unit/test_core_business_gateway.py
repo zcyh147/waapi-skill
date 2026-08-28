@@ -142,6 +142,29 @@ def test_request_schema_routes_project_save_to_one_business_draft(tmp_path: Path
     assert "typed-call" not in json.dumps(payload, sort_keys=True)
 
 
+def test_project_save_keeps_its_zero_input_route_before_business_fields_exist(
+    tmp_path: Path,
+) -> None:
+    operation = "ak.wwise.core.project.save"
+
+    exit_code, payload = gateway.execute_gateway(
+        ["--version", "2022.1", "request-schema", operation],
+        env=_env(tmp_path),
+        client_factory=lambda url: pytest.fail(f"offline schema connected to {url}"),
+    )
+
+    assert exit_code == 0, payload
+    assert payload["contract"] == "waapi-skill.typed-request-schema/v1"
+    assert payload["input_shape"] == "zero"
+    assert payload["continuation"]["gateway_argv"] == [
+        "typed-zero-call",
+        operation,
+        "--schema-digest",
+        payload["schema_digest"],
+        "--apply",
+    ]
+
+
 @pytest.mark.parametrize("operation", sorted(gateway.core_business_operations()))
 def test_every_issue_84_route_blocks_typed_call_bypass(
     tmp_path: Path,
