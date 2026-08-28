@@ -1796,14 +1796,8 @@ def test_compound_undo_business_draft_executes_and_cancels_without_retry(
                 "query-object",
                 "--exact-id",
                 success_id,
-                "--return-field",
-                "id",
-                "--return-field",
-                "name",
-                "--return-field",
+                "--include",
                 "notes",
-                "--return-field",
-                "path",
             ],
             live=True,
         )
@@ -2054,9 +2048,7 @@ def test_core_business_public_read_and_result_schema_mutation(
                 "query-object",
                 "--exact-id",
                 target_id,
-                "--return-field",
-                "id",
-                "--return-field",
+                "--include",
                 "notes",
             ],
             live=True,
@@ -2385,7 +2377,7 @@ def _create_object(
 
 def _delete_if_present_via_transaction(runtime: _WorkflowSandboxRuntime, object_id: str) -> None:
     before = runtime.gateway(
-        ["query-object", "--exact-id", object_id, "--return-field", "id", "--return-field", "path"],
+        ["query-object", "--exact-id", object_id],
         live=True,
     )
     if before["count"] == 0:
@@ -2397,7 +2389,7 @@ def _delete_if_present_via_transaction(runtime: _WorkflowSandboxRuntime, object_
         object_id=object_id,
     )
     after = runtime.gateway(
-        ["query-object", "--exact-id", object_id, "--return-field", "id"],
+        ["query-object", "--exact-id", object_id],
         live=True,
     )
     assert after["count"] == 0

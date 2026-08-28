@@ -177,6 +177,27 @@ prevention checks that are expensive to rediscover.
   examples against the oracle before spending a new Fresh root; do not solve a
   stable vocabulary seam by repeatedly strengthening only the prompt.
 
+### Real-test helpers can outlive a public Gateway cutover
+
+- Evidence: the first two #84 dual-host real attempts completed the new
+  `core-call object.diff` and Core Business Draft `object.pasteProperties`
+  dispatches, then failed only in test assertions and cleanup. The helper first
+  required terminal state `verified` although the sealed verifier was
+  deliberately `result_schema_checked`; after that correction it still used
+  the retired `query-object --object-id ... --return-field ...` grammar from
+  before #96.
+- Cause: the product seam and deterministic tests migrated together, but a
+  destructive-only helper was skipped by Program/Non-live and retained both an
+  obsolete terminal-state assumption and obsolete query flags.
+- Prevention: before spending a real-host rerun, audit the selected test node's
+  setup, assertions, manual readback, and `finally` cleanup against the current
+  `query-schema` or returned continuation. Exact-ID reads use
+  `query-object --exact-id`; identity fields are default output and extra
+  business fields use `--include`. Assert the sealed verifier terminal state
+  instead of upgrading `result_schema_checked` to business verification. A run
+  that reached Wwise but failed these test-only checks remains FAIL and receives
+  no semantic or real-host PASS credit.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:
