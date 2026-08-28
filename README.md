@@ -314,26 +314,29 @@ Check the live version/project and query objects without composing WAAPI code:
 python scripts/run.py gateway.py status
 python scripts/run.py gateway.py object-types --query 'audio source' --limit 20
 python scripts/run.py gateway.py query-object \
-  --path '\Events\Default Work Unit' \
-  --return-field id --return-field name --return-field type --return-field path
+  --path-segment Events --path-segment 'Default Work Unit' \
+  --relationship children --max-results 100
 ```
 
-Simple lookups keep the compact flags above. When those flags cannot express
-the required nested boolean logic or ordered relationship chain, inspect
-`query-schema` and follow its typed structured continuation. The Python Builder
-materializes those Gateway-owned facts into bounded WAQL. If that schema still
-cannot express a required read-only construct, inspect `query-schema --advanced`
-and follow its typed advanced continuation. That third layer accepts one bounded
-WAQL scalar and typed return expressions, but fixes the API to read-only `object.get`,
-appends a final row cap, preserves timeout/byte limits, and lets the connected
-Wwise version validate the syntax. Mutation selectors never accept raw WAQL;
-advanced results are read-only candidates, not proof of target uniqueness. A
-later change requires the user to choose an exact candidate and the Skill to
-verify that GUID and its matching name/type/path through the simple exact-ID
-route before a separate closed mutation transaction. The returned advanced
-schema makes the native-input boundary explicit: WAQL and each return
-expression have UTF-8 byte limits and must be trimmed, single-line frames with
-no comments, semicolons, or unclosed string/regex literals.
+`query-schema` describes this same closed business declaration: literal path
+segments, identities, relationships, business predicates, requested outputs,
+and a result bound. The Gateway compiles those values into the exact native
+WAQL source, transforms, accessors, projection, and final cap. Only when the
+business declaration cannot express a required server-side read semantic, run
+`query-schema --advanced`, then use its bounded second layer:
+
+```bash
+python scripts/run.py gateway.py query-object \
+  --advanced-waql 'from project' --max-results 100
+```
+
+The advanced route fixes the API to read-only `object.get`, owns its projection
+and final row cap, preserves timeout/byte limits, and lets the connected Wwise
+version validate the exact expression. Mutation selectors never accept raw
+WAQL; advanced results are read-only candidates, not proof of target uniqueness.
+A later change requires the user to choose an exact candidate and the Skill to
+verify that GUID and its matching name/type/path through the business exact-ID
+route before a separate closed mutation transaction.
 
 ### 4. Use the closed transaction lane for project changes
 

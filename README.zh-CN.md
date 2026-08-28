@@ -300,23 +300,25 @@ $HOME/.config/waapi-skill/config.json
 python scripts/run.py gateway.py status
 python scripts/run.py gateway.py object-types --query 'audio source' --limit 20
 python scripts/run.py gateway.py query-object \
-  --path '\Events\Default Work Unit' \
-  --return-field id --return-field name --return-field type --return-field path
+  --path-segment Events --path-segment 'Default Work Unit' \
+  --relationship children --max-results 100
 ```
 
-简单查询继续使用上面的紧凑参数。只有这些参数无法表达所需的嵌套布尔条件
-或有顺序的关系链时，才读取 `query-schema`，并只使用它返回的 typed facts、
-Gateway-issued handle 与 `query-object --typed-structured` continuation。Python
-Builder 会把这些事实稳定地编译成有结果上限的 WAQL。如果结构化 typed contract
-仍表达不了所需的只读语法，则显式读取 `query-schema --advanced`，再使用
-`query-object --typed-advanced` 及其披露的有界字段。第三层允许原生 WAQL 和高级返回表达式，
-但 API 固定为只读 `object.get`，Gateway 会追加最终结果上限并保留超时和字节
-限制，具体语法由当前连接的 Wwise 版本验证。修改对象选择器仍不接受原始
-WAQL；高级查询结果只是只读候选，不能证明目标唯一。后续若要修改，必须先
-让用户明确选择一个候选，再用第一层精确 GUID 查询验证该对象的 GUID、名称、
-类型和路径完全一致，随后才能进入另一个闭合修改事务。返回的高级 Schema 还会
-明确原生输入边界：WAQL 和每个返回表达式都有 UTF-8 字节上限，必须去除首尾空白、
-保持单行，且不能含注释、分号或未闭合的字符串/正则字面量。
+`query-schema` 描述的就是这套闭合业务声明：逐级路径名、对象身份、关系、
+业务条件、需要的输出和结果上限。Gateway 会把这些值编译成精确的 WAQL 来源、
+变换、accessor、projection 和最终上限。只有业务声明无法表达必要的服务端读取
+语义时，才运行 `query-schema --advanced`，再使用第二层有界接口：
+
+```bash
+python scripts/run.py gateway.py query-object \
+  --advanced-waql 'from project' --max-results 100
+```
+
+高级接口把 API 固定为只读 `object.get`，由 Gateway 管理 projection、最终行数、
+超时和字节限制，精确表达式则交给当前连接的 Wwise 版本验证。修改对象选择器仍
+不接受原始 WAQL；高级查询结果只是只读候选，不能证明目标唯一。后续若要修改，
+必须先让用户明确选择候选，再通过业务层的精确 GUID 查询核对 GUID、名称、类型
+和路径，随后才能进入另一个闭合修改事务。
 
 ### 4. 工程修改必须走 closed transaction lane
 

@@ -387,3 +387,9 @@ def test_public_readmes_publish_exact_five_version_api_coverage() -> None:
     assert "not a claim that all 808 rows have been exercised against a real Wwise process" in english
     assert "不等于已经在真实 Wwise 进程中逐一运行了全部 808 行" in chinese
     assert "currently contains 3811 passing tests" in coverage_contract
+    for readme in (english, chinese):
+        assert "--path-segment" in readme
+        assert "--advanced-waql" in readme
+        assert "--typed-structured" not in readme
+        assert "--typed-advanced" not in readme
+        assert "--return-field id" not in readme
