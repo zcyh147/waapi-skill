@@ -98,7 +98,7 @@ This is a Wwise `2025.1`-only follow-up to a successful Media Pool read.
 - Invoke exactly one command, repeating only the final candidate option:
 
   ```bash
-  python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version 2025.1 query-object --type-name AudioFileSource --max-results 1000 --match-original-file-path '<first-complete-returned-Path>' --match-original-file-path '<second-complete-returned-Path>'
+  python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version 2025.1 query-object --max-results 1000 --match-original-file-path '<first-complete-returned-Path>' --match-original-file-path '<second-complete-returned-Path>'
   ```
 
   Do not add predicates, relationships, or extra business outputs.
@@ -126,8 +126,8 @@ This is a Wwise `2025.1`-only follow-up to a successful Media Pool read.
 ## Object queries
 
 Object reads use one Gateway-owned business declaration. Choose exactly one
-source: repeated `--path-segment`, `--exact-id`, a closed `--kind`, an exact
-user-requested or Gateway-reported `--type-name`, `--search-text`,
+source: repeated `--path-segment`, `--exact-id`, a closed `--kind`, a
+live-resolved `--custom-kind`, `--search-text`,
 `--query-id`, or repeated `--query-path-segment`. Never reconstruct a Wwise
 path separator, native type discriminator, predicate accessor, or relationship
 token. The Gateway constructs the exact Wwise path and separators from the
@@ -270,7 +270,7 @@ its complete result.
   row position, similar names, or path prefixes. Missing or disagreeing exact
   sources mean unresolved.
 - For "from the Sounds, find their direct parents", use
-  `--type-name Sound --relationship parent`.
+  `--kind all-sounds --relationship parent`.
   Predicates then describe the selected parent rows; include a returned-parent
   `path` predicate before type, child-count, and notes. Do not replace this with
   a descendant inventory.
@@ -311,7 +311,7 @@ python scripts/run.py gateway.py query-object --path-segment 'Actor-Mixer Hierar
 Direct parents:
 
 ```bash
-python scripts/run.py gateway.py query-object --type-name Sound --relationship parent --predicate kind-is random-container --predicate children-at-least 3 --predicate notes-contain parent-review --max-results 10
+python scripts/run.py gateway.py query-object --kind all-sounds --relationship parent --predicate kind-is random-container --predicate children-at-least 3 --predicate notes-contain parent-review --max-results 10
 ```
 
 Eight-level non-Project ownership:
@@ -341,7 +341,7 @@ Use live `metadata types` only to reflect the running instance again; its
 projection and bound are fixed.
 
 `metadata discover` resolves user-facing meanings to authoritative live names.
-Choose exactly one scope: repeated `--path-segment`, exact `--type-name`, or
+Choose exactly one scope: repeated `--path-segment`, exact metadata `--type-name`, or
 `--exact-id`; repeat `--meaning` for one to eight short English phrases. The
 Gateway owns detail level, search bounds, projection, metadata tokens, and
 cache scope. `metadata property-state` takes one meaning plus `--platform` and
@@ -378,7 +378,7 @@ For cross-reference diagnosis from an exact path, resolve
 `id,name,type,path`, then follow returned relationship ids by exact-id lookup.
 For Event use `--relationship children --max-results 100`, not descendants or
 same-name search. Request business hop fields: Action ->
-`--include action-type --include-field 'Target'`; Sound ->
+`--include action-type --include target`; Sound ->
 `--include override-output --include active-source --include output-bus`. The Event
 children result is already the Action hop. With its `ActionType,Target`, do not
 query the Action id again; use the returned `Target.id` directly for the next

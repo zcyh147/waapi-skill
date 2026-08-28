@@ -2478,7 +2478,7 @@ def test_query_object_detail_restores_compiler_and_dispatch_evidence(tmp_path: P
     )
 
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["query-object", "--type-name", "Sound", "--max-results", "1", "--detail"],
+        ["query-object", "--kind", "all-sounds", "--max-results", "1", "--detail"],
         env=gateway_env(tmp_path),
         client_factory=lambda url: client,
     )
@@ -2538,7 +2538,7 @@ def test_query_object_cleanup_failure_keeps_complete_success_evidence(
     )
 
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["query-object", "--type-name", "Sound", "--max-results", "1"],
+        ["query-object", "--kind", "all-sounds", "--max-results", "1"],
         env=gateway_env(tmp_path),
         client_factory=lambda url: client,
     )
@@ -2686,8 +2686,6 @@ def test_query_object_original_file_reference_match_returns_closed_candidate_rec
     exit_code, payload = waapi_gateway.execute_gateway(
         [
             "query-object",
-            "--type-name",
-            "AudioFileSource",
             "--max-results",
             "1000",
             "--match-original-file-path",
@@ -2822,8 +2820,6 @@ def test_query_object_original_file_reference_match_sorts_and_truncates_details(
     exit_code, payload = waapi_gateway.execute_gateway(
         [
             "query-object",
-            "--type-name",
-            "AudioFileSource",
             "--max-results",
             "1000",
             "--match-original-file-path",
@@ -2889,8 +2885,6 @@ def test_query_object_original_file_reference_match_maximum_shape_stays_below_ga
     env["WWISE_VERSION"] = "2025.1"
     argv = [
         "query-object",
-        "--type-name",
-        "AudioFileSource",
         "--max-results",
         "1000",
     ]
@@ -2924,20 +2918,18 @@ def test_query_object_original_file_reference_match_maximum_shape_stays_below_ga
         (
             (
                 "query-object",
-                "--type-name",
-                "Sound",
+                "--kind",
+                "all-sounds",
                 "--max-results",
                 "1000",
                 "--match-original-file-path",
                 r"Y:\Sandbox\Originals\source.wav",
             ),
-            "requires exactly --type-name AudioFileSource",
+            "cannot be combined with another query source",
         ),
         (
             (
                 "query-object",
-                "--type-name",
-                "AudioFileSource",
                 "--max-results",
                 "1000",
                 "--relationship",
@@ -2950,8 +2942,6 @@ def test_query_object_original_file_reference_match_maximum_shape_stays_below_ga
         (
             (
                 "query-object",
-                "--type-name",
-                "AudioFileSource",
                 "--max-results",
                 "999",
                 "--match-original-file-path",
@@ -2969,7 +2959,7 @@ def test_query_object_original_file_reference_match_maximum_shape_stays_below_ga
                 "--match-original-file-path",
                 r"Y:\Sandbox\Originals\source.wav",
             ),
-            "requires exactly --type-name AudioFileSource",
+            "cannot be combined with another query source",
         ),
     ),
 )
@@ -3030,8 +3020,6 @@ def test_query_object_original_file_reference_match_rejects_invalid_candidates(
 ) -> None:
     argv = [
         "query-object",
-        "--type-name",
-        "AudioFileSource",
         "--max-results",
         "1000",
     ]
@@ -3071,8 +3059,6 @@ def test_query_object_original_file_reference_match_is_strictly_2025_1(
     exit_code, payload = waapi_gateway.execute_gateway(
         [
             "query-object",
-            "--type-name",
-            "AudioFileSource",
             "--max-results",
             "1000",
             "--match-original-file-path",
@@ -3094,8 +3080,6 @@ def test_query_object_original_file_reference_match_enforces_candidate_limit(
     candidates = [rf"Y:\Sandbox\Originals\source-{index}.wav" for index in range(65)]
     argv = [
         "query-object",
-        "--type-name",
-        "AudioFileSource",
         "--max-results",
         "1000",
     ]
@@ -3182,8 +3166,6 @@ def test_query_object_original_file_reference_match_rejects_malformed_or_duplica
     exit_code, payload = waapi_gateway.execute_gateway(
         [
             "query-object",
-            "--type-name",
-            "AudioFileSource",
             "--max-results",
             "1000",
             "--match-original-file-path",
@@ -3221,8 +3203,6 @@ def test_query_object_original_file_reference_match_rejects_scan_at_take_limit(
     exit_code, payload = waapi_gateway.execute_gateway(
         [
             "query-object",
-            "--type-name",
-            "AudioFileSource",
             "--max-results",
             "1000",
             "--match-original-file-path",
@@ -3243,12 +3223,12 @@ def test_query_object_original_file_reference_match_rejects_scan_at_take_limit(
 @pytest.mark.parametrize(
     ("argv", "expected_error"),
     (
-        (("query-object", "--type-name", "Sound"), "GatewayInputError"),
+        (("query-object", "--kind", "all-sounds"), "GatewayInputError"),
         (
             (
                 "query-object",
-                "--type-name",
-                "Sound",
+                "--kind",
+                "all-sounds",
                 "--max-results",
                 str(waapi_gateway.MAX_QUERY_TAKE + 1),
             ),
@@ -3302,7 +3282,7 @@ def test_query_object_rejects_malformed_success_result_shape(
     )
 
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["query-object", "--type-name", "Sound", "--max-results", "1"],
+        ["query-object", "--kind", "all-sounds", "--max-results", "1"],
         env=gateway_env(tmp_path),
         client_factory=lambda url: client,
     )
@@ -3331,7 +3311,7 @@ def test_query_object_rejects_rows_above_requested_take(tmp_path: Path) -> None:
     )
 
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["query-object", "--type-name", "Sound", "--max-results", "1"],
+        ["query-object", "--kind", "all-sounds", "--max-results", "1"],
         env=gateway_env(tmp_path),
         client_factory=lambda url: client,
     )
@@ -3387,7 +3367,7 @@ def test_query_object_broad_results_remain_gateway_bounded(tmp_path: Path) -> No
     )
 
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["query-object", "--type-name", "Sound", "--max-results", "2"],
+        ["query-object", "--kind", "all-sounds", "--max-results", "2"],
         env=gateway_env(tmp_path),
         client_factory=lambda url: client,
     )
@@ -3476,21 +3456,25 @@ def test_query_object_builds_exact_wwise_path_from_business_segments(
         ("sound-voice", "from type Sound where @IsVoice = true take 2"),
     ),
 )
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
 def test_query_object_compiles_semantic_kind_to_native_type_and_predicate(
     tmp_path: Path,
     kind: str,
     expected_waql: str,
+    version: str,
 ) -> None:
     client = FakeClient(
         {
-            "ak.wwise.core.getInfo": live_info(),
+            "ak.wwise.core.getInfo": live_info(year=int(version.split(".")[0])),
             "ak.wwise.core.object.get": {"return": []},
         }
     )
 
+    env = gateway_env(tmp_path)
+    env["WWISE_VERSION"] = version
     exit_code, payload = waapi_gateway.execute_gateway(
         ["query-object", "--kind", kind, "--max-results", "2"],
-        env=gateway_env(tmp_path),
+        env=env,
         client_factory=lambda url: client,
     )
 
@@ -3501,6 +3485,83 @@ def test_query_object_compiles_semantic_kind_to_native_type_and_predicate(
         {"return": ["id", "name", "type", "path"]},
     )
 
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+def test_query_object_advanced_expression_dispatches_through_public_business_projection(
+    tmp_path: Path,
+    version: str,
+) -> None:
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": live_info(year=int(version.split(".")[0])),
+            "ak.wwise.core.object.get": {"return": []},
+        }
+    )
+    env = gateway_env(tmp_path)
+    env["WWISE_VERSION"] = version
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "query-object",
+            "--advanced-waql",
+            "from type Sound",
+            "--max-results",
+            "2",
+            "--include",
+            "volume-db",
+            "--detail",
+        ],
+        env=env,
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 0, payload
+    assert payload["query_layer"] == "advanced-native-waql"
+    assert client.calls[-1] == (
+        "ak.wwise.core.object.get",
+        {"waql": "from type Sound take 2"},
+        {"return": ["id", "name", "type", "path", "@Volume"]},
+    )
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+def test_query_object_custom_kind_is_live_bound_before_waql(
+    tmp_path: Path,
+    version: str,
+) -> None:
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": live_info(year=int(version.split(".")[0])),
+            "ak.wwise.core.object.getTypes": {
+                "return": [
+                    {"classId": 42, "name": "MyPluginSound", "type": "WObject"}
+                ]
+            },
+            "ak.wwise.core.object.get": {"return": []},
+        }
+    )
+    env = gateway_env(tmp_path)
+    env["WWISE_VERSION"] = version
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "query-object",
+            "--custom-kind",
+            "My Plug-in Sound",
+            "--max-results",
+            "2",
+        ],
+        env=env,
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 0, payload
+    assert client.calls[-2][0] == "ak.wwise.core.object.getTypes"
+    assert client.calls[-1] == (
+        "ak.wwise.core.object.get",
+        {"waql": "from type MyPluginSound take 2"},
+        {"return": ["id", "name", "type", "path"]},
+    )
 
 def test_query_object_compiles_business_predicates_without_native_tuple_fields(
     tmp_path: Path,
@@ -3609,8 +3670,90 @@ def test_query_object_rejects_model_authored_native_type_predicate_before_connec
     assert payload["error_code"] == "GatewayInputError"
 
 
+def test_query_object_event_children_expose_closed_action_target_without_metadata_scope(
+    tmp_path: Path,
+) -> None:
+    target = {"id": "{22222222-2222-2222-2222-222222222222}"}
+    row = {
+        "id": "{11111111-1111-1111-1111-111111111111}",
+        "name": "Play_Rain_Action",
+        "type": "Action",
+        "path": r"\Events\Default Work Unit\Play_Rain\Play_Rain_Action",
+        "ActionType": 1,
+        "Target": target,
+    }
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": live_info(),
+            "ak.wwise.core.object.get": {"return": [row]},
+        }
+    )
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "query-object",
+            "--path-segment",
+            "Events",
+            "--path-segment",
+            "Default Work Unit",
+            "--path-segment",
+            "Play_Rain",
+            "--relationship",
+            "children",
+            "--max-results",
+            "10",
+            "--include",
+            "action-type",
+            "--include",
+            "target",
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 0, payload
+    assert payload["agent_result"][0]["action_type"] == 1
+    assert payload["agent_result"][0]["target"] == target
+    assert client.calls[-1][2] == {
+        "return": ["id", "name", "type", "path", "ActionType", "Target"]
+    }
+
+
+def test_query_object_rejects_custom_field_across_every_relationship_scope(
+    tmp_path: Path,
+) -> None:
+    connected = False
+
+    def client_factory(_url: str) -> FakeClient:
+        nonlocal connected
+        connected = True
+        raise AssertionError("cross-scope metadata must fail before WAAPI")
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "query-object",
+            "--kind",
+            "all-sounds",
+            "--relationship",
+            "parent",
+            "--max-results",
+            "5",
+            "--include-field",
+            "Custom Gain",
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=client_factory,
+    )
+
+    assert exit_code == 2
+    assert connected is False
+    assert "post-traversal result type" in payload["message"]
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
 def test_query_object_compiles_and_renames_business_and_custom_outputs(
     tmp_path: Path,
+    version: str,
 ) -> None:
     row = {
         "id": "{11111111-1111-1111-1111-111111111111}",
@@ -3652,7 +3795,7 @@ def test_query_object_compiles_and_renames_business_and_custom_outputs(
 
     client = MetadataFakeClient(
         {
-            "ak.wwise.core.getInfo": live_info(),
+            "ak.wwise.core.getInfo": live_info(year=int(version.split(".")[0])),
             "ak.wwise.core.object.get": {"return": [row]},
             "ak.wwise.core.object.getTypes": {
                 "return": [{"classId": 65552, "name": "Sound", "type": "WObject"}]
@@ -3664,6 +3807,8 @@ def test_query_object_compiles_and_renames_business_and_custom_outputs(
         }
     )
 
+    env = gateway_env(tmp_path)
+    env["WWISE_VERSION"] = version
     exit_code, payload = waapi_gateway.execute_gateway(
         [
             "query-object",
@@ -3680,7 +3825,7 @@ def test_query_object_compiles_and_renames_business_and_custom_outputs(
             "--max-results",
             "1",
         ],
-        env=gateway_env(tmp_path),
+        env=env,
         client_factory=lambda url: client,
     )
 
@@ -3944,7 +4089,7 @@ def test_query_object_exposes_business_path_segments_not_raw_wwise_path() -> Non
     assert "--path" not in options
 
 
-def test_query_object_prefers_semantic_kind_and_labels_exact_custom_type() -> None:
+def test_query_object_exposes_closed_and_live_bound_business_kinds() -> None:
     parser = waapi_gateway.build_parser()
     subparsers = next(
         action
@@ -3958,7 +4103,8 @@ def test_query_object_prefers_semantic_kind_and_labels_exact_custom_type() -> No
         for option in action.option_strings
     }
 
-    assert {"--kind", "--type-name"} <= options
+    assert {"--kind", "--custom-kind"} <= options
+    assert "--type-name" not in options
     assert "--type" not in options
 
 
@@ -4229,7 +4375,7 @@ def test_unknown_object_error_is_not_normalized_for_broad_waql(tmp_path: Path) -
     )
 
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["query-object", "--type-name", "Sound", "--max-results", "1"],
+        ["query-object", "--kind", "all-sounds", "--max-results", "1"],
         env=gateway_env(tmp_path),
         client_factory=lambda url: client,
     )
@@ -4311,7 +4457,7 @@ def test_query_object_broad_sources_require_explicit_business_result_bound(tmp_p
     )
 
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["query-object", "--type-name", "Sound"],
+        ["query-object", "--kind", "all-sounds"],
         env=gateway_env(tmp_path),
         client_factory=lambda url: client,
     )
@@ -4321,7 +4467,7 @@ def test_query_object_broad_sources_require_explicit_business_result_bound(tmp_p
     assert client.calls == []
 
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["query-object", "--type-name", "Sound", "--max-results", "3"],
+        ["query-object", "--kind", "all-sounds", "--max-results", "3"],
         env=gateway_env(tmp_path),
         client_factory=lambda url: client,
     )
@@ -5332,7 +5478,7 @@ def test_disconnect_failure_is_attached_without_masking_primary_result_error(
     )
 
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["query-object", "--type-name", "Sound", "--max-results", "1"],
+        ["query-object", "--kind", "all-sounds", "--max-results", "1"],
         env=gateway_env(tmp_path),
         client_factory=lambda url: client,
     )
@@ -5365,7 +5511,7 @@ def test_hostile_disconnect_exception_is_safely_attached_to_primary_result_error
     )
 
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["query-object", "--type-name", "Sound", "--max-results", "1"],
+        ["query-object", "--kind", "all-sounds", "--max-results", "1"],
         env=gateway_env(tmp_path),
         client_factory=lambda url: client,
     )
@@ -5454,7 +5600,7 @@ def test_baseexception_disconnect_failure_does_not_mask_primary_result_error(
     )
 
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["query-object", "--type-name", "Sound", "--max-results", "1"],
+        ["query-object", "--kind", "all-sounds", "--max-results", "1"],
         env=gateway_env(tmp_path),
         client_factory=lambda url: client,
     )

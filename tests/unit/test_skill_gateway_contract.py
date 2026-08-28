@@ -216,7 +216,7 @@ def test_query_reference_exposes_only_the_closed_original_file_match_surface() -
     query_flat = " ".join(query_reference.split())
     command = (
         "python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version "
-        "2025.1 query-object --type-name AudioFileSource --max-results 1000 "
+        "2025.1 query-object --max-results 1000 "
         "--match-original-file-path '<first-complete-returned-Path>' "
         "--match-original-file-path '<second-complete-returned-Path>'"
     )

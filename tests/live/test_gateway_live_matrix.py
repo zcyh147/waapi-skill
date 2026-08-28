@@ -40,7 +40,7 @@ EVIDENCE_ROOT = REPO_ROOT / ".waapi-skill-state" / "evidence" / "waapi-gateway-l
 GATEWAY_CONTRACT = "waapi-skill.gateway-result/v1"
 PREFERRED_METADATA_TYPES = ("Sound", "ActorMixer", "Bus", "MusicTrack", "Event")
 PREFERRED_PROPERTY_NAMES = ("Volume", "Pitch", "Lowpass", "Highpass", "InitialDelay", "MakeUpGain")
-MAX_PROPERTY_INFO_ATTEMPTS = 40
+MAX_METADATA_DISCOVERY_ATTEMPTS = 40
 EXACT_ROOT_PATHS = {
     "2021.1": r"\Actor-Mixer Hierarchy",
     "2022.1": r"\Actor-Mixer Hierarchy",
@@ -214,7 +214,14 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
                 project_query = _require_gateway_success(
                     _invoke_gateway(
                         common,
-                        ("query-object", "--type", "Project", "--take", "1", "--detail"),
+                        (
+                            "query-object",
+                            "--kind",
+                            "project",
+                            "--max-results",
+                            "1",
+                            "--detail",
+                        ),
                         env=env,
                     ),
                     command="query-object",
@@ -222,46 +229,19 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
                 )
                 _assert_project_query(project_query)
 
-                project_all_results = _require_gateway_success(
-                    _invoke_gateway(
-                        common,
-                        ("query-object", "--type", "Project", "--all-results", "--detail"),
-                        env=env,
-                    ),
-                    command="query-object --all-results",
-                    version=version,
-                )
-                _assert_query_preview(
-                    project_all_results,
-                    expected_waql="from type Project",
-                    minimum_count=1,
-                )
-                assert project_all_results["query_bound"] == {
-                    "mode": "all-results-explicit"
-                }
-
                 exact_path = EXACT_ROOT_PATHS[version]
                 path_query_result, command_durations["exact_path_query"] = _invoke_gateway_timed(
                     common,
                     (
                         "query-object",
-                        "--path",
-                        exact_path,
-                        "--return-field",
-                        "id",
-                        "--return-field",
-                        "name",
-                        "--return-field",
-                        "type",
-                        "--return-field",
-                        "path",
+                        *_path_segment_argv(exact_path),
                         "--detail",
                     ),
                     env=env,
                 )
                 path_query = _require_gateway_success(
                     path_query_result,
-                    command="query-object --path",
+                    command="query-object --path-segment",
                     version=version,
                 )
                 _assert_exact_path_query(path_query, expected_path=exact_path)
@@ -273,21 +253,13 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
                         common,
                         (
                             "query-object",
-                            "--object-id",
+                            "--exact-id",
                             root_id,
-                            "--return-field",
-                            "id",
-                            "--return-field",
-                            "name",
-                            "--return-field",
-                            "type",
-                            "--return-field",
-                            "path",
                             "--detail",
                         ),
                         env=env,
                     ),
-                    command="query-object --object-id",
+                    command="query-object --exact-id",
                     version=version,
                 )
                 _assert_exact_guid_query(
@@ -301,12 +273,9 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
                         common,
                         (
                             "query-object",
-                            "--path",
-                            exact_path + r"\__WAAPI_SKILL_MISSING__",
-                            "--return-field",
-                            "id",
-                            "--return-field",
-                            "path",
+                            *_path_segment_argv(
+                                exact_path + r"\__WAAPI_SKILL_MISSING__"
+                            ),
                             "--detail",
                         ),
                         env=env,
@@ -321,15 +290,13 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
                         common,
                         (
                             "query-object",
-                            "--object-id",
+                            "--exact-id",
                             "{FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF}",
-                            "--return-field",
-                            "id",
                             "--detail",
                         ),
                         env=env,
                     ),
-                    command="query-object --object-id missing",
+                    command="query-object --exact-id missing",
                     version=version,
                 )
                 _assert_empty_exact_query(missing_guid_query)
@@ -341,20 +308,18 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
                         common,
                         (
                             "query-object",
-                            "--type",
-                            "Project",
-                            "--where",
-                            "name",
-                            "=",
-                            "string",
+                            "--kind",
+                            "project",
+                            "--predicate",
+                            "name-is",
                             project_name,
-                            "--take",
+                            "--max-results",
                             "1",
                             "--detail",
                         ),
                         env=env,
                     ),
-                    command="query-object --type --where --take",
+                    command="query-object --kind --predicate --max-results",
                     version=version,
                 )
                 _assert_query_preview(
@@ -368,20 +333,18 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
                         common,
                         (
                             "query-object",
-                            "--search",
+                            "--search-text",
                             "Default Work Unit",
-                            "--where",
-                            "name",
-                            "=",
-                            "string",
+                            "--predicate",
+                            "name-is",
                             "Default Work Unit",
-                            "--take",
+                            "--max-results",
                             "1",
                             "--detail",
                         ),
                         env=env,
                     ),
-                    command="query-object --search --where --take",
+                    command="query-object --search-text --predicate --max-results",
                     version=version,
                 )
                 _assert_query_preview(
@@ -395,17 +358,16 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
                         common,
                         (
                             "query-object",
-                            "--path",
-                            exact_path,
-                            "--select",
+                            *_path_segment_argv(exact_path),
+                            "--relationship",
                             "children",
-                            "--take",
+                            "--max-results",
                             "1",
                             "--detail",
                         ),
                         env=env,
                     ),
-                    command="query-object --select children",
+                    command="query-object --relationship children",
                     version=version,
                 )
                 _assert_query_preview(
@@ -417,50 +379,50 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
                 child_id = str(child_row["id"])
 
                 select_payloads: dict[str, Mapping[str, Any]] = {}
-                for select, source_id, minimum_count in (
-                    ("parent", child_id, 1),
-                    ("ancestors", child_id, 1),
-                    ("descendants", root_id, 1),
-                    ("referencesTo", child_id, 0),
+                for relationship, native_select, source_id, minimum_count in (
+                    ("parent", "parent", child_id, 1),
+                    ("ancestors", "ancestors", child_id, 1),
+                    ("descendants", "descendants", root_id, 1),
+                    ("references-to", "referencesTo", child_id, 0),
                 ):
                     select_payload = _require_gateway_success(
                         _invoke_gateway(
                             common,
                             (
                                 "query-object",
-                                "--object-id",
+                                "--exact-id",
                                 source_id,
-                                "--select",
-                                select,
-                                "--take",
+                                "--relationship",
+                                relationship,
+                                "--max-results",
                                 "1",
                                 "--detail",
                             ),
                             env=env,
                         ),
-                        command=f"query-object --select {select}",
+                        command=f"query-object --relationship {relationship}",
                         version=version,
                     )
                     _assert_query_preview(
                         select_payload,
-                        expected_waql=f'from object "{source_id}" select {select} take 1',
+                        expected_waql=(
+                            f'from object "{source_id}" select {native_select} take 1'
+                        ),
                         minimum_count=minimum_count,
                     )
-                    select_payloads[select] = select_payload
+                    select_payloads[relationship] = select_payload
 
                 query_discovery = _require_gateway_success(
                     _invoke_gateway(
                         common,
                         (
                             "query-object",
-                            "--type",
-                            "Query",
-                            "--where",
-                            "name",
-                            "=",
-                            "string",
+                            "--kind",
+                            "saved-query",
+                            "--predicate",
+                            "name-is",
                             "Sound = SFX",
-                            "--take",
+                            "--max-results",
                             "1",
                             "--detail",
                         ),
@@ -482,7 +444,14 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
                 query_by_guid = _require_gateway_success(
                     _invoke_gateway(
                         common,
-                        ("query-object", "--query", query_id, "--take", "1", "--detail"),
+                        (
+                            "query-object",
+                            "--query-id",
+                            query_id,
+                            "--max-results",
+                            "1",
+                            "--detail",
+                        ),
                         env=env,
                     ),
                     command="query-object --query GUID",
@@ -496,7 +465,13 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
                 query_by_path = _require_gateway_success(
                     _invoke_gateway(
                         common,
-                        ("query-object", "--query", query_path, "--take", "1", "--detail"),
+                        (
+                            "query-object",
+                            *_query_path_segment_argv(query_path),
+                            "--max-results",
+                            "1",
+                            "--detail",
+                        ),
                         env=env,
                     ),
                     command="query-object --query path",
@@ -533,6 +508,42 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
                     version=version,
                     type_rows=type_rows,
                 )
+                profiler_game_objects: Mapping[str, Any] | None = None
+                if version != "2021.1":
+                    profiler_result, command_durations["profiler_game_objects"] = (
+                        _invoke_gateway_timed(
+                            common,
+                            ("profiler-game-objects", "--capture", "latest"),
+                            env=env,
+                        )
+                    )
+                    profiler_game_objects = _require_gateway_success(
+                        profiler_result,
+                        command="profiler-game-objects",
+                        version=version,
+                    )
+                    assert isinstance(
+                        profiler_game_objects.get("agent_result"), Mapping
+                    )
+
+                debug_validation: Mapping[str, Any] | None = None
+                if version in {"2024.1", "2025.1"}:
+                    debug_result, command_durations["debug_validate_call"] = (
+                        _invoke_gateway_timed(
+                            common,
+                            (
+                                "debug-validate-call",
+                                "ak.wwise.core.object.get",
+                            ),
+                            env=env,
+                        )
+                    )
+                    debug_validation = _require_gateway_success(
+                        debug_result,
+                        command="debug-validate-call",
+                        version=version,
+                    )
+                    assert debug_validation["agent_result"]["accepted_by_wwise"] is True
                 performance_result = {
                     "wwise_ready_seconds": sandbox.metadata.ready_duration_seconds,
                     "gateway_matrix_seconds": round(time.monotonic() - gateway_matrix_started, 6),
@@ -541,7 +552,7 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
                 assert isinstance(performance_result["wwise_ready_seconds"], float)
                 assert performance_result["wwise_ready_seconds"] > 0
                 assert performance_result["gateway_matrix_seconds"] > 0
-                assert set(command_durations) == {
+                expected_duration_keys = {
                     "status",
                     "buses",
                     "selected",
@@ -550,6 +561,11 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
                     "exact_path_query",
                     "metadata_types",
                 }
+                if version != "2021.1":
+                    expected_duration_keys.add("profiler_game_objects")
+                if version in {"2024.1", "2025.1"}:
+                    expected_duration_keys.add("debug_validate_call")
+                assert set(command_durations) == expected_duration_keys
                 assert all(duration > 0 for duration in command_durations.values())
 
                 for payload in (
@@ -558,7 +574,6 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
                     selected,
                     functions,
                     project_query,
-                    project_all_results,
                     path_query,
                     exact_guid_query,
                     missing_path_query,
@@ -571,8 +586,13 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
                     query_by_guid,
                     query_by_path,
                     types,
-                    property_scope["names"],
-                    property_scope["property_info"],
+                    property_scope["discovery"],
+                    *(
+                        (profiler_game_objects,)
+                        if profiler_game_objects is not None
+                        else ()
+                    ),
+                    *((debug_validation,) if debug_validation is not None else ()),
                 ):
                     paths = _dispatcher_evidence_paths(payload)
                     assert paths, f"gateway command {payload.get('command')!r} did not record dispatcher evidence"
@@ -622,7 +642,6 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
                         "missing_path_count": missing_path_query["count"],
                         "missing_guid_count": missing_guid_query["count"],
                         "type_where_take_count": type_where_take["count"],
-                        "project_all_results_count": project_all_results["count"],
                         "search_where_take_count": search_where_take["count"],
                         "children_count": children_query["count"],
                         "select_counts": {
@@ -641,9 +660,19 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
                         "type_count": len(type_rows),
                         "selected_type": property_scope["type_row"],
                         "selected_property": property_scope["property_name"],
-                        "property_info": property_scope["property_info"]["normalized"],
-                        "property_info_attempts": property_scope["attempts"],
+                        "candidate": property_scope["candidate"],
+                        "discovery_attempts": property_scope["attempts"],
                     },
+                    "profiler_game_objects": (
+                        profiler_game_objects["agent_result"]
+                        if profiler_game_objects is not None
+                        else {"status": "unavailable_in_version"}
+                    ),
+                    "debug_validate_call": (
+                        debug_validation["agent_result"]
+                        if debug_validation is not None
+                        else {"status": "unavailable_in_version"}
+                    ),
                 }
                 failed = False
             finally:
@@ -709,6 +738,22 @@ def _gateway_prefix(
         f"{timeout:g}",
         "--evidence-dir",
         str(evidence_dir),
+    )
+
+
+def _path_segment_argv(path: str) -> tuple[str, ...]:
+    segments = tuple(segment for segment in path.split("\\") if segment)
+    assert segments
+    return tuple(item for segment in segments for item in ("--path-segment", segment))
+
+
+def _query_path_segment_argv(path: str) -> tuple[str, ...]:
+    segments = tuple(segment for segment in path.split("\\") if segment)
+    assert len(segments) >= 2 and segments[0] == "Queries"
+    return tuple(
+        item
+        for segment in segments[1:]
+        for item in ("--query-path-segment", segment)
     )
 
 
@@ -968,60 +1013,54 @@ def _find_live_property_scope(
     attempts = 0
 
     for type_row in _ordered_type_rows(type_rows):
-        class_id = type_row["classId"]
-        names_result = _invoke_gateway(
-            common,
-            ("metadata", "names", "--class-id", str(class_id)),
-            env=env,
-        )
-        if names_result[0] != 0:
-            diagnostics.append(_failure_summary(type_row, None, names_result[1]))
-            continue
-        names = _require_gateway_success(names_result, command="metadata names", version=version)
-        normalized_names = names.get("normalized")
-        if not isinstance(normalized_names, list):
-            diagnostics.append({"type": dict(type_row), "reason": "normalized names was not a list"})
-            continue
-        discovered = [
-            str(item["name"])
-            for item in normalized_names
-            if isinstance(item, Mapping) and isinstance(item.get("name"), str) and item["name"]
-        ]
-
-        for property_name in _ordered_property_names(discovered):
+        for property_name in PREFERRED_PROPERTY_NAMES:
             attempts += 1
-            info_result = _invoke_gateway(
+            discovery_result = _invoke_gateway(
                 common,
                 (
                     "metadata",
-                    "property-info",
-                    "--class-id",
-                    str(class_id),
-                    "--property",
+                    "discover",
+                    "--type-name",
+                    str(type_row["name"]),
+                    "--meaning",
                     property_name,
                 ),
                 env=env,
             )
-            if info_result[0] == 0:
-                info = _require_gateway_success(info_result, command="metadata property-info", version=version)
-                normalized = info.get("normalized")
-                if isinstance(normalized, Mapping) and normalized.get("name") == property_name:
-                    assert isinstance(normalized.get("type"), str) and normalized["type"]
+            if discovery_result[0] == 0:
+                discovery = _require_gateway_success(
+                    discovery_result,
+                    command="metadata discover",
+                    version=version,
+                )
+                agent_result = discovery.get("agent_result")
+                candidates = (
+                    agent_result.get("candidates")
+                    if isinstance(agent_result, Mapping)
+                    else None
+                )
+                if isinstance(candidates, list) and candidates:
+                    candidate = candidates[0]
+                    assert isinstance(candidate, Mapping)
+                    assert isinstance(candidate.get("name"), str)
+                    assert candidate.get("kind") in {"property", "reference"}
                     return {
                         "type_row": dict(type_row),
-                        "property_name": property_name,
-                        "names": names,
-                        "property_info": info,
+                        "property_name": candidate["name"],
+                        "candidate": dict(candidate),
+                        "discovery": discovery,
                         "attempts": attempts,
                     }
-            diagnostics.append(_failure_summary(type_row, property_name, info_result[1]))
-            if attempts >= MAX_PROPERTY_INFO_ATTEMPTS:
+            diagnostics.append(
+                _failure_summary(type_row, property_name, discovery_result[1])
+            )
+            if attempts >= MAX_METADATA_DISCOVERY_ATTEMPTS:
                 break
-        if attempts >= MAX_PROPERTY_INFO_ATTEMPTS:
+        if attempts >= MAX_METADATA_DISCOVERY_ATTEMPTS:
             break
 
     pytest.fail(
-        "getTypes returned no classId/property scope accepted by metadata property-info; "
+        "getTypes returned no type/meaning scope accepted by metadata discover; "
         f"attempts={attempts}, diagnostics={json.dumps(diagnostics, ensure_ascii=False, sort_keys=True)}"
     )
 
@@ -1036,12 +1075,6 @@ def _ordered_type_rows(type_rows: Sequence[Mapping[str, Any]]) -> list[Mapping[s
             int(row["classId"]),
         ),
     )
-
-
-def _ordered_property_names(names: Sequence[str]) -> list[str]:
-    discovered = list(dict.fromkeys(names))
-    preference = {name: index for index, name in enumerate(PREFERRED_PROPERTY_NAMES)}
-    return sorted(discovered, key=lambda name: (preference.get(name, len(preference)), name))
 
 
 def _failure_summary(

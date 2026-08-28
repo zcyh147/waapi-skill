@@ -122,7 +122,7 @@ def test_media_pool_reference_classification_uses_one_closed_versioned_query() -
     )[0]
     section_flat = " ".join(section.split())
     command = (
-        "gateway.py --version 2025.1 query-object --type-name AudioFileSource "
+        "gateway.py --version 2025.1 query-object "
         "--max-results 1000 --match-original-file-path "
         "'<first-complete-returned-Path>' --match-original-file-path "
         "'<second-complete-returned-Path>'"
@@ -490,13 +490,13 @@ def test_reverse_direct_parent_query_uses_the_parent_transform() -> None:
     query_flat = " ".join(QUERY.split())
     for phrase in (
         '"from the Sounds, find their direct parents"',
-        "`--type-name Sound --relationship parent`",
+        "`--kind all-sounds --relationship parent`",
         "Predicates then describe the selected parent rows",
         "Do not replace this with a descendant inventory",
     ):
         assert phrase in query_flat
     assert (
-        "query-object --type-name Sound --relationship parent "
+        "query-object --kind all-sounds --relationship parent "
         "--predicate kind-is random-container"
     ) in query_flat
     assert (

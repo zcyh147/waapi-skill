@@ -726,7 +726,7 @@ def test_simple_query_business_predicate_preserves_short_gateway_route(
     client = _AdvancedQueryClient("2025.1")
     code, payload = gateway.execute_gateway(
         [
-            "query-object", "--type-name", "Sound",
+            "query-object", "--kind", "all-sounds",
             "--predicate", "name-contains", "UI",
             "--max-results", "10",
         ],

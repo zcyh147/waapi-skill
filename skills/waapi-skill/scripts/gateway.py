@@ -121,7 +121,6 @@ from wwise_waapi.builders.stable_reads import (  # noqa: E402  # pyright: ignore
 from wwise_waapi.typed_requests import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     MAX_TYPED_ARRAY_ITEMS,
     TYPED_REQUEST_COMPLEX_TRACER_URI,
-    TYPED_REQUEST_TRACER_URI,
     TypedRequestContract,
     TypedRequestError,
     TypedRequestFact,
@@ -519,6 +518,14 @@ QUERY_BUSINESS_PREDICATES: Mapping[str, tuple[str, str, str]] = {
     "category-is": ("category", "=", "string"),
 }
 QUERY_BUSINESS_KIND_PREDICATE = "kind-is"
+QUERY_FIXED_KIND_TYPES: Mapping[str, str] = {
+    "all-sounds": "Sound",
+    "project": "Project",
+    "saved-query": "Query",
+}
+QUERY_BUSINESS_KINDS = tuple(
+    sorted({*SUPPORTED_BUSINESS_KINDS, *QUERY_FIXED_KIND_TYPES})
+)
 QUERY_BUSINESS_RELATIONSHIPS: Mapping[str, str] = {
     "descendants": "descendants",
     "ancestors": "ancestors",
@@ -545,6 +552,7 @@ QUERY_BUSINESS_OUTPUTS: Mapping[str, tuple[str, str]] = {
     "original-file-path": ("originalFilePath", "original_file_path"),
     "active-source": ("activeSource", "active_source"),
     "action-type": ("ActionType", "action_type"),
+    "target": ("Target", "target"),
     "override-output": ("OverrideOutput", "override_output"),
     "work-unit": ("workunit", "work_unit"),
     "source-duration": ("audioSource:playbackDuration", "source_duration"),
@@ -1550,6 +1558,7 @@ def build_parser() -> argparse.ArgumentParser:
     query_object.set_defaults(
         path=None,
         object_id=None,
+        object_type=None,
         search=None,
         query=None,
         where=None,
@@ -1560,7 +1569,7 @@ def build_parser() -> argparse.ArgumentParser:
     query_source.add_argument("--exact-id", dest="object_id")
     query_source.add_argument(
         "--kind",
-        choices=SUPPORTED_BUSINESS_KINDS,
+        choices=QUERY_BUSINESS_KINDS,
         dest="semantic_kind",
         help=(
             "Stable Wwise business kind; the Gateway derives the native type "
@@ -1568,11 +1577,11 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     query_source.add_argument(
-        "--type-name",
-        dest="object_type",
+        "--custom-kind",
+        dest="custom_kind_meaning",
         help=(
-            "Exact user-requested or Gateway-reported Wwise type name for "
-            "custom types; prefer --kind for the closed common vocabulary"
+            "User-facing custom object/plug-in kind meaning; the Gateway binds "
+            "it to one exact live Wwise type before constructing WAQL"
         ),
     )
     query_source.add_argument("--search-text", dest="search")
@@ -3986,10 +3995,7 @@ def preflight_typed_request_input(
             f"{', '.join(capability.fixed_commands)}"
         )
     contract = request_contract(versions[0], args.api)
-    if (
-        contract.as_gateway_payload()["input_shape"] == "draft"
-        and contract.uri != TYPED_REQUEST_COMPLEX_TRACER_URI
-    ):
+    if contract.as_gateway_payload()["input_shape"] == "draft":
         raise GatewayInputError(
             "This complex typed request must use its single draft-start entry."
         )
@@ -4058,27 +4064,6 @@ def preflight_typed_request_input(
         if not requires_preview
         else None
     )
-    if args.typed_request.uri == TYPED_REQUEST_TRACER_URI:
-        args.typed_stable_request = build_profiler_voice_contributions_request(
-            version=args.typed_request.version,
-            time=args.typed_request.args["time"],
-            voice_pipeline_id=args.typed_request.args["voicePipelineID"],
-            bus_pipeline_ids=tuple(
-                args.typed_request.args.get("bussesPipelineID", ())
-            ),
-        )
-    elif args.typed_request.uri == TYPED_REQUEST_COMPLEX_TRACER_URI:
-        target_uri = args.typed_request.args.get("id")
-        if not isinstance(target_uri, str) or not target_uri.startswith("ak."):
-            raise GatewayInputError("typed debug validation requires an exact target API id")
-        try:
-            target = CapabilityCatalog().describe(versions[0], target_uri)
-        except CapabilityNotFoundError as exc:
-            raise GatewayInputError(str(exc)) from exc
-        if target.item_type != "function":
-            raise GatewayInputError("typed debug validation accepts only a function URI")
-
-
 def preflight_typed_operation_input(
     args: argparse.Namespace,
     *,
@@ -4207,6 +4192,35 @@ def preflight_typed_zero_input(
     )
 
 
+def _query_kind_predicates(
+    name: str,
+    *,
+    version: str,
+) -> tuple[tuple[str, str, str, str], ...]:
+    """Compile one closed query kind into exact native type discriminators."""
+
+    fixed_type = QUERY_FIXED_KIND_TYPES.get(name)
+    if fixed_type is not None:
+        return (("type", "=", "string", fixed_type),)
+    kind = resolve_semantic_kind(name, version=version)
+    native_type = (
+        "Sound" if name in {"sound-sfx", "sound-voice"} else kind.native_object_type
+    )
+    predicates: list[tuple[str, str, str, str]] = [
+        ("type", "=", "string", native_type)
+    ]
+    if name in {"sound-sfx", "sound-voice"}:
+        predicates.append(
+            (
+                "@IsVoice",
+                "=",
+                "boolean",
+                "true" if name == "sound-voice" else "false",
+            )
+        )
+    return tuple(predicates)
+
+
 def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, str]) -> None:
     """Reject closed query input errors before opening a WAAPI transport."""
 
@@ -4226,40 +4240,30 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
         )
     if getattr(args, "semantic_kind", None):
         (kind_version,) = resolve_catalog_versions(args, env=env)
-        kind = resolve_semantic_kind(args.semantic_kind, version=kind_version)
-        args.object_type = (
-            "Sound"
-            if args.semantic_kind in {"sound-sfx", "sound-voice"}
-            else kind.native_object_type
+        kind_predicates = _query_kind_predicates(
+            args.semantic_kind,
+            version=kind_version,
         )
-        if args.semantic_kind in {"sound-sfx", "sound-voice"}:
-            args.where.append(
-                (
-                    "@IsVoice",
-                    "=",
-                    "boolean",
-                    "true" if args.semantic_kind == "sound-voice" else "false",
-                )
-            )
+        args.object_type = kind_predicates[0][3]
+        args.where.extend(kind_predicates[1:])
+    custom_kind_meaning = getattr(args, "custom_kind_meaning", None)
+    if custom_kind_meaning is not None and (
+        not isinstance(custom_kind_meaning, str)
+        or not custom_kind_meaning
+        or custom_kind_meaning != custom_kind_meaning.strip()
+        or len(custom_kind_meaning) > MAX_METADATA_DISCOVERY_NAME_CHARS
+    ):
+        raise GatewayInputError(
+            "--custom-kind must be one bounded, trimmed user-facing type meaning"
+        )
     for intent, value in getattr(args, "business_predicates", ()):
         if intent == QUERY_BUSINESS_KIND_PREDICATE:
             (kind_version,) = resolve_catalog_versions(args, env=env)
-            kind = resolve_semantic_kind(value, version=kind_version)
-            native_type = (
-                "Sound"
-                if value in {"sound-sfx", "sound-voice"}
-                else kind.native_object_type
-            )
-            args.where.append(("type", "=", "string", native_type))
-            if value in {"sound-sfx", "sound-voice"}:
-                args.where.append(
-                    (
-                        "@IsVoice",
-                        "=",
-                        "boolean",
-                        "true" if value == "sound-voice" else "false",
-                    )
+            if value not in QUERY_BUSINESS_KINDS:
+                raise GatewayInputError(
+                    "--predicate kind-is must use one disclosed business kind"
                 )
+            args.where.extend(_query_kind_predicates(value, version=kind_version))
             continue
         native = QUERY_BUSINESS_PREDICATES.get(intent)
         if native is None:
@@ -4298,11 +4302,19 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
 
     if args.query_custom_field_meanings:
         exact_object_scope = args.path is not None or args.object_id is not None
-        type_scope = args.object_type is not None
-        if not (type_scope or (exact_object_scope and not args.select)):
+        type_scope = (
+            args.object_type is not None or custom_kind_meaning is not None
+        )
+        if args.select:
             raise GatewayInputError(
-                "--include-field requires a --kind/--type-name source or one exact "
-                "path/GUID source without relationship traversal so the Gateway can "
+                "--include-field cannot be combined with --relationship because "
+                "the post-traversal result type is not one exact metadata scope; "
+                "use a closed --include business field"
+            )
+        if not (type_scope or exact_object_scope):
+            raise GatewayInputError(
+                "--include-field requires a --kind/--custom-kind source or one exact "
+                "path/GUID source so the Gateway can "
                 "bind one live metadata scope"
             )
 
@@ -4328,28 +4340,30 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
             args.object_type is not None,
             args.search is not None,
             args.query is not None,
+            custom_kind_meaning is not None,
         )
     ):
         raise GatewayInputError(
             "query-object requires one business source or --advanced-waql"
         )
 
-    where = typed_query_predicates(args)
-    return_fields = args.query_return_fields
-    _require_exact_identity_return_field(args, return_fields)
-    (preflight_version,) = resolve_catalog_versions(args, env=env)
-    build_object_get_query(
-        path=args.path,
-        object_id=args.object_id,
-        type=args.object_type,
-        search=args.search,
-        query=args.query,
-        where=where,
-        select=tuple(args.select or ()),
-        take=args.take,
-        return_fields=return_fields,
-        version=preflight_version,
-    )
+    if custom_kind_meaning is None:
+        where = typed_query_predicates(args)
+        return_fields = args.query_return_fields
+        _require_exact_identity_return_field(args, return_fields)
+        (preflight_version,) = resolve_catalog_versions(args, env=env)
+        build_object_get_query(
+            path=args.path,
+            object_id=args.object_id,
+            type=args.object_type,
+            search=args.search,
+            query=args.query,
+            where=where,
+            select=tuple(args.select or ()),
+            take=args.take,
+            return_fields=return_fields,
+            version=preflight_version,
+        )
     _require_explicit_query_bound(args)
 
 
@@ -4426,10 +4440,19 @@ def validate_original_file_reference_match_input(
             "--match-original-file-path is currently supported only for Wwise "
             f"{ORIGINAL_FILE_REFERENCE_MATCH_VERSION}"
         )
-    if args.object_type != ORIGINAL_FILE_REFERENCE_MATCH_TYPE:
+    if any(
+        (
+            args.path is not None,
+            args.object_id is not None,
+            args.object_type is not None,
+            getattr(args, "custom_kind_meaning", None) is not None,
+            args.search is not None,
+            args.query is not None,
+        )
+    ):
         raise GatewayInputError(
-            "--match-original-file-path requires exactly "
-            f"--type-name {ORIGINAL_FILE_REFERENCE_MATCH_TYPE}"
+            "--match-original-file-path owns its Audio File Source query and "
+            "cannot be combined with another query source"
         )
     if args.where:
         raise GatewayInputError(
@@ -6817,7 +6840,7 @@ def query_business_schema_payload(
             "object_path": "--path-segment <one literal name> (repeat)",
             "exact_object_id": "--exact-id <canonical GUID>",
             "common_kind": "--kind <closed business kind>",
-            "custom_type": "--type-name <exact user-requested type>",
+            "custom_kind": "--custom-kind <user-facing type meaning>",
             "search": "--search-text <literal text>",
             "query_id": "--query-id <canonical GUID>",
             "query_path": "--query-path-segment <one literal name> (repeat)",
@@ -6831,7 +6854,7 @@ def query_business_schema_payload(
         | {
             QUERY_BUSINESS_KIND_PREDICATE: {
                 "value_type": "business-kind",
-                "choices": list(SUPPORTED_BUSINESS_KINDS),
+                "choices": list(QUERY_BUSINESS_KINDS),
             }
         },
         "relationships": list(QUERY_BUSINESS_RELATIONSHIPS),
@@ -9366,108 +9389,93 @@ def dispatch_command(
             raise GatewayInputError(
                 "Typed request version changed after preflight; request-schema must be rerun"
             )
-        if typed_request.uri != TYPED_REQUEST_TRACER_URI:
-            capability = live_capability(
-                detected_version,
-                typed_request.uri,
+        capability = live_capability(
+            detected_version,
+            typed_request.uri,
+            live_info=live_info,
+        )
+        if capability.execution_contract["effect"] != "read":
+            request_payload = {
+                "contract": OPERATION_REQUEST_CONTRACT,
+                "version": detected_version,
+                "operation": "waapi.call",
+                "arguments": {
+                    "api": typed_request.uri,
+                    "args": dict(typed_request.args),
+                    "options": dict(typed_request.options),
+                    **(
+                        {"io_root": args.typed_io_root}
+                        if args.typed_io_root is not None
+                        else {}
+                    ),
+                },
+            }
+            return create_transaction_preview(
+                request_payload,
+                args=args,
+                env=env,
+                connection=connection,
+                detected_version=detected_version,
                 live_info=live_info,
+                dispatcher=dispatcher,
+                common={
+                    **common,
+                    "typed_request": {
+                        "contract": typed_request.as_dict()["contract"],
+                        "schema_digest": typed_request.schema_digest,
+                    },
+                },
             )
-            if capability.execution_contract["effect"] != "read":
-                request_payload = {
-                    "contract": OPERATION_REQUEST_CONTRACT,
-                    "version": detected_version,
-                    "operation": "waapi.call",
-                    "arguments": {
-                        "api": typed_request.uri,
-                        "args": dict(typed_request.args),
-                        "options": dict(typed_request.options),
-                        **(
-                            {"io_root": args.typed_io_root}
-                            if args.typed_io_root is not None
-                            else {}
-                        ),
-                    },
-                }
-                return create_transaction_preview(
-                    request_payload,
-                    args=args,
-                    env=env,
-                    connection=connection,
-                    detected_version=detected_version,
-                    live_info=live_info,
-                    dispatcher=dispatcher,
-                    common={
-                        **common,
-                        "typed_request": {
-                            "contract": typed_request.as_dict()["contract"],
-                            "schema_digest": typed_request.schema_digest,
-                        },
-                    },
-                )
-            request_validation = validate_semantic_payload(
+        request_validation = validate_semantic_payload(
+            typed_request.uri,
+            typed_request.args,
+            typed_request.options,
+            version=detected_version,
+            authoring_ui_profile=live_info.get("isCommandLine") is False,
+        )
+        result = dispatch(
+            dispatcher,
+            typed_request.uri,
+            connection=connection,
+            version=detected_version,
+            args=typed_request.args,
+            options=typed_request.options,
+            allow_destructive=True,
+            result_limit_bytes=int(
+                capability.execution_contract["result_limit_bytes"]
+            ),
+            operation_timeout=float(
+                capability.execution_contract["timeout_seconds"]
+            ),
+        )
+        result_validation = (
+            validate_semantic_result(
                 typed_request.uri,
-                typed_request.args,
-                typed_request.options,
+                result.get("result"),
                 version=detected_version,
                 authoring_ui_profile=live_info.get("isCommandLine") is False,
             )
-            result = dispatch(
-                dispatcher,
-                typed_request.uri,
-                connection=connection,
-                version=detected_version,
-                args=typed_request.args,
-                options=typed_request.options,
-                allow_destructive=True,
-                result_limit_bytes=int(
-                    capability.execution_contract["result_limit_bytes"]
-                ),
-                operation_timeout=float(
-                    capability.execution_contract["timeout_seconds"]
-                ),
-            )
-            result_validation = (
-                validate_semantic_result(
-                    typed_request.uri,
-                    result.get("result"),
-                    version=detected_version,
-                    authoring_ui_profile=live_info.get("isCommandLine") is False,
-                )
-                if result.get("ok")
-                else None
-            )
-            return {
-                "ok": bool(result.get("ok")),
-                "status": "ok" if result.get("ok") else "error",
-                **common,
-                "api_attempted": typed_request.uri,
-                "typed_request": {
-                    "contract": typed_request.as_dict()["contract"],
-                    "schema_digest": typed_request.schema_digest,
-                },
-                "call": dispatch_call_summary(result),
-                "schema_validation": {
-                    "request": request_validation.as_dict(),
-                    "result": (
-                        result_validation.as_dict() if result_validation else None
-                    ),
-                },
-                "agent_result": result.get("result") if result.get("ok") else None,
-            }
-        request = args.typed_stable_request
-        return dispatch_profiler_voice_contributions_request(
-            request,
-            connection=connection,
-            detected_version=detected_version,
-            dispatcher=dispatcher,
-            common={
-                **common,
-                "typed_request": {
+            if result.get("ok")
+            else None
+        )
+        return {
+            "ok": bool(result.get("ok")),
+            "status": "ok" if result.get("ok") else "error",
+            **common,
+            "api_attempted": typed_request.uri,
+            "typed_request": {
                 "contract": typed_request.as_dict()["contract"],
                 "schema_digest": typed_request.schema_digest,
             },
+            "call": dispatch_call_summary(result),
+            "schema_validation": {
+                "request": request_validation.as_dict(),
+                "result": (
+                    result_validation.as_dict() if result_validation else None
+                ),
             },
-        )
+            "agent_result": result.get("result") if result.get("ok") else None,
+        }
     if args.command == "typed-operation":
         return create_transaction_preview(
             args.typed_operation_request,
@@ -9984,6 +9992,20 @@ def dispatch_command(
                 dispatcher=dispatcher,
                 common=common,
             )
+        custom_kind_clarification = _bind_query_custom_kind_from_live_types(
+            args,
+            connection=connection,
+            detected_version=detected_version,
+            dispatcher=dispatcher,
+        )
+        if custom_kind_clarification is not None:
+            return {
+                "ok": True,
+                "status": "needs_clarification",
+                **common,
+                "query_layer": "business-declaration",
+                "agent_result": custom_kind_clarification,
+            }
         custom_field_clarification = _bind_query_custom_fields_from_live_metadata(
             args,
             connection=connection,
@@ -15924,7 +15946,12 @@ def _canonical_exact_query_request(args: argparse.Namespace) -> bool:
 
 
 def _require_explicit_query_bound(args: argparse.Namespace) -> None:
-    broad_source = args.object_type is not None or args.search is not None or args.query is not None
+    broad_source = (
+        args.object_type is not None
+        or getattr(args, "custom_kind_meaning", None) is not None
+        or args.search is not None
+        or args.query is not None
+    )
     transformed = bool(args.select)
     if (broad_source or transformed) and args.take is None:
         raise GatewayInputError(
@@ -16346,6 +16373,47 @@ def _project_query_business_rows(
             item["references"] = references
         projected.append(item)
     return projected
+
+
+def _bind_query_custom_kind_from_live_types(
+    args: argparse.Namespace,
+    *,
+    connection: GatewayConnection,
+    detected_version: str,
+    dispatcher: WwiseDispatcher,
+) -> dict[str, Any] | None:
+    """Resolve one user-facing custom kind against the live type inventory."""
+
+    meaning = getattr(args, "custom_kind_meaning", None)
+    if meaning is None:
+        return None
+    read = transaction_read_call(
+        dispatcher,
+        connection=connection,
+        version=detected_version,
+    )
+    records = parse_get_types_result(read(CACHE_GET_TYPES_URI, {}, {}))
+
+    def lexical(value: str) -> str:
+        return "".join(character.casefold() for character in value if character.isalnum())
+
+    needle = lexical(meaning)
+    exact = [record for record in records if lexical(record.name) == needle]
+    matches = exact or [
+        record
+        for record in records
+        if needle and (needle in lexical(record.name) or lexical(record.name) in needle)
+    ]
+    if len(matches) != 1:
+        return {
+            "metadata_authority": "live-waapi",
+            "meaning": meaning,
+            "candidate_count": len(matches),
+            "candidates": [record.as_dict() for record in matches[:8]],
+            "repair": "refine --custom-kind until one live Wwise type matches",
+        }
+    args.object_type = matches[0].name
+    return None
 
 
 def _bind_query_custom_fields_from_live_metadata(
