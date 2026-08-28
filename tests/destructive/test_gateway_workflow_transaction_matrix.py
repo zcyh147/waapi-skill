@@ -763,7 +763,7 @@ def test_closed_gateway_workflows_across_selected_version(
             assert media_pool["agent_result"]["complete"] is True
             assert media_pool["agent_result"]["returned_count"] == 1
             assert media_pool["agent_result"]["items"][0]["values"]["filename"] == (
-                f"{import_name}.wav"
+                import_name
             )
 
         included_name = (
@@ -1233,7 +1233,7 @@ def test_media_build_business_reads_across_selected_version(
             assert media_pool["agent_result"]["complete"] is True
             assert media_pool["agent_result"]["returned_count"] == 1
             assert media_pool["agent_result"]["items"][0]["values"]["filename"] == (
-                f"{import_name}.wav"
+                import_name
             )
 
         included_name = f"WAAPI_MEDIA_INCLUDED_{suffix}"
