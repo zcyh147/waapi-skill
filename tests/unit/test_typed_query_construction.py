@@ -476,6 +476,7 @@ def test_query_schema_discloses_one_business_continuation_without_typed_facts(
         assert "volume-db" in payload["business_outputs"]
         assert payload["kind_semantics"] == {
             "all-sounds": "every Wwise Sound, including SFX and Voice",
+            "sound": "alias of all-sounds; every Wwise Sound, including SFX and Voice",
             "sound-sfx": "only Sound objects whose source language is SFX",
             "sound-voice": "only Sound objects whose source language is not SFX",
         }
@@ -762,6 +763,42 @@ def test_simple_query_business_predicate_preserves_short_gateway_route(
         (
             "ak.wwise.core.object.get",
             {"waql": 'from type Sound where name : "UI" take 10'},
+            {"return": ["id", "name", "type", "path"]},
+        )
+    ]
+
+
+def test_all_sound_business_alias_compiles_to_the_same_closed_type_filter(
+    tmp_path: Path,
+) -> None:
+    client = _AdvancedQueryClient("2025.1")
+    code, payload = gateway.execute_gateway(
+        [
+            "query-object",
+            "--path-segment",
+            "Actor-Mixer Hierarchy",
+            "--relationship",
+            "descendants",
+            "--predicate",
+            "kind-is",
+            "sound",
+            "--max-results",
+            "10",
+        ],
+        env=_env(tmp_path, "2025.1"),
+        client_factory=lambda _url: client,
+    )
+
+    assert code == 0, payload
+    assert client.calls == [
+        (
+            "ak.wwise.core.object.get",
+            {
+                "waql": (
+                    r'from object "\Actor-Mixer Hierarchy" '
+                    'select descendants where type = "Sound" take 10'
+                )
+            },
             {"return": ["id", "name", "type", "path"]},
         )
     ]

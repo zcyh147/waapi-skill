@@ -3724,6 +3724,7 @@ _BUSINESS_QUERY_SOURCE_OPTIONS = frozenset(
         "--advanced-waql",
     }
 )
+_BUSINESS_QUERY_KIND_ALIASES = {"sound": "all-sounds"}
 
 
 def _normalize_business_query_arguments(
@@ -3786,6 +3787,27 @@ def _normalize_business_query_arguments(
                     )
                 parsed["single"][option] = arguments
             index += arity + 1
+
+        parsed["sources"] = [
+            (
+                option,
+                (
+                    _BUSINESS_QUERY_KIND_ALIASES.get(arguments[0], arguments[0]),
+                ),
+            )
+            if option == "--kind"
+            else (option, arguments)
+            for option, arguments in parsed["sources"]
+        ]
+        parsed["predicates"] = [
+            (
+                arguments[0],
+                _BUSINESS_QUERY_KIND_ALIASES.get(arguments[1], arguments[1]),
+            )
+            if arguments[0] == "kind-is"
+            else arguments
+            for arguments in parsed["predicates"]
+        ]
 
         source_kinds = {option for option, _arguments in parsed["sources"]}
         if len(source_kinds) != 1:

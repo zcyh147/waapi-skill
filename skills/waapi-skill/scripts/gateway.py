@@ -521,6 +521,7 @@ QUERY_BUSINESS_PREDICATES: Mapping[str, tuple[str, str, str]] = {
 QUERY_BUSINESS_KIND_PREDICATE = "kind-is"
 QUERY_FIXED_KIND_TYPES: Mapping[str, str] = {
     "all-sounds": "Sound",
+    "sound": "Sound",
     "project": "Project",
     "saved-query": "Query",
 }
@@ -6903,6 +6904,7 @@ def query_business_schema_payload(
         },
         "kind_semantics": {
             "all-sounds": "every Wwise Sound, including SFX and Voice",
+            "sound": "alias of all-sounds; every Wwise Sound, including SFX and Voice",
             "sound-sfx": "only Sound objects whose source language is SFX",
             "sound-voice": "only Sound objects whose source language is not SFX",
         },

@@ -443,7 +443,7 @@ def test_complex_query_guidance_preserves_tokens_pushdown_and_user_bounds() -> N
         "ask for a limit instead of inventing one",
     ):
         assert phrase in query_flat
-    assert "--predicate kind-is sound-sfx --max-results 24" in query_flat
+    assert "--predicate kind-is all-sounds --max-results 24" in query_flat
     assert "--include volume-db" in query_flat
 
 
@@ -458,7 +458,7 @@ def test_pure_and_query_pushes_every_supported_conjunct_in_canonical_order() -> 
     ):
         assert phrase in query_flat
     assert (
-        "--predicate kind-is sound-sfx --predicate volume-db-at-most -6.0 "
+        "--predicate kind-is all-sounds --predicate volume-db-at-most -6.0 "
         "--predicate notes-contain mix-review --predicate included-is true --max-results 12"
     ) in query_flat
     assert "--where" not in query_flat

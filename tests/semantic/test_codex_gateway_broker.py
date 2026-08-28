@@ -10076,6 +10076,65 @@ def test_broker_compares_business_query_meaning_not_option_group_order(
     assert broker.evidence().passed
 
 
+def test_broker_accepts_the_closed_all_sound_business_alias(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    expected = (
+        "--path-segment",
+        "Actor-Mixer Hierarchy",
+        "--predicate",
+        "kind-is",
+        "all-sounds",
+        "--max-results",
+        "12",
+    )
+    supplied = [
+        "query-object",
+        "--path-segment",
+        "Actor-Mixer Hierarchy",
+        "--predicate",
+        "kind-is",
+        "sound",
+        "--max-results",
+        "12",
+    ]
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(ExpectedGatewayStep("query", "query-object", expected),),
+        transport="tcp",
+    ) as broker:
+        result = run_model_command(broker, supplied)
+
+    assert result.returncode == 0
+    assert broker.evidence().passed
+
+
+def test_broker_does_not_treat_sound_sfx_as_all_sounds(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    expected = (
+        "--kind",
+        "all-sounds",
+        "--max-results",
+        "12",
+    )
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(ExpectedGatewayStep("query", "query-object", expected),),
+        transport="tcp",
+    ) as broker:
+        result = run_model_command(
+            broker,
+            ["query-object", "--kind", "sound-sfx", "--max-results", "12"],
+        )
+
+    assert result.returncode != 0
+    assert broker.evidence().passed is False
+
+
 @pytest.mark.parametrize("read_schema", (False, True))
 def test_broker_accepts_one_optional_initial_query_schema(
     tmp_path: Path,

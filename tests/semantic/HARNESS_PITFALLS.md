@@ -150,6 +150,23 @@ prevention checks that are expensive to rediscover.
   failure; do not normalize or accept a near path. A Gateway-supplied
   continuation mismatch remains subject to its separate byte-exact audit.
 
+### A natural business synonym can expose a real public-seam gap
+
+- Evidence: #96 query `r10` on both hosts completed the live
+  `Music` → `MusicSegment` clarification, then submitted the otherwise exact
+  `CombatMix` query with `kind-is sound`. The Broker rejected it because the
+  sealed oracle used `all-sounds`.
+- Cause: `sound` and `all-sounds` express the same Gateway-level business
+  meaning, but only the latter was public. The nearby Skill examples also used
+  `sound-sfx` for a request whose oracle intentionally included SFX and Voice,
+  so the reference and formal business meaning disagreed.
+- Prevention: define any accepted synonym explicitly at the public Gateway,
+  disclose its exact canonical meaning, and apply the same narrow
+  canonicalization in the Broker before semantic comparison. Keep distinct
+  meanings such as `sound-sfx` and `sound-voice` non-equivalent. Audit reference
+  examples against the oracle before spending a new Fresh root; do not solve a
+  stable vocabulary seam by repeatedly strengthening only the prompt.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:

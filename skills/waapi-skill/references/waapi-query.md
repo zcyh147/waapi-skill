@@ -144,7 +144,8 @@ repeated `--relationship` for `descendants`, `ancestors`, `references-to`,
 `--max-results`; exact path/GUID identity may omit it. There is no unbounded
 mode.
 
-`all-sounds` means every Wwise `Sound`, including SFX and Voice. Use
+`all-sounds` means every Wwise `Sound`, including SFX and Voice; `sound` is the
+same business meaning and the Gateway canonicalizes it. Use
 `sound-sfx` only when the user explicitly limits the request to SFX, and
 `sound-voice` only for Voice. `--kind` is itself one exclusive source. When a
 path, ID, search, or Query Editor source is already present, apply a type limit
@@ -313,13 +314,13 @@ For example, a bounded descendant inventory of Sound candidates remains a
 simple flag query:
 
 ```bash
-python scripts/run.py gateway.py query-object --path-segment 'Actor-Mixer Hierarchy' --path-segment 'Default Work Unit' --path-segment 'Combat' --relationship descendants --predicate kind-is sound-sfx --max-results 24
+python scripts/run.py gateway.py query-object --path-segment 'Actor-Mixer Hierarchy' --path-segment 'Default Work Unit' --path-segment 'Combat' --relationship descendants --predicate kind-is all-sounds --max-results 24
 ```
 
 Pure AND; `isIncluded` is appended last because it is filter-only:
 
 ```bash
-python scripts/run.py gateway.py query-object --path-segment 'Actor-Mixer Hierarchy' --path-segment 'Default Work Unit' --path-segment 'CombatMix' --relationship descendants --predicate kind-is sound-sfx --predicate volume-db-at-most -6.0 --predicate notes-contain mix-review --predicate included-is true --max-results 12
+python scripts/run.py gateway.py query-object --path-segment 'Actor-Mixer Hierarchy' --path-segment 'Default Work Unit' --path-segment 'CombatMix' --relationship descendants --predicate kind-is all-sounds --predicate volume-db-at-most -6.0 --predicate notes-contain mix-review --predicate included-is true --max-results 12
 ```
 
 Direct parents:
