@@ -10019,6 +10019,99 @@ def test_broker_accepts_typed_schema_envelopes_for_public_discovery(
     assert broker.evidence().passed
 
 
+def test_broker_compares_business_query_meaning_not_option_group_order(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    expected = (
+        "--path-segment",
+        "Actor-Mixer Hierarchy",
+        "--path-segment",
+        "Default Work Unit",
+        "--relationship",
+        "descendants",
+        "--predicate",
+        "kind-is",
+        "all-sounds",
+        "--predicate",
+        "volume-db-at-most",
+        "-6.0",
+        "--max-results",
+        "12",
+        "--include",
+        "volume-db",
+        "--include",
+        "notes",
+    )
+    reordered = [
+        "query-object",
+        "--include",
+        "notes",
+        "--predicate",
+        "volume-db-at-most",
+        "-6.0",
+        "--path-segment",
+        "Actor-Mixer Hierarchy",
+        "--path-segment",
+        "Default Work Unit",
+        "--max-results",
+        "12",
+        "--predicate",
+        "kind-is",
+        "all-sounds",
+        "--include",
+        "volume-db",
+        "--relationship",
+        "descendants",
+    ]
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(ExpectedGatewayStep("query", "query-object", expected),),
+        transport="tcp",
+    ) as broker:
+        result = run_model_command(broker, reordered)
+
+    assert result.returncode == 0
+    assert broker.evidence().passed
+
+
+def test_broker_rejects_a_different_business_query_predicate(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    expected = (
+        "--kind",
+        "all-sounds",
+        "--predicate",
+        "volume-db-at-most",
+        "-6.0",
+        "--max-results",
+        "12",
+    )
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(ExpectedGatewayStep("query", "query-object", expected),),
+        transport="tcp",
+    ) as broker:
+        result = run_model_command(
+            broker,
+            [
+                "query-object",
+                "--kind",
+                "all-sounds",
+                "--predicate",
+                "volume-db-at-most",
+                "-5.0",
+                "--max-results",
+                "12",
+            ],
+        )
+
+    assert result.returncode != 0
+    assert broker.evidence().passed is False
+
+
 def test_broker_rejects_commutative_query_pair_outside_closed_identity_shape(
     tmp_path: Path,
 ) -> None:

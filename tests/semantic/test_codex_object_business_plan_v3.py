@@ -15,6 +15,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_schema_query_transaction_protocol,
     build_transaction_protocol,
     query_object_step,
+    query_schema_step,
 )
 from tests.semantic.support.codex_compound_heavy_v1 import (
     load_compound_heavy_profile,
@@ -172,7 +173,8 @@ def _case(
         build_transaction_protocol([request.as_dict(version=recipe.version)])
         if isinstance(request, OperationRequestSpec)
         else build_direct_protocol(
-            [
+            ([query_schema_step()] if "--max-results" in request.argv else [])
+            + [
                 query_object_step("query-object", request.argv[3:]),
             ]
         )
@@ -237,6 +239,7 @@ def _archive_test_all_fifteen_object_cases_compile_and_archive_validate(
     assert archived.writer_kwargs() == sections.writer_kwargs()
     assert sections.fixture_spec["kind"] == "object_materialized_v1"
     assert sections.payload_bindings["primary_steps"] in (
+        ["query-schema", "query-object"],
         ["query-object"],
         ["tx01.execute"],
     )

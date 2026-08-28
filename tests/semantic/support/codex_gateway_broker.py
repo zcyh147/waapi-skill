@@ -3695,6 +3695,124 @@ def _query_object_return_field_value_indexes(
     return frozenset(index + 1 for index in expected_option_indexes)
 
 
+_BUSINESS_QUERY_OPTION_ARITIES = {
+    "--path-segment": 1,
+    "--exact-id": 1,
+    "--kind": 1,
+    "--custom-kind": 1,
+    "--search-text": 1,
+    "--query-id": 1,
+    "--query-path-segment": 1,
+    "--advanced-waql": 1,
+    "--max-results": 1,
+    "--include": 1,
+    "--include-field": 1,
+    "--predicate": 2,
+    "--match-original-file-path": 1,
+    "--relationship": 1,
+    "--detail": 0,
+}
+_BUSINESS_QUERY_SOURCE_OPTIONS = frozenset(
+    {
+        "--path-segment",
+        "--exact-id",
+        "--kind",
+        "--custom-kind",
+        "--search-text",
+        "--query-id",
+        "--query-path-segment",
+        "--advanced-waql",
+    }
+)
+
+
+def _normalize_business_query_arguments(
+    supplied_arguments: Sequence[str],
+    expected_arguments: Sequence[ExpectedArgument],
+) -> tuple[str, ...]:
+    """Accept equivalent business declarations without making CLI order semantic."""
+
+    if not all(isinstance(value, str) for value in expected_arguments):
+        raise GatewayInvocationError(
+            "business query allow-list must contain only exact string arguments"
+        )
+
+    def parse(values: Sequence[str]) -> dict[str, Any]:
+        parsed: dict[str, Any] = {
+            "sources": [],
+            "single": {},
+            "includes": [],
+            "custom_includes": [],
+            "predicates": [],
+            "relationships": [],
+            "original_paths": [],
+            "detail": False,
+        }
+        index = 0
+        while index < len(values):
+            option = values[index]
+            arity = _BUSINESS_QUERY_OPTION_ARITIES.get(option)
+            if arity is None:
+                raise GatewayInvocationError(
+                    f"query-object business declaration contains unsupported option {option!r}"
+                )
+            if index + arity >= len(values):
+                raise GatewayInvocationError(
+                    f"query-object business option {option!r} lacks its value"
+                )
+            arguments = tuple(values[index + 1 : index + 1 + arity])
+            if option in _BUSINESS_QUERY_SOURCE_OPTIONS:
+                parsed["sources"].append((option, arguments))
+            elif option == "--include":
+                parsed["includes"].append(arguments)
+            elif option == "--include-field":
+                parsed["custom_includes"].append(arguments)
+            elif option == "--predicate":
+                parsed["predicates"].append(arguments)
+            elif option == "--relationship":
+                parsed["relationships"].append(arguments)
+            elif option == "--match-original-file-path":
+                parsed["original_paths"].append(arguments)
+            elif option == "--detail":
+                if parsed["detail"]:
+                    raise GatewayInvocationError(
+                        "query-object business declaration repeats --detail"
+                    )
+                parsed["detail"] = True
+            else:
+                if option in parsed["single"]:
+                    raise GatewayInvocationError(
+                        f"query-object business declaration repeats {option}"
+                    )
+                parsed["single"][option] = arguments
+            index += arity + 1
+
+        source_kinds = {option for option, _arguments in parsed["sources"]}
+        if len(source_kinds) != 1:
+            raise GatewayInvocationError(
+                "query-object business declaration requires one source kind"
+            )
+        source_kind = next(iter(source_kinds))
+        if source_kind not in {"--path-segment", "--query-path-segment"} and len(
+            parsed["sources"]
+        ) != 1:
+            raise GatewayInvocationError(
+                "query-object business declaration repeats a scalar source"
+            )
+        parsed["includes"] = sorted(parsed["includes"])
+        parsed["custom_includes"] = sorted(parsed["custom_includes"])
+        parsed["predicates"] = sorted(parsed["predicates"])
+        return parsed
+
+    supplied = parse(tuple(str(value) for value in supplied_arguments))
+    expected = parse(tuple(str(value) for value in expected_arguments))
+    if supplied != expected:
+        raise GatewayInvocationError(
+            "query-object business declaration differs from its sealed semantic inputs"
+        )
+    return tuple(str(value) for value in expected_arguments)
+
+
 def _canonical_json_bytes(value: Any) -> bytes:
     try:
         return json.dumps(
@@ -9969,6 +10087,14 @@ class CodexGatewayBroker:
             step,
             validation_arguments,
         )
+        if (
+            step.subcommand == "query-object"
+            and "--max-results" in step.arguments
+        ):
+            validation_arguments = _normalize_business_query_arguments(
+                validation_arguments,
+                step.arguments,
+            )
         if (
             metadata_discovery is None
             and len(validation_arguments) != len(step.arguments)

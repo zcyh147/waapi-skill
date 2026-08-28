@@ -261,7 +261,7 @@ def test_mutation_requests_parse_through_the_production_closed_contract() -> Non
     }
 
 
-def test_query_recipes_use_current_typed_where_facts_without_legacy_json() -> None:
+def test_query_recipes_keep_historical_and_business_declarations_explicit() -> None:
     simple = build_object_heavy_v3_recipe("OBJ22-F-GET-01", "2021.1")
     conjunctive = build_object_heavy_v3_recipe("OBJ22-F-GET-03", "2022.1")
 
@@ -291,31 +291,49 @@ def test_query_recipes_use_current_typed_where_facts_without_legacy_json() -> No
         "OutputBus",
     )
     assert isinstance(conjunctive.request, QueryObjectRequestSpec)
-    assert "--where-json" not in conjunctive.request.argv
-    assert (
+    assert not {
+        "--path",
+        "--type",
+        "--select",
         "--where",
-        "@Volume",
-        "<=",
-        "number",
+        "--where-json",
+        "--take",
+        "--return-field",
+    } & set(conjunctive.request.argv)
+    assert conjunctive.request.argv[4:] == (
+        "--path-segment",
+        "Actor-Mixer Hierarchy",
+        "--path-segment",
+        "Default Work Unit",
+        "--path-segment",
+        "SemanticLab_Query03",
+        "--path-segment",
+        "CombatMix",
+        "--relationship",
+        "descendants",
+        "--predicate",
+        "kind-is",
+        "all-sounds",
+        "--predicate",
+        "volume-db-at-most",
         "-6.0",
-    ) in tuple(
-        conjunctive.request.argv[index : index + 5]
-        for index, value in enumerate(conjunctive.request.argv)
-        if value == "--where"
-    )
-    assert (
-        "--where",
-        "isIncluded",
-        "=",
-        "boolean",
+        "--predicate",
+        "notes-contain",
+        "mix-review",
+        "--predicate",
+        "included-is",
         "true",
-    ) in tuple(
-        conjunctive.request.argv[index : index + 5]
-        for index, value in enumerate(conjunctive.request.argv)
-        if value == "--where"
+        "--max-results",
+        "12",
+        "--include",
+        "volume-db",
+        "--include",
+        "notes",
+        "--include",
+        "output-bus",
+        "--include",
+        "included",
     )
-
-
 @pytest.mark.parametrize(
     "case_id",
     (
@@ -522,9 +540,12 @@ def test_every_get_is_one_bounded_query_object_with_closed_return_fields() -> No
         request = recipe.request
         assert request.argv[:4] == ("gateway.py", "--version", "2022.1", "query-object")
         assert request.argv.count("query-object") == 1
-        assert request.argv.count("--take") == 1
+        bound_option = (
+            "--max-results" if case_id == "OBJ22-F-GET-03" else "--take"
+        )
+        assert request.argv.count(bound_option) == 1
         assert request.take == expected_takes[case_id]
-        assert request.argv[request.argv.index("--take") + 1] == str(request.take)
+        assert request.argv[request.argv.index(bound_option) + 1] == str(request.take)
         assert set(request.return_fields) == required_fields[case_id]
         assert "--all-results" not in request.argv
         assert "--args-json" not in request.argv

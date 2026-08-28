@@ -1097,6 +1097,14 @@ def _verify_query_primary_rows(
 
 
 def _query_row_field(row: Mapping[str, Any], name: str) -> Any:
+    properties = row.get("properties")
+    references = row.get("references")
+    if name == "@Volume" and isinstance(properties, Mapping):
+        return properties.get("volume_db")
+    if name == "OutputBus" and isinstance(references, Mapping):
+        return _reference_id(references.get("output_bus"))
+    if name == "isIncluded" and "included" in row:
+        return row.get("included")
     if name == "parent":
         return _reference_id(row.get(name))
     if name == "audioSource:language":

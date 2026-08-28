@@ -820,6 +820,43 @@ def _query(
     )
 
 
+def _business_query(
+    *,
+    path: str,
+    relationships: Sequence[str] = (),
+    predicates: Sequence[tuple[str, str]] = (),
+    take: int,
+    includes: Sequence[str],
+    return_fields: Sequence[str],
+    strategy: QueryResultStrategy,
+    exact_keys: Sequence[str],
+    superset_keys: Sequence[str],
+    final_filter: FinalAnswerFilter,
+) -> QueryObjectRequestSpec:
+    segments = tuple(segment for segment in path.split("\\") if segment)
+    if not segments:
+        raise ObjectHeavyRecipeError("business query path has no visible segments")
+    argv = ["gateway.py", "--version", VERSION, "query-object"]
+    for segment in segments:
+        argv.extend(("--path-segment", segment))
+    for relationship in relationships:
+        argv.extend(("--relationship", relationship))
+    for condition, value in predicates:
+        argv.extend(("--predicate", condition, value))
+    argv.extend(("--max-results", str(take)))
+    for field_name in includes:
+        argv.extend(("--include", field_name))
+    return QueryObjectRequestSpec(
+        argv=tuple(argv),
+        take=take,
+        return_fields=tuple(return_fields),
+        result_strategy=strategy,
+        exact_expected_keys=tuple(exact_keys),
+        bounded_superset_keys=tuple(superset_keys),
+        final_filter=final_filter,
+    )
+
+
 def _fixture(objects: Sequence[FixtureObject], *, absent: Sequence[str] = (), prefixes: Sequence[tuple[str, str]] = ()) -> FixtureRecipe:
     return FixtureRecipe(
         adapter="core_object_runner_fixture_v3",
@@ -1828,22 +1865,22 @@ def _get_03() -> ObjectHeavyRecipe:
         _expected_from_seed(next(item for item in objects if item.key == key), objects, return_fields=return_fields)
         for key in exact_keys
     )
-    predicates = (
-        {"field": "type", "operator": "=", "value": "Sound"},
-        {"field": "@Volume", "operator": "<=", "value": -6.0},
-        {"field": "notes", "operator": ":", "value": "mix-review"},
-        {"field": "isIncluded", "operator": "=", "value": True},
-    )
     return _recipe(
         "OBJ22-F-GET-03",
         OBJECT_GET_URI,
         prompt_literals=(combat_path, "Sound", "-6 dB", "mix-review", "12 条", "Output Bus"),
         fixture=_fixture(objects),
-        request=_query(
-            source=("--path", combat_path),
-            selects=("descendants",),
-            predicates=predicates,
+        request=_business_query(
+            path=combat_path,
+            relationships=("descendants",),
+            predicates=(
+                ("kind-is", "all-sounds"),
+                ("volume-db-at-most", "-6.0"),
+                ("notes-contain", "mix-review"),
+                ("included-is", "true"),
+            ),
             take=12,
+            includes=("volume-db", "notes", "output-bus", "included"),
             return_fields=return_fields,
             strategy="exact_rows",
             exact_keys=exact_keys,
@@ -2202,26 +2239,49 @@ def _validate_query_request(recipe: ObjectHeavyRecipe) -> None:
         raise ObjectHeavyRecipeError(
             f"{recipe.scenario_id} query must use the packaged query-object route"
         )
-    if argv.count("query-object") != 1 or argv.count("--take") != 1:
+    bound_option = "--max-results" if "--max-results" in argv else "--take"
+    if argv.count("query-object") != 1 or argv.count(bound_option) != 1:
         raise ObjectHeavyRecipeError(
             f"{recipe.scenario_id} query must be one explicitly bounded command"
         )
-    take_index = argv.index("--take")
+    take_index = argv.index(bound_option)
     if argv[take_index + 1] != str(request.take) or not 1 <= request.take <= 1000:
         raise ObjectHeavyRecipeError(f"{recipe.scenario_id} query take is inconsistent")
     if "--all-results" in argv or "--args-json" in argv or "--options-json" in argv:
         raise ObjectHeavyRecipeError(
             f"{recipe.scenario_id} query bypasses the bounded query-object builder"
         )
-    argv_return_fields = tuple(
-        argv[index + 1]
-        for index, item in enumerate(argv)
-        if item == "--return-field"
-    )
-    if argv_return_fields != request.return_fields or not request.return_fields:
-        raise ObjectHeavyRecipeError(
-            f"{recipe.scenario_id} query return fields are inconsistent"
+    if bound_option == "--max-results":
+        if recipe.scenario_id != "OBJ22-F-GET-03":
+            raise ObjectHeavyRecipeError(
+                f"{recipe.scenario_id} lacks a reviewed business query declaration"
+            )
+        if any(
+            option in argv
+            for option in ("--path", "--type", "--select", "--where", "--return-field")
+        ):
+            raise ObjectHeavyRecipeError(
+                f"{recipe.scenario_id} business query retains native query inputs"
+            )
+        argv_includes = tuple(
+            argv[index + 1]
+            for index, item in enumerate(argv)
+            if item == "--include"
         )
+        if argv_includes != ("volume-db", "notes", "output-bus", "included"):
+            raise ObjectHeavyRecipeError(
+                f"{recipe.scenario_id} business query outputs are inconsistent"
+            )
+    else:
+        argv_return_fields = tuple(
+            argv[index + 1]
+            for index, item in enumerate(argv)
+            if item == "--return-field"
+        )
+        if argv_return_fields != request.return_fields or not request.return_fields:
+            raise ObjectHeavyRecipeError(
+                f"{recipe.scenario_id} query return fields are inconsistent"
+            )
     if any(token in argument for argument in argv for token in _FORBIDDEN_ARGV_TOKENS):
         raise ObjectHeavyRecipeError(
             f"{recipe.scenario_id} query argv contains shell composition"

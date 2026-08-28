@@ -92,6 +92,20 @@ prevention checks that are expensive to rediscover.
   with that candidate's `.venv` interpreter. Formal campaign preflight rejects
   a missing or different interpreter before creating a root or starting Codex.
 
+### A clean Windows pytest worktree selected the Store Python alias
+
+- Symptom: direct-SSH `ci\test.bat` stops before pytest with Python exit `9009`,
+  or creates an empty Poetry environment and then reports `No module named pytest`.
+- Cause: the SSH `PATH` resolves the disabled Microsoft Store app-execution
+  alias before the installed Python, and a new worktree has a distinct Poetry
+  environment whose locked dependencies have not been installed.
+- Prevention: for ordinary pytest only, prepend the known installed Python
+  directory to that SSH process, create the worktree-local environment with
+  `POETRY_KEYRING_ENABLED=false` and a null keyring backend, then run
+  `ci\test.bat` directly through SSH. This is not a Fresh campaign and does not
+  use Task Scheduler. Require the test-context header before counting an
+  attempt; launcher failures receive no test result or retry number.
+
 ### A rejected runner path can be a real Agent error
 
 - Evidence: #83 macOS `r6` used the correct candidate runner for six commands,
