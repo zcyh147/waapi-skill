@@ -261,6 +261,28 @@ _READ_DECLARATIONS: dict[str, dict[str, Any]] = {
     },
 }
 
+_CATALOG_INTENTS = {
+    "ak.wwise.core.object.setAttenuationCurve": "set one attenuation curve",
+    "ak.wwise.core.object.setRandomizer": "configure one property randomizer",
+    "ak.wwise.core.switchContainer.getAssignments": "read Switch Container assignments",
+    "ak.wwise.core.object.diff": "compare two Wwise objects",
+    "ak.wwise.core.object.pasteProperties": "copy selected properties between objects",
+    "ak.wwise.core.audio.mute": "mute or unmute authoring objects",
+    "ak.wwise.core.audio.solo": "solo or unsolo authoring objects",
+    "ak.wwise.core.object.isLinked": "inspect one platform-linked property",
+    "ak.wwise.core.object.setStateGroups": "set an object's State Groups",
+    "ak.wwise.core.object.setStateProperties": "set an object's State properties",
+    "ak.wwise.core.project.save": "save the current Wwise project with optional source-control auto-checkout",
+    "ak.wwise.core.audio.convert": "convert selected audio for platforms and languages",
+    "ak.wwise.core.audio.setConversionPlugin": "select an installed Conversion plug-in",
+    "ak.wwise.core.blendContainer.addAssignment": "assign a child to a Blend Track",
+    "ak.wwise.core.blendContainer.addTrack": "add a Blend Track",
+    "ak.wwise.core.blendContainer.getAssignments": "read Blend Track assignments",
+    "ak.wwise.core.blendContainer.removeAssignment": "remove a Blend Track assignment",
+    "ak.wwise.core.workUnit.load": "load one Work Unit",
+    "ak.wwise.core.workUnit.unload": "unload one Work Unit",
+}
+
 
 def _mutation_input_form(value_type: str) -> dict[str, Any]:
     if value_type == "bound_object_handle":
@@ -308,6 +330,21 @@ def core_business_read_operations() -> frozenset[str]:
         operation
         for operation, row in _CONTRACTS.items()
         if row["execution_shape"] == "bounded_read"
+    )
+
+
+def core_business_catalog_rows() -> tuple[dict[str, Any], ...]:
+    """Expose every reviewed raw Core route for natural-intent discovery."""
+
+    if set(_CATALOG_INTENTS) != set(_CONTRACTS):  # pragma: no cover - invariant
+        raise ValueError("generic Core catalog intent coverage drifted")
+    return tuple(
+        {
+            "api": operation,
+            "intent": _CATALOG_INTENTS[operation],
+            "supported_versions": list(_CONTRACTS[operation]["versions"]),
+        }
+        for operation in sorted(_CONTRACTS)
     )
 
 
@@ -419,6 +456,7 @@ def core_business_contract_data(operation: str, version: str) -> dict[str, Any]:
 __all__ = [
     "CORE_BUSINESS_CONTRACT",
     "core_business_contract_data",
+    "core_business_catalog_rows",
     "core_business_draft_operations",
     "core_business_operations",
     "core_business_read_operations",

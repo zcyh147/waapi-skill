@@ -238,6 +238,7 @@ from wwise_waapi.business_adapters import (  # noqa: E402  # pyright: ignore[rep
     business_adapter,
 )
 from wwise_waapi.core_business_contracts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    core_business_catalog_rows,
     core_business_contract_data,
     core_business_operations,
 )
@@ -8285,6 +8286,13 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 if mode == COMPOSER_INPUT_MODE
             }
             operations.append(projection)
+        request_schema_routes = [
+            {
+                **row,
+                "next_command": ["request-schema", row["api"]],
+            }
+            for row in core_business_catalog_rows()
+        ]
         return {
             "contract": GATEWAY_RESULT_CONTRACT,
             "ok": True,
@@ -8294,6 +8302,8 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             "count": len(operations),
             "implemented_count": sum(item["implemented"] is True for item in operations),
             "operations": operations,
+            "request_schema_route_count": len(request_schema_routes),
+            "request_schema_routes": request_schema_routes,
         }
     if args.command == "operation-schema":
         if args.operation == "waapi.call":

@@ -1457,8 +1457,18 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
     assert operations["ui.commands.execute"]["implemented"] is True
     assert operations["ui.commands.register"]["implemented"] is True
     assert operations["ui.commands.unregister"]["implemented"] is True
+    request_schema_routes = {
+        item["api"]: item for item in catalog["request_schema_routes"]
+    }
+    project_save = request_schema_routes["ak.wwise.core.project.save"]
+    assert "save the current Wwise project" in project_save["intent"]
+    assert project_save["next_command"] == [
+        "request-schema",
+        "ak.wwise.core.project.save",
+    ]
+    assert catalog["request_schema_route_count"] == 19
     compact_json = json.dumps(catalog, ensure_ascii=False, indent=2, sort_keys=True).encode("utf-8")
-    assert len(compact_json) < 24_000
+    assert len(compact_json) < 30_000
 
     exit_code, detail_catalog = execute(["operations", "--detail"], tmp_path=tmp_path)
 

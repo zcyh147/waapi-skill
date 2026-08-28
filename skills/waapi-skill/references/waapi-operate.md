@@ -33,7 +33,7 @@ When this change uses a subset that the user selected from a previous multi-resu
 
 After a selected-subset gate, choose one first transaction-contract branch:
 
-A natural-language outcome is not an exact operation name. Unless the user supplied that name or a visible Gateway result returned it, run compact `operations` once and copy one matching `name`; never invent, translate, specialize, or repair it. When the exact name is visible, open its schema directly. `operations --detail` is audit-only.
+A natural-language outcome is not an exact operation name or URI. Unless the user supplied it or a visible Gateway result returned it, run compact `operations` once. Match either one named `operations` row or one raw-Core `request_schema_routes` row by its business summary/intent, then copy that row's `next_command` exactly; never invent, translate, specialize, or repair a name or URI. `operations --detail` is audit-only.
 | Request | First transaction-contract sequence |
 |---|---|
 | `object.create` | Preflight: explicit pre-Preview same-name-root type/path only; not parent/sibling or later verification. Then `operation-schema`; metadata. |

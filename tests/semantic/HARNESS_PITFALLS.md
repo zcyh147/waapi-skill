@@ -51,7 +51,9 @@ prevention checks that are expensive to rediscover.
   `-LogonType Interactive -RunLevel Limited`, and attest `InteractiveToken` in
   exported XML. Before registration, require the candidate-local Python,
   absolute campaign path, action script, and copied ignored
-  `live-environment.json`. Run the original campaign inside a profile-free
+  `live-environment.json` for a live profile. For a genuinely offline profile,
+  pass the sealed `--offline-only` option on both hosts instead of requiring or
+  copying live configuration. Run the original campaign inside a profile-free
   PowerShell action wrapper that records stdout, stderr, and exit code; SSH only
   registers, starts, polls, reads, and removes it.
 
