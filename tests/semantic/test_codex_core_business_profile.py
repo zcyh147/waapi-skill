@@ -59,7 +59,7 @@ def test_core_business_runtime_is_offline_and_contains_no_native_request(
     assert runtime.request["operation"] == "waapi.call"
     assert runtime.request["arguments"] == {
         "api": "ak.wwise.core.project.save",
-        "args": {},
+        "args": {"autoCheckOutToSourceControl": False},
         "options": {},
     }
 
@@ -85,10 +85,15 @@ def test_core_business_protocol_uses_one_complete_gateway_continuation() -> None
         "operation": "waapi.call",
         "arguments": {
             "api": "ak.wwise.core.project.save",
-            "args": {},
+            "args": {"autoCheckOutToSourceControl": False},
             "options": {},
         },
     }
+    assert steps[2].arguments[-3:] == (
+        "--value",
+        "auto_check_out",
+        "false",
+    )
     assert all(step.subcommand not in {"typed-call", "draft-apply", "execute"} for step in steps)
 
 

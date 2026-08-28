@@ -91,7 +91,7 @@ def prepare_core_business_runtime(
         "operation": "waapi.call",
         "arguments": {
             "api": unit.operation,
-            "args": {},
+            "args": {"autoCheckOutToSourceControl": False},
             "options": {},
         },
     }

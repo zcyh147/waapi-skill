@@ -1709,7 +1709,7 @@ def build_core_business_transaction_steps(
     version: str,
     label: str,
 ) -> tuple[ExpectedGatewayStep, ...]:
-    """Seal one zero-input raw-Core business Draft through one Preview."""
+    """Seal one explicit no-checkout Core save Draft through one Preview."""
 
     if api != "ak.wwise.core.project.save" or version != "2025.1":
         raise V3ProtocolError("Core business Fresh proof supports exact 2025.1 project.save")
@@ -1732,7 +1732,11 @@ def build_core_business_transaction_steps(
         "contract": "waapi-skill.operation-request/v1",
         "version": version,
         "operation": "waapi.call",
-        "arguments": {"api": api, "args": {}, "options": {}},
+        "arguments": {
+            "api": api,
+            "args": {"autoCheckOutToSourceControl": False},
+            "options": {},
+        },
     }
     return (
         ExpectedGatewayStep(
@@ -1748,7 +1752,12 @@ def build_core_business_transaction_steps(
         ExpectedGatewayStep(
             name=declaration,
             subcommand="draft-declare-core-plan",
-            arguments=prefix(draft_start),
+            arguments=(
+                *prefix(draft_start),
+                "--value",
+                "auto_check_out",
+                "false",
+            ),
         ),
         ExpectedGatewayStep(
             name=check,
