@@ -14774,7 +14774,12 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
         parser.error(str(exc))
     if is_executable_v3 and args.pair_id:
         parser.error(f"--pair-id is not supported by {args.profile}")
-    if is_executable_v3 and args.offline_only:
+    if (
+        is_executable_v3
+        and args.offline_only
+        and not is_deep_interface_mvp
+        and business_agent_profile is None
+    ):
         parser.error(f"--offline-only is not supported by {args.profile}")
     if not is_executable_v3:
         unknown_case_ids = sorted(set(args.case_id) - set(CASE_IDS))
@@ -14861,7 +14866,9 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
             else None
         )
         auth_json = Path(args.auth_json).expanduser().resolve(strict=True)
-        live_config = Path(args.live_config).expanduser().resolve(strict=True)
+        live_config = Path(args.live_config).expanduser().resolve(
+            strict=not args.offline_only
+        )
     except (OSError, matrix.CodexHarnessError) as exc:
         parser.error(str(exc))
     return CampaignOptions(

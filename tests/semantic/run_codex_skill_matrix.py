@@ -3891,7 +3891,12 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
         parser.error(str(exc))
     if is_executable_v3 and args.pair_id:
         parser.error(f"--pair-id is not supported by {args.profile}")
-    if is_executable_v3 and args.offline_only:
+    if (
+        is_executable_v3
+        and args.offline_only
+        and not is_deep_interface_mvp
+        and business_agent_profile is None
+    ):
         parser.error(f"--offline-only is not supported by {args.profile}")
     if not is_executable_v3:
         unknown_case_ids = sorted(set(args.case_id) - set(CASE_IDS))

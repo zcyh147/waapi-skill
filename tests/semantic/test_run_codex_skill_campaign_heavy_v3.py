@@ -6461,6 +6461,40 @@ def test_parse_args_rejects_v2_only_heavy_filters(
         )
 
 
+def test_offline_business_profile_accepts_offline_only_without_live_config(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    codex = tmp_path / ("codex.exe" if os.name == "nt" else "codex")
+    auth = tmp_path / "auth.json"
+    missing_live = tmp_path / "missing-live-environment.json"
+    auth.write_text("{}\n", encoding="utf-8")
+    monkeypatch.setattr(matrix, "resolve_codex_binary", lambda _value: codex)
+    common = [
+        "--profile",
+        "core_business_1",
+        "--offline-only",
+        "--auth-json",
+        str(auth),
+        "--live-config",
+        str(missing_live),
+        "--codex-binary",
+        str(codex),
+    ]
+
+    campaign_options = campaign.parse_args(
+        ["--campaign-root", str(tmp_path / "campaign"), *common]
+    )
+    matrix_options = matrix.parse_args(
+        ["--iteration-root", str(tmp_path / "matrix"), *common]
+    )
+
+    assert campaign_options.offline_only is True
+    assert campaign_options.live_config == missing_live.resolve(strict=False)
+    assert matrix_options.offline_only is True
+    assert matrix_options.live_config == missing_live.resolve(strict=False)
+
+
 def test_heavy_child_argv_reuses_matrix_and_requests_exact_pending_cases(tmp_path: Path) -> None:
     options = _options(tmp_path)
     units = (_unit(1), _unit(3, version="2025.1"))
