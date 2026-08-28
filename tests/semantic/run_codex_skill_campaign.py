@@ -3477,9 +3477,14 @@ def _validate_bound_business_agent_protocol(
 
     expected_names = tuple(step.name for step in steps)
     audited_steps = tuple(steps)
-    if profile == matrix.COMPOUND_UNDO_BUSINESS_PROFILE_ID:
+    optional_discovery_labels = {
+        matrix.COMPOUND_UNDO_BUSINESS_PROFILE_ID: "tx03",
+        matrix.CORE_BUSINESS_PROFILE_ID: "tx01",
+    }
+    if profile in optional_discovery_labels:
+        label = optional_discovery_labels[profile]
         optional_discovery = ExpectedGatewayStep(
-            name="tx03.operations",
+            name=f"{label}.operations",
             subcommand="operations",
         )
         raw_expected_names = broker.get("expected_step_names")
@@ -3493,7 +3498,7 @@ def _validate_bound_business_agent_protocol(
             expected_names = observed_expected_names
         elif observed_expected_names != expected_names:
             raise CampaignEvidenceError(
-                "compound Undo Broker used an unreviewed discovery prefix"
+                "Business Agent Broker used an unreviewed discovery prefix"
             )
     consumed_names = broker.get("consumed_step_names")
     records = broker.get("records")
