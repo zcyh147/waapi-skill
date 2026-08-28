@@ -8,8 +8,10 @@ from typing import Any, Mapping
 
 import pytest
 
-from wwise_waapi.builders.stable_reads import GET_VOICE_CONTRIBUTIONS_URI
 from wwise_waapi.versions import SUPPORTED_WWISE_VERSION_KEYS
+
+
+INLINE_READ_URI = "ak.wwise.core.profiler.getCursorTime"
 
 
 SCRIPT_PATH = (
@@ -88,7 +90,7 @@ def _live_info(version: str) -> dict[str, Any]:
 
 def _request_contract(tmp_path: Path, version: str = "2025.1") -> dict[str, Any]:
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["--version", version, "request-schema", GET_VOICE_CONTRIBUTIONS_URI],
+        ["--version", version, "request-schema", INLINE_READ_URI],
         env=_env(tmp_path, version),
         client_factory=lambda _url: pytest.fail("discovery must remain offline"),
     )
@@ -139,26 +141,22 @@ def test_request_schema_returns_one_typed_continuation_for_tracer(
     version: str,
 ) -> None:
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["--version", version, "request-schema", GET_VOICE_CONTRIBUTIONS_URI],
+        ["--version", version, "request-schema", INLINE_READ_URI],
         env=_env(tmp_path, version),
         client_factory=lambda _url: pytest.fail("discovery must remain offline"),
     )
 
-    assert exit_code == 0
+    assert exit_code == 0, payload
     assert payload["input_shape"] == "inline"
     assert payload["version"] == version
-    assert payload["uri"] == GET_VOICE_CONTRIBUTIONS_URI
+    assert payload["uri"] == INLINE_READ_URI
     assert payload["continuation"]["subcommand"] == "typed-call"
     assert payload["continuation"]["schema_digest"] == payload["schema_digest"]
     assert "args-json" not in json.dumps(payload)
     assert "options-json" not in json.dumps(payload)
     assert {
         field["name"] for field in payload["fields"] if "parent_handle" not in field
-    } == {
-        "time",
-        "voicePipelineID",
-        "bussesPipelineID",
-    }
+    } == {"cursor"}
     assert all(str(field["handle"]).startswith("trh1-") for field in payload["fields"])
 
 
@@ -172,57 +170,32 @@ def test_typed_call_materializes_and_dispatches_without_preview(
     client = FakeClient(
         {
             "ak.wwise.core.getInfo": _live_info(version),
-            GET_VOICE_CONTRIBUTIONS_URI: {
-                "return": {
-                    "volume": -3.0,
-                    "LPF": 2.0,
-                    "HPF": 1.0,
-                    "objects": [],
-                    **({"DSF": -0.5} if version == "2025.1" else {}),
-                }
-            },
+            INLINE_READ_URI: {"return": 1200},
         }
     )
     exit_code, payload = waapi_gateway.execute_gateway(
         [
             "typed-call",
-            GET_VOICE_CONTRIBUTIONS_URI,
+            INLINE_READ_URI,
             "--schema-digest",
             contract["schema_digest"],
-            *_typed_scalar_args(contract, "time", "integer", "1200"),
             "--set",
-            handles["voicePipelineID"],
-            "integer",
-            "17",
-            "--append",
-            handles["bussesPipelineID"],
-            "integer",
-            "21",
-            "--append",
-            handles["bussesPipelineID"],
-            "integer",
-            "22",
+            handles["cursor"],
+            "string",
+            "capture",
         ],
         env=_env(tmp_path, version),
         client_factory=lambda _url: client,
     )
 
-    assert exit_code == 0
-    assert payload["agent_result"]["dsf"] == (
-        {"feature_available": True, "reported": True, "value": -0.5}
-        if version == "2025.1"
-        else {"feature_available": False, "reported": False, "value": None}
-    )
+    assert exit_code == 0, payload
+    assert payload["agent_result"] == {"return": 1200}
     assert list(payload)[-1] == "agent_result"
     assert client.calls == [
         ("ak.wwise.core.getInfo", None, None),
         (
-            GET_VOICE_CONTRIBUTIONS_URI,
-            {
-                "voicePipelineID": 17,
-                "bussesPipelineID": [21, 22],
-                "time": 1200,
-            },
+            INLINE_READ_URI,
+            {"cursor": "capture"},
             {},
         ),
     ]
@@ -238,20 +211,20 @@ def test_invalid_typed_facts_fail_before_connection(
 ) -> None:
     contract = _request_contract(tmp_path)
     handles = _field_handles(contract)
-    facts = _typed_scalar_args(contract, "time", "integer", "1200")
+    facts: list[str] = []
     if case != "missing":
         facts.extend(
             [
                 "--set",
-                "trh1-not-a-packaged-handle" if case == "unknown" else handles["voicePipelineID"],
-                "string" if case == "wrong_type" else "integer",
-                "17",
+                "trh1-not-a-packaged-handle" if case == "unknown" else handles["cursor"],
+                "integer" if case == "wrong_type" else "string",
+                "17" if case == "wrong_type" else "capture",
             ]
         )
     exit_code, payload = waapi_gateway.execute_gateway(
         [
             "typed-call",
-            GET_VOICE_CONTRIBUTIONS_URI,
+            INLINE_READ_URI,
             "--schema-digest",
             "0" * 64 if case == "stale_digest" else contract["schema_digest"],
             *facts,
@@ -271,14 +244,13 @@ def test_typed_call_rejects_configured_live_version_drift(tmp_path: Path) -> Non
     exit_code, payload = waapi_gateway.execute_gateway(
         [
             "typed-call",
-            GET_VOICE_CONTRIBUTIONS_URI,
+            INLINE_READ_URI,
             "--schema-digest",
             contract["schema_digest"],
-            *_typed_scalar_args(contract, "time", "string", "capture"),
             "--set",
-            handles["voicePipelineID"],
-            "integer",
-            "17",
+            handles["cursor"],
+            "string",
+            "capture",
         ],
         env=_env(tmp_path, "2025.1"),
         client_factory=lambda _url: client,
@@ -355,7 +327,7 @@ def test_zero_input_read_discloses_one_short_continuation_and_dispatches_directl
     assert "transaction_id" not in payload
 
 
-def test_get_info_request_schema_discloses_the_independent_typed_read(
+def test_get_info_request_schema_discloses_only_status_fixed_route(
     tmp_path: Path,
 ) -> None:
     exit_code, contract = waapi_gateway.execute_gateway(
@@ -365,54 +337,13 @@ def test_get_info_request_schema_discloses_the_independent_typed_read(
     )
 
     assert exit_code == 0
+    assert contract["input_shape"] == "fixed_business_command"
+    assert contract["native_request_fields_disclosed"] is False
     assert contract["continuation"] == {
-        "subcommand": "typed-zero-call",
-        "uri": "ak.wwise.core.getInfo",
-        "schema_digest": contract["schema_digest"],
-        "gateway_argv": [
-            "typed-zero-call",
-            "ak.wwise.core.getInfo",
-            "--schema-digest",
-            contract["schema_digest"],
-        ],
+        "subcommand": "status",
+        "arguments": [],
         "business_values_required": False,
     }
-
-    result = _live_info("2021.1")
-    result.update(
-        {
-            "sessionId": "{11111111-1111-1111-1111-111111111111}",
-            "apiVersion": 1,
-            "branch": "main",
-            "copyright": "Audiokinetic",
-            "configuration": "release",
-            "platform": "macosx",
-            "processId": 4242,
-            "processPath": "/Applications/Wwise.app/Contents/MacOS/Wwise",
-            "directories": {
-                key: f"/tmp/{key}"
-                for key in ("install", "authoring", "bin", "log", "help", "user")
-            },
-        }
-    )
-    result["version"].update({"nickname": "", "schema": 110})
-    client = FakeClient(
-        {
-            "ak.wwise.core.getInfo": result,
-        }
-    )
-    exit_code, payload = waapi_gateway.execute_gateway(
-        [
-            "typed-zero-call",
-            "ak.wwise.core.getInfo",
-            "--schema-digest",
-            contract["schema_digest"],
-        ],
-        env=_env(tmp_path, "2021.1"),
-        client_factory=lambda _url: client,
-    )
-    assert exit_code == 0, payload
-    assert payload["agent_result"] == result
 
 
 def test_zero_input_mutation_cannot_bypass_preview_before_connection(
@@ -613,7 +544,7 @@ def test_flat_generic_enum_error_is_exact_and_preconnection(
 
 def test_flat_generic_optional_array_can_be_explicitly_empty(tmp_path: Path) -> None:
     version = "2025.1"
-    api = "ak.wwise.core.profiler.getBusses"
+    api = "ak.soundengine.getState"
     exit_code, schema = waapi_gateway.execute_gateway(
         ["request-schema", api],
         env=_env(tmp_path, version),
@@ -621,7 +552,12 @@ def test_flat_generic_optional_array_can_be_explicitly_empty(tmp_path: Path) -> 
     )
     assert exit_code == 0, schema
     handles = _field_handles(schema)
-    time_args = _typed_scalar_args(schema, "time", "string", "capture")
+    state_group_args = _typed_scalar_args(
+        schema,
+        "stateGroup",
+        "string",
+        "StateGroup:MusicState",
+    )
     assert "container" in schema["continuation"]["fact_flags"]
     client = FakeClient(
         {
@@ -634,14 +570,18 @@ def test_flat_generic_optional_array_can_be_explicitly_empty(tmp_path: Path) -> 
         [
             "typed-call", api,
             "--schema-digest", schema["schema_digest"],
-            *time_args,
+            *state_group_args,
             "--present", handles["return"],
         ],
         env=_env(tmp_path, version),
         client_factory=lambda _url: client,
     )
     assert exit_code == 0, payload
-    assert client.calls[-1] == (api, {"time": "capture"}, {"return": []})
+    assert client.calls[-1] == (
+        api,
+        {"stateGroup": "StateGroup:MusicState"},
+        {"return": []},
+    )
 
 
 @pytest.mark.parametrize(
@@ -667,24 +607,60 @@ def test_zero_input_fixed_route_discloses_only_its_existing_command(
         client_factory=lambda _url: pytest.fail("discovery must remain offline"),
     )
     assert exit_code == 0, contract
-    assert contract["input_shape"] == "zero"
-    if api == "ak.wwise.core.getInfo":
-        assert contract["continuation"] == {
-            "subcommand": "typed-zero-call",
-            "uri": api,
-            "schema_digest": contract["schema_digest"],
-            "gateway_argv": [
-                "typed-zero-call",
-                api,
-                "--schema-digest",
-                contract["schema_digest"],
-            ],
-            "business_values_required": False,
+    assert contract["input_shape"] == "fixed_business_command"
+    assert contract["native_request_fields_disclosed"] is False
+    expected_commands = [
+        {
+            "subcommand": command.split()[0],
+            "arguments": command.split()[1:],
+            "business_values_required": command not in {
+                "status",
+                "metadata types",
+                "debug-wal-tree",
+            },
         }
-        return
-    assert contract["continuation"] == {
-        "subcommand": commands[0].split()[0],
-        "arguments": commands[0].split()[1:],
-        "business_values_required": False,
-    }
+        for command in commands
+    ]
+    if len(expected_commands) == 1:
+        assert contract["continuation"] == {
+            **expected_commands[0],
+        }
+    else:
+        assert contract["continuation"] == {
+            "choose_by_business_intent": expected_commands,
+            "business_values_required": "depends_on_command",
+        }
     assert "typed-zero-call" not in json.dumps(contract)
+
+
+@pytest.mark.parametrize(
+    ("version", "api", "command"),
+    (
+        ("2025.1", "ak.wwise.core.object.get", "query-object"),
+        (
+            "2025.1",
+            "ak.wwise.core.profiler.getVoiceContributions",
+            "profiler-voice-contributions",
+        ),
+        ("2025.1", "ak.wwise.debug.validateCall", "debug-validate-call"),
+    ),
+)
+def test_parameterized_fixed_routes_disclose_no_typed_request_escape(
+    tmp_path: Path,
+    version: str,
+    api: str,
+    command: str,
+) -> None:
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["request-schema", api],
+        env=_env(tmp_path, version),
+        client_factory=lambda _url: pytest.fail("fixed route discovery is offline"),
+    )
+
+    assert exit_code == 0, payload
+    assert payload["input_shape"] == "fixed_business_command"
+    assert payload["native_request_fields_disclosed"] is False
+    assert command in json.dumps(payload["commands"])
+    assert "schema_digest" not in payload
+    assert "fields" not in payload
+    assert "typed-call" not in json.dumps(payload)

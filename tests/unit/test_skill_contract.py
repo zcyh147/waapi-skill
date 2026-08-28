@@ -17,8 +17,8 @@ def test_skill_contract_documents_fixed_runner_and_versioned_runtime() -> None:
         "python scripts/run.py gateway.py status",
         "python scripts/run.py gateway.py buses",
         "python scripts/run.py gateway.py selected",
-        "python scripts/run.py gateway.py query-object --type Event --take 100",
-        "python scripts/run.py gateway.py metadata types --summary-only",
+        "python scripts/run.py gateway.py query-object --kind sound-sfx --include volume-db --max-results 100",
+        "python scripts/run.py gateway.py metadata types",
     ):
         assert command in text
     for resource in (

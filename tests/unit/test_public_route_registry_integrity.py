@@ -60,9 +60,9 @@ def test_every_registry_row_has_one_complete_route_contract() -> None:
         "bounded_call": 60,
         "bounded_topic_wait": 152,
         "excluded": 6,
-        "fixed_command": 56,
+            "fixed_command": 56,
         "isolated_transaction": 141,
-        "managed_transaction": 248,
+            "managed_transaction": 248,
         "compound_transaction_member": 15,
         "transaction": 136,
     }

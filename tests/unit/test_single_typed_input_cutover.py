@@ -40,7 +40,6 @@ REMOVED_PRODUCT_COMMANDS = frozenset(
         "preview",
         "legacy-preview",
         "call",
-        "debug-validate-call",
     }
 )
 REMOVED_PRODUCT_OPTIONS = frozenset(

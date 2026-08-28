@@ -24,9 +24,9 @@ gateway = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = gateway
 SPEC.loader.exec_module(gateway)
 
-VALIDATE_URI = "ak.wwise.debug.validateCall"
 AUDIO_CONVERT_URI = "ak.wwise.core.audio.convert"
 MEDIA_POOL_URI = "ak.wwise.core.mediaPool.get"
+SYNTHETIC_URI = MEDIA_POOL_URI
 
 
 class FakeClient:
@@ -614,164 +614,6 @@ def test_audio_convert_schema_forbids_present_with_nonempty_languages(
     }
 
 
-@pytest.mark.parametrize("version", ("2024.1", "2025.1"))
-def test_complex_tracer_uses_open_map_facts_and_existing_debug_dispatch(
-    tmp_path: Path, version: str
-) -> None:
-    exit_code, schema = gateway.execute_gateway(
-        ["request-schema", VALIDATE_URI],
-        env=_env(tmp_path, version),
-        client_factory=lambda _url: pytest.fail("schema must be offline"),
-    )
-    assert exit_code == 0
-    handles = {
-        field["name"]: field["handle"]
-        for field in schema["fields"]
-        if "parent_handle" not in field
-    }
-    client = FakeClient(version)
-    exit_code, payload = gateway.execute_gateway(
-        [
-            "typed-call", VALIDATE_URI,
-            "--schema-digest", schema["schema_digest"],
-            "--set", handles["id"], "string", "ak.wwise.core.getInfo",
-            "--map-put", handles["args"], "sentinel", "integer", "42",
-            "--map-correct", handles["args"], "sentinel", "integer", "43",
-            "--map-put", handles["args"], "removed", "null", "null",
-            "--map-remove", handles["args"], "removed",
-        ],
-        env=_env(tmp_path, version),
-        client_factory=lambda _url: client,
-    )
-    assert exit_code == 0
-    assert payload["agent_result"] == {
-        "validated_api": "ak.wwise.core.getInfo",
-        "supplied_sections": ["args"],
-        "accepted_by_wwise": True,
-    }
-    assert list(payload)[-1] == "agent_result"
-    assert client.calls[-1] == (
-        VALIDATE_URI,
-        {"id": "ak.wwise.core.getInfo", "args": {"sentinel": 43}},
-        {},
-    )
-
-
-def test_complex_tracer_is_unavailable_before_2024_without_connection(tmp_path: Path) -> None:
-    exit_code, payload = gateway.execute_gateway(
-        ["request-schema", VALIDATE_URI],
-        env=_env(tmp_path, "2023.1"),
-        client_factory=lambda _url: pytest.fail("unsupported discovery must be offline"),
-    )
-    assert exit_code == 2
-    assert payload["ok"] is False
-
-
-def test_open_map_container_handle_is_gateway_issued_and_version_bound(tmp_path: Path) -> None:
-    exit_code, schema = gateway.execute_gateway(
-        ["request-schema", VALIDATE_URI],
-        env=_env(tmp_path, "2025.1"),
-        client_factory=lambda _url: pytest.fail("schema must be offline"),
-    )
-    assert exit_code == 0
-    args_handle = next(
-        field["handle"] for field in schema["fields"] if field["name"] == "args"
-    )
-
-    exit_code, payload = gateway.execute_gateway(
-        [
-            "request-map-container", VALIDATE_URI,
-            "--schema-digest", schema["schema_digest"],
-            "--map-handle", args_handle,
-            "--key", "nested",
-            "--shape", "object",
-        ],
-        env=_env(tmp_path, "2025.1"),
-        client_factory=lambda _url: pytest.fail("handle issuance must be offline"),
-    )
-    assert exit_code == 0
-    assert payload["handle"].startswith("trm1-")
-    assert payload["continuation"]["deferred_fact"]["argv"] == [
-        "--map-put", args_handle, "nested", "object", payload["handle"]
-    ]
-
-    stale_code, stale = gateway.execute_gateway(
-        [
-            "request-map-container", VALIDATE_URI,
-            "--schema-digest", schema["schema_digest"],
-            "--map-handle", args_handle,
-            "--key", "nested",
-            "--shape", "object",
-        ],
-        env=_env(tmp_path, "2024.1"),
-        client_factory=lambda _url: pytest.fail("stale handle must fail offline"),
-    )
-    assert stale_code == 2
-    assert stale["ok"] is False
-
-    nested_code, nested = gateway.execute_gateway(
-        [
-            "request-map-container", VALIDATE_URI,
-            "--schema-digest", schema["schema_digest"],
-            "--map-handle", payload["handle"],
-            "--key", "items",
-            "--shape", "array",
-        ],
-        env=_env(tmp_path, "2025.1"),
-        client_factory=lambda _url: pytest.fail("nested handle issuance must be offline"),
-    )
-    assert nested_code == 0
-    assert nested["parent_handle"] == payload["handle"]
-    assert nested["handle"].startswith("trm1-")
-
-
-def test_complex_schema_discloses_one_complete_non_json_continuation(tmp_path: Path) -> None:
-    exit_code, schema = gateway.execute_gateway(
-        ["request-schema", VALIDATE_URI],
-        env=_env(tmp_path, "2025.1"),
-        client_factory=lambda _url: pytest.fail("schema must be offline"),
-    )
-    assert exit_code == 0
-    continuation = schema["continuation"]
-    dynamic = continuation["dynamic_container_commands"]
-    assert dynamic["map_value"] == "request-map-container"
-    assert dynamic["array_item"] == "request-array-item"
-    assert dynamic["draft_binding"] is False
-    assert dynamic["map_value_argv"][:5] == [
-        "request-map-container",
-        VALIDATE_URI,
-        "--schema-digest",
-        schema["schema_digest"],
-        "--map-handle",
-    ]
-    assert dynamic["array_item_argv"][:5] == [
-        "request-array-item",
-        VALIDATE_URI,
-        "--schema-digest",
-        schema["schema_digest"],
-        "--array-handle",
-    ]
-    assert "--schema-digest" not in dynamic["nested_map_value_argv"]
-    assert "--schema-digest" not in dynamic["nested_array_item_argv"]
-    assert "--parent-schema-token" in dynamic["nested_map_value_argv"]
-    assert "--parent-schema-token" in dynamic["nested_array_item_argv"]
-    assert "nested_parent_argv" not in dynamic
-    assert continuation["gateway_argv_prefix"] == [
-        "typed-call",
-        VALIDATE_URI,
-        "--schema-digest",
-        schema["schema_digest"],
-    ]
-    assert set(continuation["fact_flags"]) == {
-        "scalar", "array_item", "container", "branch", "dynamic_branch", "map_put",
-        "map_correct", "map_remove",
-    }
-    encoded = json.dumps(schema)
-    assert "args-json" not in encoded
-    assert "options-json" not in encoded
-    assert "action-json" not in encoded
-
-
 def test_isolated_typed_call_prefix_places_io_authority_before_every_fact(
     tmp_path: Path,
 ) -> None:
@@ -799,137 +641,6 @@ def test_isolated_typed_call_prefix_places_io_authority_before_every_fact(
         "infer_or_replace_prompt_values": "invalid",
         "submission_scope": "one_complete_typed_call",
         "draft_batch_size_applies": False,
-    }
-
-
-def test_nested_container_handles_can_be_issued_before_one_atomic_typed_call(
-    tmp_path: Path,
-) -> None:
-    exit_code, schema = gateway.execute_gateway(
-        ["request-schema", VALIDATE_URI],
-        env=_env(tmp_path, "2025.1"),
-        client_factory=lambda _url: pytest.fail("schema must be offline"),
-    )
-    assert exit_code == 0
-    handles = {
-        field["name"]: field["handle"]
-        for field in schema["fields"]
-        if "parent_handle" not in field
-    }
-    _, object_handle = gateway.execute_gateway(
-        [
-            "request-map-container", VALIDATE_URI,
-            "--schema-digest", schema["schema_digest"],
-            "--map-handle", handles["args"],
-            "--key", "nested", "--shape", "object",
-        ],
-        env=_env(tmp_path, "2025.1"),
-        client_factory=lambda _url: pytest.fail("handle issuance must be offline"),
-    )
-    _, array_handle = gateway.execute_gateway(
-        [
-            "request-map-container", VALIDATE_URI,
-            "--schema-digest", schema["schema_digest"],
-            "--map-handle", object_handle["handle"],
-            "--key", "items", "--shape", "array",
-        ],
-        env=_env(tmp_path, "2025.1"),
-        client_factory=lambda _url: pytest.fail("handle issuance must be offline"),
-    )
-    client = FakeClient("2025.1")
-    exit_code, _payload = gateway.execute_gateway(
-        [
-            "typed-call", VALIDATE_URI,
-            "--schema-digest", schema["schema_digest"],
-            "--set", handles["id"], "string", "ak.wwise.core.getInfo",
-            # Child facts may arrive before their parents; the Gateway validates
-            # the complete signed chain atomically before opening the transport.
-            "--append", array_handle["handle"], "integer", "42",
-            "--map-put", object_handle["handle"], "items", "array", array_handle["handle"],
-            "--map-put", handles["args"], "nested", "object", object_handle["handle"],
-        ],
-        env=_env(tmp_path, "2025.1"),
-        client_factory=lambda _url: client,
-    )
-    assert exit_code == 0
-    assert client.calls[-1] == (
-        VALIDATE_URI,
-        {
-            "id": "ak.wwise.core.getInfo",
-            "args": {"nested": {"items": [42]}},
-        },
-        {},
-    )
-
-
-def test_array_item_handle_is_gateway_issued_and_schema_bound(tmp_path: Path) -> None:
-    # The public command rejects an array handle from another exact schema
-    # before any transport is opened.
-    exit_code, schema = gateway.execute_gateway(
-        ["request-schema", "ak.wwise.core.profiler.getVoiceContributions"],
-        env=_env(tmp_path, "2025.1"),
-        client_factory=lambda _url: pytest.fail("schema must be offline"),
-    )
-    assert exit_code == 0
-    scalar_array = next(
-        field["handle"] for field in schema["fields"] if field["name"] == "bussesPipelineID"
-    )
-    exit_code, payload = gateway.execute_gateway(
-        [
-            "request-array-item", "ak.wwise.core.profiler.getVoiceContributions",
-            "--schema-digest", schema["schema_digest"],
-            "--array-handle", scalar_array,
-            "--index", "0",
-            "--shape", "object",
-        ],
-        env=_env(tmp_path, "2025.1"),
-        client_factory=lambda _url: pytest.fail("invalid handle request must be offline"),
-    )
-    assert exit_code == 2
-    assert payload["ok"] is False
-
-
-def test_dynamic_open_array_can_issue_and_materialize_nonempty_object_item(
-    tmp_path: Path,
-) -> None:
-    exit_code, schema = gateway.execute_gateway(
-        ["request-schema", VALIDATE_URI],
-        env=_env(tmp_path, "2025.1"),
-        client_factory=lambda _url: pytest.fail("schema must be offline"),
-    )
-    assert exit_code == 0
-    handles = {field["name"]: field["handle"] for field in schema["fields"] if "parent_handle" not in field}
-    _, array_payload = gateway.execute_gateway(
-        [
-            "request-map-container", VALIDATE_URI,
-            "--schema-digest", schema["schema_digest"],
-            "--map-handle", handles["args"],
-            "--key", "items", "--shape", "array",
-        ], env=_env(tmp_path, "2025.1"), client_factory=lambda _url: pytest.fail("offline")
-    )
-    _, object_payload = gateway.execute_gateway(
-        [
-            "request-array-item", VALIDATE_URI,
-            "--schema-digest", schema["schema_digest"],
-            "--array-handle", array_payload["handle"],
-            "--index", "0", "--shape", "object",
-        ], env=_env(tmp_path, "2025.1"), client_factory=lambda _url: pytest.fail("offline")
-    )
-    client = FakeClient("2025.1")
-    exit_code, _ = gateway.execute_gateway(
-        [
-            "typed-call", VALIDATE_URI,
-            "--schema-digest", schema["schema_digest"],
-            "--set", handles["id"], "string", "ak.wwise.core.getInfo",
-            "--map-put", object_payload["handle"], "x", "integer", "1",
-            "--append", array_payload["handle"], "object", object_payload["handle"],
-            "--map-put", handles["args"], "items", "array", array_payload["handle"],
-        ], env=_env(tmp_path, "2025.1"), client_factory=lambda _url: client,
-    )
-    assert exit_code == 0
-    assert client.calls[-1][1] == {
-        "id": "ak.wwise.core.getInfo",
-        "args": {"items": [{"x": 1}]},
     }
 
 
@@ -965,7 +676,7 @@ def test_gateway_discloses_opaque_choice_for_exact_dynamic_key(
 ) -> None:
     contract = compile_typed_request_contract(
         version="2025.1",
-        uri=VALIDATE_URI,
+        uri=SYNTHETIC_URI,
         schema={
             "argsSchema": {
                 "type": "object",
@@ -992,7 +703,7 @@ def test_gateway_discloses_opaque_choice_for_exact_dynamic_key(
 
     code, initial = gateway.execute_gateway(
         [
-            "request-array-item", VALIDATE_URI,
+            "request-array-item", SYNTHETIC_URI,
             "--schema-digest", contract.schema_digest,
             "--array-handle", rows.handle,
             "--index", "0",
@@ -1024,42 +735,6 @@ def test_gateway_discloses_opaque_choice_for_exact_dynamic_key(
     )
     assert integer_choice.startswith("trc1-")
 
-    id_handle = next(field for field in contract.fields if field.name == "id").handle
-    parser = gateway.build_parser()
-    accepted = parser.parse_args(
-        [
-            "typed-call", VALIDATE_URI,
-            "--schema-digest", contract.schema_digest,
-            "--set", id_handle, "string", "ak.wwise.core.getInfo",
-            "--append", rows.handle, "object", row_handle,
-            "--choose-dynamic", row_handle, member_key, integer_choice,
-            "--map-put", row_handle, member_key, "integer", "7",
-        ]
-    )
-    gateway.preflight_typed_request_input(
-        accepted,
-        env=_env(tmp_path, "2025.1"),
-    )
-    assert accepted.typed_request.args == {
-        "id": "ak.wwise.core.getInfo",
-        "rows": [{member_key: 7}],
-    }
-
-    rejected_code, rejected = gateway.execute_gateway(
-        [
-            "typed-call", VALIDATE_URI,
-            "--schema-digest", contract.schema_digest,
-            "--set", id_handle, "string", "ak.wwise.core.getInfo",
-            "--append", rows.handle, "object", row_handle,
-            "--choose-dynamic", row_handle, member_key, "0",
-            "--map-put", row_handle, member_key, "integer", "7",
-        ],
-        env=_env(tmp_path, "2025.1"),
-        client_factory=lambda _url: pytest.fail("numeric choice must fail before transport"),
-    )
-    assert rejected_code == 2
-    assert rejected["ok"] is False
-
 
 def test_nested_dynamic_lineage_discloses_deep_opaque_choice(
     tmp_path: Path,
@@ -1067,7 +742,7 @@ def test_nested_dynamic_lineage_discloses_deep_opaque_choice(
 ) -> None:
     contract = compile_typed_request_contract(
         version="2025.1",
-        uri=VALIDATE_URI,
+        uri=SYNTHETIC_URI,
         schema={
             "argsSchema": {
                 "type": "object",
@@ -1109,7 +784,7 @@ def test_nested_dynamic_lineage_discloses_deep_opaque_choice(
 
     code, inner = gateway.execute_gateway(
         [
-            "request-array-item", VALIDATE_URI,
+            "request-array-item", SYNTHETIC_URI,
             "--schema-digest", contract.schema_digest,
             "--array-handle", matrix.handle,
             "--index", "0", "--shape", "array",
@@ -1120,7 +795,7 @@ def test_nested_dynamic_lineage_discloses_deep_opaque_choice(
     assert code == 0
     code, row = gateway.execute_gateway(
         [
-            "request-array-item", VALIDATE_URI,
+            "request-array-item", SYNTHETIC_URI,
             "--schema-digest", contract.schema_digest,
             "--array-handle", inner["handle"],
             "--index", "0", "--shape", "object",
@@ -1139,24 +814,6 @@ def test_nested_dynamic_lineage_discloses_deep_opaque_choice(
     )
     assert integer_choice.startswith("trc1-")
 
-    id_handle = next(field for field in contract.fields if field.name == "id").handle
-    parsed = gateway.build_parser().parse_args(
-        [
-            "typed-call", VALIDATE_URI,
-            "--schema-digest", contract.schema_digest,
-            "--set", id_handle, "string", "ak.wwise.core.getInfo",
-            "--append", matrix.handle, "array", inner["handle"],
-            "--append", inner["handle"], "object", row["handle"],
-            "--choose-dynamic", row["handle"], "v", integer_choice,
-            "--map-put", row["handle"], "v", "integer", "1",
-        ]
-    )
-    gateway.preflight_typed_request_input(parsed, env=_env(tmp_path, "2025.1"))
-    assert parsed.typed_request.args == {
-        "id": "ak.wwise.core.getInfo",
-        "matrix": [[{"v": 1}]],
-    }
-
 
 def test_anchored_regex_requires_exact_member_key_disclosure(
     tmp_path: Path,
@@ -1164,7 +821,7 @@ def test_anchored_regex_requires_exact_member_key_disclosure(
 ) -> None:
     contract = compile_typed_request_contract(
         version="2025.1",
-        uri=VALIDATE_URI,
+        uri=SYNTHETIC_URI,
         schema={
             "argsSchema": {
                 "type": "object",
@@ -1197,7 +854,7 @@ def test_anchored_regex_requires_exact_member_key_disclosure(
     rows = next(field for field in contract.fields if field.name == "rows")
     code, payload = gateway.execute_gateway(
         [
-            "request-array-item", VALIDATE_URI,
+            "request-array-item", SYNTHETIC_URI,
             "--schema-digest", contract.schema_digest,
             "--array-handle", rows.handle,
             "--index", "0", "--shape", "object",
@@ -1210,117 +867,13 @@ def test_anchored_regex_requires_exact_member_key_disclosure(
     assert payload["child_contract"]["member_key_disclosure_required"] is True
 
 
-def test_schema_lineage_token_cannot_invent_a_child_schema(
-    tmp_path: Path,
-) -> None:
-    code, schema = gateway.execute_gateway(
-        ["request-schema", VALIDATE_URI],
-        env=_env(tmp_path, "2025.1"),
-        client_factory=lambda _url: pytest.fail("offline"),
-    )
-    assert code == 0
-    args_handle = next(
-        field["handle"] for field in schema["fields"] if field["name"] == "args"
-    )
-    code, parent = gateway.execute_gateway(
-        [
-            "request-map-container", VALIDATE_URI,
-            "--schema-digest", schema["schema_digest"],
-            "--map-handle", args_handle,
-            "--key", "nested", "--shape", "object",
-        ],
-        env=_env(tmp_path, "2025.1"),
-        client_factory=lambda _url: pytest.fail("offline"),
-    )
-    assert code == 0
-    token = parent["schema_lineage_token"]
-    assert token.startswith("trl2-")
-    assert len(token) < 96
-    wrong_digest_code, wrong_digest = gateway.execute_gateway(
-        [
-            "request-map-container", VALIDATE_URI,
-            "--schema-digest", "0" * 64,
-            "--map-handle", parent["handle"],
-            "--key", "child", "--shape", "object",
-            "--parent-schema-token", token,
-        ],
-        env=_env(tmp_path, "2025.1"),
-        client_factory=lambda _url: pytest.fail("wrong digest must fail offline"),
-    )
-    assert wrong_digest_code == 2
-    assert wrong_digest["ok"] is False
-
-    root_without_digest_code, root_without_digest = gateway.execute_gateway(
-        [
-            "request-map-container", VALIDATE_URI,
-            "--map-handle", args_handle,
-            "--key", "nested", "--shape", "object",
-        ],
-        env=_env(tmp_path, "2025.1"),
-        client_factory=lambda _url: pytest.fail("unbound root must fail offline"),
-    )
-    assert root_without_digest_code == 2
-    assert root_without_digest["ok"] is False
-
-    from base64 import urlsafe_b64decode, urlsafe_b64encode
-    raw = token.removeprefix("trl2-")
-    decoded = json.loads(
-        urlsafe_b64decode(raw + "=" * (-len(raw) % 4)).decode("utf-8")
-    )
-    decoded[0][1] = "invented"
-    forged = "trl2-" + urlsafe_b64encode(
-        json.dumps(decoded, separators=(",", ":"), sort_keys=True).encode("utf-8")
-    ).decode("ascii").rstrip("=")
-    rejected_code, rejected = gateway.execute_gateway(
-        [
-            "request-map-container", VALIDATE_URI,
-            "--schema-digest", schema["schema_digest"],
-            "--map-handle", parent["handle"],
-            "--key", "child", "--shape", "object",
-            "--parent-schema-token", forged,
-        ],
-        env=_env(tmp_path, "2025.1"),
-        client_factory=lambda _url: pytest.fail("forgery must fail offline"),
-    )
-    assert rejected_code == 2
-    assert rejected["ok"] is False
-
-    stale_code, stale = gateway.execute_gateway(
-        [
-            "request-map-container", VALIDATE_URI,
-            "--schema-digest", schema["schema_digest"],
-            "--map-handle", parent["handle"],
-            "--key", "child", "--shape", "object",
-            "--parent-schema-token", token.replace("trl2-", "trl1-", 1),
-        ],
-        env=_env(tmp_path, "2025.1"),
-        client_factory=lambda _url: pytest.fail("stale token must fail offline"),
-    )
-    assert stale_code == 2
-    assert stale["ok"] is False
-
-    oversized_code, oversized = gateway.execute_gateway(
-        [
-            "request-map-container", VALIDATE_URI,
-            "--schema-digest", schema["schema_digest"],
-            "--map-handle", parent["handle"],
-            "--key", "child", "--shape", "object",
-            "--parent-schema-token", "trl2-" + "A" * (64 * 1024 * 2 + 1),
-        ],
-        env=_env(tmp_path, "2025.1"),
-        client_factory=lambda _url: pytest.fail("oversized token must fail offline"),
-    )
-    assert oversized_code == 2
-    assert oversized["ok"] is False
-
-
 def test_nested_options_local_reference_keeps_its_origin_section(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     contract = compile_typed_request_contract(
         version="2025.1",
-        uri=VALIDATE_URI,
+        uri=SYNTHETIC_URI,
         schema={
             "argsSchema": {
                 "type": "object", "additionalProperties": False, "properties": {}
@@ -1359,7 +912,7 @@ def test_nested_options_local_reference_keeps_its_origin_section(
     assert matrix.section == "options"
     code, inner = gateway.execute_gateway(
         [
-            "request-array-item", VALIDATE_URI,
+            "request-array-item", SYNTHETIC_URI,
             "--schema-digest", contract.schema_digest,
             "--array-handle", matrix.handle,
             "--index", "0", "--shape", "array",
@@ -1369,7 +922,7 @@ def test_nested_options_local_reference_keeps_its_origin_section(
     assert code == 0
     code, row = gateway.execute_gateway(
         [
-            "request-array-item", VALIDATE_URI,
+            "request-array-item", SYNTHETIC_URI,
             "--schema-digest", contract.schema_digest,
             "--array-handle", inner["handle"],
             "--index", "0", "--shape", "object", "--member-key", "v",

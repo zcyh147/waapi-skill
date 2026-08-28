@@ -114,6 +114,7 @@ from wwise_waapi.builders.stable_reads import (  # noqa: E402  # pyright: ignore
     build_profiler_voice_contributions_request,
     build_project_default_work_units_request,
     normalize_profiler_game_objects_result,
+    normalize_profiler_time,
     normalize_profiler_voice_contributions_result,
     normalize_project_default_work_units_result,
 )
@@ -247,6 +248,7 @@ from wwise_waapi.business_adapters import (  # noqa: E402  # pyright: ignore[rep
 from wwise_waapi.business_declarations import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     MAX_BUSINESS_NAME_BYTES,
     MAX_BUSINESS_PATH_BYTES,
+    SUPPORTED_BUSINESS_KINDS,
     BusinessContext,
     BusinessDeclarationError,
     BusinessHandleRegistry,
@@ -502,8 +504,77 @@ MAX_MEDIA_POOL_SEARCH_TEXT_CHARS = 1024
 MAX_MEDIA_POOL_FILTER_TOKEN_CHARS = 256
 MAX_MEDIA_POOL_FILTER_VALUE_CHARS = 4096
 SELECTED_REQUIRED_RETURN_FIELDS = ("id", "name", "type", "path")
-MAX_SELECTED_RETURN_FIELDS = 32
-MAX_SELECTED_RETURN_FIELD_CHARS = 256
+QUERY_BUSINESS_PREDICATES: Mapping[str, tuple[str, str, str]] = {
+    "name-is": ("name", "=", "string"),
+    "name-contains": ("name", ":", "string"),
+    "type-is": ("type", "=", "string"),
+    "notes-contain": ("notes", ":", "string"),
+    "volume-db-at-most": ("@Volume", "<=", "number"),
+    "volume-db-at-least": ("@Volume", ">=", "number"),
+    "included-is": ("isIncluded", "=", "boolean"),
+    "playable-is": ("isPlayable", "=", "boolean"),
+    "explicitly-muted-is": ("isExplicitMute", "=", "boolean"),
+    "explicitly-soloed-is": ("isExplicitSolo", "=", "boolean"),
+    "children-at-least": ("childrenCount", ">=", "integer"),
+    "plugin-name-is": ("pluginName", "=", "string"),
+    "category-is": ("category", "=", "string"),
+}
+QUERY_BUSINESS_RELATIONSHIPS: Mapping[str, str] = {
+    "descendants": "descendants",
+    "ancestors": "ancestors",
+    "references-to": "referencesTo",
+    "children": "children",
+    "parent": "parent",
+}
+QUERY_BUSINESS_OUTPUTS: Mapping[str, tuple[str, str]] = {
+    "notes": ("notes", "notes"),
+    "volume-db": ("@Volume", "volume_db"),
+    "pitch-cents": ("@Pitch", "pitch_cents"),
+    "output-bus": ("OutputBus", "output_bus"),
+    "source-language": ("audioSource:language", "source_language"),
+    "parent": ("parent", "parent"),
+    "owner": ("owner", "owner"),
+    "included": ("isIncluded", "included"),
+    "playable": ("isPlayable", "playable"),
+    "explicitly-muted": ("isExplicitMute", "explicitly_muted"),
+    "explicitly-soloed": ("isExplicitSolo", "explicitly_soloed"),
+    "child-count": ("childrenCount", "child_count"),
+    "plugin-name": ("pluginName", "plugin_name"),
+    "category": ("category", "category"),
+    "file-path": ("filePath", "file_path"),
+    "original-file-path": ("originalFilePath", "original_file_path"),
+    "active-source": ("activeSource", "active_source"),
+    "action-type": ("ActionType", "action_type"),
+    "override-output": ("OverrideOutput", "override_output"),
+    "work-unit": ("workunit", "work_unit"),
+    "source-duration": ("audioSource:playbackDuration", "source_duration"),
+    "max-radius": ("audioSource:maxRadiusAttenuation", "max_radius"),
+}
+MAX_QUERY_BUSINESS_OUTPUTS = 32
+MAX_QUERY_CUSTOM_OUTPUTS = 16
+MAX_QUERY_CUSTOM_FIELD_CHARS = 128
+BUSINESS_QUERY_CONTRACT = "waapi-skill.object-query-business/v1"
+BUSINESS_QUERY_SCHEMA_CONTRACT = "waapi-skill.object-query-business-schema/v1"
+ADVANCED_QUERY_SCHEMA_CONTRACT = (
+    "waapi-skill.advanced-object-query-business-schema/v1"
+)
+METADATA_CURVE_ROLES: Mapping[str, str] = {
+    "volume-dry": "VolumeDryUsage",
+    "game-defined-aux-send-volume": "VolumeAuxGameDef",
+    "user-defined-aux-send-volume": "VolumeAuxUserDef",
+    "low-pass-filter": "LowPassFilter",
+    "high-pass-filter": "HighPassFilter",
+    "spread": "Spread",
+    "focus": "Focus",
+}
+PROFILER_PIPELINE_IDENTITY_RETURN_FIELDS = (
+    "pipelineID",
+    "gameObjectID",
+    "objectGUID",
+    "objectName",
+    "gameObjectName",
+)
+MAX_PROFILER_PIPELINE_IDENTITY_ROWS = 4096
 MEDIA_POOL_FLOAT_FILTER_FIELDS_BY_VERSION: Mapping[str, frozenset[str]] = {
     "2025.1": frozenset({"WAV/Duration"}),
 }
@@ -1189,15 +1260,6 @@ def build_parser() -> argparse.ArgumentParser:
         "selected",
         help="Return current UI selection or a clear command-line/UI boundary",
     )
-    selected.add_argument(
-        "--return-field",
-        action="append",
-        dest="return_fields",
-        help=(
-            "Add one bounded object accessor to the selected-object projection; "
-            "id, name, type, and path are always retained"
-        ),
-    )
     subparsers.add_parser(
         "project-default-work-units",
         help="Report version-aware default project Work Units without fabricating unavailable fields",
@@ -1207,31 +1269,58 @@ def build_parser() -> argparse.ArgumentParser:
         "profiler-game-objects",
         help="Return profiler game objects through a cross-version registration-time projection",
     )
-    profiler_game_objects.add_argument(
-        "--time",
-        required=True,
-        help="Non-negative capture time in milliseconds, or the exact cursor token user/capture",
+    profiler_game_objects_capture = profiler_game_objects.add_mutually_exclusive_group(
+        required=True
     )
+    profiler_game_objects_capture.add_argument(
+        "--capture",
+        choices=("latest", "user-cursor"),
+        help="Choose the latest capture or the user-positioned profiler cursor",
+    )
+    profiler_game_objects_capture.add_argument(
+        "--capture-ms",
+        help="Exact non-negative capture time in milliseconds",
+    )
+    profiler_game_objects.set_defaults(time=None)
 
     profiler_voice_contributions = subparsers.add_parser(
         "profiler-voice-contributions",
         help="Return one bounded voice contribution tree with version-aware DSF availability",
     )
-    profiler_voice_contributions.add_argument(
-        "--time",
-        required=True,
-        help="Non-negative capture time in milliseconds, or the exact cursor token user/capture",
+    profiler_voice_capture = profiler_voice_contributions.add_mutually_exclusive_group(
+        required=True
+    )
+    profiler_voice_capture.add_argument(
+        "--capture",
+        choices=("latest", "user-cursor"),
+        help="Choose the latest capture or the user-positioned profiler cursor",
+    )
+    profiler_voice_capture.add_argument(
+        "--capture-ms",
+        help="Exact non-negative capture time in milliseconds",
     )
     profiler_voice_contributions.add_argument(
-        "--voice-pipeline-id",
+        "--voice-object-id",
         required=True,
-        help="Unsigned 32-bit voice pipeline identifier",
+        help="Exact canonical Wwise object GUID for the requested active voice",
     )
     profiler_voice_contributions.add_argument(
-        "--bus-pipeline-id",
+        "--game-object-id",
+        help="Optional exact runtime game-object ID used only to disambiguate voices",
+    )
+    profiler_voice_contributions.add_argument(
+        "--bus-object-id",
         action="append",
         default=[],
-        help="Repeat in voice-path order; omit all values for the dry path",
+        help=(
+            "Repeat exact canonical Wwise Bus GUIDs in the requested voice-path "
+            "order; omit for the dry path"
+        ),
+    )
+    profiler_voice_contributions.set_defaults(
+        time=None,
+        voice_pipeline_id=None,
+        bus_pipeline_id=[],
     )
 
     request_schema = subparsers.add_parser(
@@ -1415,13 +1504,32 @@ def build_parser() -> argparse.ArgumentParser:
         help="Return a bounded deterministic projection of the private WAL tree",
     )
     debug_wal_tree.add_argument(
-        "--take",
+        "--max-nodes",
         type=int,
         default=128,
+        dest="max_nodes",
         metavar=f"1..{MAX_WAL_TREE_NODES}",
         help=(
             "Maximum WAL nodes returned after the complete bounded call; "
             f"defaults to 128 and is capped at {MAX_WAL_TREE_NODES}"
+        ),
+    )
+    debug_validate_call = subparsers.add_parser(
+        "debug-validate-call",
+        help=(
+            "Validate one exact reflected function and, optionally, a bounded "
+            "user-owned call artifact without executing that function"
+        ),
+    )
+    debug_validate_call.add_argument(
+        "api",
+        help="Exact reflected WAAPI function URI to validate",
+    )
+    debug_validate_call.add_argument(
+        "--artifact-file",
+        help=(
+            "Absolute path to a user-owned strict JSON object containing only "
+            "optional args, options, and result objects"
         ),
     )
 
@@ -1430,96 +1538,111 @@ def build_parser() -> argparse.ArgumentParser:
         help="Run a source-grounded read-only object query without composing WAAPI code",
     )
     query_source = query_object.add_mutually_exclusive_group()
-    query_source.add_argument("--path")
-    query_source.add_argument("--object-id")
-    query_source.add_argument("--type", dest="object_type")
-    query_source.add_argument("--search")
     query_source.add_argument(
-        "--query",
-        metavar="QUERY_PATH_OR_GUID",
+        "--path-segment",
+        action="append",
+        dest="path_segments",
         help=(
-            "Query Editor object specifier: canonical {GUID} or absolute "
-            r"\Queries\... path; raw WAQL is not accepted"
+            "Repeat one user-visible hierarchy name per level; the Gateway "
+            "constructs the exact Wwise path and separators"
+        ),
+    )
+    query_object.set_defaults(
+        path=None,
+        object_id=None,
+        search=None,
+        query=None,
+        where=None,
+        select=None,
+        take=None,
+        all_results=False,
+    )
+    query_source.add_argument("--exact-id", dest="object_id")
+    query_source.add_argument(
+        "--kind",
+        choices=SUPPORTED_BUSINESS_KINDS,
+        dest="semantic_kind",
+        help=(
+            "Stable Wwise business kind; the Gateway derives the native type "
+            "and any required Sound SFX/Voice predicate"
         ),
     )
     query_source.add_argument(
-        "--typed-advanced",
-        action="store_true",
-        help="Use Gateway-owned typed facts for the bounded advanced WAQL layer",
+        "--type-name",
+        dest="object_type",
+        help=(
+            "Exact user-requested or Gateway-reported Wwise type name for "
+            "custom types; prefer --kind for the closed common vocabulary"
+        ),
+    )
+    query_source.add_argument("--search-text", dest="search")
+    query_source.add_argument(
+        "--query-id",
+        dest="query_id",
+        metavar="QUERY_GUID",
+        help=(
+            "Exact Query Editor object GUID; raw WAQL is not accepted"
+        ),
     )
     query_source.add_argument(
-        "--typed-structured",
-        action="store_true",
-        help="Use Gateway-owned typed facts for the structured Builder layer",
+        "--query-path-segment",
+        action="append",
+        dest="query_path_segments",
+        help=(
+            "Repeat one Query Editor folder/name below the Queries root; the "
+            "Gateway constructs the exact path and separators"
+        ),
     )
-    query_object.add_argument("--schema-digest")
-    query_object.add_argument("--waql")
-    query_object.add_argument("--advanced-return", action="append", default=[])
+    query_source.add_argument(
+        "--advanced-waql",
+        dest="advanced_waql",
+        metavar="BOUNDED_WAQL",
+        help=(
+            "One exact bounded read-only domain expression disclosed only by "
+            "query-schema --advanced; the Gateway owns URI, projection, and cap"
+        ),
+    )
     query_object.add_argument("--max-results", type=int)
     query_object.add_argument(
-        "--typed-schema-digest",
-        help="Bind structured typed facts to the exact configured-version query schema",
-    )
-    query_object.add_argument(
-        "--typed-set",
+        "--include",
         action="append",
-        nargs=3,
-        metavar=("FIELD_HANDLE", "TYPE", "VALUE"),
+        choices=tuple(QUERY_BUSINESS_OUTPUTS),
         default=[],
-    )
-    query_object.add_argument(
-        "--typed-append",
-        action="append",
-        nargs=3,
-        metavar=("FIELD_HANDLE", "TYPE", "VALUE"),
-        default=[],
-    )
-    query_object.add_argument(
-        "--typed-present",
-        action="append",
-        metavar="CONTAINER_HANDLE",
-        default=[],
-    )
-    query_object.add_argument(
-        "--typed-choose",
-        action="append",
-        nargs=2,
-        metavar=("BRANCH_HANDLE", "CHOICE_HANDLE"),
-        default=[],
-    )
-    query_object.add_argument(
-        "--typed-choose-dynamic",
-        action="append",
-        nargs=3,
-        metavar=("OBJECT_HANDLE", "KEY", "CHOICE_HANDLE"),
-        default=[],
-    )
-    for action_name in ("map-put", "map-correct"):
-        query_object.add_argument(
-            f"--typed-{action_name}",
-            action="append",
-            nargs=4,
-            metavar=("MAP_HANDLE", "KEY", "TYPE", "VALUE"),
-            default=[],
-            dest=f"typed_query_{action_name.replace('-', '_')}",
-        )
-    query_object.add_argument(
-        "--typed-map-remove",
-        action="append",
-        nargs=2,
-        metavar=("MAP_HANDLE", "KEY"),
-        default=[],
-        dest="typed_query_map_remove",
-    )
-    query_object.add_argument(
-        "--where",
-        nargs=4,
-        action="append",
-        default=[],
-        metavar=("FIELD", "OPERATOR", "TYPE", "VALUE"),
+        dest="business_outputs",
         help=(
-            "Append one typed conjunctive predicate; TYPE is string, integer, "
-            "number, or boolean"
+            "Repeat one business result field; the Gateway derives the native "
+            "projection and returns a stable business key"
+        ),
+    )
+    query_object.add_argument(
+        "--include-property",
+        action="append",
+        default=[],
+        dest="custom_properties",
+        help=(
+            "Repeat one exact user-requested or Gateway-reported custom property "
+            "name; the Gateway owns property accessor syntax"
+        ),
+    )
+    query_object.add_argument(
+        "--include-reference",
+        action="append",
+        default=[],
+        dest="custom_references",
+        help=(
+            "Repeat one exact user-requested or Gateway-reported custom reference name"
+        ),
+    )
+    query_object.add_argument(
+        "--predicate",
+        nargs=2,
+        action="append",
+        default=[],
+        metavar=("BUSINESS_CONDITION", "VALUE"),
+        dest="business_predicates",
+        help=(
+            "Repeat one closed business condition and value; the Gateway "
+            "derives the native accessor, operator, and wire type"
         ),
     )
     query_object.add_argument(
@@ -1529,28 +1652,19 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="ABSOLUTE_PATH",
         help=(
             "Repeat for 1..64 absolute Media Pool candidate paths; only the fixed "
-            "2025.1 AudioFileSource take-1000 reference-match mode accepts this option"
+            "2025.1 AudioFileSource max-1000 reference-match mode accepts this option"
         ),
     )
     query_object.add_argument(
-        "--select",
+        "--relationship",
         action="append",
-        choices=SUPPORTED_SELECTS,
-        help="Append one supported read-only WAQL select transform",
+        choices=tuple(QUERY_BUSINESS_RELATIONSHIPS),
+        dest="relationships",
+        help=(
+            "Repeat one user-requested object relationship; the Gateway "
+            "derives the exact WAQL select token and order"
+        ),
     )
-    query_bound = query_object.add_mutually_exclusive_group()
-    query_bound.add_argument(
-        "--take",
-        type=int,
-        metavar=f"0..{MAX_QUERY_TAKE}",
-        help=f"Bound returned rows to at most {MAX_QUERY_TAKE}; larger values fail closed",
-    )
-    query_bound.add_argument(
-        "--all-results",
-        action="store_true",
-        help="Explicitly allow an unbounded broad query; otherwise broad sources/selects require --take",
-    )
-    query_object.add_argument("--return-field", action="append", dest="return_fields")
     query_object.add_argument(
         "--detail",
         action="store_true",
@@ -1569,60 +1683,72 @@ def build_parser() -> argparse.ArgumentParser:
         "operation",
         choices=(
             "types",
-            "names",
-            "property-info",
-            "property-enabled",
-            "attenuation-curve",
             "discover",
+            "property-state",
+            "attenuation",
         ),
     )
-    metadata.add_argument("--object")
-    metadata.add_argument("--class-id", type=int)
-    metadata.add_argument(
-        "--object-type",
-        help=(
-            "Exact live Wwise object type name for metadata discover; resolved "
-            "through getTypes before class-scoped discovery"
-        ),
-    )
-    metadata.add_argument("--property")
-    metadata.add_argument("--platform")
-    metadata.add_argument("--curve-type")
-    metadata.add_argument(
-        "--query",
+    metadata_scope = metadata.add_mutually_exclusive_group()
+    metadata_scope.add_argument(
+        "--path-segment",
         action="append",
-        dest="queries",
-        metavar="SEARCH_PHRASE",
+        dest="metadata_path_segments",
         help=(
-            "Repeat 1..8 natural-language search phrases for metadata discover; "
-            "the gateway returns live lexical candidates without selecting one"
+            "Repeat one user-visible object hierarchy name per level; the "
+            "Gateway constructs the exact Wwise object scope"
         ),
     )
-    metadata.add_argument(
-        "--limit",
-        type=int,
-        metavar=f"1..{MAX_METADATA_DISCOVERY_LIMIT}",
+    metadata_scope.add_argument(
+        "--type-name",
+        dest="metadata_type_name",
         help=(
-            "Maximum candidates returned per discovery phrase; defaults to "
-            f"{DEFAULT_METADATA_DISCOVERY_LIMIT}"
+            "Exact user-requested or Gateway-reported Wwise type name for "
+            "class-scoped field discovery"
         ),
     )
-    metadata.add_argument(
-        "--detail",
-        action="store_true",
-        help=(
-            "For metadata discover only, opt into the larger legacy-v1 full "
-            "live-metadata audit view; ordinary mutation selection uses the "
-            "compact v2 default"
-        ),
+    metadata_scope.add_argument(
+        "--exact-id",
+        dest="metadata_exact_id",
+        help="Exact canonical object GUID returned by a prior bounded query",
     )
     metadata.add_argument(
-        "--summary-only",
-        action="store_true",
+        "--meaning",
+        action="append",
+        dest="metadata_meanings",
+        metavar="USER_FACING_FIELD_MEANING",
         help=(
-            "For metadata types only, omit the normalized type inventory and return "
-            "the packaged count/ActorMixer projection"
+            "Repeat one user-facing property/reference meaning; the Gateway "
+            "discovers the exact live field metadata"
         ),
+    )
+    metadata.add_argument("--platform")
+    metadata.add_argument(
+        "--curve-role",
+        choices=(
+            "volume-dry",
+            "game-defined-aux-send-volume",
+            "user-defined-aux-send-volume",
+            "low-pass-filter",
+            "high-pass-filter",
+            "spread",
+            "focus",
+        ),
+        dest="curve_role",
+        help=(
+            "User-facing attenuation curve role; the Gateway derives Wwise's "
+            "exact curveType token"
+        ),
+    )
+    metadata.set_defaults(
+        object=None,
+        class_id=None,
+        object_type=None,
+        property=None,
+        curve_type=None,
+        queries=None,
+        limit=None,
+        detail=False,
+        summary_only=False,
     )
 
     wait_topic = subparsers.add_parser(
@@ -2540,10 +2666,6 @@ def _execute_gateway_unconstrained(
         if route_boundary is not None:
             return finish(2, route_boundary)
         preflight_json_inputs(args)
-        if args.command == "selected":
-            args.return_fields = list(
-                normalize_selected_return_fields(args.return_fields)
-            )
         if args.command == "query-object":
             preflight_query_object_input(args, env=source_env)
         if args.command in {"wait-topic", "stream-topic"}:
@@ -2561,8 +2683,8 @@ def _execute_gateway_unconstrained(
             preflight_typed_operation_input(args, env=source_env)
         if args.command == "typed-zero-call":
             preflight_typed_zero_input(args, env=source_env)
-        if args.command == "debug-wal-tree":
-            preflight_debug_read_input(args)
+        if args.command in {"debug-wal-tree", "debug-validate-call"}:
+            preflight_debug_read_input(args, env=source_env)
         if args.command in OFFLINE_COMMANDS:
             payload = dispatch_offline_command(args, env=source_env)
             return finish(0 if payload.get("ok") else 2, payload)
@@ -3864,6 +3986,15 @@ def preflight_typed_request_input(
     versions = resolve_catalog_versions(args, env=env)
     if len(versions) != 1:
         raise GatewayInputError("typed-call requires one exact Wwise version")
+    capability = CapabilityCatalog().describe(versions[0], args.api)
+    if (
+        capability.preferred_route == "fixed_command"
+        and "typed-call" not in capability.fixed_commands
+    ):
+        raise GatewayInputError(
+            f"{args.api} uses its Gateway-owned fixed command: "
+            f"{', '.join(capability.fixed_commands)}"
+        )
     contract = request_contract(versions[0], args.api)
     if (
         contract.as_gateway_payload()["input_shape"] == "draft"
@@ -3914,7 +4045,6 @@ def preflight_typed_request_input(
         schema_digest=args.schema_digest,
         facts=facts,
     )
-    capability = CapabilityCatalog().describe(versions[0], args.api)
     isolated = capability.execution_contract["route"] == "isolated_transaction"
     if isolated and not isinstance(args.io_root, str):
         raise GatewayInputError(
@@ -4062,7 +4192,7 @@ def preflight_typed_zero_input(
         "effect": contract.effect,
         "route": contract.route,
     }
-    if contract.route == "fixed_command" and contract.uri != "ak.wwise.core.getInfo":
+    if contract.route == "fixed_command":
         raise GatewayInputError(
             "This zero-input API retains its packaged fixed command: "
             + ", ".join(contract.gateway_commands)
@@ -4090,118 +4220,69 @@ def preflight_typed_zero_input(
 def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, str]) -> None:
     """Reject closed query input errors before opening a WAAPI transport."""
 
-    if getattr(args, "typed_structured", False):
-        _require_typed_structured_query_option_exclusivity(args)
-        (preflight_version,) = resolve_catalog_versions(args, env=env)
-        contract = typed_query_contract(preflight_version)
-        if not isinstance(args.typed_schema_digest, str):
+    _compile_query_business_projection(args)
+    args.where = []
+    args.select = [
+        QUERY_BUSINESS_RELATIONSHIPS[value]
+        for value in getattr(args, "relationships", ()) or ()
+    ]
+    if getattr(args, "path_segments", None):
+        args.path = _business_object_path_from_segments(args.path_segments)
+    if getattr(args, "query_id", None):
+        args.query = args.query_id
+    if getattr(args, "query_path_segments", None):
+        args.query = _business_object_path_from_segments(
+            ["Queries", *args.query_path_segments]
+        )
+    if getattr(args, "semantic_kind", None):
+        (kind_version,) = resolve_catalog_versions(args, env=env)
+        kind = resolve_semantic_kind(args.semantic_kind, version=kind_version)
+        args.object_type = (
+            "Sound"
+            if args.semantic_kind in {"sound-sfx", "sound-voice"}
+            else kind.native_object_type
+        )
+        if args.semantic_kind in {"sound-sfx", "sound-voice"}:
+            args.where.append(
+                (
+                    "@IsVoice",
+                    "=",
+                    "boolean",
+                    "true" if args.semantic_kind == "sound-voice" else "false",
+                )
+            )
+    for intent, value in getattr(args, "business_predicates", ()):
+        native = QUERY_BUSINESS_PREDICATES.get(intent)
+        if native is None:
             raise GatewayInputError(
-                "typed structured query requires --typed-schema-digest"
+                "--predicate BUSINESS_CONDITION must be one of: "
+                + ", ".join(sorted(QUERY_BUSINESS_PREDICATES))
             )
-        facts = [
-            TypedRequestFact("set", handle, value_type, value)
-            for handle, value_type, value in args.typed_set
-        ]
-        facts.extend(
-            TypedRequestFact("append", handle, value_type, value)
-            for handle, value_type, value in args.typed_append
-        )
-        facts.extend(
-            TypedRequestFact("present", handle, "null", "null")
-            for handle in args.typed_present
-        )
-        facts.extend(
-            TypedRequestFact("choose", handle, "branch", choice)
-            for handle, choice in args.typed_choose
-        )
-        facts.extend(
-            TypedRequestFact("choose-dynamic", handle, "choice", choice, key=key)
-            for handle, key, choice in args.typed_choose_dynamic
-        )
-        for action_name in ("map_put", "map_correct"):
-            facts.extend(
-                TypedRequestFact(
-                    action_name.replace("_", "-"),
-                    handle,
-                    value_type,
-                    value,
-                    key=key,
-                )
-                for handle, key, value_type, value in getattr(
-                    args, f"typed_query_{action_name}"
-                )
+        field, operator, value_type = native
+        args.where.append((field, operator, value_type, value))
+    if getattr(args, "advanced_waql", None) is not None:
+        if args.business_predicates or args.relationships:
+            raise GatewayInputError(
+                "--advanced-waql cannot be combined with --predicate or "
+                "--relationship"
             )
-        facts.extend(
-            TypedRequestFact("map-remove", handle, "null", "null", key=key)
-            for handle, key in args.typed_query_map_remove
-        )
-        args.typed_query = materialize_typed_query(
-            STRUCTURED_TYPED_QUERY_OPERATION,
-            preflight_version,
-            args.typed_schema_digest,
-            tuple(facts),
-        )
-        _require_structured_exact_identity_return_field(args.typed_query.preview)
-        args.typed_query_read_timeout = DEFAULT_TIMEOUT
-        return
-    if getattr(args, "typed_advanced", False):
-        _require_typed_advanced_query_option_exclusivity(args)
-        (preflight_version,) = resolve_catalog_versions(args, env=env)
-        contract = typed_query_contract(preflight_version, advanced=True)
-        fields = {field.name: field for field in contract.fields}
-        if not isinstance(args.schema_digest, str):
-            raise GatewayInputError("typed advanced query requires --schema-digest")
-        if not isinstance(args.waql, str):
-            raise GatewayInputError("typed advanced query requires --waql")
-        if not args.advanced_return:
-            raise GatewayInputError("typed advanced query requires --advanced-return")
         if args.max_results is None:
-            raise GatewayInputError("typed advanced query requires --max-results")
-        args.typed_query = materialize_typed_query(
-            ADVANCED_TYPED_QUERY_OPERATION,
-            preflight_version,
-            args.schema_digest,
-            (
-                TypedRequestFact("set", fields["waql"].handle, "string", args.waql),
-                *(
-                    TypedRequestFact("append", fields["return"].handle, "string", value)
-                    for value in args.advanced_return
-                ),
-                TypedRequestFact(
-                    "set", fields["max_results"].handle, "integer", str(args.max_results)
-                ),
-            ),
+            raise GatewayInputError(
+                "--advanced-waql requires --max-results"
+            )
+        (advanced_version,) = resolve_catalog_versions(args, env=env)
+        args.advanced_query_preview = build_advanced_object_get_query(
+            {
+                "contract": ADVANCED_QUERY_CONTRACT,
+                "waql": args.advanced_waql,
+                "return": list(args.query_return_fields),
+                "max_results": args.max_results,
+            },
+            version=advanced_version,
         )
-        args.typed_query_read_timeout = DEFAULT_TIMEOUT
         return
-    if any(
-        (
-            args.schema_digest is not None,
-            args.waql is not None,
-            bool(args.advanced_return),
-            args.max_results is not None,
-        )
-    ):
-        raise GatewayInputError(
-            "--schema-digest, --waql, --advanced-return, and --max-results "
-            "require query-object --typed-advanced"
-        )
-    if any(
-        (
-            args.typed_schema_digest is not None,
-            bool(args.typed_set),
-            bool(args.typed_append),
-            bool(args.typed_present),
-            bool(args.typed_choose),
-            bool(args.typed_choose_dynamic),
-            bool(args.typed_query_map_put),
-            bool(args.typed_query_map_correct),
-            bool(args.typed_query_map_remove),
-        )
-    ):
-        raise GatewayInputError(
-            "structured typed fact flags require query-object --typed-structured"
-        )
+
+    args.take = args.max_results
     if original_file_reference_match_requested(args):
         (preflight_version,) = resolve_catalog_versions(args, env=env)
         validate_original_file_reference_match_input(
@@ -4226,11 +4307,11 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
         )
     ):
         raise GatewayInputError(
-            "query-object requires one simple source or one typed/structured query layer"
+            "query-object requires one business source or --advanced-waql"
         )
 
     where = typed_query_predicates(args)
-    return_fields = tuple(args.return_fields or ("id", "name", "type", "path"))
+    return_fields = args.query_return_fields
     _require_exact_identity_return_field(args, return_fields)
     (preflight_version,) = resolve_catalog_versions(args, env=env)
     build_object_get_query(
@@ -4246,6 +4327,70 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
         version=preflight_version,
     )
     _require_explicit_query_bound(args)
+
+
+def _compile_query_business_projection(args: argparse.Namespace) -> None:
+    """Compile stable business output names into exact object.get accessors."""
+
+    requested = list(getattr(args, "business_outputs", ()) or ())
+    properties = list(getattr(args, "custom_properties", ()) or ())
+    references = list(getattr(args, "custom_references", ()) or ())
+    if len(requested) > MAX_QUERY_BUSINESS_OUTPUTS:
+        raise GatewayInputError(
+            f"query-object accepts at most {MAX_QUERY_BUSINESS_OUTPUTS} --include values"
+        )
+    if len(properties) + len(references) > MAX_QUERY_CUSTOM_OUTPUTS:
+        raise GatewayInputError(
+            "query-object accepts at most "
+            f"{MAX_QUERY_CUSTOM_OUTPUTS} custom property/reference outputs"
+        )
+    if len(set(requested)) != len(requested):
+        raise GatewayInputError("query-object --include values must be unique")
+
+    bindings: list[tuple[str, str, str]] = []
+    for name in requested:
+        native, output = QUERY_BUSINESS_OUTPUTS[name]
+        bindings.append(("business", native, output))
+
+    def exact_custom_name(value: Any, *, option: str) -> str:
+        if (
+            not isinstance(value, str)
+            or not value
+            or value != value.strip()
+            or len(value) > MAX_QUERY_CUSTOM_FIELD_CHARS
+            or any(ord(character) < 32 or ord(character) == 127 for character in value)
+            or any(character in value for character in ('"', "'", "\\", ";"))
+        ):
+            raise GatewayInputError(
+                f"{option} must be one bounded exact user-requested or Gateway-reported name"
+            )
+        return value
+
+    for name in properties:
+        token = exact_custom_name(name, option="--include-property")
+        if token.startswith("@"):
+            raise GatewayInputError(
+                "--include-property takes the property name without native @ syntax"
+            )
+        bindings.append(("property", f"@{token}", token))
+    for name in references:
+        token = exact_custom_name(name, option="--include-reference")
+        if token.startswith("@"):
+            raise GatewayInputError(
+                "--include-reference takes the reference name without native @ syntax"
+            )
+        bindings.append(("reference", token, token))
+
+    native_fields = [binding[1] for binding in bindings]
+    if len(set(native_fields)) != len(native_fields):
+        raise GatewayInputError(
+            "query-object requested the same native result field more than once"
+        )
+    args.query_output_bindings = tuple(bindings)
+    args.query_return_fields = (
+        *SELECTED_REQUIRED_RETURN_FIELDS,
+        *native_fields,
+    )
 
 
 def original_file_reference_match_requested(args: argparse.Namespace) -> bool:
@@ -4269,7 +4414,7 @@ def validate_original_file_reference_match_input(
     if args.object_type != ORIGINAL_FILE_REFERENCE_MATCH_TYPE:
         raise GatewayInputError(
             "--match-original-file-path requires exactly "
-            f"--type {ORIGINAL_FILE_REFERENCE_MATCH_TYPE}"
+            f"--type-name {ORIGINAL_FILE_REFERENCE_MATCH_TYPE}"
         )
     if args.where:
         raise GatewayInputError(
@@ -4277,21 +4422,16 @@ def validate_original_file_reference_match_input(
         )
     if args.select:
         raise GatewayInputError(
-            "--match-original-file-path cannot be combined with --select"
+            "--match-original-file-path cannot be combined with --relationship"
         )
     if args.all_results:
         raise GatewayInputError(
             "--match-original-file-path cannot be combined with --all-results"
         )
-    if args.return_fields:
-        raise GatewayInputError(
-            "--match-original-file-path uses the fixed id, path, originalFilePath "
-            "projection and cannot be combined with --return-field"
-        )
-    if args.take != MAX_QUERY_TAKE:
+    if args.max_results != MAX_QUERY_TAKE:
         raise GatewayInputError(
             "--match-original-file-path requires exactly "
-            f"--take {MAX_QUERY_TAKE}"
+            f"--max-results {MAX_QUERY_TAKE}"
         )
     normalized_original_file_candidates(args)
 
@@ -4352,111 +4492,125 @@ def normalize_original_file_system_path(value: Any) -> tuple[str, ...]:
 
 
 def preflight_metadata_input(args: argparse.Namespace) -> None:
-    """Reject metadata projection modes that have no packaged result contract."""
+    """Compile business metadata scope and meaning into fixed live reads."""
 
-    if args.summary_only and args.operation != "types":
-        raise GatewayInputError("metadata --summary-only is supported only for the types operation")
-    discovery_only_supplied = (
-        args.object_type is not None
-        or args.queries is not None
-        or args.limit is not None
-        or args.detail
-    )
-    if args.operation != "discover":
-        if discovery_only_supplied:
+    path_segments = getattr(args, "metadata_path_segments", None)
+    type_name = getattr(args, "metadata_type_name", None)
+    exact_id = getattr(args, "metadata_exact_id", None)
+    meanings = list(getattr(args, "metadata_meanings", None) or ())
+    if path_segments:
+        args.object = _business_object_path_from_segments(path_segments)
+    if type_name is not None:
+        if (
+            not isinstance(type_name, str)
+            or not type_name.strip()
+            or type_name != type_name.strip()
+            or len(type_name) > MAX_METADATA_DISCOVERY_NAME_CHARS
+        ):
             raise GatewayInputError(
-                "metadata --object-type, --query, --limit, and --detail are "
-                "supported only for the discover operation"
+                "metadata --type-name must be non-empty, trimmed, and contain "
+                f"at most {MAX_METADATA_DISCOVERY_NAME_CHARS} characters"
+            )
+        args.object_type = type_name
+    if exact_id is not None:
+        args.object = exact_id
+    args.queries = meanings or None
+    args.limit = DEFAULT_METADATA_DISCOVERY_LIMIT
+    args.detail = False
+
+    if args.operation == "types":
+        if (
+            path_segments
+            or type_name is not None
+            or exact_id is not None
+            or meanings
+            or args.platform
+            or args.curve_role
+        ):
+            raise GatewayInputError("metadata types accepts no business input")
+        return
+
+    if args.operation in {"discover", "property-state"}:
+        if not 1 <= len(meanings) <= MAX_METADATA_DISCOVERY_QUERIES:
+            raise GatewayInputError(
+                f"metadata {args.operation} requires 1.."
+                f"{MAX_METADATA_DISCOVERY_QUERIES} --meaning values"
+            )
+        total_chars = 0
+        seen: set[str] = set()
+        for meaning in meanings:
+            if (
+                not isinstance(meaning, str)
+                or not meaning.strip()
+                or meaning != meaning.strip()
+                or len(meaning) > MAX_METADATA_DISCOVERY_QUERY_CHARS
+            ):
+                raise GatewayInputError(
+                    "each metadata --meaning must be non-empty, trimmed, and "
+                    f"contain at most {MAX_METADATA_DISCOVERY_QUERY_CHARS} characters"
+                )
+            total_chars += len(meaning)
+            folded = " ".join(meaning.split()).casefold()
+            if folded in seen:
+                raise GatewayInputError("metadata --meaning values must be distinct")
+            seen.add(folded)
+        if total_chars > MAX_METADATA_DISCOVERY_TOTAL_QUERY_CHARS:
+            raise GatewayInputError(
+                "metadata meaning text exceeds the combined "
+                f"{MAX_METADATA_DISCOVERY_TOTAL_QUERY_CHARS}-character limit"
+            )
+
+    if args.operation == "discover":
+        if sum(
+            value is not None
+            for value in (path_segments, type_name, exact_id)
+        ) != 1:
+            raise GatewayInputError(
+                "metadata discover requires exactly one --path-segment, "
+                "--type-name, or --exact-id scope"
+            )
+        if args.platform is not None or args.curve_role is not None:
+            raise GatewayInputError(
+                "metadata discover does not accept --platform or --curve-role"
             )
         return
 
-    if any(
-        value is not None
-        for value in (args.property, args.platform, args.curve_type)
-    ):
-        raise GatewayInputError(
-            "metadata discover does not accept --property, --platform, or --curve-type"
-        )
-    supplied_scopes = sum(
-        value is not None
-        for value in (args.object_type, args.class_id, args.object)
-    )
-    if supplied_scopes != 1:
-        raise GatewayInputError(
-            "metadata discover requires exactly one of --object-type, --class-id, "
-            "or --object"
-        )
-    if args.object_type is not None and (
-        not args.object_type.strip()
-        or args.object_type != args.object_type.strip()
-        or len(args.object_type) > MAX_METADATA_DISCOVERY_NAME_CHARS
-    ):
-        raise GatewayInputError(
-            "metadata discover --object-type must be non-empty, have no outer "
-            "whitespace, and contain at most "
-            f"{MAX_METADATA_DISCOVERY_NAME_CHARS} characters"
-        )
-    if args.class_id is not None and not 0 <= args.class_id <= 0xFFFFFFFF:
-        raise GatewayInputError(
-            "metadata discover --class-id must be a uint32 integer"
-        )
-    if args.object is not None and (
-        not args.object.strip()
-        or args.object != args.object.strip()
-        or len(args.object) > MAX_METADATA_DISCOVERY_NAME_CHARS * 8
-    ):
-        raise GatewayInputError(
-            "metadata discover --object must be non-empty, have no outer "
-            "whitespace, and remain within the bounded identifier length"
-        )
-    queries = args.queries
-    if not isinstance(queries, list) or not (
-        1 <= len(queries) <= MAX_METADATA_DISCOVERY_QUERIES
-    ):
-        raise GatewayInputError(
-            "metadata discover requires 1.."
-            f"{MAX_METADATA_DISCOVERY_QUERIES} --query values"
-        )
-    total_query_chars = 0
-    seen_queries: set[str] = set()
-    for query in queries:
-        if (
-            not isinstance(query, str)
-            or not query.strip()
-            or query != query.strip()
-            or len(query) > MAX_METADATA_DISCOVERY_QUERY_CHARS
-        ):
+    if args.operation == "property-state":
+        if (path_segments is None) == (exact_id is None) or type_name is not None:
             raise GatewayInputError(
-                "each metadata discover --query must be non-empty, have no outer "
-                "whitespace, and contain at most "
-                f"{MAX_METADATA_DISCOVERY_QUERY_CHARS} characters"
+                "metadata property-state requires one object --path-segment or "
+                "--exact-id scope"
             )
-        total_query_chars += len(query)
-        folded_query = " ".join(query.split()).casefold()
-        if folded_query in seen_queries:
+        if len(meanings) != 1:
             raise GatewayInputError(
-                "metadata discover --query values must be distinct"
+                "metadata property-state requires exactly one --meaning"
             )
-        seen_queries.add(folded_query)
-    if total_query_chars > MAX_METADATA_DISCOVERY_TOTAL_QUERY_CHARS:
-        raise GatewayInputError(
-            "metadata discover query text exceeds the combined "
-            f"{MAX_METADATA_DISCOVERY_TOTAL_QUERY_CHARS}-character limit"
-        )
-    limit = (
-        DEFAULT_METADATA_DISCOVERY_LIMIT
-        if args.limit is None
-        else args.limit
-    )
-    if (
-        isinstance(limit, bool)
-        or not isinstance(limit, int)
-        or not 1 <= limit <= MAX_METADATA_DISCOVERY_LIMIT
-    ):
-        raise GatewayInputError(
-            "metadata discover --limit must be between 1 and "
-            f"{MAX_METADATA_DISCOVERY_LIMIT}"
-        )
+        if not isinstance(args.platform, str) or not args.platform.strip():
+            raise GatewayInputError(
+                "metadata property-state requires one non-empty --platform name"
+            )
+        if args.curve_role is not None:
+            raise GatewayInputError(
+                "metadata property-state does not accept --curve-role"
+            )
+        return
+
+    if args.operation == "attenuation":
+        if (path_segments is None) == (exact_id is None) or type_name is not None:
+            raise GatewayInputError(
+                "metadata attenuation requires one object --path-segment or "
+                "--exact-id scope"
+            )
+        if meanings:
+            raise GatewayInputError("metadata attenuation does not accept --meaning")
+        if args.curve_role not in METADATA_CURVE_ROLES:
+            raise GatewayInputError(
+                "metadata attenuation requires one disclosed --curve-role"
+            )
+        args.curve_type = METADATA_CURVE_ROLES[args.curve_role]
+        return
+
+    raise GatewayInputError(f"unsupported metadata operation: {args.operation}")
 
 
 def preflight_stable_read_input(
@@ -4464,41 +4618,137 @@ def preflight_stable_read_input(
     *,
     env: Mapping[str, str],
 ) -> None:
-    """Validate closed profiler scalars before opening a WAAPI transport."""
+    """Compile profiler capture and object intent before opening WAAPI."""
 
     (version,) = resolve_catalog_versions(args, env=env)
+    capture = getattr(args, "capture", None)
+    capture_ms = getattr(args, "capture_ms", None)
+    args.time = (
+        "capture"
+        if capture == "latest"
+        else "user"
+        if capture == "user-cursor"
+        else capture_ms
+    )
     if args.command == "profiler-game-objects":
         build_profiler_game_objects_request(
             version=version,
             time=args.time,
         )
         return
-    if len(args.bus_pipeline_id) > MAX_BUS_PIPELINE_IDS:
+    if not _canonical_guid(args.voice_object_id):
+        raise GatewayInputError(
+            "profiler-voice-contributions --voice-object-id must be a canonical GUID"
+        )
+    bus_object_ids = tuple(args.bus_object_id)
+    if len(bus_object_ids) > MAX_BUS_PIPELINE_IDS:
         raise GatewayInputError(
             "profiler-voice-contributions accepts at most "
-            f"{MAX_BUS_PIPELINE_IDS} --bus-pipeline-id values"
+            f"{MAX_BUS_PIPELINE_IDS} --bus-object-id values"
         )
-    build_profiler_voice_contributions_request(
-        version=version,
-        time=args.time,
-        voice_pipeline_id=args.voice_pipeline_id,
-        bus_pipeline_ids=tuple(args.bus_pipeline_id),
-    )
+    if (
+        any(not _canonical_guid(value) for value in bus_object_ids)
+        or len({value.casefold() for value in bus_object_ids}) != len(bus_object_ids)
+    ):
+        raise GatewayInputError(
+            "profiler-voice-contributions --bus-object-id values must be unique "
+            "canonical GUIDs"
+        )
+    if args.game_object_id is not None:
+        if re.fullmatch(r"[0-9]+", args.game_object_id) is None:
+            raise GatewayInputError(
+                "profiler-voice-contributions --game-object-id must be an "
+                "unsigned 64-bit integer"
+            )
+        game_object_id = int(args.game_object_id)
+        if not 0 <= game_object_id <= (1 << 64) - 1:
+            raise GatewayInputError(
+                "profiler-voice-contributions --game-object-id must be an "
+                "unsigned 64-bit integer"
+            )
+        args.game_object_id = game_object_id
+    # Validate the shared capture value now; pipeline IDs are derived from the
+    # bounded getVoices/getBusses reads after connection.
+    args.time = normalize_profiler_time(args.time)
 
 
-def preflight_debug_read_input(args: argparse.Namespace) -> None:
+def preflight_debug_read_input(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+) -> None:
     """Reject fixed debug-read scalar boundaries before opening WAAPI."""
 
     if args.command == "debug-wal-tree":
         if (
-            isinstance(args.take, bool)
-            or not isinstance(args.take, int)
-            or not 1 <= args.take <= MAX_WAL_TREE_NODES
+            isinstance(args.max_nodes, bool)
+            or not isinstance(args.max_nodes, int)
+            or not 1 <= args.max_nodes <= MAX_WAL_TREE_NODES
         ):
             raise GatewayInputError(
-                f"debug-wal-tree --take must be between 1 and {MAX_WAL_TREE_NODES}"
+                "debug-wal-tree --max-nodes must be between 1 and "
+                f"{MAX_WAL_TREE_NODES}"
             )
         return
+    if args.command != "debug-validate-call":
+        raise GatewayInputError(f"unsupported debug-read command: {args.command}")
+
+    (version,) = resolve_catalog_versions(args, env=env)
+    try:
+        target = CapabilityCatalog().describe(version, args.api)
+    except CapabilityNotFoundError as exc:
+        raise GatewayInputError(
+            f"debug-validate-call target is not reflected in Wwise {version}: {args.api}"
+        ) from exc
+    if target.item_type != "function":
+        raise GatewayInputError("debug-validate-call target must be a WAAPI function")
+
+    call_args: dict[str, Any] = {"id": target.uri}
+    if args.artifact_file is not None:
+        artifact = Path(args.artifact_file).expanduser()
+        if not artifact.is_absolute():
+            raise GatewayInputError(
+                "debug-validate-call --artifact-file must be an absolute path"
+            )
+        try:
+            artifact_stat = artifact.lstat()
+        except OSError as exc:
+            raise GatewayInputError(
+                "debug-validate-call --artifact-file must exist"
+            ) from exc
+        if stat.S_ISLNK(artifact_stat.st_mode) or not stat.S_ISREG(artifact_stat.st_mode):
+            raise GatewayInputError(
+                "debug-validate-call --artifact-file must be a regular non-symlink file"
+            )
+        if artifact_stat.st_size > MAX_GATEWAY_JSON_INPUT_BYTES:
+            raise GatewayInputError(
+                "debug-validate-call --artifact-file exceeds the "
+                f"{MAX_GATEWAY_JSON_INPUT_BYTES}-byte input limit"
+            )
+        try:
+            text = artifact.read_text(encoding="utf-8")
+        except (OSError, UnicodeError) as exc:
+            raise GatewayInputError(
+                "debug-validate-call --artifact-file must be readable UTF-8"
+            ) from exc
+        envelope = parse_json_object(text, "--artifact-file")
+        unknown = sorted(set(envelope) - {"args", "options", "result"})
+        if unknown:
+            raise GatewayInputError(
+                "debug-validate-call --artifact-file accepts only args, options, "
+                f"and result objects; unknown keys: {', '.join(unknown)}"
+            )
+        for section, value in envelope.items():
+            if not isinstance(value, dict):
+                raise GatewayInputError(
+                    f"debug-validate-call artifact {section} must be a JSON object"
+                )
+            call_args[section] = value
+        args.artifact_digest = canonical_sha256(envelope)
+        args.artifact_file = str(artifact)
+    else:
+        args.artifact_digest = None
+    args.debug_validation_args = call_args
 
 
 def preflight_json_inputs(args: argparse.Namespace) -> None:
@@ -5064,10 +5314,6 @@ def operation_draft_schema_digest(operation: str, version: str) -> str:
 def public_typed_contract(version: str, api: str) -> Any:
     """Resolve one function or query construction contract by exact public key."""
 
-    if api == STRUCTURED_TYPED_QUERY_OPERATION:
-        return typed_query_contract(version)
-    if api == ADVANCED_TYPED_QUERY_OPERATION:
-        return typed_query_contract(version, advanced=True)
     if api.startswith(TOPIC_OPTIONS_OPERATION_PREFIX):
         return topic_options_contract(
             version, api.removeprefix(TOPIC_OPTIONS_OPERATION_PREFIX)
@@ -5079,6 +5325,51 @@ def public_typed_contract(version: str, api: str) -> Any:
     if api in DRAFT_TYPED_OPERATIONS:
         return draft_operation_request_contract(api, version)
     return request_contract(version, api)
+
+
+def fixed_command_route_payload(capability: CapabilityRecord) -> dict[str, Any]:
+    """Describe one deep fixed route without exposing its native request schema."""
+
+    def command_requires_business_values(command: str) -> bool:
+        return (
+            command.split()[0]
+            in {
+            "query-object",
+            "metadata",
+            "profiler-game-objects",
+            "profiler-voice-contributions",
+            "debug-validate-call",
+            }
+            and command != "metadata types"
+        )
+
+    commands = [
+        {
+            "subcommand": command.split()[0],
+            "arguments": command.split()[1:],
+            "business_values_required": command_requires_business_values(command),
+        }
+        for command in capability.fixed_commands
+    ]
+    return {
+        "contract": "waapi-skill.fixed-command-route/v1",
+        "ok": True,
+        "status": "ok",
+        "command": "request-schema",
+        "version": capability.version,
+        "uri": capability.uri,
+        "input_shape": "fixed_business_command",
+        "native_request_fields_disclosed": False,
+        "commands": commands,
+        "continuation": (
+            commands[0]
+            if len(commands) == 1
+            else {
+                "choose_by_business_intent": commands,
+                "business_values_required": "depends_on_command",
+            }
+        ),
+    }
 
 
 def typed_topic_contract_payload(contract: Any) -> dict[str, Any]:
@@ -6440,6 +6731,97 @@ def _dynamic_next_command_decision(
     }
 
 
+def query_business_schema_payload(
+    version: str,
+    *,
+    advanced: bool,
+) -> dict[str, Any]:
+    """Describe the one deep direct-read continuation for an object query."""
+
+    if advanced:
+        return {
+            "contract": ADVANCED_QUERY_SCHEMA_CONTRACT,
+            "ok": True,
+            "status": "ok",
+            "command": "query-schema",
+            "version": version,
+            "query_layer": "advanced-native-waql",
+            "query_contract": ADVANCED_QUERY_CONTRACT,
+            "input_shape": "business_declaration",
+            "identity_projection": list(SELECTED_REQUIRED_RETURN_FIELDS),
+            "business_outputs": list(QUERY_BUSINESS_OUTPUTS),
+            "custom_outputs": {
+                "property": "--include-property <exact user-requested or Gateway-reported name>",
+                "reference": "--include-reference <exact user-requested or Gateway-reported name>",
+            },
+            "continuation": {
+                "subcommand": "query-object",
+                "query_layer": "advanced-native-waql",
+                "exact_expression": (
+                    "--advanced-waql <one bounded exact WAQL expression>"
+                ),
+                "result_bound": f"--max-results <1..{MAX_QUERY_TAKE}>",
+                "business_output": "--include <business-field> (repeat)",
+            },
+            "boundary": {
+                "fixed_api": OBJECT_GET_URI,
+                "read_only": True,
+                "gateway_appends_final_take": True,
+                "all_results_available": False,
+                "return_projection": "gateway_compiled_business_projection",
+                "arbitrary_uri_args_or_options_accepted": False,
+                "fallback_or_retry_on_invalid_query": False,
+            },
+        }
+    return {
+        "contract": BUSINESS_QUERY_SCHEMA_CONTRACT,
+        "ok": True,
+        "status": "ok",
+        "command": "query-schema",
+        "version": version,
+        "query_layer": "business-declaration",
+        "query_contract": BUSINESS_QUERY_CONTRACT,
+        "input_shape": "business_declaration",
+        "identity_projection": list(SELECTED_REQUIRED_RETURN_FIELDS),
+        "business_outputs": list(QUERY_BUSINESS_OUTPUTS),
+        "custom_outputs": {
+            "property": "--include-property <exact user-requested or Gateway-reported name>",
+            "reference": "--include-reference <exact user-requested or Gateway-reported name>",
+        },
+        "sources": {
+            "object_path": "--path-segment <one literal name> (repeat)",
+            "exact_object_id": "--exact-id <canonical GUID>",
+            "common_kind": "--kind <closed business kind>",
+            "custom_type": "--type-name <exact user-requested type>",
+            "search": "--search-text <literal text>",
+            "query_id": "--query-id <canonical GUID>",
+            "query_path": "--query-path-segment <one literal name> (repeat)",
+        },
+        "predicates": {
+            name: {"value_type": value_type}
+            for name, (_field, _operator, value_type) in sorted(
+                QUERY_BUSINESS_PREDICATES.items()
+            )
+        },
+        "relationships": list(QUERY_BUSINESS_RELATIONSHIPS),
+        "continuation": {
+            "subcommand": "query-object",
+            "predicate": "--predicate <business-condition> <value>",
+            "relationship": "--relationship <business-relationship>",
+            "result_bound": f"--max-results <1..{MAX_QUERY_TAKE}>",
+            "business_output": "--include <business-field> (repeat)",
+        },
+        "advanced_fallback": {
+            "available": True,
+            "disclose_with": "query-schema --advanced",
+            "use_only_when": (
+                "the business declaration cannot express the requested "
+                "read-only WAQL construct"
+            ),
+        },
+    }
+
+
 def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]) -> dict[str, Any]:
     """Run catalog commands without requiring a WAAPI port or live Wwise."""
 
@@ -6593,13 +6975,13 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
         versions = resolve_catalog_versions(args, env=env)
         if len(versions) != 1:
             raise GatewayInputError(f"{args.command} requires one exact Wwise version")
-        contract = public_typed_contract(versions[0], args.api)
-        if args.command == "request-schema" and args.api in {
+        if args.api in {
             STRUCTURED_TYPED_QUERY_OPERATION,
             ADVANCED_TYPED_QUERY_OPERATION,
         }:
             raise GatewayInputError(
-                "Typed object queries use query-schema as their single schema entry."
+                "Object queries use query-schema and its business continuation; "
+                "archived typed query pseudo-operations are not public routes."
             )
         if args.command == "request-schema" and args.api.startswith(
             (TOPIC_OPTIONS_OPERATION_PREFIX, TOPIC_MATCH_OPERATION_PREFIX)
@@ -6607,6 +6989,34 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             raise GatewayInputError(
                 "Typed Topics use topic-schema <topic-uri> as their single schema entry."
             )
+        capability: CapabilityRecord | None = None
+        if args.api.startswith("ak."):
+            try:
+                catalog = CapabilityCatalog()
+                capability = (
+                    catalog.authoring_ui_describe(versions[0], args.api)
+                    if args.api in AUTHORING_UI_COMMAND_URIS
+                    else catalog.describe(versions[0], args.api)
+                )
+            except CapabilityNotFoundError:
+                capability = None
+        if (
+            args.command == "request-schema"
+            and capability is not None
+            and capability.preferred_route == "fixed_command"
+        ):
+            return fixed_command_route_payload(capability)
+        if args.command != "request-schema" and args.api.startswith("ak."):
+            if (
+                capability is not None
+                and capability.preferred_route == "fixed_command"
+                and args.command not in capability.fixed_commands
+            ):
+                raise GatewayInputError(
+                    f"{args.api} uses its Gateway-owned fixed command: "
+                    f"{', '.join(capability.fixed_commands)}"
+                )
+        contract = public_typed_contract(versions[0], args.api)
         if args.command == "request-schema":
             dedicated_zero = {
                 "ak.wwise.debug.restartWaapiServers": "debug.restartWaapiServers",
@@ -6621,10 +7031,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
         if args.command == "request-schema":
             return contract.as_gateway_payload()
         draft_shape = contract.as_gateway_payload()["input_shape"] == "draft"
-        query_shape = args.api in {
-            STRUCTURED_TYPED_QUERY_OPERATION,
-            ADVANCED_TYPED_QUERY_OPERATION,
-        }
+        query_shape = False
         topic_prefix = (
             "option"
             if args.api.startswith(TOPIC_OPTIONS_OPERATION_PREFIX)
@@ -7486,7 +7893,9 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
         versions = resolve_catalog_versions(args, env=env)
         if len(versions) == 1:
             return {
-                **typed_query_schema_payload(versions[0], advanced=args.advanced),
+                **query_business_schema_payload(
+                    versions[0], advanced=args.advanced
+                ),
                 "offline": True,
                 "versions": list(versions),
             }
@@ -7497,66 +7906,19 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             "command": "query-schema",
             "offline": True,
             "query_layer": (
-                "advanced-native-waql" if args.advanced else "structured-builder"
+                "advanced-native-waql" if args.advanced else "business-declaration"
             ),
             "query_contract": (
-                ADVANCED_QUERY_CONTRACT if args.advanced else STRUCTURED_QUERY_CONTRACT
+                ADVANCED_QUERY_CONTRACT if args.advanced else BUSINESS_QUERY_CONTRACT
             ),
             "versions": list(versions),
-            "schemas": {
-                version: (
-                    advanced_query_schema(version=version)
-                    if args.advanced
-                    else structured_query_schema(version=version)
-                )
-                for version in versions
-            },
             "contracts": {
-                version: typed_query_schema_payload(
-                    version, advanced=args.advanced
+                version: query_business_schema_payload(
+                    version,
+                    advanced=args.advanced,
                 )
                 for version in versions
             },
-            "boundary": (
-                {
-                    "fixed_api": OBJECT_GET_URI,
-                    "read_only": True,
-                    "native_waql_accepted": True,
-                    "gateway_appends_final_take": True,
-                    "all_results_available": False,
-                    "arbitrary_uri_args_or_options_accepted": False,
-                    "gateway_json_input_bytes": MAX_GATEWAY_JSON_INPUT_BYTES,
-                    "gateway_result_bytes": MAX_GATEWAY_RESULT_JSON_BYTES,
-                    "version_specific_syntax_validated_by": "connected Wwise",
-                    "fallback_or_retry_on_invalid_query": False,
-                }
-                if args.advanced
-                else {
-                    "raw_waql_accepted": False,
-                    "raw_expression_accepted": False,
-                    "result_limit_required_for": [
-                        "broad sources",
-                        "multiple object sources",
-                        "select transforms",
-                    ],
-                    "deferred_syntax": [
-                        "skip",
-                        "orderby",
-                        "distinct",
-                        "regular-expression literals",
-                        "WAQL 2.0 list functions",
-                    ],
-                    "advanced_fallback": {
-                        "available": True,
-                        "disclose_with": "query-schema --advanced",
-                        "execute_with": "query-object --typed-advanced",
-                        "use_only_when": (
-                            "the structured schema cannot express the requested "
-                            "read-only WAQL construct"
-                        ),
-                    },
-                }
-            ),
         }
     if args.command == "operations":
         operations: list[dict[str, Any]] = []
@@ -8421,6 +8783,158 @@ def resolve_connection(args: argparse.Namespace, *, env: Mapping[str, str]) -> G
     )
 
 
+def resolve_profiler_voice_path(
+    args: argparse.Namespace,
+    *,
+    connection: GatewayConnection,
+    detected_version: str,
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> tuple[int, tuple[int, ...]] | dict[str, Any]:
+    """Resolve semantic voice/Bus identities to one live pipeline path."""
+
+    def read_rows(api: str) -> tuple[list[dict[str, Any]], Mapping[str, Any]]:
+        request_args = {"time": args.time}
+        request_options = {
+            "return": list(PROFILER_PIPELINE_IDENTITY_RETURN_FIELDS)
+        }
+        validation = validate_semantic_payload(
+            api,
+            request_args,
+            request_options,
+            version=detected_version,
+        )
+        result = dispatch(
+            dispatcher,
+            api,
+            connection=connection,
+            version=detected_version,
+            args=request_args,
+            options=request_options,
+            # These are read-only implementation dependencies of the closed
+            # voice-contribution Adapter. Their separate public routes remain
+            # transaction-gated until #87 migrates them.
+            allow_destructive=True,
+            result_limit_bytes=STABLE_READ_RESULT_LIMIT_BYTES,
+        )
+        if not result.get("ok"):
+            return [], {
+                "ok": False,
+                "status": "error",
+                **dict(common),
+                "api_attempted": api,
+                "schema_validation": {
+                    "request": validation.as_dict(),
+                    "result": None,
+                },
+                "call": dispatch_call_summary(result),
+            }
+        payload = result.get("result")
+        rows = payload.get("return") if isinstance(payload, Mapping) else None
+        if not isinstance(rows, list) or len(rows) > MAX_PROFILER_PIPELINE_IDENTITY_ROWS:
+            raise GatewayResultShapeError(
+                "Profiler identity lookup returned an invalid bounded row array.",
+                details={
+                    "api": api,
+                    "maximum_rows": MAX_PROFILER_PIPELINE_IDENTITY_ROWS,
+                },
+                error_code="INVALID_STABLE_READ_RESULT",
+            )
+        required = set(PROFILER_PIPELINE_IDENTITY_RETURN_FIELDS)
+        normalized: list[dict[str, Any]] = []
+        for index, row in enumerate(rows):
+            if not isinstance(row, Mapping) or not required <= set(row):
+                raise GatewayResultShapeError(
+                    "Profiler identity lookup returned a malformed row.",
+                    details={"api": api, "row_index": index},
+                    error_code="INVALID_STABLE_READ_RESULT",
+                )
+            pipeline_id = row.get("pipelineID")
+            game_object_id = row.get("gameObjectID")
+            object_guid = row.get("objectGUID")
+            if (
+                isinstance(pipeline_id, bool)
+                or not isinstance(pipeline_id, int)
+                or not 0 <= pipeline_id <= 0xFFFFFFFF
+                or isinstance(game_object_id, bool)
+                or not isinstance(game_object_id, int)
+                or not 0 <= game_object_id <= (1 << 64) - 1
+                or not _canonical_guid(object_guid)
+            ):
+                raise GatewayResultShapeError(
+                    "Profiler identity lookup returned invalid identity values.",
+                    details={"api": api, "row_index": index},
+                    error_code="INVALID_STABLE_READ_RESULT",
+                )
+            normalized.append(dict(row))
+        return normalized, result
+
+    voices_or_rows = read_rows("ak.wwise.core.profiler.getVoices")
+    voices, voice_result = voices_or_rows
+    if not voice_result.get("ok", True):
+        return dict(voice_result)
+    voice_matches = [
+        row
+        for row in voices
+        if str(row["objectGUID"]).casefold() == args.voice_object_id.casefold()
+        and (
+            args.game_object_id is None
+            or row["gameObjectID"] == args.game_object_id
+        )
+    ]
+    if len(voice_matches) != 1:
+        return {
+            "ok": True,
+            "status": "needs_clarification",
+            **dict(common),
+            "operation": "profiler-voice-contributions",
+            "agent_result": {
+                "requested_voice_object_id": args.voice_object_id,
+                "matching_voice_count": len(voice_matches),
+                "candidates": [
+                    {
+                        "object_name": row["objectName"],
+                        "game_object_id": row["gameObjectID"],
+                        "game_object_name": row["gameObjectName"],
+                    }
+                    for row in voice_matches
+                ],
+                "repair": (
+                    "provide --game-object-id when more than one active voice matches"
+                ),
+            },
+        }
+    voice = voice_matches[0]
+    bus_pipeline_ids: list[int] = []
+    if args.bus_object_id:
+        busses, bus_result = read_rows("ak.wwise.core.profiler.getBusses")
+        if not bus_result.get("ok", True):
+            return dict(bus_result)
+        for requested in args.bus_object_id:
+            matches = [
+                row
+                for row in busses
+                if str(row["objectGUID"]).casefold() == requested.casefold()
+                and row["gameObjectID"] == voice["gameObjectID"]
+            ]
+            if len(matches) != 1:
+                return {
+                    "ok": True,
+                    "status": "needs_clarification",
+                    **dict(common),
+                    "operation": "profiler-voice-contributions",
+                    "agent_result": {
+                        "requested_bus_object_id": requested,
+                        "matching_bus_count": len(matches),
+                        "repair": (
+                            "choose one Bus identity active for the selected game object"
+                        ),
+                    },
+                }
+            bus_pipeline_ids.append(int(matches[0]["pipelineID"]))
+    return int(voice["pipelineID"]), tuple(bus_pipeline_ids)
+
+
 def dispatch_profiler_voice_contributions_request(
     request: Any,
     *,
@@ -8492,21 +9006,40 @@ def dispatch_typed_debug_validation(
 ) -> dict[str, Any]:
     """Run the existing bounded Debug validateCall adapter from typed facts."""
 
+    return dispatch_debug_validation(
+        dict(typed_request.args),
+        connection=connection,
+        detected_version=detected_version,
+        dispatcher=dispatcher,
+        common=common,
+    )
+
+
+def dispatch_debug_validation(
+    call_args: Mapping[str, Any],
+    *,
+    connection: GatewayConnection,
+    detected_version: str,
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Validate one Gateway-owned exact Debug call envelope."""
+
     api = TYPED_REQUEST_COMPLEX_TRACER_URI
     capability = CapabilityCatalog().describe(detected_version, api)
-    call_args = dict(typed_request.args)
+    normalized_args = dict(call_args)
     supplied_sections = [
-        name for name in ("args", "options", "result") if name in call_args
+        name for name in ("args", "options", "result") if name in normalized_args
     ]
     request_validation = validate_semantic_payload(
-        api, call_args, {}, version=detected_version
+        api, normalized_args, {}, version=detected_version
     )
     result = dispatch(
         dispatcher,
         api,
         connection=connection,
         version=detected_version,
-        args=call_args,
+        args=normalized_args,
         options={},
         result_limit_bytes=int(capability.execution_contract["result_limit_bytes"]),
         operation_timeout=float(capability.execution_contract["timeout_seconds"]),
@@ -8521,7 +9054,7 @@ def dispatch_typed_debug_validation(
         "status": "ok" if result.get("ok") else "error",
         **dict(common),
         "api_attempted": api,
-        "validated_api": call_args["id"],
+        "validated_api": normalized_args["id"],
         "supplied_sections": supplied_sections,
         "call": dispatch_call_summary(result),
         "schema_validation": {
@@ -8530,7 +9063,7 @@ def dispatch_typed_debug_validation(
         },
         "agent_result": (
             {
-                "validated_api": call_args["id"],
+                "validated_api": normalized_args["id"],
                 "supplied_sections": supplied_sections,
                 "accepted_by_wwise": True,
             }
@@ -9123,11 +9656,21 @@ def dispatch_command(
             "agent_result": projection,
         }
     if args.command == "profiler-voice-contributions":
+        resolved = resolve_profiler_voice_path(
+            args,
+            connection=connection,
+            detected_version=detected_version,
+            dispatcher=dispatcher,
+            common=common,
+        )
+        if isinstance(resolved, dict):
+            return resolved
+        voice_pipeline_id, bus_pipeline_ids = resolved
         request = build_profiler_voice_contributions_request(
             version=detected_version,
             time=args.time,
-            voice_pipeline_id=args.voice_pipeline_id,
-            bus_pipeline_ids=tuple(args.bus_pipeline_id),
+            voice_pipeline_id=voice_pipeline_id,
+            bus_pipeline_ids=bus_pipeline_ids,
         )
         return dispatch_profiler_voice_contributions_request(
             request,
@@ -9194,7 +9737,7 @@ def dispatch_command(
         try:
             projection = normalize_wal_tree_result(
                 result.get("result"),
-                take=args.take,
+                take=args.max_nodes,
             )
         except DebugLuaContractError as exc:
             raise GatewayResultShapeError(
@@ -9214,6 +9757,40 @@ def dispatch_command(
             },
             "agent_result": projection,
         }
+    if args.command == "debug-validate-call":
+        api = TYPED_REQUEST_COMPLEX_TRACER_URI
+        try:
+            capability = CapabilityCatalog().describe(detected_version, api)
+        except CapabilityNotFoundError:
+            return unreflected_interface_payload(
+                api,
+                detected_version,
+                command=args.command,
+                common=common,
+            )
+        if (
+            capability.preferred_route != "fixed_command"
+            or args.command not in capability.fixed_commands
+        ):
+            raise GatewayInputError(
+                f"{api} is not bound to the packaged {args.command} route in Wwise {detected_version}"
+            )
+        artifact = (
+            {
+                "path": args.artifact_file,
+                "digest": args.artifact_digest,
+                "authority": "user_owned_exact_artifact",
+            }
+            if args.artifact_file is not None
+            else None
+        )
+        return dispatch_debug_validation(
+            args.debug_validation_args,
+            connection=connection,
+            detected_version=detected_version,
+            dispatcher=dispatcher,
+            common={**common, "artifact": artifact},
+        )
     if args.command == "buses":
         preview = build_object_get_query(
             type="Bus",
@@ -9256,9 +9833,10 @@ def dispatch_command(
             "possibly_truncated": (
                 len(rows) == MAX_QUERY_TAKE if result.get("ok") else None
             ),
+            "agent_result": rows if result.get("ok") else None,
         }
     if args.command == "selected":
-        return_fields = normalize_selected_return_fields(args.return_fields)
+        return_fields = SELECTED_REQUIRED_RETURN_FIELDS
         request_validation = None
         try:
             selected_capability = CapabilityCatalog().describe(
@@ -9351,75 +9929,15 @@ def dispatch_command(
             },
             "count": len(rows) if result.get("ok") else None,
             "objects": rows if result.get("ok") else None,
+            "agent_result": rows if result.get("ok") else None,
         }
     if args.command == "query-object":
-        if original_file_reference_match_requested(args):
-            return dispatch_original_file_reference_match(
-                args,
-                connection=connection,
-                detected_version=detected_version,
-                dispatcher=dispatcher,
-                common=common,
+        advanced_preview = getattr(args, "advanced_query_preview", None)
+        if advanced_preview is not None:
+            envelope = advanced_preview.envelope
+            maximum_rows = int(
+                advanced_preview.envelope.metadata["query_bound"]["value"]
             )
-        if getattr(args, "typed_structured", False):
-            typed_query = args.typed_query
-            if typed_query.version != detected_version:
-                raise GatewayInputError(
-                    "Typed query version changed after preflight; query-schema must be rerun"
-                )
-            preview = typed_query.preview
-            _require_structured_exact_identity_return_field(preview)
-            envelope = preview.envelope
-            exact_identity = _structured_query_exact_identity(preview)
-            query_bound = _structured_query_bound(preview)
-            result = dispatch(
-                dispatcher,
-                envelope.uri,
-                connection=connection,
-                version=detected_version,
-                args=envelope.args,
-                options=envelope.options,
-                exact_object_lookup=exact_identity is not None,
-            )
-            rows = (
-                strict_object_get_rows(
-                    result,
-                    command="query-object --typed-structured",
-                    maximum_rows=_structured_query_result_maximum(
-                        query_bound,
-                        exact_identity=exact_identity,
-                    ),
-                )
-                if result.get("ok")
-                else []
-            )
-            if result.get("ok"):
-                validate_structured_exact_query_identity(exact_identity, rows)
-            payload = {
-                "ok": bool(result.get("ok")),
-                "status": "ok" if result.get("ok") else "error",
-                **common,
-                "query_layer": "structured-builder",
-                "query_contract": STRUCTURED_QUERY_CONTRACT,
-                "typed_query": {"schema_digest": typed_query.schema_digest},
-                "semantic_preview": preview.as_dict(),
-                "query_bound": query_bound,
-                "call": dispatch_call_summary(result),
-                "count": len(rows) if result.get("ok") else None,
-                "objects": rows if result.get("ok") else None,
-                "agent_result": rows if result.get("ok") else None,
-            }
-            return payload
-        if getattr(args, "typed_advanced", False):
-            typed_query = args.typed_query
-            if typed_query.version != detected_version:
-                raise GatewayInputError(
-                    "Typed query version changed after preflight; query-schema must be rerun"
-                )
-            preview = typed_query.preview
-            envelope = preview.envelope
-            query_bound = _advanced_query_bound(preview)
-            maximum_rows = query_bound["value"]
             result = dispatch(
                 dispatcher,
                 envelope.uri,
@@ -9432,11 +9950,14 @@ def dispatch_command(
             rows = (
                 strict_object_get_rows(
                     result,
-                    command="query-object --typed-advanced",
+                    command="query-object --advanced-waql",
                     maximum_rows=maximum_rows,
                 )
                 if result.get("ok")
                 else []
+            )
+            business_rows = (
+                _project_query_business_rows(args, rows) if result.get("ok") else []
             )
             return {
                 "ok": bool(result.get("ok")),
@@ -9444,17 +9965,29 @@ def dispatch_command(
                 **common,
                 "query_layer": "advanced-native-waql",
                 "query_contract": ADVANCED_QUERY_CONTRACT,
-                "typed_query": {"schema_digest": typed_query.schema_digest},
-                "semantic_preview": preview.as_dict(),
-                "query_bound": query_bound,
+                "semantic_preview": advanced_preview.as_dict(),
+                "query_bound": {
+                    "mode": "gateway-appended-take",
+                    "value": maximum_rows,
+                },
                 "call": dispatch_call_summary(result),
                 "count": len(rows) if result.get("ok") else None,
-                "limit_reached": len(rows) == maximum_rows if result.get("ok") else None,
-                "objects": rows if result.get("ok") else None,
-                "agent_result": rows if result.get("ok") else None,
+                "limit_reached": (
+                    len(rows) == maximum_rows if result.get("ok") else None
+                ),
+                "objects": business_rows if result.get("ok") else None,
+                "agent_result": business_rows if result.get("ok") else None,
             }
+        if original_file_reference_match_requested(args):
+            return dispatch_original_file_reference_match(
+                args,
+                connection=connection,
+                detected_version=detected_version,
+                dispatcher=dispatcher,
+                common=common,
+            )
         where = typed_query_predicates(args)
-        return_fields = tuple(args.return_fields or ("id", "name", "type", "path"))
+        return_fields = args.query_return_fields
         _require_exact_identity_return_field(args, return_fields)
         preview = build_object_get_query(
             path=args.path,
@@ -9490,6 +10023,9 @@ def dispatch_command(
         )
         if result.get("ok"):
             validate_exact_query_identity(args, rows)
+        business_rows = (
+            _project_query_business_rows(args, rows) if result.get("ok") else []
+        )
         return {
             "ok": bool(result.get("ok")),
             "status": "ok" if result.get("ok") else "error",
@@ -9498,10 +10034,11 @@ def dispatch_command(
             "query_bound": _query_bound_summary(args),
             "call": dispatch_call_summary(result),
             "count": len(rows) if result.get("ok") else None,
-            "objects": rows if result.get("ok") else None,
+            "objects": business_rows if result.get("ok") else None,
+            "agent_result": business_rows if result.get("ok") else None,
         }
     if args.command == "metadata":
-        if args.operation == "discover":
+        if args.operation in {"discover", "property-state"}:
             read_call = transaction_read_call(
                 dispatcher,
                 connection=connection,
@@ -9549,15 +10086,89 @@ def dispatch_command(
                     else args.limit
                 ),
             )
-            payload = {
-                "ok": True,
-                "status": "ok",
+            if args.operation == "discover":
+                payload = {
+                    "ok": True,
+                    "status": "ok",
+                    **common,
+                    "operation": args.operation,
+                    "metadata_authority": "live-waapi",
+                }
+                payload["agent_result"] = discovery.as_dict(detail=False)
+                return payload
+            candidates = tuple(discovery.candidates)
+            if len(candidates) != 1:
+                return {
+                    "ok": True,
+                    "status": "needs_clarification",
+                    **common,
+                    "operation": args.operation,
+                    "metadata_authority": "live-waapi",
+                    "agent_result": {
+                        "meaning": args.queries[0],
+                        "candidate_count": len(candidates),
+                        "candidates": [
+                            {
+                                "field": candidate.get("name"),
+                                "display_name": (
+                                    candidate.get("metadata", {})
+                                    .get("display", {})
+                                    .get("name")
+                                    if isinstance(candidate.get("metadata"), Mapping)
+                                    else None
+                                ),
+                            }
+                            for candidate in candidates
+                        ],
+                        "repair": (
+                            "refine --meaning until exactly one live field matches"
+                        ),
+                    },
+                }
+            field_name = candidates[0].get("name")
+            if not isinstance(field_name, str) or not field_name:
+                raise GatewayResultShapeError(
+                    "metadata property-state discovery returned an invalid field.",
+                    details={"operation": args.operation},
+                    error_code="INVALID_METADATA_RESULT",
+                )
+            preview = MetadataBuilder(version=detected_version).is_property_enabled(
+                object=args.object,
+                property=field_name,
+                platform=args.platform,
+            )
+            envelope = preview.envelope
+            result = dispatch(
+                dispatcher,
+                envelope.uri,
+                connection=connection,
+                version=detected_version,
+                args=envelope.args,
+                options=envelope.options,
+            )
+            normalized = (
+                parse_is_property_enabled_result(result.get("result")).as_dict()
+                if result.get("ok")
+                else None
+            )
+            return {
+                "ok": bool(result.get("ok")),
+                "status": "ok" if result.get("ok") else "error",
                 **common,
                 "operation": args.operation,
                 "metadata_authority": "live-waapi",
+                "semantic_preview": preview.as_dict(),
+                "call": dispatch_call_summary(result),
+                "agent_result": (
+                    {
+                        "meaning": args.queries[0],
+                        "platform": args.platform,
+                        "enabled": normalized["enabled"],
+                    }
+                    if normalized is not None
+                    else None
+                ),
             }
-            payload["agent_result"] = discovery.as_dict(detail=args.detail)
-            return payload
         preview = build_metadata_command_preview(args, version=detected_version)
         envelope = preview.envelope
         result = dispatch(
@@ -9577,6 +10188,17 @@ def dispatch_command(
             "semantic_preview": preview.as_dict(),
             "call": dispatch_call_summary(result),
         }
+        if args.operation == "attenuation":
+            payload["agent_result"] = (
+                {
+                    "curve_role": args.curve_role,
+                    "use": normalized["use"],
+                    "points": normalized["points"],
+                }
+                if normalized is not None
+                else None
+            )
+            return payload
         if args.summary_only:
             payload["summary_only"] = True
             if result.get("ok"):
@@ -15067,7 +15689,7 @@ def _require_typed_advanced_query_option_exclusivity(
         conflicting.append("--take")
     if args.all_results:
         conflicting.append("--all-results")
-    if args.return_fields:
+    if getattr(args, "return_fields", None):
         conflicting.append("--return-field")
     if args.typed_structured:
         conflicting.append("--typed-structured")
@@ -15092,7 +15714,7 @@ def _require_typed_structured_query_option_exclusivity(
         (bool(args.select), "--select"),
         (args.take is not None, "--take"),
         (bool(args.all_results), "--all-results"),
-        (bool(args.return_fields), "--return-field"),
+        (bool(getattr(args, "return_fields", None)), "--return-field"),
         (bool(args.typed_advanced), "--typed-advanced"),
     ):
         if enabled:
@@ -15286,10 +15908,10 @@ def _canonical_exact_query_request(args: argparse.Namespace) -> bool:
 def _require_explicit_query_bound(args: argparse.Namespace) -> None:
     broad_source = args.object_type is not None or args.search is not None or args.query is not None
     transformed = bool(args.select)
-    if (broad_source or transformed) and args.take is None and not args.all_results:
+    if (broad_source or transformed) and args.take is None:
         raise GatewayInputError(
-            "Broad query-object sources and --select transforms require an explicit --take limit "
-            "or the explicit --all-results opt-in."
+            "Broad query-object sources and --relationship traversal require an "
+            "explicit --max-results bound."
         )
 
 
@@ -15669,9 +16291,43 @@ def _normalize_wwise_identity_path(value: Any) -> str | None:
 def _query_bound_summary(args: argparse.Namespace) -> dict[str, Any]:
     if args.take is not None:
         return {"mode": "take", "value": args.take}
-    if args.all_results:
-        return {"mode": "all-results-explicit"}
     return {"mode": "exact-object"}
+
+
+def _project_query_business_rows(
+    args: argparse.Namespace,
+    rows: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Rename Gateway-compiled native accessors into stable business fields."""
+
+    bindings = tuple(getattr(args, "query_output_bindings", ()) or ())
+    projected: list[dict[str, Any]] = []
+    for index, row in enumerate(rows):
+        item = {field: row[field] for field in SELECTED_REQUIRED_RETURN_FIELDS}
+        properties: dict[str, Any] = {}
+        references: dict[str, Any] = {}
+        for kind, native, output in bindings:
+            if native not in row:
+                raise GatewayResultShapeError(
+                    "Object query omitted a requested business result field.",
+                    details={
+                        "row_index": index,
+                        "business_field": output,
+                    },
+                    error_code="INVALID_QUERY_RESULT",
+                )
+            if kind == "property":
+                properties[output] = row[native]
+            elif kind == "reference":
+                references[output] = row[native]
+            else:
+                item[output] = row[native]
+        if properties:
+            item["properties"] = properties
+        if references:
+            item["references"] = references
+        projected.append(item)
+    return projected
 
 
 def project_successful_query_object_payload(
@@ -16547,34 +17203,6 @@ def strict_object_get_rows(
             error_code=error_code,
         )
     return [dict(row) for row in rows]
-
-
-def normalize_selected_return_fields(
-    requested: Sequence[str] | None,
-) -> tuple[str, ...]:
-    """Return a bounded projection while retaining stable selection identity."""
-
-    fields = list(SELECTED_REQUIRED_RETURN_FIELDS)
-    for value in requested or ():
-        if (
-            not isinstance(value, str)
-            or not value
-            or value != value.strip()
-            or len(value) > MAX_SELECTED_RETURN_FIELD_CHARS
-            or any(ord(character) < 0x20 for character in value)
-        ):
-            raise GatewayInputError(
-                "selected --return-field values must be non-empty, trimmed "
-                f"accessors of at most {MAX_SELECTED_RETURN_FIELD_CHARS} characters"
-            )
-        if value not in fields:
-            fields.append(value)
-        if len(fields) > MAX_SELECTED_RETURN_FIELDS:
-            raise GatewayInputError(
-                f"selected accepts at most {MAX_SELECTED_RETURN_FIELDS} unique "
-                "return fields including id, name, type, and path"
-            )
-    return tuple(fields)
 
 
 def strict_selected_rows(result: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -21597,7 +22225,7 @@ def build_metadata_command_preview(args: argparse.Namespace, *, version: str) ->
         return builder.get_property_info(property=args.property, object=args.object, class_id=args.class_id)
     if args.operation == "property-enabled":
         return builder.is_property_enabled(object=args.object, property=args.property, platform=args.platform)
-    if args.operation == "attenuation-curve":
+    if args.operation in {"attenuation", "attenuation-curve"}:
         return builder.get_attenuation_curve(
             object=args.object,
             curve_type=args.curve_type,
@@ -21618,7 +22246,7 @@ def normalize_metadata_result(operation: str, result: Mapping[str, Any]) -> Any:
         return parse_get_property_info_result(payload).as_dict()
     if operation == "property-enabled":
         return parse_is_property_enabled_result(payload).as_dict()
-    if operation == "attenuation-curve":
+    if operation in {"attenuation", "attenuation-curve"}:
         record = parse_get_attenuation_curve_result(payload, allow_documented_empty=True)
         return record.as_dict() if record is not None else None
     raise GatewayInputError(f"unsupported metadata operation: {operation}")

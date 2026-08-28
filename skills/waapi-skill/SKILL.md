@@ -43,22 +43,23 @@ python scripts/run.py gateway.py config-set --reset
 python scripts/run.py gateway.py buses
 python scripts/run.py gateway.py selected
 python scripts/run.py gateway.py project-default-work-units
-python scripts/run.py gateway.py profiler-game-objects --time capture
-python scripts/run.py gateway.py profiler-voice-contributions --time capture --voice-pipeline-id <uint32> --bus-pipeline-id <uint32>
+python scripts/run.py gateway.py profiler-game-objects --capture latest
+python scripts/run.py gateway.py profiler-voice-contributions --capture latest --voice-object-id <guid> --bus-object-id <guid>
 python scripts/run.py gateway.py request-schema <migrated-api-uri>
-python scripts/run.py gateway.py debug-wal-tree --take 128
+python scripts/run.py gateway.py debug-wal-tree --max-nodes 128
+python scripts/run.py gateway.py debug-validate-call <reflected-function-uri> [--artifact-file <absolute-user-owned-json>]
 python scripts/run.py gateway.py capabilities --all-versions --summary-only
 python scripts/run.py gateway.py capabilities --all-versions --query object.get --limit 20
 python scripts/run.py gateway.py describe <uri> --all-versions
 python scripts/run.py gateway.py request-schema ak.wwise.waapi.getFunctions
 python scripts/run.py gateway.py request-schema ak.wwise.waapi.getTopics
 python scripts/run.py gateway.py request-schema <reflected-function-uri>
-python scripts/run.py gateway.py query-object --path '<exact-object-path>' --return-field id --return-field name --return-field type --return-field path
-python scripts/run.py gateway.py query-object --type Event --take 100
+python scripts/run.py gateway.py query-object --path-segment '<root>' --path-segment '<child>'
+python scripts/run.py gateway.py query-object --kind sound-sfx --include volume-db --max-results 100
 python scripts/run.py gateway.py --version <supported-version> query-schema [--advanced]
-python scripts/run.py gateway.py --version <supported-version> query-object (--typed-structured <typed-facts-from-query-schema> | --typed-advanced --waql '<bounded-single-line-waql>' <typed-fields-from-query-schema>)
+python scripts/run.py gateway.py --version <supported-version> query-object --advanced-waql '<bounded-single-line-waql>' --include <business-field> --max-results <1..1000>
 python scripts/run.py gateway.py --version <supported-version> object-types --query '<type keywords>' --limit 20
-python scripts/run.py gateway.py metadata types --summary-only
+python scripts/run.py gateway.py metadata types
 python scripts/run.py gateway.py wait-topic <topic-uri>
 python scripts/run.py gateway.py topic-schema <topic-uri>
 python scripts/run.py gateway.py --timeout <positive-finite-seconds> wait-topic <topic-uri> --event-count <1..64> <typed-topic-facts-from-topic-schema>
@@ -85,17 +86,17 @@ Use the listed route for the corresponding intent:
 | inspect one voice-path contribution tree | `profiler-voice-contributions` |
 | build a migrated API request from typed values | run `request-schema`; execute its sole continuation |
 | inspect the private WAL tree | `debug-wal-tree` |
-| ask a Debug Wwise build to validate one reflected call shape without executing it | `request-schema ak.wwise.debug.validateCall` and its typed continuation |
+| ask a Debug Wwise build to validate one reflected call shape without executing it | `debug-validate-call` with an optional exact user-owned artifact |
 | inspect packaged API support, schema, route, or boundary | `capabilities` / `describe` |
 | run a reviewed reflected capability | `request-schema <exact-uri>` and its typed continuation |
-| object lookup | progressively disclose `query-object` flags, structured schema, then advanced schema |
+| object lookup | use the `query-object` business declaration; disclose advanced WAQL only when needed |
 | packaged object-type discovery without Wwise | `object-types` |
 | live object type/property/reference metadata | `metadata` |
 | wait for one or a fixed bounded count of topic events | `wait-topic` |
 | explicitly stream topic events continuously | `stream-topic` |
 | inspect project-changing operation support | `operations` / `operation-schema` |
 
-`status` completes a connection/version/project request. When the user instead asks for the independent live result of a named API, including `getInfo`, use `status` only as the required host/project preflight, then run `request-schema <exact-uri>` and its sole typed continuation. The result embedded in `status` does not replace that independently requested API call. This complete named-`getInfo` route needs only this `SKILL.md`; do not read the setup or query reference for it.
+`status` is the sole Gateway-owned `getInfo` route and completes a connection/version/project request. Do not use `request-schema` or `typed-zero-call` as another `getInfo` path. This complete route needs only this `SKILL.md`; do not read the setup or query reference for it.
 Treat the named `getInfo` result's `processId` as the requested live process identity; finish from that Gateway evidence without a system process lookup.
 
 Every command except `stream-topic` prints one JSON document; streaming prints compact flushed NDJSON event records and one terminal record. Summarize actual values; show full JSON only if asked. Every result includes bounded `session_context`; use it for the one-time introduction and never reconstruct it.
@@ -150,11 +151,11 @@ Default result shape: return the resolved structured result, not just “I calle
 
 Classify the complete read-only task before its first hop. If it needs multiple or relationship hops, fully read `references/waapi-query.md` before any Gateway command; an exact path/GUID first hop does not make the whole task a complete fast route.
 
-For a complete single-hop exact path/GUID existence or identity lookup, run exactly `query-object --path '<exact-object-path>' --return-field id --return-field name --return-field type --return-field path`; substitute `--object-id '<exact-guid>'`. Keep all four return fields explicit. Exact `not_found` stays Gateway-owned in compact output; use `--detail` only for explicit compile/dispatch diagnostics. This route is complete: do not read the query reference before or after it; do not retry a rejected or failed gateway invocation.
+For a complete single-hop exact path/GUID existence or identity lookup, run exactly `query-object` with one literal `--path-segment` per hierarchy level, or `--exact-id '<exact-guid>'`. The Gateway constructs path separators and always returns the four identity fields. Exact `not_found` stays Gateway-owned in compact output; use `--detail` only for explicit compile/dispatch diagnostics. This route is complete: do not read the query reference before or after it; do not retry a rejected or failed gateway invocation.
 
 For current-selection questions, use the live selected-object query first. On a headless/command-line Wwise host, report the UI boundary; do not research or pretend a selection exists.
 
-For repeated `query-object --where FIELD OPERATOR TYPE VALUE`, `=` is exact and `:` is contains/match; an exact-name restriction uses `=`.
+Repeated `query-object --predicate BUSINESS_CONDITION VALUE` declarations mean AND; the Gateway owns native fields, operators, and value types.
 
 Conditional read for a query not fully covered by the fixed commands, exact-identity fast route, or exact reflection-call fast route: `references/waapi-query.md`
 

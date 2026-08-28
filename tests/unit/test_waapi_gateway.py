@@ -613,14 +613,12 @@ def test_selected_accepts_only_an_explicit_empty_objects_array(tmp_path: Path) -
     assert payload["objects"] == []
 
 
-def test_selected_adds_bounded_manifest_validated_return_fields(tmp_path: Path) -> None:
+def test_selected_derives_one_fixed_identity_projection(tmp_path: Path) -> None:
     selected_row = {
         "id": "{11111111-1111-1111-1111-111111111111}",
         "name": "Selected Sound",
         "type": "Sound",
         "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Selected Sound",
-        "@Volume": -6.0,
-        "parent.name": "Default Work Unit",
     }
     client = FakeClient(
         {
@@ -630,28 +628,13 @@ def test_selected_adds_bounded_manifest_validated_return_fields(tmp_path: Path) 
     )
 
     exit_code, payload = waapi_gateway.execute_gateway(
-        [
-            "selected",
-            "--return-field",
-            "@Volume",
-            "--return-field",
-            "parent.name",
-            "--return-field",
-            "@Volume",
-        ],
+        ["selected"],
         env=gateway_env(tmp_path),
         client_factory=lambda url: client,
     )
 
     assert exit_code == 0
-    assert payload["return_fields"] == [
-        "id",
-        "name",
-        "type",
-        "path",
-        "@Volume",
-        "parent.name",
-    ]
+    assert payload["return_fields"] == ["id", "name", "type", "path"]
     assert payload["objects"] == [selected_row]
     assert payload["schema_validation"]["request"]["uri"] == (
         "ak.wwise.ui.getSelectedObjects"
@@ -662,40 +645,26 @@ def test_selected_adds_bounded_manifest_validated_return_fields(tmp_path: Path) 
     assert client.calls[-1] == (
         "ak.wwise.ui.getSelectedObjects",
         {},
-        {
-            "return": [
-                "id",
-                "name",
-                "type",
-                "path",
-                "@Volume",
-                "parent.name",
-            ]
-        },
+        {"return": ["id", "name", "type", "path"]},
     )
 
 
-@pytest.mark.parametrize("return_field", ("", " Volume", "Volume ", "bad\nfield"))
-def test_selected_rejects_invalid_return_fields_before_connecting(
-    tmp_path: Path,
-    return_field: str,
-) -> None:
-    called = False
-
-    def client_factory(url: str) -> FakeClient:
-        nonlocal called
-        called = True
-        raise AssertionError(url)
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["selected", "--return-field", return_field],
-        env=gateway_env(tmp_path),
-        client_factory=client_factory,
+def test_selected_exposes_no_model_authored_projection() -> None:
+    parser = waapi_gateway.build_parser()
+    command_action = next(
+        action
+        for action in parser._actions
+        if isinstance(getattr(action, "choices", None), dict)
+        and "selected" in action.choices
     )
+    selected = command_action.choices["selected"]
 
-    assert exit_code == 2
-    assert payload["error_code"] == "GatewayInputError"
-    assert called is False
+    assert {
+        option
+        for action in selected._actions
+        for option in action.option_strings
+        if option.startswith("--")
+    } == {"--help"}
 
 
 @pytest.mark.parametrize(
@@ -2500,7 +2469,7 @@ def test_query_object_detail_restores_compiler_and_dispatch_evidence(tmp_path: P
     )
 
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["query-object", "--type", "Sound", "--take", "1", "--detail"],
+        ["query-object", "--type-name", "Sound", "--max-results", "1", "--detail"],
         env=gateway_env(tmp_path),
         client_factory=lambda url: client,
     )
@@ -2560,7 +2529,7 @@ def test_query_object_cleanup_failure_keeps_complete_success_evidence(
     )
 
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["query-object", "--type", "Sound", "--take", "1"],
+        ["query-object", "--type-name", "Sound", "--max-results", "1"],
         env=gateway_env(tmp_path),
         client_factory=lambda url: client,
     )
@@ -2593,17 +2562,20 @@ def test_query_schema_returns_five_version_closed_contract_without_connecting(
 
     assert exit_code == 0
     assert called is False
-    assert payload["query_contract"] == "waapi-skill.object-query/v1"
+    assert payload["query_contract"] == "waapi-skill.object-query-business/v1"
     assert tuple(payload["versions"]) == tuple(SUPPORTED_WWISE_VERSION_KEYS)
-    assert set(payload["schemas"]) == set(SUPPORTED_WWISE_VERSION_KEYS)
+    assert set(payload["contracts"]) == set(SUPPORTED_WWISE_VERSION_KEYS)
     assert {
-        schema["x-wwise-version"]
-        for schema in payload["schemas"].values()
+        schema["version"]
+        for schema in payload["contracts"].values()
     } == set(SUPPORTED_WWISE_VERSION_KEYS)
-    serialized = json.dumps(payload["schemas"], sort_keys=True)
+    serialized = json.dumps(payload["contracts"], sort_keys=True)
     assert '"waql"' not in serialized
     assert '"raw"' not in serialized
-    assert payload["boundary"]["raw_waql_accepted"] is False
+    assert all(
+        contract["identity_projection"] == ["id", "name", "type", "path"]
+        for contract in payload["contracts"].values()
+    )
 
 
 def test_query_schema_advanced_discloses_bounded_native_contract_offline(
@@ -2627,40 +2599,19 @@ def test_query_schema_advanced_discloses_bounded_native_contract_offline(
     assert payload["query_layer"] == "advanced-native-waql"
     assert payload["query_contract"] == "waapi-skill.advanced-object-query/v1"
     assert tuple(payload["versions"]) == tuple(SUPPORTED_WWISE_VERSION_KEYS)
-    assert set(payload["schemas"]) == set(SUPPORTED_WWISE_VERSION_KEYS)
-    assert payload["boundary"] == {
-        "fixed_api": "ak.wwise.core.object.get",
-        "read_only": True,
-        "native_waql_accepted": True,
-        "gateway_appends_final_take": True,
-        "all_results_available": False,
-        "arbitrary_uri_args_or_options_accepted": False,
-        "gateway_json_input_bytes": waapi_gateway.MAX_GATEWAY_JSON_INPUT_BYTES,
-        "gateway_result_bytes": waapi_gateway.MAX_GATEWAY_RESULT_JSON_BYTES,
-        "version_specific_syntax_validated_by": "connected Wwise",
-        "fallback_or_retry_on_invalid_query": False,
-    }
-    for schema in payload["schemas"].values():
-        waql = schema["properties"]["waql"]
-        expression = schema["properties"]["return"]["items"]
-        assert waql["x-maxUtf8Bytes"] == MAX_ADVANCED_WAQL_BYTES
-        assert waql["x-framing"] == {
-            "trimmed": True,
-            "singleLine": True,
-            "queryEditorDollarPrefix": False,
-            "comments": False,
-            "statementSeparators": False,
-            "balancedDoubleQuotedStrings": True,
-            "balancedSlashRegexLiterals": True,
-        }
-        assert expression["x-maxUtf8Bytes"] == MAX_ADVANCED_RETURN_EXPRESSION_BYTES
-        assert expression["x-framing"] == {
-            "trimmed": True,
-            "singleLine": True,
-            "comments": False,
-            "statementSeparators": False,
-            "balancedDoubleQuotedStrings": True,
-            "balancedSlashRegexLiterals": True,
+    assert set(payload["contracts"]) == set(SUPPORTED_WWISE_VERSION_KEYS)
+    for contract in payload["contracts"].values():
+        assert contract["continuation"]["exact_expression"].startswith(
+            "--advanced-waql"
+        )
+        assert contract["boundary"] == {
+            "fixed_api": "ak.wwise.core.object.get",
+            "read_only": True,
+            "gateway_appends_final_take": True,
+            "all_results_available": False,
+                "return_projection": "gateway_compiled_business_projection",
+            "arbitrary_uri_args_or_options_accepted": False,
+            "fallback_or_retry_on_invalid_query": False,
         }
 
 
@@ -2714,9 +2665,9 @@ def test_query_object_original_file_reference_match_returns_closed_candidate_rec
     exit_code, payload = waapi_gateway.execute_gateway(
         [
             "query-object",
-            "--type",
+            "--type-name",
             "AudioFileSource",
-            "--take",
+            "--max-results",
             "1000",
             "--match-original-file-path",
             footstep,
@@ -2850,9 +2801,9 @@ def test_query_object_original_file_reference_match_sorts_and_truncates_details(
     exit_code, payload = waapi_gateway.execute_gateway(
         [
             "query-object",
-            "--type",
+            "--type-name",
             "AudioFileSource",
-            "--take",
+            "--max-results",
             "1000",
             "--match-original-file-path",
             candidate,
@@ -2917,9 +2868,9 @@ def test_query_object_original_file_reference_match_maximum_shape_stays_below_ga
     env["WWISE_VERSION"] = "2025.1"
     argv = [
         "query-object",
-        "--type",
+        "--type-name",
         "AudioFileSource",
-        "--take",
+        "--max-results",
         "1000",
     ]
     for candidate in candidates:
@@ -2952,77 +2903,52 @@ def test_query_object_original_file_reference_match_maximum_shape_stays_below_ga
         (
             (
                 "query-object",
-                "--type",
+                "--type-name",
                 "Sound",
-                "--take",
+                "--max-results",
                 "1000",
                 "--match-original-file-path",
                 r"Y:\Sandbox\Originals\source.wav",
             ),
-            "requires exactly --type AudioFileSource",
+            "requires exactly --type-name AudioFileSource",
         ),
         (
             (
                 "query-object",
-                "--type",
+                "--type-name",
                 "AudioFileSource",
-                "--take",
+                "--max-results",
                 "1000",
-                "--select",
+                "--relationship",
                 "parent",
                 "--match-original-file-path",
                 r"Y:\Sandbox\Originals\source.wav",
             ),
-            "cannot be combined with --select",
+            "cannot be combined with --relationship",
         ),
         (
             (
                 "query-object",
-                "--type",
+                "--type-name",
                 "AudioFileSource",
-                "--all-results",
-                "--match-original-file-path",
-                r"Y:\Sandbox\Originals\source.wav",
-            ),
-            "cannot be combined with --all-results",
-        ),
-        (
-            (
-                "query-object",
-                "--type",
-                "AudioFileSource",
-                "--take",
-                "1000",
-                "--return-field",
-                "id",
-                "--match-original-file-path",
-                r"Y:\Sandbox\Originals\source.wav",
-            ),
-            "cannot be combined with --return-field",
-        ),
-        (
-            (
-                "query-object",
-                "--type",
-                "AudioFileSource",
-                "--take",
+                "--max-results",
                 "999",
                 "--match-original-file-path",
                 r"Y:\Sandbox\Originals\source.wav",
             ),
-            "requires exactly --take 1000",
+            "requires exactly --max-results 1000",
         ),
         (
             (
                 "query-object",
-                "--path",
-                r"\Actor-Mixer Hierarchy",
-                "--take",
+                "--path-segment",
+                "Actor-Mixer Hierarchy",
+                "--max-results",
                 "1000",
                 "--match-original-file-path",
                 r"Y:\Sandbox\Originals\source.wav",
             ),
-            "requires exactly --type AudioFileSource",
+            "requires exactly --type-name AudioFileSource",
         ),
     ),
 )
@@ -3083,9 +3009,9 @@ def test_query_object_original_file_reference_match_rejects_invalid_candidates(
 ) -> None:
     argv = [
         "query-object",
-        "--type",
+        "--type-name",
         "AudioFileSource",
-        "--take",
+        "--max-results",
         "1000",
     ]
     for candidate in candidates:
@@ -3124,9 +3050,9 @@ def test_query_object_original_file_reference_match_is_strictly_2025_1(
     exit_code, payload = waapi_gateway.execute_gateway(
         [
             "query-object",
-            "--type",
+            "--type-name",
             "AudioFileSource",
-            "--take",
+            "--max-results",
             "1000",
             "--match-original-file-path",
             r"Y:\Sandbox\Originals\source.wav",
@@ -3147,9 +3073,9 @@ def test_query_object_original_file_reference_match_enforces_candidate_limit(
     candidates = [rf"Y:\Sandbox\Originals\source-{index}.wav" for index in range(65)]
     argv = [
         "query-object",
-        "--type",
+        "--type-name",
         "AudioFileSource",
-        "--take",
+        "--max-results",
         "1000",
     ]
     for candidate in candidates:
@@ -3235,9 +3161,9 @@ def test_query_object_original_file_reference_match_rejects_malformed_or_duplica
     exit_code, payload = waapi_gateway.execute_gateway(
         [
             "query-object",
-            "--type",
+            "--type-name",
             "AudioFileSource",
-            "--take",
+            "--max-results",
             "1000",
             "--match-original-file-path",
             r"Y:\Sandbox\Originals\source.wav",
@@ -3274,9 +3200,9 @@ def test_query_object_original_file_reference_match_rejects_scan_at_take_limit(
     exit_code, payload = waapi_gateway.execute_gateway(
         [
             "query-object",
-            "--type",
+            "--type-name",
             "AudioFileSource",
-            "--take",
+            "--max-results",
             "1000",
             "--match-original-file-path",
             r"Y:\Sandbox\Originals\source-0.wav",
@@ -3296,39 +3222,19 @@ def test_query_object_original_file_reference_match_rejects_scan_at_take_limit(
 @pytest.mark.parametrize(
     ("argv", "expected_error"),
     (
-        (("query-object", "--type", "Sound"), "GatewayInputError"),
+        (("query-object", "--type-name", "Sound"), "GatewayInputError"),
         (
             (
                 "query-object",
-                "--type",
+                "--type-name",
                 "Sound",
-                "--take",
+                "--max-results",
                 str(waapi_gateway.MAX_QUERY_TAKE + 1),
             ),
             "SemanticValidationError",
         ),
-        (("query-object", "--query", "from type Sound"), "SemanticValidationError"),
-        (("query-object", "--object-id", "not-a-guid"), "SemanticValidationError"),
-        (
-            (
-                "query-object",
-                "--path",
-                r"\Events\Default Work Unit",
-                "--return-field",
-                "id",
-            ),
-            "GatewayInputError",
-        ),
-        (
-            (
-                "query-object",
-                "--object-id",
-                "{11111111-1111-1111-1111-111111111111}",
-                "--return-field",
-                "path",
-            ),
-            "GatewayInputError",
-        ),
+        (("query-object", "--query-id", "from type Sound"), "SemanticValidationError"),
+        (("query-object", "--exact-id", "not-a-guid"), "SemanticValidationError"),
     ),
 )
 def test_query_input_errors_fail_before_opening_transport(
@@ -3375,7 +3281,7 @@ def test_query_object_rejects_malformed_success_result_shape(
     )
 
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["query-object", "--type", "Sound", "--take", "1"],
+        ["query-object", "--type-name", "Sound", "--max-results", "1"],
         env=gateway_env(tmp_path),
         client_factory=lambda url: client,
     )
@@ -3404,7 +3310,7 @@ def test_query_object_rejects_rows_above_requested_take(tmp_path: Path) -> None:
     )
 
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["query-object", "--type", "Sound", "--take", "1", "--return-field", "id"],
+        ["query-object", "--type-name", "Sound", "--max-results", "1"],
         env=gateway_env(tmp_path),
         client_factory=lambda url: client,
     )
@@ -3430,7 +3336,13 @@ def test_query_object_rejects_multiple_rows_for_untransformed_exact_source(tmp_p
     )
 
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["query-object", "--path", path, "--return-field", "path"],
+        [
+            "query-object",
+            "--path-segment",
+            "Events",
+            "--path-segment",
+            "Wanted",
+        ],
         env=gateway_env(tmp_path),
         client_factory=lambda url: client,
     )
@@ -3441,8 +3353,11 @@ def test_query_object_rejects_multiple_rows_for_untransformed_exact_source(tmp_p
     assert payload["details"]["actual_count"] == 2
 
 
-def test_query_object_all_results_remains_unbounded(tmp_path: Path) -> None:
-    rows = [{"id": "{one}"}, {"id": "{two}"}]
+def test_query_object_broad_results_remain_gateway_bounded(tmp_path: Path) -> None:
+    rows = [
+        {"id": "{one}", "name": "One", "type": "Sound", "path": r"\One"},
+        {"id": "{two}", "name": "Two", "type": "Sound", "path": r"\Two"},
+    ]
     client = FakeClient(
         {
             "ak.wwise.core.getInfo": live_info(),
@@ -3451,14 +3366,15 @@ def test_query_object_all_results_remains_unbounded(tmp_path: Path) -> None:
     )
 
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["query-object", "--type", "Sound", "--all-results", "--return-field", "id"],
+        ["query-object", "--type-name", "Sound", "--max-results", "2"],
         env=gateway_env(tmp_path),
         client_factory=lambda url: client,
     )
 
     assert exit_code == 0
     assert payload["objects"] == rows
-    assert payload["query_bound"] == {"mode": "all-results-explicit"}
+    assert payload["query_bound"] == {"mode": "take", "value": 2}
+    assert client.calls[-1][1] == {"waql": "from type Sound take 2"}
 
 
 def test_query_object_exact_path_uses_from_object_without_doubled_separators(
@@ -3476,16 +3392,12 @@ def test_query_object_exact_path_uses_from_object_without_doubled_separators(
     exit_code, payload = waapi_gateway.execute_gateway(
         [
             "query-object",
-            "--path",
-            path,
-            "--return-field",
-            "id",
-            "--return-field",
-            "name",
-            "--return-field",
-            "type",
-            "--return-field",
-            "path",
+            "--path-segment",
+            "Actor-Mixer Hierarchy",
+            "--path-segment",
+            "Default Work Unit",
+            "--path-segment",
+            "Leaf",
         ],
         env=gateway_env(tmp_path),
         client_factory=lambda url: client,
@@ -3500,22 +3412,213 @@ def test_query_object_exact_path_uses_from_object_without_doubled_separators(
     )
 
 
+def test_query_object_builds_exact_wwise_path_from_business_segments(
+    tmp_path: Path,
+) -> None:
+    path = r"\Actor-Mixer Hierarchy\Default Work Unit\Leaf"
+    row = {"id": "{leaf}", "name": "Leaf", "type": "ActorMixer", "path": path}
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": live_info(),
+            "ak.wwise.core.object.get": {"return": [row]},
+        }
+    )
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "query-object",
+            "--path-segment",
+            "Actor-Mixer Hierarchy",
+            "--path-segment",
+            "Default Work Unit",
+            "--path-segment",
+            "Leaf",
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 0, payload
+    assert payload["objects"] == [row]
+    assert client.calls[-1] == (
+        "ak.wwise.core.object.get",
+        {"waql": r'from object "\Actor-Mixer Hierarchy\Default Work Unit\Leaf"'},
+        {"return": ["id", "name", "type", "path"]},
+    )
+
+
+@pytest.mark.parametrize(
+    ("kind", "expected_waql"),
+    (
+        ("actor-mixer", "from type ActorMixer take 2"),
+        ("sound-sfx", "from type Sound where @IsVoice = false take 2"),
+        ("sound-voice", "from type Sound where @IsVoice = true take 2"),
+    ),
+)
+def test_query_object_compiles_semantic_kind_to_native_type_and_predicate(
+    tmp_path: Path,
+    kind: str,
+    expected_waql: str,
+) -> None:
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": live_info(),
+            "ak.wwise.core.object.get": {"return": []},
+        }
+    )
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["query-object", "--kind", kind, "--max-results", "2"],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 0, payload
+    assert client.calls[-1] == (
+        "ak.wwise.core.object.get",
+        {"waql": expected_waql},
+        {"return": ["id", "name", "type", "path"]},
+    )
+
+
+def test_query_object_compiles_business_predicates_without_native_tuple_fields(
+    tmp_path: Path,
+) -> None:
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": live_info(),
+            "ak.wwise.core.object.get": {"return": []},
+        }
+    )
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "query-object",
+            "--kind",
+            "sound-sfx",
+            "--predicate",
+            "volume-db-at-most",
+            "-6",
+            "--predicate",
+            "notes-contain",
+            "mix-review",
+            "--max-results",
+            "12",
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 0, payload
+    assert client.calls[-1] == (
+        "ak.wwise.core.object.get",
+        {
+            "waql": (
+                "from type Sound where @IsVoice = false and @Volume <= -6.0 "
+                'and notes : "mix-review" take 12'
+            )
+        },
+        {"return": ["id", "name", "type", "path"]},
+    )
+
+
+def test_query_object_compiles_and_renames_business_and_custom_outputs(
+    tmp_path: Path,
+) -> None:
+    row = {
+        "id": "{11111111-1111-1111-1111-111111111111}",
+        "name": "Rain",
+        "type": "Sound",
+        "path": r"\Actor-Mixer Hierarchy\Weather\Rain",
+        "@Volume": -4.0,
+        "OutputBus": {"id": "{22222222-2222-2222-2222-222222222222}"},
+        "@MyPluginGain": 0.5,
+        "MyPluginRoute": {"id": "{33333333-3333-3333-3333-333333333333}"},
+    }
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": live_info(),
+            "ak.wwise.core.object.get": {"return": [row]},
+        }
+    )
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "query-object",
+            "--kind",
+            "sound-sfx",
+            "--include",
+            "volume-db",
+            "--include",
+            "output-bus",
+            "--include-property",
+            "MyPluginGain",
+            "--include-reference",
+            "MyPluginRoute",
+            "--max-results",
+            "1",
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 0, payload
+    assert payload["agent_result"] == [
+        {
+            "id": row["id"],
+            "name": "Rain",
+            "type": "Sound",
+            "path": row["path"],
+            "volume_db": -4.0,
+            "output_bus": row["OutputBus"],
+            "properties": {"MyPluginGain": 0.5},
+            "references": {"MyPluginRoute": row["MyPluginRoute"]},
+        }
+    ]
+    assert client.calls[-1][2] == {
+        "return": [
+            "id",
+            "name",
+            "type",
+            "path",
+            "@Volume",
+            "OutputBus",
+            "@MyPluginGain",
+            "MyPluginRoute",
+        ]
+    }
+
+
 @pytest.mark.parametrize(
     ("argv", "row"),
     (
         (
-            ("query-object", "--path", r"\Events\Wanted", "--return-field", "path"),
-            {"path": r"/events//WANTED/"},
+            (
+                "query-object",
+                "--path-segment",
+                "Events",
+                "--path-segment",
+                "Wanted",
+            ),
+            {
+                "id": "{11111111-1111-1111-1111-111111111111}",
+                "name": "Wanted",
+                "type": "Event",
+                "path": r"/events//WANTED/",
+            },
         ),
         (
             (
                 "query-object",
-                "--object-id",
+                "--exact-id",
                 "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}",
-                "--return-field",
-                "id",
             ),
-            {"id": "{aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa}"},
+            {
+                "id": "{aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa}",
+                "name": "Wanted",
+                "type": "Event",
+                "path": r"\Events\Wanted",
+            },
         ),
     ),
 )
@@ -3545,18 +3648,22 @@ def test_exact_query_identity_comparison_normalizes_path_and_guid_case(
     ("argv", "row", "identity_field"),
     (
         (
-            ("query-object", "--path", r"\Events\Wanted", "--return-field", "path"),
+            (
+                "query-object",
+                "--path-segment",
+                "Events",
+                "--path-segment",
+                "Wanted",
+            ),
             {"path": r"\Events\Other"},
             "path",
         ),
         (
             (
-                "query-object",
-                "--object-id",
-                "{11111111-1111-1111-1111-111111111111}",
-                "--return-field",
-                "id",
-            ),
+                    "query-object",
+                    "--exact-id",
+                    "{11111111-1111-1111-1111-111111111111}",
+                ),
             {"id": "{22222222-2222-2222-2222-222222222222}"},
             "id",
         ),
@@ -3587,21 +3694,29 @@ def test_exact_query_rejects_mismatched_returned_identity(
 
 
 @pytest.mark.parametrize(
-    ("query", "expected_waql"),
+    ("source_args", "expected_waql"),
     (
         (
-            "{22222222-2222-2222-2222-222222222222}",
+            (
+                "--query-id",
+                "{22222222-2222-2222-2222-222222222222}",
+            ),
             'from query "{22222222-2222-2222-2222-222222222222}"',
         ),
         (
-            r"\Queries\Shared Queries\Events With Play Actions",
+            (
+                "--query-path-segment",
+                "Shared Queries",
+                "--query-path-segment",
+                "Events With Play Actions",
+            ),
             r'from query "\Queries\Shared Queries\Events With Play Actions"',
         ),
     ),
 )
 def test_query_object_accepts_only_query_editor_path_or_guid(
     tmp_path: Path,
-    query: str,
+    source_args: tuple[str, ...],
     expected_waql: str,
 ) -> None:
     client = FakeClient(
@@ -3614,12 +3729,9 @@ def test_query_object_accepts_only_query_editor_path_or_guid(
     exit_code, payload = waapi_gateway.execute_gateway(
         [
             "query-object",
-            "--query",
-            query,
-            "--take",
+            *source_args,
+            "--max-results",
             "1",
-            "--return-field",
-            "id",
             "--detail",
         ],
         env=gateway_env(tmp_path),
@@ -3633,11 +3745,11 @@ def test_query_object_accepts_only_query_editor_path_or_guid(
     assert client.calls[-1] == (
         "ak.wwise.core.object.get",
         {"waql": bounded_waql},
-        {"return": ["id"]},
+        {"return": ["id", "name", "type", "path"]},
     )
 
 
-def test_query_object_help_names_closed_query_editor_specifier_and_selects() -> None:
+def test_query_object_help_names_closed_query_editor_specifier_and_relationships() -> None:
     parser = waapi_gateway.build_parser()
     subparsers = next(
         action
@@ -3647,38 +3759,197 @@ def test_query_object_help_names_closed_query_editor_specifier_and_selects() -> 
     query_parser = subparsers.choices["query-object"]
     help_text = query_parser.format_help()
 
-    assert "QUERY_PATH_OR_GUID" in help_text
-    assert "Query Editor object specifier" in help_text
-    assert "raw WAQL is not accepted" in help_text
-    assert "--all-results" in help_text
+    assert "QUERY_GUID" in help_text
+    assert "Query Editor object GUID" in help_text
+    assert "--query-path-segment" in help_text
+    assert "--advanced-waql" in help_text
+    assert "Gateway derives the exact WAQL select token" in help_text
+    assert "--max-results" in help_text
     assert "--detail" in help_text
     assert "failures skip compact projection but still obey the global result ceiling" in " ".join(
         help_text.split()
     )
-    select_action = next(action for action in query_parser._actions if action.dest == "select")
-    assert tuple(select_action.choices) == (
+    relationship_action = next(
+        action for action in query_parser._actions if action.dest == "relationships"
+    )
+    assert tuple(relationship_action.choices) == (
         "descendants",
         "ancestors",
-        "referencesTo",
+        "references-to",
         "children",
         "parent",
     )
 
 
-def test_query_take_and_all_results_are_mutually_exclusive() -> None:
-    with pytest.raises(SystemExit):
-        waapi_gateway.build_parser().parse_args(
-            [
-                "query-object",
-                "--type",
-                "Sound",
-                "--take",
-                "1",
-                "--all-results",
-            ]
-        )
+def test_query_object_exposes_no_model_authored_return_projection() -> None:
+    parser = waapi_gateway.build_parser()
+    subparsers = next(
+        action
+        for action in parser._actions
+        if "query-object" in (getattr(action, "choices", None) or {})
+    )
+    query_parser = subparsers.choices["query-object"]
+
+    assert "--return-field" not in {
+        option
+        for action in query_parser._actions
+        for option in action.option_strings
+    }
+    assert {"--include", "--include-property", "--include-reference"} <= {
+        option
+        for action in query_parser._actions
+        for option in action.option_strings
+    }
 
 
+def test_query_object_exposes_business_path_segments_not_raw_wwise_path() -> None:
+    parser = waapi_gateway.build_parser()
+    subparsers = next(
+        action
+        for action in parser._actions
+        if "query-object" in (getattr(action, "choices", None) or {})
+    )
+    query_parser = subparsers.choices["query-object"]
+    options = {
+        option
+        for action in query_parser._actions
+        for option in action.option_strings
+    }
+
+    assert "--path-segment" in options
+    assert "--path" not in options
+
+
+def test_query_object_prefers_semantic_kind_and_labels_exact_custom_type() -> None:
+    parser = waapi_gateway.build_parser()
+    subparsers = next(
+        action
+        for action in parser._actions
+        if "query-object" in (getattr(action, "choices", None) or {})
+    )
+    query_parser = subparsers.choices["query-object"]
+    options = {
+        option
+        for action in query_parser._actions
+        for option in action.option_strings
+    }
+
+    assert {"--kind", "--type-name"} <= options
+    assert "--type" not in options
+
+
+def test_query_object_exposes_business_predicates_not_native_where_tuples() -> None:
+    parser = waapi_gateway.build_parser()
+    subparsers = next(
+        action
+        for action in parser._actions
+        if "query-object" in (getattr(action, "choices", None) or {})
+    )
+    query_parser = subparsers.choices["query-object"]
+    options = {
+        option
+        for action in query_parser._actions
+        for option in action.option_strings
+    }
+
+    assert "--predicate" in options
+    assert "--where" not in options
+
+
+def test_query_object_exposes_relationship_intent_not_native_select() -> None:
+    parser = waapi_gateway.build_parser()
+    subparsers = next(
+        action
+        for action in parser._actions
+        if "query-object" in (getattr(action, "choices", None) or {})
+    )
+    query_parser = subparsers.choices["query-object"]
+    options = {
+        option
+        for action in query_parser._actions
+        for option in action.option_strings
+    }
+
+    assert "--relationship" in options
+    assert "--select" not in options
+
+
+def test_query_object_exposes_business_result_bound_not_native_take_or_unbounded_mode() -> None:
+    parser = waapi_gateway.build_parser()
+    subparsers = next(
+        action
+        for action in parser._actions
+        if "query-object" in (getattr(action, "choices", None) or {})
+    )
+    query_parser = subparsers.choices["query-object"]
+    options = {
+        option
+        for action in query_parser._actions
+        for option in action.option_strings
+    }
+
+    assert "--max-results" in options
+    assert "--take" not in options
+    assert "--all-results" not in options
+
+
+def test_query_object_labels_semantic_sources_and_builds_query_editor_paths() -> None:
+    parser = waapi_gateway.build_parser()
+    subparsers = next(
+        action
+        for action in parser._actions
+        if "query-object" in (getattr(action, "choices", None) or {})
+    )
+    query_parser = subparsers.choices["query-object"]
+    options = {
+        option
+        for action in query_parser._actions
+        for option in action.option_strings
+    }
+
+    assert {
+        "--exact-id",
+        "--search-text",
+        "--query-id",
+        "--query-path-segment",
+    } <= options
+    assert not {"--object-id", "--search", "--query"} & options
+
+
+def test_query_object_builds_query_editor_path_from_business_segments(
+    tmp_path: Path,
+) -> None:
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": live_info(),
+            "ak.wwise.core.object.get": {"return": []},
+        }
+    )
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "query-object",
+            "--query-path-segment",
+            "Shared Queries",
+            "--query-path-segment",
+            "Events With Play Actions",
+            "--max-results",
+            "1",
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 0, payload
+    assert client.calls[-1] == (
+        "ak.wwise.core.object.get",
+        {
+            "waql": (
+                r'from query "\Queries\Shared Queries\Events With Play Actions" take 1'
+            )
+        },
+        {"return": ["id", "name", "type", "path"]},
+    )
 
 
 def test_documented_single_quoted_path_reaches_preview_with_single_separators(
@@ -3688,11 +3959,10 @@ def test_documented_single_quoted_path_reaches_preview_with_single_separators(
     command = next(
         line
         for line in query_reference.read_text(encoding="utf-8").splitlines()
-        if "gateway.py query-object --path" in line
+        if "gateway.py query-object --path-segment 'Events'" in line
     )
     tokens = shlex.split(command)
     argv = tokens[tokens.index("gateway.py") + 1 :]
-    documented_path = r"\Events\Default Work Unit"
     client = FakeClient(
         {
             "ak.wwise.core.getInfo": live_info(),
@@ -3707,7 +3977,13 @@ def test_documented_single_quoted_path_reaches_preview_with_single_separators(
     )
 
     assert exit_code == 0, payload
-    assert argv[argv.index("--path") + 1] == documented_path
+    assert argv == [
+        "query-object",
+        "--path-segment",
+        "Events",
+        "--path-segment",
+        "Default Work Unit",
+    ]
     assert "semantic_preview" not in payload
     assert client.calls[-1][1] == {
         "waql": r'from object "\Events\Default Work Unit"'
@@ -3739,138 +4015,6 @@ def test_metadata_types_uses_fixed_builder_and_result_parser(tmp_path: Path) -> 
     assert "agent_result" not in payload
     assert client.calls[-1][0] == "ak.wwise.core.object.getTypes"
 
-
-def test_metadata_types_summary_only_returns_tail_agent_result_without_inventory(
-    tmp_path: Path,
-) -> None:
-    raw_only_sentinel = "must-not-reach-model-facing-summary"
-    client = FakeClient(
-        {
-            "ak.wwise.core.getInfo": live_info(),
-            "ak.wwise.core.object.getTypes": {
-                "return": [
-                    {
-                        "classId": 1,
-                        "name": "ActorMixer",
-                        "type": "WObject",
-                        "extra": raw_only_sentinel,
-                    },
-                    {"classId": 2, "name": "Sound", "type": "WObject"},
-                ]
-            },
-        }
-    )
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["metadata", "types", "--summary-only"],
-        env=gateway_env(tmp_path),
-        client_factory=lambda url: client,
-    )
-
-    assert exit_code == 0
-    assert payload["operation"] == "types"
-    assert payload["summary_only"] is True
-    assert "normalized" not in payload
-    assert payload["semantic_preview"]["envelope"]["uri"] == "ak.wwise.core.object.getTypes"
-    assert payload["call"]["api"] == "ak.wwise.core.object.getTypes"
-    assert payload["agent_result"] == {
-        "count": 2,
-        "contains_actor_mixer": True,
-    }
-    assert list(payload)[-1] == "agent_result"
-    assert raw_only_sentinel not in waapi_gateway.gateway_stdout_json_encoder().encode(payload)
-    assert client.calls[-1][0] == "ak.wwise.core.object.getTypes"
-
-
-def test_metadata_types_summary_only_actor_mixer_match_is_case_sensitive(tmp_path: Path) -> None:
-    client = FakeClient(
-        {
-            "ak.wwise.core.getInfo": live_info(),
-            "ak.wwise.core.object.getTypes": {
-                "return": [
-                    {"classId": 1, "name": "actormixer", "type": "WObject"},
-                    {"classId": 2, "name": "Sound", "type": "ACTORMIXER"},
-                ]
-            },
-        }
-    )
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["metadata", "types", "--summary-only"],
-        env=gateway_env(tmp_path),
-        client_factory=lambda url: client,
-    )
-
-    assert exit_code == 0
-    assert payload["agent_result"] == {
-        "count": 2,
-        "contains_actor_mixer": False,
-    }
-
-
-def test_metadata_types_summary_only_matches_actor_mixer_type_field(tmp_path: Path) -> None:
-    client = FakeClient(
-        {
-            "ak.wwise.core.getInfo": live_info(),
-            "ak.wwise.core.object.getTypes": {
-                "return": [{"classId": 1, "name": "ActorMixerPlugin", "type": "ActorMixer"}]
-            },
-        }
-    )
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["metadata", "types", "--summary-only"],
-        env=gateway_env(tmp_path),
-        client_factory=lambda url: client,
-    )
-
-    assert exit_code == 0
-    assert payload["agent_result"] == {
-        "count": 1,
-        "contains_actor_mixer": True,
-    }
-
-
-def test_metadata_types_summary_only_still_validates_every_return_row(tmp_path: Path) -> None:
-    client = FakeClient(
-        {
-            "ak.wwise.core.getInfo": live_info(),
-            "ak.wwise.core.object.getTypes": {
-                "return": [
-                    {"classId": 1, "name": "ActorMixer", "type": "WObject"},
-                    {"classId": 2, "name": "MalformedWithoutType"},
-                ]
-            },
-        }
-    )
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["metadata", "types", "--summary-only"],
-        env=gateway_env(tmp_path),
-        client_factory=lambda url: client,
-    )
-
-    assert exit_code == 2
-    assert payload["ok"] is False
-    assert "agent_result" not in payload
-    assert "normalized" not in payload
-    assert client.calls[-1][0] == "ak.wwise.core.object.getTypes"
-
-
-def test_metadata_summary_only_rejects_non_types_before_connecting(tmp_path: Path) -> None:
-    client = FakeClient({})
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["metadata", "names", "--class-id", "1", "--summary-only"],
-        env=gateway_env(tmp_path),
-        client_factory=lambda url: client,
-    )
-
-    assert exit_code == 2
-    assert payload["ok"] is False
-    assert payload["command"] == "metadata"
-    assert payload["message"] == "metadata --summary-only is supported only for the types operation"
-    assert client.calls == []
 
 
 @pytest.mark.parametrize(
@@ -3907,10 +4051,8 @@ def test_exact_missing_object_is_normalized_to_empty_rows(
     exit_code, payload = waapi_gateway.execute_gateway(
         [
             "query-object",
-            "--object-id",
+            "--exact-id",
             missing_id,
-            "--return-field",
-            "id",
             "--detail",
         ],
         env=gateway_env(tmp_path),
@@ -3963,7 +4105,7 @@ def test_unknown_object_error_is_not_normalized_for_broad_waql(tmp_path: Path) -
     )
 
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["query-object", "--type", "Sound", "--take", "1"],
+        ["query-object", "--type-name", "Sound", "--max-results", "1"],
         env=gateway_env(tmp_path),
         client_factory=lambda url: client,
     )
@@ -4024,7 +4166,7 @@ def test_query_object_rejects_raw_waql_before_dispatch(tmp_path: Path) -> None:
     client = FakeClient({"ak.wwise.core.getInfo": live_info()})
 
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["query-object", "--query", "from type Sound"],
+        ["query-object", "--query-id", "from type Sound"],
         env=gateway_env(tmp_path),
         client_factory=lambda url: client,
     )
@@ -4036,7 +4178,7 @@ def test_query_object_rejects_raw_waql_before_dispatch(tmp_path: Path) -> None:
     assert client.calls == []
 
 
-def test_query_object_broad_sources_require_explicit_bound_or_all_results(tmp_path: Path) -> None:
+def test_query_object_broad_sources_require_explicit_business_result_bound(tmp_path: Path) -> None:
     client = FakeClient(
         {
             "ak.wwise.core.getInfo": live_info(),
@@ -4045,23 +4187,23 @@ def test_query_object_broad_sources_require_explicit_bound_or_all_results(tmp_pa
     )
 
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["query-object", "--type", "Sound"],
+        ["query-object", "--type-name", "Sound"],
         env=gateway_env(tmp_path),
         client_factory=lambda url: client,
     )
     assert exit_code == 2
     assert payload["error_code"] == "GatewayInputError"
-    assert "--take" in payload["message"] and "--all-results" in payload["message"]
+    assert "--max-results" in payload["message"]
     assert client.calls == []
 
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["query-object", "--type", "Sound", "--all-results"],
+        ["query-object", "--type-name", "Sound", "--max-results", "3"],
         env=gateway_env(tmp_path),
         client_factory=lambda url: client,
     )
     assert exit_code == 0
-    assert payload["query_bound"] == {"mode": "all-results-explicit"}
-    assert client.calls[-1][1] == {"waql": "from type Sound"}
+    assert payload["query_bound"] == {"mode": "take", "value": 3}
+    assert client.calls[-1][1] == {"waql": "from type Sound take 3"}
 
 
 def test_exact_absence_requires_structured_waapi_failure_and_canonical_cli_source() -> None:
@@ -5066,7 +5208,7 @@ def test_disconnect_failure_is_attached_without_masking_primary_result_error(
     )
 
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["query-object", "--type", "Sound", "--take", "1"],
+        ["query-object", "--type-name", "Sound", "--max-results", "1"],
         env=gateway_env(tmp_path),
         client_factory=lambda url: client,
     )
@@ -5099,7 +5241,7 @@ def test_hostile_disconnect_exception_is_safely_attached_to_primary_result_error
     )
 
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["query-object", "--type", "Sound", "--take", "1"],
+        ["query-object", "--type-name", "Sound", "--max-results", "1"],
         env=gateway_env(tmp_path),
         client_factory=lambda url: client,
     )
@@ -5188,7 +5330,7 @@ def test_baseexception_disconnect_failure_does_not_mask_primary_result_error(
     )
 
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["query-object", "--type", "Sound", "--take", "1"],
+        ["query-object", "--type-name", "Sound", "--max-results", "1"],
         env=gateway_env(tmp_path),
         client_factory=lambda url: client,
     )

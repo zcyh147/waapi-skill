@@ -25,11 +25,11 @@ def test_skill_declares_fixed_gateway_before_discovery_and_no_code_fallback() ->
         "python scripts/run.py gateway.py describe <uri> --all-versions",
         "python scripts/run.py gateway.py request-schema ak.wwise.waapi.getFunctions",
         "python scripts/run.py gateway.py request-schema ak.wwise.waapi.getTopics",
-        "python scripts/run.py gateway.py query-object --path '<exact-object-path>' --return-field id --return-field name --return-field type --return-field path",
-        "python scripts/run.py gateway.py query-object --type Event --take 100",
+        "python scripts/run.py gateway.py query-object --path-segment '<root>' --path-segment '<child>'",
+        "python scripts/run.py gateway.py query-object --kind sound-sfx --include volume-db --max-results 100",
         "python scripts/run.py gateway.py --version <supported-version> query-schema [--advanced]",
-        "python scripts/run.py gateway.py --version <supported-version> query-object (--typed-structured <typed-facts-from-query-schema> | --typed-advanced --waql '<bounded-single-line-waql>' <typed-fields-from-query-schema>)",
-        "python scripts/run.py gateway.py metadata types --summary-only",
+        "python scripts/run.py gateway.py --version <supported-version> query-object --advanced-waql '<bounded-single-line-waql>' --include <business-field> --max-results <1..1000>",
+        "python scripts/run.py gateway.py metadata types",
         "python scripts/run.py gateway.py wait-topic <topic-uri>",
         "python scripts/run.py gateway.py topic-schema <topic-uri>",
         "python scripts/run.py gateway.py --timeout <positive-finite-seconds> wait-topic <topic-uri>",
@@ -119,32 +119,31 @@ def test_query_reference_has_no_raw_client_fallback() -> None:
     assert "WAIT_TOPIC_REQUIRED" in query_reference
     assert "UNSUPPORTED_BY_SKILL_INTERFACE" in query_reference
     assert "gateway.py query-object" in query_reference
-    assert "`--query` means an existing Wwise Query Editor object" in query_reference
+    assert "`--query-id`" in query_reference
+    assert "`--query-path-segment`" in query_reference
     assert "query-schema --advanced" in query_reference
-    assert "query-object --typed-advanced" in query_reference
+    assert "query-object --advanced-waql" in query_reference
     assert "do not write Python" in query_reference
     assert "Raw WAQL itself is never a mutation identity" in query_flat
     assert "never alias another advanced expression onto" in query_flat
     assert "The exact-ID readback must match" in query_flat
     assert "query each distinct GUID exactly once in a separate" in query_flat
-    assert "`query-object --object-id`" in query_flat
+    assert "`query-object --exact-id`" in query_flat
     assert "never merge IDs" in query_flat
-    assert "`--all-results`" in query_reference
-    assert "between `0` and `1000`" in query_reference
+    assert "no unbounded mode" in query_flat
+    assert "--max-results <1..1000>" in query_reference
     assert "`QUERY_OBJECT_REQUIRED`" in query_reference
     assert "gateway.py --version <supported-version> query-schema" in query_reference
-    assert "typed-structured continuation" in query_reference
+    assert "business declaration" in query_reference
     assert "Add `--full-schema` only when" in query_reference
     assert "at most 50 compact rows by default" in query_reference
     assert "Use `--limit 0` only when" in query_reference
-    assert "--path '\\Events\\Default Work Unit'" in query_reference
-    assert "--path '\\\\Events\\\\Default Work Unit'" not in query_reference
-    assert "--search 'ExactName' --where name = string ExactName --take 1" in query_reference
-    assert "`=` is exact equality" in query_reference
-    assert "`:` is" in query_reference and "a contains/match predicate" in query_reference
+    assert "--path-segment 'Events' --path-segment 'Default Work Unit'" in query_reference
+    assert "--search-text 'ExactName' --predicate name-is ExactName --max-results 1" in query_reference
+    assert "Repeated `--predicate` values mean AND" in query_reference
     assert "Use `request-schema` for each URI and follow only its typed continuation" in query_reference
-    assert "metadata types --summary-only" in query_reference
-    assert "compact-serialize that object exactly" in query_reference
+    assert "Use live `metadata types`" in query_reference
+    assert "projection and bound are fixed" in query_reference
 
 
 def test_topic_wait_policy_is_consistent_across_skill_reference_and_readmes() -> None:
@@ -217,7 +216,7 @@ def test_query_reference_exposes_only_the_closed_original_file_match_surface() -
     query_flat = " ".join(query_reference.split())
     command = (
         "python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version "
-        "2025.1 query-object --type AudioFileSource --take 1000 "
+        "2025.1 query-object --type-name AudioFileSource --max-results 1000 "
         "--match-original-file-path '<first-complete-returned-Path>' "
         "--match-original-file-path '<second-complete-returned-Path>'"
     )
@@ -227,7 +226,7 @@ def test_query_reference_exposes_only_the_closed_original_file_match_surface() -
     assert "Each path is limited to 1024 UTF-8 bytes" in query_flat
     assert "candidate-limit boundary" in query_flat
     assert "do not silently truncate" in query_flat
-    assert "Do not add `--where`, `--select`, `--all-results`, or `--return-field`" in query_flat
+    assert "Do not add predicates, relationships, or extra business outputs" in query_flat
     assert "never run the old unfiltered 1000-row AudioFileSource projection" in query_flat
     assert "--return-field originalFilePath" not in query_reference
     assert "A 1000-row scan returns `ORIGINAL_FILE_REFERENCE_SCAN_INCOMPLETE`" in query_flat

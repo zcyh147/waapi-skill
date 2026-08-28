@@ -167,7 +167,7 @@ def test_stable_scalars_artifacts_expressions_and_bound_handles_remain_distinct(
         field["name"]
         for field in all_model_values
         if field["value_ownership"] == "bounded_domain_expression"
-    } == {"waql"}
+    } == {"advanced-waql"}
     argument_contracts = {
         contract["sha256"]: contract["model_values"]
         for contract in inventory["argument_contracts"]
@@ -268,18 +268,20 @@ def test_nested_operation_values_and_exact_paths_are_explicitly_classified() -> 
     )
     query_values = _model_values(inventory, object_get)
     assert any(
-        value["channel"] == "query.structured"
+        value["channel"] == "fixed.query-object"
+        and value["name"] == "path-segment"
+        and value["value_ownership"] == "stable_business_declaration"
         for value in query_values
     )
     assert any(
-        value["channel"] == "query.structured"
-        and value["name"] == "source"
+        value["channel"] == "fixed.query-object"
+        and value["name"] == "kind"
         and value["value_ownership"] == "reviewed_adapter"
         for value in query_values
     )
     assert any(
-        value["channel"] == "query.advanced"
-        and value["name"] == "waql"
+        value["channel"] == "fixed.query-object"
+        and value["name"] == "advanced-waql"
         and value["value_ownership"] == "bounded_domain_expression"
         for value in query_values
     )
@@ -341,7 +343,6 @@ def test_every_migration_row_has_exactly_one_rollup_and_ticket_family() -> None:
     assert set(tickets) == expected
     assert {family["github_issue"] for family in inventory["ticket_families"]} == {
         *range(77, 94),
-        96,
     } - {77, 78, 79, 80, 81, 82, 83, 92, 93}
     assert all(
         row["owner_issue"] in {56, 57}
@@ -407,6 +408,27 @@ def test_every_supported_named_operation_uses_or_migrates_to_the_business_path()
 
 def test_fixed_commands_are_audited_from_their_actual_public_parameters() -> None:
     inventory = _inventory()
+    issue_96_apis = {
+        "ak.wwise.core.object.get",
+        "ak.wwise.core.object.getAttenuationCurve",
+        "ak.wwise.core.object.getPropertyAndReferenceNames",
+        "ak.wwise.core.object.getPropertyInfo",
+        "ak.wwise.core.object.getTypes",
+        "ak.wwise.core.object.isPropertyEnabled",
+        "ak.wwise.core.profiler.getGameObjects",
+        "ak.wwise.core.profiler.getVoiceContributions",
+        "ak.wwise.debug.getWalTree",
+        "ak.wwise.debug.validateCall",
+        "ak.wwise.ui.getSelectedObjects",
+    }
+    issue_96_rows = [
+        row for row in inventory["native_lanes"] if row["uri"] in issue_96_apis
+    ]
+    assert len(issue_96_rows) == 47
+    assert all(
+        row["disposition"] == "already_deep" and row["owner_issue"] is None
+        for row in issue_96_rows
+    )
     object_get = next(
         row
         for row in inventory["native_lanes"]
@@ -414,40 +436,25 @@ def test_fixed_commands_are_audited_from_their_actual_public_parameters() -> Non
         and row["uri"] == "ak.wwise.core.object.get"
     )
     assert object_get["classification"] == "generic-fixed-query-metadata"
-    assert object_get["disposition"] == "migration_required"
+    assert object_get["disposition"] == "already_deep"
+    assert object_get["owner_issue"] is None
     query_values = _model_values(inventory, object_get)
     assert any(
-        value["channel"] == "query.advanced"
-        and value["name"] == "waql"
+        value["channel"] == "fixed.query-object"
+        and value["name"] == "advanced-waql"
         and value["value_ownership"] == "bounded_domain_expression"
         for value in query_values
     )
-    assert any(
-        value["name"] in {"advanced-return", "return"}
-        and value["value_ownership"] == "gateway_derivation"
-        for value in query_values
-    )
-    where = next(value for value in query_values if value["name"] == "where")
-    assert where["value_ownership"] == "reviewed_adapter"
-    assert {
-        component["name"]: component["value_ownership"]
-        for component in where["components"]
-    } == {
-        "FIELD": "gateway_derivation",
-        "OPERATOR": "gateway_derivation",
-        "TYPE": "gateway_derivation",
-        "VALUE": "stable_business_declaration",
-    }
-    assert any(
-        value["name"] == "select"
-        and value["value_ownership"] == "gateway_derivation"
-        for value in query_values
-    )
-    assert all(
-        value["value_ownership"] == "gateway_derivation"
-        for value in query_values
-        if value["name"] in {"typed-advanced", "typed-structured"}
-    )
+    names = {value["name"] for value in query_values}
+    assert {"path-segment", "predicate", "relationship", "include"} <= names
+    assert not {
+        "where",
+        "select",
+        "return-field",
+        "typed-advanced",
+        "typed-structured",
+        "advanced-return",
+    } & names
 
     selected = next(
         row
@@ -455,12 +462,8 @@ def test_fixed_commands_are_audited_from_their_actual_public_parameters() -> Non
         if row["version"] == "2023.1"
         and row["uri"] == "ak.wwise.ui.getSelectedObjects"
     )
-    assert selected["disposition"] == "migration_required"
-    assert any(
-        value["name"] == "return-field"
-        and value["value_ownership"] == "gateway_derivation"
-        for value in _model_values(inventory, selected)
-    )
+    assert selected["disposition"] == "already_deep"
+    assert _model_values(inventory, selected) == []
 
     for row in inventory["native_lanes"]:
         if row["classification"] == "generic-fixed-command-audited-deep":

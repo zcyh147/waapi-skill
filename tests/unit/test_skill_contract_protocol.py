@@ -112,8 +112,8 @@ def test_machine_readable_agent_result_is_terminal_for_fixed_reads_and_transacti
     assert "This rule applies to fixed reads as well as transactions" in SKILL
     assert "Do not reconstruct its fields from the prompt, `normalized`" in SKILL
     assert "do not run another command after receiving it" in SKILL
-    assert "metadata types --summary-only" in QUERY
-    assert "compact-serialize that object exactly" in QUERY
+    assert "Use live `metadata types`" in QUERY
+    assert "projection and bound are fixed" in QUERY
 
 
 def test_media_pool_reference_classification_uses_one_closed_versioned_query() -> None:
@@ -122,8 +122,8 @@ def test_media_pool_reference_classification_uses_one_closed_versioned_query() -
     )[0]
     section_flat = " ".join(section.split())
     command = (
-        "gateway.py --version 2025.1 query-object --type AudioFileSource "
-        "--take 1000 --match-original-file-path "
+        "gateway.py --version 2025.1 query-object --type-name AudioFileSource "
+        "--max-results 1000 --match-original-file-path "
         "'<first-complete-returned-Path>' --match-original-file-path "
         "'<second-complete-returned-Path>'"
     )
@@ -141,7 +141,7 @@ def test_media_pool_reference_classification_uses_one_closed_versioned_query() -
     assert "Do not pre-normalize or de-duplicate" in section_flat
     assert "normalizes slash spelling and drive/UNC case" in section_flat
     assert "keeps POSIX case significant" in section_flat
-    assert "Do not add `--where`, `--select`, `--all-results`, or `--return-field`" in section_flat
+    assert "Do not add predicates, relationships, or extra business outputs" in section_flat
     assert "fixed `id,path,originalFilePath` projection" in section_flat
     assert "emits no raw AudioFileSource inventory" in section_flat
     assert "never perform this join in model-authored code" in QUERY
@@ -221,17 +221,14 @@ def test_skill_entry_fits_the_fresh_codex_bootstrap_window() -> None:
 
 
 def test_exact_identity_query_is_complete_in_entry_file() -> None:
-    command = (
-        "query-object --path '<exact-object-path>' --return-field id "
-        "--return-field name --return-field type --return-field path"
-    )
-    assert command in SKILL
-    assert "Keep all four return fields explicit" in SKILL
+    assert "one literal `--path-segment` per hierarchy level" in SKILL
+    assert "`--exact-id '<exact-guid>'`" in SKILL
+    assert "always returns the four identity fields" in SKILL
     assert "Exact `not_found` stays Gateway-owned in compact output" in SKILL
     assert "use `--detail` only for explicit compile/dispatch diagnostics" in SKILL
     assert "do not read the query reference before or after it" in SKILL
     assert "Conditional read for a query not fully covered" in SKILL
-    assert "keep those four fields explicit for an exact path/GUID identity lookup" in QUERY
+    assert "The fixed identity projection is always present" in QUERY
 
 
 def test_multihop_query_reads_reference_before_a_fast_looking_first_hop() -> None:
@@ -297,8 +294,8 @@ def test_exact_hop_bus_comparison_uses_symmetric_volume_projections() -> None:
     section_flat = " ".join(section.split())
 
     assert "Both exact Bus reads must use the same" in section_flat
-    assert "`id,name,type,path,@Volume` projection" in section_flat
-    assert "never omit `@Volume` from comparison Bus" in section_flat
+    assert "fixed identity plus `volume_db`" in section_flat
+    assert "never omit `--include volume-db` from the comparison Bus" in section_flat
 
 
 def test_query_relationship_hops_reuse_returned_guids_without_weakening_guards() -> None:
@@ -363,9 +360,9 @@ def test_broad_query_subset_mutations_require_exact_id_readback() -> None:
     )[0]
     section_flat = " ".join(section.split())
 
-    assert "broad ordinary/structured query returns multiple candidates" in section_flat
+    assert "broad ordinary or advanced query returns multiple candidates" in section_flat
     assert "selects some to change" in section_flat
-    assert "`query-object --object-id` on each selected GUID" in section_flat
+    assert "`query-object --exact-id` on each selected GUID" in section_flat
     assert "`id`, `name`, `type`, and `path`" in section_flat
     assert "Never reread unselected rows" in section_flat
     assert "relationship read hops are exempt" in section_flat
@@ -396,24 +393,18 @@ def test_query_reference_discloses_compact_success_and_explicit_detail() -> None
 def test_small_complete_audit_uses_simple_inventory_before_report_rules() -> None:
     query_flat = " ".join(QUERY.split())
 
-    assert "Choose the query layer by live retrieval, not report-rule count" in query_flat
-    assert "every object in one explicit small subtree" in query_flat
-    assert "apply the user's `OR`, `NOT`, comparison, or naming rules directly to those rows, without code" in query_flat
-    assert "Do not call `query-schema` merely because a report has several rules" in query_flat
-    assert (
-        "A complete simple `query-object` command is the first and only Gateway "
-        "command for that read; never preface it with `query-schema`"
-        in query_flat
-    )
-    assert "Boolean rules applied after a complete small inventory do not trigger that switch" in query_flat
+    assert "Plan one bounded request" in query_flat
+    assert "apply presentation logic only to its complete result" in query_flat
+    assert "Use the business declaration for one source" in query_flat
+    assert "Use advanced only for a native read-only construct absent from that schema" in query_flat
 
 
 def test_user_supplied_absolute_wwise_paths_keep_their_exact_versioned_root() -> None:
     query_flat = " ".join(QUERY.split())
 
-    assert "Copy user-supplied absolute Wwise paths character-for-character" in query_flat
-    assert "never add or change their roots" in query_flat
-    assert "In 2025, never rewrite `\\Containers\\...` or `\\Busses\\...` under legacy roots" in query_flat
+    assert "repeated `--path-segment`" in query_flat
+    assert "Never reconstruct a Wwise path separator" in query_flat
+    assert "Gateway constructs the exact Wwise path and separators" in query_flat
 
 
 def test_advanced_query_docs_forbid_identity_handoff_and_disclose_framing() -> None:
@@ -430,7 +421,7 @@ def test_advanced_query_docs_forbid_identity_handoff_and_disclose_framing() -> N
         "even a one-row result does not prove",
         "Never feed an advanced result directly into a mutation",
         "obtain their exact choice",
-        "simple `query-object --object-id` route",
+        "simple `query-object --exact-id` route",
         "workflow stops for a new choice",
     ):
         assert phrase in section_flat
@@ -441,49 +432,36 @@ def test_advanced_query_docs_forbid_identity_handoff_and_disclose_framing() -> N
 def test_complex_query_guidance_preserves_tokens_pushdown_and_user_bounds() -> None:
     query_flat = " ".join(QUERY.split())
     for phrase in (
-        "Volume -> `@Volume`",
-        "Output Bus -> `OutputBus` (never `@OutputBus`)",
-        "Source language -> `audioSource:language`",
-        "direct child count -> `childrenCount`",
-        "ASCII-single-quote every standalone argv value beginning with `@`",
+        "The Agent names `volume-db`, `pitch-cents`, `output-bus`, `source-language`",
+        "The Gateway owns case-sensitive Wwise accessors and shell quoting",
         "exactly one returned `AudioFileSource` has `parent.id` exactly equal to that Sound's `id`",
         "Do not report the language as missing when this exact child-source evidence exists",
         "do not associate by row position, similar names, or path prefixes",
-        "Repeated `--where FIELD OPERATOR TYPE VALUE` facts mean AND",
-        "When the live result selection itself requires `A and (B or C)` or another nested boolean, switch to the structured route",
-        "copy that exact number to `--take`",
+        "Repeated `--predicate` values mean AND",
+        "nested boolean logic, use the advanced exact-WAQL lane",
+        "copy that exact number to `--max-results`",
         "ask for a limit instead of inventing one",
     ):
         assert phrase in query_flat
-    assert "--where type = string Sound --take 24" in query_flat
-    assert "--return-field '@Volume' --return-field notes --return-field OutputBus" in query_flat
+    assert "--predicate type-is Sound --max-results 24" in query_flat
+    assert "--include volume-db" in query_flat
 
 
 def test_pure_and_query_pushes_every_supported_conjunct_in_canonical_order() -> None:
     query_flat = " ".join(QUERY.split())
     for phrase in (
-        'Words such as "simultaneously", "all of the following conditions", or “同时满足” introduce a pure AND',
-        "Repeat `--where` for every supported conjunct",
-        "preserving the user's condition order",
-        "Do not submit only the type predicate",
-        "report, grouping, or sorting in their first-mention order",
-        "additional filter-only fields",
+        "Repeated `--predicate` values mean AND",
+        "preserve the user's condition order",
+        "Do not submit only a type condition",
+        "Output order is fixed identity first",
         "`isIncluded` is appended last because it is filter-only",
     ):
         assert phrase in query_flat
     assert (
-        "--where type = string Sound --where '@Volume' '<=' number -6.0 "
-        "--where notes : string mix-review --where isIncluded = boolean true --take 12"
+        "--predicate type-is Sound --predicate volume-db-at-most -6.0 "
+        "--predicate notes-contain mix-review --predicate included-is true --max-results 12"
     ) in query_flat
-    assert (
-        "--return-field '@Volume' --return-field notes "
-        "--return-field OutputBus "
-        "--return-field isIncluded"
-    ) in query_flat
-    assert (
-        "--return-field notes --return-field audioSource:language "
-        "--return-field OutputBus"
-    ) not in query_flat
+    assert "--where" not in query_flat
 
 
 def test_query_shell_examples_never_expose_bare_at_prefixed_argv_values() -> None:
@@ -492,43 +470,37 @@ def test_query_shell_examples_never_expose_bare_at_prefixed_argv_values() -> Non
     )
 
     assert executable_snippets
-    assert re.search(
-        r"(?:^|\s)--return-field\s+@[A-Za-z_][A-Za-z0-9_:]*",
-        executable_snippets,
-    ) is None
+    assert "--return-field" not in executable_snippets
 
 
-def test_nested_boolean_query_uses_the_closed_structured_contract() -> None:
+def test_nested_boolean_query_uses_the_bounded_advanced_contract() -> None:
     query_flat = " ".join(QUERY.split())
     for phrase in (
-        "offline, version-aware schema command",
-        "typed structured-query continuation",
-        "nested `all`/`any`, or `not`",
-        "Do not add `waql`, `raw`, `expression`",
-        "structured route: use one `where` transform with `all`, `any`, and `not`",
+        "offline version-aware schema command",
+        "Advanced native WAQL fallback",
+        "--advanced-waql",
+        "Gateway fixes read-only `ak.wwise.core.object.get`",
+        "no generated-code fallback",
     ):
         assert phrase in query_flat
-    assert "Follow the returned typed-structured continuation" in QUERY
+    assert "typed-structured" not in QUERY
 
 
 def test_reverse_direct_parent_query_uses_the_parent_transform() -> None:
     query_flat = " ".join(QUERY.split())
     for phrase in (
         '"from the Sounds, find their direct parents"',
-        "`--type Sound --select parent`",
+        "`--type-name Sound --relationship parent`",
         "Predicates then describe the selected parent rows",
-        "returned-parent `path` predicate",
         "Do not replace this with a descendant inventory",
     ):
         assert phrase in query_flat
     assert (
-        "query-object --type Sound --select parent --where path : string "
-        "'\\Actor-Mixer Hierarchy\\Default Work Unit\\ParentReview' "
-        "--where type = string RandomSequenceContainer"
+        "query-object --type-name Sound --relationship parent "
+        "--predicate type-is RandomSequenceContainer"
     ) in query_flat
     assert (
-        "--return-field childrenCount --return-field notes "
-        "--return-field OutputBus"
+        "--predicate children-at-least 3 --predicate notes-contain parent-review"
     ) in query_flat
 
 
@@ -536,10 +508,8 @@ def test_reverse_direct_parent_example_contains_exact_typed_path() -> None:
     example = QUERY.split("Direct parents:", 1)[1].split("```bash", 1)[1].split(
         "```", 1
     )[0]
-    assert (
-        "--where path : string "
-        r"'\Actor-Mixer Hierarchy\Default Work Unit\ParentReview'"
-    ) in example
+    assert "--relationship parent" in example
+    assert "--where" not in example
 
 
 def test_reverse_parent_coverage_counts_raw_source_rows_not_children_count() -> None:
@@ -559,18 +529,13 @@ def test_ancestor_ownership_query_keeps_the_explicit_project_exclusion() -> None
     query_flat = " ".join(QUERY.split())
     for phrase in (
         "ownership chain from one exact object",
-        "`--select ancestors`",
-        "do not assume the ancestor transform removes Project by itself",
+        "`--relationship ancestors`",
+        "do not assume the relationship removes Project",
         "nearest parent to farthest ancestor",
         "without mixing same-name objects from other branches",
     ):
         assert phrase in query_flat
-    assert (
-        "--select ancestors --where type '!=' string Project --take 8"
-    ) in query_flat
-    assert (
-        "--return-field childrenCount --return-field notes"
-    ) in query_flat
+    assert "--relationship ancestors --max-results 8" in query_flat
 
 
 def test_relative_depth_uses_path_without_an_unrequested_parent_projection() -> None:
@@ -586,8 +551,8 @@ def test_relative_depth_uses_path_without_an_unrequested_parent_projection() -> 
     example = QUERY.split(
         "For example, a bounded descendant inventory of Sound candidates", 1
     )[1].split("```bash", 1)[1].split("```", 1)[0]
-    assert "--return-field path" in example
-    assert "--return-field parent" not in example
+    assert "--path-segment" in example
+    assert "--include parent" not in example
 
 
 def test_mixed_parent_child_query_keeps_both_required_types_in_candidate_set() -> None:
@@ -597,7 +562,7 @@ def test_mixed_parent_child_query_keeps_both_required_types_in_candidate_set() -
         "parent containers together with their direct child Sounds",
         "omit a `type=Sound` or container-only predicate",
         "bounded mixed-type descendant set",
-        "request `parent`",
+        "`--include parent`",
         "erase one required side of the relationship",
     ):
         assert phrase in query_flat
@@ -759,23 +724,24 @@ def test_query_reference_has_a_deterministic_end_and_separate_alarm_hops() -> No
     assert "do not reread a range or invoke the Gateway" in query_flat
     assert "`WAAPI_QUERY_REFERENCE_END` and `WAAPI_OPERATE_REFERENCE_END`" in SKILL
     assert "matching sentinel is the final visible line" in SKILL
-    assert "That Sound projection ends at `OutputBus`" in query_flat
-    assert "do not add `@Volume` to the Sound hop" in query_flat
-    assert "query `@Volume` only on the exact Bus identities" in query_flat
-    assert "first the returned `OutputBus` id" in query_flat
+    assert "That Sound projection ends at `output_bus`" in query_flat
+    assert "do not add `volume-db` to the Sound hop" in query_flat
+    assert "request `volume-db` only on the exact Bus identities" in query_flat
+    assert "first the returned `output_bus` id" in query_flat
     assert "then the requested comparison Bus path or id" in query_flat
-    assert "count only repeated `--query` flags" in query_flat
-    assert "1–2 use 8, 3–4 use 3, and 5–8 use 2" in query_flat
+    assert "repeat `--meaning` for one to eight" in query_flat
+    assert "Gateway owns detail level, search bounds, projection" in query_flat
     for phrase in (
         "Exact standard bindings",
         "Success rows are objects in the array",
         "Complete `no_match` is a bounded miss",
         "Honor dependencies when authorized, otherwise clarify",
         "Use fixed reads rather than reflected payloads",
-        "voice pipeline id",
-        "bus pipeline ids",
+            "Voice object GUID",
+            "Bus object GUIDs",
+            "Gateway resolves volatile pipeline IDs",
         "auto-detected Authoring profile",
-        "bounds the projection",
+            "deduplicates and bounds it",
     ):
         assert phrase in query_flat
 
@@ -1109,9 +1075,8 @@ def test_operate_terminal_states_migration_and_cleanup_are_fail_closed() -> None
 
 def test_complex_query_projection_documents_derived_field_first_mention_order() -> None:
     flattened = " ".join(QUERY.split())
-    assert "scanning the user's requested output left to right" in flattened
-    assert "`id`, `name`, `type`, `path`, `parent`, `audioSource:language`, `@Volume`," in QUERY
-    assert "`notes`" in QUERY
+    assert "repeated `--include` values in caller order" in flattened
+    assert "custom `properties` and `references` maps" in flattened
 
 
 def test_media_pool_reference_orders_field_discovery_before_the_bound_read() -> None:
@@ -1218,10 +1183,9 @@ def test_one_time_onboarding_is_global_natural_and_does_not_add_a_gateway_call()
     assert "project modification policy" not in QUERY.lower()
 
 
-def test_named_api_result_uses_status_only_as_preflight() -> None:
-    assert "asks for the independent live result of a named API" in SKILL
-    assert "status` only as the required host/project preflight" in SKILL
-    assert "does not replace that independently requested API call" in SKILL
+def test_named_get_info_uses_status_as_its_only_route() -> None:
+    assert "`status` is the sole Gateway-owned `getInfo` route" in SKILL
+    assert "Do not use `request-schema` or `typed-zero-call`" in SKILL
     assert "needs only this `SKILL.md`" in SKILL
     assert "do not read the setup or query reference" in SKILL
     assert (

@@ -34,6 +34,8 @@ OBJECT_GET_URI = "ak.wwise.core.object.get"
 GET_TYPES_URI = "ak.wwise.core.object.getTypes"
 GET_NAMES_URI = "ak.wwise.core.object.getPropertyAndReferenceNames"
 GET_PROPERTY_INFO_URI = "ak.wwise.core.object.getPropertyInfo"
+IS_PROPERTY_ENABLED_URI = "ak.wwise.core.object.isPropertyEnabled"
+GET_ATTENUATION_CURVE_URI = "ak.wwise.core.object.getAttenuationCurve"
 PROJECT_GUID = "{11111111-1111-1111-1111-111111111111}"
 OBJECT_GUID = "{22222222-2222-2222-2222-222222222222}"
 SESSION_A = "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"
@@ -212,107 +214,204 @@ def _metadata_responses(
     }
 
 
+def test_metadata_discover_exposes_business_scope_and_meaning_not_native_tokens() -> None:
+    parser = waapi_gateway.build_parser()
+    subparsers = next(
+        action
+        for action in parser._actions
+        if "metadata" in (getattr(action, "choices", None) or {})
+    )
+    metadata = subparsers.choices["metadata"]
+    options = {
+        option
+        for action in metadata._actions
+        for option in action.option_strings
+    }
+
+    assert {"--path-segment", "--type-name", "--exact-id", "--meaning"} <= options
+    assert not {
+        "--object",
+        "--class-id",
+        "--object-type",
+        "--property",
+        "--query",
+        "--limit",
+        "--detail",
+    } & options
+
+
+def test_metadata_discover_resolves_exact_type_from_business_meaning(
+    tmp_path: Path,
+) -> None:
+    client = FakeClient(_metadata_responses(tmp_path))
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "metadata",
+            "discover",
+            "--type-name",
+            "Sound",
+            "--meaning",
+            "Volume",
+        ],
+        env=_gateway_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+
+    assert exit_code == 0, payload
+    assert payload["agent_result"]["candidates"][0]["name"] == "Volume"
+    assert [call[0] for call in client.calls][-3:] == [
+        GET_TYPES_URI,
+        GET_NAMES_URI,
+        GET_PROPERTY_INFO_URI,
+    ]
+
+
+def test_metadata_property_state_resolves_meaning_before_exact_native_read(
+    tmp_path: Path,
+) -> None:
+    responses = _metadata_responses(tmp_path)
+    responses[IS_PROPERTY_ENABLED_URI] = {"return": True}
+    client = FakeClient(responses)
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "metadata",
+            "property-state",
+            "--path-segment",
+            "Actor-Mixer Hierarchy",
+            "--path-segment",
+            "Default Work Unit",
+            "--path-segment",
+            "Rain",
+            "--meaning",
+            "Volume",
+            "--platform",
+            "Windows",
+        ],
+        env=_gateway_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+
+    assert exit_code == 0, payload
+    assert payload["agent_result"] == {
+        "meaning": "Volume",
+        "platform": "Windows",
+        "enabled": True,
+    }
+    assert client.calls[-1] == (
+        IS_PROPERTY_ENABLED_URI,
+        {
+            "object": (
+                r"\Actor-Mixer Hierarchy\Default Work Unit\Rain"
+            ),
+            "platform": "Windows",
+            "property": "Volume",
+        },
+        {},
+    )
+
+
+def test_metadata_attenuation_compiles_business_curve_role(
+    tmp_path: Path,
+) -> None:
+    responses = _metadata_responses(tmp_path)
+    responses[GET_ATTENUATION_CURVE_URI] = {
+        "curveType": "VolumeDryUsage",
+        "use": "Custom",
+        "points": [],
+    }
+    client = FakeClient(responses)
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "metadata",
+            "attenuation",
+            "--path-segment",
+            "Attenuations",
+            "--path-segment",
+            "Default Work Unit",
+            "--path-segment",
+            "Outdoor",
+            "--curve-role",
+            "volume-dry",
+        ],
+        env=_gateway_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+
+    assert exit_code == 0, payload
+    assert payload["agent_result"] == {
+        "curve_role": "volume-dry",
+        "use": "Custom",
+        "points": [],
+    }
+    assert client.calls[-1] == (
+        GET_ATTENUATION_CURVE_URI,
+        {
+            "object": r"\Attenuations\Default Work Unit\Outdoor",
+            "curveType": "VolumeDryUsage",
+        },
+        {},
+    )
+
+
 @pytest.mark.parametrize(
     ("argv", "message_fragment"),
     (
         (
-            ["metadata", "discover", "--query", "Volume"],
-            "requires exactly one",
+            ["metadata", "discover", "--meaning", "Volume"],
+            "requires exactly one --path-segment, --type-name, or --exact-id scope",
+        ),
+        (
+            ["metadata", "discover", "--type-name", "Sound"],
+            "requires 1..8 --meaning values",
         ),
         (
             [
                 "metadata",
                 "discover",
-                "--class-id",
-                str(SOUND_CLASS_ID),
-                "--object",
-                OBJECT_GUID,
-                "--query",
-                "Volume",
-            ],
-            "requires exactly one",
-        ),
-        (
-            ["metadata", "discover", "--class-id", str(SOUND_CLASS_ID)],
-            "requires 1..8 --query values",
-        ),
-        (
-            [
-                "metadata",
-                "discover",
-                "--class-id",
-                "-1",
-                "--query",
-                "Volume",
-            ],
-            "--class-id must be a uint32 integer",
-        ),
-        (
-            [
-                "metadata",
-                "discover",
-                "--object-type",
+                "--type-name",
                 " ",
-                "--query",
+                "--meaning",
                 "Volume",
             ],
-            "--object-type must be non-empty",
+            "--type-name must be non-empty",
         ),
         (
             [
                 "metadata",
                 "discover",
-                "--class-id",
-                str(SOUND_CLASS_ID),
-                "--query",
+                "--type-name",
+                "Sound",
+                "--meaning",
                 "Volume",
-                "--query",
+                "--meaning",
                 "volume",
             ],
-            "--query values must be distinct",
+            "--meaning values must be distinct",
         ),
         (
             [
                 "metadata",
                 "discover",
-                "--class-id",
-                str(SOUND_CLASS_ID),
+                "--type-name",
+                "Sound",
                 *sum(
-                    (["--query", f"query-{index}"] for index in range(9)),
+                    (["--meaning", f"query-{index}"] for index in range(9)),
                     [],
                 ),
             ],
-            "requires 1..8 --query values",
+            "requires 1..8 --meaning values",
         ),
         (
             [
                 "metadata",
-                "discover",
-                "--class-id",
-                str(SOUND_CLASS_ID),
-                "--query",
-                "Volume",
-                "--limit",
-                "0",
+                "types",
+                "--type-name",
+                "Sound",
             ],
-            "--limit must be between 1 and 8",
-        ),
-        (
-            [
-                "metadata",
-                "discover",
-                "--class-id",
-                str(SOUND_CLASS_ID),
-                "--query",
-                "Volume",
-                "--limit",
-                "9",
-            ],
-            "--limit must be between 1 and 8",
-        ),
-        (
-            ["metadata", "types", "--detail"],
-            "--detail are supported only for the discover operation",
+            "metadata types accepts no business input",
         ),
     ),
 )
@@ -348,9 +447,9 @@ def test_metadata_discover_has_a_bounded_thirty_second_default_deadline(
         [
             "metadata",
             "discover",
-            "--class-id",
-            str(SOUND_CLASS_ID),
-            "--query",
+            "--type-name",
+            "Sound",
+            "--meaning",
             "Volume",
         ]
     )
@@ -365,46 +464,12 @@ def test_metadata_discover_has_a_bounded_thirty_second_default_deadline(
 
 
 @pytest.mark.parametrize(
-    ("version", "scope_argv", "expected_scope_args", "uses_get_types"),
-    (
-        (
-            "2021.1",
-            ["--object-type", "Sound"],
-            {"classId": SOUND_CLASS_ID},
-            True,
-        ),
-        (
-            "2022.1",
-            ["--class-id", str(SOUND_CLASS_ID)],
-            {"classId": SOUND_CLASS_ID},
-            False,
-        ),
-        (
-            "2023.1",
-            ["--object", OBJECT_GUID],
-            {"object": OBJECT_GUID},
-            False,
-        ),
-        (
-            "2024.1",
-            ["--object-type", "Sound"],
-            {"classId": SOUND_CLASS_ID},
-            True,
-        ),
-        (
-            "2025.1",
-            ["--class-id", str(SOUND_CLASS_ID)],
-            {"classId": SOUND_CLASS_ID},
-            False,
-        ),
-    ),
+    "version",
+    ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"),
 )
 def test_metadata_discover_dispatches_only_closed_reads_for_all_versions(
     tmp_path: Path,
     version: str,
-    scope_argv: list[str],
-    expected_scope_args: Mapping[str, Any],
-    uses_get_types: bool,
 ) -> None:
     client = FakeClient(_metadata_responses(tmp_path, version=version))
 
@@ -412,11 +477,10 @@ def test_metadata_discover_dispatches_only_closed_reads_for_all_versions(
         [
             "metadata",
             "discover",
-            *scope_argv,
-            "--query",
+            "--type-name",
+            "Sound",
+            "--meaning",
             "Volume",
-            "--limit",
-            "1",
         ],
         env=_gateway_env(tmp_path, version=version),
         client_factory=lambda _url: client,
@@ -448,21 +512,20 @@ def test_metadata_discover_dispatches_only_closed_reads_for_all_versions(
         GET_NAMES_URI,
         GET_PROPERTY_INFO_URI,
     }
-    if uses_get_types:
-        expected_uris.add(GET_TYPES_URI)
+    expected_uris.add(GET_TYPES_URI)
     assert set(call_uris) == expected_uris
     assert call_uris.count(GET_INFO_URI) == 1
     assert call_uris.count(OBJECT_GET_URI) == 1
     assert call_uris.count(GET_NAMES_URI) == 1
     assert call_uris.count(GET_PROPERTY_INFO_URI) == 1
-    assert call_uris.count(GET_TYPES_URI) == int(uses_get_types)
+    assert call_uris.count(GET_TYPES_URI) == 1
 
     names_call = next(call for call in client.calls if call[0] == GET_NAMES_URI)
     info_call = next(
         call for call in client.calls if call[0] == GET_PROPERTY_INFO_URI
     )
-    assert names_call[1] == expected_scope_args
-    assert info_call[1] == {**expected_scope_args, "property": "Volume"}
+    assert names_call[1] == {"classId": SOUND_CLASS_ID}
+    assert info_call[1] == {"classId": SOUND_CLASS_ID, "property": "Volume"}
     assert client.disconnected is True
 
 
@@ -485,37 +548,6 @@ def test_live_metadata_type_discloses_canonical_typed_action_scalar(
 ) -> None:
     assert metadata_typed_value_type(metadata_type) == typed_value_type
 
-
-def test_metadata_discover_detail_is_an_explicit_full_audit_opt_in(
-    tmp_path: Path,
-) -> None:
-    client = FakeClient(_metadata_responses(tmp_path))
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        [
-            "metadata",
-            "discover",
-            "--class-id",
-            str(SOUND_CLASS_ID),
-            "--query",
-            "Volume",
-            "--limit",
-            "1",
-            "--detail",
-        ],
-        env=_gateway_env(tmp_path),
-        client_factory=lambda _url: client,
-    )
-
-    assert exit_code == 0, payload
-    result = payload["agent_result"]
-    assert result["contract"] == "waapi-skill.metadata-discovery/v1"
-    assert "result_detail" not in result
-    candidate = result["candidates"][0]
-    assert candidate["match_evidence"]
-    assert candidate["metadata"]["supports"]["rtpc"] == "Exclusive"
-    assert candidate["metadata"]["ui"]["value"]["min"] == -96.3
-    assert candidate["metadata"]["audioEngineId"] == 42
 
 
 def _compact_five_query_gateway_payload(
@@ -594,18 +626,16 @@ def _compact_five_query_gateway_payload(
     query_argv = [
         item
         for query in queries
-        for item in ("--query", query)
+        for item in ("--meaning", query)
     ]
 
     exit_code, payload = waapi_gateway.execute_gateway(
         [
             "metadata",
             "discover",
-            "--object-type",
+            "--type-name",
             "Sound",
             *query_argv,
-            "--limit",
-            "8",
         ],
         env=_gateway_env(tmp_path),
         client_factory=lambda _url: client,
@@ -654,12 +684,10 @@ def test_metadata_discover_persists_and_reuses_exact_live_session_cache(
     argv = [
         "metadata",
         "discover",
-        "--object-type",
+        "--type-name",
         "Sound",
-        "--query",
+        "--meaning",
         "Volume",
-        "--limit",
-        "1",
     ]
     first_exit, first_payload = waapi_gateway.execute_gateway(
         argv,
@@ -752,7 +780,7 @@ def test_metadata_discover_persists_and_reuses_exact_live_session_cache(
     waapi_gateway._METADATA_SESSION_CACHE.clear()
 
 
-def test_canonical_guid_discovery_cache_is_reused_by_next_preview_process(
+def test_exact_id_discovery_cache_is_reused_by_next_preview_process(
     tmp_path: Path,
 ) -> None:
     state_dir = tmp_path / "guid-state"
@@ -765,12 +793,10 @@ def test_canonical_guid_discovery_cache_is_reused_by_next_preview_process(
         [
             "metadata",
             "discover",
-            "--object",
+            "--exact-id",
             object_guid_lower,
-            "--query",
+            "--meaning",
             "Volume",
-            "--limit",
-            "1",
         ],
         env=env,
         client_factory=lambda _url: client,
@@ -833,9 +859,9 @@ def test_metadata_discover_falls_back_to_uncached_live_when_project_unavailable(
         [
             "metadata",
             "discover",
-            "--class-id",
-            str(SOUND_CLASS_ID),
-            "--query",
+            "--type-name",
+            "Sound",
+            "--meaning",
             "Volume",
         ],
         env=_gateway_env(tmp_path, state_dir=state_dir),
@@ -865,9 +891,9 @@ def test_metadata_discover_never_invents_rejected_property_name(
         [
             "metadata",
             "discover",
-            "--class-id",
-            str(SOUND_CLASS_ID),
-            "--query",
+            "--type-name",
+            "Sound",
+            "--meaning",
             "OverrideMaxSoundPerInstance",
         ],
         env=_gateway_env(tmp_path),

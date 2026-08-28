@@ -172,37 +172,27 @@ FIXED_COMMANDS_BY_URI: Mapping[str, tuple[str, ...]] = MappingProxyType(
             "project-default-work-units",
         ),
         "ak.wwise.core.object.get": ("query-object", "buses"),
-        "ak.wwise.core.object.getAttenuationCurve": ("metadata attenuation-curve",),
+        "ak.wwise.core.object.getAttenuationCurve": ("metadata attenuation",),
         "ak.wwise.core.object.getPropertyAndReferenceNames": (
-            "metadata names",
             "metadata discover",
         ),
         "ak.wwise.core.object.getPropertyInfo": (
-            "metadata property-info",
             "metadata discover",
         ),
         "ak.wwise.core.object.getTypes": (
             "metadata types",
             "metadata discover",
         ),
-        "ak.wwise.core.object.isPropertyEnabled": ("metadata property-enabled",),
+        "ak.wwise.core.object.isPropertyEnabled": ("metadata property-state",),
         "ak.wwise.core.profiler.getGameObjects": (
             "profiler-game-objects",
         ),
         "ak.wwise.core.profiler.getVoiceContributions": (
             "profiler-voice-contributions",
-            "request-schema",
-            "typed-call",
         ),
         "ak.wwise.debug.getWalTree": ("debug-wal-tree",),
-        # This Debug-only API validates a described call but never invokes the
-        # target URI. Keep its established read-only lifecycle while exposing
-        # only the shared typed construction path.
         "ak.wwise.debug.validateCall": (
-            "request-schema",
-            "request-map-container",
-            "request-array-item",
-            "typed-call",
+            "debug-validate-call",
         ),
         "ak.wwise.ui.getSelectedObjects": ("selected",),
     }

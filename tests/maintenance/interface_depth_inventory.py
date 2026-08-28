@@ -19,10 +19,6 @@ from wwise_waapi.operation_registry import (
     operation_input_mode,
 )
 from wwise_waapi.typed_requests import TypedRequestError, request_contract
-from wwise_waapi.typed_queries import (
-    typed_query_contract,
-    typed_query_schema_payload,
-)
 from wwise_waapi.typed_topics import topic_match_contract, topic_options_contract
 
 
@@ -66,12 +62,8 @@ def _operation_contract_rows() -> list[dict[str, Any]]:
 
 
 @lru_cache(maxsize=1)
-def _gateway_subparsers() -> Mapping[str, argparse.ArgumentParser]:
-    """Load the actual public CLI parser used by fixed Gateway commands.
-
-    Argparse has no public schema-introspection API.  Keep its private action
-    walk isolated here and project only semantic command facts below.
-    """
+def _gateway_module() -> Any:
+    """Load the packaged Gateway once for parser and public schema audit."""
 
     module_name = "_waapi_skill_interface_depth_gateway"
     spec = importlib.util.spec_from_file_location(module_name, GATEWAY_PATH)
@@ -80,6 +72,18 @@ def _gateway_subparsers() -> Mapping[str, argparse.ArgumentParser]:
     module = importlib.util.module_from_spec(spec)
     sys.modules[module_name] = module
     spec.loader.exec_module(module)
+    return module
+
+
+@lru_cache(maxsize=1)
+def _gateway_subparsers() -> Mapping[str, argparse.ArgumentParser]:
+    """Load the actual public CLI parser used by fixed Gateway commands.
+
+    Argparse has no public schema-introspection API.  Keep its private action
+    walk isolated here and project only semantic command facts below.
+    """
+
+    module = _gateway_module()
     parser = module.build_parser()
     subparsers = next(
         (
@@ -284,10 +288,10 @@ def _public_continuation_rows(
             and lane["uri"] == "ak.wwise.core.object.get"
         ):
             row["query_layers"] = {
-                "structured": typed_query_schema_payload(
+                "business": _gateway_module().query_business_schema_payload(
                     lane["version"], advanced=False
                 ),
-                "advanced": typed_query_schema_payload(
+                "advanced": _gateway_module().query_business_schema_payload(
                     lane["version"], advanced=True
                 ),
             }
@@ -442,19 +446,6 @@ def _typed_field_rows(
             contracts = [("request", request_contract(lane["version"], lane["uri"]))]
         except TypedRequestError:
             contracts = []
-    if lane["item_type"] == "function" and lane["uri"] == "ak.wwise.core.object.get":
-        contracts.extend(
-            [
-                (
-                    "query.structured",
-                    typed_query_contract(lane["version"], advanced=False),
-                ),
-                (
-                    "query.advanced",
-                    typed_query_contract(lane["version"], advanced=True),
-                ),
-            ]
-        )
     rows: list[dict[str, Any]] = []
     for command in _fixed_command_contracts(lane):
         for parameter in command["parameters"]:

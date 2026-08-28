@@ -11,6 +11,11 @@ from wwise_waapi.metadata_discovery import (
 
 GATEWAY_RESULT_CONTRACT = "waapi-skill.gateway-result/v1"
 TYPED_REQUEST_SCHEMA_CONTRACT = "waapi-skill.typed-request-schema/v1"
+FIXED_COMMAND_ROUTE_CONTRACT = "waapi-skill.fixed-command-route/v1"
+BUSINESS_QUERY_SCHEMA_CONTRACT = "waapi-skill.object-query-business-schema/v1"
+ADVANCED_QUERY_SCHEMA_CONTRACT = (
+    "waapi-skill.advanced-object-query-business-schema/v1"
+)
 TYPED_TOPIC_INPUT_CONTRACT = "waapi-skill.typed-topic-input/v1"
 TYPED_CONTAINER_HANDLE_CONTRACT = "waapi-skill.typed-container-handle/v1"
 TYPED_MAP_CONTAINER_CHOICES_CONTRACT = (
@@ -43,8 +48,18 @@ def task_local_runner_matches_normalized(
 def gateway_payload_contracts(subcommand: str) -> frozenset[str]:
     """Return the exact public success envelopes allowed for one command."""
 
-    if subcommand in {"request-schema", "query-schema"}:
-        return frozenset({TYPED_REQUEST_SCHEMA_CONTRACT})
+    if subcommand == "request-schema":
+        return frozenset(
+            {TYPED_REQUEST_SCHEMA_CONTRACT, FIXED_COMMAND_ROUTE_CONTRACT}
+        )
+    if subcommand == "query-schema":
+        return frozenset(
+            {
+                BUSINESS_QUERY_SCHEMA_CONTRACT,
+                ADVANCED_QUERY_SCHEMA_CONTRACT,
+                GATEWAY_RESULT_CONTRACT,
+            }
+        )
     if subcommand == "topic-schema":
         return frozenset({TYPED_TOPIC_INPUT_CONTRACT})
     if subcommand == "request-map-container":
@@ -60,6 +75,9 @@ def gateway_payload_contracts(subcommand: str) -> frozenset[str]:
 
 __all__ = [
     "GATEWAY_RESULT_CONTRACT",
+    "ADVANCED_QUERY_SCHEMA_CONTRACT",
+    "BUSINESS_QUERY_SCHEMA_CONTRACT",
+    "FIXED_COMMAND_ROUTE_CONTRACT",
     "TASK_LOCAL_RUNNER_POSIX",
     "TASK_LOCAL_RUNNER_WINDOWS",
     "TYPED_ARRAY_ITEM_CHOICES_CONTRACT",

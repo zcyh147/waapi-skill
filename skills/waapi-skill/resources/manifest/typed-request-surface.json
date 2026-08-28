@@ -1,7 +1,7 @@
 {
   "contract": "waapi-skill.typed-request-surface/v1",
   "intentionally_blocked_field_occurrences": 79,
-  "inventory_sha256": "6d05d64e95a6e0f7099ddd03f1da42c763e9c06f33f93cac7581c7c061a83af8",
+  "inventory_sha256": "2d595ba571ac74ac7a40c7dc18dd60ce47110de4b8b9ed2a7c5baf48e6a00cc5",
   "lanes": [
     {
       "construction_shape": "inline",
@@ -2070,7 +2070,7 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "metadata attenuation-curve"
+          "metadata attenuation"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -2085,7 +2085,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2021.1"
       },
-      "execution_policy_sha256": "60a9af694ec09fa1b076918020898094e500efd584639803c8825aa3b14c142a",
+      "execution_policy_sha256": "5609902fcb6e457e8231e8a253f9bede851947b0d0b0c5317a93dc0b38ca37fc",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 2,
@@ -2115,7 +2115,6 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "metadata names",
           "metadata discover"
         ],
         "item_type": "function",
@@ -2131,7 +2130,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2021.1"
       },
-      "execution_policy_sha256": "bca5c7b83be7ce945fec35eb6c066d74526c23ca749a3955f0b6d6b068d73be8",
+      "execution_policy_sha256": "d552a165d3858a34208cecde1b89b37637b0447ecc6f47534d624464a528945a",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 2,
@@ -2161,7 +2160,6 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "metadata property-info",
           "metadata discover"
         ],
         "item_type": "function",
@@ -2177,7 +2175,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2021.1"
       },
-      "execution_policy_sha256": "dbc5f625db007b62a416d2b75d072b62f251825fb5699cacdcaedd0091adade6",
+      "execution_policy_sha256": "ca693f60d0cae57bac8acabb4ffe8b1eebee26c68764c5b101c046f31defd693",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 7,
@@ -2252,7 +2250,7 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "metadata property-enabled"
+          "metadata property-state"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -2267,7 +2265,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2021.1"
       },
-      "execution_policy_sha256": "8a9f1ab9f81b7f3ef51d3d8f7131059ed5211a6df07b4dfff4d73b57f7bf6cad",
+      "execution_policy_sha256": "94f64c7d32c9f2ca9c07663a64f2fa24268f59937386b5be1db3fc7a54a2bbc9",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 3,
@@ -2851,9 +2849,7 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "profiler-voice-contributions",
-          "request-schema",
-          "typed-call"
+          "profiler-voice-contributions"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -2868,7 +2864,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2021.1"
       },
-      "execution_policy_sha256": "d632edfa5398822301602fa3b8e66787b812083e2107b9b00f0beb6fe5991542",
+      "execution_policy_sha256": "5507cd9e0844d900099a6c5aaa2308b959cd741e8d40bbed07b01fcc8f588f3a",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 4,
@@ -8077,7 +8073,7 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "metadata attenuation-curve"
+          "metadata attenuation"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -8092,7 +8088,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2022.1"
       },
-      "execution_policy_sha256": "b83d45467ef73da3e307efa8aa78957eccfc26e6e1d92f2f3b5552144288ce99",
+      "execution_policy_sha256": "db670028d882d6196e9da2e03548e4a9d6af56d2253a4dde5a3361b58c28caa8",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 3,
@@ -8121,7 +8117,6 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "metadata names",
           "metadata discover"
         ],
         "item_type": "function",
@@ -8137,7 +8132,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2022.1"
       },
-      "execution_policy_sha256": "3b19448347876df754114d2ee406b1b6c352244c66df3343f7d1169937a1ee8b",
+      "execution_policy_sha256": "9960984c7f1fb6d12119e5a69efc7134f351769856310ee21c268240e8085095",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 2,
@@ -8167,7 +8162,6 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "metadata property-info",
           "metadata discover"
         ],
         "item_type": "function",
@@ -8183,7 +8177,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2022.1"
       },
-      "execution_policy_sha256": "90e43d603bcfc8a891294f9f6e81f175306bbb6efb09062b8f3d342ad6ce19e3",
+      "execution_policy_sha256": "9a4c12a37f9ba901f7cb58aa54087f8254071f690f36870886ccd73b6e0a9a62",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 7,
@@ -8258,7 +8252,7 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "metadata property-enabled"
+          "metadata property-state"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -8273,7 +8267,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2022.1"
       },
-      "execution_policy_sha256": "b7cfd5aa5658e2ae953f0e3e80a7d45753c4511b3e382a86b2e620efab0a317f",
+      "execution_policy_sha256": "07b646055ea2c5aeb7c9a52957501ca95ada2749d92990516aa3b793577ae8fa",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 3,
@@ -9009,9 +9003,7 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "profiler-voice-contributions",
-          "request-schema",
-          "typed-call"
+          "profiler-voice-contributions"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -9026,7 +9018,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2022.1"
       },
-      "execution_policy_sha256": "83c071ed04dc2643eec060ec26d207e278cc52c181906ecbe1ae354040f4dcff",
+      "execution_policy_sha256": "d0a704eca6fc2a9569be9d0f20ef492d941e0669c97ce42e3a2e79fa629160b2",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 4,
@@ -15312,7 +15304,7 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "metadata attenuation-curve"
+          "metadata attenuation"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -15327,7 +15319,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2023.1"
       },
-      "execution_policy_sha256": "479f97610f18ecd9089c90f10312bf37cc16215b0c8535ca9405fd2431e8fd94",
+      "execution_policy_sha256": "a4d20ee9c79429d128c635f37dddbdfccb7ab687664309c08b109df6e23cef06",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 3,
@@ -15356,7 +15348,6 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "metadata names",
           "metadata discover"
         ],
         "item_type": "function",
@@ -15372,7 +15363,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2023.1"
       },
-      "execution_policy_sha256": "3b466b4291ed78caa26b5bbe65069fc991f0daa4936c11be13f384c814082ed5",
+      "execution_policy_sha256": "496ddb1d86c7246700b66088afb11e46ed6b05d9013f46f05bd56a9d1721cfc9",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 2,
@@ -15402,7 +15393,6 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "metadata property-info",
           "metadata discover"
         ],
         "item_type": "function",
@@ -15418,7 +15408,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2023.1"
       },
-      "execution_policy_sha256": "1a93ffe8a2d348206b5a13a3b856b929c669450c73380ea8c4b2683cabd7271a",
+      "execution_policy_sha256": "dc0776e684e03451404d91f46e15c0e563ca6b630a1874cbfd6d6ac10d002ad5",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 7,
@@ -15536,7 +15526,7 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "metadata property-enabled"
+          "metadata property-state"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -15551,7 +15541,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2023.1"
       },
-      "execution_policy_sha256": "1b25461a956bb55ecceb921953f1f19afa7a85f387599ce5e8697a00ce420e95",
+      "execution_policy_sha256": "f7fa2185794e7597d8c9f783d2fdfb22572c1e1aebb2cc93063410037fd9af55",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 3,
@@ -16611,9 +16601,7 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "profiler-voice-contributions",
-          "request-schema",
-          "typed-call"
+          "profiler-voice-contributions"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -16628,7 +16616,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2023.1"
       },
-      "execution_policy_sha256": "7eda6ee2a0d96c6bea1fcbf14c0d613820dc4075b930612a4bd82ee3271cc12b",
+      "execution_policy_sha256": "4e388d81936a5e97408b65b58f9436bb1c75eb4d247c8ac443e71f7f4eee0f88",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 4,
@@ -23985,7 +23973,7 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "metadata attenuation-curve"
+          "metadata attenuation"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -24000,7 +23988,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2024.1"
       },
-      "execution_policy_sha256": "b7cfa9f6a91fe563277d21e9d86e0dac34bb78fd647f3e26b5b6f000d776724c",
+      "execution_policy_sha256": "74b2736e34e15e2a4b2fa7513d7bfcbf23524a442ad1ed4206d7265a1aeb84d3",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 3,
@@ -24029,7 +24017,6 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "metadata names",
           "metadata discover"
         ],
         "item_type": "function",
@@ -24045,7 +24032,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2024.1"
       },
-      "execution_policy_sha256": "41b205d0acaff5488141027d524574c81d389a43d20f859dd1194afb4869f6c8",
+      "execution_policy_sha256": "274b9d05bc3a53863a8e32c206573ef54873a7d21c6980314a8454a67a5d9bf5",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 2,
@@ -24075,7 +24062,6 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "metadata property-info",
           "metadata discover"
         ],
         "item_type": "function",
@@ -24091,7 +24077,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2024.1"
       },
-      "execution_policy_sha256": "795f6f7e1d2d2dae7c1c901ec2aa1392b7aec541e05d25c9dfef72a8b1548b3b",
+      "execution_policy_sha256": "602509d784bf3e24e8371cd4c3bca544c368663cb3b78bafd20aa0c64d716122",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 7,
@@ -24209,7 +24195,7 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "metadata property-enabled"
+          "metadata property-state"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -24224,7 +24210,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2024.1"
       },
-      "execution_policy_sha256": "0c7f9708dac31454e99312cf778b407ce789fd3f9cc14df180b001672eae9729",
+      "execution_policy_sha256": "c70024deb17e10c0a060a8b492a73df3b30fd0cedb00b16674fb1f80e4a9da42",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 3,
@@ -25377,9 +25363,7 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "profiler-voice-contributions",
-          "request-schema",
-          "typed-call"
+          "profiler-voice-contributions"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -25394,7 +25378,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2024.1"
       },
-      "execution_policy_sha256": "ee91157f486c669211f11a542a023b1820f93b60b263abdc329daf7154671ced",
+      "execution_policy_sha256": "db9fead7f8bf51ff78dfd92f94a33b25c05acdff469a21ae554603c3fbe053a3",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 4,
@@ -27430,10 +27414,7 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "request-schema",
-          "request-map-container",
-          "request-array-item",
-          "typed-call"
+          "debug-validate-call"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -27448,7 +27429,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2024.1"
       },
-      "execution_policy_sha256": "49e6d1dadb0bf785a001dde3953508da8f3b35434433bca29a4fe58d560be907",
+      "execution_policy_sha256": "87641ae97ce216585e0b53b8a5febc61bb9d9e6608f3ee72c90c3c66b7b5e16e",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 0,
@@ -32538,7 +32519,7 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "metadata attenuation-curve"
+          "metadata attenuation"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -32553,7 +32534,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2025.1"
       },
-      "execution_policy_sha256": "76a4a735537ddb50f1ed588018922e6b03599c82f7b2b5c995bd3151a748c427",
+      "execution_policy_sha256": "3e2c4b39c82210c0a5b72b253f1a45d6fbb4e3dc46a46bf93c6d7e0d76285059",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 3,
@@ -32582,7 +32563,6 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "metadata names",
           "metadata discover"
         ],
         "item_type": "function",
@@ -32598,7 +32578,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2025.1"
       },
-      "execution_policy_sha256": "4b5d100f025dd2b202387cad9955629d143b6a697f77e0b03a2947fc3ac441f5",
+      "execution_policy_sha256": "ef401359e643ecff01b0a1f4d975d02bbffac9f6693c43c21a9ec67092334bb2",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 2,
@@ -32628,7 +32608,6 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "metadata property-info",
           "metadata discover"
         ],
         "item_type": "function",
@@ -32644,7 +32623,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2025.1"
       },
-      "execution_policy_sha256": "08f597efcf23703e264e0a84c8c309ce573d441c334c6bd2922eeb2ed3b46cbc",
+      "execution_policy_sha256": "eebf53a9735f78da554e5f6a2689e9060fbf4a3363945105ee98a805512a4098",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 7,
@@ -32762,7 +32741,7 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "metadata property-enabled"
+          "metadata property-state"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -32777,7 +32756,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2025.1"
       },
-      "execution_policy_sha256": "74f5a97181bd097324ed43187badfdd1be31ae852b649e9da388e8b98c2a40cb",
+      "execution_policy_sha256": "6be2988712b410c71244fd2dffe1f50db2c1cffe85e6ce548981fa9c21b70754",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 3,
@@ -33931,9 +33910,7 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "profiler-voice-contributions",
-          "request-schema",
-          "typed-call"
+          "profiler-voice-contributions"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -33948,7 +33925,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2025.1"
       },
-      "execution_policy_sha256": "6ceb55eb2cc684e6ec2bc0220b3e85639b282b25ff099ecee2ab09466a410b30",
+      "execution_policy_sha256": "72fe287054d05d9875c1fb3ba00ebc4625ecdee2e4d6716c87de314ae175f1d8",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 4,
@@ -36171,10 +36148,7 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "request-schema",
-          "request-map-container",
-          "request-array-item",
-          "typed-call"
+          "debug-validate-call"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -36189,7 +36163,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2025.1"
       },
-      "execution_policy_sha256": "4b52cc0e4578981b348ad6c748226fa1173c29fca58f193c45d85608732e025b",
+      "execution_policy_sha256": "871da66e67884ed0c20fa8479ce477b6782a557d3574c90e0c8e6ef6fd42eedc",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 0,

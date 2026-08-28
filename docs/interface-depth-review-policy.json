@@ -16,10 +16,10 @@
     ]
   },
   "source_contracts": {
-    "gateway_parser_sha256": "78007b801e768a0fba9ef8e64fbf0614118620dd81f16352b3015970b9f77a2f",
+    "gateway_parser_sha256": "f42fd705dd5940acb29c3c9cc722642756f5c76e65eeceb33aa233bc6b857cb2",
     "operation_contract_sha256": "bd3f63201dec616a6b57dbd4be326a6e72fbf0642367c773a331491a56c914f5",
-    "public_continuation_sha256": "2fa739b8ede432490e6474de7477fb77a933cd99f5d57a8e07a5e7e2fd365e52",
-    "typed_request_surface_sha256": "6d05d64e95a6e0f7099ddd03f1da42c763e9c06f33f93cac7581c7c061a83af8"
+    "public_continuation_sha256": "e86effa5a84930f1e1aff9a22f84afed417e08959388d187bf3deb3c21d2aca0",
+    "typed_request_surface_sha256": "2d595ba571ac74ac7a40c7dc18dd60ce47110de4b8b9ed2a7c5baf48e6a00cc5"
   },
   "ownership_classes": {
     "stable_business_declaration": "A prompt-derived business value remains visible in the public request.",
@@ -150,10 +150,11 @@
     },
     {
       "id": "generic-fixed-query-metadata",
-      "disposition": "migration_required",
-      "owner_issue": 57,
+      "disposition": "already_deep",
+      "owner_issue": null,
       "match": {"routes": ["fixed_command"], "fixed_command_model_values": true},
-      "leaked_mechanics": ["native_object_path", "metadata_scope", "property_or_reference_token", "wire_type", "request_fragment"]
+      "leaked_mechanics": [],
+      "audit_evidence": "The fixed query, metadata, selection, profiler, and Debug routes accept business sources, predicates, outputs, meanings, identities, capture intent, and bounded exact artifacts. The Gateway owns native paths, types, accessors, projections, metadata tokens, pipeline IDs, Debug envelopes, result bounds, and every continuation; request-schema and typed-call cannot bypass those routes."
     },
     {
       "id": "generic-fixed-command-audited-deep",
@@ -222,19 +223,10 @@
     }
   ],
   "ticket_blueprints": {
-    "generic-fixed-query-metadata": {
-      "title": "Migrate fixed query, metadata, selection, profiler, and debug commands to deep declarations",
-      "parent_issue": 57,
-      "blocked_by_family": null,
-      "public_behavior": "Accept semantic query sources and predicates, business metadata choices, selection/profiler intent, and bounded debug-read intent; derive exact object.get source/transform/projection, metadata tokens, field handles, wire types, and continuations. Only bounded advanced WAQL remains an exact expression.",
-      "deterministic_tests": "Introspect and seal the actual argparse schema for every fixed command, cover each exact version lane and parameter, structured/advanced query repair, stale handles, metadata scope, projections, hostile values, bounds, and no legacy construction continuation.",
-      "removal_boundary": "Remove model-authored query source/transform/return construction, metadata tokens, selected/profiler native parameters, and fixed-command typed escape paths after parity; retain truly parameterless fixed commands as direct Gateway routes.",
-      "proportional_evidence": "Representative object query, metadata, selection, profiler, and debug-read cases on 2022.1 and 2025.1 on macOS and Windows, plus targeted Fresh Agent query routing and repair."
-    },
     "generic-core-project-object": {
       "title": "Deepen generic Core project, object, audio, blend, switch, and Work Unit routes",
       "parent_issue": 57,
-      "blocked_by_family": "generic-fixed-query-metadata",
+      "blocked_by_family": null,
       "public_behavior": "Replace raw typed field handles and native request layout with coherent business declarations for the exact audited Core project/object route rows; keep dedicated-operation bypasses closed.",
       "deterministic_tests": "Every exact inventory row and version, positive/negative/repair/stale cases, identity and version deltas, hostile scalars, continuation completeness, and non-bypass.",
       "removal_boundary": "Remove request-schema/typed-call model construction for these rows only after semantic parity; keep closed query and mutation safety boundaries.",
@@ -305,7 +297,6 @@
     }
   },
   "ticket_issue_numbers": {
-    "generic-fixed-query-metadata": 96,
     "generic-core-project-object": 84,
     "generic-core-media-build": 85,
     "generic-core-remaining": 86,
@@ -324,7 +315,7 @@
     "filesystem_artifact_names": ["source"],
     "exact_artifact_suffixes": ["_directory", "_file", "_path"],
     "filesystem_path_uris": ["ak.wwise.cli.", "ak.wwise.console.", "ak.wwise.debug.generateToneWAV", "ak.wwise.ui.captureScreen", "ak.wwise.ui.project."],
-    "bounded_expression_names": ["waql"],
+    "bounded_expression_names": ["advanced_waql", "waql"],
     "live_bound_names": ["field", "metadata", "property", "reference"],
     "reviewed_adapter_names": ["calls", "children", "commands", "control_input", "import_location", "inclusions", "kind", "object_path", "object_type", "objects", "plugin", "points", "type"],
     "live_bound_description_phrases": ["mutation token", "property metadata"],
