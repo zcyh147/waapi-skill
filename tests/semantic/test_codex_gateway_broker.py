@@ -2521,6 +2521,30 @@ def test_broker_accepts_one_optional_initial_operations_discovery(
     )
 
 
+def test_broker_allows_optional_initial_operations_before_request_schema(
+    tmp_path: Path,
+) -> None:
+    broker = CodexGatewayBroker(
+        skill_source=make_fake_skill(tmp_path),
+        expected_steps=(
+            ExpectedGatewayStep(
+                "tx01.request-schema",
+                "request-schema",
+                ("ak.wwise.core.project.save",),
+            ),
+        ),
+        optional_initial_operations_discovery_operation=(
+            "ak.wwise.core.project.save"
+        ),
+        transport="tcp",
+    )
+
+    assert broker._optional_initial_operations_step == ExpectedGatewayStep(  # noqa: SLF001
+        "tx01.operations",
+        "operations",
+    )
+
+
 @pytest.mark.parametrize(
     "commands",
     (
@@ -2559,7 +2583,7 @@ def test_broker_optional_initial_operations_discovery_binds_one_exact_operation(
     tmp_path: Path,
 ) -> None:
     skill = make_fake_skill(tmp_path)
-    with pytest.raises(ValueError, match="bind the exact first operation-schema"):
+    with pytest.raises(ValueError, match="bind the exact first schema"):
         CodexGatewayBroker(
             skill_source=skill,
             expected_steps=(

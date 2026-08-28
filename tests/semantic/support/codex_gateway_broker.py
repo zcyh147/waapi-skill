@@ -8048,12 +8048,15 @@ class CodexGatewayBroker:
             raise ValueError("ExpectedGatewayStep names must be unique")
         if self.optional_initial_operations_discovery_operation is not None:
             first = self.expected_steps[0]
-            if first.subcommand != "operation-schema" or first.arguments != (
+            if first.subcommand not in {
+                "operation-schema",
+                "request-schema",
+            } or first.arguments != (
                 self.optional_initial_operations_discovery_operation,
             ):
                 raise ValueError(
                     "optional operations discovery must bind the exact first "
-                    "operation-schema operation"
+                    "schema operation"
                 )
             label = first.name.rsplit(".", 1)[0]
             discovery = ExpectedGatewayStep(

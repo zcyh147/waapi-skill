@@ -228,12 +228,14 @@ prevention checks that are expensive to rediscover.
   the synthetic Broker expected the opaque Core URI immediately. The prompt
   intentionally contained no URI or Gateway mechanics.
 - Cause: the profile tested natural-language routing but omitted the shared
-  one-read discovery allowance already used by other business profiles.
+  one-read discovery allowance already used by other business profiles. Root
+  `imac-core-0120163-r3` then exposed that the allowance itself accepted only
+  named `operation-schema`, not the raw-API `request-schema` seam.
 - Prevention: when a natural prompt cannot name its reviewed raw API, bind one
   optional initial `operations` read to that exact API. The Broker may insert
-  it once before the immutable Draft flow; any different, repeated, or later
-  discovery remains a semantic failure. Freeze the original root without
-  replay or PASS credit.
+  it once before the exact first `operation-schema` or `request-schema`; any
+  different, repeated, or later discovery remains a semantic failure. Freeze
+  each original root without replay or PASS credit.
 
 ## New-root preflight
 
