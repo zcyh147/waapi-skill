@@ -280,7 +280,7 @@ def _complete_core_result_schema_draft(
     executed = runtime.gateway(["execute", transaction_id], live=True)
     verified = runtime.gateway(["verify", transaction_id], live=True)
     assert executed["state"] == TransactionState.EXECUTED_UNVERIFIED.value, executed
-    assert verified["state"] == TransactionState.VERIFIED.value, verified
+    assert verified["state"] == "result_schema_checked", verified
     verification = verified.get("verification")
     assert isinstance(verification, Mapping), verified
     assert verification["status"] == "result_schema_checked", verification
@@ -1794,7 +1794,7 @@ def test_compound_undo_business_draft_executes_and_cancels_without_retry(
         success_readback = runtime.gateway(
             [
                 "query-object",
-                "--object-id",
+                "--exact-id",
                 success_id,
                 "--return-field",
                 "id",
@@ -2052,7 +2052,7 @@ def test_core_business_public_read_and_result_schema_mutation(
         readback = runtime.gateway(
             [
                 "query-object",
-                "--object-id",
+                "--exact-id",
                 target_id,
                 "--return-field",
                 "id",
@@ -2385,7 +2385,7 @@ def _create_object(
 
 def _delete_if_present_via_transaction(runtime: _WorkflowSandboxRuntime, object_id: str) -> None:
     before = runtime.gateway(
-        ["query-object", "--object-id", object_id, "--return-field", "id", "--return-field", "path"],
+        ["query-object", "--exact-id", object_id, "--return-field", "id", "--return-field", "path"],
         live=True,
     )
     if before["count"] == 0:
@@ -2397,7 +2397,7 @@ def _delete_if_present_via_transaction(runtime: _WorkflowSandboxRuntime, object_
         object_id=object_id,
     )
     after = runtime.gateway(
-        ["query-object", "--object-id", object_id, "--return-field", "id"],
+        ["query-object", "--exact-id", object_id, "--return-field", "id"],
         live=True,
     )
     assert after["count"] == 0
