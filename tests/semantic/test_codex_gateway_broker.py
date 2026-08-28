@@ -5340,6 +5340,69 @@ def test_raw_core_draft_replay_accepts_canonical_waapi_call_identity(
     ) == expected
 
 
+def test_raw_core_durable_replay_selects_the_exact_api_adapter(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    steps = build_core_business_transaction_steps(
+        api="ak.wwise.core.project.save",
+        version="2025.1",
+        label="tx01",
+    )
+    start = next(step for step in steps if step.subcommand == "draft-start")
+    preview = next(
+        step for step in steps if step.subcommand == "preview-from-draft"
+    )
+    expected = preview.expected_operation_request
+    assert expected is not None
+    skill = make_fake_skill(tmp_path)
+    (skill / "wwise_waapi").mkdir()
+    state = tmp_path / "state"
+    state.mkdir()
+    selected: list[str] = []
+    session = SimpleNamespace(
+        handles=SimpleNamespace(as_dict=lambda: {"objects": []})
+    )
+    monkeypatch.setattr(
+        broker_module,
+        "OperationDraftStore",
+        lambda _state: SimpleNamespace(
+            inspect=lambda *_args, **_kwargs: SimpleNamespace(
+                composition={"business_session": {}}
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        broker_module.BusinessDeclarationSession,
+        "from_dict",
+        lambda _value: session,
+    )
+
+    def select_adapter(operation: str) -> SimpleNamespace:
+        selected.append(operation)
+        return SimpleNamespace(
+            supports_cleaned_file_evidence=False,
+            materialize=lambda *_args, **_kwargs: expected,
+        )
+
+    monkeypatch.setattr(broker_module, "business_adapter", select_adapter)
+    broker = CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=steps,
+        expected_wwise_version="2025.1",
+    )
+    broker._state_directory = state  # noqa: SLF001
+    broker._payloads_by_step[start.name] = {  # noqa: SLF001
+        "task_authority": "da1-" + "2" * 40,
+        "draft": {"draft_id": "od1-" + "1" * 32},
+    }
+
+    assert broker._replay_expected_operation_draft_request(  # noqa: SLF001
+        preview
+    ) == expected
+    assert selected == ["ak.wwise.core.project.save"]
+
+
 def test_sealed_business_draft_replay_survives_successful_media_cleanup(
     tmp_path: Path,
 ) -> None:

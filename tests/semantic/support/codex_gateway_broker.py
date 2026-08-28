@@ -11715,7 +11715,7 @@ class CodexGatewayBroker:
                         else None
                     )
                     session = BusinessDeclarationSession.from_dict(raw_session)
-                    adapter = business_adapter(expected_operation)
+                    adapter = business_adapter(draft_operation)
                     replayed = adapter.materialize(
                         session,
                         allow_cleaned_file_evidence=(
