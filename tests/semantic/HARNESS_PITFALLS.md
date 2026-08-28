@@ -103,7 +103,11 @@ prevention checks that are expensive to rediscover.
   the full four-step list to its first three entries. #96 query `r11` produced a
   task-level PASS with `ambiguous-kind`, `refined-kind`, and the main query, but
   exposed this second archive-only failure before the omission-aware replay was
-  covered by a synthetic regression.
+  covered by a synthetic regression. The same repair also has one primary
+  business query but two audited `object.get` dispatches: the exact-type
+  confirmation and the main query. Preserve those as separate counts in the
+  runner and archive validator; auxiliary repair evidence must neither inflate
+  business-oracle cardinality nor be rejected by a primary-only audit check.
 
 ### Interleaved Drafts leaked the most recent flow
 

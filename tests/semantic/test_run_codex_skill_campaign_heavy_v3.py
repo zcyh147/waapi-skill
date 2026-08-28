@@ -6335,7 +6335,11 @@ def _write_passing_project_outcome(
             "trusted_direct_call_count": 1,
             "primary_dispatch": {
                 "api": unit.scenario.api,
-                "dispatch_count": unit.scenario.primary_dispatch.count,
+                "dispatch_count": getattr(
+                    unit,
+                    "expected_audited_dispatch_count",
+                    unit.scenario.primary_dispatch.count,
+                ),
             },
             "business_verification": (
                 _synthetic_audio_oracle(
@@ -7211,6 +7215,7 @@ def test_heavy_cli_pass_checks_accept_both_valid_migration_shutdown_shapes(
         expected_row={"api": unit.scenario.api, "runner": "cli", "version": "2022.1"},
         expected_thread_id="thread-1",
         primary_count=1,
+        audited_count=1,
         task_root=Path("/synthetic/task"),
         prompt_evidence=None,  # type: ignore[arg-type]
     )
@@ -7240,6 +7245,7 @@ def test_heavy_cli_pass_checks_reject_migration_disconnect_before_dispatch() -> 
             expected_row={"api": unit.scenario.api, "runner": "cli", "version": "2022.1"},
             expected_thread_id="thread-1",
             primary_count=1,
+            audited_count=1,
             task_root=Path("/synthetic/task"),
             prompt_evidence=None,  # type: ignore[arg-type]
         )
@@ -7285,6 +7291,7 @@ def test_get_info_pass_checks_bind_status_preflight_separately(
         },
         expected_thread_id="thread-1",
         primary_count=1,
+        audited_count=1,
         task_root=Path("/synthetic/task"),
         prompt_evidence=None,  # type: ignore[arg-type]
     )
@@ -7302,6 +7309,7 @@ def test_get_info_pass_checks_bind_status_preflight_separately(
             },
             expected_thread_id="thread-1",
             primary_count=1,
+            audited_count=1,
             task_root=Path("/synthetic/task"),
             prompt_evidence=None,  # type: ignore[arg-type]
         )

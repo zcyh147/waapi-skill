@@ -378,6 +378,7 @@ def test_campaign_alarm_dispatch_contract_counts_mutations_only(
         },
         expected_thread_id="unused-for-project-runner",
         primary_count=1,
+        audited_count=1,
         task_root=Path("/synthetic/task"),
         prompt_evidence=SimpleNamespace(
             typed_sections=_workflow_sections(

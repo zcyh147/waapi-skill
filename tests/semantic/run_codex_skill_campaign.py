@@ -5128,12 +5128,14 @@ def _validate_heavy_v3_pass_outcome(
         options=options,
     )
     primary_count = _heavy_v3_primary_dispatch_count(expected_unit)
+    audited_count = _heavy_v3_audited_dispatch_count(expected_unit)
     _validate_heavy_v3_pass_checks(
         checks,
         expected_unit=expected_unit,
         expected_row=expected_row,
         expected_thread_id=thread_id,
         primary_count=primary_count,
+        audited_count=audited_count,
         task_root=task_root,
         prompt_evidence=prompt_evidence,
     )
@@ -5166,6 +5168,21 @@ def _heavy_v3_primary_dispatch_count(expected_unit: Any) -> int:
             "heavy scenario has no closed primary-dispatch count"
         )
     return count
+
+
+def _heavy_v3_audited_dispatch_count(expected_unit: Any) -> int:
+    declared = getattr(
+        expected_unit,
+        "expected_audited_dispatch_count",
+        None,
+    )
+    if declared is None:
+        return _heavy_v3_primary_dispatch_count(expected_unit)
+    if type(declared) is not int or declared < 0:
+        raise CampaignEvidenceError(
+            "policy unit has an invalid audited-dispatch count"
+        )
+    return declared
 
 
 def _heavy_v3_base_scenario_id(expected_unit: Any) -> str:
@@ -7695,6 +7712,7 @@ def _validate_heavy_v3_pass_checks(
     expected_row: Mapping[str, Any],
     expected_thread_id: str,
     primary_count: int,
+    audited_count: int,
     task_root: Path,
     prompt_evidence: HeavyV3PromptEvidence,
 ) -> None:
@@ -7712,7 +7730,7 @@ def _validate_heavy_v3_pass_checks(
             set(primary)
             != {"api", "count", "connection_lost", "connection_lost_after_dispatch"}
             or primary.get("api") != api
-            or primary.get("count") != primary_count
+            or primary.get("count") != audited_count
             or not isinstance(primary.get("connection_lost"), bool)
             or not isinstance(primary.get("connection_lost_after_dispatch"), bool)
         ):
@@ -7797,7 +7815,7 @@ def _validate_heavy_v3_pass_checks(
             set(primary) != {"api", "gateway_dispatch_calls", "event_count"}
             or primary.get("api") != api
             or primary.get("gateway_dispatch_calls") != 1
-            or primary.get("event_count") != primary_count
+            or primary.get("event_count") != audited_count
             or checks.get("topic_publisher_call_count") != publisher_count
             or type(checks.get("topic_publisher_direct_call_count")) is not int
             or checks.get("topic_publisher_direct_call_count", 0) < publisher_count
@@ -7843,7 +7861,7 @@ def _validate_heavy_v3_pass_checks(
         if (
             set(primary) != expected_primary_keys
             or primary.get("api") != api
-            or primary.get("dispatch_count") != primary_count
+            or primary.get("dispatch_count") != audited_count
             or (
                 api == "ak.wwise.core.getInfo"
                 and primary.get("status_preflight_dispatch_count") != 1
@@ -7881,7 +7899,7 @@ def _validate_heavy_v3_pass_checks(
     if (
         set(primary) != {"api", "dispatch_count"}
         or primary.get("api") != api
-        or primary.get("dispatch_count") != primary_count
+        or primary.get("dispatch_count") != audited_count
     ):
         raise CampaignEvidenceError("passing project primary-dispatch proof is invalid")
     workflow_id = _heavy_v3_integration_workflow_id(expected_unit)
