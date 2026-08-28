@@ -154,6 +154,7 @@ from tests.semantic.support.codex_object_business_plan_v3 import (  # noqa: E402
     ObjectBusinessPlanError,
     ObjectBusinessPlanSections,
     TYPED_PROFILE_OBJECT_METADATA_UNITS,
+    TYPED_PROFILE_QUERY_REPAIR_UNIT_ID,
     TYPED_PROFILE_RENAME_UNIT_ID,
     TYPED_PROFILE_SET03_UNIT_ID,
     parse_object_business_plan_sections,
@@ -7137,6 +7138,7 @@ def _validate_heavy_v3_typed_business_plan(
                 if getattr(expected_unit, "unit_id", None)
                 in {
                     *TYPED_PROFILE_OBJECT_METADATA_UNITS,
+                    TYPED_PROFILE_QUERY_REPAIR_UNIT_ID,
                     TYPED_PROFILE_RENAME_UNIT_ID,
                 }
                 else None

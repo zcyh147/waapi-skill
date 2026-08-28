@@ -10113,6 +10113,7 @@ class CodexGatewayBroker:
         if (
             step.subcommand == "query-object"
             and "--max-results" in step.arguments
+            and all(isinstance(value, str) for value in step.arguments)
         ):
             validation_arguments = _normalize_business_query_arguments(
                 validation_arguments,

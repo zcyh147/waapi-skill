@@ -58,6 +58,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_direct_protocol,
     build_metadata_transaction_protocol,
     build_object_set_composer_transaction_steps,
+    build_optional_query_repair_protocol,
     build_optional_query_schema_protocol,
     build_transaction_protocol,
     query_object_step,
@@ -108,6 +109,7 @@ from tests.semantic.support.codex_prompt_provenance_v3 import (
 )
 from tests.semantic.support.codex_object_business_plan_v3 import (
     ObjectBusinessPlanError,
+    TYPED_PROFILE_QUERY_REPAIR_UNIT_ID,
     compile_object_business_plan,
     validate_object_archived_verification,
 )
@@ -1606,7 +1608,7 @@ def _mark_codex_infrastructure_block(
         sandbox_project.write_text("<WwiseDocument/>\n", encoding="utf-8")
         lifecycle = {
             "contract": campaign.HEAVY_V3_PROJECT_LIFECYCLE_CONTRACT,
-            "scenario_id": unit.unit_id,
+            "scenario_id": getattr(unit, "base_scenario_id", unit.unit_id),
             "version": unit.version,
             "requested_status": "BLOCKED",
             "final_status": "BLOCKED",
@@ -1770,7 +1772,10 @@ def _synthetic_typed_sections(
         "ak.wwise.core.object.create",
         "ak.wwise.core.object.set",
     }:
-        recipe = build_object_heavy_v3_recipe(unit.unit_id)
+        recipe = build_object_heavy_v3_recipe(
+            getattr(unit, "base_scenario_id", unit.unit_id),
+            version=unit.version,
+        )
         before = _synthetic_object_before(recipe)
         audio_root = scenario_root / "owned" / "assets" / "object-query-audio"
         manifest: list[dict[str, Any]] = []
@@ -1795,6 +1800,11 @@ def _synthetic_typed_sections(
             protocol,
             before,
             manifest,
+            profile_unit_id=(
+                TYPED_PROFILE_QUERY_REPAIR_UNIT_ID
+                if unit.unit_id == TYPED_PROFILE_QUERY_REPAIR_UNIT_ID
+                else None
+            ),
         )
     if unit.scenario.api == "ak.wwise.core.audio.convert":
         plan, before = _synthetic_audio_plan_and_before(unit, scenario_root)
@@ -2186,7 +2196,7 @@ def _write_prompt_materialization(
             "delta_rules": (),
         }
     business_oracle_plan = write_business_oracle_plan(
-        scenario_id=unit.unit_id,
+        scenario_id=getattr(unit, "base_scenario_id", unit.unit_id),
         version=unit.version,
         api=unit.scenario.api,
         runner="cli" if unit.scenario.api.startswith("ak.wwise.cli.") else "project",
@@ -2246,11 +2256,16 @@ def _synthetic_protocol(
         "ak.wwise.core.object.create",
         "ak.wwise.core.object.set",
     }:
-        recipe = build_object_heavy_v3_recipe(unit.unit_id)
+        recipe = build_object_heavy_v3_recipe(
+            getattr(unit, "base_scenario_id", unit.unit_id),
+            version=unit.version,
+        )
         if isinstance(recipe.request, OperationRequestSpec):
             return build_transaction_protocol((recipe.request.as_dict(),))
         if isinstance(recipe.request, QueryObjectRequestSpec):
             query = query_object_step("query-object", recipe.request.argv[3:])
+            if unit.unit_id == TYPED_PROFILE_QUERY_REPAIR_UNIT_ID:
+                return build_optional_query_repair_protocol(query)
             return (
                 build_optional_query_schema_protocol(query)
                 if "--max-results" in recipe.request.argv
@@ -2570,6 +2585,41 @@ def _synthetic_gateway_records(
                 }
             )
         elif step.subcommand == "query-object":
+            if step.name == "query-repair.ambiguous-kind":
+                payload.update(
+                    {
+                        "status": "needs_clarification",
+                        "agent_result": {
+                            "meaning": "Music",
+                            "candidate_count": 2,
+                            "candidates": [
+                                {
+                                    "classId": 17,
+                                    "name": "MusicTrack",
+                                    "type": "Object",
+                                },
+                                {
+                                    "classId": 18,
+                                    "name": "MusicSegment",
+                                    "type": "Object",
+                                },
+                            ],
+                            "repair": (
+                                "refine --custom-kind until one live Wwise "
+                                "type matches"
+                            ),
+                        },
+                    }
+                )
+            elif step.name == "query-repair.refined-kind":
+                payload.update(
+                    {
+                        "status": "ok",
+                        "count": 0,
+                        "objects": [],
+                        "agent_result": [],
+                    }
+                )
             query_arguments = tuple(
                 item for item in step.arguments if isinstance(item, str)
             )
@@ -4646,7 +4696,7 @@ def _synthetic_object_oracle(
         verification = _synthetic_object_mutation_verification(plan)
     return {
         "contract": campaign.HEAVY_V3_ORACLE_CONTRACT,
-        "scenario_id": unit.unit_id,
+        "scenario_id": getattr(unit, "base_scenario_id", unit.unit_id),
         "version": unit.version,
         "api": unit.scenario.api,
         "runner": "project",
@@ -6182,7 +6232,7 @@ def _write_passing_project_outcome(
         previous_prefix = prefix
     task_result = {
             "contract": campaign.HEAVY_V3_TASK_RESULT_CONTRACT,
-            "scenario_id": unit.unit_id,
+            "scenario_id": getattr(unit, "base_scenario_id", unit.unit_id),
             "version": unit.version,
             "thread_id": thread_id,
             "turn_count": len(prompts),
@@ -6737,6 +6787,41 @@ def test_heavy_validator_accepts_sealed_optional_query_schema_terminal_prefixes(
     result = campaign.validate_heavy_v3_child_run(
         root,
         expected_units=units,
+        options=options,
+        returncode=0,
+    )
+
+    assert [row["status"] for row in result.observations] == ["PASS"], "\n".join(
+        verdict.reason for verdict in result.phase_verdicts
+    )
+
+
+def test_heavy_validator_accepts_typed_profile_query_repair_archive(
+    tmp_path: Path,
+) -> None:
+    from tests.semantic.support.codex_typed_input_profile import (
+        load_typed_input_profile,
+    )
+
+    options = _options(tmp_path)
+    profile = load_typed_input_profile(
+        Path(__file__).resolve().parent
+        / "data"
+        / "typed-input-v1"
+        / "profile.json",
+        unit_ids=("TYP22-GENERIC-OBJECT-QUERY",),
+    )
+    root = tmp_path / "matrix"
+    _write_matrix_evidence(
+        root,
+        options=options,
+        units=profile.units,
+        statuses=("PASS",),
+    )
+
+    result = campaign.validate_heavy_v3_child_run(
+        root,
+        expected_units=profile.units,
         options=options,
         returncode=0,
     )
