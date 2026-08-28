@@ -9,6 +9,7 @@ import pytest
 from tests.semantic import run_codex_skill_campaign as campaign
 from tests.semantic import run_codex_skill_matrix as matrix
 from tests.semantic.support.codex_core_business_agent_runner import (
+    _core_business_run_spec,
     prepare_core_business_runtime,
 )
 from tests.semantic.support.codex_core_business_profile import (
@@ -89,6 +90,13 @@ def test_core_business_protocol_uses_one_complete_gateway_continuation() -> None
         },
     }
     assert all(step.subcommand not in {"typed-call", "draft-apply", "execute"} for step in steps)
+
+
+def test_core_business_fresh_runner_allows_one_initial_operation_discovery() -> None:
+    unit = load_core_business_profile(PROFILE).units[0]
+    spec = _core_business_run_spec(unit)
+
+    assert spec.optional_initial_operations_discovery_operation == unit.operation
 
 
 def test_core_business_profile_is_registered_in_the_formal_terra_lane() -> None:

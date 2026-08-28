@@ -127,6 +127,29 @@ def _preview_is_closed_core_call(records: Sequence[Any]) -> bool:
     )
 
 
+def _core_business_run_spec(unit: CoreBusinessUnit) -> BusinessAgentRunSpec:
+    return BusinessAgentRunSpec(
+        prepare_runtime=prepare_core_business_runtime,
+        build_steps=lambda runtime: build_core_business_transaction_steps(
+            api=unit.operation,
+            version=unit.version,
+            label="tx01",
+        ),
+        transaction_count=lambda _runtime: 1,
+        preview_gates=lambda expected, _runtime, result, evidence: {
+            "preview_reported": _final_response_reports_preview(
+                result.final_response,
+                markers=expected.final_markers,
+            ),
+            "closed_core_request": _preview_is_closed_core_call(
+                evidence.records
+            ),
+        },
+        outcome_factory=CoreBusinessAgentOutcome,
+        optional_initial_operations_discovery_operation=unit.operation,
+    )
+
+
 def run_core_business_agent_unit(
     unit: CoreBusinessUnit,
     *,
@@ -137,25 +160,7 @@ def run_core_business_agent_unit(
         unit,
         scenario_root=scenario_root,
         options=options,
-        spec=BusinessAgentRunSpec(
-            prepare_runtime=prepare_core_business_runtime,
-            build_steps=lambda runtime: build_core_business_transaction_steps(
-                api=unit.operation,
-                version=unit.version,
-                label="tx01",
-            ),
-            transaction_count=lambda _runtime: 1,
-            preview_gates=lambda expected, _runtime, result, evidence: {
-                "preview_reported": _final_response_reports_preview(
-                    result.final_response,
-                    markers=expected.final_markers,
-                ),
-                "closed_core_request": _preview_is_closed_core_call(
-                    evidence.records
-                ),
-            },
-            outcome_factory=CoreBusinessAgentOutcome,
-        ),
+        spec=_core_business_run_spec(unit),
     )
 
 

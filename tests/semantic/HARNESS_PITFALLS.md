@@ -221,6 +221,20 @@ prevention checks that are expensive to rediscover.
   complete protocol validator before spending a Fresh root. A pre-Codex block
   is frozen without replay or PASS credit.
 
+### Natural raw-API prompts need one bounded operation discovery
+
+- Evidence: #84 Fresh root `imac-core-5a1d501-r2` failed semantically because
+  the Agent correctly asked `operations` how to route “save the project”, while
+  the synthetic Broker expected the opaque Core URI immediately. The prompt
+  intentionally contained no URI or Gateway mechanics.
+- Cause: the profile tested natural-language routing but omitted the shared
+  one-read discovery allowance already used by other business profiles.
+- Prevention: when a natural prompt cannot name its reviewed raw API, bind one
+  optional initial `operations` read to that exact API. The Broker may insert
+  it once before the immutable Draft flow; any different, repeated, or later
+  discovery remains a semantic failure. Freeze the original root without
+  replay or PASS credit.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:
