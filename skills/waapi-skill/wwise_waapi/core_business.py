@@ -16,6 +16,9 @@ _PASTE_MODES = {
     "merge-replace": "addReplace",
     "merge-keep": "addKeep",
 }
+_PASTE_BUSINESS_FIELDS = {
+    "notes": "Notes",
+}
 _CURVE_KINDS = {
     "volume-dry": "VolumeDryUsage",
     "volume-wet-game": "VolumeWetGameUsage",
@@ -205,6 +208,31 @@ def _field_tokens(
         )
         for handle in handles
     ]
+
+
+def _paste_business_fields(value: Any, *, field: str) -> list[str]:
+    names = _string_list(value, field=field)
+    unknown = sorted(set(names) - set(_PASTE_BUSINESS_FIELDS))
+    if unknown:
+        raise business_repair(
+            "BUSINESS_ENUM_INVALID",
+            field=field,
+            choices=sorted(_PASTE_BUSINESS_FIELDS),
+            rejected=unknown,
+            action="choose one disclosed stable paste field",
+        )
+    return [_PASTE_BUSINESS_FIELDS[name] for name in names]
+
+
+def _merge_paste_fields(*groups: list[str], field: str) -> list[str]:
+    merged = [value for group in groups for value in group]
+    if len(merged) != len(set(merged)):
+        raise business_repair(
+            "BUSINESS_COLLECTION_INVALID",
+            field=field,
+            action="include each paste field exactly once",
+        )
+    return merged
 
 
 def _finite_number(value: Any, *, field: str) -> float:
@@ -571,15 +599,23 @@ def materialize_core_business_request(
             plan,
             required={"source_handle", "target_handles"},
             optional={
+                "include_fields",
+                "exclude_fields",
                 "include_field_handles",
                 "exclude_field_handles",
                 "list_mode",
             },
         )
-        if "include_field_handles" in plan and "exclude_field_handles" in plan:
+        has_inclusion = bool(
+            {"include_fields", "include_field_handles"} & set(plan)
+        )
+        has_exclusion = bool(
+            {"exclude_fields", "exclude_field_handles"} & set(plan)
+        )
+        if has_inclusion and has_exclusion:
             raise business_repair(
                 "BUSINESS_FIELDS_CONFLICT",
-                field="include_field_handles",
+                field="include_fields",
                 action="choose inclusion or exclusion, not both",
             )
         source_id = _object_id(
@@ -597,19 +633,49 @@ def materialize_core_business_request(
                 role="target",
             ),
         }
-        if "include_field_handles" in plan:
-            args["inclusion"] = _field_tokens(
-                session,
-                plan["include_field_handles"],
-                field="include_field_handles",
-                object_id=source_id,
+        if has_inclusion:
+            args["inclusion"] = _merge_paste_fields(
+                (
+                    _paste_business_fields(
+                        plan["include_fields"],
+                        field="include_fields",
+                    )
+                    if "include_fields" in plan
+                    else []
+                ),
+                (
+                    _field_tokens(
+                        session,
+                        plan["include_field_handles"],
+                        field="include_field_handles",
+                        object_id=source_id,
+                    )
+                    if "include_field_handles" in plan
+                    else []
+                ),
+                field="include_fields",
             )
-        if "exclude_field_handles" in plan:
-            args["exclusion"] = _field_tokens(
-                session,
-                plan["exclude_field_handles"],
-                field="exclude_field_handles",
-                object_id=source_id,
+        if has_exclusion:
+            args["exclusion"] = _merge_paste_fields(
+                (
+                    _paste_business_fields(
+                        plan["exclude_fields"],
+                        field="exclude_fields",
+                    )
+                    if "exclude_fields" in plan
+                    else []
+                ),
+                (
+                    _field_tokens(
+                        session,
+                        plan["exclude_field_handles"],
+                        field="exclude_field_handles",
+                        object_id=source_id,
+                    )
+                    if "exclude_field_handles" in plan
+                    else []
+                ),
+                field="exclude_fields",
             )
         if "list_mode" in plan:
             mode = _PASTE_MODES.get(plan["list_mode"])

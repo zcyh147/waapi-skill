@@ -438,6 +438,75 @@ def test_paste_convert_and_conversion_plugin_compile_business_collections(
     }
 
 
+def test_paste_properties_maps_stable_notes_meaning_without_metadata_guessing() -> None:
+    session, handles, ids = _role_session(("source", "target"))
+    session = session.with_settings(
+        {
+            "core_plan": {
+                "source_handle": handles[0],
+                "target_handles": [handles[1]],
+                "include_fields": ["notes"],
+                "list_mode": "merge-replace",
+            }
+        }
+    )
+
+    request = materialize_core_business_request(
+        "ak.wwise.core.object.pasteProperties",
+        session,
+    )
+
+    assert request["arguments"]["args"] == {
+        "source": ids[0],
+        "targets": [ids[1]],
+        "inclusion": ["Notes"],
+        "pasteMode": "addReplace",
+    }
+    contract = core_business_contract_data(
+        "ak.wwise.core.object.pasteProperties",
+        "2025.1",
+    )
+    assert contract["declaration"]["input_forms"]["include_fields"] == {
+        "flag": "--item",
+        "repeatable": True,
+        "arguments": ["FIELD", "VALUE"],
+    }
+
+
+@pytest.mark.parametrize(
+    ("extra_plan", "error_code"),
+    [
+        ({"include_fields": ["midi-notes"]}, "BUSINESS_ENUM_INVALID"),
+        (
+            {"include_fields": ["notes"], "exclude_fields": ["notes"]},
+            "BUSINESS_FIELDS_CONFLICT",
+        ),
+    ],
+)
+def test_paste_properties_rejects_unknown_or_conflicting_stable_fields(
+    extra_plan: dict[str, object],
+    error_code: str,
+) -> None:
+    session, handles, _ids = _role_session(("source", "target"))
+    session = session.with_settings(
+        {
+            "core_plan": {
+                "source_handle": handles[0],
+                "target_handles": [handles[1]],
+                **extra_plan,
+            }
+        }
+    )
+
+    with pytest.raises(BusinessDeclarationError) as raised:
+        materialize_core_business_request(
+            "ak.wwise.core.object.pasteProperties",
+            session,
+        )
+
+    assert raised.value.repair["error_code"] == error_code
+
+
 def test_curve_and_blend_business_values_compile_native_enums_and_shapes() -> None:
     curve_session, curve_handles, curve_ids = _role_session(("attenuation",))
     curve_session = curve_session.with_settings(

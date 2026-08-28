@@ -9721,7 +9721,11 @@ def dispatch_business_core_plan(
         append_item(
             name,
             raw,
-            accepted={"platform_name_list", "language_name_list"},
+            accepted={
+                "platform_name_list",
+                "language_name_list",
+                "paste_business_field_list",
+            },
         )
     if args.curve_point:
         if field_types.get("points") != "attenuation_curve_points":

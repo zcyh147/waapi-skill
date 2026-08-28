@@ -2016,12 +2016,6 @@ def test_core_business_public_read_and_result_schema_mutation(
             object_id=source_id,
             role="source",
         )
-        notes_field = _discover_business_field(
-            runtime,
-            draft,
-            object_handle=source_handle,
-            meaning="notes",
-        )
         target_handle = _bind_business_object(
             runtime,
             draft,
@@ -2039,9 +2033,9 @@ def test_core_business_public_read_and_result_schema_mutation(
                 "--role",
                 "target_handles",
                 target_handle,
-                "--field",
-                "include_field_handles",
-                notes_field,
+                "--item",
+                "include_fields",
+                "notes",
                 "--value",
                 "list_mode",
                 "merge-replace",
