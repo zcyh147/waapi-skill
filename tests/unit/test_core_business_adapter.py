@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 import pytest
 
@@ -361,7 +362,9 @@ def test_metadata_core_business_fields_compile_bound_tokens_and_platform() -> No
     }
 
 
-def test_paste_convert_and_conversion_plugin_compile_business_collections() -> None:
+def test_paste_convert_and_conversion_plugin_compile_business_collections(
+    tmp_path: Path,
+) -> None:
     paste_session, paste_handles, paste_ids = _role_session(
         ("source", "target", "target")
     )
@@ -400,7 +403,7 @@ def test_paste_convert_and_conversion_plugin_compile_business_collections() -> N
                 "audio_object_handles": convert_handles,
                 "platform_names": ["Windows", "Mac"],
                 "languages": ["SFX", "English(US)"],
-                "io_root": "/tmp/waapi-convert-output",
+                "io_root": str(tmp_path / "waapi-convert-output"),
             }
         }
     )

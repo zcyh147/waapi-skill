@@ -7074,8 +7074,8 @@
           "description": "Vehicle_Engine Switch Container 的完整对象路径"
         }
       ],
-      "protocol": "preview_confirm",
-      "confirmation_prompt": "可以，读取这个容器的完整分配。",
+      "protocol": "single",
+      "confirmation_prompt": null,
       "fixture": {
         "adapter": "switch_assignment_fixture",
         "sandbox": "scenario_project_copy",
@@ -7094,12 +7094,6 @@
         }
       ],
       "oracle_assertions": [
-        {
-          "phase": "preview",
-          "adapter": "project_snapshot_unchanged_oracle",
-          "subject_api": "ak.wwise.core.switchContainer.getAssignments",
-          "expectation": "确认前目标调用尚未执行，沙箱工程、受控运行时和隔离输出均与预览前快照一致"
-        },
         {
           "phase": "after",
           "adapter": "waapi_switch_assignment_oracle",
@@ -7139,8 +7133,8 @@
           "description": "Footstep_Player 与 Footstep_NPC 两个容器的完整对象路径"
         }
       ],
-      "protocol": "preview_confirm",
-      "confirmation_prompt": "这一步预览没问题，执行它；如果还有下一步，先把下一步预览给我。",
+      "protocol": "single",
+      "confirmation_prompt": null,
       "fixture": {
         "adapter": "switch_assignment_fixture",
         "sandbox": "scenario_project_copy",
@@ -7159,12 +7153,6 @@
         }
       ],
       "oracle_assertions": [
-        {
-          "phase": "preview",
-          "adapter": "project_snapshot_unchanged_oracle",
-          "subject_api": "ak.wwise.core.switchContainer.getAssignments",
-          "expectation": "确认前目标调用尚未执行，沙箱工程、受控运行时和隔离输出均与预览前快照一致"
-        },
         {
           "phase": "after",
           "adapter": "waapi_switch_assignment_oracle",
