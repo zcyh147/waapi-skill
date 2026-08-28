@@ -589,7 +589,7 @@ def test_compact_dynamic_fact_receipt_keeps_disclosed_sequence_active(
     assert "completion_candidate" not in put["draft"]["next_action_binding"]
 
 
-def test_audio_convert_schema_forbids_present_with_nonempty_languages(
+def test_audio_convert_business_schema_requires_complete_language_collection(
     tmp_path: Path,
 ) -> None:
     exit_code, schema = gateway.execute_gateway(
@@ -599,22 +599,14 @@ def test_audio_convert_schema_forbids_present_with_nonempty_languages(
     )
 
     assert exit_code == 0, schema
-    languages = next(
-        field for field in schema["fields"] if field["path"] == ["args", "languages"]
-    )
-    assert languages["fact_construction"]["nonempty_scalar_items"] == {
-        "phase": "before_dynamic_disclosure",
-        "fact_action": "append",
-        "repeat_for_each_item": True,
-    }
-    assert languages["fact_construction"]["empty_array_only"] == {
-        "phase": "before_dynamic_disclosure",
-        "fact_action": "present",
-        "must_not_accompany": ["append"],
-    }
+    declaration = schema["business_adapter"]["declaration"]
+    assert "languages" in declaration["required_fields"]
+    assert declaration["field_types"]["languages"] == "language_name_list"
+    assert "fields" not in schema
+    assert "schema_digest" not in schema
 
 
-def test_isolated_typed_call_prefix_places_io_authority_before_every_fact(
+def test_audio_convert_business_draft_keeps_exact_io_authority_in_one_plan(
     tmp_path: Path,
 ) -> None:
     exit_code, schema = gateway.execute_gateway(
@@ -624,24 +616,12 @@ def test_isolated_typed_call_prefix_places_io_authority_before_every_fact(
     )
     assert exit_code == 0
     continuation = schema["continuation"]
-    assert continuation["gateway_argv_prefix"] == [
-        "typed-call",
-        AUDIO_CONVERT_URI,
-        "--schema-digest",
-        schema["schema_digest"],
-        "--apply",
-        "--io-root",
-        "<absolute-allowed-root>",
-    ]
-    assert continuation["apply"] is True
-    assert "io_root_flag" not in continuation
-    assert continuation["prompt_fact_completion_guard"] == {
-        "account_for_every_prompt_present_scalar_array_item_and_map_entry": True,
-        "copy_boolean_values_exactly": True,
-        "infer_or_replace_prompt_values": "invalid",
-        "submission_scope": "one_complete_typed_call",
-        "draft_batch_size_applies": False,
-    }
+    assert continuation["gateway_argv"] == ["draft-start", AUDIO_CONVERT_URI]
+    assert continuation["copy_exactly"] is True
+    assert continuation["append_arguments"] == "forbidden"
+    declaration = schema["business_adapter"]["declaration"]
+    assert declaration["field_types"]["io_root"] == "exact_user_io_root"
+    assert "typed-call" not in str(schema)
 
 
 @pytest.mark.parametrize(

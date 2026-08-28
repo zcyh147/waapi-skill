@@ -3640,10 +3640,16 @@ def operation_input_mode(name: str, version: str) -> str:
 
 
 def operation_uses_business_declaration(name: str, version: str) -> bool:
-    """Return false for native URI Drafts outside the named-operation Registry."""
+    """Return whether one named or reviewed native lane has a deep Adapter."""
 
     spec = OPERATION_SPECS.get(name)
-    if spec is None or version not in spec.supported_versions:
+    if spec is None:
+        try:
+            business_adapter(name).contract(version)
+        except (KeyError, ValueError):
+            return False
+        return True
+    if version not in spec.supported_versions:
         return False
     uses_business_declaration = (
         operation_input_mode(name, version) == BUSINESS_DECLARATION_INPUT_MODE
@@ -3673,6 +3679,14 @@ def audio_import_business_contract(version: str) -> dict[str, Any]:
 def operation_business_contract(name: str, version: str) -> dict[str, Any]:
     """Publish the Adapter-owned business contract for one exact lane."""
 
+    if name not in OPERATION_SPECS:
+        try:
+            return business_adapter(name).contract(version)
+        except (KeyError, ValueError) as exc:
+            raise OperationContractError(
+                "BUSINESS_ADAPTER_UNAVAILABLE",
+                f"{name} has no reviewed Business Declaration Adapter.",
+            ) from exc
     if operation_input_mode(name, version) != BUSINESS_DECLARATION_INPUT_MODE:
         raise OperationContractError(
             "OPERATION_INPUT_MODE_INVALID",

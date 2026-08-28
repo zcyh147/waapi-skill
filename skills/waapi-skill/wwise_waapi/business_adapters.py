@@ -16,6 +16,10 @@ from .debug_business_contracts import debug_business_contract_data
 from .compound_undo_business_contracts import (
     compound_undo_business_contract_data,
 )
+from .core_business_contracts import (
+    core_business_contract_data,
+    core_business_draft_operations,
+)
 from .object_lifecycle_business_contracts import (
     object_lifecycle_business_contract_data,
 )
@@ -103,6 +107,10 @@ def _compound_undo_contract(operation: str, version: str) -> dict[str, Any]:
     if operation != "waapi.undoGroup":  # pragma: no cover - registry invariant
         raise ValueError("compound Undo Adapter received the wrong operation")
     return compound_undo_business_contract_data(version)
+
+
+def _core_business_contract(operation: str, version: str) -> dict[str, Any]:
+    return core_business_contract_data(operation, version)
 
 
 def _object_lifecycle_contract(operation: str, version: str) -> dict[str, Any]:
@@ -262,6 +270,15 @@ def _materialize_compound_undo(
     from .compound_undo_business import materialize_compound_undo_business_request
 
     return materialize_compound_undo_business_request(operation, session)
+
+
+def _materialize_core_business(
+    operation: str,
+    session: BusinessDeclarationSession,
+) -> Mapping[str, Any]:
+    from .core_business import materialize_core_business_request
+
+    return materialize_core_business_request(operation, session)
 
 
 def _authoring_ui_is_complete(
@@ -719,6 +736,24 @@ _COMPOUND_UNDO_DEFINITION = {
     "settings_are_complete_declaration": True,
 }
 
+_CORE_BUSINESS_DEFINITION = {
+    "family": "core-project-object",
+    "contract_builder": _core_business_contract,
+    "materializer": _materialize_core_business,
+    "update_commands": frozenset({"draft-declare-core-plan"}),
+    "initial_projection_actions": ("bind-object", "inspect", "cancel"),
+    "active_projection_actions": (
+        "bind-object",
+        "declare-core-plan",
+        "check",
+        "inspect",
+        "cancel",
+    ),
+    "auto_apply_preview": True,
+    "settings_are_complete_declaration": True,
+    "supports_field_discovery": True,
+}
+
 
 def _bind_adapter(operation: str, definition: Mapping[str, Any]) -> BusinessAdapter:
     values = dict(definition)
@@ -734,6 +769,10 @@ def _bind_adapter(operation: str, definition: Mapping[str, Any]) -> BusinessAdap
 
 
 _BUSINESS_ADAPTERS = {
+    **{
+        operation: _bind_adapter(operation, _CORE_BUSINESS_DEFINITION)
+        for operation in core_business_draft_operations()
+    },
     "audio.import": _bind_adapter("audio.import", _AUDIO_IMPORT_DEFINITION),
     "audio.importTabDelimited": _bind_adapter(
         "audio.importTabDelimited",

@@ -6,7 +6,7 @@ This report is generated from the exact five-version public surface and the revi
 
 - Native function/Topic lanes: **824**
 - Named-operation lanes: **153**
-- Migration families: **8**
+- Migration families: **7**
 - Unowned migration rows: **0**
 
 Every exact row, version, schema digest, continuation command, field ownership, disposition, and owner is recorded in `interface-depth-inventory.json`.
@@ -31,7 +31,6 @@ Business scalar values remain visible. Native paths, metadata scope, property/re
 | --- | ---: | ---: | --- | ---: | --- |
 | [`generic-cli-console`](https://github.com/zcyh147/waapi-skill/issues/89) | #57 | 65 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 14 | `3f5b7464510f32b6f06dc4c6c3e0a7da700159ad07b8aff69b4b759bed41b9e1` |
 | [`generic-core-media-build`](https://github.com/zcyh147/waapi-skill/issues/85) | #57 | 16 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 4 | `eb0692ad57f0a504bf110f38355997bb9abca7519ed412c4ed97c223a6a0decf` |
-| [`generic-core-project-object`](https://github.com/zcyh147/waapi-skill/issues/84) | #57 | 55 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 19 | `caf467378cbabccb637cd93d18cc4e87e5356d409ce110da1f040825af4245ed` |
 | [`generic-core-remaining`](https://github.com/zcyh147/waapi-skill/issues/86) | #57 | 43 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 13 | `a7541ae6dad3c8c033b13089c13c1faad9a2688aee985c72e5c414fdb812fa8a` |
 | [`generic-core-runtime-inspection`](https://github.com/zcyh147/waapi-skill/issues/87) | #57 | 94 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 26 | `b66b1f4d66d8d77b456b98041c7e14fa2d383e02bae02b4a17fabfb85261d593` |
 | [`generic-host-ui-debug-waapi`](https://github.com/zcyh147/waapi-skill/issues/90) | #57 | 15 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 5 | `8d701d66442416c74f627e468842139fa8971b441b9b813be95cd9e7d3712ee0` |
@@ -42,6 +41,7 @@ Business scalar values remain visible. Native paths, metadata scope, property/re
 
 | Classification | Disposition | Exact lanes | Audit evidence |
 | --- | --- | ---: | --- |
+| `generic-core-project-object` | `already_deep` | 55 | The public core-business/v1 declarations cover all 55 exact Core project, object, audio, Blend, Switch, and Work Unit lanes. Bounded reads accept exact object choices plus user-facing field meaning where needed; mutations accept live-bound object and Field Handles, stable Wwise-facing values, exact I/O authority, curves, edges, platforms, and languages. The Gateway derives native GUID placement, property tokens, enum spellings, arrays, nested point and edge structures, request revisions, Preview lifecycle, result bounds, and the sole continuation; request-schema exposes no typed fields and typed-call or draft-apply cannot bypass the business route. |
 | `generic-dedicated-route-boundary` | `prohibited_boundary` | 139 | request-schema rejects these exact URI lanes before construction and directs callers to the Registry-selected dedicated operation, preventing a weaker generic bypass. |
 | `generic-fixed-command-audited-deep` | `already_deep` | 12 | The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior. |
 | `generic-fixed-query-metadata` | `already_deep` | 44 | The fixed query, metadata, selection, profiler, and Debug routes accept business sources, predicates, outputs, meanings, identities, capture intent, and bounded exact artifacts. The Gateway owns native paths, types, accessors, projections, metadata tokens, pipeline IDs, Debug envelopes, result bounds, and every continuation; request-schema and typed-call cannot bypass those routes. |

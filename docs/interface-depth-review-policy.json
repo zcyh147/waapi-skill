@@ -16,10 +16,10 @@
     ]
   },
   "source_contracts": {
-    "gateway_parser_sha256": "31b76abfe4b2503765054700250f282aa60309370264ca0399d2c85308fa3b1f",
+    "gateway_parser_sha256": "14d15778ae8785aa2680de5dcb59ee4c64243a4d0991094bc8382d1ca9d4c6dc",
     "operation_contract_sha256": "bd3f63201dec616a6b57dbd4be326a6e72fbf0642367c773a331491a56c914f5",
-    "public_continuation_sha256": "c5629e8a236e8df6ef2dd755a08ae19ca74f3dad33d7ff11b188253ddb008760",
-    "typed_request_surface_sha256": "2d595ba571ac74ac7a40c7dc18dd60ce47110de4b8b9ed2a7c5baf48e6a00cc5"
+    "public_continuation_sha256": "607be41657b6d39448764ce2846da39ddb600f038f392fab03199038c111e4a2",
+    "typed_request_surface_sha256": "80aef4bed3064ea1859c65d3bcf6d5068a42318a9278d7a691ffa73e2bf00c99"
   },
   "ownership_classes": {
     "stable_business_declaration": "A prompt-derived business value remains visible in the public request.",
@@ -195,10 +195,11 @@
     },
     {
       "id": "generic-core-project-object",
-      "disposition": "migration_required",
-      "owner_issue": 57,
+      "disposition": "already_deep",
+      "owner_issue": null,
       "match": {"uri_prefixes": ["ak.wwise.core.audio.", "ak.wwise.core.blendContainer.", "ak.wwise.core.object.", "ak.wwise.core.project.", "ak.wwise.core.switchContainer.", "ak.wwise.core.workUnit."]},
-      "leaked_mechanics": ["native_object_path", "metadata_scope", "property_or_reference_token", "wire_type", "dependency_order", "batch_layout", "revision_arithmetic", "request_fragment"]
+      "leaked_mechanics": [],
+      "audit_evidence": "The public core-business/v1 declarations cover all 55 exact Core project, object, audio, Blend, Switch, and Work Unit lanes. Bounded reads accept exact object choices plus user-facing field meaning where needed; mutations accept live-bound object and Field Handles, stable Wwise-facing values, exact I/O authority, curves, edges, platforms, and languages. The Gateway derives native GUID placement, property tokens, enum spellings, arrays, nested point and edge structures, request revisions, Preview lifecycle, result bounds, and the sole continuation; request-schema exposes no typed fields and typed-call or draft-apply cannot bypass the business route."
     },
     {
       "id": "generic-core-media-build",
@@ -223,15 +224,6 @@
     }
   ],
   "ticket_blueprints": {
-    "generic-core-project-object": {
-      "title": "Deepen generic Core project, object, audio, blend, switch, and Work Unit routes",
-      "parent_issue": 57,
-      "blocked_by_family": null,
-      "public_behavior": "Replace raw typed field handles and native request layout with coherent business declarations for the exact audited Core project/object route rows; keep dedicated-operation bypasses closed.",
-      "deterministic_tests": "Every exact inventory row and version, positive/negative/repair/stale cases, identity and version deltas, hostile scalars, continuation completeness, and non-bypass.",
-      "removal_boundary": "Remove request-schema/typed-call model construction for these rows only after semantic parity; keep closed query and mutation safety boundaries.",
-      "proportional_evidence": "Representative real cases per distinct verifier/effect shape on 2022.1 and 2025.1 and targeted Fresh Agent evidence only for changed routing or parameter closure."
-    },
     "generic-core-media-build": {
       "title": "Deepen generic media peaks, media-pool, and SoundBank read routes",
       "parent_issue": 57,
@@ -297,7 +289,6 @@
     }
   },
   "ticket_issue_numbers": {
-    "generic-core-project-object": 84,
     "generic-core-media-build": 85,
     "generic-core-remaining": 86,
     "generic-core-runtime-inspection": 87,

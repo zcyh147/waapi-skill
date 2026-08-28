@@ -27,6 +27,10 @@ from .authorization import (
     DEFAULT_TRANSACTION_AUTHORIZATION_MODES,
     accepted_authorization_modes_for_uri,
 )
+from .core_business_contracts import (
+    core_business_operations,
+    core_business_read_operations,
+)
 from .manifest import ManifestStore
 from .versions import SUPPORTED_WWISE_VERSION_KEYS
 
@@ -657,14 +661,18 @@ class ExecutionContractRegistry:
                 accepted_authorization_modes=(),
                 program_case="fixed-command-dispatch",
             )
-        if uri in BOUNDED_DIRECT_CALL_URIS:
+        if uri in BOUNDED_DIRECT_CALL_URIS or uri in core_business_read_operations():
             return ExecutionContract(
                 version=version,
                 uri=uri,
                 item_type=item_type,
                 route="bounded_call",
                 effect="read",
-                gateway_commands=("request-schema",),
+                gateway_commands=(
+                    ("request-schema", "core-call")
+                    if uri in core_business_operations()
+                    else ("request-schema",)
+                ),
                 timeout_seconds=10.0,
                 result_limit_bytes=256 * 1024,
                 verification_strategy="result_schema",

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from tests.unit.test_operation_input_gateway import (
@@ -371,7 +372,7 @@ def test_compound_undo_rejects_two_children_that_own_the_same_final_outcome(
     assert rejected["error_code"] == "UNDO_GROUP_OVERLAPPING_OUTCOME"
 
 
-def test_generic_undo_child_is_not_promoted_to_a_checked_business_draft(
+def test_migrated_core_child_exposes_business_draft_without_typed_fallback(
     tmp_path: Path,
 ) -> None:
     operation = "ak.wwise.core.object.setRandomizer"
@@ -383,8 +384,10 @@ def test_generic_undo_child_is_not_promoted_to_a_checked_business_draft(
         operation,
     )
     assert code == 0, schema
-    assert schema["input_shape"] == "inline"
-    assert "draft_requirement" not in schema
+    assert schema["input_shape"] == "business_declaration"
+    assert schema["business_adapter"]["execution_shape"] == "draft_mutation"
+    assert schema["continuation"]["subcommand"] == "draft-start"
+    assert "typed-call" not in json.dumps(schema, sort_keys=True)
 
 
 def test_compound_undo_rejects_child_changed_after_check_before_parent_snapshot(

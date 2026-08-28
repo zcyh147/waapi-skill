@@ -237,6 +237,13 @@ from wwise_waapi.business_declaration_state import (  # noqa: E402  # pyright: i
 from wwise_waapi.business_adapters import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     business_adapter,
 )
+from wwise_waapi.core_business_contracts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    core_business_contract_data,
+    core_business_operations,
+)
+from wwise_waapi.core_business import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    materialize_core_business_request,
+)
 from wwise_waapi.business_declarations import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     MAX_BUSINESS_NAME_BYTES,
     MAX_BUSINESS_PATH_BYTES,
@@ -1332,6 +1339,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     request_schema.add_argument("api")
 
+    core_call = subparsers.add_parser(
+        "core-call",
+        help="Run one reviewed generic Core read from closed business identities",
+    )
+    core_call.add_argument("api", choices=tuple(sorted(core_business_operations())))
+    core_call.add_argument("--source-id")
+    core_call.add_argument("--target-id")
+    core_call.add_argument("--object-id")
+    core_call.add_argument("--field-meaning")
+    core_call.add_argument("--platform-name")
+
     typed_zero_call = subparsers.add_parser(
         "typed-zero-call",
         help="Run one reflected function whose exact schema accepts no business input",
@@ -2259,6 +2277,57 @@ def build_parser() -> argparse.ArgumentParser:
         metavar=("DRAFT_ID", "TASK_AUTHORITY"),
     )
 
+    draft_declare_core_plan = subparsers.add_parser(
+        "draft-declare-core-plan",
+        help=(
+            "Declare one complete reviewed Core business plan while the "
+            "Gateway owns the native request"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_declare_core_plan)
+    draft_declare_core_plan.add_argument(
+        "--role",
+        action="append",
+        nargs=2,
+        default=[],
+        metavar=("ROLE", "BOUND_OBJECT_HANDLE"),
+    )
+    draft_declare_core_plan.add_argument(
+        "--field",
+        action="append",
+        nargs=2,
+        default=[],
+        metavar=("BUSINESS_FIELD", "BOUND_FIELD_HANDLE"),
+    )
+    draft_declare_core_plan.add_argument(
+        "--value",
+        action="append",
+        nargs=2,
+        default=[],
+        metavar=("BUSINESS_FIELD", "VALUE"),
+    )
+    draft_declare_core_plan.add_argument(
+        "--item",
+        action="append",
+        nargs=2,
+        default=[],
+        metavar=("BUSINESS_COLLECTION", "VALUE"),
+    )
+    draft_declare_core_plan.add_argument(
+        "--curve-point",
+        action="append",
+        nargs=3,
+        default=[],
+        metavar=("X", "Y", "SHAPE"),
+    )
+    draft_declare_core_plan.add_argument(
+        "--blend-edge",
+        action="append",
+        nargs=4,
+        default=[],
+        metavar=("EDGE_POSITION", "FADE_MODE", "FADE_POSITION_OR_NONE", "SHAPE"),
+    )
+
     draft_declare_field_change = subparsers.add_parser(
         "draft-declare-field-change",
         help=(
@@ -2681,6 +2750,8 @@ def _execute_gateway_unconstrained(
             preflight_stable_read_input(args, env=source_env)
         if args.command == "typed-call":
             preflight_typed_request_input(args, env=source_env)
+        if args.command == "core-call":
+            preflight_core_business_input(args, env=source_env)
         if args.command == "typed-operation":
             preflight_typed_operation_input(args, env=source_env)
         if args.command == "typed-zero-call":
@@ -3989,6 +4060,10 @@ def preflight_typed_request_input(
     versions = resolve_catalog_versions(args, env=env)
     if len(versions) != 1:
         raise GatewayInputError("typed-call requires one exact Wwise version")
+    if args.api in core_business_operations():
+        raise GatewayInputError(
+            f"{args.api} uses request-schema and its closed Core business continuation"
+        )
     capability = CapabilityCatalog().describe(versions[0], args.api)
     if (
         capability.preferred_route == "fixed_command"
@@ -4068,6 +4143,78 @@ def preflight_typed_request_input(
         if not requires_preview
         else None
     )
+
+
+def preflight_core_business_input(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+) -> None:
+    """Validate one closed Core business read before opening WAAPI."""
+
+    versions = resolve_catalog_versions(args, env=env)
+    if len(versions) != 1:
+        raise GatewayInputError("core-call requires one exact Wwise version")
+    contract = core_business_contract_data(args.api, versions[0])
+    if contract["execution_shape"] != "bounded_read":
+        raise GatewayInputError(
+            "This Core business operation requires its Gateway-owned Draft continuation"
+        )
+    if args.api == "ak.wwise.core.object.diff":
+        for field in ("source_id", "target_id"):
+            value = getattr(args, field)
+            if not isinstance(value, str) or not _canonical_guid(value):
+                raise GatewayInputError(
+                    f"core-call --{field.replace('_', '-')} requires one exact GUID "
+                    "copied from Gateway object evidence"
+                )
+        if args.source_id.upper() == args.target_id.upper():
+            raise GatewayInputError("object.diff requires two distinct objects")
+        if any(
+            value is not None
+            for value in (args.object_id, args.field_meaning, args.platform_name)
+        ):
+            raise GatewayInputError(
+                "object.diff accepts only source and target business identities"
+            )
+    elif args.api in {
+        "ak.wwise.core.switchContainer.getAssignments",
+        "ak.wwise.core.blendContainer.getAssignments",
+    }:
+        if not isinstance(args.object_id, str) or not _canonical_guid(args.object_id):
+            raise GatewayInputError(
+                "This relationship read requires --object-id copied from Gateway evidence"
+            )
+        if any(
+            value is not None
+            for value in (
+                args.source_id,
+                args.target_id,
+                args.field_meaning,
+                args.platform_name,
+            )
+        ):
+            raise GatewayInputError(
+                "This relationship read accepts only its one object identity"
+            )
+    elif args.api == "ak.wwise.core.object.isLinked":
+        if not isinstance(args.object_id, str) or not _canonical_guid(args.object_id):
+            raise GatewayInputError(
+                "object.isLinked requires --object-id copied from Gateway evidence"
+            )
+        if not isinstance(args.field_meaning, str) or not args.field_meaning.strip():
+            raise GatewayInputError("object.isLinked requires --field-meaning")
+        if not isinstance(args.platform_name, str) or not args.platform_name.strip():
+            raise GatewayInputError("object.isLinked requires --platform-name")
+        if args.source_id is not None or args.target_id is not None:
+            raise GatewayInputError(
+                "object.isLinked accepts one object, field meaning, and platform"
+            )
+    else:  # pragma: no cover - contract registry invariant
+        raise GatewayInputError("Unsupported Core business read")
+    args.core_business_version = versions[0]
+
+
 def preflight_typed_operation_input(
     args: argparse.Namespace,
     *,
@@ -5459,6 +5606,39 @@ def fixed_command_route_payload(capability: CapabilityRecord) -> dict[str, Any]:
                 "business_values_required": "depends_on_command",
             }
         ),
+    }
+
+
+def core_business_route_payload(version: str, api: str) -> dict[str, Any]:
+    """Expose one reviewed Core declaration without reflected typed fields."""
+
+    contract = core_business_contract_data(api, version)
+    start = contract["start"]
+    bounded_read = contract["execution_shape"] == "bounded_read"
+    argv_key = "gateway_argv_prefix" if bounded_read else "gateway_argv"
+    continuation_argv = start.get(argv_key)
+    if not isinstance(continuation_argv, list):
+        raise GatewayInputError("Core business contract lacks its continuation")
+    return {
+        "contract": "waapi-skill.core-business-route/v1",
+        "ok": True,
+        "status": "ok",
+        "command": "request-schema",
+        "offline": True,
+        "version": version,
+        "uri": api,
+        "input_shape": "business_declaration",
+        "native_request_fields_disclosed": False,
+        "business_adapter": contract,
+        "continuation": {
+            "subcommand": "core-call" if bounded_read else "draft-start",
+            argv_key: list(continuation_argv),
+            **(
+                {"append_only_disclosed_business_fields": True}
+                if bounded_read
+                else {"copy_exactly": True, "append_arguments": "forbidden"}
+            ),
+        },
     }
 
 
@@ -7134,6 +7314,16 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             and capability.preferred_route == "fixed_command"
         ):
             return fixed_command_route_payload(capability)
+        if (
+            args.command == "request-schema"
+            and args.api in core_business_operations()
+        ):
+            return core_business_route_payload(versions[0], args.api)
+        if args.api in core_business_operations():
+            raise GatewayInputError(
+                f"{args.api} uses its closed Core business declaration; "
+                "typed field and container construction are not public"
+            )
         if args.command != "request-schema" and args.api.startswith("ak."):
             if (
                 capability is not None
@@ -9199,6 +9389,423 @@ def dispatch_debug_validation(
     }
 
 
+def dispatch_core_business_read(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Resolve business identities and run one bounded reviewed Core read."""
+
+    if args.core_business_version != detected_version:
+        raise GatewayInputError(
+            "Core business version changed after preflight; request-schema must be rerun"
+        )
+    project, project_call = current_project(
+        dispatcher,
+        connection=connection,
+        version=detected_version,
+    )
+    assert project is not None
+    if args.api == "ak.wwise.core.object.diff":
+        requested = {
+            "source": args.source_id,
+            "target": args.target_id,
+        }
+        plan_fields = {
+            "source": "source_handle",
+            "target": "target_handle",
+        }
+    elif args.api == "ak.wwise.core.switchContainer.getAssignments":
+        requested = {"switch_container": args.object_id}
+        plan_fields = {"switch_container": "switch_container_handle"}
+    elif args.api == "ak.wwise.core.blendContainer.getAssignments":
+        requested = {"blend_track": args.object_id}
+        plan_fields = {"blend_track": "blend_track_handle"}
+    elif args.api == "ak.wwise.core.object.isLinked":
+        requested = {"object": args.object_id}
+        plan_fields = {"object": "object_handle"}
+    else:  # pragma: no cover - preflight registry invariant
+        raise GatewayInputError("Unsupported Core business read")
+    read_call = transaction_read_call(
+        dispatcher,
+        connection=connection,
+        version=detected_version,
+    )
+    raw = read_call(
+        OBJECT_GET_URI,
+        {"from": {"id": list(requested.values())}},
+        {"return": ["id", "name", "type", "path"]},
+    )
+    rows = raw.get("return")
+    if not isinstance(rows, list) or len(rows) != len(requested):
+        raise GatewayResultShapeError(
+            "Core business read requires both exact live object identities.",
+            details={
+                "actual_count": len(rows) if isinstance(rows, list) else None,
+                "expected_count": len(requested),
+            },
+            error_code="CORE_BUSINESS_IDENTITY_MISMATCH",
+        )
+    by_id: dict[str, Mapping[str, Any]] = {}
+    for row in rows:
+        if (
+            not isinstance(row, Mapping)
+            or not _canonical_guid(row.get("id"))
+            or not all(
+                isinstance(row.get(field), str) and bool(row[field])
+                for field in ("name", "type", "path")
+            )
+        ):
+            raise GatewayResultShapeError(
+                "Core business identity row is malformed.",
+                error_code="CORE_BUSINESS_IDENTITY_MISMATCH",
+            )
+        key = str(row["id"]).upper()
+        if key in by_id:
+            raise GatewayResultShapeError(
+                "Core business identity read returned a duplicate object.",
+                error_code="CORE_BUSINESS_IDENTITY_MISMATCH",
+            )
+        by_id[key] = row
+    if set(by_id) != {value.upper() for value in requested.values()}:
+        raise GatewayResultShapeError(
+            "Core business identity read did not match the requested objects.",
+            error_code="CORE_BUSINESS_IDENTITY_MISMATCH",
+        )
+    authority = "da1-" + canonical_sha256(
+        {"operation": args.api, "roles": requested}
+    )[:40]
+    session = BusinessDeclarationSession.create(
+        _business_context_from_live(
+            task_authority=authority,
+            project=project,
+            detected_version=detected_version,
+            live_info=live_info,
+        )
+    )
+    handles: dict[str, str] = {}
+    for role, object_id in requested.items():
+        row = by_id[object_id.upper()]
+        bound = session.handles.bind_object(
+            object_id=str(row["id"]),
+            name=str(row["name"]),
+            object_type=str(row["type"]),
+            path=str(row["path"]),
+            role=role,
+        )
+        handles[plan_fields[role]] = bound.handle
+    if args.api == "ak.wwise.core.object.isLinked":
+        discovery = discover_metadata(
+            read_call=read_call,
+            queries=(args.field_meaning,),
+            object=args.object_id,
+            limit=2,
+        )
+        eligible = [
+            candidate
+            for candidate in discovery.candidates
+            if candidate.get("kind") in {"property", "reference"}
+            and isinstance(candidate.get("metadata"), Mapping)
+        ]
+        if len(eligible) != 1:
+            raise GatewayResultShapeError(
+                "Core field meaning requires one live metadata candidate.",
+                details={
+                    "candidate_count": len(eligible),
+                    "candidates": [
+                        {
+                            "label": candidate.get("name"),
+                            "kind": candidate.get("kind"),
+                        }
+                        for candidate in eligible[:2]
+                    ],
+                },
+                error_code="CORE_BUSINESS_FIELD_AMBIGUOUS",
+            )
+        bound_field = bind_live_field(
+            session.handles,
+            read_call=read_call,
+            scope_kind="object",
+            scope_value=args.object_id,
+            token=str(eligible[0]["name"]),
+            platform=args.platform_name,
+        )
+        handles["field_handle"] = bound_field.handle
+        handles["platform_name"] = args.platform_name
+    session = session.with_settings({"core_plan": handles})
+    request = materialize_core_business_request(args.api, session)
+    request_validation = validate_semantic_payload(
+        request["api"],
+        request["args"],
+        request["options"],
+        version=detected_version,
+    )
+    capability = live_capability(
+        detected_version,
+        args.api,
+        live_info=live_info,
+    )
+    result = dispatch(
+        dispatcher,
+        request["api"],
+        connection=connection,
+        version=detected_version,
+        args=request["args"],
+        options=request["options"],
+        allow_destructive=True,
+        result_limit_bytes=int(
+            capability.execution_contract["result_limit_bytes"]
+        ),
+        operation_timeout=float(capability.execution_contract["timeout_seconds"]),
+    )
+    result_validation = (
+        validate_semantic_result(
+            request["api"],
+            result.get("result"),
+            version=detected_version,
+        )
+        if result.get("ok")
+        else None
+    )
+    return {
+        "ok": bool(result.get("ok")),
+        "status": "ok" if result.get("ok") else "error",
+        **common,
+        "api_attempted": args.api,
+        "business_request": {
+            "operation": args.api,
+            "roles": requested,
+            **(
+                {
+                    "field_meaning": args.field_meaning,
+                    "platform_name": args.platform_name,
+                }
+                if args.api == "ak.wwise.core.object.isLinked"
+                else {}
+            ),
+        },
+        "project_call": dispatch_call_summary(project_call),
+        "identity_read": {
+            "count": len(requested),
+            "exact": True,
+        },
+        "call": dispatch_call_summary(result),
+        "schema_validation": {
+            "request": request_validation.as_dict(),
+            "result": (
+                result_validation.as_dict() if result_validation else None
+            ),
+        },
+        "agent_result": result.get("result") if result.get("ok") else None,
+    }
+
+
+def dispatch_business_core_plan(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Record one complete Core business plan without native request fields."""
+
+    binding = _open_business_binding(
+        args,
+        env=env,
+        connection=connection,
+        detected_version=detected_version,
+        live_info=live_info,
+        dispatcher=dispatcher,
+    )
+    adapter = business_adapter(binding.record.operation)
+    if adapter.family != "core-project-object" or not adapter.accepts_update_command(
+        args.command
+    ):
+        raise GatewayInputError(
+            f"{binding.record.operation} does not expose {args.command}"
+        )
+    raw_session = (
+        binding.record.composition.get("business_session")
+        if binding.record.composition is not None
+        else None
+    )
+    session = (
+        BusinessDeclarationSession.create(binding.context)
+        if raw_session is None
+        else BusinessDeclarationSession.from_dict(raw_session)
+    )
+    if session.context != binding.context:
+        raise OperationDraftBindingDrift(
+            "Live project or Wwise build differs from the Core plan binding."
+        )
+    contract = core_business_contract_data(
+        binding.record.operation,
+        detected_version,
+    )
+    field_types = contract["declaration"]["field_types"]
+    plan: dict[str, Any] = {}
+
+    def put_scalar(name: str, value: Any, *, accepted: set[str]) -> None:
+        value_type = field_types.get(name)
+        if value_type not in accepted:
+            raise GatewayInputError(
+                f"Core business field {name!r} is unavailable through this input form"
+            )
+        if name in plan:
+            raise GatewayInputError(f"Core business field {name!r} was supplied twice")
+        plan[name] = value
+
+    def append_item(name: str, value: Any, *, accepted: set[str]) -> None:
+        value_type = field_types.get(name)
+        if value_type not in accepted:
+            raise GatewayInputError(
+                f"Core business collection {name!r} is unavailable through this input form"
+            )
+        current = plan.setdefault(name, [])
+        if not isinstance(current, list):  # pragma: no cover - local invariant
+            raise GatewayInputError(f"Core business field {name!r} has conflicting forms")
+        current.append(value)
+
+    for name, handle in args.role:
+        value_type = field_types.get(name)
+        if value_type == "bound_object_handle":
+            put_scalar(name, handle, accepted={value_type})
+        elif value_type == "bound_object_handle_list":
+            append_item(name, handle, accepted={value_type})
+        else:
+            raise GatewayInputError(
+                f"Core business role {name!r} is not disclosed for this operation"
+            )
+    for name, handle in args.field:
+        value_type = field_types.get(name)
+        if value_type == "bound_field_handle":
+            put_scalar(name, handle, accepted={value_type})
+        elif value_type == "bound_field_handle_list":
+            append_item(name, handle, accepted={value_type})
+        else:
+            raise GatewayInputError(
+                f"Core business field role {name!r} is not disclosed for this operation"
+            )
+    for name, raw in args.value:
+        value_type = field_types.get(name)
+        if value_type == "boolean":
+            value = _parse_business_value("boolean", raw, field=name)
+        elif value_type in {"finite_number_lte_zero", "finite_number_gte_zero"}:
+            value = _parse_business_value("number", raw, field=name)
+        elif value_type == "nonnegative_integer":
+            value = _parse_business_value("integer", raw, field=name)
+        elif value_type in {
+            "attenuation_curve_kind",
+            "attenuation_curve_source",
+            "installed_conversion_plugin_name",
+            "paste_list_mode",
+            "platform_name",
+            "wwise_object_name",
+            "exact_user_io_root",
+        }:
+            value = raw
+        else:
+            raise GatewayInputError(
+                f"Core business value {name!r} is not disclosed for this operation"
+            )
+        put_scalar(name, value, accepted={str(value_type)})
+    for name, raw in args.item:
+        append_item(
+            name,
+            raw,
+            accepted={"platform_name_list", "language_name_list"},
+        )
+    if args.curve_point:
+        if field_types.get("points") != "attenuation_curve_points":
+            raise GatewayInputError("Curve points are unavailable for this Core operation")
+        points: list[dict[str, Any]] = []
+        for index, (raw_x, raw_y, shape) in enumerate(args.curve_point):
+            try:
+                x = float(raw_x)
+                y = float(raw_y)
+            except ValueError as exc:
+                raise GatewayInputError(
+                    f"Curve point {index} requires finite numeric X and Y values"
+                ) from exc
+            if not math.isfinite(x) or not math.isfinite(y):
+                raise GatewayInputError(
+                    f"Curve point {index} requires finite numeric X and Y values"
+                )
+            points.append({"x": x, "y": y, "shape": shape})
+        plan["points"] = points
+    if args.blend_edge:
+        if field_types.get("edges") != "blend_assignment_edges":
+            raise GatewayInputError("Blend edges are unavailable for this Core operation")
+        edges: list[dict[str, Any]] = []
+        for index, (raw_edge, mode, raw_fade, shape) in enumerate(args.blend_edge):
+            try:
+                edge_position = float(raw_edge)
+                fade_position = None if raw_fade == "none" else float(raw_fade)
+            except ValueError as exc:
+                raise GatewayInputError(
+                    f"Blend edge {index} requires finite numeric positions"
+                ) from exc
+            if not math.isfinite(edge_position) or (
+                fade_position is not None and not math.isfinite(fade_position)
+            ):
+                raise GatewayInputError(
+                    f"Blend edge {index} requires finite numeric positions"
+                )
+            edge = {
+                "edge_position": edge_position,
+                "fade_mode": mode,
+                "shape": shape,
+            }
+            if fade_position is not None:
+                edge["fade_position"] = fade_position
+            edges.append(edge)
+        plan["edges"] = edges
+
+    def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
+        candidate = current.with_settings({"core_plan": plan})
+        adapter.materialize(candidate)
+        return candidate
+
+    record = binding.store.apply_business_update(
+        args.draft_id,
+        task_authority=args.task_authority,
+        expected_revision=args.expected_revision,
+        schema_digest=operation_draft_schema_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        composer_digest=operation_composer_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        context=binding.context,
+        update=update,
+        event_type="settings.revised",
+    )
+    payload = operation_draft_payload(
+        args.command,
+        record,
+        offline=False,
+        task_authority=args.task_authority,
+    )
+    payload.update(
+        {
+            "endpoint": dict(common["endpoint"]),
+            "detected_version": detected_version,
+            "project_call": dispatch_call_summary(binding.project_call),
+        }
+    )
+    return payload
+
+
 def dispatch_command(
     args: argparse.Namespace,
     *,
@@ -9216,6 +9823,26 @@ def dispatch_command(
         "detected_version": detected_version,
         "is_command_line": bool(live_info.get("isCommandLine")),
     }
+    if args.command == "core-call":
+        return dispatch_core_business_read(
+            args,
+            env=env,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+        )
+    if args.command == "draft-declare-core-plan":
+        return dispatch_business_core_plan(
+            args,
+            env=env,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+        )
     if args.command == "draft-check":
         return dispatch_operation_draft_check(
             args,
@@ -11239,11 +11866,12 @@ def dispatch_operation_draft_check(
         if materialized.record.composition is not None
         else None
     )
+    business_operation = materialized.record.operation
     if raw_business_session is not None and operation_uses_business_declaration(
-        canonical_request.operation,
+        business_operation,
         canonical_request.version,
     ):
-        adapter = business_adapter(canonical_request.operation)
+        adapter = business_adapter(business_operation)
         business_session = BusinessDeclarationSession.from_dict(raw_business_session)
         bound_objects = tuple(
             business_session.handles.resolve_object(row["handle"])
@@ -11364,10 +11992,10 @@ def dispatch_operation_draft_check(
     ]
     if not (
         operation_uses_business_declaration(
-            canonical_request.operation,
+            business_operation,
             canonical_request.version,
         )
-        and business_adapter(canonical_request.operation).auto_apply_preview
+        and business_adapter(business_operation).auto_apply_preview
     ):
         preview_arguments.append("--apply")
     payload["next_command"] = transaction_next_command(
@@ -13166,6 +13794,15 @@ def dispatch_business_field_discovery(
         raise GatewayInputError(
             f"Business field discovery is unavailable for {binding.record.operation}"
         )
+    if adapter.family == "core-project-object":
+        field_types = adapter.contract(detected_version)["declaration"]["field_types"]
+        if not any(
+            value_type in {"bound_field_handle", "bound_field_handle_list"}
+            for value_type in field_types.values()
+        ):
+            raise GatewayInputError(
+                f"Business field discovery is unavailable for {binding.record.operation}"
+            )
     raw_session = (
         binding.record.composition.get("business_session")
         if binding.record.composition is not None
@@ -13200,8 +13837,8 @@ def dispatch_business_field_discovery(
     if (
         binding.record.operation
         in {"object.setLinked", "object.setProperty", "object.setReference", "object.setRTPC"}
-        and source is None
-    ):
+        or adapter.family == "core-project-object"
+    ) and source is None:
         raise GatewayInputError(
             f"{binding.record.operation} field discovery requires its exact bound object"
         )
@@ -13253,6 +13890,19 @@ def dispatch_business_field_discovery(
             accepted = (
                 (kind == "property" and value_type is not None)
                 or kind == "reference"
+            )
+        elif adapter.family == "core-project-object":
+            accepted = (
+                kind == "property" and value_type is not None
+                if binding.record.operation
+                in {
+                    "ak.wwise.core.object.setRandomizer",
+                    "ak.wwise.core.object.setStateProperties",
+                }
+                else (
+                    (kind == "property" and value_type is not None)
+                    or kind == "reference"
+                )
             )
         else:
             supports = metadata.get("supports")
@@ -18021,6 +18671,11 @@ def _business_next_action_binding(
         "draft-declare-undo-plan",
         *binding,
     ]
+    declare_core_plan_prefix = [
+        *base,
+        "draft-declare-core-plan",
+        *binding,
+    ]
     revise_prefix = [*base, "draft-revise-declaration", *binding]
     remove_prefix = [*base, "draft-remove-declaration", *binding]
     check = [*base, "draft-check", *binding]
@@ -18103,6 +18758,99 @@ def _business_next_action_binding(
             "role_assignment": (
                 "bind_each_required_role_then_copy_its_returned_handle_into_"
                 "the_same_named_declaration_field"
+            ),
+        }
+    if adapter.family == "core-project-object":
+        roles = business_contract["binding"]["roles"]
+        core_field_types = business_contract["declaration"]["field_types"]
+        needs_field_discovery = any(
+            value_type in {"bound_field_handle", "bound_field_handle_list"}
+            for value_type in core_field_types.values()
+        )
+        shared = {
+            "contract": "waapi-skill.business-draft-next-action/v1",
+            "responsibility_split": {
+                "agent": "natural_language_to_closed_high_level_business_facts",
+                "gateway": "business_facts_to_exact_waapi_request_and_execution_plan",
+            },
+            "business_contract": business_contract,
+            "forbidden_inputs": [
+                *forbidden_inputs,
+                "native_field_name",
+                "native_enum_token",
+                "complete_request",
+            ],
+            "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+            "then_read_next_response": True,
+            "precompute_or_increment_revision": False,
+        }
+        if session is not None and adapter.is_complete(session):
+            return {
+                **shared,
+                "required_next_phase": "check_complete_core_plan",
+                "check": {
+                    **operation_draft_prefix_copy_binding(check),
+                    "append": [],
+                },
+            }
+        declaration = {
+            **operation_draft_prefix_copy_binding(
+                declare_core_plan_prefix,
+                append_action=(
+                    "copy_verbatim_then_append_one_complete_core_business_plan"
+                ),
+            ),
+            "append_fields": business_contract["declaration"],
+            "submit_once": True,
+            "native_request_input": "forbidden",
+        }
+        field_discovery = {
+            **operation_draft_prefix_copy_binding(field_discover_prefix),
+            "append": [
+                "--object-handle",
+                "<bound-field-owner-handle>",
+                "--meaning",
+                "<user-facing-field-meaning>",
+                "[--platform <exact-user-requested-platform>]",
+            ],
+            "result": "copy_one_returned_field_candidate.handle",
+            "token_input": "forbidden",
+            "repeat_when_multiple_business_fields_are_requested": True,
+        }
+        if session is None and roles:
+            return {
+                **shared,
+                "required_next_phase": "bind_remaining_core_roles",
+                "object_binding": {
+                    **object_binding,
+                    "use_only_for": roles,
+                    "repeat_until": "every_role_named_by_the_business_contract_is_bound",
+                },
+                "declaration": declaration,
+                **(
+                    {"field_discovery": field_discovery}
+                    if needs_field_discovery
+                    else {}
+                ),
+            }
+        return {
+            **shared,
+            "required_next_phase": "declare_complete_core_plan",
+            **(
+                {
+                    "object_binding": {
+                        **object_binding,
+                        "use_only_for": roles,
+                    }
+                }
+                if roles
+                else {}
+            ),
+            "declaration": declaration,
+            **(
+                {"field_discovery": field_discovery}
+                if needs_field_discovery
+                else {}
             ),
         }
     if adapter.family == "compound-undo-business":

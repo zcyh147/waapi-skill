@@ -18,6 +18,7 @@ from wwise_waapi.operation_composer import (
     operation_composer_contract,
     parse_typed_action_cli_argument_sequence,
 )
+from wwise_waapi.operation_registry import operation_uses_business_declaration
 from wwise_waapi.platform_commands import encode_windows_model_argv
 from wwise_waapi.transactions import TransactionStore
 from wwise_waapi.typed_requests import request_contract
@@ -188,61 +189,35 @@ def test_complex_generic_schema_discloses_draft_as_the_only_normal_entry(
     assert "action-json" not in encoded
 
 
-def test_branch_and_empty_container_actions_require_no_placeholder_values(
+def test_deep_attenuation_curve_rejects_retired_typed_draft_actions(
     tmp_path: Path,
 ) -> None:
     uri = "ak.wwise.core.object.setAttenuationCurve"
     version = "2025.1"
     state_dir = tmp_path / "state"
-    contract = request_contract(version, uri)
-    object_branch = next(
-        field for field in contract.fields if field.path == ("object",) and field.shape == "branch"
-    )
-    object_guid_choice = next(
-        field
-        for field in contract.fields
-        if field.parent_handle == object_branch.handle
-        and any(
-            "a-fA-F0-9" in pattern
-            for pattern in field.as_dict().get("patterns", [])
-        )
-    )
-    points = next(field for field in contract.fields if field.path == ("points",))
     start_code, started = gateway.execute_gateway(
         ["--state-dir", str(state_dir), "draft-start", uri],
         env=_env(tmp_path, version),
         client_factory=lambda _url: pytest.fail("draft-start must be offline"),
     )
     assert start_code == 0
+    assert started["draft"]["next_action_binding"]["business_contract"][
+        "execution_shape"
+    ] == "draft_mutation"
 
-    choose_code, chosen = gateway.execute_gateway(
+    apply_code, rejected = gateway.execute_gateway(
         [
             "--state-dir", str(state_dir), "draft-apply", started["draft"]["draft_id"],
             "--task-authority", started["task_authority"],
             "--expected-revision", "1", "--facts",
-            "--action", "add_typed_fact", "--fact-action", "choose",
-            "--field-handle", object_branch.handle,
-            "--fact-value", object_guid_choice.handle,
-        ],
-        env=_env(tmp_path, version),
-        client_factory=lambda _url: pytest.fail("draft-apply must be offline"),
-    )
-    assert choose_code == 0, chosen
-    assert chosen["draft"]["revision"] == 2
-
-    present_code, present = gateway.execute_gateway(
-        [
-            "--state-dir", str(state_dir), "draft-apply", started["draft"]["draft_id"],
-            "--task-authority", started["task_authority"],
-            "--expected-revision", "2", "--facts",
             "--action", "add_typed_fact", "--fact-action", "present",
-            "--field-handle", points.handle,
+            "--field-handle", "retired-typed-handle",
         ],
         env=_env(tmp_path, version),
         client_factory=lambda _url: pytest.fail("draft-apply must be offline"),
     )
-    assert present_code == 0, present
-    assert present["draft"]["revision"] == 3
+    assert apply_code == 2
+    assert "no longer accepts shallow draft-apply" in rejected["message"]
 
 
 def test_draft_apply_batches_ordered_typed_actions_in_one_atomic_write(
@@ -583,6 +558,8 @@ def test_every_permitted_complex_generic_lane_has_one_draft_adapter() -> None:
                 continue
             if typed.as_gateway_payload()["input_shape"] != "draft":
                 continue
+            if operation_uses_business_declaration(capability.uri, version):
+                continue
             lanes.append((version, capability.uri))
             composer = operation_composer_contract(capability.uri, version)
             assert composer["typed_request_schema_digest"] == typed.schema_digest
@@ -592,7 +569,7 @@ def test_every_permitted_complex_generic_lane_has_one_draft_adapter() -> None:
                 "remove_typed_fact",
             ]
 
-    assert len(lanes) == 28
+    assert len(lanes) == 21
     assert ("2022.1", "ak.soundengine.setPosition") in lanes
     assert ("2025.1", "ak.wwise.core.mediaPool.get") in lanes
 

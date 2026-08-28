@@ -1,7 +1,7 @@
 {
   "contract": "waapi-skill.typed-request-surface/v1",
   "intentionally_blocked_field_occurrences": 79,
-  "inventory_sha256": "2d595ba571ac74ac7a40c7dc18dd60ce47110de4b8b9ed2a7c5baf48e6a00cc5",
+  "inventory_sha256": "80aef4bed3064ea1859c65d3bcf6d5068a42318a9278d7a691ffa73e2bf00c99",
   "lanes": [
     {
       "construction_shape": "inline",
@@ -3436,31 +3436,30 @@
       "correct_host": "wwise-console",
       "definition_graph_sha256": "bf5d4fb5c4b487edc70563553f02cef8a232a5846a8ffd16fa7044feb77f1c10",
       "execution_policy": {
-        "accepted_authorization_modes": [
-          "explicit_confirmation"
-        ],
+        "accepted_authorization_modes": [],
         "companion_uris": [],
         "contract": "waapi-skill.public-execution-contract/v2",
         "effect": "read",
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "request-schema"
+          "request-schema",
+          "core-call"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
         "post_execution_project_guard_policy": "revalidate",
-        "program_case": "transaction-result-schema",
+        "program_case": "call-result-schema",
         "project_guard_mode": "invariant",
-        "requires_authorization": true,
-        "result_limit_bytes": 1048576,
-        "route": "transaction",
-        "timeout_seconds": 30.0,
+        "requires_authorization": false,
+        "result_limit_bytes": 262144,
+        "route": "bounded_call",
+        "timeout_seconds": 10.0,
         "uri": "ak.wwise.core.switchContainer.getAssignments",
         "verification_strategy": "result_schema",
         "version": "2021.1"
       },
-      "execution_policy_sha256": "197fd1528bff039451f6bd01a3ab8a38e0fe1d96b1090b1fbc769a64c1c580e0",
+      "execution_policy_sha256": "8df5ccb3a754e11c71f61a53767f9e56db3746de5e5cb49812992743241e94ad",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 3,
@@ -7979,7 +7978,8 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "request-schema"
+          "request-schema",
+          "core-call"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -7994,7 +7994,7 @@
         "verification_strategy": "result_schema",
         "version": "2022.1"
       },
-      "execution_policy_sha256": "2659229115686f7a68186a1a4003c94e70038e75bb734e6d8245e4d50a837978",
+      "execution_policy_sha256": "65aad51b68f253aab437b186a1d9e1a43d8492a865c6423ed3570c15bd483ecf",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 2,
@@ -9730,31 +9730,30 @@
       "correct_host": "wwise-console",
       "definition_graph_sha256": "c16f761d9bcb861dd782f138edebf30f1629b346de5a75bf1a0469f938f50dc1",
       "execution_policy": {
-        "accepted_authorization_modes": [
-          "explicit_confirmation"
-        ],
+        "accepted_authorization_modes": [],
         "companion_uris": [],
         "contract": "waapi-skill.public-execution-contract/v2",
         "effect": "read",
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "request-schema"
+          "request-schema",
+          "core-call"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
         "post_execution_project_guard_policy": "revalidate",
-        "program_case": "transaction-result-schema",
+        "program_case": "call-result-schema",
         "project_guard_mode": "invariant",
-        "requires_authorization": true,
-        "result_limit_bytes": 1048576,
-        "route": "transaction",
-        "timeout_seconds": 30.0,
+        "requires_authorization": false,
+        "result_limit_bytes": 262144,
+        "route": "bounded_call",
+        "timeout_seconds": 10.0,
         "uri": "ak.wwise.core.switchContainer.getAssignments",
         "verification_strategy": "result_schema",
         "version": "2022.1"
       },
-      "execution_policy_sha256": "f2a6790c36db89007210468f1c387c090505f72366d88ef9841424d134432f0c",
+      "execution_policy_sha256": "8759ba085fa9955eb7cd7ec2038730ba69eb59f73a35eda7e529c5f1ced13d5c",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 3,
@@ -15210,7 +15209,8 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "request-schema"
+          "request-schema",
+          "core-call"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -15225,7 +15225,7 @@
         "verification_strategy": "result_schema",
         "version": "2023.1"
       },
-      "execution_policy_sha256": "228d21634bdfd405466f1ba0f403bb8716e5d0161790df71621bc1c8c361d6e5",
+      "execution_policy_sha256": "57905b64c13ebb9d45c285508329eb693fa5050f75df4786c15db4013a35615d",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 2,
@@ -15483,7 +15483,8 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "request-schema"
+          "request-schema",
+          "core-call"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -15498,7 +15499,7 @@
         "verification_strategy": "result_schema",
         "version": "2023.1"
       },
-      "execution_policy_sha256": "a38c98b96cbcd66b7f9de6cf973cc8d2f9d55695b880aa7420256d8e84dc7619",
+      "execution_policy_sha256": "8a1818c48910443c3df10a3941c554baceda1056a9a4530694c836798e5ed1e1",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 2,
@@ -17791,31 +17792,30 @@
       "correct_host": "wwise-console",
       "definition_graph_sha256": "dcbd1cc56ba2680898f123966f74db81cf693ed3ce9f03339f89751a18ef536f",
       "execution_policy": {
-        "accepted_authorization_modes": [
-          "explicit_confirmation"
-        ],
+        "accepted_authorization_modes": [],
         "companion_uris": [],
         "contract": "waapi-skill.public-execution-contract/v2",
         "effect": "read",
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "request-schema"
+          "request-schema",
+          "core-call"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
         "post_execution_project_guard_policy": "revalidate",
-        "program_case": "transaction-result-schema",
+        "program_case": "call-result-schema",
         "project_guard_mode": "invariant",
-        "requires_authorization": true,
-        "result_limit_bytes": 1048576,
-        "route": "transaction",
-        "timeout_seconds": 30.0,
+        "requires_authorization": false,
+        "result_limit_bytes": 262144,
+        "route": "bounded_call",
+        "timeout_seconds": 10.0,
         "uri": "ak.wwise.core.switchContainer.getAssignments",
         "verification_strategy": "result_schema",
         "version": "2023.1"
       },
-      "execution_policy_sha256": "449c7406aa59eb2479d52c48dd6c437b62cb2ae4acc36268d0a03dda345f371b",
+      "execution_policy_sha256": "308f951ef57067e6ce8193786dfbfad0d7a3cb488c3c6cd05cf6cd0859924b9b",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 3,
@@ -23281,31 +23281,30 @@
       "correct_host": "wwise-console",
       "definition_graph_sha256": "548a0bdcce2b8b91975a046080f96d38b0d7d9b9799c04e9ea6457efe8fcdb7a",
       "execution_policy": {
-        "accepted_authorization_modes": [
-          "explicit_confirmation"
-        ],
+        "accepted_authorization_modes": [],
         "companion_uris": [],
         "contract": "waapi-skill.public-execution-contract/v2",
         "effect": "read",
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "request-schema"
+          "request-schema",
+          "core-call"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
         "post_execution_project_guard_policy": "revalidate",
-        "program_case": "transaction-result-schema",
+        "program_case": "call-result-schema",
         "project_guard_mode": "invariant",
-        "requires_authorization": true,
-        "result_limit_bytes": 1048576,
-        "route": "transaction",
-        "timeout_seconds": 30.0,
+        "requires_authorization": false,
+        "result_limit_bytes": 262144,
+        "route": "bounded_call",
+        "timeout_seconds": 10.0,
         "uri": "ak.wwise.core.blendContainer.getAssignments",
         "verification_strategy": "result_schema",
         "version": "2024.1"
       },
-      "execution_policy_sha256": "acd8ec6a53f79d11fc57019e6eb0eaca4a8d927357802174efabcb05a79595be",
+      "execution_policy_sha256": "fc32ea0000493cf51710b1e38f0b77369e3c2414f96f52d15ed8516482270c70",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 3,
@@ -23879,7 +23878,8 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "request-schema"
+          "request-schema",
+          "core-call"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -23894,7 +23894,7 @@
         "verification_strategy": "result_schema",
         "version": "2024.1"
       },
-      "execution_policy_sha256": "1416db1810a33c86ca7f84cef592d8f3050681f635a02afea62b5d9ca8ea29bd",
+      "execution_policy_sha256": "8385a02a30a9debd73b9dbbfcbae417d69f36f6c3224e707568a39d3cb200c08",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 2,
@@ -24152,7 +24152,8 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "request-schema"
+          "request-schema",
+          "core-call"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -24167,7 +24168,7 @@
         "verification_strategy": "result_schema",
         "version": "2024.1"
       },
-      "execution_policy_sha256": "1663f09d12b4d2104f4cb1a26f9077dda8b7b298cacbc9b886207f54445a13f9",
+      "execution_policy_sha256": "f05ada16c2aa552ddfa7859abf620373490044701111854e17dca0ac19980565",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 2,
@@ -26468,31 +26469,30 @@
       "correct_host": "wwise-console",
       "definition_graph_sha256": "548a0bdcce2b8b91975a046080f96d38b0d7d9b9799c04e9ea6457efe8fcdb7a",
       "execution_policy": {
-        "accepted_authorization_modes": [
-          "explicit_confirmation"
-        ],
+        "accepted_authorization_modes": [],
         "companion_uris": [],
         "contract": "waapi-skill.public-execution-contract/v2",
         "effect": "read",
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "request-schema"
+          "request-schema",
+          "core-call"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
         "post_execution_project_guard_policy": "revalidate",
-        "program_case": "transaction-result-schema",
+        "program_case": "call-result-schema",
         "project_guard_mode": "invariant",
-        "requires_authorization": true,
-        "result_limit_bytes": 1048576,
-        "route": "transaction",
-        "timeout_seconds": 30.0,
+        "requires_authorization": false,
+        "result_limit_bytes": 262144,
+        "route": "bounded_call",
+        "timeout_seconds": 10.0,
         "uri": "ak.wwise.core.switchContainer.getAssignments",
         "verification_strategy": "result_schema",
         "version": "2024.1"
       },
-      "execution_policy_sha256": "704632d7e6f872cab22d0e78766588a59acf90555717db567b1bf24cb855f810",
+      "execution_policy_sha256": "68da4cf9b1e97ca44c56292b2d7d31465205f7a6967441ef8eb58234f904f387",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 3,
@@ -31735,31 +31735,30 @@
       "correct_host": "wwise-console",
       "definition_graph_sha256": "61e9c4ca7756b827e65389fd0ecbe0d6a75a90ab93a280be7d6963f52ef15ccf",
       "execution_policy": {
-        "accepted_authorization_modes": [
-          "explicit_confirmation"
-        ],
+        "accepted_authorization_modes": [],
         "companion_uris": [],
         "contract": "waapi-skill.public-execution-contract/v2",
         "effect": "read",
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "request-schema"
+          "request-schema",
+          "core-call"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
         "post_execution_project_guard_policy": "revalidate",
-        "program_case": "transaction-result-schema",
+        "program_case": "call-result-schema",
         "project_guard_mode": "invariant",
-        "requires_authorization": true,
-        "result_limit_bytes": 1048576,
-        "route": "transaction",
-        "timeout_seconds": 30.0,
+        "requires_authorization": false,
+        "result_limit_bytes": 262144,
+        "route": "bounded_call",
+        "timeout_seconds": 10.0,
         "uri": "ak.wwise.core.blendContainer.getAssignments",
         "verification_strategy": "result_schema",
         "version": "2025.1"
       },
-      "execution_policy_sha256": "24bbb77fadd19d0a62e7dfe9726ed67cbc926034fa1ee33578999b47c3019bf2",
+      "execution_policy_sha256": "5c61152ac0695f3124ca0d7932497359a9180da154b09e7ae9635f2ca5253086",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 3,
@@ -32425,7 +32424,8 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "request-schema"
+          "request-schema",
+          "core-call"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -32440,7 +32440,7 @@
         "verification_strategy": "result_schema",
         "version": "2025.1"
       },
-      "execution_policy_sha256": "1f7cb92ca9c1a5f639ec77979aa109f4f527b610a929cded6673b74c495895d1",
+      "execution_policy_sha256": "0b272105b50095e7d98e027ece1fe55eb75041f88cb4838b21b6b4047584a4fb",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 2,
@@ -32698,7 +32698,8 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "request-schema"
+          "request-schema",
+          "core-call"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -32713,7 +32714,7 @@
         "verification_strategy": "result_schema",
         "version": "2025.1"
       },
-      "execution_policy_sha256": "a087da01a88f5c05db3098729ed299bea97ffc74baeafa66b5b3e79d93e4136a",
+      "execution_policy_sha256": "b080a6884401517b56ba4004633de68459fa29057a6c4c39a485ccdb8d6af3b6",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 2,
@@ -35107,31 +35108,30 @@
       "correct_host": "wwise-console",
       "definition_graph_sha256": "61e9c4ca7756b827e65389fd0ecbe0d6a75a90ab93a280be7d6963f52ef15ccf",
       "execution_policy": {
-        "accepted_authorization_modes": [
-          "explicit_confirmation"
-        ],
+        "accepted_authorization_modes": [],
         "companion_uris": [],
         "contract": "waapi-skill.public-execution-contract/v2",
         "effect": "read",
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "request-schema"
+          "request-schema",
+          "core-call"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
         "post_execution_project_guard_policy": "revalidate",
-        "program_case": "transaction-result-schema",
+        "program_case": "call-result-schema",
         "project_guard_mode": "invariant",
-        "requires_authorization": true,
-        "result_limit_bytes": 1048576,
-        "route": "transaction",
-        "timeout_seconds": 30.0,
+        "requires_authorization": false,
+        "result_limit_bytes": 262144,
+        "route": "bounded_call",
+        "timeout_seconds": 10.0,
         "uri": "ak.wwise.core.switchContainer.getAssignments",
         "verification_strategy": "result_schema",
         "version": "2025.1"
       },
-      "execution_policy_sha256": "7f7c215dd8b1ac99a209e2ebe24c65ebe1e407a2b126735e0a78adeb7d45752f",
+      "execution_policy_sha256": "063e62d2b66322a1affe38cf36bea1b3cad4c014a9f9d867287e5ff21e1b430a",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 3,

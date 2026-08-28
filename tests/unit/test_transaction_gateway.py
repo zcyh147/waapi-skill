@@ -1844,7 +1844,7 @@ def test_soundbank_generate_operation_schema_closes_batch_language_scope(
 
 
 @pytest.mark.parametrize("version", ["2024.1", "2025.1"])
-def test_request_schema_owns_exact_audio_convert_typed_route_contract(
+def test_request_schema_owns_exact_audio_convert_business_route_contract(
     tmp_path: Path,
     version: str,
 ) -> None:
@@ -1864,16 +1864,21 @@ def test_request_schema_owns_exact_audio_convert_typed_route_contract(
     assert exit_code == 0
     assert factory_calls == []
     assert payload["uri"] == "ak.wwise.core.audio.convert"
-    assert payload["input_shape"] == "inline"
-    assert payload["continuation"]["subcommand"] == "typed-call"
-    assert payload["continuation"]["apply"] is True
-    assert payload["continuation"]["gateway_argv_prefix"][-2:] == [
-        "--io-root",
-        "<absolute-allowed-root>",
+    assert payload["input_shape"] == "business_declaration"
+    assert payload["continuation"]["subcommand"] == "draft-start"
+    assert payload["continuation"]["gateway_argv"] == [
+        "draft-start",
+        "ak.wwise.core.audio.convert",
     ]
-    assert "io_root_flag" not in payload["continuation"]
-    fields = {field["name"]: field for field in payload["fields"]}
-    assert set(fields) == {"objects", "platforms", "languages"}
+    declaration = payload["business_adapter"]["declaration"]
+    assert declaration["required_fields"] == [
+        "audio_object_handles",
+        "platform_names",
+        "languages",
+        "io_root",
+    ]
+    assert declaration["field_types"]["io_root"] == "exact_user_io_root"
+    assert payload["business_adapter"]["legacy_typed_call_public"] is False
     second_exit_code, second_payload = waapi_gateway.execute_gateway(
         ["request-schema", "ak.wwise.core.audio.convert"],
         env=env,
