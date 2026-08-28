@@ -210,6 +210,18 @@ def test_project_save_draft_start_returns_only_core_business_continuation(
         "required_fields": [],
         "optional_fields": ["auto_check_out"],
         "field_types": {"auto_check_out": "boolean"},
+        "field_semantics": {
+            "auto_check_out": {
+                "intent_binding": (
+                    "include_when_user_explicitly_allows_or_forbids_auto_checkout"
+                ),
+                "omitted_effect": "wwise_native_default_true",
+                "true_effect": (
+                    "automatically_checkout_affected_work_units_and_project"
+                ),
+                "false_effect": "do_not_automatically_checkout",
+            }
+        },
         "input_forms": {
             "auto_check_out": {
                 "flag": "--value",

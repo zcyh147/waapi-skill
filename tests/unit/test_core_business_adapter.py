@@ -199,6 +199,26 @@ def test_project_save_business_interface_derives_zero_or_one_stable_setting() ->
     assert adapter.accepts_update_command("draft-declare-core-plan") is True
 
 
+def test_project_save_contract_discloses_native_default_and_explicit_intent_binding() -> None:
+    contract = core_business_contract_data(
+        "ak.wwise.core.project.save",
+        "2025.1",
+    )
+
+    assert contract["declaration"]["field_semantics"] == {
+        "auto_check_out": {
+            "intent_binding": (
+                "include_when_user_explicitly_allows_or_forbids_auto_checkout"
+            ),
+            "omitted_effect": "wwise_native_default_true",
+            "true_effect": (
+                "automatically_checkout_affected_work_units_and_project"
+            ),
+            "false_effect": "do_not_automatically_checkout",
+        }
+    }
+
+
 @pytest.mark.parametrize(
     ("operation", "roles", "plan_factory", "native_factory", "read_shape"),
     [

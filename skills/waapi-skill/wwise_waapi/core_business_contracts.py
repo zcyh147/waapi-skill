@@ -132,6 +132,14 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
         "required_fields": (),
         "optional_fields": ("auto_check_out",),
         "field_types": {"auto_check_out": "boolean"},
+        "field_semantics": {
+            "auto_check_out": {
+                "intent_binding": "include_when_user_explicitly_allows_or_forbids_auto_checkout",
+                "omitted_effect": "wwise_native_default_true",
+                "true_effect": "automatically_checkout_affected_work_units_and_project",
+                "false_effect": "do_not_automatically_checkout",
+            }
+        },
         "execution_shape": "draft_mutation",
     },
     "ak.wwise.core.audio.convert": {
@@ -403,6 +411,19 @@ def core_business_contract_data(operation: str, version: str) -> dict[str, Any]:
                 ),
             }
         )
+    declaration = {
+        "subcommand": "core-call" if bounded_read else "draft-declare-core-plan",
+        "required_fields": list(public_required_fields),
+        "optional_fields": list(public_optional_fields),
+        "field_types": dict(public_field_types),
+        "input_forms": dict(input_forms),
+    }
+    field_semantics = row.get("field_semantics")
+    if field_semantics is not None:
+        declaration["field_semantics"] = {
+            field: dict(semantics)
+            for field, semantics in field_semantics.items()
+        }
     return {
         "contract": CORE_BUSINESS_CONTRACT,
         "operation": operation,
@@ -430,13 +451,7 @@ def core_business_contract_data(operation: str, version: str) -> dict[str, Any]:
             ),
             "validation": "exact_guid_name_type_path",
         },
-        "declaration": {
-            "subcommand": "core-call" if bounded_read else "draft-declare-core-plan",
-            "required_fields": list(public_required_fields),
-            "optional_fields": list(public_optional_fields),
-            "field_types": dict(public_field_types),
-            "input_forms": dict(input_forms),
-        },
+        "declaration": declaration,
         "gateway_derivations": [
             "exact_object_identities",
             "native_request",

@@ -49,7 +49,10 @@ prevention checks that are expensive to rediscover.
   machine-local test configuration.
 - Prevention: obtain `UserId` from `Win32_ComputerSystem.UserName`, register
   `-LogonType Interactive -RunLevel Limited`, and attest `InteractiveToken` in
-  exported XML. Before registration, require the candidate-local Python,
+  exported XML. Task Scheduler may omit the default `RunLevel` element from
+  that XML; attest `Limited` from the registered task Principal instead of
+  treating the omitted XML tag as a launch failure. Before registration,
+  require the candidate-local Python,
   absolute campaign path, action script, and copied ignored
   `live-environment.json` for a live profile. For a genuinely offline profile,
   pass the sealed `--offline-only` option on both hosts instead of requiring or
@@ -178,6 +181,24 @@ prevention checks that are expensive to rediscover.
   meanings such as `sound-sfx` and `sound-voice` non-equivalent. Audit reference
   examples against the oracle before spending a new Fresh root; do not solve a
   stable vocabulary seam by repeatedly strengthening only the prompt.
+
+### An optional business field can retain a non-neutral native default
+
+- Evidence: #84 native-Windows Core Fresh root `iwin-core-33f668f-r13`
+  followed `operations`, `request-schema`, and `draft-start`, then omitted the
+  explicit `auto_check_out=false` requested by the user. The authenticated
+  Broker rejected the incomplete declaration before Gateway or Wwise dispatch;
+  the root is frozen without replay and no mutation occurred.
+- Cause: the public field was correctly optional when the user says nothing,
+  but its schema did not disclose that omission preserves Wwise's native
+  `true` default. The Agent treated omission as equivalent to the explicit
+  negative business intent even though their effects differ.
+- Prevention: for an optional business field with a non-neutral native
+  default, disclose structured `omitted_effect`, true/false effects, and an
+  exact intent-binding rule in the Gateway contract. Keep the Broker strict:
+  an explicit user value must survive into the closed business declaration.
+  Do not weaken the oracle or retry the same root merely because a missing
+  field resembles a safe default.
 
 ### Real-test helpers can outlive a public Gateway cutover
 
