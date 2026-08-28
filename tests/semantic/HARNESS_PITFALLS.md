@@ -239,6 +239,19 @@ prevention checks that are expensive to rediscover.
   different, repeated, or later discovery remains a semantic failure. Freeze
   each original root without replay or PASS credit.
 
+### Offline business mode must survive every campaign layer
+
+- Evidence: #84 macOS r5/Windows r6 were rejected by the CLI parser, then
+  macOS r6/Windows r7 reached the heavy-campaign guard and were rejected there;
+  none created a campaign root or started Codex.
+- Cause: the matrix already classified these profiles as offline production
+  Gateway runs, but argument parsing, immutable heavy options, child argv, and
+  live-config fingerprinting still hard-coded real-Wwise mode.
+- Prevention: allow `--offline-only` only for registered offline business
+  profiles, preserve it through selection, child argv, run-config validation,
+  and evidence seals, and mark a nonexistent live config explicitly unused.
+  Keep ordinary heavy profiles fail-closed to real Wwise.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:

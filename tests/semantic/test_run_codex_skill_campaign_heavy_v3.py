@@ -198,6 +198,7 @@ EXPECTED_DRAFT_REVISION_SUBCOMMANDS = frozenset(
         "draft-declare-switch-assignment",
         "draft-declare-soundbank-plan",
         "draft-declare-artifact-plan",
+        "draft-declare-core-plan",
         "draft-declare-ui-plan",
         "draft-add-ui-command",
         "draft-discover-fields",
@@ -6518,6 +6519,27 @@ def test_heavy_child_argv_reuses_matrix_and_requests_exact_pending_cases(tmp_pat
     assert "--overwrite" not in argv
     assert argv[argv.index("--model") + 1] == "gpt-5.6-terra"
     assert argv[argv.index("--reasoning-effort") + 1] == "medium"
+
+
+def test_offline_business_child_argv_and_options_preserve_offline_mode(
+    tmp_path: Path,
+) -> None:
+    options = replace(
+        _options(tmp_path),
+        profile=matrix.CORE_BUSINESS_PROFILE_ID,
+        offline_only=True,
+        live_config=tmp_path / "unused-live-environment.json",
+    )
+    units = (_unit(1, version="2025.1"),)
+
+    argv = campaign.build_heavy_v3_child_argv(
+        options,
+        units=units,
+        matrix_root=tmp_path / "matrix",
+    )
+
+    assert argv.count("--offline-only") == 1
+    assert campaign.heavy_v3_immutable_options(options)["offline_only"] is True
 
 
 def test_heavy_validator_preserves_fail_and_later_pass_observations(tmp_path: Path) -> None:

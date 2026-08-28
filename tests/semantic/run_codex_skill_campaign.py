@@ -1052,7 +1052,10 @@ def run_heavy_v3_campaign(options: CampaignOptions) -> int:
 
     if options.pair_ids:
         raise CampaignConfigError("heavy V3 campaigns do not accept pair filters")
-    if options.offline_only:
+    if (
+        options.offline_only
+        and options.profile not in OFFLINE_BUSINESS_AGENT_PROFILE_IDS
+    ):
         raise CampaignConfigError("heavy V3 campaigns require real Wwise execution")
     if (
         options.profile == MODIFICATION_POLICY_V3_PROFILE_ID
@@ -1346,7 +1349,7 @@ def load_heavy_v3_campaign_units(options: CampaignOptions) -> tuple[Any, ...]:
         case_ids=options.case_ids,
         versions=options.versions,
         pair_ids=(),
-        offline_only=False,
+        offline_only=options.offline_only,
         overwrite=False,
         wwise_readiness_timeout_seconds=(
             options.wwise_readiness_timeout_seconds
@@ -1401,6 +1404,8 @@ def build_heavy_v3_child_argv(
                 ),
             )
         )
+    if options.offline_only:
+        argv.append("--offline-only")
     for unit in units:
         argv.extend(("--case-id", str(unit.unit_id)))
     return argv
@@ -1444,6 +1449,7 @@ def heavy_v3_child_request(
                 else {}
             ),
             "sequential": True,
+            "offline_only": options.offline_only,
         },
         "argv": list(argv),
         "started_at": utc_now(),
@@ -2078,7 +2084,7 @@ def build_heavy_v3_effective_config(
             "case_ids": list(options.case_ids),
             "versions": list(options.versions),
             "pair_ids": [],
-            "offline_only": False,
+            "offline_only": options.offline_only,
             "units": unit_rows,
             "required_units": {
                 str(key): list(value) for key, value in required_units.items()
@@ -2119,10 +2125,19 @@ def build_heavy_v3_effective_config(
                 else {}
             ),
         },
-        "live_config": {
-            "path": str(options.live_config),
-            "sha256": sha256_file(options.live_config),
-        },
+        "live_config": (
+            {
+                "path": str(options.live_config),
+                "sha256": None,
+                "used": False,
+            }
+            if options.offline_only
+            else {
+                "path": str(options.live_config),
+                "sha256": sha256_file(options.live_config),
+                "used": True,
+            }
+        ),
         "live_inputs": live_inputs,
         "codex": {
             "path": str(options.codex_binary),
@@ -2184,7 +2199,7 @@ def heavy_v3_immutable_options(options: CampaignOptions) -> dict[str, Any]:
         "case_ids": list(options.case_ids),
         "versions": list(options.versions),
         "pair_ids": [],
-        "offline_only": False,
+        "offline_only": options.offline_only,
         "lock_timeout_seconds": options.lock_timeout_seconds,
         "max_pre_action_retries": options.max_pre_action_retries,
     }
@@ -2724,7 +2739,7 @@ def _validate_heavy_v3_run_config(
         "case_ids": expected_ids,
         "versions": [],
         "pair_ids": [],
-        "offline_only": False,
+        "offline_only": options.offline_only,
         "model": options.model,
         "reasoning_effort": options.reasoning_effort,
         "service_tier": options.service_tier,
@@ -14083,12 +14098,24 @@ def assert_effective_inputs_frozen(
     harness = require_section("harness")
     file_bindings = (
         ("suite", options.suite_path, suite),
-        ("live config", options.live_config, live_config),
+        *(
+            (("live config", options.live_config, live_config),)
+            if not options.offline_only
+            else ()
+        ),
         ("Codex binary", options.codex_binary, codex),
     )
     for label, path, section in file_bindings:
         if section.get("path") != str(path) or section.get("sha256") != sha256_file(path):
             raise CampaignEvidenceError(f"{label} drifted from the immutable campaign fingerprint")
+    if options.offline_only and live_config != {
+        "path": str(options.live_config),
+        "sha256": None,
+        "used": False,
+    }:
+        raise CampaignEvidenceError(
+            "offline campaign must seal live config as unused"
+        )
     if codex.get("runtime_files", []) != _codex_runtime_fingerprints(options.codex_binary):
         raise CampaignEvidenceError(
             "Codex runtime helpers drifted from the immutable campaign fingerprint"
@@ -14777,7 +14804,6 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
     if (
         is_executable_v3
         and args.offline_only
-        and not is_deep_interface_mvp
         and business_agent_profile is None
     ):
         parser.error(f"--offline-only is not supported by {args.profile}")

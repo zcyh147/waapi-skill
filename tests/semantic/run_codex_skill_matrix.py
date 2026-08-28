@@ -3894,7 +3894,6 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
     if (
         is_executable_v3
         and args.offline_only
-        and not is_deep_interface_mvp
         and business_agent_profile is None
     ):
         parser.error(f"--offline-only is not supported by {args.profile}")
