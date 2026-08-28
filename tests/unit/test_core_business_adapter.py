@@ -469,6 +469,32 @@ def test_curve_and_blend_business_values_compile_native_enums_and_shapes() -> No
         ],
     }
 
+    for public_source, native_source in (
+        ("none", "None"),
+        ("volume-dry", "UseVolumeDry"),
+        ("project", "UseProject"),
+    ):
+        inherited = curve_session.with_settings(
+            {
+                "core_plan": {
+                    "attenuation_handle": curve_handles[0],
+                    "curve_kind": "volume-dry",
+                    "curve_source": public_source,
+                    "points": [],
+                }
+            }
+        )
+        inherited_request = materialize_core_business_request(
+            "ak.wwise.core.object.setAttenuationCurve",
+            inherited,
+        )
+        assert inherited_request["arguments"]["args"] == {
+            "object": curve_ids[0],
+            "curveType": "VolumeDryUsage",
+            "use": native_source,
+            "points": [],
+        }
+
     assignment_session, assignment_handles, assignment_ids = _role_session(
         ("blend_track", "child")
     )
@@ -708,6 +734,23 @@ def test_core_business_repair_rejects_native_enum_spelling_and_invalid_range() -
             curve_session,
         )
     assert enum_error.value.error_code == "BUSINESS_ENUM_INVALID"
+
+    empty_custom = curve_session.with_settings(
+        {
+            "core_plan": {
+                "attenuation_handle": curve_handles[0],
+                "curve_kind": "volume-dry",
+                "curve_source": "custom",
+                "points": [],
+            }
+        }
+    )
+    with pytest.raises(BusinessDeclarationError) as empty_custom_error:
+        materialize_core_business_request(
+            "ak.wwise.core.object.setAttenuationCurve",
+            empty_custom,
+        )
+    assert empty_custom_error.value.error_code == "BUSINESS_FIELDS_CONFLICT"
 
     random_session, random_handles, random_ids = _role_session(("object",))
     field = _bind_property(random_session, object_id=random_ids[0], token="Volume")

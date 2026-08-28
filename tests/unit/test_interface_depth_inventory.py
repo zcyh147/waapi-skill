@@ -352,6 +352,22 @@ def test_every_migration_row_has_exactly_one_rollup_and_ticket_family() -> None:
     assert inventory["summary"]["unowned_migration_rows"] == 0
 
 
+def test_completed_core_family_retains_the_authoritative_issue_84_row_seal() -> None:
+    inventory = _inventory()
+    completed = {
+        family["id"]: family
+        for family in inventory["completed_family_seals"]
+    }
+    core = completed["generic-core-project-object"]
+
+    assert core["github_issue"] == 84
+    assert core["row_count"] == len(core["rows"]) == 55
+    assert core["rows_sha256"] == (
+        "caf467378cbabccb637cd93d18cc4e87e"
+        "5356d409ce110da1f040825af4245ed"
+    )
+
+
 def test_every_supported_named_operation_uses_or_migrates_to_the_business_path() -> None:
     inventory = _inventory()
     assert inventory["summary"]["operation_dispositions"] == {

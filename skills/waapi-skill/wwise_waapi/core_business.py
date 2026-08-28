@@ -262,11 +262,11 @@ def _business_name(value: Any, *, field: str) -> str:
 
 
 def _curve_points(value: Any) -> list[dict[str, Any]]:
-    if not isinstance(value, list) or not 1 <= len(value) <= 64:
+    if not isinstance(value, list) or len(value) > 64:
         raise business_repair(
             "BUSINESS_COLLECTION_INVALID",
             field="points",
-            action="provide between one and 64 curve points",
+            action="provide a bounded list of at most 64 curve points",
         )
     points: list[dict[str, Any]] = []
     for index, row in enumerate(value):
@@ -673,13 +673,19 @@ def materialize_core_business_request(
                 action="choose disclosed attenuation curve meanings",
             )
         points = _curve_points(plan["points"])
+        if curve_source == "Custom" and not points:
+            raise business_repair(
+                "BUSINESS_FIELDS_CONFLICT",
+                field="points",
+                action="provide at least one point for curve_source custom",
+            )
         if curve_source != "Custom" and points:
             raise business_repair(
                 "BUSINESS_FIELDS_CONFLICT",
                 field="points",
                 action="use curve_source custom when supplying curve points",
             )
-        args = {
+        args: dict[str, Any] = {
             "object": _object_id(
                 session,
                 plan["attenuation_handle"],

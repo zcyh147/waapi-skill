@@ -83,10 +83,13 @@ a version string:
    classifications, metadata index, and semantic/WAQL resources.
 3. Classify changed routes by host and execution lane, then update the
    capability and execution registries, adapter and request-mapping registries,
-   and native-surface policy where applicable. For structured Gateway
+   and native-surface policy where applicable. For named structured Gateway
    operations, `skills/waapi-skill/wwise_waapi/operation_registry.py` is
-   authoritative; a builder implementation by itself is not a public operation
-   contract.
+   authoritative. Reviewed exact reflected-URI business lanes instead use their
+   version-aware business contract registry and Gateway `request-schema`.
+   A builder or dispatcher implementation by itself is never a public operation
+   contract, and neither public lane permits caller-authored native `args` or
+   `options`.
 4. Review the default business-declaration `query-schema` and the separately
    disclosed `query-schema --advanced` contract against the new reflection.
    Extend five-version business compiler goldens, advanced fixed-URI/final-cap

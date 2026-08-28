@@ -37,6 +37,12 @@ Business scalar values remain visible. Native paths, metadata scope, property/re
 | [`generic-soundengine-runtime`](https://github.com/zcyh147/waapi-skill/issues/88) | #57 | 124 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 26 | `5075fdcc32810059d6a3fee10499ff6823eea0be4c300dfb717bede6697c6ced` |
 | [`generic-topics`](https://github.com/zcyh147/waapi-skill/issues/91) | #57 | 154 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 33 | `48f62fffb957f2ed581bee75cb11ddd6624411b77fc307813d1984b5ce015982` |
 
+## Completed migration family seals
+
+| Family | Completed issue | Exact rows | Row digest |
+| --- | ---: | ---: | --- |
+| `generic-core-project-object` | #84 | 55 | `caf467378cbabccb637cd93d18cc4e87e5356d409ce110da1f040825af4245ed` |
+
 ## Already-deep and boundary evidence
 
 | Classification | Disposition | Exact lanes | Audit evidence |

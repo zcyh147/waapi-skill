@@ -67,11 +67,15 @@ for Wwise Authoring. Read this file before changing the Skill or running tests.
     `operation_composer.py` owns typed operation-local actions and deterministic
     materialization. Neither replaces the immutable transaction preview or its
     authorization and verification.
-  - `operation_registry.py` is the authoritative Gateway entrypoint for
-    structured operation contracts. Builder or dispatcher support alone does
-    not expose an operation: its public request shape, version scope, safety
-    behavior, and verification boundary must be present through this registry
-    and the Gateway `operation-schema` path.
+  - `operation_registry.py` is the authoritative Gateway entrypoint for named
+    structured operation contracts. Reviewed exact reflected-URI business
+    lanes use their version-aware business contract registry (currently
+    `core_business_contracts.py`) and the Gateway `request-schema` path instead.
+    Builder or dispatcher support alone does not expose either kind of
+    operation: its public request shape, version scope, safety behavior, and
+    verification boundary must be present through the matching registry and
+    Gateway schema path. The reflected-URI lane still materializes its native
+    `args` and `options` inside the Gateway; callers never author them.
 - `skills/waapi-skill/resources/manifest/<version>/`
   - reflected Console functions, topics, schemas, immutable inventory
     metadata, and the narrow `authoring-ui-commands-supplement.json` and
@@ -131,8 +135,11 @@ it supported without proving the reflected and executable surfaces:
 3. Classify every new or changed route in its execution lane and update the
    capability, execution-contract, operation registry, adapter registry,
    request-mapping registry, and native-surface policy entries that actually
-   apply. A structured mutation is not public until `operation_registry.py`
-   exposes its closed contract.
+   apply. A named structured mutation is not public until
+   `operation_registry.py` exposes its closed contract. A reviewed exact
+   reflected-URI mutation is not public until its business contract registry
+   exposes the closed request through Gateway `request-schema`; raw native
+   `args` and `options` remain internal in both cases.
 4. Update README coverage and test-inventory documentation only from generated
    inventories and completed runs; distinguish a reflected route, a
    program-tested route, and real execution evidence.

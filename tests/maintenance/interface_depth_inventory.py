@@ -1456,6 +1456,24 @@ def build_interface_depth_inventory() -> dict[str, Any]:
     operation_dispositions = Counter(row["disposition"] for row in operation_rows)
     blueprints = policy["ticket_blueprints"]
     issue_numbers = policy["ticket_issue_numbers"]
+    completed_seals = policy.get("completed_family_seals", {})
+    completed_family_rows: dict[str, list[str]] = {
+        family_id: sorted(
+            f"{row['version']}|{row['item_type']}|{row['uri']}"
+            for row in native_rows
+            if row["classification"] == family_id
+        )
+        for family_id in completed_seals
+    }
+    for family_id, expected in completed_seals.items():
+        rows = completed_family_rows[family_id]
+        if (
+            len(rows) != expected["row_count"]
+            or canonical_sha256(rows) != expected["rows_sha256"]
+        ):
+            raise RuntimeError(
+                f"completed family seal drifted for {family_id}"
+            )
     if set(blueprints) != set(ticket_rows):
         raise RuntimeError(
             "ticket blueprint mismatch: "
@@ -1494,6 +1512,16 @@ def build_interface_depth_inventory() -> dict[str, Any]:
                 "rows_sha256": canonical_sha256(sorted(rows)),
             }
             for ticket_id, rows in sorted(ticket_rows.items())
+        ],
+        "completed_family_seals": [
+            {
+                "id": family_id,
+                "github_issue": completed_seals[family_id]["github_issue"],
+                "rows": rows,
+                "row_count": len(rows),
+                "rows_sha256": canonical_sha256(rows),
+            }
+            for family_id, rows in sorted(completed_family_rows.items())
         ],
         "field_contracts": [
             {"sha256": digest, "model_values": fields}
@@ -1572,6 +1600,19 @@ def render_interface_depth_inventory(inventory: Mapping[str, Any]) -> str:
         lines.append(
             f"| [`{family['id']}`](https://github.com/zcyh147/waapi-skill/issues/{family['github_issue']}) | #{owner} | {family['row_count']} | "
             f"{', '.join(versions)} | {len(names)} | `{family['rows_sha256']}` |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Completed migration family seals",
+            "",
+            "| Family | Completed issue | Exact rows | Row digest |",
+            "| --- | ---: | ---: | --- |",
+        ]
+    )
+    for family in inventory["completed_family_seals"]:
+        lines.append(
+            f"| `{family['id']}` | #{family['github_issue']} | {family['row_count']} | `{family['rows_sha256']}` |"
         )
     reviewed_groups: dict[tuple[str, str, str], int] = Counter()
     for row in (*inventory["native_lanes"], *inventory["operation_lanes"]):
