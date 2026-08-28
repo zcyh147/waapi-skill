@@ -72,7 +72,7 @@ _FIELD_ALIASES = {
     "ixml-take": "IXML/Take",
     "take": "IXML/Take",
 }
-_FIXED_MEDIA_FIELDS = ("Path", "FileId", "Db")
+_FIXED_MEDIA_FIELDS = ("Path", "FileId")
 
 
 class MediaBuildBusinessError(ValueError):
@@ -889,7 +889,7 @@ def _normalize_media_pool_result(raw_result: Any, plan: Mapping[str, Any]) -> di
     projected: list[dict[str, Any]] = []
     for index, row in enumerate(filtered):
         fixed: dict[str, Any] = {}
-        for native, business in (("Path", "path"), ("FileId", "file_id"), ("Db", "database_id")):
+        for native, business in (("Path", "path"), ("FileId", "file_id")):
             value = row.get(native)
             if not isinstance(value, str) or not value:
                 raise MediaBuildBusinessError(
@@ -897,6 +897,14 @@ def _normalize_media_pool_result(raw_result: Any, plan: Mapping[str, Any]) -> di
                     code="MEDIA_BUILD_RESULT_INVALID",
                 )
             fixed[business] = value
+        if "Db" in row:
+            database_id = row.get("Db")
+            if not isinstance(database_id, str) or not database_id:
+                raise MediaBuildBusinessError(
+                    f"Media Pool row {index} has an invalid Db value",
+                    code="MEDIA_BUILD_RESULT_INVALID",
+                )
+            fixed["database_id"] = database_id
         values: dict[str, Any] = {}
         for binding in plan.get("output_bindings", ()):
             if binding["field"] not in row:

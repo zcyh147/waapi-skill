@@ -394,6 +394,36 @@ def test_media_pool_result_rejects_missing_or_excess_projection_rows() -> None:
         )
 
 
+def test_media_pool_database_identity_is_optional_unless_requested() -> None:
+    prepared = materialize_media_build_business_request(
+        MEDIA_POOL_GET_URI,
+        "2025.1",
+        {"max_results": 2, "return_field_meanings": ["filename"]},
+        available_media_fields=["Path", "FileId", "Filename"],
+    )
+
+    normalized = normalize_media_build_result(
+        prepared,
+        {
+            "return": [
+                {
+                    "Path": "/Audio/Rain.wav",
+                    "FileId": "rain-id",
+                    "Filename": "Rain.wav",
+                }
+            ]
+        },
+    )
+
+    assert normalized["items"] == [
+        {
+            "path": "/Audio/Rain.wav",
+            "file_id": "rain-id",
+            "values": {"filename": "Rain.wav"},
+        }
+    ]
+
+
 def test_media_pool_descending_sort_keeps_missing_values_last() -> None:
     prepared = materialize_media_build_business_request(
         MEDIA_POOL_GET_URI,
