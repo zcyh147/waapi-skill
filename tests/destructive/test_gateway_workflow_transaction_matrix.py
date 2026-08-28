@@ -702,12 +702,78 @@ def test_closed_gateway_workflows_across_selected_version(
             expected_notes=import_notes,
             source_file=audio_file,
         )
+        audio_source_id = _imported_audio_source_id(
+            audio_import["verification_evidence"],
+            expected_path=f"{imported_path}\\{audio_file.stem}",
+        )
+        region_peaks = runtime.gateway(
+            [
+                "core-call",
+                "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
+                "--audio-source-id",
+                audio_source_id,
+                "--start-seconds",
+                "0",
+                "--end-seconds",
+                "0.1",
+                "--peak-pair-count",
+                "8",
+                "--channel-mode",
+                "per-channel",
+            ],
+            live=True,
+        )
+        assert region_peaks["agent_result"]["peak_pair_count"] == 8
+        assert region_peaks["agent_result"]["channel_count"] == 1
+        assert len(region_peaks["agent_result"]["channels"][0]["pairs_normalized"]) == 8
+        trimmed_peaks = runtime.gateway(
+            [
+                "core-call",
+                "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion",
+                "--audio-source-id",
+                audio_source_id,
+                "--peak-pair-count",
+                "8",
+                "--channel-mode",
+                "cross-channel",
+            ],
+            live=True,
+        )
+        assert trimmed_peaks["agent_result"]["peak_pair_count"] == 8
+        assert trimmed_peaks["agent_result"]["channel_count"] == 1
 
+        if runtime.version == "2025.1":
+            media_pool = runtime.gateway(
+                [
+                    "core-call",
+                    "ak.wwise.core.mediaPool.get",
+                    "--max-results",
+                    "200",
+                    "--include-field",
+                    "filename",
+                    "--include-field",
+                    "duration-seconds",
+                    "--exact-name-contains",
+                    import_name,
+                    "--final-limit",
+                    "1",
+                ],
+                live=True,
+            )
+            assert media_pool["agent_result"]["complete"] is True
+            assert media_pool["agent_result"]["returned_count"] == 1
+            assert media_pool["agent_result"]["items"][0]["values"]["filename"] == (
+                f"{import_name}.wav"
+            )
+
+        included_name = (
+            f"WAAPI_GATEWAY_INCLUDED_{runtime.version.replace('.', '_')}_{unique_suffix}"
+        )
         included_id = _create_object(
             runtime,
             parent=object_parent,
             object_type="ActorMixer",
-            name=f"WAAPI_GATEWAY_INCLUDED_{runtime.version.replace('.', '_')}_{unique_suffix}",
+            name=included_name,
         )
         included_second_id = _create_object(
             runtime,
@@ -832,6 +898,29 @@ def test_closed_gateway_workflows_across_selected_version(
                 }
             ],
         )
+        inclusions_read = runtime.gateway(
+            [
+                "core-call",
+                "ak.wwise.core.soundbank.getInclusions",
+                "--soundbank-id",
+                soundbank_id,
+            ],
+            live=True,
+        )
+        assert inclusions_read["agent_result"] == {
+            "contract": "waapi-skill.media-build-result/v1",
+            "kind": "soundbank_inclusions",
+            "count": 1,
+            "inclusions": [
+                {
+                    "object_id": included_id.upper(),
+                    "name": included_name,
+                    "type": "ActorMixer",
+                    "path": f"{object_parent}\\{included_name}",
+                    "includes": ["events", "structures"],
+                }
+            ],
+        }
 
         inclusions_clear = _complete_transaction(
             runtime,
@@ -1000,6 +1089,15 @@ def test_closed_gateway_workflows_across_selected_version(
                 {"category": "scalar-reference-link", "status": "PASS", "verifier_strength": "operation_specific_readback"},
                 {"category": "relationship", "status": "PASS", "verifier_strength": "operation_specific_readback"},
                 {"category": "soundbank-file-artifact", "status": "PASS", "verifier_strength": "operation_specific_readback"},
+                {
+                    "category": "media-build-business-read",
+                    "status": "PASS",
+                    "verifier_strength": (
+                        "region_trimmed_peaks_soundbank_inclusions_and_media_pool"
+                        if runtime.version == "2025.1"
+                        else "region_trimmed_peaks_and_soundbank_inclusions"
+                    ),
+                },
             ]
         )
     finally:
@@ -2434,6 +2532,34 @@ def _imported_object(executed: Mapping[str, Any], requested_object_path: str) ->
     _required_string(matches[0], "id")
     _required_string(matches[0], "path")
     return matches[0]
+
+
+def _imported_audio_source_id(
+    verification: Mapping[str, Any],
+    *,
+    expected_path: str,
+) -> str:
+    readbacks = verification.get("readbacks")
+    assert isinstance(readbacks, list), verification
+    matches: list[Mapping[str, Any]] = []
+    for readback in readbacks:
+        if not isinstance(readback, Mapping) or readback.get("uri") != (
+            "ak.wwise.core.object.get"
+        ):
+            continue
+        result = readback.get("result")
+        rows = result.get("return") if isinstance(result, Mapping) else None
+        if not isinstance(rows, list):
+            continue
+        matches.extend(
+            row
+            for row in rows
+            if isinstance(row, Mapping)
+            and row.get("type") == "AudioFileSource"
+            and row.get("path") == expected_path
+        )
+    assert len(matches) == 1, {"expected_path": expected_path, "matches": matches}
+    return _required_string(matches[0], "id")
 
 
 def _required_string(value: Mapping[str, Any], field: str) -> str:

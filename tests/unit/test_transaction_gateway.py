@@ -1466,7 +1466,17 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
         "request-schema",
         "ak.wwise.core.project.save",
     ]
-    assert catalog["request_schema_route_count"] == 19
+    assert catalog["request_schema_route_count"] == 23
+    assert request_schema_routes[
+        "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion"
+    ]["next_command"] == [
+        "request-schema",
+        "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
+    ]
+    assert request_schema_routes["ak.wwise.core.mediaPool.get"]["next_command"] == [
+        "request-schema",
+        "ak.wwise.core.mediaPool.get",
+    ]
     compact_json = json.dumps(catalog, ensure_ascii=False, indent=2, sort_keys=True).encode("utf-8")
     assert len(compact_json) < 30_000
 

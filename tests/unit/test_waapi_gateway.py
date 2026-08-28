@@ -2195,38 +2195,6 @@ def test_selected_manifest_absence_is_an_explicit_boundary_for_newer_versions(tm
 
 
 
-@pytest.mark.parametrize(
-    "raw_result",
-    (
-        {},
-        {"return": {}},
-        {"return": [[]]},
-        {"return": [{"Filename": 7}]},
-        {"return": [], "unexpected": True},
-    ),
-    ids=(
-        "missing-return",
-        "return-not-array",
-        "row-not-object",
-        "filename-not-string",
-        "extra-top-level-key",
-    ),
-)
-def test_media_pool_post_filter_rejects_invalid_success_result_shapes(raw_result: Any) -> None:
-    with pytest.raises(waapi_gateway.GatewayResultShapeError) as exc_info:
-        waapi_gateway.apply_media_pool_post_filter(
-            raw_result,
-            spec={
-                "field": "Filename",
-                "operator": "containsCaseSensitive",
-                "value": "footstep",
-                "limit": 2,
-            },
-            request_max_results=20,
-            evidence_path="evidence.json",
-        )
-
-    assert exc_info.value.error_code == "INVALID_MEDIA_POOL_POST_FILTER_RESULT"
 
 
 

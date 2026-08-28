@@ -226,6 +226,7 @@ from wwise_waapi.operation_drafts import (  # noqa: E402  # pyright: ignore[repo
     OPERATION_DRAFT_CONTRACT,
     OperationDraftBindingDrift,
     OperationDraftCheckRequired,
+    OperationDraftNotAvailable,
     OperationDraftRecord,
     OperationDraftSealReplayMismatch,
     OperationDraftState,
@@ -244,6 +245,26 @@ from wwise_waapi.core_business_contracts import (  # noqa: E402  # pyright: igno
 )
 from wwise_waapi.core_business import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     materialize_core_business_request,
+)
+from wwise_waapi.media_build_business_contracts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    MEDIA_POOL_GET_URI,
+    PEAKS_REGION_URI,
+    PEAKS_TRIMMED_URI,
+    SOUNDBANK_GET_INCLUSIONS_URI,
+    media_build_business_catalog_rows,
+    media_build_business_contract_data,
+    media_build_business_operations,
+)
+from wwise_waapi.media_build_business import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    MediaBuildBusinessError,
+    materialize_media_build_business_request,
+    normalize_media_build_result,
+)
+from wwise_waapi.media_build_business_cli import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    MediaBuildBusinessCliError,
+    add_media_build_read_arguments,
+    media_build_fields_supplied,
+    media_build_input_from_namespace,
 )
 from wwise_waapi.business_declarations import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     MAX_BUSINESS_NAME_BYTES,
@@ -369,7 +390,6 @@ GET_INFO_URI = "ak.wwise.core.getInfo"
 GET_PROJECT_INFO_URI = "ak.wwise.core.getProjectInfo"
 OBJECT_GET_URI = "ak.wwise.core.object.get"
 GET_SELECTED_URI = "ak.wwise.ui.getSelectedObjects"
-MEDIA_POOL_GET_URI = "ak.wwise.core.mediaPool.get"
 ENV_HOST = "WWISE_WAAPI_HOST"
 ENV_PORT = "WWISE_WAAPI_PORT"
 ENV_VERSION = "WWISE_VERSION"
@@ -416,7 +436,6 @@ GATEWAY_SESSION_CONTEXT_CONTRACT = "waapi-skill.session-context/v2"
 GATEWAY_SESSION_INTRODUCTION_CONTRACT = "waapi-skill.session-introduction/v2"
 GATEWAY_DEADLINE_PROVENANCE = "waapi-skill.gateway-deadline/v1"
 GATEWAY_RESULT_CEILING_PROVENANCE = "waapi-skill.gateway-live-result-json-ceiling/v1"
-MEDIA_POOL_POST_FILTER_CONTRACT = "waapi-skill.media-pool-post-filter/v1"
 MAX_METADATA_PLATFORM_NAME_CHARS = 256
 ORIGINAL_FILE_REFERENCE_MATCH_CONTRACT = (
     "waapi-skill.original-file-reference-match/v1"
@@ -1344,12 +1363,18 @@ def build_parser() -> argparse.ArgumentParser:
         "core-call",
         help="Run one reviewed generic Core read from closed business identities",
     )
-    core_call.add_argument("api", choices=tuple(sorted(core_business_operations())))
+    core_call.add_argument(
+        "api",
+        choices=tuple(
+            sorted(core_business_operations() | media_build_business_operations())
+        ),
+    )
     core_call.add_argument("--source-id")
     core_call.add_argument("--target-id")
     core_call.add_argument("--object-id")
     core_call.add_argument("--field-meaning")
     core_call.add_argument("--platform-name")
+    add_media_build_read_arguments(core_call)
 
     typed_zero_call = subparsers.add_parser(
         "typed-zero-call",
@@ -2520,8 +2545,6 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Include complete validation and dispatch evidence",
     )
-    draft_check.add_argument("--post-filter-value")
-    draft_check.add_argument("--post-filter-limit", type=int)
 
     preview_from_draft = subparsers.add_parser(
         "preview-from-draft",
@@ -2753,6 +2776,8 @@ def _execute_gateway_unconstrained(
             preflight_typed_request_input(args, env=source_env)
         if args.command == "core-call":
             preflight_core_business_input(args, env=source_env)
+        if args.command in {"draft-apply", "draft-check", "preview-from-draft"}:
+            preflight_retired_media_build_draft(args, env=source_env)
         if args.command == "typed-operation":
             preflight_typed_operation_input(args, env=source_env)
         if args.command == "typed-zero-call":
@@ -4061,7 +4086,7 @@ def preflight_typed_request_input(
     versions = resolve_catalog_versions(args, env=env)
     if len(versions) != 1:
         raise GatewayInputError("typed-call requires one exact Wwise version")
-    if args.api in core_business_operations():
+    if args.api in core_business_operations() | media_build_business_operations():
         raise GatewayInputError(
             f"{args.api} uses request-schema and its closed Core business continuation"
         )
@@ -4156,6 +4181,23 @@ def preflight_core_business_input(
     versions = resolve_catalog_versions(args, env=env)
     if len(versions) != 1:
         raise GatewayInputError("core-call requires one exact Wwise version")
+    if args.api in media_build_business_operations():
+        try:
+            media_input = media_build_input_from_namespace(
+                args,
+                operation=args.api,
+                version=versions[0],
+            )
+        except MediaBuildBusinessCliError as exc:
+            raise GatewayInputError(str(exc)) from exc
+        args.media_build_request = media_input.materialized_request
+        args.media_build_plan = media_input.deferred_media_pool_plan
+        args.core_business_version = versions[0]
+        return
+    if media_build_fields_supplied(args):
+        raise GatewayInputError(
+            "This Core business read does not accept media/build fields"
+        )
     contract = core_business_contract_data(args.api, versions[0])
     if contract["execution_shape"] != "bounded_read":
         raise GatewayInputError(
@@ -4214,6 +4256,29 @@ def preflight_core_business_input(
     else:  # pragma: no cover - contract registry invariant
         raise GatewayInputError("Unsupported Core business read")
     args.core_business_version = versions[0]
+
+
+def preflight_retired_media_build_draft(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+) -> None:
+    """Reject archived shallow media/build Drafts before any live connection."""
+
+    try:
+        record = OperationDraftStore(
+            resolve_transaction_state_directory(args, env=env)
+        ).inspect(
+            args.draft_id,
+            task_authority=args.task_authority,
+        )
+    except OperationDraftNotAvailable:
+        return
+    if record.operation in media_build_business_operations():
+        raise GatewayInputError(
+            f"{record.operation} uses its closed Core business continuation; "
+            "the retired typed Draft cannot continue"
+        )
 
 
 def preflight_typed_operation_input(
@@ -5613,7 +5678,11 @@ def fixed_command_route_payload(capability: CapabilityRecord) -> dict[str, Any]:
 def core_business_route_payload(version: str, api: str) -> dict[str, Any]:
     """Expose one reviewed Core declaration without reflected typed fields."""
 
-    contract = core_business_contract_data(api, version)
+    contract = (
+        media_build_business_contract_data(api, version)
+        if api in media_build_business_operations()
+        else core_business_contract_data(api, version)
+    )
     start = contract["start"]
     bounded_read = contract["execution_shape"] == "bounded_read"
     argv_key = "gateway_argv_prefix" if bounded_read else "gateway_argv"
@@ -7317,10 +7386,10 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             return fixed_command_route_payload(capability)
         if (
             args.command == "request-schema"
-            and args.api in core_business_operations()
+            and args.api in core_business_operations() | media_build_business_operations()
         ):
             return core_business_route_payload(versions[0], args.api)
-        if args.api in core_business_operations():
+        if args.api in core_business_operations() | media_build_business_operations():
             raise GatewayInputError(
                 f"{args.api} uses its closed Core business declaration; "
                 "typed field and container construction are not public"
@@ -7907,6 +7976,11 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             raise GatewayInputError(
                 "draft-start requires an explicit or configured Wwise version."
             )
+        if args.operation in media_build_business_operations():
+            raise GatewayInputError(
+                f"{args.operation} uses request-schema and its closed Core business "
+                "continuation; the retired typed Draft is not public"
+            )
         schema_digest = operation_draft_schema_digest(
             args.operation, request_version
         )
@@ -8291,7 +8365,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 **row,
                 "next_command": ["request-schema", row["api"]],
             }
-            for row in core_business_catalog_rows()
+            for row in (*core_business_catalog_rows(), *media_build_business_catalog_rows())
         ]
         return {
             "contract": GATEWAY_RESULT_CONTRACT,
@@ -9415,6 +9489,15 @@ def dispatch_core_business_read(
         raise GatewayInputError(
             "Core business version changed after preflight; request-schema must be rerun"
         )
+    if args.api in media_build_business_operations():
+        return dispatch_media_build_business_read(
+            args,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+        )
     project, project_call = current_project(
         dispatcher,
         connection=connection,
@@ -9612,6 +9695,281 @@ def dispatch_core_business_read(
             ),
         },
         "agent_result": result.get("result") if result.get("ok") else None,
+    }
+
+
+def dispatch_media_build_business_read(
+    args: argparse.Namespace,
+    *,
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Revalidate and execute one closed media/build business read."""
+
+    project, project_call = current_project(
+        dispatcher,
+        connection=connection,
+        version=detected_version,
+    )
+    assert project is not None
+    read_call = transaction_read_call(
+        dispatcher,
+        connection=connection,
+        version=detected_version,
+    )
+    field_discovery_call = None
+    if args.api == MEDIA_POOL_GET_URI:
+        field_api = "ak.wwise.core.mediaPool.getFields"
+        field_capability = live_capability(
+            detected_version,
+            field_api,
+            live_info=live_info,
+        )
+        field_discovery_call = dispatch(
+            dispatcher,
+            field_api,
+            connection=connection,
+            version=detected_version,
+            args={},
+            options={},
+            result_limit_bytes=int(
+                field_capability.execution_contract["result_limit_bytes"]
+            ),
+            operation_timeout=float(
+                field_capability.execution_contract["timeout_seconds"]
+            ),
+        )
+        if not field_discovery_call.get("ok"):
+            return {
+                "ok": False,
+                "status": "error",
+                **dict(common),
+                "api_attempted": args.api,
+                "field_discovery_call": dispatch_call_summary(field_discovery_call),
+                "agent_result": None,
+            }
+        field_result = field_discovery_call.get("result")
+        available_fields = (
+            field_result.get("return")
+            if isinstance(field_result, Mapping)
+            else None
+        )
+        if not isinstance(available_fields, list):
+            raise GatewayResultShapeError(
+                "Media Pool field discovery must return an exact-case field list.",
+                details={"result_type": type(field_result).__name__},
+                error_code="MEDIA_BUILD_FIELD_DISCOVERY_INVALID",
+            )
+        try:
+            request = materialize_media_build_business_request(
+                args.api,
+                detected_version,
+                args.media_build_plan,
+                available_media_fields=available_fields,
+            )
+        except MediaBuildBusinessError as exc:
+            raise GatewayInputError(str(exc)) from exc
+    else:
+        request = args.media_build_request
+    if args.api == MEDIA_POOL_GET_URI:
+        required_type = None
+        identity_rows = None
+    else:
+        identity_id = request["business_request"].get(
+            "audio_source_id"
+            if args.api in {PEAKS_REGION_URI, PEAKS_TRIMMED_URI}
+            else "soundbank_id"
+        )
+        required_type = (
+            "AudioFileSource"
+            if args.api in {PEAKS_REGION_URI, PEAKS_TRIMMED_URI}
+            else "SoundBank"
+        )
+        if not isinstance(identity_id, str):  # pragma: no cover - preflight invariant
+            raise GatewayInputError("Media/build request lacks its object identity")
+        identity_result = read_call(
+            OBJECT_GET_URI,
+            {"from": {"id": [identity_id]}},
+            {"return": ["id", "name", "type", "path"]},
+        )
+        identity_rows = identity_result.get("return")
+        identity = (
+            identity_rows[0]
+            if isinstance(identity_rows, list) and len(identity_rows) == 1
+            else None
+        )
+        if (
+            not isinstance(identity, Mapping)
+            or str(identity.get("id", "")).upper() != identity_id.upper()
+            or identity.get("type") != required_type
+            or not all(
+                isinstance(identity.get(field), str) and bool(identity[field])
+                for field in ("name", "path")
+            )
+        ):
+            raise GatewayResultShapeError(
+                f"Media/build read requires one exact live {required_type} identity.",
+                details={
+                    "requested_id": identity_id,
+                    "required_type": required_type,
+                    "actual_rows": identity_rows,
+                },
+                error_code="MEDIA_BUILD_IDENTITY_MISMATCH",
+            )
+    request_validation = validate_semantic_payload(
+        request["api"],
+        request["args"],
+        request["options"],
+        version=detected_version,
+    )
+    capability = live_capability(
+        detected_version,
+        args.api,
+        live_info=live_info,
+    )
+    result = dispatch(
+        dispatcher,
+        request["api"],
+        connection=connection,
+        version=detected_version,
+        args=request["args"],
+        options=request["options"],
+        allow_destructive=True,
+        result_limit_bytes=int(capability.execution_contract["result_limit_bytes"]),
+        operation_timeout=float(capability.execution_contract["timeout_seconds"]),
+    )
+    result_validation = (
+        validate_semantic_result(
+            request["api"],
+            result.get("result"),
+            version=detected_version,
+        )
+        if result.get("ok")
+        else None
+    )
+    normalized = None
+    result_identity_rows: list[Mapping[str, Any]] = []
+    if result.get("ok"):
+        if args.api == SOUNDBANK_GET_INCLUSIONS_URI:
+            raw_result = result.get("result")
+            raw_inclusions = (
+                raw_result.get("inclusions")
+                if isinstance(raw_result, Mapping)
+                else None
+            )
+            if not isinstance(raw_inclusions, list):
+                raise GatewayResultShapeError(
+                    "SoundBank inclusion result lacks its inclusion list.",
+                    details={"result_type": type(raw_result).__name__},
+                    error_code="MEDIA_BUILD_RESULT_INVALID",
+                )
+            if len(raw_inclusions) > 500:
+                raise GatewayResultShapeError(
+                    "SoundBank inclusion result exceeds 500 rows.",
+                    details={"count": len(raw_inclusions), "limit": 500},
+                    error_code="MEDIA_BUILD_RESULT_LIMIT_EXCEEDED",
+                )
+            inclusion_ids = []
+            for row in raw_inclusions:
+                object_id = row.get("object") if isinstance(row, Mapping) else None
+                if not isinstance(object_id, str) or not _canonical_guid(object_id):
+                    raise GatewayResultShapeError(
+                        "SoundBank inclusion result contains a malformed object identity.",
+                        details={"row": row},
+                        error_code="MEDIA_BUILD_RESULT_INVALID",
+                    )
+                inclusion_ids.append(object_id)
+            if len({value.upper() for value in inclusion_ids}) != len(inclusion_ids):
+                raise GatewayResultShapeError(
+                    "SoundBank inclusion result contains duplicate object identities.",
+                    details={"count": len(inclusion_ids)},
+                    error_code="MEDIA_BUILD_RESULT_INVALID",
+                )
+            if inclusion_ids:
+                resolved = read_call(
+                    OBJECT_GET_URI,
+                    {"from": {"id": inclusion_ids}},
+                    {"return": ["id", "name", "type", "path"]},
+                )
+                raw_rows = resolved.get("return")
+                if not isinstance(raw_rows, list):
+                    raise GatewayResultShapeError(
+                        "SoundBank inclusion identity read is malformed.",
+                        details={"result_type": type(raw_rows).__name__},
+                        error_code="MEDIA_BUILD_RESULT_INVALID",
+                    )
+                result_identity_rows = raw_rows
+        try:
+            normalized = normalize_media_build_result(
+                request,
+                result.get("result"),
+                identity_rows=result_identity_rows,
+            )
+        except MediaBuildBusinessError as exc:
+            raise GatewayResultShapeError(
+                str(exc),
+                details={"media_build_error_code": exc.code},
+                error_code=exc.code,
+            ) from exc
+    incomplete_media_pool = (
+        args.api == MEDIA_POOL_GET_URI
+        and isinstance(normalized, Mapping)
+        and normalized.get("complete") is False
+    )
+    effective_ok = bool(result.get("ok")) and not incomplete_media_pool
+    return {
+        "ok": effective_ok,
+        "status": (
+            "incomplete_boundary"
+            if incomplete_media_pool
+            else "ok"
+            if result.get("ok")
+            else "error"
+        ),
+        **dict(common),
+        "api_attempted": args.api,
+        **(
+            {
+                "error_code": "MEDIA_POOL_POST_FILTER_INCOMPLETE",
+                "message": (
+                    "The Media Pool candidate response reached maxResults, so "
+                    "the exact-case post-filter cannot prove completeness."
+                ),
+            }
+            if incomplete_media_pool
+            else {}
+        ),
+        "business_request": {
+            "operation": args.api,
+            **dict(request["business_request"]),
+        },
+        "project_call": dispatch_call_summary(project_call),
+        "identity_read": {
+            "count": (0 if required_type is None else 1) + len(result_identity_rows),
+            "exact": True,
+            "required_type": required_type,
+        },
+        **(
+            {
+                "field_discovery": {
+                    "api": "ak.wwise.core.mediaPool.getFields",
+                    "field_count": len(available_fields),
+                    "exact_case": True,
+                    "call": dispatch_call_summary(field_discovery_call),
+                }
+            }
+            if field_discovery_call is not None
+            else {}
+        ),
+        "call": dispatch_call_summary(result),
+        "schema_validation": {
+            "request": request_validation.as_dict(),
+            "result": result_validation.as_dict() if result_validation else None,
+        },
+        "agent_result": None if incomplete_media_pool else normalized,
     }
 
 
@@ -11716,15 +12074,6 @@ def dispatch_operation_draft_check(
             request_options = require_mapping(
                 arguments.get("options"), "typed Draft request options"
             )
-            post_filter = media_pool_post_filter_spec_from_args(args)
-            if post_filter is not None:
-                validate_media_pool_post_filter_request(
-                    api=inspected.operation,
-                    spec=post_filter,
-                    request_args=request_args,
-                    request_options=request_options,
-                    dry_run=False,
-                )
             validation = validate_semantic_payload(
                 inspected.operation,
                 request_args,
@@ -11757,31 +12106,6 @@ def dispatch_operation_draft_check(
                 else None
             )
             agent_result = result.get("result") if result.get("ok") else None
-            post_filter_audit = None
-            if post_filter is not None and result.get("ok"):
-                agent_result, post_filter_audit = apply_media_pool_post_filter(
-                    result.get("result"),
-                    spec=post_filter,
-                    request_max_results=request_args["maxResults"],
-                    evidence_path=result.get("evidence_path"),
-                )
-                if agent_result is None:
-                    return {
-                        "contract": GATEWAY_RESULT_CONTRACT,
-                        "ok": False,
-                        "status": "incomplete_boundary",
-                        "command": args.command,
-                        "offline": False,
-                        **common,
-                        "api_attempted": inspected.operation,
-                        "error_code": "MEDIA_POOL_POST_FILTER_INCOMPLETE",
-                        "message": (
-                            "The Media Pool candidate response reached maxResults, so "
-                            "the case-sensitive post-filter cannot prove completeness."
-                        ),
-                        "post_filter": post_filter_audit,
-                        "agent_result": None,
-                    }
             payload = {
                 "contract": GATEWAY_RESULT_CONTRACT,
                 "ok": bool(result.get("ok")),
@@ -11805,12 +12129,6 @@ def dispatch_operation_draft_check(
                 },
                 "agent_result": agent_result,
             }
-            if post_filter_audit is not None:
-                payload = {
-                    **{key: value for key, value in payload.items() if key != "agent_result"},
-                    "post_filter": post_filter_audit,
-                    "agent_result": agent_result,
-                }
             return payload
     canonical_request = parse_operation_request(
         request_payload,
@@ -22748,208 +23066,14 @@ def _parse_strict_json_float(token: str) -> float:
     return value
 
 
-def media_pool_post_filter_spec(
-    value: Any,
-    limit: Any,
-) -> dict[str, Any]:
-    """Validate the one closed typed Media Pool post-filter contract."""
-
-    if not isinstance(value, str) or not value:
-        raise GatewayInputError("--post-filter-value must be a nonempty string")
-    if len(value) > MAX_MEDIA_POOL_SEARCH_TEXT_CHARS:
-        raise GatewayInputError(
-            "--post-filter-value exceeds the reviewed "
-            f"{MAX_MEDIA_POOL_SEARCH_TEXT_CHARS}-code-point literal limit"
-        )
-    if type(limit) is not int or not 1 <= limit <= MAX_MEDIA_POOL_RESULTS:
-        raise GatewayInputError(
-            "--post-filter-limit must be an integer between 1 and "
-            f"{MAX_MEDIA_POOL_RESULTS}"
-        )
-    return {
-        "field": "Filename",
-        "operator": "containsCaseSensitive",
-        "value": value,
-        "limit": limit,
-    }
 
 
-def media_pool_post_filter_spec_from_args(
-    args: argparse.Namespace,
-) -> dict[str, Any] | None:
-    """Build the closed Media Pool filter from its normal typed scalars."""
-
-    typed_value = getattr(args, "post_filter_value", None)
-    typed_limit = getattr(args, "post_filter_limit", None)
-    if typed_value is None and typed_limit is None:
-        return None
-    if typed_value is None or typed_limit is None:
-        raise GatewayInputError(
-            "Media Pool post-filter requires both --post-filter-value and --post-filter-limit"
-        )
-    return media_pool_post_filter_spec(typed_value, typed_limit)
 
 
-def validate_media_pool_post_filter_request(
-    *,
-    api: str,
-    spec: Mapping[str, Any],
-    request_args: Mapping[str, Any],
-    request_options: Mapping[str, Any],
-    dry_run: bool,
-) -> None:
-    """Bind a post-filter to one bounded superset request before connecting."""
-
-    if api != MEDIA_POOL_GET_URI:
-        raise GatewayInputError(
-            "Typed post-filter fields are supported only for ak.wwise.core.mediaPool.get"
-        )
-    if dry_run:
-        raise GatewayInputError(
-            "Typed post-filter fields require a live result and cannot be combined with --dry-run"
-        )
-    max_results = request_args.get("maxResults")
-    if (
-        type(max_results) is not int
-        or not 1 <= max_results <= MAX_MEDIA_POOL_RESULTS
-    ):
-        raise GatewayInputError(
-            "A Media Pool post-filter requires request maxResults between 1 and "
-            f"{MAX_MEDIA_POOL_RESULTS}"
-        )
-    if max_results < spec["limit"]:
-        raise GatewayInputError(
-            "A Media Pool post-filter requires request maxResults to be greater "
-            "than or equal to its limit"
-        )
-    filters = request_args.get("filters")
-    if not isinstance(filters, list) or not any(
-        isinstance(item, Mapping)
-        and item.get("type") == "field"
-        and item.get("field") == spec["field"]
-        and item.get("operator") == "contains"
-        and item.get("value") == spec["value"]
-        for item in filters
-    ):
-        raise GatewayInputError(
-            "A Media Pool post-filter requires a matching Filename contains field "
-            "filter with the same value in the typed request"
-        )
-    return_fields = request_options.get("return")
-    if not isinstance(return_fields, list) or "Filename" not in return_fields:
-        raise GatewayInputError(
-            "A Media Pool post-filter requires options.return to include 'Filename'"
-        )
 
 
-def media_pool_post_filter_audit(
-    spec: Mapping[str, Any],
-    *,
-    request_max_results: int,
-    status: str,
-    raw_count: int | None = None,
-    matched_count: int | None = None,
-    returned_count: int | None = None,
-) -> dict[str, Any]:
-    """Build a bounded audit projection without echoing the arbitrary match text."""
-
-    value = spec["value"]
-    return {
-        "contract": MEDIA_POOL_POST_FILTER_CONTRACT,
-        "status": status,
-        "field": "Filename",
-        "operator": "containsCaseSensitive",
-        "value_sha256": canonical_sha256({"value": value}),
-        "value_code_points": len(value),
-        "value_utf8_bytes": len(value.encode("utf-8")),
-        "limit": spec["limit"],
-        "request_max_results": request_max_results,
-        "raw_count": raw_count,
-        "matched_count": matched_count,
-        "returned_count": returned_count,
-        "truncated_to_limit": (
-            None
-            if matched_count is None or returned_count is None
-            else matched_count > returned_count
-        ),
-    }
 
 
-def apply_media_pool_post_filter(
-    raw_result: Any,
-    *,
-    spec: Mapping[str, Any],
-    request_max_results: int,
-    evidence_path: Any,
-) -> tuple[dict[str, Any] | None, dict[str, Any]]:
-    """Apply code-point case-sensitive containment only to a proven-complete candidate set."""
-
-    if not isinstance(raw_result, Mapping) or set(raw_result) != {"return"}:
-        raise GatewayResultShapeError(
-            "mediaPool.get post-filter expected exactly one top-level return array.",
-            details={
-                "expected": {"return": "array<object>"},
-                "actual_result_type": type(raw_result).__name__,
-                "evidence_path": evidence_path,
-            },
-            error_code="INVALID_MEDIA_POOL_POST_FILTER_RESULT",
-        )
-    raw_rows = raw_result.get("return")
-    if not isinstance(raw_rows, list):
-        raise GatewayResultShapeError(
-            "mediaPool.get post-filter expected result.return to be an array.",
-            details={
-                "expected": "array<object>",
-                "actual_return_type": type(raw_rows).__name__,
-                "evidence_path": evidence_path,
-            },
-            error_code="INVALID_MEDIA_POOL_POST_FILTER_RESULT",
-        )
-    rows: list[dict[str, Any]] = []
-    for index, raw_row in enumerate(raw_rows):
-        if not isinstance(raw_row, Mapping):
-            raise GatewayResultShapeError(
-                "mediaPool.get post-filter expected every return row to be an object.",
-                details={
-                    "invalid_index": index,
-                    "actual_row_type": type(raw_row).__name__,
-                    "evidence_path": evidence_path,
-                },
-                error_code="INVALID_MEDIA_POOL_POST_FILTER_RESULT",
-            )
-        filename = raw_row.get("Filename")
-        if not isinstance(filename, str):
-            raise GatewayResultShapeError(
-                "mediaPool.get post-filter expected every return row Filename to be a string.",
-                details={
-                    "invalid_index": index,
-                    "actual_filename_type": type(filename).__name__,
-                    "evidence_path": evidence_path,
-                },
-                error_code="INVALID_MEDIA_POOL_POST_FILTER_RESULT",
-            )
-        rows.append(dict(raw_row))
-
-    raw_count = len(rows)
-    if raw_count >= request_max_results:
-        return None, media_pool_post_filter_audit(
-            spec,
-            request_max_results=request_max_results,
-            status="incomplete",
-            raw_count=raw_count,
-        )
-
-    value = spec["value"]
-    matches = [row for row in rows if value in row["Filename"]]
-    filtered_rows = matches[: spec["limit"]]
-    return {"return": filtered_rows}, media_pool_post_filter_audit(
-        spec,
-        request_max_results=request_max_results,
-        status="applied",
-        raw_count=raw_count,
-        matched_count=len(matches),
-        returned_count=len(filtered_rows),
-    )
 
 
 def canonicalize_bounded_direct_call_request(
