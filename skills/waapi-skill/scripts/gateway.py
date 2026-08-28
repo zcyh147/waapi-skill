@@ -138,9 +138,6 @@ from wwise_waapi.typed_requests import (  # noqa: E402  # pyright: ignore[report
 from wwise_waapi.typed_queries import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     ADVANCED_TYPED_QUERY_OPERATION,
     STRUCTURED_TYPED_QUERY_OPERATION,
-    materialize_typed_query,
-    typed_query_contract,
-    typed_query_schema_payload,
 )
 from wwise_waapi.typed_topics import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     TOPIC_MATCH_OPERATION_PREFIX,

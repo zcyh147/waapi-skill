@@ -29,7 +29,7 @@ This is a mandatory safety gate. Do not call `operations`, `operation-schema`, o
 
 ### New transaction
 
-When this change uses a subset that the user selected from a previous multi-result ordinary, structured, or advanced object query, finish the query lane's selected-subset identity gate first: exact-ID read back every selected GUID and require its unaliased name, type, and path to match the candidate that the user chose. A failed, missing, changed, or ambiguous row stops the change. These bounded read-only checks precede the transaction contract; they do not replace its schema or metadata steps.
+When this change uses a subset that the user selected from a previous multi-result business-declaration or advanced object query, finish the query lane's selected-subset identity gate first: exact-ID read back every selected GUID and require its unaliased name, type, and path to match the candidate that the user chose. A failed, missing, changed, or ambiguous row stops the change. These bounded read-only checks precede the transaction contract; they do not replace its schema or metadata steps.
 
 After a selected-subset gate, choose one first transaction-contract branch:
 

@@ -188,7 +188,8 @@ code-only construction report, not real-host or Fresh Agent evidence.
 
 ## Verification scope
 
-The focused program gate currently contains 3405 passing tests and exercises
+The focused macOS Program gate currently contains 3811 passing tests with two
+platform-specific skips and exercises
 all 808 packaged route-contract version/API rows with
 in-process fake clients. It validates exact URI dispatch, reflected request and
 result/event schemas, timeout/result ceilings, all three modification-policy
@@ -201,7 +202,7 @@ payloads, and manifest drift. Reflected and isolated typed transactions also run
 through complete preview/confirm/execute/verify program chains. Dedicated tests
 separately validate the 824-row Authoring overlay and its UI-command routes;
 this is not a second 824-row per-API fake-dispatch matrix. The query tests cover
-all five versions of the closed Builder plus the advanced WAQL route's fixed
+all five versions of the closed business compiler plus the advanced WAQL route's fixed
 read-only URI, UTF-8 byte limits, trimmed single-line framing (no comments,
 semicolons, or unclosed string/regex literals), Gateway-appended final `take`,
 response cap, and explicit lack of a mutation-identity bridge. Dedicated
