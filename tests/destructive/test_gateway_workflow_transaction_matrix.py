@@ -1130,6 +1130,207 @@ def test_closed_gateway_workflows_across_selected_version(
 
 @pytest.mark.live
 @pytest.mark.destructive
+def test_media_build_business_reads_across_selected_version(
+    workflow_sandbox_runtime: _WorkflowSandboxRuntime,
+) -> None:
+    runtime = workflow_sandbox_runtime
+    if runtime.version not in {"2022.1", "2025.1"}:
+        pytest.skip("Media/build business evidence targets Wwise 2022.1 and 2025.1")
+    object_parent = (
+        CONTAINERS_PARENT if runtime.version == "2025.1" else ACTOR_MIXER_PARENT
+    )
+    suffix = uuid.uuid4().hex[:12]
+    imported_id: str | None = None
+    included_id: str | None = None
+    soundbank_id: str | None = None
+    try:
+        runtime.packaged_status()
+        import_name = f"WAAPI_MEDIA_BUILD_{runtime.version.replace('.', '_')}_{suffix}"
+        audio_file = _write_fixture_wav(
+            runtime.sandbox.sandbox_path / "MediaBuildAudio",
+            import_name,
+        )
+        requested_object_path = f"{object_parent}\\<Sound>{import_name}"
+        import_notes = f"media/build business read fixture {import_name}"
+        audio_import = _complete_transaction(
+            runtime,
+            operation="audio.import",
+            arguments={
+                "imports": [
+                    {
+                        "object_path": requested_object_path,
+                        "audio_file": str(audio_file),
+                        "object_type": "Sound",
+                        "import_language": "SFX",
+                        "notes": import_notes,
+                    }
+                ]
+            },
+        )
+        imported_row = _imported_object(audio_import["execute"], requested_object_path)
+        imported_id = _required_string(imported_row, "id")
+        imported_path = _required_string(imported_row, "path")
+        validate_audio_import_business_evidence(
+            execution=audio_import["execute"],
+            verification=audio_import["verification_evidence"],
+            version=runtime.version,
+            expected_target_path=imported_path,
+            expected_target_id=imported_id,
+            expected_notes=import_notes,
+            source_file=audio_file,
+        )
+        audio_source_id = _imported_audio_source_id(
+            audio_import["verification_evidence"],
+            expected_path=f"{imported_path}\\{audio_file.stem}",
+        )
+
+        for api, extra in (
+            (
+                "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
+                ["--start-seconds", "0", "--end-seconds", "0.1"],
+            ),
+            (
+                "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion",
+                [],
+            ),
+        ):
+            peaks = runtime.gateway(
+                [
+                    "core-call",
+                    api,
+                    "--audio-source-id",
+                    audio_source_id,
+                    "--peak-pair-count",
+                    "8",
+                    "--channel-mode",
+                    "cross-channel",
+                    *extra,
+                ],
+                live=True,
+            )
+            assert peaks["agent_result"]["channel_count"] == 1
+            assert peaks["agent_result"]["peak_pair_count"] == 8
+            assert len(peaks["agent_result"]["channels"][0]["pairs_normalized"]) == 8
+
+        if runtime.version == "2025.1":
+            media_pool = runtime.gateway(
+                [
+                    "core-call",
+                    "ak.wwise.core.mediaPool.get",
+                    "--max-results",
+                    "200",
+                    "--include-field",
+                    "filename",
+                    "--include-field",
+                    "duration-seconds",
+                    "--exact-name-contains",
+                    import_name,
+                    "--final-limit",
+                    "1",
+                ],
+                live=True,
+            )
+            assert media_pool["agent_result"]["complete"] is True
+            assert media_pool["agent_result"]["returned_count"] == 1
+            assert media_pool["agent_result"]["items"][0]["values"]["filename"] == (
+                f"{import_name}.wav"
+            )
+
+        included_name = f"WAAPI_MEDIA_INCLUDED_{suffix}"
+        included_id = _create_object(
+            runtime,
+            parent=object_parent,
+            object_type="ActorMixer",
+            name=included_name,
+        )
+        soundbank_id = _create_object(
+            runtime,
+            parent=SOUNDBANK_PARENT,
+            object_type="SoundBank",
+            name=f"WAAPI_MEDIA_BANK_{suffix}",
+        )
+        set_inclusions = _complete_transaction(
+            runtime,
+            operation="soundbank.setInclusions",
+            arguments={
+                "soundbank": {"kind": "id", "value": soundbank_id},
+                "mode": "replace",
+                "inclusions": [
+                    {
+                        "object": {"kind": "id", "value": included_id},
+                        "filters": ["events", "structures"],
+                    }
+                ],
+            },
+        )
+        validate_soundbank_inclusions_business_evidence(
+            set_inclusions["verification_evidence"],
+            soundbank_id=soundbank_id,
+            expected=[
+                {
+                    "object": included_id.casefold(),
+                    "filters": ["events", "structures"],
+                }
+            ],
+        )
+        inclusions = runtime.gateway(
+            [
+                "core-call",
+                "ak.wwise.core.soundbank.getInclusions",
+                "--soundbank-id",
+                soundbank_id,
+            ],
+            live=True,
+        )
+        assert inclusions["agent_result"] == {
+            "contract": "waapi-skill.media-build-result/v1",
+            "kind": "soundbank_inclusions",
+            "count": 1,
+            "inclusions": [
+                {
+                    "object_id": included_id.upper(),
+                    "name": included_name,
+                    "type": "ActorMixer",
+                    "path": f"{object_parent}\\{included_name}",
+                    "includes": ["events", "structures"],
+                }
+            ],
+        }
+        runtime.category_results.append(
+            {
+                "category": "media-build-business-read",
+                "status": "PASS",
+                "verifier_strength": (
+                    "region_trimmed_peaks_soundbank_inclusions_and_media_pool"
+                    if runtime.version == "2025.1"
+                    else "region_trimmed_peaks_and_soundbank_inclusions"
+                ),
+            }
+        )
+    finally:
+        active_error = sys.exc_info()[1]
+        cleanup_errors: list[str] = []
+        for object_id in (soundbank_id, included_id, imported_id):
+            if object_id is None:
+                continue
+            try:
+                _delete_if_present_via_transaction(runtime, object_id)
+            except BaseException as exc:  # noqa: BLE001 - clean every owned object
+                cleanup_errors.append(
+                    f"{object_id}: {type(exc).__name__}: {exc}"
+                )
+        if cleanup_errors:
+            message = "media/build workflow cleanup failures: " + "; ".join(
+                cleanup_errors
+            )
+            if active_error is not None:
+                active_error.add_note(message)
+            else:
+                raise AssertionError(message)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
 def test_soundengine_call_is_result_schema_only_or_explicitly_host_blocked(
     workflow_sandbox_runtime: _WorkflowSandboxRuntime,
 ) -> None:
