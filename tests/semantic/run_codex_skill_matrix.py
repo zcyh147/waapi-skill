@@ -1306,7 +1306,7 @@ def _heavy_v3_run_config(
         "case_ids": list(options.case_ids),
         "versions": list(options.versions),
         "pair_ids": [],
-        "offline_only": False,
+        "offline_only": options.offline_only,
         "model": options.model,
         "reasoning_effort": options.reasoning_effort,
         "service_tier": options.service_tier,

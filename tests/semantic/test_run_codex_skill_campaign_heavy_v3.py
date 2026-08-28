@@ -6494,6 +6494,17 @@ def test_offline_business_profile_accepts_offline_only_without_live_config(
     assert campaign_options.live_config == missing_live.resolve(strict=False)
     assert matrix_options.offline_only is True
     assert matrix_options.live_config == missing_live.resolve(strict=False)
+    run_config = matrix._heavy_v3_run_config(
+        matrix_options,
+        unit_rows=(),
+        records=(),
+        run_errors=(),
+        stop_reason="",
+        preflight_state="passed",
+        started_at="2026-08-29T00:00:00Z",
+        completed_at="2026-08-29T00:00:01Z",
+    )
+    assert run_config["offline_only"] is True
 
 
 def test_heavy_child_argv_reuses_matrix_and_requests_exact_pending_cases(tmp_path: Path) -> None:
