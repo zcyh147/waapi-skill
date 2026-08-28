@@ -76,6 +76,7 @@ from .support.codex_eval_protocol_v3 import (  # pyright: ignore[reportMissingIm
     CompoundUndoChildExpectation,
     build_audio_import_composer_transaction_steps,
     build_compound_undo_business_transaction_steps,
+    build_core_business_transaction_steps,
     build_object_set_composer_transaction_steps,
     build_transaction_protocol,
     typed_read_draft_steps,
@@ -5279,6 +5280,32 @@ def test_draft_replay_is_scoped_to_the_preview_flow_in_multi_transaction_protoco
     assert broker._replay_expected_operation_draft_request(  # noqa: SLF001
         preview
     ) == expected_audio_witness
+
+
+def test_raw_core_draft_replay_accepts_canonical_waapi_call_identity(
+    tmp_path: Path,
+) -> None:
+    steps = build_core_business_transaction_steps(
+        api="ak.wwise.core.project.save",
+        version="2025.1",
+        label="tx01",
+    )
+    preview = next(
+        step for step in steps if step.subcommand == "preview-from-draft"
+    )
+    expected = preview.expected_operation_request
+    assert expected is not None
+    broker = CodexGatewayBroker(
+        skill_source=make_fake_skill(tmp_path),
+        expected_steps=steps,
+        expected_wwise_version="2025.1",
+        runner_environment={},
+        offline_replay_preview_requests={preview.name: expected},
+    )
+
+    assert broker._replay_expected_operation_draft_request(  # noqa: SLF001
+        preview
+    ) == expected
 
 
 def test_sealed_business_draft_replay_survives_successful_media_cleanup(

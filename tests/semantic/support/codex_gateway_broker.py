@@ -3096,11 +3096,13 @@ def validate_operation_draft_protocol_steps(
             "draft-start must follow the exact matching operation-schema"
         )
     for step in steps:
-        if (
-            step.subcommand == "preview-from-draft"
-            and step.expected_operation_request is not None
-            and step.expected_operation_request.get("operation")
-            != draft_operation
+        if step.subcommand != "preview-from-draft" or (
+            step.expected_operation_request is None
+        ):
+            continue
+        if not _business_request_matches_draft_operation(
+            step.expected_operation_request,
+            draft_operation,
         ):
             raise ValueError(
                 "Business request witness must match its exact draft-start"
@@ -3314,6 +3316,21 @@ def validate_operation_draft_protocol_steps(
                     "preview-from-draft trailing policy arguments must be fixed literals"
                 )
         latest_revision_step = step.name
+
+
+def _business_request_matches_draft_operation(
+    request: Mapping[str, Any],
+    draft_operation: str,
+) -> bool:
+    """Match a named adapter or its reviewed raw-Core ``waapi.call`` envelope."""
+
+    operation = request.get("operation")
+    arguments = request.get("arguments")
+    return operation == draft_operation or (
+        operation == "waapi.call"
+        and isinstance(arguments, Mapping)
+        and arguments.get("api") == draft_operation
+    )
 
 
 def gateway_step_prefix_matches(
@@ -11630,7 +11647,15 @@ class CodexGatewayBroker:
                     "Business request witness has no exact operation"
                 )
             start = self._draft_start_for_step(preview_step)
-            if start.arguments != (expected_operation,):
+            draft_operation = (
+                start.arguments[0] if len(start.arguments) == 1 else None
+            )
+            if not isinstance(draft_operation, str) or not (
+                _business_request_matches_draft_operation(
+                    preview_step.expected_operation_request,
+                    draft_operation,
+                )
+            ):
                 raise GatewayInvocationError(
                     "Business request witness is missing its exact flow-local "
                     "draft-start"

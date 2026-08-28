@@ -18,6 +18,9 @@ from tests.semantic.support.codex_core_business_profile import (
 from tests.semantic.support.codex_eval_protocol_v3 import (
     build_core_business_transaction_steps,
 )
+from tests.semantic.support.codex_gateway_broker import (
+    validate_operation_draft_protocol_steps,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -66,6 +69,7 @@ def test_core_business_protocol_uses_one_complete_gateway_continuation() -> None
         version="2025.1",
         label="tx01",
     )
+    validate_operation_draft_protocol_steps(steps)
 
     assert [step.subcommand for step in steps] == [
         "request-schema",

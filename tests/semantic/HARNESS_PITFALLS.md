@@ -205,6 +205,22 @@ prevention checks that are expensive to rediscover.
   Field Handle and reads `volume-db` back. A valid result alone is never
   upgraded to business success.
 
+### Raw Core Drafts have two intentional operation identities
+
+- Evidence: #84 Fresh root `imac-core-91a2adf-r1` was BLOCKED before Codex
+  because the Broker required the Preview witness operation to equal the
+  `draft-start` argument. The same preflight also classified
+  `draft-declare-core-plan` as an interrupting non-Draft command.
+- Cause: a reviewed raw Core Draft starts with the exact `ak.wwise.core.*` URI,
+  while its immutable internal request is canonical `waapi.call` with that URI
+  in `arguments.api`. The semantic Draft taxonomy predated this declaration.
+- Prevention: accept either a named Business Adapter request whose operation
+  equals `draft-start`, or canonical `waapi.call` whose exact `arguments.api`
+  equals the raw Core start URI; no other mismatch is valid. Keep
+  `draft-declare-core-plan` in the one shared Draft command taxonomy and run the
+  complete protocol validator before spending a Fresh root. A pre-Codex block
+  is frozen without replay or PASS credit.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:
