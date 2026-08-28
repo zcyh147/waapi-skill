@@ -5644,6 +5644,10 @@ def _validate_heavy_v3_task_result(
             raise CampaignEvidenceError(
                 "passing heavy turn selected an invalid optional broker prefix"
             )
+        consumed_protocol_steps = _consumed_heavy_v3_protocol_steps(
+            protocol,
+            expected_prefix,
+        )
         turn_gateway_records = _validate_heavy_v3_turn_grade(
             grade,
             index=index,
@@ -5654,7 +5658,9 @@ def _validate_heavy_v3_task_result(
             options=options,
             previous_broker_prefix=previous_prefix,
             expected_broker_prefix=expected_prefix,
-            expected_steps=protocol.steps[previous_prefix:expected_prefix],
+            expected_steps=consumed_protocol_steps[
+                previous_prefix:expected_prefix
+            ],
             version=str(getattr(expected_unit, "version", "")),
             expected_skill_reads=expected_skill_reads[index - 1],
             expected_skill_read_schedule=expected_skill_reads,
@@ -5785,12 +5791,13 @@ def _validate_heavy_v3_broker_result(
         top_keys.add("commutative_composer_setup_step_groups")
     if not isinstance(value, Mapping) or set(value) != top_keys:
         raise CampaignEvidenceError("passing heavy task broker evidence is malformed")
-    expected_names = [step.name for step in protocol.steps]
     consumed_count = (
-        len(expected_names)
+        len(protocol.steps)
         if expected_consumed_count is None
         else expected_consumed_count
     )
+    protocol_steps = _consumed_heavy_v3_protocol_steps(protocol, consumed_count)
+    expected_names = [step.name for step in protocol_steps]
     accepted_terminal = tuple(
         getattr(protocol, "accepted_terminal_prefixes", (len(expected_names),))
     )
@@ -5832,9 +5839,9 @@ def _validate_heavy_v3_broker_result(
     _validate_heavy_v3_broker_records(
         records,
         task_root=task_root,
-        canonical_steps=protocol.steps[:consumed_count],
+        canonical_steps=protocol_steps[:consumed_count],
         steps=_steps_in_consumed_order(
-            protocol.steps[:consumed_count],
+            protocol_steps[:consumed_count],
             consumed_names,
         ),
         commutative_read_only_step_groups=getattr(
@@ -5870,6 +5877,21 @@ def _validate_heavy_v3_broker_result(
             expected,
             label=f"passing heavy broker {key}",
         )
+
+
+def _consumed_heavy_v3_protocol_steps(
+    protocol: Any,
+    consumed_count: int,
+) -> tuple[Any, ...]:
+    """Select the sealed command lane after one optional schema omission."""
+
+    steps = tuple(protocol.steps)
+    if (
+        getattr(protocol, "optional_initial_query_schema", False)
+        and consumed_count == len(steps) - 1
+    ):
+        return steps[1:]
+    return steps
 
 
 def _codex_command_exit_status_aligns(

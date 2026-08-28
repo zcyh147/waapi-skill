@@ -1205,6 +1205,7 @@ def _write_matrix_evidence(
     stop_reason: str = "",
     run_errors: Sequence[str] = (),
     visible_values_by_id: Mapping[str, Mapping[str, str]] | None = None,
+    omit_optional_query_schema_unit_ids: Sequence[str] = (),
 ) -> None:
     root.mkdir(parents=True, exist_ok=False)
     selected_rows = tuple(
@@ -1225,6 +1226,9 @@ def _write_matrix_evidence(
                 thread_id=f"thread-{index}",
                 options=options,
                 visible_values=(visible_values_by_id or {}).get(unit.unit_id, {}),
+                omit_optional_query_schema=(
+                    unit.unit_id in omit_optional_query_schema_unit_ids
+                ),
             )
         else:
             task_root = scenario_root / "evidence" / "codex-task"
@@ -6093,6 +6097,7 @@ def _write_passing_project_outcome(
     thread_id: str,
     options: campaign.CampaignOptions,
     visible_values: Mapping[str, str] | None = None,
+    omit_optional_query_schema: bool = False,
 ) -> dict[str, Any]:
     evidence_root = scenario_root / "evidence"
     task_root = evidence_root / "codex-task"
@@ -6116,10 +6121,26 @@ def _write_passing_project_outcome(
         visible_values=visible_values,
     )
     protocol = provenance.protocol
+    active_steps = (
+        protocol.steps[1:]
+        if omit_optional_query_schema and protocol.optional_initial_query_schema
+        else protocol.steps
+    )
+    active_protocol = (
+        replace(
+            protocol,
+            steps=active_steps,
+            turn_prefix_counts=(len(active_steps),),
+            allowed_turn_prefix_counts=(),
+            terminal_prefix_counts=(),
+        )
+        if omit_optional_query_schema
+        else protocol
+    )
     records = _synthetic_gateway_records(
         options=options,
         task_root=task_root,
-        protocol=protocol,
+        protocol=active_protocol,
         version=unit.version,
         invocation_skill_source=skill_install,
     )
@@ -6129,8 +6150,8 @@ def _write_passing_project_outcome(
             business_oracle_plan.payload,
         )
     broker = {
-        "expected_step_names": [step.name for step in protocol.steps],
-        "consumed_step_names": [step.name for step in protocol.steps],
+        "expected_step_names": [step.name for step in active_steps],
+        "consumed_step_names": [step.name for step in active_steps],
         "records": records,
         "state_directory": str(broker_state),
         "evidence_directory": str(broker_evidence),
@@ -6145,7 +6166,7 @@ def _write_passing_project_outcome(
     if any(
         step.subcommand.startswith("draft-")
         or step.subcommand == "preview-from-draft"
-        for step in protocol.steps
+        for step in active_steps
     ):
         from tests.semantic.support.codex_typed_draft_evidence_v3 import (
             validate_typed_draft_evidence,
@@ -6153,7 +6174,7 @@ def _write_passing_project_outcome(
 
         composer_evidence = validate_typed_draft_evidence(
             state_directory=broker_state,
-            steps=protocol.steps,
+            steps=active_steps,
             broker_records=records,
         )
     if unit.scenario.api == "ak.wwise.core.object.get":
@@ -6164,7 +6185,7 @@ def _write_passing_project_outcome(
     grades: list[dict[str, Any]] = []
     previous_prefix = 0
     for index, prompt in enumerate(prompts, start=1):
-        prefix = protocol.turn_prefix_counts[index - 1]
+        prefix = active_protocol.turn_prefix_counts[index - 1]
         turn_records = records[previous_prefix:prefix]
         prompt_sha256 = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
         grade = {
@@ -6225,7 +6246,7 @@ def _write_passing_project_outcome(
                 prompt=prompt,
                 thread_id=thread_id,
                 events_text=events_text,
-                protocol=protocol,
+                protocol=active_protocol,
                 version=unit.version,
             ),
         )
@@ -6817,6 +6838,7 @@ def test_heavy_validator_accepts_typed_profile_query_repair_archive(
         options=options,
         units=profile.units,
         statuses=("PASS",),
+        omit_optional_query_schema_unit_ids=("TYP22-GENERIC-OBJECT-QUERY",),
     )
 
     result = campaign.validate_heavy_v3_child_run(

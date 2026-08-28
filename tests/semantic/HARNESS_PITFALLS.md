@@ -98,6 +98,12 @@ prevention checks that are expensive to rediscover.
   prompt protocol, never from unit metadata or a fixed prefix. Provisionally
   accept the optional result keys only until the seal is loaded, then require an
   exact match and reject missing, shortened, reordered, or invented prefixes.
+  When the first `query-schema` is omitted from a multi-step repair protocol,
+  replay the sealed lane with exactly that first step removed; do not truncate
+  the full four-step list to its first three entries. #96 query `r11` produced a
+  task-level PASS with `ambiguous-kind`, `refined-kind`, and the main query, but
+  exposed this second archive-only failure before the omission-aware replay was
+  covered by a synthetic regression.
 
 ### Interleaved Drafts leaked the most recent flow
 
