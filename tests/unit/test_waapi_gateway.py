@@ -613,7 +613,11 @@ def test_selected_accepts_only_an_explicit_empty_objects_array(tmp_path: Path) -
     assert payload["objects"] == []
 
 
-def test_selected_derives_one_fixed_identity_projection(tmp_path: Path) -> None:
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1"))
+def test_selected_derives_one_fixed_identity_projection(
+    tmp_path: Path,
+    version: str,
+) -> None:
     selected_row = {
         "id": "{11111111-1111-1111-1111-111111111111}",
         "name": "Selected Sound",
@@ -622,14 +626,19 @@ def test_selected_derives_one_fixed_identity_projection(tmp_path: Path) -> None:
     }
     client = FakeClient(
         {
-            "ak.wwise.core.getInfo": live_info(command_line=False),
+            "ak.wwise.core.getInfo": live_info(
+                year=int(version.split(".")[0]),
+                command_line=False,
+            ),
             "ak.wwise.ui.getSelectedObjects": {"objects": [selected_row]},
         }
     )
 
+    env = gateway_env(tmp_path)
+    env["WWISE_VERSION"] = version
     exit_code, payload = waapi_gateway.execute_gateway(
         ["selected"],
-        env=gateway_env(tmp_path),
+        env=env,
         client_factory=lambda url: client,
     )
 
@@ -2604,6 +2613,18 @@ def test_query_schema_advanced_discloses_bounded_native_contract_offline(
         assert contract["continuation"]["exact_expression"].startswith(
             "--advanced-waql"
         )
+        limits = contract["continuation"]["exact_expression_limits"]
+        assert limits["max_utf8_bytes"] == MAX_ADVANCED_WAQL_BYTES
+        assert limits["framing"] == {
+            "trimmed": True,
+            "singleLine": True,
+            "queryEditorDollarPrefix": False,
+            "comments": False,
+            "statementSeparators": False,
+            "balancedDoubleQuotedStrings": True,
+            "balancedSlashRegexLiterals": True,
+        }
+        assert "UTF-8 bytes" in limits["description"]
         assert contract["boundary"] == {
             "fixed_api": "ak.wwise.core.object.get",
             "read_only": True,
@@ -3522,6 +3543,72 @@ def test_query_object_compiles_business_predicates_without_native_tuple_fields(
     )
 
 
+def test_query_object_compiles_closed_business_kind_predicate_without_native_type(
+    tmp_path: Path,
+) -> None:
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": live_info(),
+            "ak.wwise.core.object.get": {"return": []},
+        }
+    )
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "query-object",
+            "--path-segment",
+            "Actor-Mixer Hierarchy",
+            "--relationship",
+            "descendants",
+            "--predicate",
+            "kind-is",
+            "sound-voice",
+            "--max-results",
+            "3",
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 0, payload
+    assert client.calls[-1][1] == {
+        "waql": (
+            'from object "\\Actor-Mixer Hierarchy" select descendants '
+            'where type = "Sound" and @IsVoice = true take 3'
+        )
+    }
+
+
+def test_query_object_rejects_model_authored_native_type_predicate_before_connecting(
+    tmp_path: Path,
+) -> None:
+    connected = False
+
+    def client_factory(_url: str) -> FakeClient:
+        nonlocal connected
+        connected = True
+        raise AssertionError("native type predicate must fail before WAAPI")
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "query-object",
+            "--kind",
+            "actor-mixer",
+            "--predicate",
+            "type-is",
+            "Sound",
+            "--max-results",
+            "2",
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=client_factory,
+    )
+
+    assert exit_code == 2
+    assert connected is False
+    assert payload["error_code"] == "GatewayInputError"
+
+
 def test_query_object_compiles_and_renames_business_and_custom_outputs(
     tmp_path: Path,
 ) -> None:
@@ -3535,10 +3622,45 @@ def test_query_object_compiles_and_renames_business_and_custom_outputs(
         "@MyPluginGain": 0.5,
         "MyPluginRoute": {"id": "{33333333-3333-3333-3333-333333333333}"},
     }
-    client = FakeClient(
+    def property_info(
+        args: Mapping[str, Any] | None,
+        _options: Mapping[str, Any] | None,
+    ) -> Mapping[str, Any]:
+        assert isinstance(args, Mapping)
+        name = args["property"]
+        return {
+            "name": name,
+            "type": "ObjectReference" if name == "MyPluginRoute" else "Real32",
+            "default": None if name == "MyPluginRoute" else 0.0,
+            "supports": {},
+            "display": {"name": name},
+            "restriction": {},
+            "dependencies": [],
+        }
+
+    class MetadataFakeClient(FakeClient):
+        def call(
+            self,
+            uri: str,
+            args: Mapping[str, Any] | None = None,
+            options: Mapping[str, Any] | None = None,
+        ) -> Any:
+            if uri == "ak.wwise.core.object.getPropertyInfo":
+                self.calls.append((uri, args, options))
+                return property_info(args, options)
+            return super().call(uri, args, options)
+
+    client = MetadataFakeClient(
         {
             "ak.wwise.core.getInfo": live_info(),
             "ak.wwise.core.object.get": {"return": [row]},
+            "ak.wwise.core.object.getTypes": {
+                "return": [{"classId": 65552, "name": "Sound", "type": "WObject"}]
+            },
+            "ak.wwise.core.object.getPropertyAndReferenceNames": {
+                "return": ["MyPluginGain", "MyPluginRoute"]
+            },
+            "ak.wwise.core.object.getPropertyInfo": {},
         }
     )
 
@@ -3551,9 +3673,9 @@ def test_query_object_compiles_and_renames_business_and_custom_outputs(
             "volume-db",
             "--include",
             "output-bus",
-            "--include-property",
+            "--include-field",
             "MyPluginGain",
-            "--include-reference",
+            "--include-field",
             "MyPluginRoute",
             "--max-results",
             "1",
@@ -3795,11 +3917,13 @@ def test_query_object_exposes_no_model_authored_return_projection() -> None:
         for action in query_parser._actions
         for option in action.option_strings
     }
-    assert {"--include", "--include-property", "--include-reference"} <= {
+    assert {"--include", "--include-field"} <= {
         option
         for action in query_parser._actions
         for option in action.option_strings
     }
+    assert "--include-property" not in query_parser.format_help()
+    assert "--include-reference" not in query_parser.format_help()
 
 
 def test_query_object_exposes_business_path_segments_not_raw_wwise_path() -> None:

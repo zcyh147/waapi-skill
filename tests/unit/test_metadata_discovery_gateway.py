@@ -10,6 +10,7 @@ from typing import Any, Callable, Mapping
 import pytest  # pyright: ignore[reportMissingImports]
 
 from wwise_waapi.metadata_discovery import metadata_typed_value_type
+from wwise_waapi.versions import SUPPORTED_WWISE_VERSION_KEYS
 
 
 SCRIPT_PATH = (
@@ -267,10 +268,12 @@ def test_metadata_discover_resolves_exact_type_from_business_meaning(
     ]
 
 
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
 def test_metadata_property_state_resolves_meaning_before_exact_native_read(
     tmp_path: Path,
+    version: str,
 ) -> None:
-    responses = _metadata_responses(tmp_path)
+    responses = _metadata_responses(tmp_path, version=version)
     responses[IS_PROPERTY_ENABLED_URI] = {"return": True}
     client = FakeClient(responses)
 
@@ -289,7 +292,7 @@ def test_metadata_property_state_resolves_meaning_before_exact_native_read(
             "--platform",
             "Windows",
         ],
-        env=_gateway_env(tmp_path),
+        env=_gateway_env(tmp_path, version=version),
         client_factory=lambda _url: client,
     )
 
@@ -312,10 +315,12 @@ def test_metadata_property_state_resolves_meaning_before_exact_native_read(
     )
 
 
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
 def test_metadata_attenuation_compiles_business_curve_role(
     tmp_path: Path,
+    version: str,
 ) -> None:
-    responses = _metadata_responses(tmp_path)
+    responses = _metadata_responses(tmp_path, version=version)
     responses[GET_ATTENUATION_CURVE_URI] = {
         "curveType": "VolumeDryUsage",
         "use": "Custom",
@@ -336,7 +341,7 @@ def test_metadata_attenuation_compiles_business_curve_role(
             "--curve-role",
             "volume-dry",
         ],
-        env=_gateway_env(tmp_path),
+        env=_gateway_env(tmp_path, version=version),
         client_factory=lambda _url: client,
     )
 
@@ -354,6 +359,83 @@ def test_metadata_attenuation_compiles_business_curve_role(
         },
         {},
     )
+
+
+def test_metadata_property_state_never_dispatches_a_reference_as_property(
+    tmp_path: Path,
+) -> None:
+    responses = _metadata_responses(tmp_path, names=("OutputBus",))
+    responses[GET_PROPERTY_INFO_URI] = {
+        "name": "OutputBus",
+        "type": "ObjectReference",
+        "default": None,
+        "supports": {},
+        "display": {"name": "Output Bus"},
+        "restriction": {"type": "reference"},
+        "dependencies": [],
+    }
+    client = FakeClient(responses)
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "metadata",
+            "property-state",
+            "--exact-id",
+            OBJECT_GUID,
+            "--meaning",
+            "Output Bus",
+            "--platform",
+            "Windows",
+        ],
+        env=_gateway_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+
+    assert exit_code == 0, payload
+    assert payload["status"] == "needs_clarification"
+    assert payload["agent_result"]["candidates"] == [
+        {"field": "OutputBus", "kind": "reference"}
+    ]
+    assert all(call[0] != IS_PROPERTY_ENABLED_URI for call in client.calls)
+
+
+@pytest.mark.parametrize(
+    "invalid_id",
+    (
+        "Sound",
+        r"\Actor-Mixer Hierarchy\Default Work Unit\Rain",
+        "{NOT-A-GUID}",
+        "  {22222222-2222-2222-2222-222222222222}",
+    ),
+)
+def test_metadata_exact_id_rejects_noncanonical_identity_before_connecting(
+    tmp_path: Path,
+    invalid_id: str,
+) -> None:
+    connected = False
+
+    def client_factory(_url: str) -> FakeClient:
+        nonlocal connected
+        connected = True
+        raise AssertionError("invalid metadata identity must fail before WAAPI")
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "metadata",
+            "attenuation",
+            "--exact-id",
+            invalid_id,
+            "--curve-role",
+            "volume-dry",
+        ],
+        env=_gateway_env(tmp_path),
+        client_factory=client_factory,
+    )
+
+    assert exit_code == 2
+    assert connected is False
+    assert payload["error_code"] == "GatewayInputError"
+    assert "canonical GUID" in payload["message"]
 
 
 @pytest.mark.parametrize(

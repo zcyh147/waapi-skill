@@ -78,6 +78,7 @@ from .support.codex_gateway_broker import (  # pyright: ignore[reportMissingImpo
     SHIM_TRUSTED_PYTHON_ENV,
 )
 from .support.codex_gateway_contracts import (
+    BUSINESS_QUERY_SCHEMA_CONTRACT,
     TASK_LOCAL_RUNNER_POSIX,
     TASK_LOCAL_RUNNER_WINDOWS,
     TYPED_REQUEST_SCHEMA_CONTRACT,
@@ -3245,10 +3246,17 @@ def test_command_classifier_recognizes_versioned_operation_input_routes(
     assert facts.unexpected_commands == ()
 
 
-@pytest.mark.parametrize("subcommand", ("request-schema", "query-schema"))
+@pytest.mark.parametrize(
+    ("subcommand", "accepted_contract"),
+    (
+        ("request-schema", TYPED_REQUEST_SCHEMA_CONTRACT),
+        ("query-schema", BUSINESS_QUERY_SCHEMA_CONTRACT),
+    ),
+)
 def test_command_classifier_requires_exact_typed_schema_envelope(
     tmp_path: Path,
     subcommand: str,
+    accepted_contract: str,
 ) -> None:
     skill = tmp_path / "skill"
     runner = skill / "scripts" / "run.py"
@@ -3275,12 +3283,12 @@ def test_command_classifier_requires_exact_typed_schema_envelope(
         )
 
     accepted = classify_commands(
-        (record(TYPED_REQUEST_SCHEMA_CONTRACT),),
+        (record(accepted_contract),),
         skill_source=skill,
         expected_gateway_subcommands=(subcommand,),
     )
     rejected = classify_commands(
-        (record("waapi-skill.gateway-result/v1"),),
+        (record("waapi-skill.unrelated-contract/v1"),),
         skill_source=skill,
         expected_gateway_subcommands=(subcommand,),
     )

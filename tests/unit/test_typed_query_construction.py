@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 import wwise_waapi.dispatcher as dispatcher_module
-from wwise_waapi.builders.query import ADVANCED_QUERY_CONTRACT
+from wwise_waapi.builders.query import ADVANCED_QUERY_CONTRACT, MAX_ADVANCED_WAQL_BYTES
 from wwise_waapi.builders.query import STRUCTURED_QUERY_CONTRACT
 from wwise_waapi.typed_queries import (
     ADVANCED_TYPED_QUERY_OPERATION,
@@ -456,13 +456,20 @@ def test_query_schema_discloses_one_business_continuation_without_typed_facts(
     assert payload["continuation"]["subcommand"] == "query-object"
     assert "json" not in json.dumps(payload).casefold()
     if advanced:
-        assert payload["continuation"] == {
+        assert {
+            key: value
+            for key, value in payload["continuation"].items()
+            if key != "exact_expression_limits"
+        } == {
             "subcommand": "query-object",
             "query_layer": "advanced-native-waql",
             "exact_expression": "--advanced-waql <one bounded exact WAQL expression>",
             "result_bound": "--max-results <1..1000>",
             "business_output": "--include <business-field> (repeat)",
         }
+        assert payload["continuation"]["exact_expression_limits"][
+            "max_utf8_bytes"
+        ] == MAX_ADVANCED_WAQL_BYTES
     else:
         assert payload["query_contract"] == "waapi-skill.object-query-business/v1"
         assert payload["identity_projection"] == ["id", "name", "type", "path"]

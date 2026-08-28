@@ -319,19 +319,25 @@ def test_project_defaults_rejects_2025_fields_in_an_older_lane() -> None:
     assert exc.value.error_code == "INVALID_STABLE_READ_RESULT"
 
 
-def test_gateway_game_objects_dispatches_one_closed_2022_request(
+@pytest.mark.parametrize("version", ("2022.1", "2023.1", "2024.1", "2025.1"))
+def test_gateway_game_objects_dispatches_one_closed_request_per_exact_lane(
     tmp_path: Path,
+    version: str,
 ) -> None:
+    register_field = "registrationTime" if version == "2022.1" else "registerTime"
+    unregister_field = (
+        "unregistrationTime" if version == "2022.1" else "unregisterTime"
+    )
     client = FakeClient(
         {
-            "ak.wwise.core.getInfo": _live_info("2022.1"),
+            "ak.wwise.core.getInfo": _live_info(version),
             GET_GAME_OBJECTS_URI: {
                 "return": [
                     {
                         "id": 1001,
                         "name": "Player",
-                        "registrationTime": 20,
-                        "unregistrationTime": -1,
+                        register_field: 20,
+                        unregister_field: -1,
                     }
                 ]
             },
@@ -339,7 +345,7 @@ def test_gateway_game_objects_dispatches_one_closed_2022_request(
     )
     exit_code, payload = waapi_gateway.execute_gateway(
         ["profiler-game-objects", "--capture", "latest"],
-        env=_gateway_env(tmp_path, "2022.1"),
+        env=_gateway_env(tmp_path, version),
         client_factory=lambda url: client,
     )
     assert exit_code == 0
@@ -380,6 +386,66 @@ def test_gateway_game_objects_returns_structured_result_mismatch(
     assert payload["ok"] is False
     assert payload["error_code"] == "INVALID_STABLE_READ_RESULT"
     assert payload["details"]["missing_field"] == "registrationTime"
+
+
+@pytest.mark.parametrize(
+    "version",
+    ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"),
+)
+def test_gateway_voice_contributions_resolves_identity_in_every_exact_lane(
+    tmp_path: Path,
+    version: str,
+) -> None:
+    voice_id = "{11111111-1111-1111-1111-111111111111}"
+    result = {
+        "volume": -3.0,
+        "LPF": 2.0,
+        "HPF": 1.0,
+        "objects": [],
+    }
+    if version == "2025.1":
+        result["DSF"] = -0.5
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": _live_info(version),
+            GET_VOICES_URI: {
+                "return": [
+                    {
+                        "pipelineID": 17,
+                        "gameObjectID": 1001,
+                        "objectGUID": voice_id,
+                        "objectName": "Rain",
+                        "gameObjectName": "Weather",
+                    }
+                ]
+            },
+            GET_VOICE_CONTRIBUTIONS_URI: {"return": result},
+        }
+    )
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "profiler-voice-contributions",
+            "--capture",
+            "latest",
+            "--voice-object-id",
+            voice_id,
+        ],
+        env=_gateway_env(tmp_path, version),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 0, payload
+    assert client.calls[-1] == (
+        GET_VOICE_CONTRIBUTIONS_URI,
+        {
+            "voicePipelineID": 17,
+            "bussesPipelineID": [],
+            "time": "capture",
+        },
+        {},
+    )
+    assert payload["agent_result"]["volume"] == -3.0
 
 
 def test_gateway_voice_contributions_resolves_business_object_identities(

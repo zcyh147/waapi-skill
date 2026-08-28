@@ -507,7 +507,6 @@ SELECTED_REQUIRED_RETURN_FIELDS = ("id", "name", "type", "path")
 QUERY_BUSINESS_PREDICATES: Mapping[str, tuple[str, str, str]] = {
     "name-is": ("name", "=", "string"),
     "name-contains": ("name", ":", "string"),
-    "type-is": ("type", "=", "string"),
     "notes-contain": ("notes", ":", "string"),
     "volume-db-at-most": ("@Volume", "<=", "number"),
     "volume-db-at-least": ("@Volume", ">=", "number"),
@@ -519,6 +518,7 @@ QUERY_BUSINESS_PREDICATES: Mapping[str, tuple[str, str, str]] = {
     "plugin-name-is": ("pluginName", "=", "string"),
     "category-is": ("category", "=", "string"),
 }
+QUERY_BUSINESS_KIND_PREDICATE = "kind-is"
 QUERY_BUSINESS_RELATIONSHIPS: Mapping[str, str] = {
     "descendants": "descendants",
     "ancestors": "ancestors",
@@ -1615,22 +1615,13 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     query_object.add_argument(
-        "--include-property",
+        "--include-field",
         action="append",
         default=[],
-        dest="custom_properties",
+        dest="custom_field_meanings",
         help=(
-            "Repeat one exact user-requested or Gateway-reported custom property "
-            "name; the Gateway owns property accessor syntax"
-        ),
-    )
-    query_object.add_argument(
-        "--include-reference",
-        action="append",
-        default=[],
-        dest="custom_references",
-        help=(
-            "Repeat one exact user-requested or Gateway-reported custom reference name"
+            "Repeat one user-facing custom property/reference meaning; the Gateway "
+            "discovers and binds the exact live field before object.get"
         ),
     )
     query_object.add_argument(
@@ -1748,7 +1739,6 @@ def build_parser() -> argparse.ArgumentParser:
         queries=None,
         limit=None,
         detail=False,
-        summary_only=False,
     )
 
     wait_topic = subparsers.add_parser(
@@ -4252,6 +4242,25 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
                 )
             )
     for intent, value in getattr(args, "business_predicates", ()):
+        if intent == QUERY_BUSINESS_KIND_PREDICATE:
+            (kind_version,) = resolve_catalog_versions(args, env=env)
+            kind = resolve_semantic_kind(value, version=kind_version)
+            native_type = (
+                "Sound"
+                if value in {"sound-sfx", "sound-voice"}
+                else kind.native_object_type
+            )
+            args.where.append(("type", "=", "string", native_type))
+            if value in {"sound-sfx", "sound-voice"}:
+                args.where.append(
+                    (
+                        "@IsVoice",
+                        "=",
+                        "boolean",
+                        "true" if value == "sound-voice" else "false",
+                    )
+                )
+            continue
         native = QUERY_BUSINESS_PREDICATES.get(intent)
         if native is None:
             raise GatewayInputError(
@@ -4261,6 +4270,11 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
         field, operator, value_type = native
         args.where.append((field, operator, value_type, value))
     if getattr(args, "advanced_waql", None) is not None:
+        if args.custom_field_meanings:
+            raise GatewayInputError(
+                "--advanced-waql does not accept --include-field because an exact "
+                "live metadata scope cannot be derived; use a scoped business query"
+            )
         if args.business_predicates or args.relationships:
             raise GatewayInputError(
                 "--advanced-waql cannot be combined with --predicate or "
@@ -4281,6 +4295,16 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
             version=advanced_version,
         )
         return
+
+    if args.query_custom_field_meanings:
+        exact_object_scope = args.path is not None or args.object_id is not None
+        type_scope = args.object_type is not None
+        if not (type_scope or (exact_object_scope and not args.select)):
+            raise GatewayInputError(
+                "--include-field requires a --kind/--type-name source or one exact "
+                "path/GUID source without relationship traversal so the Gateway can "
+                "bind one live metadata scope"
+            )
 
     args.take = args.max_results
     if original_file_reference_match_requested(args):
@@ -4333,16 +4357,15 @@ def _compile_query_business_projection(args: argparse.Namespace) -> None:
     """Compile stable business output names into exact object.get accessors."""
 
     requested = list(getattr(args, "business_outputs", ()) or ())
-    properties = list(getattr(args, "custom_properties", ()) or ())
-    references = list(getattr(args, "custom_references", ()) or ())
+    custom_meanings = list(getattr(args, "custom_field_meanings", ()) or ())
     if len(requested) > MAX_QUERY_BUSINESS_OUTPUTS:
         raise GatewayInputError(
             f"query-object accepts at most {MAX_QUERY_BUSINESS_OUTPUTS} --include values"
         )
-    if len(properties) + len(references) > MAX_QUERY_CUSTOM_OUTPUTS:
+    if len(custom_meanings) > MAX_QUERY_CUSTOM_OUTPUTS:
         raise GatewayInputError(
             "query-object accepts at most "
-            f"{MAX_QUERY_CUSTOM_OUTPUTS} custom property/reference outputs"
+            f"{MAX_QUERY_CUSTOM_OUTPUTS} custom field meanings"
         )
     if len(set(requested)) != len(requested):
         raise GatewayInputError("query-object --include values must be unique")
@@ -4352,7 +4375,7 @@ def _compile_query_business_projection(args: argparse.Namespace) -> None:
         native, output = QUERY_BUSINESS_OUTPUTS[name]
         bindings.append(("business", native, output))
 
-    def exact_custom_name(value: Any, *, option: str) -> str:
+    def bounded_custom_meaning(value: Any) -> str:
         if (
             not isinstance(value, str)
             or not value
@@ -4362,24 +4385,16 @@ def _compile_query_business_projection(args: argparse.Namespace) -> None:
             or any(character in value for character in ('"', "'", "\\", ";"))
         ):
             raise GatewayInputError(
-                f"{option} must be one bounded exact user-requested or Gateway-reported name"
+                "--include-field must be one bounded user-facing field meaning"
             )
         return value
 
-    for name in properties:
-        token = exact_custom_name(name, option="--include-property")
-        if token.startswith("@"):
-            raise GatewayInputError(
-                "--include-property takes the property name without native @ syntax"
-            )
-        bindings.append(("property", f"@{token}", token))
-    for name in references:
-        token = exact_custom_name(name, option="--include-reference")
-        if token.startswith("@"):
-            raise GatewayInputError(
-                "--include-reference takes the reference name without native @ syntax"
-            )
-        bindings.append(("reference", token, token))
+    normalized_meanings = [bounded_custom_meaning(value) for value in custom_meanings]
+    if len({" ".join(value.split()).casefold() for value in normalized_meanings}) != len(
+        normalized_meanings
+    ):
+        raise GatewayInputError("query-object --include-field meanings must be unique")
+    args.query_custom_field_meanings = tuple(normalized_meanings)
 
     native_fields = [binding[1] for binding in bindings]
     if len(set(native_fields)) != len(native_fields):
@@ -4513,6 +4528,8 @@ def preflight_metadata_input(args: argparse.Namespace) -> None:
             )
         args.object_type = type_name
     if exact_id is not None:
+        if not _canonical_guid(exact_id):
+            raise GatewayInputError("metadata --exact-id must be a canonical GUID")
         args.object = exact_id
     args.queries = meanings or None
     args.limit = DEFAULT_METADATA_DISCOVERY_LIMIT
@@ -6739,6 +6756,8 @@ def query_business_schema_payload(
     """Describe the one deep direct-read continuation for an object query."""
 
     if advanced:
+        advanced_schema = advanced_query_schema(version=version)
+        waql_schema = advanced_schema["properties"]["waql"]
         return {
             "contract": ADVANCED_QUERY_SCHEMA_CONTRACT,
             "ok": True,
@@ -6751,8 +6770,8 @@ def query_business_schema_payload(
             "identity_projection": list(SELECTED_REQUIRED_RETURN_FIELDS),
             "business_outputs": list(QUERY_BUSINESS_OUTPUTS),
             "custom_outputs": {
-                "property": "--include-property <exact user-requested or Gateway-reported name>",
-                "reference": "--include-reference <exact user-requested or Gateway-reported name>",
+                "available": False,
+                "reason": "advanced WAQL has no Gateway-provable live metadata scope",
             },
             "continuation": {
                 "subcommand": "query-object",
@@ -6760,6 +6779,11 @@ def query_business_schema_payload(
                 "exact_expression": (
                     "--advanced-waql <one bounded exact WAQL expression>"
                 ),
+                "exact_expression_limits": {
+                    "max_utf8_bytes": waql_schema["x-maxUtf8Bytes"],
+                    "framing": dict(waql_schema["x-framing"]),
+                    "description": waql_schema["description"],
+                },
                 "result_bound": f"--max-results <1..{MAX_QUERY_TAKE}>",
                 "business_output": "--include <business-field> (repeat)",
             },
@@ -6785,8 +6809,9 @@ def query_business_schema_payload(
         "identity_projection": list(SELECTED_REQUIRED_RETURN_FIELDS),
         "business_outputs": list(QUERY_BUSINESS_OUTPUTS),
         "custom_outputs": {
-            "property": "--include-property <exact user-requested or Gateway-reported name>",
-            "reference": "--include-reference <exact user-requested or Gateway-reported name>",
+            "field_meaning": "--include-field <user-facing property/reference meaning>",
+            "authority": "live WAAPI metadata bound by the Gateway before object.get",
+            "repair": "refine the meaning when live discovery is not unique",
         },
         "sources": {
             "object_path": "--path-segment <one literal name> (repeat)",
@@ -6802,6 +6827,12 @@ def query_business_schema_payload(
             for name, (_field, _operator, value_type) in sorted(
                 QUERY_BUSINESS_PREDICATES.items()
             )
+        }
+        | {
+            QUERY_BUSINESS_KIND_PREDICATE: {
+                "value_type": "business-kind",
+                "choices": list(SUPPORTED_BUSINESS_KINDS),
+            }
         },
         "relationships": list(QUERY_BUSINESS_RELATIONSHIPS),
         "continuation": {
@@ -8996,25 +9027,6 @@ def dispatch_profiler_voice_contributions_request(
     }
 
 
-def dispatch_typed_debug_validation(
-    typed_request: Any,
-    *,
-    connection: GatewayConnection,
-    detected_version: str,
-    dispatcher: WwiseDispatcher,
-    common: Mapping[str, Any],
-) -> dict[str, Any]:
-    """Run the existing bounded Debug validateCall adapter from typed facts."""
-
-    return dispatch_debug_validation(
-        dict(typed_request.args),
-        connection=connection,
-        detected_version=detected_version,
-        dispatcher=dispatcher,
-        common=common,
-    )
-
-
 def dispatch_debug_validation(
     call_args: Mapping[str, Any],
     *,
@@ -9355,20 +9367,6 @@ def dispatch_command(
                 "Typed request version changed after preflight; request-schema must be rerun"
             )
         if typed_request.uri != TYPED_REQUEST_TRACER_URI:
-            if typed_request.uri == TYPED_REQUEST_COMPLEX_TRACER_URI:
-                return dispatch_typed_debug_validation(
-                    typed_request,
-                    connection=connection,
-                    detected_version=detected_version,
-                    dispatcher=dispatcher,
-                    common={
-                        **common,
-                        "typed_request": {
-                            "contract": typed_request.as_dict()["contract"],
-                            "schema_digest": typed_request.schema_digest,
-                        },
-                    },
-                )
             capability = live_capability(
                 detected_version,
                 typed_request.uri,
@@ -9986,6 +9984,20 @@ def dispatch_command(
                 dispatcher=dispatcher,
                 common=common,
             )
+        custom_field_clarification = _bind_query_custom_fields_from_live_metadata(
+            args,
+            connection=connection,
+            detected_version=detected_version,
+            dispatcher=dispatcher,
+        )
+        if custom_field_clarification is not None:
+            return {
+                "ok": True,
+                "status": "needs_clarification",
+                **common,
+                "query_layer": "business-declaration",
+                "agent_result": custom_field_clarification,
+            }
         where = typed_query_predicates(args)
         return_fields = args.query_return_fields
         _require_exact_identity_return_field(args, return_fields)
@@ -10126,12 +10138,35 @@ def dispatch_command(
                     },
                 }
             field_name = candidates[0].get("name")
+            field_kind = candidates[0].get("kind")
             if not isinstance(field_name, str) or not field_name:
                 raise GatewayResultShapeError(
                     "metadata property-state discovery returned an invalid field.",
                     details={"operation": args.operation},
                     error_code="INVALID_METADATA_RESULT",
                 )
+            if field_kind != "property":
+                return {
+                    "ok": True,
+                    "status": "needs_clarification",
+                    **common,
+                    "operation": args.operation,
+                    "metadata_authority": "live-waapi",
+                    "agent_result": {
+                        "meaning": args.queries[0],
+                        "candidate_count": 1,
+                        "candidates": [
+                            {
+                                "field": field_name,
+                                "kind": field_kind,
+                            }
+                        ],
+                        "repair": (
+                            "request a property meaning; references do not have "
+                            "an enabled-state query"
+                        ),
+                    },
+                }
             preview = MetadataBuilder(version=detected_version).is_property_enabled(
                 object=args.object,
                 property=field_name,
@@ -10198,23 +10233,6 @@ def dispatch_command(
                 if normalized is not None
                 else None
             )
-            return payload
-        if args.summary_only:
-            payload["summary_only"] = True
-            if result.get("ok"):
-                if not isinstance(normalized, list):
-                    raise GatewayResultShapeError(
-                        "metadata types summary requires a normalized type array.",
-                        details={"operation": args.operation},
-                        error_code="INVALID_METADATA_RESULT",
-                    )
-                payload["agent_result"] = {
-                    "count": len(normalized),
-                    "contains_actor_mixer": any(
-                        row.get("name") == "ActorMixer" or row.get("type") == "ActorMixer"
-                        for row in normalized
-                    ),
-                }
             return payload
         payload["normalized"] = normalized
         return payload
@@ -16328,6 +16346,93 @@ def _project_query_business_rows(
             item["references"] = references
         projected.append(item)
     return projected
+
+
+def _bind_query_custom_fields_from_live_metadata(
+    args: argparse.Namespace,
+    *,
+    connection: GatewayConnection,
+    detected_version: str,
+    dispatcher: WwiseDispatcher,
+) -> dict[str, Any] | None:
+    """Bind business field meanings to exact live query projection accessors.
+
+    Returns a structured clarification payload when any meaning is ambiguous;
+    otherwise mutates only the current invocation's compiled projection facts.
+    """
+
+    meanings = tuple(getattr(args, "query_custom_field_meanings", ()) or ())
+    if not meanings:
+        return None
+    discovery = discover_metadata(
+        read_call=transaction_read_call(
+            dispatcher,
+            connection=connection,
+            version=detected_version,
+        ),
+        queries=meanings,
+        object_type=args.object_type,
+        object=args.path if args.path is not None else args.object_id,
+        limit=DEFAULT_METADATA_DISCOVERY_LIMIT,
+    )
+    candidates = {
+        candidate.get("name"): candidate
+        for candidate in discovery.candidates
+        if isinstance(candidate.get("name"), str)
+    }
+    bindings = list(getattr(args, "query_output_bindings", ()) or ())
+    unresolved: list[dict[str, Any]] = []
+    for query_result in discovery.query_results:
+        meaning = query_result.get("query")
+        names = query_result.get("candidate_names")
+        if not isinstance(meaning, str) or not isinstance(names, list):
+            unresolved.append(
+                {
+                    "meaning": meaning,
+                    "candidate_names": names if isinstance(names, list) else [],
+                }
+            )
+            continue
+        exact_names: list[str] = []
+        for name in names:
+            candidate = candidates.get(name)
+            metadata = candidate.get("metadata") if isinstance(candidate, Mapping) else None
+            display = metadata.get("display") if isinstance(metadata, Mapping) else None
+            display_name = display.get("name") if isinstance(display, Mapping) else None
+            if (
+                isinstance(name, str)
+                and name.casefold() == meaning.casefold()
+            ) or (
+                isinstance(display_name, str)
+                and display_name.casefold() == meaning.casefold()
+            ):
+                exact_names.append(name)
+        selected_names = exact_names if len(exact_names) == 1 else names
+        if len(selected_names) != 1:
+            unresolved.append({"meaning": meaning, "candidate_names": names})
+            continue
+        candidate = candidates.get(selected_names[0])
+        kind = candidate.get("kind") if isinstance(candidate, Mapping) else None
+        token = candidate.get("name") if isinstance(candidate, Mapping) else None
+        if kind not in {"property", "reference"} or not isinstance(token, str):
+            unresolved.append({"meaning": meaning, "candidate_names": names})
+            continue
+        native = f"@{token}" if kind == "property" else token
+        bindings.append((kind, native, token))
+    if unresolved:
+        return {
+            "metadata_authority": "live-waapi",
+            "unresolved": unresolved,
+            "repair": "refine each --include-field meaning until one live field matches",
+        }
+    native_fields = [binding[1] for binding in bindings]
+    if len(set(native_fields)) != len(native_fields):
+        raise GatewayInputError(
+            "query-object live field discovery resolved duplicate result fields"
+        )
+    args.query_output_bindings = tuple(bindings)
+    args.query_return_fields = (*SELECTED_REQUIRED_RETURN_FIELDS, *native_fields)
+    return None
 
 
 def project_successful_query_object_payload(

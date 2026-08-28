@@ -141,11 +141,12 @@ mode.
 
 The Gateway always returns `id,name,type,path`. Add requested report data with
 repeated `--include <business-field>`; `query-schema` lists the closed names.
-For a custom plug-in field, use `--include-property` or `--include-reference`
-only when the exact name came from the user or authoritative live metadata.
-The Gateway owns `@` property syntax and returns custom values under
-`properties` or `references`; never turn a natural-language guess into a field
-name.
+For a custom plug-in field, use `--include-field` with the user's short field
+meaning. The Gateway performs live metadata discovery in the query's exact
+object/class scope, binds the result as a property or reference, and returns
+custom values under `properties` or `references`. If discovery is not unique,
+refine the meaning from the structured repair; never supply a native metadata
+token.
 
 The offline version-aware schema command describes this same business entry:
 
@@ -298,19 +299,19 @@ For example, a bounded descendant inventory of Sound candidates remains a
 simple flag query:
 
 ```bash
-python scripts/run.py gateway.py query-object --path-segment 'Actor-Mixer Hierarchy' --path-segment 'Default Work Unit' --path-segment 'Combat' --relationship descendants --predicate type-is Sound --max-results 24
+python scripts/run.py gateway.py query-object --path-segment 'Actor-Mixer Hierarchy' --path-segment 'Default Work Unit' --path-segment 'Combat' --relationship descendants --predicate kind-is sound-sfx --max-results 24
 ```
 
 Pure AND; `isIncluded` is appended last because it is filter-only:
 
 ```bash
-python scripts/run.py gateway.py query-object --path-segment 'Actor-Mixer Hierarchy' --path-segment 'Default Work Unit' --path-segment 'CombatMix' --relationship descendants --predicate type-is Sound --predicate volume-db-at-most -6.0 --predicate notes-contain mix-review --predicate included-is true --max-results 12
+python scripts/run.py gateway.py query-object --path-segment 'Actor-Mixer Hierarchy' --path-segment 'Default Work Unit' --path-segment 'CombatMix' --relationship descendants --predicate kind-is sound-sfx --predicate volume-db-at-most -6.0 --predicate notes-contain mix-review --predicate included-is true --max-results 12
 ```
 
 Direct parents:
 
 ```bash
-python scripts/run.py gateway.py query-object --type-name Sound --relationship parent --predicate type-is RandomSequenceContainer --predicate children-at-least 3 --predicate notes-contain parent-review --max-results 10
+python scripts/run.py gateway.py query-object --type-name Sound --relationship parent --predicate kind-is random-container --predicate children-at-least 3 --predicate notes-contain parent-review --max-results 10
 ```
 
 Eight-level non-Project ownership:
@@ -377,7 +378,7 @@ For cross-reference diagnosis from an exact path, resolve
 `id,name,type,path`, then follow returned relationship ids by exact-id lookup.
 For Event use `--relationship children --max-results 100`, not descendants or
 same-name search. Request business hop fields: Action ->
-`--include action-type --include-reference Target`; Sound ->
+`--include action-type --include-field 'Target'`; Sound ->
 `--include override-output --include active-source --include output-bus`. The Event
 children result is already the Action hop. With its `ActionType,Target`, do not
 query the Action id again; use the returned `Target.id` directly for the next

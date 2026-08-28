@@ -6,6 +6,8 @@ import sys
 from pathlib import Path
 from typing import Any, Mapping
 
+import pytest
+
 
 SCRIPT_PATH = (
     Path(__file__).resolve().parents[2]
@@ -82,12 +84,14 @@ def _gateway_env(tmp_path: Path, version: str) -> dict[str, str]:
     }
 
 
+@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
 def test_debug_wal_tree_dispatches_one_closed_bounded_request(
     tmp_path: Path,
+    version: str,
 ) -> None:
     client = FakeClient(
         {
-            "ak.wwise.core.getInfo": _live_info("2025.1"),
+            "ak.wwise.core.getInfo": _live_info(version),
             "ak.wwise.debug.getWalTree": {
                 "return": {
                     "nodes": {
@@ -101,7 +105,7 @@ def test_debug_wal_tree_dispatches_one_closed_bounded_request(
 
     exit_code, payload = waapi_gateway.execute_gateway(
         ["debug-wal-tree", "--max-nodes", "1"],
-        env=_gateway_env(tmp_path, "2025.1"),
+        env=_gateway_env(tmp_path, version),
         client_factory=lambda url: client,
     )
 
@@ -151,19 +155,21 @@ def test_debug_parser_exposes_only_business_boundaries() -> None:
     } & validate_options
 
 
+@pytest.mark.parametrize("version", ("2024.1", "2025.1"))
 def test_debug_validate_call_validates_target_without_executing_it(
     tmp_path: Path,
+    version: str,
 ) -> None:
     client = FakeClient(
         {
-            "ak.wwise.core.getInfo": _live_info("2025.1"),
+            "ak.wwise.core.getInfo": _live_info(version),
             "ak.wwise.debug.validateCall": {},
         }
     )
 
     exit_code, payload = waapi_gateway.execute_gateway(
         ["debug-validate-call", "ak.wwise.core.getProjectInfo"],
-        env=_gateway_env(tmp_path, "2025.1"),
+        env=_gateway_env(tmp_path, version),
         client_factory=lambda url: client,
     )
 
