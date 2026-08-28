@@ -14393,6 +14393,193 @@
     {
       "model_values": [
         {
+          "channel": "fixed.metadata types",
+          "name": "path-segment",
+          "path": [
+            "fixed_command",
+            "metadata types",
+            "path-segment"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata types",
+          "name": "kind",
+          "path": [
+            "fixed_command",
+            "metadata types",
+            "kind"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "reviewed_adapter"
+        },
+        {
+          "channel": "fixed.metadata types",
+          "name": "custom-kind",
+          "path": [
+            "fixed_command",
+            "metadata types",
+            "custom-kind"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata types",
+          "name": "exact-id",
+          "path": [
+            "fixed_command",
+            "metadata types",
+            "exact-id"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata types",
+          "name": "meaning",
+          "path": [
+            "fixed_command",
+            "metadata types",
+            "meaning"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata types",
+          "name": "platform",
+          "path": [
+            "fixed_command",
+            "metadata types",
+            "platform"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata types",
+          "name": "curve-role",
+          "path": [
+            "fixed_command",
+            "metadata types",
+            "curve-role"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata discover",
+          "name": "path-segment",
+          "path": [
+            "fixed_command",
+            "metadata discover",
+            "path-segment"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata discover",
+          "name": "kind",
+          "path": [
+            "fixed_command",
+            "metadata discover",
+            "kind"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "reviewed_adapter"
+        },
+        {
+          "channel": "fixed.metadata discover",
+          "name": "custom-kind",
+          "path": [
+            "fixed_command",
+            "metadata discover",
+            "custom-kind"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata discover",
+          "name": "exact-id",
+          "path": [
+            "fixed_command",
+            "metadata discover",
+            "exact-id"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata discover",
+          "name": "meaning",
+          "path": [
+            "fixed_command",
+            "metadata discover",
+            "meaning"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata discover",
+          "name": "platform",
+          "path": [
+            "fixed_command",
+            "metadata discover",
+            "platform"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata discover",
+          "name": "curve-role",
+          "path": [
+            "fixed_command",
+            "metadata discover",
+            "curve-role"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        }
+      ],
+      "sha256": "0df715dac57d4c99215b2d12061657469062415a70b137f905c5c36ff263344d"
+    },
+    {
+      "model_values": [
+        {
           "channel": "request",
           "name": "enabled",
           "path": [
@@ -38757,6 +38944,102 @@
     {
       "model_values": [
         {
+          "channel": "fixed.metadata attenuation",
+          "name": "path-segment",
+          "path": [
+            "fixed_command",
+            "metadata attenuation",
+            "path-segment"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata attenuation",
+          "name": "kind",
+          "path": [
+            "fixed_command",
+            "metadata attenuation",
+            "kind"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "reviewed_adapter"
+        },
+        {
+          "channel": "fixed.metadata attenuation",
+          "name": "custom-kind",
+          "path": [
+            "fixed_command",
+            "metadata attenuation",
+            "custom-kind"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata attenuation",
+          "name": "exact-id",
+          "path": [
+            "fixed_command",
+            "metadata attenuation",
+            "exact-id"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata attenuation",
+          "name": "meaning",
+          "path": [
+            "fixed_command",
+            "metadata attenuation",
+            "meaning"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata attenuation",
+          "name": "platform",
+          "path": [
+            "fixed_command",
+            "metadata attenuation",
+            "platform"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata attenuation",
+          "name": "curve-role",
+          "path": [
+            "fixed_command",
+            "metadata attenuation",
+            "curve-role"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        }
+      ],
+      "sha256": "43ffe2f590a3e22cbaf0979d8906e7445bb0b1b100bda4b147b4052c4a5b5779"
+    },
+    {
+      "model_values": [
+        {
           "channel": "request",
           "name": "object",
           "path": [
@@ -50376,6 +50659,102 @@
     {
       "model_values": [
         {
+          "channel": "fixed.metadata property-state",
+          "name": "path-segment",
+          "path": [
+            "fixed_command",
+            "metadata property-state",
+            "path-segment"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata property-state",
+          "name": "kind",
+          "path": [
+            "fixed_command",
+            "metadata property-state",
+            "kind"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "reviewed_adapter"
+        },
+        {
+          "channel": "fixed.metadata property-state",
+          "name": "custom-kind",
+          "path": [
+            "fixed_command",
+            "metadata property-state",
+            "custom-kind"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata property-state",
+          "name": "exact-id",
+          "path": [
+            "fixed_command",
+            "metadata property-state",
+            "exact-id"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata property-state",
+          "name": "meaning",
+          "path": [
+            "fixed_command",
+            "metadata property-state",
+            "meaning"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata property-state",
+          "name": "platform",
+          "path": [
+            "fixed_command",
+            "metadata property-state",
+            "platform"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata property-state",
+          "name": "curve-role",
+          "path": [
+            "fixed_command",
+            "metadata property-state",
+            "curve-role"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        }
+      ],
+      "sha256": "5ca790d0c93ef93380c331c2f89829a29b689884e99fa03ba9a6262fd176b787"
+    },
+    {
+      "model_values": [
+        {
           "channel": "request",
           "name": "time",
           "path": [
@@ -56882,167 +57261,6 @@
     {
       "model_values": [
         {
-          "channel": "fixed.metadata types",
-          "name": "path-segment",
-          "path": [
-            "fixed_command",
-            "metadata types",
-            "path-segment"
-          ],
-          "required": false,
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata types",
-          "name": "type-name",
-          "path": [
-            "fixed_command",
-            "metadata types",
-            "type-name"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata types",
-          "name": "exact-id",
-          "path": [
-            "fixed_command",
-            "metadata types",
-            "exact-id"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata types",
-          "name": "meaning",
-          "path": [
-            "fixed_command",
-            "metadata types",
-            "meaning"
-          ],
-          "required": false,
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata types",
-          "name": "platform",
-          "path": [
-            "fixed_command",
-            "metadata types",
-            "platform"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata types",
-          "name": "curve-role",
-          "path": [
-            "fixed_command",
-            "metadata types",
-            "curve-role"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata discover",
-          "name": "path-segment",
-          "path": [
-            "fixed_command",
-            "metadata discover",
-            "path-segment"
-          ],
-          "required": false,
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata discover",
-          "name": "type-name",
-          "path": [
-            "fixed_command",
-            "metadata discover",
-            "type-name"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata discover",
-          "name": "exact-id",
-          "path": [
-            "fixed_command",
-            "metadata discover",
-            "exact-id"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata discover",
-          "name": "meaning",
-          "path": [
-            "fixed_command",
-            "metadata discover",
-            "meaning"
-          ],
-          "required": false,
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata discover",
-          "name": "platform",
-          "path": [
-            "fixed_command",
-            "metadata discover",
-            "platform"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata discover",
-          "name": "curve-role",
-          "path": [
-            "fixed_command",
-            "metadata discover",
-            "curve-role"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        }
-      ],
-      "sha256": "6267c591ba7816caa862993051a607b0c38ba13587753b5407e0ff4adb6916c6"
-    },
-    {
-      "model_values": [
-        {
           "channel": "request",
           "name": "soundbank",
           "path": [
@@ -57109,89 +57327,6 @@
         }
       ],
       "sha256": "648647d7336a251e1927f6ac1a033df18571a6a796b9613f53046bbf4a6610e7"
-    },
-    {
-      "model_values": [
-        {
-          "channel": "fixed.metadata attenuation",
-          "name": "path-segment",
-          "path": [
-            "fixed_command",
-            "metadata attenuation",
-            "path-segment"
-          ],
-          "required": false,
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata attenuation",
-          "name": "type-name",
-          "path": [
-            "fixed_command",
-            "metadata attenuation",
-            "type-name"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata attenuation",
-          "name": "exact-id",
-          "path": [
-            "fixed_command",
-            "metadata attenuation",
-            "exact-id"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata attenuation",
-          "name": "meaning",
-          "path": [
-            "fixed_command",
-            "metadata attenuation",
-            "meaning"
-          ],
-          "required": false,
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata attenuation",
-          "name": "platform",
-          "path": [
-            "fixed_command",
-            "metadata attenuation",
-            "platform"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata attenuation",
-          "name": "curve-role",
-          "path": [
-            "fixed_command",
-            "metadata attenuation",
-            "curve-role"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        }
-      ],
-      "sha256": "68539cf44a5551061687d762acef6d2372a6ceb6c8a4d4073b80ef261db700ce"
     },
     {
       "model_values": [
@@ -112829,89 +112964,6 @@
     {
       "model_values": [
         {
-          "channel": "fixed.metadata discover",
-          "name": "path-segment",
-          "path": [
-            "fixed_command",
-            "metadata discover",
-            "path-segment"
-          ],
-          "required": false,
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata discover",
-          "name": "type-name",
-          "path": [
-            "fixed_command",
-            "metadata discover",
-            "type-name"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata discover",
-          "name": "exact-id",
-          "path": [
-            "fixed_command",
-            "metadata discover",
-            "exact-id"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata discover",
-          "name": "meaning",
-          "path": [
-            "fixed_command",
-            "metadata discover",
-            "meaning"
-          ],
-          "required": false,
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata discover",
-          "name": "platform",
-          "path": [
-            "fixed_command",
-            "metadata discover",
-            "platform"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata discover",
-          "name": "curve-role",
-          "path": [
-            "fixed_command",
-            "metadata discover",
-            "curve-role"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        }
-      ],
-      "sha256": "a6e6739bf40aa3dd2e0376cc893f9af1ac9f087efbdecd94b8ea0721429f4284"
-    },
-    {
-      "model_values": [
-        {
           "channel": "request",
           "name": "file",
           "path": [
@@ -132991,89 +133043,6 @@
     {
       "model_values": [
         {
-          "channel": "fixed.metadata property-state",
-          "name": "path-segment",
-          "path": [
-            "fixed_command",
-            "metadata property-state",
-            "path-segment"
-          ],
-          "required": false,
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata property-state",
-          "name": "type-name",
-          "path": [
-            "fixed_command",
-            "metadata property-state",
-            "type-name"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata property-state",
-          "name": "exact-id",
-          "path": [
-            "fixed_command",
-            "metadata property-state",
-            "exact-id"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata property-state",
-          "name": "meaning",
-          "path": [
-            "fixed_command",
-            "metadata property-state",
-            "meaning"
-          ],
-          "required": false,
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata property-state",
-          "name": "platform",
-          "path": [
-            "fixed_command",
-            "metadata property-state",
-            "platform"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata property-state",
-          "name": "curve-role",
-          "path": [
-            "fixed_command",
-            "metadata property-state",
-            "curve-role"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        }
-      ],
-      "sha256": "d3b6aef608f2de7a647856d604b2dbaaca00141c935546459eb4ca9c818afe77"
-    },
-    {
-      "model_values": [
-        {
           "channel": "request",
           "name": "cursor",
           "path": [
@@ -142694,6 +142663,102 @@
         }
       ],
       "sha256": "e40c883c11a1b63c564da053bb85ff6ec51b832e061841cf77c74053125116ad"
+    },
+    {
+      "model_values": [
+        {
+          "channel": "fixed.metadata discover",
+          "name": "path-segment",
+          "path": [
+            "fixed_command",
+            "metadata discover",
+            "path-segment"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata discover",
+          "name": "kind",
+          "path": [
+            "fixed_command",
+            "metadata discover",
+            "kind"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "reviewed_adapter"
+        },
+        {
+          "channel": "fixed.metadata discover",
+          "name": "custom-kind",
+          "path": [
+            "fixed_command",
+            "metadata discover",
+            "custom-kind"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata discover",
+          "name": "exact-id",
+          "path": [
+            "fixed_command",
+            "metadata discover",
+            "exact-id"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata discover",
+          "name": "meaning",
+          "path": [
+            "fixed_command",
+            "metadata discover",
+            "meaning"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata discover",
+          "name": "platform",
+          "path": [
+            "fixed_command",
+            "metadata discover",
+            "platform"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata discover",
+          "name": "curve-role",
+          "path": [
+            "fixed_command",
+            "metadata discover",
+            "curve-role"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        }
+      ],
+      "sha256": "e4dd152eb4a9c620c4ed362c04f2c389daa6a4318ca6cfc90f1996a095852309"
     },
     {
       "model_values": [
@@ -153176,7 +153241,7 @@
     "contract": "waapi-skill.typed-request-surface/v1",
     "total_lanes": 824
   },
-  "inventory_sha256": "b0073c09ef30f8121b239df8980ca0df97b7bf1f90f975fc9e4cb988b8a92424",
+  "inventory_sha256": "0ac0e91be86308587a270aa41cf34018e6daaac1c0e7af9d4b069818205ef159",
   "mechanic_owners": {
     "ambiguous_continuation_selection": "gateway_derivation",
     "batch_layout": "gateway_derivation",
@@ -154724,7 +154789,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "5609902fcb6e457e8231e8a253f9bede851947b0d0b0c5317a93dc0b38ca37fc",
-      "field_contract_sha256": "68539cf44a5551061687d762acef6d2372a6ceb6c8a4d4073b80ef261db700ce",
+      "field_contract_sha256": "43ffe2f590a3e22cbaf0979d8906e7445bb0b1b100bda4b147b4052c4a5b5779",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -154755,7 +154820,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "d552a165d3858a34208cecde1b89b37637b0447ecc6f47534d624464a528945a",
-      "field_contract_sha256": "a6e6739bf40aa3dd2e0376cc893f9af1ac9f087efbdecd94b8ea0721429f4284",
+      "field_contract_sha256": "e4dd152eb4a9c620c4ed362c04f2c389daa6a4318ca6cfc90f1996a095852309",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -154786,7 +154851,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "ca693f60d0cae57bac8acabb4ffe8b1eebee26c68764c5b101c046f31defd693",
-      "field_contract_sha256": "a6e6739bf40aa3dd2e0376cc893f9af1ac9f087efbdecd94b8ea0721429f4284",
+      "field_contract_sha256": "e4dd152eb4a9c620c4ed362c04f2c389daa6a4318ca6cfc90f1996a095852309",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -154818,7 +154883,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "e56f154d3c5c4c90c9102dd636fd4390b496f939a2e95c3587d0a94715390470",
-      "field_contract_sha256": "6267c591ba7816caa862993051a607b0c38ba13587753b5407e0ff4adb6916c6",
+      "field_contract_sha256": "0df715dac57d4c99215b2d12061657469062415a70b137f905c5c36ff263344d",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -154849,7 +154914,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "94f64c7d32c9f2ca9c07663a64f2fa24268f59937386b5be1db3fc7a54a2bbc9",
-      "field_contract_sha256": "d3b6aef608f2de7a647856d604b2dbaaca00141c935546459eb4ca9c818afe77",
+      "field_contract_sha256": "5ca790d0c93ef93380c331c2f89829a29b689884e99fa03ba9a6262fd176b787",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -159252,7 +159317,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "db670028d882d6196e9da2e03548e4a9d6af56d2253a4dde5a3361b58c28caa8",
-      "field_contract_sha256": "68539cf44a5551061687d762acef6d2372a6ceb6c8a4d4073b80ef261db700ce",
+      "field_contract_sha256": "43ffe2f590a3e22cbaf0979d8906e7445bb0b1b100bda4b147b4052c4a5b5779",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -159283,7 +159348,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "9960984c7f1fb6d12119e5a69efc7134f351769856310ee21c268240e8085095",
-      "field_contract_sha256": "a6e6739bf40aa3dd2e0376cc893f9af1ac9f087efbdecd94b8ea0721429f4284",
+      "field_contract_sha256": "e4dd152eb4a9c620c4ed362c04f2c389daa6a4318ca6cfc90f1996a095852309",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -159314,7 +159379,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "9a4c12a37f9ba901f7cb58aa54087f8254071f690f36870886ccd73b6e0a9a62",
-      "field_contract_sha256": "a6e6739bf40aa3dd2e0376cc893f9af1ac9f087efbdecd94b8ea0721429f4284",
+      "field_contract_sha256": "e4dd152eb4a9c620c4ed362c04f2c389daa6a4318ca6cfc90f1996a095852309",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -159346,7 +159411,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "640a58b5deeb185fbc956eb184cb1c3fe3600be1312709698330deebbba7d6ed",
-      "field_contract_sha256": "6267c591ba7816caa862993051a607b0c38ba13587753b5407e0ff4adb6916c6",
+      "field_contract_sha256": "0df715dac57d4c99215b2d12061657469062415a70b137f905c5c36ff263344d",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -159377,7 +159442,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "07b646055ea2c5aeb7c9a52957501ca95ada2749d92990516aa3b793577ae8fa",
-      "field_contract_sha256": "d3b6aef608f2de7a647856d604b2dbaaca00141c935546459eb4ca9c818afe77",
+      "field_contract_sha256": "5ca790d0c93ef93380c331c2f89829a29b689884e99fa03ba9a6262fd176b787",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -164678,7 +164743,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "a4d20ee9c79429d128c635f37dddbdfccb7ab687664309c08b109df6e23cef06",
-      "field_contract_sha256": "68539cf44a5551061687d762acef6d2372a6ceb6c8a4d4073b80ef261db700ce",
+      "field_contract_sha256": "43ffe2f590a3e22cbaf0979d8906e7445bb0b1b100bda4b147b4052c4a5b5779",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -164709,7 +164774,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "496ddb1d86c7246700b66088afb11e46ed6b05d9013f46f05bd56a9d1721cfc9",
-      "field_contract_sha256": "a6e6739bf40aa3dd2e0376cc893f9af1ac9f087efbdecd94b8ea0721429f4284",
+      "field_contract_sha256": "e4dd152eb4a9c620c4ed362c04f2c389daa6a4318ca6cfc90f1996a095852309",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -164740,7 +164805,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "dc0776e684e03451404d91f46e15c0e563ca6b630a1874cbfd6d6ac10d002ad5",
-      "field_contract_sha256": "a6e6739bf40aa3dd2e0376cc893f9af1ac9f087efbdecd94b8ea0721429f4284",
+      "field_contract_sha256": "e4dd152eb4a9c620c4ed362c04f2c389daa6a4318ca6cfc90f1996a095852309",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -164772,7 +164837,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "1be3b2ec76e801ff2e54bda43ba78519ffb52f8be2638d7de52c8e90a850fafa",
-      "field_contract_sha256": "6267c591ba7816caa862993051a607b0c38ba13587753b5407e0ff4adb6916c6",
+      "field_contract_sha256": "0df715dac57d4c99215b2d12061657469062415a70b137f905c5c36ff263344d",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -164843,7 +164908,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "f7fa2185794e7597d8c9f783d2fdfb22572c1e1aebb2cc93063410037fd9af55",
-      "field_contract_sha256": "d3b6aef608f2de7a647856d604b2dbaaca00141c935546459eb4ca9c818afe77",
+      "field_contract_sha256": "5ca790d0c93ef93380c331c2f89829a29b689884e99fa03ba9a6262fd176b787",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -171221,7 +171286,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "74b2736e34e15e2a4b2fa7513d7bfcbf23524a442ad1ed4206d7265a1aeb84d3",
-      "field_contract_sha256": "68539cf44a5551061687d762acef6d2372a6ceb6c8a4d4073b80ef261db700ce",
+      "field_contract_sha256": "43ffe2f590a3e22cbaf0979d8906e7445bb0b1b100bda4b147b4052c4a5b5779",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -171252,7 +171317,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "274b9d05bc3a53863a8e32c206573ef54873a7d21c6980314a8454a67a5d9bf5",
-      "field_contract_sha256": "a6e6739bf40aa3dd2e0376cc893f9af1ac9f087efbdecd94b8ea0721429f4284",
+      "field_contract_sha256": "e4dd152eb4a9c620c4ed362c04f2c389daa6a4318ca6cfc90f1996a095852309",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -171283,7 +171348,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "602509d784bf3e24e8371cd4c3bca544c368663cb3b78bafd20aa0c64d716122",
-      "field_contract_sha256": "a6e6739bf40aa3dd2e0376cc893f9af1ac9f087efbdecd94b8ea0721429f4284",
+      "field_contract_sha256": "e4dd152eb4a9c620c4ed362c04f2c389daa6a4318ca6cfc90f1996a095852309",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -171315,7 +171380,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "3d5271de106aa4db3d4f7095b097b47c5f99e2919eb28b6f275739459280b2c5",
-      "field_contract_sha256": "6267c591ba7816caa862993051a607b0c38ba13587753b5407e0ff4adb6916c6",
+      "field_contract_sha256": "0df715dac57d4c99215b2d12061657469062415a70b137f905c5c36ff263344d",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -171386,7 +171451,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "c70024deb17e10c0a060a8b492a73df3b30fd0cedb00b16674fb1f80e4a9da42",
-      "field_contract_sha256": "d3b6aef608f2de7a647856d604b2dbaaca00141c935546459eb4ca9c818afe77",
+      "field_contract_sha256": "5ca790d0c93ef93380c331c2f89829a29b689884e99fa03ba9a6262fd176b787",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -177665,7 +177730,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "3e2c4b39c82210c0a5b72b253f1a45d6fbb4e3dc46a46bf93c6d7e0d76285059",
-      "field_contract_sha256": "68539cf44a5551061687d762acef6d2372a6ceb6c8a4d4073b80ef261db700ce",
+      "field_contract_sha256": "43ffe2f590a3e22cbaf0979d8906e7445bb0b1b100bda4b147b4052c4a5b5779",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -177696,7 +177761,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "ef401359e643ecff01b0a1f4d975d02bbffac9f6693c43c21a9ec67092334bb2",
-      "field_contract_sha256": "a6e6739bf40aa3dd2e0376cc893f9af1ac9f087efbdecd94b8ea0721429f4284",
+      "field_contract_sha256": "e4dd152eb4a9c620c4ed362c04f2c389daa6a4318ca6cfc90f1996a095852309",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -177727,7 +177792,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "eebf53a9735f78da554e5f6a2689e9060fbf4a3363945105ee98a805512a4098",
-      "field_contract_sha256": "a6e6739bf40aa3dd2e0376cc893f9af1ac9f087efbdecd94b8ea0721429f4284",
+      "field_contract_sha256": "e4dd152eb4a9c620c4ed362c04f2c389daa6a4318ca6cfc90f1996a095852309",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -177759,7 +177824,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "b6a88d69ac39f493905310c9586308dbe845a38e252ee8e59396fc47aaac8a2d",
-      "field_contract_sha256": "6267c591ba7816caa862993051a607b0c38ba13587753b5407e0ff4adb6916c6",
+      "field_contract_sha256": "0df715dac57d4c99215b2d12061657469062415a70b137f905c5c36ff263344d",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -177830,7 +177895,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "6be2988712b410c71244fd2dffe1f50db2c1cffe85e6ce548981fa9c21b70754",
-      "field_contract_sha256": "d3b6aef608f2de7a647856d604b2dbaaca00141c935546459eb4ca9c818afe77",
+      "field_contract_sha256": "5ca790d0c93ef93380c331c2f89829a29b689884e99fa03ba9a6262fd176b787",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -185625,9 +185690,9 @@
     "stable_business_declaration": "A prompt-derived business value remains visible in the public request."
   },
   "source_contracts": {
-    "gateway_parser_sha256": "5a619ca6ed3b7bbc198288d53a178890c1943a53d76aa64e41038c8025916634",
+    "gateway_parser_sha256": "fe702c0ec4201d12187c43d32944fb7890997b85e6fed0f26514905e744db2ba",
     "operation_contract_sha256": "bd3f63201dec616a6b57dbd4be326a6e72fbf0642367c773a331491a56c914f5",
-    "public_continuation_sha256": "f56ecd7247818e58a2e649f991f6b06874d4ead3992afd04c958dc8c7643212d",
+    "public_continuation_sha256": "a0571d9d9177e406e341d1de8c9fd3cc7924813a8916b7c62813009b0d33bdb4",
     "typed_request_surface_sha256": "2d595ba571ac74ac7a40c7dc18dd60ce47110de4b8b9ed2a7c5baf48e6a00cc5"
   },
   "summary": {

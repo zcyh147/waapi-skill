@@ -1020,7 +1020,7 @@ def _find_live_property_scope(
                 (
                     "metadata",
                     "discover",
-                    "--type-name",
+                    "--custom-kind",
                     str(type_row["name"]),
                     "--meaning",
                     property_name,

@@ -1699,11 +1699,20 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     metadata_scope.add_argument(
-        "--type-name",
-        dest="metadata_type_name",
+        "--kind",
+        choices=QUERY_BUSINESS_KINDS,
+        dest="metadata_semantic_kind",
         help=(
-            "Exact user-requested or Gateway-reported Wwise type name for "
-            "class-scoped field discovery"
+            "Closed business kind for class-scoped field discovery; the Gateway "
+            "derives the exact versioned metadata type"
+        ),
+    )
+    metadata_scope.add_argument(
+        "--custom-kind",
+        dest="metadata_custom_kind_meaning",
+        help=(
+            "User-facing custom object/plug-in kind meaning; the Gateway binds "
+            "it to one exact live Wwise metadata type"
         ),
     )
     metadata_scope.add_argument(
@@ -2670,7 +2679,7 @@ def _execute_gateway_unconstrained(
         if args.command in {"wait-topic", "stream-topic"}:
             preflight_typed_topic_input(args, env=source_env)
         if args.command == "metadata":
-            preflight_metadata_input(args)
+            preflight_metadata_input(args, env=source_env)
         if args.command in {
             "profiler-game-objects",
             "profiler-voice-contributions",
@@ -4529,27 +4538,38 @@ def normalize_original_file_system_path(value: Any) -> tuple[str, ...]:
     return host_path_comparison_key(value)
 
 
-def preflight_metadata_input(args: argparse.Namespace) -> None:
+def preflight_metadata_input(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+) -> None:
     """Compile business metadata scope and meaning into fixed live reads."""
 
     path_segments = getattr(args, "metadata_path_segments", None)
-    type_name = getattr(args, "metadata_type_name", None)
+    semantic_kind = getattr(args, "metadata_semantic_kind", None)
+    custom_kind_meaning = getattr(args, "metadata_custom_kind_meaning", None)
     exact_id = getattr(args, "metadata_exact_id", None)
     meanings = list(getattr(args, "metadata_meanings", None) or ())
     if path_segments:
         args.object = _business_object_path_from_segments(path_segments)
-    if type_name is not None:
-        if (
-            not isinstance(type_name, str)
-            or not type_name.strip()
-            or type_name != type_name.strip()
-            or len(type_name) > MAX_METADATA_DISCOVERY_NAME_CHARS
-        ):
-            raise GatewayInputError(
-                "metadata --type-name must be non-empty, trimmed, and contain "
-                f"at most {MAX_METADATA_DISCOVERY_NAME_CHARS} characters"
-            )
-        args.object_type = type_name
+    if semantic_kind is not None:
+        (version,) = resolve_catalog_versions(args, env=env)
+        if semantic_kind in QUERY_FIXED_KIND_TYPES:
+            args.object_type = QUERY_FIXED_KIND_TYPES[semantic_kind]
+        else:
+            args.object_type = resolve_semantic_kind(
+                semantic_kind,
+                version=version,
+            ).metadata_object_type
+    if custom_kind_meaning is not None and (
+        not isinstance(custom_kind_meaning, str)
+        or not custom_kind_meaning
+        or custom_kind_meaning != custom_kind_meaning.strip()
+        or len(custom_kind_meaning) > MAX_METADATA_DISCOVERY_NAME_CHARS
+    ):
+        raise GatewayInputError(
+            "metadata --custom-kind must be one bounded, trimmed user-facing meaning"
+        )
     if exact_id is not None:
         if not _canonical_guid(exact_id):
             raise GatewayInputError("metadata --exact-id must be a canonical GUID")
@@ -4561,7 +4581,8 @@ def preflight_metadata_input(args: argparse.Namespace) -> None:
     if args.operation == "types":
         if (
             path_segments
-            or type_name is not None
+            or semantic_kind is not None
+            or custom_kind_meaning is not None
             or exact_id is not None
             or meanings
             or args.platform
@@ -4603,11 +4624,11 @@ def preflight_metadata_input(args: argparse.Namespace) -> None:
     if args.operation == "discover":
         if sum(
             value is not None
-            for value in (path_segments, type_name, exact_id)
+            for value in (path_segments, semantic_kind, custom_kind_meaning, exact_id)
         ) != 1:
             raise GatewayInputError(
-                "metadata discover requires exactly one --path-segment, "
-                "--type-name, or --exact-id scope"
+                "metadata discover requires exactly one --path-segment, --kind, "
+                "--custom-kind, or --exact-id scope"
             )
         if args.platform is not None or args.curve_role is not None:
             raise GatewayInputError(
@@ -4616,7 +4637,11 @@ def preflight_metadata_input(args: argparse.Namespace) -> None:
         return
 
     if args.operation == "property-state":
-        if (path_segments is None) == (exact_id is None) or type_name is not None:
+        if (
+            (path_segments is None) == (exact_id is None)
+            or semantic_kind is not None
+            or custom_kind_meaning is not None
+        ):
             raise GatewayInputError(
                 "metadata property-state requires one object --path-segment or "
                 "--exact-id scope"
@@ -4636,7 +4661,11 @@ def preflight_metadata_input(args: argparse.Namespace) -> None:
         return
 
     if args.operation == "attenuation":
-        if (path_segments is None) == (exact_id is None) or type_name is not None:
+        if (
+            (path_segments is None) == (exact_id is None)
+            or semantic_kind is not None
+            or custom_kind_meaning is not None
+        ):
             raise GatewayInputError(
                 "metadata attenuation requires one object --path-segment or "
                 "--exact-id scope"
@@ -9992,7 +10021,7 @@ def dispatch_command(
                 dispatcher=dispatcher,
                 common=common,
             )
-        custom_kind_clarification = _bind_query_custom_kind_from_live_types(
+        custom_kind_clarification = _bind_custom_kind_from_live_types(
             args,
             connection=connection,
             detected_version=detected_version,
@@ -10073,6 +10102,21 @@ def dispatch_command(
         }
     if args.command == "metadata":
         if args.operation in {"discover", "property-state"}:
+            custom_kind_clarification = _bind_custom_kind_from_live_types(
+                args,
+                connection=connection,
+                detected_version=detected_version,
+                dispatcher=dispatcher,
+            )
+            if custom_kind_clarification is not None:
+                return {
+                    "ok": True,
+                    "status": "needs_clarification",
+                    **common,
+                    "operation": args.operation,
+                    "metadata_authority": "live-waapi",
+                    "agent_result": custom_kind_clarification,
+                }
             read_call = transaction_read_call(
                 dispatcher,
                 connection=connection,
@@ -16375,7 +16419,7 @@ def _project_query_business_rows(
     return projected
 
 
-def _bind_query_custom_kind_from_live_types(
+def _bind_custom_kind_from_live_types(
     args: argparse.Namespace,
     *,
     connection: GatewayConnection,
@@ -16384,7 +16428,11 @@ def _bind_query_custom_kind_from_live_types(
 ) -> dict[str, Any] | None:
     """Resolve one user-facing custom kind against the live type inventory."""
 
-    meaning = getattr(args, "custom_kind_meaning", None)
+    meaning = getattr(args, "custom_kind_meaning", None) or getattr(
+        args,
+        "metadata_custom_kind_meaning",
+        None,
+    )
     if meaning is None:
         return None
     read = transaction_read_call(

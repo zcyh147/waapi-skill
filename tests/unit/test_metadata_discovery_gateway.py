@@ -229,7 +229,14 @@ def test_metadata_discover_exposes_business_scope_and_meaning_not_native_tokens(
         for option in action.option_strings
     }
 
-    assert {"--path-segment", "--type-name", "--exact-id", "--meaning"} <= options
+    assert {
+        "--path-segment",
+        "--kind",
+        "--custom-kind",
+        "--exact-id",
+        "--meaning",
+    } <= options
+    assert "--type-name" not in options
     assert not {
         "--object",
         "--class-id",
@@ -250,8 +257,8 @@ def test_metadata_discover_resolves_exact_type_from_business_meaning(
         [
             "metadata",
             "discover",
-            "--type-name",
-            "Sound",
+            "--kind",
+            "all-sounds",
             "--meaning",
             "Volume",
         ],
@@ -266,6 +273,29 @@ def test_metadata_discover_resolves_exact_type_from_business_meaning(
         GET_NAMES_URI,
         GET_PROPERTY_INFO_URI,
     ]
+
+
+def test_metadata_discover_custom_kind_is_live_bound_before_field_scope(
+    tmp_path: Path,
+) -> None:
+    client = FakeClient(_metadata_responses(tmp_path))
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "metadata",
+            "discover",
+            "--custom-kind",
+            "Sound",
+            "--meaning",
+            "Volume",
+        ],
+        env=_gateway_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+
+    assert exit_code == 0, payload
+    assert payload["agent_result"]["scope"]["requested"] == "Sound"
+    assert [call[0] for call in client.calls].count(GET_TYPES_URI) == 2
 
 
 @pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
@@ -443,29 +473,29 @@ def test_metadata_exact_id_rejects_noncanonical_identity_before_connecting(
     (
         (
             ["metadata", "discover", "--meaning", "Volume"],
-            "requires exactly one --path-segment, --type-name, or --exact-id scope",
+            "requires exactly one --path-segment, --kind, --custom-kind, or --exact-id scope",
         ),
         (
-            ["metadata", "discover", "--type-name", "Sound"],
+            ["metadata", "discover", "--kind", "all-sounds"],
             "requires 1..8 --meaning values",
         ),
         (
             [
                 "metadata",
                 "discover",
-                "--type-name",
+                "--custom-kind",
                 " ",
                 "--meaning",
                 "Volume",
             ],
-            "--type-name must be non-empty",
+            "--custom-kind must be one bounded",
         ),
         (
             [
                 "metadata",
                 "discover",
-                "--type-name",
-                "Sound",
+                "--kind",
+                "all-sounds",
                 "--meaning",
                 "Volume",
                 "--meaning",
@@ -477,8 +507,8 @@ def test_metadata_exact_id_rejects_noncanonical_identity_before_connecting(
             [
                 "metadata",
                 "discover",
-                "--type-name",
-                "Sound",
+                "--kind",
+                "all-sounds",
                 *sum(
                     (["--meaning", f"query-{index}"] for index in range(9)),
                     [],
@@ -490,8 +520,8 @@ def test_metadata_exact_id_rejects_noncanonical_identity_before_connecting(
             [
                 "metadata",
                 "types",
-                "--type-name",
-                "Sound",
+                "--kind",
+                "all-sounds",
             ],
             "metadata types accepts no business input",
         ),
@@ -529,8 +559,8 @@ def test_metadata_discover_has_a_bounded_thirty_second_default_deadline(
         [
             "metadata",
             "discover",
-            "--type-name",
-            "Sound",
+            "--kind",
+            "all-sounds",
             "--meaning",
             "Volume",
         ]
@@ -559,8 +589,8 @@ def test_metadata_discover_dispatches_only_closed_reads_for_all_versions(
         [
             "metadata",
             "discover",
-            "--type-name",
-            "Sound",
+            "--kind",
+            "all-sounds",
             "--meaning",
             "Volume",
         ],
@@ -715,8 +745,8 @@ def _compact_five_query_gateway_payload(
         [
             "metadata",
             "discover",
-            "--type-name",
-            "Sound",
+            "--kind",
+            "all-sounds",
             *query_argv,
         ],
         env=_gateway_env(tmp_path),
@@ -766,8 +796,8 @@ def test_metadata_discover_persists_and_reuses_exact_live_session_cache(
     argv = [
         "metadata",
         "discover",
-        "--type-name",
-        "Sound",
+        "--kind",
+        "all-sounds",
         "--meaning",
         "Volume",
     ]
@@ -941,8 +971,8 @@ def test_metadata_discover_falls_back_to_uncached_live_when_project_unavailable(
         [
             "metadata",
             "discover",
-            "--type-name",
-            "Sound",
+            "--kind",
+            "all-sounds",
             "--meaning",
             "Volume",
         ],
@@ -973,8 +1003,8 @@ def test_metadata_discover_never_invents_rejected_property_name(
         [
             "metadata",
             "discover",
-            "--type-name",
-            "Sound",
+            "--kind",
+            "all-sounds",
             "--meaning",
             "OverrideMaxSoundPerInstance",
         ],

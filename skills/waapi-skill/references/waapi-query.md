@@ -341,8 +341,9 @@ Use live `metadata types` only to reflect the running instance again; its
 projection and bound are fixed.
 
 `metadata discover` resolves user-facing meanings to authoritative live names.
-Choose exactly one scope: repeated `--path-segment`, exact metadata `--type-name`, or
-`--exact-id`; repeat `--meaning` for one to eight short English phrases. The
+Choose exactly one scope: repeated `--path-segment`, closed `--kind`,
+live-resolved `--custom-kind`, or `--exact-id`; repeat `--meaning` for one to
+eight short English phrases. The
 Gateway owns detail level, search bounds, projection, metadata tokens, and
 cache scope. `metadata property-state` takes one meaning plus `--platform` and
 first resolves exactly one property. `metadata attenuation` takes one semantic
