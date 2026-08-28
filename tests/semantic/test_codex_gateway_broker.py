@@ -1022,6 +1022,14 @@ def test_compact_generic_typed_fact_receipt_rejects_open_followups(
                 "waapi-skill.typed-array-item-choices/v1",
             },
         ),
+        (
+            "request-schema",
+            {
+                "waapi-skill.typed-request-schema/v1",
+                "waapi-skill.fixed-command-route/v1",
+                "waapi-skill.core-business-route/v1",
+            },
+        ),
         ("operation-schema", {"waapi-skill.gateway-result/v1"}),
     ),
 )

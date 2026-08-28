@@ -12,6 +12,7 @@ from wwise_waapi.metadata_discovery import (
 GATEWAY_RESULT_CONTRACT = "waapi-skill.gateway-result/v1"
 TYPED_REQUEST_SCHEMA_CONTRACT = "waapi-skill.typed-request-schema/v1"
 FIXED_COMMAND_ROUTE_CONTRACT = "waapi-skill.fixed-command-route/v1"
+CORE_BUSINESS_ROUTE_CONTRACT = "waapi-skill.core-business-route/v1"
 BUSINESS_QUERY_SCHEMA_CONTRACT = "waapi-skill.object-query-business-schema/v1"
 ADVANCED_QUERY_SCHEMA_CONTRACT = (
     "waapi-skill.advanced-object-query-business-schema/v1"
@@ -50,7 +51,11 @@ def gateway_payload_contracts(subcommand: str) -> frozenset[str]:
 
     if subcommand == "request-schema":
         return frozenset(
-            {TYPED_REQUEST_SCHEMA_CONTRACT, FIXED_COMMAND_ROUTE_CONTRACT}
+            {
+                TYPED_REQUEST_SCHEMA_CONTRACT,
+                FIXED_COMMAND_ROUTE_CONTRACT,
+                CORE_BUSINESS_ROUTE_CONTRACT,
+            }
         )
     if subcommand == "query-schema":
         return frozenset(
@@ -77,6 +82,7 @@ __all__ = [
     "GATEWAY_RESULT_CONTRACT",
     "ADVANCED_QUERY_SCHEMA_CONTRACT",
     "BUSINESS_QUERY_SCHEMA_CONTRACT",
+    "CORE_BUSINESS_ROUTE_CONTRACT",
     "FIXED_COMMAND_ROUTE_CONTRACT",
     "TASK_LOCAL_RUNNER_POSIX",
     "TASK_LOCAL_RUNNER_WINDOWS",
