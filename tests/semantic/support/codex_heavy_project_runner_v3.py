@@ -1023,7 +1023,7 @@ def run_heavy_project_unit(
             task=task,
             topic_payload=observer.topic_payload,
             topic_subscription_ack=observer.checks.get("topic_subscription_ack"),
-            expected_count=_unit_primary_dispatch_count(unit),
+            expected_count=_unit_audited_dispatch_count(unit),
         )
         if prepared.expected_dispatches:
             checks["workflow_dispatch"] = _audit_workflow_dispatch(
@@ -5693,6 +5693,17 @@ def _unit_primary_dispatch_count(unit: Any) -> int:
     if type(declared) is not int or declared < 0:
         raise _HeavyProjectInfrastructureError(
             "unit has no closed expected primary-dispatch count"
+        )
+    return declared
+
+
+def _unit_audited_dispatch_count(unit: Any) -> int:
+    declared = getattr(unit, "expected_audited_dispatch_count", None)
+    if declared is None:
+        return _unit_primary_dispatch_count(unit)
+    if type(declared) is not int or declared < 0:
+        raise _HeavyProjectInfrastructureError(
+            "unit has no closed expected audited-dispatch count"
         )
     return declared
 

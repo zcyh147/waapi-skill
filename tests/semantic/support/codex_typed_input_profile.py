@@ -90,6 +90,12 @@ class TypedInputUnit:
     def user_turn_count(self) -> int:
         return len(self.turns)
 
+    @property
+    def expected_audited_dispatch_count(self) -> int:
+        if self.unit_id == "TYP22-GENERIC-OBJECT-QUERY":
+            return 2
+        return self.scenario.primary_dispatch.count
+
 
 @dataclass(frozen=True, slots=True)
 class TypedInputProfile:
