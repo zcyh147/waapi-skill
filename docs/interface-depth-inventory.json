@@ -153241,7 +153241,7 @@
     "contract": "waapi-skill.typed-request-surface/v1",
     "total_lanes": 824
   },
-  "inventory_sha256": "94c1e8c5f0dda700e5f54a5aeb3fb6be8cd719e25d36e6d835814af5ae04ee4c",
+  "inventory_sha256": "764782bcc1f2f49600974dfa90e69fd607ec022ad2181d0f0c969b24e934e409",
   "mechanic_owners": {
     "ambiguous_continuation_selection": "gateway_derivation",
     "batch_layout": "gateway_derivation",
@@ -154591,7 +154591,7 @@
       "version": "2021.1"
     },
     {
-      "audit_evidence": "The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior. The object.get rows additionally inventory the preferred simple flags, the complete structured Builder contract, and the separately disclosed bounded advanced WAQL contract.",
+      "audit_evidence": "The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior.",
       "classification": "generic-fixed-command-audited-deep",
       "construction_shape": "zero",
       "continuation_commands": [
@@ -156406,7 +156406,7 @@
       "version": "2021.1"
     },
     {
-      "audit_evidence": "The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior. The object.get rows additionally inventory the preferred simple flags, the complete structured Builder contract, and the separately disclosed bounded advanced WAQL contract.",
+      "audit_evidence": "The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior.",
       "classification": "generic-fixed-command-audited-deep",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -159047,7 +159047,7 @@
       "version": "2022.1"
     },
     {
-      "audit_evidence": "The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior. The object.get rows additionally inventory the preferred simple flags, the complete structured Builder contract, and the separately disclosed bounded advanced WAQL contract.",
+      "audit_evidence": "The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior.",
       "classification": "generic-fixed-command-audited-deep",
       "construction_shape": "zero",
       "continuation_commands": [
@@ -159078,7 +159078,7 @@
       "version": "2022.1"
     },
     {
-      "audit_evidence": "The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior. The object.get rows additionally inventory the preferred simple flags, the complete structured Builder contract, and the separately disclosed bounded advanced WAQL contract.",
+      "audit_evidence": "The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior.",
       "classification": "generic-fixed-command-audited-deep",
       "construction_shape": "zero",
       "continuation_commands": [
@@ -161198,7 +161198,7 @@
       "version": "2022.1"
     },
     {
-      "audit_evidence": "The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior. The object.get rows additionally inventory the preferred simple flags, the complete structured Builder contract, and the separately disclosed bounded advanced WAQL contract.",
+      "audit_evidence": "The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior.",
       "classification": "generic-fixed-command-audited-deep",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -164405,7 +164405,7 @@
       "version": "2023.1"
     },
     {
-      "audit_evidence": "The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior. The object.get rows additionally inventory the preferred simple flags, the complete structured Builder contract, and the separately disclosed bounded advanced WAQL contract.",
+      "audit_evidence": "The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior.",
       "classification": "generic-fixed-command-audited-deep",
       "construction_shape": "zero",
       "continuation_commands": [
@@ -164436,7 +164436,7 @@
       "version": "2023.1"
     },
     {
-      "audit_evidence": "The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior. The object.get rows additionally inventory the preferred simple flags, the complete structured Builder contract, and the separately disclosed bounded advanced WAQL contract.",
+      "audit_evidence": "The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior.",
       "classification": "generic-fixed-command-audited-deep",
       "construction_shape": "zero",
       "continuation_commands": [
@@ -167431,7 +167431,7 @@
       "version": "2023.1"
     },
     {
-      "audit_evidence": "The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior. The object.get rows additionally inventory the preferred simple flags, the complete structured Builder contract, and the separately disclosed bounded advanced WAQL contract.",
+      "audit_evidence": "The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior.",
       "classification": "generic-fixed-command-audited-deep",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -170948,7 +170948,7 @@
       "version": "2024.1"
     },
     {
-      "audit_evidence": "The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior. The object.get rows additionally inventory the preferred simple flags, the complete structured Builder contract, and the separately disclosed bounded advanced WAQL contract.",
+      "audit_evidence": "The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior.",
       "classification": "generic-fixed-command-audited-deep",
       "construction_shape": "zero",
       "continuation_commands": [
@@ -170979,7 +170979,7 @@
       "version": "2024.1"
     },
     {
-      "audit_evidence": "The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior. The object.get rows additionally inventory the preferred simple flags, the complete structured Builder contract, and the separately disclosed bounded advanced WAQL contract.",
+      "audit_evidence": "The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior.",
       "classification": "generic-fixed-command-audited-deep",
       "construction_shape": "zero",
       "continuation_commands": [
@@ -177324,7 +177324,7 @@
       "version": "2025.1"
     },
     {
-      "audit_evidence": "The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior. The object.get rows additionally inventory the preferred simple flags, the complete structured Builder contract, and the separately disclosed bounded advanced WAQL contract.",
+      "audit_evidence": "The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior.",
       "classification": "generic-fixed-command-audited-deep",
       "construction_shape": "zero",
       "continuation_commands": [
@@ -177355,7 +177355,7 @@
       "version": "2025.1"
     },
     {
-      "audit_evidence": "The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior. The object.get rows additionally inventory the preferred simple flags, the complete structured Builder contract, and the separately disclosed bounded advanced WAQL contract.",
+      "audit_evidence": "The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior.",
       "classification": "generic-fixed-command-audited-deep",
       "construction_shape": "zero",
       "continuation_commands": [

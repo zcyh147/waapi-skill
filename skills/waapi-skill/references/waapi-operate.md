@@ -61,9 +61,9 @@ exact existing Event path whose requested target is its one direct Action, use
 The Gateway owns quoting, the two-row ambiguity ceiling, exact type validation,
 and the applicable parent or name checks.
 
-If the target can be described only by a complex filter, first follow the query
-lane's offline `query-schema` plus its returned typed structured-query flow. Proceed
-to a mutation only when that read returns exactly one verified GUID, then use
+If the target needs a complex filter, follow the closed business declaration
+from offline `query-schema`; use bounded advanced query only for an unexpressible
+server-side read semantic. Mutate only when that read returns one verified GUID, then use
 `{"kind":"id","value":"<returned GUID>"}`. Zero, multiple, truncated, or
 otherwise incomplete query results do not identify a mutation target.
 

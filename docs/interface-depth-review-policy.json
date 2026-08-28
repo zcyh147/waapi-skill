@@ -162,7 +162,7 @@
       "owner_issue": null,
       "match": {"routes": ["fixed_command"], "fixed_command_model_values": false},
       "leaked_mechanics": [],
-      "audit_evidence": "The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior. The object.get rows additionally inventory the preferred simple flags, the complete structured Builder contract, and the separately disclosed bounded advanced WAQL contract."
+      "audit_evidence": "The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior."
     },
     {
       "id": "generic-zero-input-audited-deep",

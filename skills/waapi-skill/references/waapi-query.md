@@ -215,10 +215,10 @@ simple exact-id readback.
 
 ### Advanced native WAQL fallback
 
-If the schema returned by ordinary `query-schema` lacks a required read-only
+If the business declaration returned by `query-schema` lacks a required read-only
 construct—such as `skip`, `orderby`, `distinct`, a regular-expression literal,
 a WAQL list function, or an advanced return expression—do not reject the user
-request and do not write Python. Disclose only the third-layer contract:
+request and do not write Python. Disclose only the bounded advanced fallback:
 
 ```bash
 python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version <supported-version> query-schema --advanced
@@ -384,9 +384,10 @@ Use fixed reads rather than reflected payloads:
 
 Each exposes its stable terminal `agent_result`; do not rebuild it.
 
-For a migrated reflected read, run `request-schema <uri>` with the configured version, then
-its sole continuation with the returned handles, digest, and typed values. On
-stale/schema errors, rerun discovery.
+For a remaining non-fixed reflected read not covered by the business routes
+above, run `request-schema <uri>` with the configured version, then its sole
+continuation with the returned handles, digest, and typed values. On stale/schema
+errors, rerun discovery.
 
 ## Exact-hop playback diagnosis
 

@@ -99,13 +99,9 @@ from wwise_waapi.platform_commands import (  # noqa: E402  # pyright: ignore[rep
 from wwise_waapi.builders.query import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     ADVANCED_QUERY_CONTRACT,
     MAX_QUERY_TAKE,
-    STRUCTURED_QUERY_CONTRACT,
-    SUPPORTED_SELECTS,
     advanced_query_schema,
     build_advanced_object_get_query,
     build_object_get_query,
-    build_structured_object_get_query,
-    structured_query_schema,
 )
 from wwise_waapi.builders.stable_reads import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     MAX_BUS_PIPELINE_IDS,
@@ -1887,8 +1883,7 @@ def build_parser() -> argparse.ArgumentParser:
     query_schema = subparsers.add_parser(
         "query-schema",
         help=(
-            "Describe the closed structured object-query contract offline; "
-            "use it only when the simple query-object flags are insufficient"
+            "Describe the closed business object-query declaration offline"
         ),
     )
     query_schema.add_argument("--all-versions", action="store_true")
@@ -1896,8 +1891,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--advanced",
         action="store_true",
         help=(
-            "Disclose the third-layer bounded native WAQL contract instead "
-            "of the preferred structured object-query contract"
+            "Disclose the bounded native WAQL fallback when the business "
+            "declaration cannot express a required server-side read semantic"
         ),
     )
 
@@ -3495,8 +3490,9 @@ def query_object_required_payload(*, common: Mapping[str, Any] | None = None) ->
         "error_code": "QUERY_OBJECT_REQUIRED",
         "message": (
             "The public generic call path does not accept ak.wwise.core.object.get. "
-            "Use query-object so simple flags, the structured Builder, or the "
-            "bounded advanced WAQL contract retain Gateway-owned result limits."
+            "Use query-object with the closed business declaration, or the bounded "
+            "advanced WAQL contract only when that declaration cannot express the "
+            "required server-side read semantic; both retain Gateway-owned result limits."
         ),
         "required_command": "query-object",
         "executed": False,
@@ -15849,59 +15845,6 @@ def _single_exact_lookup(args: Mapping[str, Any] | None) -> bool:
     if "id" in source:
         return _canonical_guid(value)
     return _canonical_wwise_path(value)
-
-
-def _require_typed_advanced_query_option_exclusivity(
-    args: argparse.Namespace,
-) -> None:
-    """Keep the short typed advanced continuation authoritative."""
-
-    conflicting: list[str] = []
-    if args.where:
-        conflicting.append("--where")
-    if args.match_original_file_paths:
-        conflicting.append("--match-original-file-path")
-    if args.select:
-        conflicting.append("--select")
-    if args.take is not None:
-        conflicting.append("--take")
-    if args.all_results:
-        conflicting.append("--all-results")
-    if getattr(args, "return_fields", None):
-        conflicting.append("--return-field")
-    if args.typed_structured:
-        conflicting.append("--typed-structured")
-    if conflicting:
-        raise GatewayInputError(
-            "query-object --typed-advanced owns the WAQL scalar, return expressions, "
-            "and result bound; it cannot be combined with "
-            + ", ".join(conflicting)
-            + "."
-        )
-
-
-def _require_typed_structured_query_option_exclusivity(
-    args: argparse.Namespace,
-) -> None:
-    """Keep typed structured facts authoritative for the complete read."""
-
-    conflicting: list[str] = []
-    for enabled, label in (
-        (bool(args.where), "--where"),
-        (bool(args.match_original_file_paths), "--match-original-file-path"),
-        (bool(args.select), "--select"),
-        (args.take is not None, "--take"),
-        (bool(args.all_results), "--all-results"),
-        (bool(getattr(args, "return_fields", None)), "--return-field"),
-        (bool(args.typed_advanced), "--typed-advanced"),
-    ):
-        if enabled:
-            conflicting.append(label)
-    if conflicting:
-        raise GatewayInputError(
-            "query-object --typed-structured owns the complete structured read; "
-            "it cannot be combined with " + ", ".join(conflicting) + "."
-        )
 
 
 def _advanced_query_bound(preview: SemanticPreview) -> dict[str, Any]:

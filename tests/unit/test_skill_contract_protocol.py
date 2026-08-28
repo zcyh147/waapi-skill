@@ -366,7 +366,7 @@ def test_broad_query_subset_mutations_require_exact_id_readback() -> None:
     assert "`id`, `name`, `type`, and `path`" in section_flat
     assert "Never reread unselected rows" in section_flat
     assert "relationship read hops are exempt" in section_flat
-    assert "mutation subset selected from multiple ordinary/structured results" in SKILL
+    assert "mutation subset selected from multiple business-declaration or advanced results" in SKILL
     assert "relationship-GUID read hops are exempt" in SKILL
 
 

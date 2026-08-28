@@ -2492,6 +2492,15 @@ def test_query_object_detail_restores_compiler_and_dispatch_evidence(tmp_path: P
     assert payload["call"]["ok"] is True
 
 
+def test_query_object_required_discloses_only_the_two_public_query_layers() -> None:
+    payload = waapi_gateway.query_object_required_payload()
+
+    assert "closed business declaration" in payload["message"]
+    assert "bounded advanced WAQL contract" in payload["message"]
+    assert "structured Builder" not in payload["message"]
+    assert "simple flags" not in payload["message"]
+
+
 def test_query_object_success_projection_preserves_terminal_agent_result_exactly() -> None:
     agent_result = {"contract": "example/v1", "objects": [{"id": "{one}"}]}
     full = {

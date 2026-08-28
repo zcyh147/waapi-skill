@@ -123,10 +123,11 @@ it supported without proving the reflected and executable surfaces:
    scope.
 2. Add the versioned manifest inventory and required deferred, metadata,
    semantic, and WAQL resources, with immutable counts and digests derived from
-   the new reflection. Review the versioned structured-query schema and extend
-   the closed query Builder, compiler goldens, and negative grammar matrix when
-   the new version changes any supported source, transform, predicate,
-   accessor, literal, or result-bound rule.
+   the new reflection. Review the versioned business-query schema and extend
+   the Gateway-owned declaration compiler, advanced-contract goldens, and
+   fail-closed negative matrix when the new version changes any supported
+   source, relationship, business predicate, output, native expression, or
+   result-bound rule.
 3. Classify every new or changed route in its execution lane and update the
    capability, execution-contract, operation registry, adapter registry,
    request-mapping registry, and native-surface policy entries that actually
