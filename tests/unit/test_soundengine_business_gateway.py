@@ -27,7 +27,7 @@ sys.modules[SPEC.name] = gateway
 SPEC.loader.exec_module(gateway)
 
 
-def _env(tmp_path: Path) -> dict[str, str]:
+def _env(tmp_path: Path, version: str = "2022.1") -> dict[str, str]:
     config = tmp_path / "config.json"
     config.write_text(
         json.dumps(
@@ -42,20 +42,28 @@ def _env(tmp_path: Path) -> dict[str, str]:
     )
     return {
         "WAAPI_SKILL_CONFIG_PATH": str(config),
-        "WWISE_VERSION": "2022.1",
+        "WWISE_VERSION": version,
         "WWISE_WAAPI_PORT": "31337",
     }
 
 
 class _SoundEngineDraftClient:
     event_id = "{11111111-1111-1111-1111-111111111111}"
+    state_group_id = "{22222222-2222-2222-2222-222222222222}"
+    state_id = "{33333333-3333-3333-3333-333333333333}"
+    switch_group_id = "{44444444-4444-4444-4444-444444444444}"
+    switch_id = "{55555555-5555-5555-5555-555555555555}"
+    trigger_id = "{66666666-6666-6666-6666-666666666666}"
+    game_parameter_id = "{77777777-7777-7777-7777-777777777777}"
+    sound_bank_id = "{88888888-8888-8888-8888-888888888888}"
 
-    def __init__(self, tmp_path: Path) -> None:
+    def __init__(self, tmp_path: Path, version: str = "2022.1") -> None:
         project_root = tmp_path / "SampleProject"
         project_root.mkdir()
         self.project_file = project_root / "SampleProject.wproj"
         self.project_file.write_text("fixture", encoding="utf-8")
         self.event_name = "Play_Weather"
+        self.version = version
         self.soundengine_calls: list[str] = []
 
     def call(self, uri: str, args: object = None, options: object = None) -> object:
@@ -67,11 +75,11 @@ class _SoundEngineDraftClient:
                 "platform": "macosx",
                 "configuration": "release",
                 "version": {
-                    "year": 2022,
+                    "year": int(self.version.split(".", 1)[0]),
                     "major": 1,
                     "minor": 0,
                     "build": 1,
-                    "displayName": "v2022.1.0.1",
+                    "displayName": f"v{self.version}.0.1",
                 },
             }
         if uri == "ak.wwise.core.getProjectInfo":
@@ -82,22 +90,71 @@ class _SoundEngineDraftClient:
             }
         if uri == "ak.wwise.core.object.get" and isinstance(args, dict):
             requested = args.get("from", {}).get("id", [])
-            if requested == [self.event_id]:
-                return {
-                    "return": [
-                        {
-                            "id": self.event_id,
-                            "name": self.event_name,
-                            "type": "Event",
-                            "path": r"\Events\Default Work Unit\Play_Weather",
-                        }
-                    ]
-                }
+            rows = {
+                self.event_id: {
+                    "id": self.event_id,
+                    "name": self.event_name,
+                    "type": "Event",
+                    "path": r"\Events\Default Work Unit\Play_Weather",
+                },
+                self.state_group_id: {
+                    "id": self.state_group_id,
+                    "name": "Weather",
+                    "type": "StateGroup",
+                    "path": r"\States\Default Work Unit\Weather",
+                },
+                self.state_id: {
+                    "id": self.state_id,
+                    "name": "Storm",
+                    "type": "State",
+                    "path": r"\States\Default Work Unit\Weather\Storm",
+                },
+                self.switch_group_id: {
+                    "id": self.switch_group_id,
+                    "name": "Surface",
+                    "type": "SwitchGroup",
+                    "path": r"\Switches\Default Work Unit\Surface",
+                },
+                self.switch_id: {
+                    "id": self.switch_id,
+                    "name": "Metal",
+                    "type": "Switch",
+                    "path": r"\Switches\Default Work Unit\Surface\Metal",
+                },
+                self.trigger_id: {
+                    "id": self.trigger_id,
+                    "name": "Thunder",
+                    "type": "Trigger",
+                    "path": r"\Triggers\Default Work Unit\Thunder",
+                },
+                self.game_parameter_id: {
+                    "id": self.game_parameter_id,
+                    "name": "Wind_Intensity",
+                    "type": "GameParameter",
+                    "path": r"\Game Parameters\Default Work Unit\Wind_Intensity",
+                },
+                self.sound_bank_id: {
+                    "id": self.sound_bank_id,
+                    "name": "Combat_Main",
+                    "type": "SoundBank",
+                    "path": r"\SoundBanks\Default Work Unit\Combat_Main",
+                },
+            }
+            if requested and all(object_id in rows for object_id in requested):
+                return {"return": [rows[object_id] for object_id in requested]}
             raise AssertionError(f"unexpected object ids {requested!r}")
         if uri in {
             "ak.soundengine.registerGameObj",
             "ak.soundengine.unregisterGameObj",
             "ak.soundengine.executeActionOnEvent",
+            "ak.soundengine.seekOnEvent",
+            "ak.soundengine.setState",
+            "ak.soundengine.setSwitch",
+            "ak.soundengine.postTrigger",
+            "ak.soundengine.setRTPCValue",
+            "ak.soundengine.resetRTPCValue",
+            "ak.soundengine.loadBank",
+            "ak.soundengine.unloadBank",
             "ak.soundengine.stopAll",
         }:
             self.soundengine_calls.append(uri)
@@ -360,11 +417,12 @@ def _preview_soundengine_plan(
     operation: str,
     declaration: list[str],
     role_bindings: tuple[tuple[str, str], ...] = (),
+    version: str = "2022.1",
 ) -> tuple[dict[str, object], dict[str, object]]:
     code, started = gateway.execute_gateway(
         [
             "--version",
-            "2022.1",
+            version,
             "--state-dir",
             str(state_dir),
             "draft-start",
@@ -382,7 +440,7 @@ def _preview_soundengine_plan(
         code, bound = gateway.execute_gateway(
             [
                 "--version",
-                "2022.1",
+                version,
                 "--state-dir",
                 str(state_dir),
                 "draft-bind-object",
@@ -411,7 +469,7 @@ def _preview_soundengine_plan(
     code, declared = gateway.execute_gateway(
         [
             "--version",
-            "2022.1",
+            version,
             "--state-dir",
             str(state_dir),
             "draft-declare-soundengine-plan",
@@ -429,7 +487,7 @@ def _preview_soundengine_plan(
     code, checked = gateway.execute_gateway(
         [
             "--version",
-            "2022.1",
+            version,
             "--state-dir",
             str(state_dir),
             "draft-check",
@@ -446,7 +504,7 @@ def _preview_soundengine_plan(
     code, previewed = gateway.execute_gateway(
         [
             "--version",
-            "2022.1",
+            version,
             "--state-dir",
             str(state_dir),
             "preview-from-draft",
@@ -472,13 +530,14 @@ def _execute_and_verify_soundengine(
     env: dict[str, str],
     client: _SoundEngineDraftClient,
     previewed: dict[str, object],
+    version: str = "2022.1",
 ) -> dict[str, object]:
     transaction_id = str(previewed["transaction_id"])
     snapshot = TransactionStore(state_dir).load_snapshot(transaction_id)
     code, confirmed = gateway.execute_gateway(
         [
             "--version",
-            "2022.1",
+            version,
             "--state-dir",
             str(state_dir),
             "confirm",
@@ -493,7 +552,7 @@ def _execute_and_verify_soundengine(
     code, executed = gateway.execute_gateway(
         [
             "--version",
-            "2022.1",
+            version,
             "--state-dir",
             str(state_dir),
             "execute",
@@ -506,7 +565,7 @@ def _execute_and_verify_soundengine(
     code, verified = gateway.execute_gateway(
         [
             "--version",
-            "2022.1",
+            version,
             "--state-dir",
             str(state_dir),
             "verify",
@@ -951,6 +1010,299 @@ def test_event_action_and_stop_all_hide_native_enums_and_wildcards(
         client=client,
         previewed=stop_all_preview,
     )
+
+
+def test_seek_event_compiles_business_position_and_opaque_playing_target(
+    tmp_path: Path,
+) -> None:
+    env = _env(tmp_path)
+    state_dir = tmp_path / "state"
+    client = _SoundEngineDraftClient(tmp_path)
+    register_preview, _ = _preview_soundengine_plan(
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        env=env,
+        client=client,
+        operation="ak.soundengine.registerGameObj",
+        declaration=["--game-object-name", "Weather Listener"],
+    )
+    registered = _execute_and_verify_soundengine(
+        state_dir=state_dir,
+        env=env,
+        client=client,
+        previewed=register_preview,
+    )
+    post_preview, _ = _preview_soundengine_plan(
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        env=env,
+        client=client,
+        operation="ak.soundengine.postEvent",
+        declaration=[
+            "--event-handle",
+            "<bound:event>",
+            "--game-object-handle",
+            registered["agent_result"]["business_result"]["game_object_handle"],
+        ],
+        role_bindings=(("event", client.event_id),),
+    )
+    posted = _execute_and_verify_soundengine(
+        state_dir=state_dir,
+        env=env,
+        client=client,
+        previewed=post_preview,
+    )
+    playing_handle = posted["agent_result"]["business_result"]["playing_handle"]
+
+    seek_preview, seek_artifact = _preview_soundengine_plan(
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        env=env,
+        client=client,
+        operation="ak.soundengine.seekOnEvent",
+        declaration=[
+            "--event-handle",
+            "<bound:event>",
+            "--playing-handle",
+            playing_handle,
+            "--position-percent",
+            "25",
+            "--nearest-marker",
+        ],
+        role_bindings=(("event", client.event_id),),
+    )
+    assert seek_artifact["request"]["arguments"] == {
+        "api": "ak.soundengine.seekOnEvent",
+        "args": {
+            "event": client.event_id,
+            "gameObject": 0xFFFFFFFFFFFFFFFF,
+            "percent": 0.25,
+            "seekToNearestMarker": True,
+            "playingId": 1234,
+        },
+        "options": {},
+    }
+    _execute_and_verify_soundengine(
+        state_dir=state_dir,
+        env=env,
+        client=client,
+        previewed=seek_preview,
+    )
+
+
+def test_state_switch_and_trigger_compile_only_from_bound_business_roles(
+    tmp_path: Path,
+) -> None:
+    env = _env(tmp_path)
+    state_dir = tmp_path / "state"
+    client = _SoundEngineDraftClient(tmp_path)
+    register_preview, register_artifact = _preview_soundengine_plan(
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        env=env,
+        client=client,
+        operation="ak.soundengine.registerGameObj",
+        declaration=["--game-object-name", "Weather Listener"],
+    )
+    registered = _execute_and_verify_soundengine(
+        state_dir=state_dir,
+        env=env,
+        client=client,
+        previewed=register_preview,
+    )
+    game_object_handle = registered["agent_result"]["business_result"][
+        "game_object_handle"
+    ]
+    game_object_id = register_artifact["request"]["arguments"]["args"][
+        "gameObject"
+    ]
+
+    cases = (
+        (
+            "ak.soundengine.setState",
+            [
+                "--state-group-handle",
+                "<bound:state_group>",
+                "--state-handle",
+                "<bound:state>",
+            ],
+            (
+                ("state_group", client.state_group_id),
+                ("state", client.state_id),
+            ),
+            {
+                "stateGroup": client.state_group_id,
+                "state": client.state_id,
+            },
+        ),
+        (
+            "ak.soundengine.setSwitch",
+            [
+                "--switch-group-handle",
+                "<bound:switch_group>",
+                "--switch-handle",
+                "<bound:switch>",
+                "--game-object-handle",
+                game_object_handle,
+            ],
+            (
+                ("switch_group", client.switch_group_id),
+                ("switch", client.switch_id),
+            ),
+            {
+                "switchGroup": client.switch_group_id,
+                "switchState": client.switch_id,
+                "gameObject": game_object_id,
+            },
+        ),
+        (
+            "ak.soundengine.postTrigger",
+            [
+                "--trigger-handle",
+                "<bound:trigger>",
+                "--game-object-handle",
+                game_object_handle,
+            ],
+            (("trigger", client.trigger_id),),
+            {
+                "trigger": client.trigger_id,
+                "gameObject": game_object_id,
+            },
+        ),
+    )
+    for operation, declaration, bindings, expected_args in cases:
+        previewed, artifact = _preview_soundengine_plan(
+            tmp_path=tmp_path,
+            state_dir=state_dir,
+            env=env,
+            client=client,
+            operation=operation,
+            declaration=declaration,
+            role_bindings=bindings,
+        )
+        assert artifact["request"]["arguments"] == {
+            "api": operation,
+            "args": expected_args,
+            "options": {},
+        }
+        _execute_and_verify_soundengine(
+            state_dir=state_dir,
+            env=env,
+            client=client,
+            previewed=previewed,
+        )
+
+
+def test_game_parameter_set_and_reset_hide_rtpc_wire_naming(
+    tmp_path: Path,
+) -> None:
+    env = _env(tmp_path)
+    state_dir = tmp_path / "state"
+    client = _SoundEngineDraftClient(tmp_path)
+    register_preview, register_artifact = _preview_soundengine_plan(
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        env=env,
+        client=client,
+        operation="ak.soundengine.registerGameObj",
+        declaration=["--game-object-name", "Weather Listener"],
+    )
+    registered = _execute_and_verify_soundengine(
+        state_dir=state_dir,
+        env=env,
+        client=client,
+        previewed=register_preview,
+    )
+    game_object_handle = registered["agent_result"]["business_result"][
+        "game_object_handle"
+    ]
+    game_object_id = register_artifact["request"]["arguments"]["args"][
+        "gameObject"
+    ]
+    cases = (
+        (
+            "ak.soundengine.setRTPCValue",
+            [
+                "--game-parameter-handle",
+                "<bound:game_parameter>",
+                "--value",
+                "37.5",
+                "--game-object-handle",
+                game_object_handle,
+            ],
+            {
+                "rtpc": client.game_parameter_id,
+                "value": 37.5,
+                "gameObject": game_object_id,
+            },
+        ),
+        (
+            "ak.soundengine.resetRTPCValue",
+            [
+                "--game-parameter-handle",
+                "<bound:game_parameter>",
+                "--game-object-handle",
+                game_object_handle,
+            ],
+            {
+                "rtpc": client.game_parameter_id,
+                "gameObject": game_object_id,
+            },
+        ),
+    )
+    for operation, declaration, expected_args in cases:
+        previewed, artifact = _preview_soundengine_plan(
+            tmp_path=tmp_path,
+            state_dir=state_dir,
+            env=env,
+            client=client,
+            operation=operation,
+            declaration=declaration,
+            role_bindings=(("game_parameter", client.game_parameter_id),),
+        )
+        assert artifact["request"]["arguments"] == {
+            "api": operation,
+            "args": expected_args,
+            "options": {},
+        }
+        _execute_and_verify_soundengine(
+            state_dir=state_dir,
+            env=env,
+            client=client,
+            previewed=previewed,
+        )
+
+
+def test_bank_runtime_lifecycle_uses_bound_soundbank_not_native_identifier(
+    tmp_path: Path,
+) -> None:
+    version = "2023.1"
+    env = _env(tmp_path, version)
+    state_dir = tmp_path / "state"
+    client = _SoundEngineDraftClient(tmp_path, version)
+    for operation in ("ak.soundengine.loadBank", "ak.soundengine.unloadBank"):
+        previewed, artifact = _preview_soundengine_plan(
+            tmp_path=tmp_path,
+            state_dir=state_dir,
+            env=env,
+            client=client,
+            operation=operation,
+            declaration=["--sound-bank-handle", "<bound:sound_bank>"],
+            role_bindings=(("sound_bank", client.sound_bank_id),),
+            version=version,
+        )
+        assert artifact["request"]["arguments"] == {
+            "api": operation,
+            "args": {"soundBank": client.sound_bank_id},
+            "options": {},
+        }
+        _execute_and_verify_soundengine(
+            state_dir=state_dir,
+            env=env,
+            client=client,
+            previewed=previewed,
+            version=version,
+        )
 
 
 def test_post_event_stops_before_dispatch_when_bound_event_drifts(

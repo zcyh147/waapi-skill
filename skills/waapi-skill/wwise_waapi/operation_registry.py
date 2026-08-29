@@ -8269,22 +8269,75 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
             call_args,
             execution_contract,
         )
-        if api == "ak.soundengine.postEvent":
-            event = _resolve_identity(
-                {"kind": "id", "value": call_args.get("event")},
-                role="event",
+        soundengine_role_specs = {
+            "ak.soundengine.postEvent": (("event", "event", "Event"),),
+            "ak.soundengine.executeActionOnEvent": (
+                ("event", "event", "Event"),
+            ),
+            "ak.soundengine.seekOnEvent": (("event", "event", "Event"),),
+            "ak.soundengine.setState": (
+                ("stateGroup", "state_group", "StateGroup"),
+                ("state", "state", "State"),
+            ),
+            "ak.soundengine.setSwitch": (
+                ("switchGroup", "switch_group", "SwitchGroup"),
+                ("switchState", "switch", "Switch"),
+            ),
+            "ak.soundengine.postTrigger": (
+                ("trigger", "trigger", "Trigger"),
+            ),
+            "ak.soundengine.setRTPCValue": (
+                ("rtpc", "game_parameter", "GameParameter"),
+            ),
+            "ak.soundengine.resetRTPCValue": (
+                ("rtpc", "game_parameter", "GameParameter"),
+            ),
+            "ak.soundengine.loadBank": (
+                ("soundBank", "sound_bank", "SoundBank"),
+            ),
+            "ak.soundengine.unloadBank": (
+                ("soundBank", "sound_bank", "SoundBank"),
+            ),
+        }
+        for argument_name, role_name, expected_type in soundengine_role_specs.get(
+            api, ()
+        ):
+            resolved = _resolve_identity(
+                {"kind": "id", "value": call_args.get(argument_name)},
+                role=role_name,
                 read=read,
             )
-            if event.row.get("type") != "Event":
+            if resolved.row.get("type") != expected_type:
                 raise OperationContractError(
                     "INVALID_IDENTITY",
-                    "SoundEngine postEvent target must remain an Event.",
+                    f"SoundEngine {role_name} target must remain {expected_type}.",
                     details={
-                        "id": event.object,
-                        "actual_type": event.row.get("type"),
+                        "id": resolved.object,
+                        "actual_type": resolved.row.get("type"),
                     },
                 )
-            roles["event"] = event
+            roles[role_name] = resolved
+        for group_role, value_role in (
+            ("state_group", "state"),
+            ("switch_group", "switch"),
+        ):
+            if group_role not in roles or value_role not in roles:
+                continue
+            group_path = roles[group_role].row.get("path")
+            value_path = roles[value_role].row.get("path")
+            if (
+                not isinstance(group_path, str)
+                or not isinstance(value_path, str)
+                or value_path.rsplit("\\", 1)[0] != group_path
+            ):
+                raise OperationContractError(
+                    "INVALID_IDENTITY",
+                    f"SoundEngine {value_role} must remain a direct child of {group_role}.",
+                    details={
+                        "group_id": roles[group_role].object,
+                        "value_id": roles[value_role].object,
+                    },
+                )
         metadata["execution_contract"] = execution_contract
     elif request.operation in {
         "lua.executeCliFile",

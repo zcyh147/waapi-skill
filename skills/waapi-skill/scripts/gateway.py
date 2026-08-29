@@ -317,10 +317,18 @@ from wwise_waapi.runtime_transport_handles import (  # noqa: E402  # pyright: ig
 )
 from wwise_waapi.soundengine_business_contracts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     EXECUTE_ACTION_ON_EVENT_URI,
+    LOAD_BANK_URI,
     POST_EVENT_URI,
+    POST_TRIGGER_URI,
     REGISTER_GAME_OBJECT_URI,
+    RESET_GAME_PARAMETER_URI,
+    SEEK_ON_EVENT_URI,
+    SET_STATE_URI,
+    SET_SWITCH_URI,
+    SET_GAME_PARAMETER_URI,
     STOP_ALL_URI,
     STOP_PLAYING_ID_URI,
+    UNLOAD_BANK_URI,
     UNREGISTER_GAME_OBJECT_URI,
     soundengine_control_business_contract_data,
     soundengine_control_business_operations,
@@ -2564,6 +2572,21 @@ def build_parser() -> argparse.ArgumentParser:
     draft_declare_soundengine_plan.add_argument("--playing-handle")
     draft_declare_soundengine_plan.add_argument("--fade-duration-ms", type=int)
     draft_declare_soundengine_plan.add_argument("--fade-curve")
+    draft_declare_soundengine_plan.add_argument("--position-ms", type=int)
+    draft_declare_soundengine_plan.add_argument("--position-percent", type=float)
+    draft_declare_soundengine_plan.add_argument(
+        "--nearest-marker",
+        action="store_true",
+        default=None,
+    )
+    draft_declare_soundengine_plan.add_argument("--state-group-handle")
+    draft_declare_soundengine_plan.add_argument("--state-handle")
+    draft_declare_soundengine_plan.add_argument("--switch-group-handle")
+    draft_declare_soundengine_plan.add_argument("--switch-handle")
+    draft_declare_soundengine_plan.add_argument("--trigger-handle")
+    draft_declare_soundengine_plan.add_argument("--game-parameter-handle")
+    draft_declare_soundengine_plan.add_argument("--value", type=float)
+    draft_declare_soundengine_plan.add_argument("--sound-bank-handle")
     draft_declare_source_control_plan = subparsers.add_parser(
         "draft-declare-source-control-plan",
         help=(
@@ -11227,6 +11250,17 @@ def dispatch_business_soundengine_plan(
         "playing_handle": args.playing_handle,
         "fade_duration_ms": args.fade_duration_ms,
         "fade_curve": args.fade_curve,
+        "position_ms": args.position_ms,
+        "position_percent": args.position_percent,
+        "nearest_marker": args.nearest_marker,
+        "state_group_handle": args.state_group_handle,
+        "state_handle": args.state_handle,
+        "switch_group_handle": args.switch_group_handle,
+        "switch_handle": args.switch_handle,
+        "trigger_handle": args.trigger_handle,
+        "game_parameter_handle": args.game_parameter_handle,
+        "value": args.value,
+        "sound_bank_handle": args.sound_bank_handle,
     }
     plan = {
         name: value
@@ -17155,6 +17189,11 @@ def dispatch_transaction_command(
                 UNREGISTER_GAME_OBJECT_URI,
                 POST_EVENT_URI,
                 EXECUTE_ACTION_ON_EVENT_URI,
+                SEEK_ON_EVENT_URI,
+                SET_SWITCH_URI,
+                POST_TRIGGER_URI,
+                SET_GAME_PARAMETER_URI,
+                RESET_GAME_PARAMETER_URI,
                 STOP_ALL_URI,
             }
             else None
@@ -17212,10 +17251,14 @@ def dispatch_transaction_command(
         playing_binding_validation = None
         playing_id = (
             call_args.get("playingId")
-            if call_uri == STOP_PLAYING_ID_URI
+            if call_uri in {STOP_PLAYING_ID_URI, SEEK_ON_EVENT_URI}
             else None
         )
-        if isinstance(playing_id, int) and not isinstance(playing_id, bool):
+        if (
+            isinstance(playing_id, int)
+            and not isinstance(playing_id, bool)
+            and 1 <= playing_id <= 0xFFFFFFFF
+        ):
             try:
                 if project is None:
                     raise RuntimePlayingHandleError(
@@ -21086,6 +21129,56 @@ def _business_next_action_binding(
                 ],
                 "ak.soundengine.stopAll": [
                     "[--game-object-handle <gateway-runtime-game-object-handle>]",
+                ],
+                "ak.soundengine.seekOnEvent": [
+                    "--event-handle <bound-event-handle>",
+                    "<exactly-one-of --position-ms <whole-ms> | --position-percent <0..100>>",
+                    "[--playing-handle <gateway-runtime-playing-handle> | --game-object-handle <gateway-runtime-game-object-handle>]",
+                    "[--nearest-marker]",
+                ],
+                "ak.soundengine.setState": [
+                    "--state-group-handle <bound-state-group-handle>",
+                    "--state-handle <bound-direct-child-state-handle>",
+                ],
+                "ak.soundengine.setSwitch": [
+                    "--switch-group-handle <bound-switch-group-handle>",
+                    "--switch-handle <bound-direct-child-switch-handle>",
+                    *(
+                        ["--game-object-handle <gateway-runtime-game-object-handle>"]
+                        if record.version in {"2021.1", "2022.1"}
+                        else ["[--game-object-handle <gateway-runtime-game-object-handle>]"]
+                    ),
+                ],
+                "ak.soundengine.postTrigger": [
+                    "--trigger-handle <bound-trigger-handle>",
+                    *(
+                        ["--game-object-handle <gateway-runtime-game-object-handle>"]
+                        if record.version in {"2021.1", "2022.1"}
+                        else ["[--game-object-handle <gateway-runtime-game-object-handle>]"]
+                    ),
+                ],
+                "ak.soundengine.setRTPCValue": [
+                    "--game-parameter-handle <bound-game-parameter-handle>",
+                    "--value <finite-business-value>",
+                    *(
+                        ["--game-object-handle <gateway-runtime-game-object-handle>"]
+                        if record.version in {"2021.1", "2022.1"}
+                        else ["[--game-object-handle <gateway-runtime-game-object-handle>]"]
+                    ),
+                ],
+                "ak.soundengine.resetRTPCValue": [
+                    "--game-parameter-handle <bound-game-parameter-handle>",
+                    *(
+                        ["--game-object-handle <gateway-runtime-game-object-handle>"]
+                        if record.version in {"2021.1", "2022.1"}
+                        else ["[--game-object-handle <gateway-runtime-game-object-handle>]"]
+                    ),
+                ],
+                "ak.soundengine.loadBank": [
+                    "--sound-bank-handle <bound-sound-bank-handle>",
+                ],
+                "ak.soundengine.unloadBank": [
+                    "--sound-bank-handle <bound-sound-bank-handle>",
                 ],
             }[record.operation],
             "submit_once": True,
