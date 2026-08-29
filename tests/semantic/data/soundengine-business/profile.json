@@ -12,7 +12,7 @@
       "unit_id": "SOUND22-MONITOR-PREVIEW",
       "operation": "ak.soundengine.postMsgMonitor",
       "version": "2022.1",
-      "prompt": "请向当前 Wwise 的监控日志写入“Fresh Agent SoundEngine business probe”。只生成预览，不要执行。",
+      "prompt": "请向当前 Wwise 的 SoundEngine 运行时 Profiler Capture Log 写入“Fresh Agent SoundEngine business probe”。只生成预览，不要执行。",
       "final_markers": ["Fresh Agent SoundEngine business probe", "监控", "预览"]
     },
     {

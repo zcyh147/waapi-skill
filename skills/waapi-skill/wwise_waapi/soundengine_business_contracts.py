@@ -707,6 +707,7 @@ def soundengine_control_business_catalog_rows() -> tuple[dict[str, Any], ...]:
     intents = {
         GET_STATE_URI: "read the current runtime State for one exact State Group",
         GET_SWITCH_URI: "read the current runtime Switch for one exact Switch Group and optional game object",
+        POST_MONITOR_MESSAGE_URI: "post one exact message to the runtime Profiler Capture Log",
         REGISTER_GAME_OBJECT_URI: "register one named runtime game object and return an opaque handle",
         UNREGISTER_GAME_OBJECT_URI: "unregister one Gateway-managed runtime game object",
         POST_EVENT_URI: "post one bound Event and return an opaque playing handle",

@@ -62,6 +62,8 @@ def test_soundengine_profile_is_four_closed_terra_previews() -> None:
         unit.user_turn_count == unit.transaction_count == 1
         for unit in profile.units
     )
+    assert "SoundEngine 运行时 Profiler Capture Log" in profile.units[0].prompt_template
+    assert "Authoring Log" not in profile.units[0].prompt_template
 
 
 def test_soundengine_profile_rejects_unknown_filters() -> None:

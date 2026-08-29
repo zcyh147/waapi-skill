@@ -86,10 +86,14 @@ def test_operations_catalog_lists_all_soundengine_business_routes(
         client_factory=lambda url: pytest.fail(f"offline operations connected to {url}"),
     )
     assert code == 0, payload
-    rows = {
+    all_rows = {
         row["api"]: row
         for row in payload["request_schema_routes"]
-        if row["api"].startswith("ak.soundengine.")
+    }
+    rows = {
+        api: row
+        for api, row in all_rows.items()
+        if api.startswith("ak.soundengine.")
     }
     assert set(rows) == soundengine_control_business_operations()
     assert len(rows) == 26
@@ -98,6 +102,12 @@ def test_operations_catalog_lists_all_soundengine_business_routes(
         "2024.1",
         "2025.1",
     ]
+    assert rows["ak.soundengine.postMsgMonitor"]["intent"] == (
+        "post one exact message to the runtime Profiler Capture Log"
+    )
+    assert all_rows["ak.wwise.core.log.addItem"]["intent"] == (
+        "add one message to a named Authoring Log view"
+    )
     assert payload["request_schema_command_template"] == [
         "request-schema",
         "<api>",

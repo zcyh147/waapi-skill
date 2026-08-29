@@ -391,8 +391,10 @@ def runtime_inspection_business_catalog_rows() -> tuple[dict[str, Any], ...]:
     def intent(operation: str) -> str:
         if operation == LOG_GET_URI:
             return "read one bounded Wwise log view in user-facing channel terms"
-        if operation.startswith("ak.wwise.core.log."):
-            return "add to or clear one named Wwise log view"
+        if operation == LOG_ADD_ITEM_URI:
+            return "add one message to a named Authoring Log view"
+        if operation == LOG_CLEAR_URI:
+            return "clear one named Authoring Log view"
         if operation.startswith("ak.wwise.core.remote."):
             return "connect Authoring to one exact remote runtime or Profiler capture"
         if operation.startswith("ak.wwise.core.transport."):
