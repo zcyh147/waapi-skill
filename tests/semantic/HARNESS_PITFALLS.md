@@ -157,19 +157,6 @@ prevention checks that are expensive to rediscover.
   conversion, migration, save, plug-in, or license dialog remains blocked for
   explicit diagnosis.
 
-### Optional SampleProject isolation must match the fixture generation
-
-- Evidence: a #87 Wwise 2025.1 preflight stopped before Authoring because the
-  broad optional-plugin isolator's pinned SampleProject work-unit/layout proofs
-  matched the 2022.1 fixture rather than the 2025.1 copy. No Wwise process or
-  behavior evidence was credited. The successful matching-Authoring lanes used
-  the exact 2022.1 source generation and ended with zero optional-plugin
-  instances.
-- Prevention: do not apply the broad 2022.1 SampleProject isolator to a later
-  fixture generation. Select the version-matched reviewed isolation profile or
-  stop before Wwise; never weaken a pinned work-unit hash/path merely to get
-  past preflight.
-
 ### Compound Draft topology assumed one terminal per Draft
 
 - Evidence: #83 Fresh `r1` on both hosts blocked before Codex with
