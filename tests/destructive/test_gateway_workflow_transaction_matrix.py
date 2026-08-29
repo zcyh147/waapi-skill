@@ -73,6 +73,7 @@ ACTOR_MIXER_PARENT = r"\Actor-Mixer Hierarchy\Default Work Unit"
 CONTAINERS_PARENT = r"\Containers\Default Work Unit"
 SOUNDBANK_PARENT = r"\SoundBanks\Default Work Unit"
 EVENTS_PARENT = r"\Events\Default Work Unit"
+GAME_PARAMETERS_PARENT = r"\Game Parameters\Default Work Unit"
 FIXTURE_SWITCH_GROUP_PATH = r"\Switches\SS_Impact\SS_FS_Type"
 FIXTURE_SWITCH_PATH = FIXTURE_SWITCH_GROUP_PATH + r"\Crawl"
 SWITCH_GROUP_REFERENCE = "SwitchGroupOrStateGroup"
@@ -1231,6 +1232,110 @@ def test_media_build_business_reads_across_selected_version(
                 active_error.add_note(message)
             else:
                 raise AssertionError(message)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_remaining_core_business_effect_families_on_2025(
+    workflow_sandbox_runtime: _WorkflowSandboxRuntime,
+) -> None:
+    """Prove one strong project-setting effect and one weak external effect."""
+
+    runtime = workflow_sandbox_runtime
+    if runtime.version != "2025.1":
+        pytest.skip("Remaining Core real evidence targets Wwise 2025.1")
+    game_parameter_id: str | None = None
+    try:
+        runtime.packaged_status()
+        game_parameter_id = _create_object(
+            runtime,
+            parent=GAME_PARAMETERS_PARENT,
+            object_type="GameParameter",
+            name=f"WAAPI_RANGE_{uuid.uuid4().hex[:12]}",
+        )
+        range_draft = _start_business_draft(
+            runtime,
+            "ak.wwise.core.gameParameter.setRange",
+        )
+        game_parameter_handle = _bind_business_object(
+            runtime,
+            range_draft,
+            object_id=game_parameter_id,
+            role="game_parameter",
+        )
+        _update_business_draft(
+            runtime,
+            range_draft,
+            "draft-declare-project-setting-plan",
+            [
+                "--role",
+                "game_parameter_handle",
+                game_parameter_handle,
+                "--value",
+                "minimum",
+                "-10",
+                "--value",
+                "maximum",
+                "100",
+                "--value",
+                "curve_update_outcome",
+                "stretch",
+            ],
+            live=True,
+        )
+        range_result = _complete_business_draft(runtime, range_draft)
+        range_verification = range_result["verify"]["verification"]
+        assert range_verification["verification_strength"] == (
+            "operation_specific_readback"
+        )
+        assert range_verification["business_state_verified"] is True
+
+        source_files_draft = _start_business_draft(
+            runtime,
+            "ak.wwise.core.sourceControl.getSourceFiles",
+        )
+        _update_business_draft(
+            runtime,
+            source_files_draft,
+            "draft-declare-source-control-plan",
+            [
+                "--usage-scope",
+                "all",
+                "--no-recursive",
+                "--no-usage-objects",
+                "--max-results",
+                "5",
+            ],
+            live=True,
+        )
+        source_files_result = _complete_core_result_schema_draft(
+            runtime,
+            source_files_draft,
+        )
+        agent_result = source_files_result["verify"].get("agent_result")
+        assert isinstance(agent_result, Mapping), source_files_result
+        projected = agent_result.get("result")
+        assert isinstance(projected, Mapping), agent_result
+        assert projected["max_results"] == 5
+        assert projected["returned_count"] <= 5
+        assert projected["returned_count"] <= projected["total_count"]
+        runtime.category_results.extend(
+            (
+                {
+                    "category": "remaining-core-project-setting",
+                    "status": "PASS",
+                    "verifier_strength": "operation_specific_readback",
+                },
+                {
+                    "category": "remaining-core-source-control",
+                    "status": "PASS",
+                    "verifier_strength": "result_schema_only",
+                },
+            )
+        )
+    finally:
+        if game_parameter_id is not None:
+            _delete_if_present_via_transaction(runtime, game_parameter_id)
 
 
 @pytest.mark.live
