@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import importlib.util
 import json
 from pathlib import Path
+import sys
 from types import SimpleNamespace
 
 import pytest
@@ -86,6 +88,51 @@ def test_project_setting_runtime_contains_one_exact_game_parameter(
         "max": 100.0,
         "onCurveUpdate": "stretch",
     }
+
+
+def test_business_fixture_shim_resolves_one_exact_typed_name(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    unit = load_project_setting_business_profile(PROFILE).units[0]
+    runtime = prepare_project_setting_business_runtime(unit, tmp_path / "runtime")
+    shim_path = (
+        REPO_ROOT
+        / "tests"
+        / "semantic"
+        / "data"
+        / "business-agent"
+        / "waapi-shim"
+        / "waapi.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "project_setting_business_waapi_shim",
+        shim_path,
+    )
+    assert spec is not None and spec.loader is not None
+    shim = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = shim
+    spec.loader.exec_module(shim)
+    monkeypatch.setenv("WAAPI_BUSINESS_AGENT_FIXTURE", str(runtime.fixture_path))
+
+    result = shim.WaapiClient().call(
+        "ak.wwise.core.object.get",
+        {
+            "waql": (
+                'from type GameParameter where name = "WeatherIntensity" take 2'
+            )
+        },
+        {"return": ["id", "name", "type", "path"]},
+    )
+
+    assert result["return"] == [
+        {
+            "id": OBJECT_ID,
+            "name": OBJECT_NAME,
+            "type": "GameParameter",
+            "path": r"\Game Parameters\Default Work Unit\WeatherIntensity",
+        }
+    ]
 
 
 def test_project_setting_protocol_is_singular_and_complete() -> None:

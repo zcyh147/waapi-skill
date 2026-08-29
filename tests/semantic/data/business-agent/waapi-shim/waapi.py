@@ -39,6 +39,10 @@ _UNIQUE_NAME_WAQL = re.compile(
     r'^from search "(?P<name>[^"\r\n]+)" '
     r'where name = "(?P=name)" take 2$'
 )
+_EXACT_TYPE_NAME_WAQL = re.compile(
+    r'^from type (?P<type>[A-Za-z][A-Za-z0-9_]*) '
+    r'where name = "(?P<name>[^"\r\n]+)" take 2$'
+)
 
 
 class WaapiRequestFailed(RuntimeError):
@@ -168,12 +172,23 @@ class WaapiClient:
                 if isinstance(waql, str)
                 else None
             )
+            exact_type_name_match = (
+                _EXACT_TYPE_NAME_WAQL.fullmatch(waql)
+                if isinstance(waql, str)
+                else None
+            )
             for row in self.fixture["objects"]:
                 if isinstance(ids, list) and row["id"] in ids:
                     selected.append(row)
                 elif isinstance(paths, list) and row["path"] in paths:
                     selected.append(row)
                 elif name_match is not None and row["name"] == name_match["name"]:
+                    selected.append(row)
+                elif (
+                    exact_type_name_match is not None
+                    and row["type"] == exact_type_name_match["type"]
+                    and row["name"] == exact_type_name_match["name"]
+                ):
                     selected.append(row)
             result = []
             for row in selected:

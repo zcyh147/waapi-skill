@@ -280,6 +280,14 @@ prevention checks that are expensive to rediscover.
   Wwise type in the continuation and let `draft-bind-object --exact-type-name`
   resolve at most two rows and accept exactly one. Keep ordinary reads outside
   an active Draft; run the complete protocol validator before a Fresh root.
+- Follow-up: repaired roots `imac-pset-e1eed9d-r2` and
+  `iwin-pset-e1eed9d-r2` copied and authenticated that exact typed-name command,
+  but the offline business WAAPI shim recognized only the older
+  `from search ...` unique-name form and returned no rows for the production
+  `from type ... where name ... take 2` request. Keep the shared shim aligned
+  with every production read shape exercised by offline Fresh profiles, and
+  prove each added shape directly against its profile fixture before starting
+  another Fresh root.
 
 ### Natural raw-API prompts need one bounded operation discovery
 
