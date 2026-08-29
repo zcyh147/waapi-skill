@@ -284,6 +284,65 @@ def _preview_runtime_plan(
     )
 
 
+def _preview_soundengine_plan(
+    operation: str,
+    declaration_args: list[str],
+    *,
+    env: dict[str, str],
+    state_dir: Path,
+) -> dict[str, object]:
+    started = _call(
+        ["draft-start", operation],
+        env=env,
+        state_dir=state_dir,
+    )
+    draft = started["draft"]
+    assert isinstance(draft, dict)
+    draft_id = str(draft["draft_id"])
+    authority = str(started["task_authority"])
+    declared = _call(
+        [
+            "draft-declare-soundengine-plan",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            str(draft["revision"]),
+            *declaration_args,
+        ],
+        env=env,
+        state_dir=state_dir,
+    )
+    current = declared["draft"]
+    assert isinstance(current, dict)
+    checked = _call(
+        [
+            "draft-check",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            str(current["revision"]),
+        ],
+        env=env,
+        state_dir=state_dir,
+    )
+    current = checked["draft"]
+    assert isinstance(current, dict)
+    return _call(
+        [
+            "preview-from-draft",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            str(current["revision"]),
+        ],
+        env=env,
+        state_dir=state_dir,
+    )
+
+
 def _preview_zero_input_plan(
     operation: str,
     *,
@@ -592,6 +651,142 @@ def test_runtime_business_profiler_and_transport_lifecycle_on_authoring(
     if primary_error is not None or cleanup_errors:
         raise BaseExceptionGroup(
             "Authoring runtime lifecycle or bounded cleanup failed",
+            [*([primary_error] if primary_error is not None else []), *cleanup_errors],
+        )
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_soundengine_business_runtime_and_spatial_families_on_authoring(
+    tmp_path: Path,
+) -> None:
+    version = os.environ["WWISE_VERSION"]
+    assert version in {"2022.1", "2025.1"}
+    env = _gateway_env(tmp_path, version=version)
+    state_dir = tmp_path / "soundengine-authoring-state"
+
+    status = _call(["status"], env=env, state_dir=state_dir)
+    assert status["is_command_line"] is False
+    project = status["project"]
+    assert isinstance(project, dict)
+    assert Path(localize_waapi_host_path(project["path"])).resolve(
+        strict=True
+    ) == Path(env["WWISE_AUTHORING_SANDBOX_PROJECT"]).resolve(strict=True)
+
+    handles: list[str] = []
+    primary_error: BaseException | None = None
+    cleanup_errors: list[BaseException] = []
+
+    def complete(operation: str, declaration: list[str]) -> dict[str, object]:
+        return _execute_and_verify(
+            _preview_soundengine_plan(
+                operation,
+                declaration,
+                env=env,
+                state_dir=state_dir,
+            ),
+            env=env,
+            state_dir=state_dir,
+        )
+
+    try:
+        monitor = complete(
+            "ak.soundengine.postMsgMonitor",
+            ["--monitor-message", f"waapi-skill authoring probe {version}"],
+        )
+        assert monitor["state"] == TransactionState.RESULT_SCHEMA_CHECKED.value
+
+        for name in ("WAAPI Skill Emitter", "WAAPI Skill Listener"):
+            registered = complete(
+                "ak.soundengine.registerGameObj",
+                ["--game-object-name", name],
+            )
+            business = _runtime_business_result(registered)
+            handle = str(business["game_object_handle"])
+            assert handle.startswith("goh1-")
+            handles.append(handle)
+        emitter, listener = handles
+
+        operations = (
+            (
+                "ak.soundengine.setPosition",
+                [
+                    "--game-object-handle", emitter,
+                    "--position-frame", "1", "2", "3", "1", "0", "0", "0", "1", "0",
+                ],
+            ),
+            (
+                "ak.soundengine.setMultiplePositions",
+                [
+                    "--game-object-handle", emitter,
+                    "--multi-position-mode", "MultiSources",
+                    "--position-frame", "1", "2", "3", "1", "0", "0", "0", "1", "0",
+                    "--position-frame", "4", "5", "6", "1", "0", "0", "0", "1", "0",
+                ],
+            ),
+            (
+                "ak.soundengine.setDefaultListeners",
+                ["--listener-handle", listener],
+            ),
+            (
+                "ak.soundengine.setListeners",
+                ["--emitter-handle", emitter, "--listener-handle", listener],
+            ),
+            (
+                "ak.soundengine.setObjectObstructionAndOcclusion",
+                [
+                    "--emitter-handle", emitter,
+                    "--listener-handle", listener,
+                    "--obstruction-percent", "25",
+                    "--occlusion-percent", "50",
+                ],
+            ),
+            (
+                "ak.soundengine.setScalingFactor",
+                ["--game-object-handle", emitter, "--attenuation-scale-percent", "150"],
+            ),
+            (
+                "ak.soundengine.setGameObjectOutputBusVolume",
+                [
+                    "--emitter-handle", emitter,
+                    "--listener-handle", listener,
+                    "--volume-db", "-6",
+                ],
+            ),
+            (
+                "ak.soundengine.setListenerSpatialization",
+                [
+                    "--listener-handle", listener,
+                    "--spatialization", "enabled",
+                    "--channel-layout", "5.1",
+                    "--speaker-offset-db", "C", "-3",
+                ],
+            ),
+            (
+                "ak.soundengine.stopAll",
+                ["--game-object-handle", emitter],
+            ),
+        )
+        for operation, declaration in operations:
+            verified = complete(operation, declaration)
+            assert verified["state"] == TransactionState.RESULT_SCHEMA_CHECKED.value
+    except BaseException as exc:
+        primary_error = exc
+    finally:
+        for handle in reversed(handles):
+            try:
+                unregistered = complete(
+                    "ak.soundengine.unregisterGameObj",
+                    ["--game-object-handle", handle],
+                )
+                assert _runtime_business_result(unregistered)[
+                    "retired_game_object_handle_count"
+                ] == 1
+            except BaseException as exc:
+                cleanup_errors.append(exc)
+    if primary_error is not None or cleanup_errors:
+        raise BaseExceptionGroup(
+            "SoundEngine Authoring workflow or bounded game-object cleanup failed",
             [*([primary_error] if primary_error is not None else []), *cleanup_errors],
         )
 
