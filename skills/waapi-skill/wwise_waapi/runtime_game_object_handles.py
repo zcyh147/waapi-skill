@@ -11,6 +11,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from .canonical import canonical_json_bytes, canonical_sha256
+from .filesystem_security import path_is_link_or_reparse
 
 
 RUNTIME_GAME_OBJECT_HANDLE_CONTRACT = (
@@ -263,7 +264,7 @@ class RuntimeGameObjectHandleStore:
             ) from exc
         if (
             not stat.S_ISREG(metadata.st_mode)
-            or path.is_symlink()
+            or path_is_link_or_reparse(path, metadata=metadata)
             or metadata.st_size > _MAX_RECORD_BYTES
         ):
             raise RuntimeGameObjectHandleError(
@@ -295,7 +296,9 @@ class RuntimeGameObjectHandleStore:
                     "GAME_OBJECT_HANDLE_STORE_CORRUPT",
                     "Game object handle state path cannot be inspected safely.",
                 ) from exc
-            if path.is_symlink() or not stat.S_ISDIR(metadata.st_mode):
+            if path_is_link_or_reparse(path, metadata=metadata) or not stat.S_ISDIR(
+                metadata.st_mode
+            ):
                 raise RuntimeGameObjectHandleError(
                     "GAME_OBJECT_HANDLE_STORE_CORRUPT",
                     "Game object handle state path is not a real directory.",

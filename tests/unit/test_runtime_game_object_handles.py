@@ -104,3 +104,29 @@ def test_game_object_handle_store_rejects_every_symlinked_storage_component(
     with pytest.raises(RuntimeGameObjectHandleError) as corrupt:
         RuntimeGameObjectHandleStore(state_dir)
     assert corrupt.value.error_code == "GAME_OBJECT_HANDLE_STORE_CORRUPT"
+
+
+@pytest.mark.parametrize("linked_component", ("state_dir", "root", "records"))
+def test_game_object_handle_store_rejects_mocked_windows_reparse_components(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    linked_component: str,
+) -> None:
+    state_dir = tmp_path / "state"
+    root = state_dir / "soundengine-game-object-handles-v1"
+    records = root / "records"
+    records.mkdir(parents=True)
+    selected = {
+        "state_dir": state_dir,
+        "root": root,
+        "records": records,
+    }[linked_component]
+    monkeypatch.setattr(
+        game_object_handles,
+        "path_is_link_or_reparse",
+        lambda path, *, metadata: path == selected,
+    )
+
+    with pytest.raises(RuntimeGameObjectHandleError) as corrupt:
+        RuntimeGameObjectHandleStore(state_dir)
+    assert corrupt.value.error_code == "GAME_OBJECT_HANDLE_STORE_CORRUPT"
