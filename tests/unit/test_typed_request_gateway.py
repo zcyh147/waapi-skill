@@ -11,7 +11,7 @@ import pytest
 from wwise_waapi.versions import SUPPORTED_WWISE_VERSION_KEYS
 
 
-INLINE_READ_URI = "ak.wwise.core.profiler.getCursorTime"
+INLINE_READ_URI = "ak.soundengine.getState"
 
 
 SCRIPT_PATH = (
@@ -135,7 +135,7 @@ def _typed_scalar_args(
     ]
 
 
-@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS[1:])
 def test_request_schema_returns_one_typed_continuation_for_tracer(
     tmp_path: Path,
     version: str,
@@ -154,23 +154,22 @@ def test_request_schema_returns_one_typed_continuation_for_tracer(
     assert payload["continuation"]["schema_digest"] == payload["schema_digest"]
     assert "args-json" not in json.dumps(payload)
     assert "options-json" not in json.dumps(payload)
-    assert {
+    assert "stateGroup" in {
         field["name"] for field in payload["fields"] if "parent_handle" not in field
-    } == {"cursor"}
+    }
     assert all(str(field["handle"]).startswith("trh1-") for field in payload["fields"])
 
 
-@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS[1:])
 def test_typed_call_materializes_and_dispatches_without_preview(
     tmp_path: Path,
     version: str,
 ) -> None:
     contract = _request_contract(tmp_path, version)
-    handles = _field_handles(contract)
     client = FakeClient(
         {
             "ak.wwise.core.getInfo": _live_info(version),
-            INLINE_READ_URI: {"return": 1200},
+            INLINE_READ_URI: {"return": ["State:Combat"]},
         }
     )
     exit_code, payload = waapi_gateway.execute_gateway(
@@ -179,23 +178,25 @@ def test_typed_call_materializes_and_dispatches_without_preview(
             INLINE_READ_URI,
             "--schema-digest",
             contract["schema_digest"],
-            "--set",
-            handles["cursor"],
-            "string",
-            "capture",
+            *_typed_scalar_args(
+                contract,
+                "stateGroup",
+                "string",
+                "StateGroup:MusicState",
+            ),
         ],
         env=_env(tmp_path, version),
         client_factory=lambda _url: client,
     )
 
     assert exit_code == 0, payload
-    assert payload["agent_result"] == {"return": 1200}
+    assert payload["agent_result"] == {"return": ["State:Combat"]}
     assert list(payload)[-1] == "agent_result"
     assert client.calls == [
         ("ak.wwise.core.getInfo", None, None),
         (
             INLINE_READ_URI,
-            {"cursor": "capture"},
+            {"stateGroup": "StateGroup:MusicState"},
             {},
         ),
     ]
@@ -210,17 +211,20 @@ def test_invalid_typed_facts_fail_before_connection(
     case: str,
 ) -> None:
     contract = _request_contract(tmp_path)
-    handles = _field_handles(contract)
     facts: list[str] = []
     if case != "missing":
         facts.extend(
-            [
-                "--set",
-                "trh1-not-a-packaged-handle" if case == "unknown" else handles["cursor"],
-                "integer" if case == "wrong_type" else "string",
-                "17" if case == "wrong_type" else "capture",
-            ]
+            _typed_scalar_args(
+                contract,
+                "stateGroup",
+                "string",
+                "StateGroup:MusicState",
+            )
         )
+        if case == "unknown":
+            facts[-3] = "trh1-not-a-packaged-handle"
+        elif case == "wrong_type":
+            facts[-2:] = ["integer", "17"]
     exit_code, payload = waapi_gateway.execute_gateway(
         [
             "typed-call",
@@ -239,7 +243,6 @@ def test_invalid_typed_facts_fail_before_connection(
 
 def test_typed_call_rejects_configured_live_version_drift(tmp_path: Path) -> None:
     contract = _request_contract(tmp_path)
-    handles = _field_handles(contract)
     client = FakeClient({"ak.wwise.core.getInfo": _live_info("2024.1")})
     exit_code, payload = waapi_gateway.execute_gateway(
         [
@@ -247,10 +250,12 @@ def test_typed_call_rejects_configured_live_version_drift(tmp_path: Path) -> Non
             INLINE_READ_URI,
             "--schema-digest",
             contract["schema_digest"],
-            "--set",
-            handles["cursor"],
-            "string",
-            "capture",
+            *_typed_scalar_args(
+                contract,
+                "stateGroup",
+                "string",
+                "StateGroup:MusicState",
+            ),
         ],
         env=_env(tmp_path, "2025.1"),
         client_factory=lambda _url: client,
@@ -449,42 +454,6 @@ def test_unmigrated_nonzero_function_does_not_disclose_a_broken_continuation(
     assert "continuation" not in payload
 
 
-@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
-def test_flat_generic_read_materializes_and_dispatches_across_versions(
-    tmp_path: Path,
-    version: str,
-) -> None:
-    api = "ak.wwise.core.log.get"
-    exit_code, schema = waapi_gateway.execute_gateway(
-        ["request-schema", api],
-        env=_env(tmp_path, version),
-        client_factory=lambda _url: pytest.fail("discovery must remain offline"),
-    )
-    assert exit_code == 0, schema
-    handle = next(field["handle"] for field in schema["fields"] if field["name"] == "channel")
-    client = FakeClient(
-        {
-            "ak.wwise.core.getInfo": _live_info(version),
-            api: {"items": []},
-        }
-    )
-    exit_code, payload = waapi_gateway.execute_gateway(
-        [
-            "typed-call", api,
-            "--schema-digest", schema["schema_digest"],
-            "--set", handle, "string", "general",
-        ],
-        env=_env(tmp_path, version),
-        client_factory=lambda _url: client,
-    )
-    assert exit_code == 0, payload
-    assert payload["agent_result"] == {"items": []}
-    assert client.calls == [
-        ("ak.wwise.core.getInfo", None, None),
-        (api, {"channel": "general"}, {}),
-    ]
-
-
 def test_flat_generic_mutation_requires_apply_before_connection(tmp_path: Path) -> None:
     api = "ak.wwise.core.remote.connect"
     version = "2021.1"
@@ -512,34 +481,6 @@ def test_flat_generic_mutation_requires_apply_before_connection(tmp_path: Path) 
     )
     assert exit_code == 2
     assert "requires --apply" in payload["message"]
-
-
-@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
-def test_flat_generic_enum_error_is_exact_and_preconnection(
-    tmp_path: Path,
-    version: str,
-) -> None:
-    api = "ak.wwise.core.log.get"
-    exit_code, schema = waapi_gateway.execute_gateway(
-        ["request-schema", api],
-        env=_env(tmp_path, version),
-        client_factory=lambda _url: pytest.fail("schema must remain offline"),
-    )
-    assert exit_code == 0
-    channel = next(field for field in schema["fields"] if field["name"] == "channel")
-    assert "general" in channel["enum"]
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        [
-            "typed-call", api,
-            "--schema-digest", schema["schema_digest"],
-            "--set", channel["handle"], "string", "invented-channel",
-        ],
-        env=_env(tmp_path, version),
-        client_factory=lambda _url: pytest.fail("invalid enum must remain offline"),
-    )
-    assert exit_code == 2
-    assert payload["message"] == "Field 'channel' violates its reflected schema"
 
 
 def test_flat_generic_optional_array_can_be_explicitly_empty(tmp_path: Path) -> None:

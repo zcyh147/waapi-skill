@@ -153393,7 +153393,7 @@
     "contract": "waapi-skill.typed-request-surface/v1",
     "total_lanes": 824
   },
-  "inventory_sha256": "78b902a33b3cc2d2c611b78cc1be0be5b9999e7766d0d2ad8cf4f58bcd235234",
+  "inventory_sha256": "f036937bb2702c396f5c807dab19897a95d5e7f56ba7d418b6a2d81e4577c634",
   "mechanic_owners": {
     "ambiguous_continuation_selection": "gateway_derivation",
     "batch_layout": "gateway_derivation",
@@ -154768,10 +154768,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "1d01fbe46636bca30be3ae053b5c34c957f474c2350eb7fc95f7405d97cb6e5d",
+      "execution_policy_sha256": "6dc3a0743029f6166162bfc194fef7120fe56dbc3110836681a6e85136e496ca",
       "field_contract_sha256": "781ce3c5f8035de2ee31d39d6aea1f66ea4f0f216c63a00e996cce50f58a25ac",
       "host": "wwise-console",
       "item_type": "function",
@@ -154792,7 +154793,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "transaction",
+      "route": "bounded_call",
       "schema_sha256": "c8dd4592548961f2131c2606a0f4c3d0b2001f9172dfa787466615a1b2e9a2a6",
       "uri": "ak.wwise.core.log.get",
       "version": "2021.1"
@@ -155334,10 +155335,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "d2d50a1f8eb6af6e362b24b31e0c8c0c8aced447aa91dec1de4981de9a232c1a",
+      "execution_policy_sha256": "af6761ffdf92fafdde290d207210ae3831c8f7806bd463ffbeabf42e14a80811",
       "field_contract_sha256": "1116f87ab48cc31f3020022189df41de9eafa757f49aa4e778abf36c0a095e9a",
       "host": "wwise-console",
       "item_type": "function",
@@ -155358,7 +155360,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "managed_transaction",
+      "route": "bounded_call",
       "schema_sha256": "031c9984b7d317f51c0edf3db6edf7c179865eb24f566cc978fa25750d157950",
       "uri": "ak.wwise.core.profiler.getAudioObjects",
       "version": "2021.1"
@@ -155368,10 +155370,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "5d19381d00d73d99e3b729c101fe6c85734625fdb1a28fd897e0654c884f7377",
+      "execution_policy_sha256": "af3bbddbd5523cc5d8240b35952c4b46bddaf4337f9263297ea99e7f1aad61fc",
       "field_contract_sha256": "1116f87ab48cc31f3020022189df41de9eafa757f49aa4e778abf36c0a095e9a",
       "host": "wwise-console",
       "item_type": "function",
@@ -155392,7 +155395,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "managed_transaction",
+      "route": "bounded_call",
       "schema_sha256": "be38b87029fba799fbb93fd3b83b9cf8c3e0bf40c39242b977e144cd6cda6b6a",
       "uri": "ak.wwise.core.profiler.getBusses",
       "version": "2021.1"
@@ -155402,10 +155405,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "f51d65a6f5824ad4bbdd46697092ebbfcdd3ba2e549284e84c447a805639bac1",
+      "execution_policy_sha256": "ccce380ea47ff8fd8f0493ef09a63c24d5b313805af1c4a960e73e2024adc311",
       "field_contract_sha256": "d409bca0d7c5552f417c352c958ceebb026f837eb9ae73e06a0d13cff6ad5347",
       "host": "wwise-console",
       "item_type": "function",
@@ -155436,10 +155440,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "79ba1bf590ea504ac5ad399711dc6658a6af510247a9244205b2bf4454979ffc",
+      "execution_policy_sha256": "f5b27dec10b73edfc714507dae9ce64d6b4f71bbf7a7fbe13df19bcb14f3eb06",
       "field_contract_sha256": "147c64c0328e97dfd98bf7f3a9c364e0f5f5f8dfd328d6b169ac70a2a2357e56",
       "host": "wwise-console",
       "item_type": "function",
@@ -155460,7 +155465,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "managed_transaction",
+      "route": "bounded_call",
       "schema_sha256": "21f412593c4f91bbf96b4ae61c14d09f67e94eb6a340070bef29a7bd392d5771",
       "uri": "ak.wwise.core.profiler.getRTPCs",
       "version": "2021.1"
@@ -155501,10 +155506,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "9d040a6268929ad823e4d0757d66f498c5cd7264e3d4b66d0dcbf21fd37d7b62",
+      "execution_policy_sha256": "312e7f4ec891464f723798cf615cdfc92f4496083af9e49762bfbba56b96f18b",
       "field_contract_sha256": "9e5ae5373016efd1a085cdea65c35f3a3f12d5abcd479e2ab8d85000a9be606b",
       "host": "wwise-console",
       "item_type": "function",
@@ -155525,7 +155531,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "managed_transaction",
+      "route": "bounded_call",
       "schema_sha256": "12d68def35ef34ac47e2178a29b86037c90988e121ec7d4fbe6e0faead4d4dec",
       "uri": "ak.wwise.core.profiler.getVoices",
       "version": "2021.1"
@@ -156076,10 +156082,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "21e72b8b12d0dc241b50206198bdfd3bfc2c697c6a93d2f29b6daff8fc2a1d9f",
+      "execution_policy_sha256": "a8286bf75ee51f97c49bc71c6b38a83da0e0b2413c5981da406c69cbcde97561",
       "field_contract_sha256": "994c9293d616ac70bf2cadcfbfebd749f2f01c71fdc5bc24b3c3507a80dd7d82",
       "host": "wwise-console",
       "item_type": "function",
@@ -159207,10 +159214,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "f348560573dc32b4e4a7899270bc452073eec4f3d27701ec74f72ff8e928d4b1",
+      "execution_policy_sha256": "f833b552660be54cc212eb01df7124e7bf05a4e0f65247351b479777c43ffbb7",
       "field_contract_sha256": "781ce3c5f8035de2ee31d39d6aea1f66ea4f0f216c63a00e996cce50f58a25ac",
       "host": "wwise-console",
       "item_type": "function",
@@ -159231,7 +159239,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "transaction",
+      "route": "bounded_call",
       "schema_sha256": "c8dd4592548961f2131c2606a0f4c3d0b2001f9172dfa787466615a1b2e9a2a6",
       "uri": "ak.wwise.core.log.get",
       "version": "2022.1"
@@ -159867,10 +159875,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "71d69751fe9bff34451f28aae6cdc6ee6880b8dcc494742c39d466664c71fa0f",
+      "execution_policy_sha256": "add5c5bbf990306580b077880b8e7768a233edfdf08617937afc8b4de91eec77",
       "field_contract_sha256": "1116f87ab48cc31f3020022189df41de9eafa757f49aa4e778abf36c0a095e9a",
       "host": "wwise-console",
       "item_type": "function",
@@ -159891,7 +159900,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "managed_transaction",
+      "route": "bounded_call",
       "schema_sha256": "031c9984b7d317f51c0edf3db6edf7c179865eb24f566cc978fa25750d157950",
       "uri": "ak.wwise.core.profiler.getAudioObjects",
       "version": "2022.1"
@@ -159901,10 +159910,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "e2df30261332bce20a8300a1ff9e4fc84643335d7eddc62f350e783565d77724",
+      "execution_policy_sha256": "c887b001151a951a1c856550a57203b40be3f0f0921c889c8956dceb93fdd5ed",
       "field_contract_sha256": "1116f87ab48cc31f3020022189df41de9eafa757f49aa4e778abf36c0a095e9a",
       "host": "wwise-console",
       "item_type": "function",
@@ -159925,7 +159935,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "managed_transaction",
+      "route": "bounded_call",
       "schema_sha256": "be38b87029fba799fbb93fd3b83b9cf8c3e0bf40c39242b977e144cd6cda6b6a",
       "uri": "ak.wwise.core.profiler.getBusses",
       "version": "2022.1"
@@ -159935,10 +159945,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "d98c9db78ef7cff72a8010511a90e27b78082c59ed1edb90eaecf4908f4aac16",
+      "execution_policy_sha256": "14d367605b52327bfc5abb8dc3f9374dc49591a30709a335481d4a03e84bae23",
       "field_contract_sha256": "d409bca0d7c5552f417c352c958ceebb026f837eb9ae73e06a0d13cff6ad5347",
       "host": "wwise-console",
       "item_type": "function",
@@ -160000,10 +160011,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "39c3abff26a9b2ec4ae310e7e679ed4ad72e298969d73c844ec0ba4facbbe84e",
+      "execution_policy_sha256": "aa3aa8d1b0b2474f1b1ee73b9d71870eb30c9b5dc9795d57b3369fc109f3f50c",
       "field_contract_sha256": "147c64c0328e97dfd98bf7f3a9c364e0f5f5f8dfd328d6b169ac70a2a2357e56",
       "host": "wwise-console",
       "item_type": "function",
@@ -160024,7 +160036,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "managed_transaction",
+      "route": "bounded_call",
       "schema_sha256": "4baa082efcdc0ebb9f95d251bf6d3160aea247665051e65cc0f64483c6883c62",
       "uri": "ak.wwise.core.profiler.getRTPCs",
       "version": "2022.1"
@@ -160065,10 +160077,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "4f97cd37b3af42ecf41ab3502e9b4d37d374f068a03c6ca3d39a55fc81a8ae49",
+      "execution_policy_sha256": "f445d36b5ef17e1aa8092a990493d9fc5ec595ef86b33fe29f55844823fda60b",
       "field_contract_sha256": "9e5ae5373016efd1a085cdea65c35f3a3f12d5abcd479e2ab8d85000a9be606b",
       "host": "wwise-console",
       "item_type": "function",
@@ -160089,7 +160102,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "managed_transaction",
+      "route": "bounded_call",
       "schema_sha256": "12d68def35ef34ac47e2178a29b86037c90988e121ec7d4fbe6e0faead4d4dec",
       "uri": "ak.wwise.core.profiler.getVoices",
       "version": "2022.1"
@@ -160733,10 +160746,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "4720872538422b4a55416d7e860f9de07922e10a6df942dc0858a5c64a88db87",
+      "execution_policy_sha256": "484d8a839e5279b6055d08797ccc61a4f76cec11e5006f0bf29027666c5530ae",
       "field_contract_sha256": "994c9293d616ac70bf2cadcfbfebd749f2f01c71fdc5bc24b3c3507a80dd7d82",
       "host": "wwise-console",
       "item_type": "function",
@@ -164545,10 +164559,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "cfee07ab9cfce8009577bbcd4e945912337a8b592f6fa115cd124400adc475b5",
+      "execution_policy_sha256": "9c7202f9a6baa374eb49b112550a6a3f4ebb36f977b7c86c27a8e918ade97539",
       "field_contract_sha256": "781ce3c5f8035de2ee31d39d6aea1f66ea4f0f216c63a00e996cce50f58a25ac",
       "host": "wwise-console",
       "item_type": "function",
@@ -164569,7 +164584,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "transaction",
+      "route": "bounded_call",
       "schema_sha256": "c8dd4592548961f2131c2606a0f4c3d0b2001f9172dfa787466615a1b2e9a2a6",
       "uri": "ak.wwise.core.log.get",
       "version": "2023.1"
@@ -165330,10 +165345,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "001e8e7cdc1e61943ca8a9d4aa1bcbc668627923bceaf742efa46da89c0c80bc",
+      "execution_policy_sha256": "6c50005964fee76fbdc8e4a96942468bd74bad50c9181bd0241c9672245d7aad",
       "field_contract_sha256": "1116f87ab48cc31f3020022189df41de9eafa757f49aa4e778abf36c0a095e9a",
       "host": "wwise-console",
       "item_type": "function",
@@ -165354,7 +165370,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "managed_transaction",
+      "route": "bounded_call",
       "schema_sha256": "031c9984b7d317f51c0edf3db6edf7c179865eb24f566cc978fa25750d157950",
       "uri": "ak.wwise.core.profiler.getAudioObjects",
       "version": "2023.1"
@@ -165364,10 +165380,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "45da40c5bab0280d5c9f6454b665661e2e34d32b4150d956e133012a5afd76dc",
+      "execution_policy_sha256": "0a2a1935dae12d5cb9b350acf8dfaf8b412f1d41fca4f16e136e91aa1870635e",
       "field_contract_sha256": "1116f87ab48cc31f3020022189df41de9eafa757f49aa4e778abf36c0a095e9a",
       "host": "wwise-console",
       "item_type": "function",
@@ -165388,7 +165405,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "managed_transaction",
+      "route": "bounded_call",
       "schema_sha256": "be38b87029fba799fbb93fd3b83b9cf8c3e0bf40c39242b977e144cd6cda6b6a",
       "uri": "ak.wwise.core.profiler.getBusses",
       "version": "2023.1"
@@ -165398,10 +165415,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "3fed5eadd961724cbfa7af1ddc6c8e3f9dd2f6aad511ee6bb6a89c915ba163cc",
+      "execution_policy_sha256": "30c70ce434a2e1d02c273ea080046475a12bead48dd7b222d59248ca674e9e75",
       "field_contract_sha256": "147c64c0328e97dfd98bf7f3a9c364e0f5f5f8dfd328d6b169ac70a2a2357e56",
       "host": "wwise-console",
       "item_type": "function",
@@ -165422,7 +165440,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "managed_transaction",
+      "route": "bounded_call",
       "schema_sha256": "7f4ee8f1981a409e2a334ccebec2aea8b46769b94ef771e5509ce91d5531386c",
       "uri": "ak.wwise.core.profiler.getCpuUsage",
       "version": "2023.1"
@@ -165432,10 +165450,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "0d45576fe32de5e5fc72d22eb4fb9bab39fd94ae37b2b3595ed59036620f1d12",
+      "execution_policy_sha256": "ace32904f8400c5419444b4ec179a9680318bfa7a80b05f8edf1432fce856543",
       "field_contract_sha256": "d409bca0d7c5552f417c352c958ceebb026f837eb9ae73e06a0d13cff6ad5347",
       "host": "wwise-console",
       "item_type": "function",
@@ -165497,10 +165516,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "5e2d8ae94b33d307da5fa5a569dde45d741c4fc84f9497d0e7d065ffcd0501b4",
+      "execution_policy_sha256": "a2e63ad3e1ec9309fe441c39d7151004486df649a90f459a5da946f8eb25e942",
       "field_contract_sha256": "147c64c0328e97dfd98bf7f3a9c364e0f5f5f8dfd328d6b169ac70a2a2357e56",
       "host": "wwise-console",
       "item_type": "function",
@@ -165521,7 +165541,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "managed_transaction",
+      "route": "bounded_call",
       "schema_sha256": "1382d3e7da563189ee0f259652a46066431cadb4a8a280c0a6ff0acd2ed64afa",
       "uri": "ak.wwise.core.profiler.getLoadedMedia",
       "version": "2023.1"
@@ -165531,10 +165551,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "215d673f92c900ba966457ef2fecd16a74db57739ea9b916324250072ea1f0f0",
+      "execution_policy_sha256": "3065463ddabe15f7ad63dd4cad74b4748680b9d446c9c2943e0c58f9de2fc5ac",
       "field_contract_sha256": "147c64c0328e97dfd98bf7f3a9c364e0f5f5f8dfd328d6b169ac70a2a2357e56",
       "host": "wwise-console",
       "item_type": "function",
@@ -165555,7 +165576,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "managed_transaction",
+      "route": "bounded_call",
       "schema_sha256": "8c2b617574412d5817df065e8bc2418056901ebf9529f6b26c7ec08f4f5637e0",
       "uri": "ak.wwise.core.profiler.getPerformanceMonitor",
       "version": "2023.1"
@@ -165565,10 +165586,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "107bcdffcc443d28aaa2e19e9f8ec2ea1dff110ae401d38f0b1f9e01427691fb",
+      "execution_policy_sha256": "c8a53f24caf59422028c380a1932e2d40f535771cb90cbdb260193db5274a738",
       "field_contract_sha256": "147c64c0328e97dfd98bf7f3a9c364e0f5f5f8dfd328d6b169ac70a2a2357e56",
       "host": "wwise-console",
       "item_type": "function",
@@ -165589,7 +165611,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "managed_transaction",
+      "route": "bounded_call",
       "schema_sha256": "835e8ddfa45f3cea1741f28502840a1543c6bc43cfd771a0691560fa61d69f82",
       "uri": "ak.wwise.core.profiler.getRTPCs",
       "version": "2023.1"
@@ -165599,10 +165621,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "cd2d3e61d717666876ebcb39d19624dc2841227655eb287da2a369daa2ad1ab9",
+      "execution_policy_sha256": "90495387c6750c93c5e606666416e4b1f85a807ce19441683f3c925ea8c49495",
       "field_contract_sha256": "147c64c0328e97dfd98bf7f3a9c364e0f5f5f8dfd328d6b169ac70a2a2357e56",
       "host": "wwise-console",
       "item_type": "function",
@@ -165623,7 +165646,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "managed_transaction",
+      "route": "bounded_call",
       "schema_sha256": "3a9b1a6119b07467bbff5ad91df16f7380a7314f39df7c2be3fb806fdf58261d",
       "uri": "ak.wwise.core.profiler.getStreamedMedia",
       "version": "2023.1"
@@ -165664,10 +165687,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "c848773383d892e47eee12fa81eba8093c3a3bdd93f5f64aacdbbc5cb3b53b36",
+      "execution_policy_sha256": "acacf47d1f5a3fbe0adc985ff6009b12cf7f896e3af74ca284b3c875c9df98e2",
       "field_contract_sha256": "9e5ae5373016efd1a085cdea65c35f3a3f12d5abcd479e2ab8d85000a9be606b",
       "host": "wwise-console",
       "item_type": "function",
@@ -165688,7 +165712,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "managed_transaction",
+      "route": "bounded_call",
       "schema_sha256": "12d68def35ef34ac47e2178a29b86037c90988e121ec7d4fbe6e0faead4d4dec",
       "uri": "ak.wwise.core.profiler.getVoices",
       "version": "2023.1"
@@ -166645,10 +166669,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "e0a1ab1d0d44d342c11172a4571c29724fc7da963c32dcd441f0ebb64b5fdc43",
+      "execution_policy_sha256": "a584fc989add6e46d47b7a13c23bae2effce82c35b55b399e55ddf0391d603ad",
       "field_contract_sha256": "994c9293d616ac70bf2cadcfbfebd749f2f01c71fdc5bc24b3c3507a80dd7d82",
       "host": "wwise-console",
       "item_type": "function",
@@ -170872,10 +170897,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "84739ab14dfdb9243a2690b9db39c0a7dd423c4fe2cc5cc31accfabcf684d92b",
+      "execution_policy_sha256": "4006e52b3a4b4fabd3442e720aec3204eddee44e600c88dafc09cae61a7f3b27",
       "field_contract_sha256": "781ce3c5f8035de2ee31d39d6aea1f66ea4f0f216c63a00e996cce50f58a25ac",
       "host": "wwise-console",
       "item_type": "function",
@@ -170896,7 +170922,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "transaction",
+      "route": "bounded_call",
       "schema_sha256": "e727d0e0bd9282d2eeb66cfde304a30a3e45a540f2c602926c3539e67453d0a3",
       "uri": "ak.wwise.core.log.get",
       "version": "2024.1"
@@ -171688,10 +171714,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "3b6e104d864e462e7baae725ad26d48bf788d24a432b32a5511f681bced5428b",
+      "execution_policy_sha256": "6476cd65193f1a44247a7df12b478afcab90a97802410e96a82c35dba2ce0604",
       "field_contract_sha256": "1116f87ab48cc31f3020022189df41de9eafa757f49aa4e778abf36c0a095e9a",
       "host": "wwise-console",
       "item_type": "function",
@@ -171712,7 +171739,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "managed_transaction",
+      "route": "bounded_call",
       "schema_sha256": "986b0c67f43a4822881fe800e339ac06175acd41859fecff199d702e8fe9eaef",
       "uri": "ak.wwise.core.profiler.getAudioObjects",
       "version": "2024.1"
@@ -171722,10 +171749,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "ed2393d8b448204372a34b667d8d8ddb2fd075a9eff9cc5e71e9e8f68ac6597f",
+      "execution_policy_sha256": "1d90251b55e118cfd9003f6541ef729fbbd4662b697869daf86d67e626bd47e4",
       "field_contract_sha256": "1116f87ab48cc31f3020022189df41de9eafa757f49aa4e778abf36c0a095e9a",
       "host": "wwise-console",
       "item_type": "function",
@@ -171746,7 +171774,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "managed_transaction",
+      "route": "bounded_call",
       "schema_sha256": "12f468ab6e9ef46d723b74b070edae7ddf96280b7e2d3574fcd31300834ee064",
       "uri": "ak.wwise.core.profiler.getBusses",
       "version": "2024.1"
@@ -171756,10 +171784,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "c43846ad66d55dd9f1b29f2043d601776dfbd4d2639c3606fd2336ab3c96466a",
+      "execution_policy_sha256": "3df184dff272344766cceba8b987be46fb7e40b9f5a9f0f73f82e80c9bcc4c1e",
       "field_contract_sha256": "147c64c0328e97dfd98bf7f3a9c364e0f5f5f8dfd328d6b169ac70a2a2357e56",
       "host": "wwise-console",
       "item_type": "function",
@@ -171780,7 +171809,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "managed_transaction",
+      "route": "bounded_call",
       "schema_sha256": "b37ff131a6a0168cd630cdcb4b24830be4c8904ae4c9ac178cb447832d76f7ef",
       "uri": "ak.wwise.core.profiler.getCpuUsage",
       "version": "2024.1"
@@ -171790,10 +171819,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "881571dc8769b5d3b7d442611b97ce50c4a13f2bb7101fbb4a436ae16fd2d2d0",
+      "execution_policy_sha256": "161e78f54e900e093d65d76fff28a142bdeb0baec46810d0503234bf83a51d93",
       "field_contract_sha256": "d409bca0d7c5552f417c352c958ceebb026f837eb9ae73e06a0d13cff6ad5347",
       "host": "wwise-console",
       "item_type": "function",
@@ -171855,10 +171885,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "e96f67a757227acd226c6583eb78995b9f0bd1729cb7f021ba75e6b3cf4875df",
+      "execution_policy_sha256": "23394796611989b54779c9a2696305baaeb708f127b7b6b5ac120e2d1b7a1801",
       "field_contract_sha256": "147c64c0328e97dfd98bf7f3a9c364e0f5f5f8dfd328d6b169ac70a2a2357e56",
       "host": "wwise-console",
       "item_type": "function",
@@ -171879,7 +171910,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "managed_transaction",
+      "route": "bounded_call",
       "schema_sha256": "1c2dc9f4c06a0c2ecfdbe83989f438437877d4e13c6707bdcac6a105a6253965",
       "uri": "ak.wwise.core.profiler.getLoadedMedia",
       "version": "2024.1"
@@ -171889,10 +171920,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "2a9bac274e2933d8e08e56052c99b185f379de5f5363b9baaa4c943a5e1f376c",
+      "execution_policy_sha256": "12fab0746ceaf9cf5f277df167dabe45b52b68cabd15e4d11327ecb3bb934cb1",
       "field_contract_sha256": "58a10db9f73d029af75753bbfbabad2eebe774018dd35a6a5cfd65a6d55c871d",
       "host": "wwise-console",
       "item_type": "function",
@@ -171913,7 +171945,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "managed_transaction",
+      "route": "bounded_call",
       "schema_sha256": "3a4e3256d4eb9108d7ca77e32c7e24d23d513f6ade7845f7c4d19a3533e1c132",
       "uri": "ak.wwise.core.profiler.getMeters",
       "version": "2024.1"
@@ -171923,10 +171955,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "f0e85e51f1a029c698cb024c471e4d6c101c6875da17579d1eb1d6501c5b85b0",
+      "execution_policy_sha256": "20338f92f59939f7c481b9dcd5d675edc20774fe546fb4639fc4824ccb8f5208",
       "field_contract_sha256": "147c64c0328e97dfd98bf7f3a9c364e0f5f5f8dfd328d6b169ac70a2a2357e56",
       "host": "wwise-console",
       "item_type": "function",
@@ -171947,7 +171980,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "managed_transaction",
+      "route": "bounded_call",
       "schema_sha256": "619ba0d3aac20a1971c754e7bbc915171ceeb43ca71a54086f3841a5e228af10",
       "uri": "ak.wwise.core.profiler.getPerformanceMonitor",
       "version": "2024.1"
@@ -171957,10 +171990,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "1ba6a951e93c7f1455d73258adccab1b1740e22deeeaf6ef2e27454bfdbacd71",
+      "execution_policy_sha256": "2acdfecb101cf5922701e6df7e1dd7e2e1e77582f788f899d60fbda7cd324bc1",
       "field_contract_sha256": "147c64c0328e97dfd98bf7f3a9c364e0f5f5f8dfd328d6b169ac70a2a2357e56",
       "host": "wwise-console",
       "item_type": "function",
@@ -171981,7 +172015,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "managed_transaction",
+      "route": "bounded_call",
       "schema_sha256": "3d13b161ae9fe95df288985b55b87fe738c7710a0796201c8f183bcec3b63f2e",
       "uri": "ak.wwise.core.profiler.getRTPCs",
       "version": "2024.1"
@@ -171991,10 +172025,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "9bb61935cffdb3195961a7890e0a73b036ef52f8e87b5f96556b038d6ee9fae5",
+      "execution_policy_sha256": "039c9978cef1c4c0e9a2e4a9b61c485cc59fc9f176dc060875fd92392f83a168",
       "field_contract_sha256": "147c64c0328e97dfd98bf7f3a9c364e0f5f5f8dfd328d6b169ac70a2a2357e56",
       "host": "wwise-console",
       "item_type": "function",
@@ -172015,7 +172050,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "managed_transaction",
+      "route": "bounded_call",
       "schema_sha256": "2370b2169bc6502a2ab52d83c37e21ae2f39090991f23670d78271368cc2e193",
       "uri": "ak.wwise.core.profiler.getStreamedMedia",
       "version": "2024.1"
@@ -172056,10 +172091,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "aa483fad9b3f96482efa20af377d9c6d38190bb88b9e0abe815708647f572b58",
+      "execution_policy_sha256": "e9fe69aee8a48b62df96d2796aa03607bb61ce8e10329ce7f48d077d5ff6b58b",
       "field_contract_sha256": "9e5ae5373016efd1a085cdea65c35f3a3f12d5abcd479e2ab8d85000a9be606b",
       "host": "wwise-console",
       "item_type": "function",
@@ -172080,7 +172116,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "managed_transaction",
+      "route": "bounded_call",
       "schema_sha256": "e46001e96ecb7b6d1c8b4b6ac2fa130f578e5f3a9a838342424b5f46a0ed680b",
       "uri": "ak.wwise.core.profiler.getVoices",
       "version": "2024.1"
@@ -172978,10 +173014,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "0d44f4127208e02164bed546ecdc7c14a0f03d484f8809d249c1eb9c16af242b",
+      "execution_policy_sha256": "01dc8a1ee8a9a7d53b4b970202b5fcddfc91d25adc1e2aadaf18bfd2a771d0c3",
       "field_contract_sha256": "994c9293d616ac70bf2cadcfbfebd749f2f01c71fdc5bc24b3c3507a80dd7d82",
       "host": "wwise-console",
       "item_type": "function",
@@ -177032,10 +177069,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "d7af9827100bbd020e9c8de463d53333b8cab672efd9752bc89671a6c74e0a11",
+      "execution_policy_sha256": "dc93163cae4c911c3103a3523fd08de49a1859a893a363df705d1b43613f2f2f",
       "field_contract_sha256": "781ce3c5f8035de2ee31d39d6aea1f66ea4f0f216c63a00e996cce50f58a25ac",
       "host": "wwise-console",
       "item_type": "function",
@@ -177056,7 +177094,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "transaction",
+      "route": "bounded_call",
       "schema_sha256": "61c38c5fb3bbe7f290582c2ae73f086fb5492b31ed20f44699e58016d8d1e260",
       "uri": "ak.wwise.core.log.get",
       "version": "2025.1"
@@ -177911,10 +177949,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "29d96d3cfd28dfb051af9dcf0a1b6b3a73ec71143753dd04722df8d83c62ea02",
+      "execution_policy_sha256": "899e1d2dbbff3eb20ae6429ae7fb20362a8db5db0498264d1930ec0ad9b8d993",
       "field_contract_sha256": "1116f87ab48cc31f3020022189df41de9eafa757f49aa4e778abf36c0a095e9a",
       "host": "wwise-console",
       "item_type": "function",
@@ -177935,7 +177974,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "managed_transaction",
+      "route": "bounded_call",
       "schema_sha256": "986b0c67f43a4822881fe800e339ac06175acd41859fecff199d702e8fe9eaef",
       "uri": "ak.wwise.core.profiler.getAudioObjects",
       "version": "2025.1"
@@ -177945,10 +177984,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "2fe6be889b1402be5f3a82b7266008c7a02a2cacab2d64985ef03936a4b1f7ec",
+      "execution_policy_sha256": "12d54fbf2880636dd9f6a2f2bd6f0a2efe6e96356aaa3a44388c66b81f7d7ed9",
       "field_contract_sha256": "1116f87ab48cc31f3020022189df41de9eafa757f49aa4e778abf36c0a095e9a",
       "host": "wwise-console",
       "item_type": "function",
@@ -177969,7 +178009,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "managed_transaction",
+      "route": "bounded_call",
       "schema_sha256": "12f468ab6e9ef46d723b74b070edae7ddf96280b7e2d3574fcd31300834ee064",
       "uri": "ak.wwise.core.profiler.getBusses",
       "version": "2025.1"
@@ -177979,10 +178019,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "e5283492915a181877cfb0c1d7787509a86c956a65cbee9b4a8e11817a8413b1",
+      "execution_policy_sha256": "9c96074c5897e7a3fed4e6d833e674c282593b8bb872b3acc5674d9f8a896902",
       "field_contract_sha256": "147c64c0328e97dfd98bf7f3a9c364e0f5f5f8dfd328d6b169ac70a2a2357e56",
       "host": "wwise-console",
       "item_type": "function",
@@ -178003,7 +178044,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "managed_transaction",
+      "route": "bounded_call",
       "schema_sha256": "03371e4034eb1101699a40ca04ee330c2c7e2ffe9c00d1d0075ef780bc3420bd",
       "uri": "ak.wwise.core.profiler.getCpuUsage",
       "version": "2025.1"
@@ -178013,10 +178054,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "ad0d3149eec117ba4fef99f40ffece33e62992b953344c87c08135d2750ed71a",
+      "execution_policy_sha256": "9fb93bbd6768911fc5f91ed1317917d1b8b60b895799442fe63020a0c955e26a",
       "field_contract_sha256": "d409bca0d7c5552f417c352c958ceebb026f837eb9ae73e06a0d13cff6ad5347",
       "host": "wwise-console",
       "item_type": "function",
@@ -178078,10 +178120,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "f654f199ced39ee5a62ade9e65e12c32940ec959a7393a0ef07eba4fe49274ff",
+      "execution_policy_sha256": "41dd8a79bfc3239d5224ffd5707886429b0307cded2e0433ed4936509ae68b3c",
       "field_contract_sha256": "147c64c0328e97dfd98bf7f3a9c364e0f5f5f8dfd328d6b169ac70a2a2357e56",
       "host": "wwise-console",
       "item_type": "function",
@@ -178102,7 +178145,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "managed_transaction",
+      "route": "bounded_call",
       "schema_sha256": "62d61a72646dba9851972cb3486f0b43c9511e0df365651dd0165cd1daa848e9",
       "uri": "ak.wwise.core.profiler.getLoadedMedia",
       "version": "2025.1"
@@ -178112,10 +178155,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "a47192c4996ab0b1f3838b1b62f111d3254f31e97ead3e527c0cf3e5f0cf9a98",
+      "execution_policy_sha256": "24005b67603447223f1b76facb1a3fa6a97f444e55baa541b50b4654fd06e529",
       "field_contract_sha256": "58a10db9f73d029af75753bbfbabad2eebe774018dd35a6a5cfd65a6d55c871d",
       "host": "wwise-console",
       "item_type": "function",
@@ -178136,7 +178180,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "managed_transaction",
+      "route": "bounded_call",
       "schema_sha256": "511dbcf40367297142a54c89ddb3a3d32f1e1c724ce4b86998ff0227f123f57c",
       "uri": "ak.wwise.core.profiler.getMeters",
       "version": "2025.1"
@@ -178146,10 +178190,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "98f4beb840d9829d734324d01ce1a325e10bbc6ba26c6ea48dcf0cafa82bfc72",
+      "execution_policy_sha256": "e9d119ebfd1961f2728a873451f3bc146d0ea2bfc54e134489a7f661b57d6c15",
       "field_contract_sha256": "147c64c0328e97dfd98bf7f3a9c364e0f5f5f8dfd328d6b169ac70a2a2357e56",
       "host": "wwise-console",
       "item_type": "function",
@@ -178170,7 +178215,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "managed_transaction",
+      "route": "bounded_call",
       "schema_sha256": "052ea3c4ff7b3d5e83caf13c892e3a49e2036535b119435999b18df6c928f510",
       "uri": "ak.wwise.core.profiler.getPerformanceMonitor",
       "version": "2025.1"
@@ -178180,10 +178225,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "df868391e29296d0df8e50ddd5ecb83304abbb341fcb1bc267daadc439f3f25a",
+      "execution_policy_sha256": "06200b20401f58d9723ef3081262ebc6ee8fa714ec29fce15ca8eb654ecc13a4",
       "field_contract_sha256": "147c64c0328e97dfd98bf7f3a9c364e0f5f5f8dfd328d6b169ac70a2a2357e56",
       "host": "wwise-console",
       "item_type": "function",
@@ -178204,7 +178250,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "managed_transaction",
+      "route": "bounded_call",
       "schema_sha256": "24c12580c0bf0ad9210f1abf6e630e18e06fc0a4b7e093d63d1bf51b0096f64c",
       "uri": "ak.wwise.core.profiler.getRTPCs",
       "version": "2025.1"
@@ -178214,10 +178260,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "f31f401fd49c8c73d626b4a450c8e725c2558fd28402f18208c7f5fbf6287f95",
+      "execution_policy_sha256": "a4786f89ad7cc6958fb021219de136a9157dd0935b5899afb43b9c9520864433",
       "field_contract_sha256": "147c64c0328e97dfd98bf7f3a9c364e0f5f5f8dfd328d6b169ac70a2a2357e56",
       "host": "wwise-console",
       "item_type": "function",
@@ -178238,7 +178285,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "managed_transaction",
+      "route": "bounded_call",
       "schema_sha256": "4d09b787e27aa596416666a347d4c0bdd2e8267f2177934ad0a21401ff50a5d9",
       "uri": "ak.wwise.core.profiler.getStreamedMedia",
       "version": "2025.1"
@@ -178279,10 +178326,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "43dec2d20c47db4fee5cda498901877046870f9125a6d0252a212c0aeef78708",
+      "execution_policy_sha256": "0d447a091cb6bcafeed67d73ff3d5012cd73b3afc9d61338f595bad723fb6312",
       "field_contract_sha256": "9e5ae5373016efd1a085cdea65c35f3a3f12d5abcd479e2ab8d85000a9be606b",
       "host": "wwise-console",
       "item_type": "function",
@@ -178303,7 +178351,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "managed_transaction",
+      "route": "bounded_call",
       "schema_sha256": "e46001e96ecb7b6d1c8b4b6ac2fa130f578e5f3a9a838342424b5f46a0ed680b",
       "uri": "ak.wwise.core.profiler.getVoices",
       "version": "2025.1"
@@ -179269,10 +179317,11 @@
       "classification": "generic-core-runtime-inspection",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "a6489b78cabb0e10f55cf64984f3b70a0e9e449d10f43c9e43bb34b55449f331",
+      "execution_policy_sha256": "225a420b34ffef13a6f74edbd9496cda58f3438e765637077f7fec1e02e3d4db",
       "field_contract_sha256": "994c9293d616ac70bf2cadcfbfebd749f2f01c71fdc5bc24b3c3507a80dd7d82",
       "host": "wwise-console",
       "item_type": "function",
@@ -185109,10 +185158,10 @@
     "stable_business_declaration": "A prompt-derived business value remains visible in the public request."
   },
   "source_contracts": {
-    "gateway_parser_sha256": "cbcbfa1682c04c285978415dd4fab608d733dd3e7807ada75f94576c5588bfa3",
+    "gateway_parser_sha256": "4303158c579d76e5aebeabce56a8b611eb9cbe4017c67dbf35b2cb47fd9242b1",
     "operation_contract_sha256": "44b2583ac1211ffff7a6c55277c4a81e2845f1042605f28122165af4f8936031",
-    "public_continuation_sha256": "e856b685076e61b14b4062d5f57bcd92e205c08f175b69d51dd883f20b86cc8b",
-    "typed_request_surface_sha256": "2040252326e175d55e5c04bca095bf68c47789302f8b0d243c931e663db30156"
+    "public_continuation_sha256": "85e9b548fc48e459e603ba0618eeacd25c631087ef2e0e360ceec51f91a093aa",
+    "typed_request_surface_sha256": "566ae35e6d0ef099d8ac7e0b2588eb66337f4334a93a924ac7c2c6a3b8c06bda"
   },
   "summary": {
     "migration_ticket_families": 5,

@@ -292,6 +292,17 @@ from wwise_waapi.media_build_business_cli import (  # noqa: E402  # pyright: ign
     media_build_fields_supplied,
     media_build_input_from_namespace,
 )
+from wwise_waapi.runtime_inspection_business_contracts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    runtime_inspection_business_catalog_rows,
+    runtime_inspection_business_contract_data,
+    runtime_inspection_business_operations,
+    runtime_inspection_business_versions,
+)
+from wwise_waapi.runtime_inspection_business import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    RuntimeInspectionBusinessError,
+    materialize_runtime_inspection_business_request,
+    normalize_runtime_inspection_result,
+)
 from wwise_waapi.business_declarations import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     MAX_BUSINESS_NAME_BYTES,
     MAX_BUSINESS_PATH_BYTES,
@@ -1392,7 +1403,11 @@ def build_parser() -> argparse.ArgumentParser:
     core_call.add_argument(
         "api",
         choices=tuple(
-            sorted(core_business_operations() | media_build_business_operations())
+            sorted(
+                core_business_operations()
+                | media_build_business_operations()
+                | runtime_inspection_business_operations()
+            )
         ),
     )
     core_call.add_argument("--source-id")
@@ -1400,6 +1415,16 @@ def build_parser() -> argparse.ArgumentParser:
     core_call.add_argument("--object-id")
     core_call.add_argument("--field-meaning")
     core_call.add_argument("--platform-name")
+    core_call.add_argument("--log-channel")
+    core_call.add_argument("--profiler-position")
+    core_call.add_argument("--profiler-cursor")
+    core_call.add_argument(
+        "--result-view",
+        choices=("summary", "identity", "diagnostics"),
+    )
+    core_call.add_argument("--bus-instance-handle")
+    core_call.add_argument("--voice-instance-handle")
+    core_call.add_argument("--transport-handle")
     add_media_build_read_arguments(core_call)
 
     typed_zero_call = subparsers.add_parser(
@@ -4257,6 +4282,28 @@ def preflight_core_business_input(
     versions = resolve_catalog_versions(args, env=env)
     if len(versions) != 1:
         raise GatewayInputError("core-call requires one exact Wwise version")
+    if args.api in runtime_inspection_business_operations():
+        try:
+            runtime_inspection_business_contract_data(args.api, versions[0])
+            request, limit, business_request = materialize_runtime_inspection_business_request(
+                args.api,
+                versions[0],
+                log_channel=args.log_channel,
+                max_results=args.max_results,
+                profiler_position=args.profiler_position,
+                profiler_cursor=args.profiler_cursor,
+                result_view=args.result_view,
+                bus_instance_handle=args.bus_instance_handle,
+                voice_instance_handle=args.voice_instance_handle,
+                transport_handle=args.transport_handle,
+            )
+        except (RuntimeInspectionBusinessError, ValueError) as exc:
+            raise GatewayInputError(str(exc)) from exc
+        args.runtime_inspection_request = request
+        args.runtime_inspection_limit = limit
+        args.runtime_inspection_business_request = business_request
+        args.core_business_version = versions[0]
+        return
     if args.api in media_build_business_operations():
         try:
             media_input = media_build_input_from_namespace(
@@ -5757,6 +5804,8 @@ def core_business_route_payload(version: str, api: str) -> dict[str, Any]:
     contract = (
         media_build_business_contract_data(api, version)
         if api in media_build_business_operations()
+        else runtime_inspection_business_contract_data(api, version)
+        if api in runtime_inspection_business_operations()
         else project_setting_business_contract_data(api, version)
         if api in project_setting_business_operations()
         else source_control_business_contract_data(api, version)
@@ -5795,6 +5844,8 @@ def core_business_route_payload(version: str, api: str) -> dict[str, Any]:
 def core_business_route_available(api: str, version: str) -> bool:
     if api in media_build_business_operations():
         return version in media_build_business_versions(api)
+    if api in runtime_inspection_business_operations():
+        return version in runtime_inspection_business_versions(api)
     if api in project_setting_business_operations():
         return version in project_setting_business_versions(api)
     if api in source_control_business_operations():
@@ -8083,7 +8134,10 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             raise GatewayInputError(
                 "draft-start requires an explicit or configured Wwise version."
             )
-        if args.operation in media_build_business_operations():
+        if args.operation in (
+            media_build_business_operations()
+            | runtime_inspection_business_operations()
+        ):
             raise GatewayInputError(
                 f"{args.operation} uses request-schema and its closed Core business "
                 "continuation; the retired typed Draft is not public"
@@ -8475,6 +8529,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             for row in (
                 *core_business_catalog_rows(),
                 *media_build_business_catalog_rows(),
+                *runtime_inspection_business_catalog_rows(),
                 *project_setting_business_catalog_rows(),
                 *source_control_business_catalog_rows(),
             )
@@ -9610,6 +9665,15 @@ def dispatch_core_business_read(
             dispatcher=dispatcher,
             common=common,
         )
+    if args.api in runtime_inspection_business_operations():
+        return dispatch_runtime_inspection_business_read(
+            args,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+        )
     project, project_call = current_project(
         dispatcher,
         connection=connection,
@@ -9807,6 +9871,87 @@ def dispatch_core_business_read(
             ),
         },
         "agent_result": result.get("result") if result.get("ok") else None,
+    }
+
+
+def dispatch_runtime_inspection_business_read(
+    args: argparse.Namespace,
+    *,
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Execute one bounded runtime-inspection read from business values."""
+
+    request = args.runtime_inspection_request
+    request_validation = validate_semantic_payload(
+        request["api"],
+        request["args"],
+        request["options"],
+        version=detected_version,
+    )
+    capability = live_capability(
+        detected_version,
+        args.api,
+        live_info=live_info,
+    )
+    result = dispatch(
+        dispatcher,
+        request["api"],
+        connection=connection,
+        version=detected_version,
+        args=request["args"],
+        options=request["options"],
+        # The legacy native-surface partition gates the whole runtime family
+        # until #87 migrates it.  This closed route is a bounded read whose
+        # request and result ceiling are both Gateway-owned.
+        allow_destructive=True,
+        result_limit_bytes=int(capability.execution_contract["result_limit_bytes"]),
+        operation_timeout=float(capability.execution_contract["timeout_seconds"]),
+    )
+    result_validation = (
+        validate_semantic_result(
+            request["api"],
+            result.get("result"),
+            version=detected_version,
+        )
+        if result.get("ok")
+        else None
+    )
+    try:
+        normalized = (
+            normalize_runtime_inspection_result(
+                args.api,
+                result.get("result"),
+                business_request=args.runtime_inspection_business_request,
+                max_results=args.runtime_inspection_limit,
+            )
+            if result.get("ok")
+            else None
+        )
+    except RuntimeInspectionBusinessError as exc:
+        raise GatewayResultShapeError(
+            str(exc),
+            error_code="RUNTIME_INSPECTION_RESULT_INVALID",
+        ) from exc
+    return {
+        "ok": bool(result.get("ok")),
+        "status": "ok" if result.get("ok") else "error",
+        **dict(common),
+        "api_attempted": args.api,
+        "business_request": {
+            "operation": args.api,
+            **args.runtime_inspection_business_request,
+            "max_results": args.runtime_inspection_limit,
+        },
+        "call": dispatch_call_summary(result),
+        "schema_validation": {
+            "request": request_validation.as_dict(),
+            "result": result_validation.as_dict() if result_validation else None,
+        },
+        "agent_result": normalized,
     }
 
 

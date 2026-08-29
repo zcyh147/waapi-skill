@@ -57,14 +57,14 @@ def test_every_registry_row_has_one_complete_route_contract() -> None:
     assert len(rows) == 814
     assert len({(row.version, row.item_type, row.uri) for row in rows}) == 814
     assert Counter(row.route for row in rows) == {
-        "bounded_call": 72,
+        "bounded_call": 111,
         "bounded_topic_wait": 152,
         "excluded": 6,
-            "fixed_command": 56,
+        "fixed_command": 56,
         "isolated_transaction": 141,
-            "managed_transaction": 248,
+        "managed_transaction": 214,
         "compound_transaction_member": 15,
-        "transaction": 124,
+        "transaction": 119,
     }
 
     for row in rows:
@@ -106,8 +106,11 @@ def test_all_transaction_reads_are_explicit_confirmation_only() -> None:
         if entry.route in TRANSACTION_ROUTES and entry.effect == "read"
     ]
 
-    assert len(rows) == 47
-    assert len({row.uri for row in rows}) == 12
+    assert len(rows) == 8
+    assert {row.uri for row in rows} == {
+        "ak.wwise.core.remote.getAvailableConsoles",
+        "ak.wwise.core.transport.getList",
+    }
     assert all(
         row.accepted_authorization_modes
         == (AUTHORIZATION_MODE_EXPLICIT_CONFIRMATION,)

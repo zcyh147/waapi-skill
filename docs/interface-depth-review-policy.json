@@ -16,10 +16,10 @@
     ]
   },
   "source_contracts": {
-    "gateway_parser_sha256": "cbcbfa1682c04c285978415dd4fab608d733dd3e7807ada75f94576c5588bfa3",
+    "gateway_parser_sha256": "4303158c579d76e5aebeabce56a8b611eb9cbe4017c67dbf35b2cb47fd9242b1",
     "operation_contract_sha256": "44b2583ac1211ffff7a6c55277c4a81e2845f1042605f28122165af4f8936031",
-    "public_continuation_sha256": "e856b685076e61b14b4062d5f57bcd92e205c08f175b69d51dd883f20b86cc8b",
-    "typed_request_surface_sha256": "2040252326e175d55e5c04bca095bf68c47789302f8b0d243c931e663db30156"
+    "public_continuation_sha256": "85e9b548fc48e459e603ba0618eeacd25c631087ef2e0e360ceec51f91a093aa",
+    "typed_request_surface_sha256": "566ae35e6d0ef099d8ac7e0b2588eb66337f4334a93a924ac7c2c6a3b8c06bda"
   },
   "ownership_classes": {
     "stable_business_declaration": "A prompt-derived business value remains visible in the public request.",

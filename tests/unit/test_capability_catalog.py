@@ -292,15 +292,15 @@ def test_catalog_summary_reconciles_all_five_version_totals() -> None:
     assert summary["totals"]["total"] == 814
     assert summary["totals"]["schema_status"] == {"ok": 814}
     assert summary["totals"]["interface_status"] == {
-        "available": 280,
-        "available_via_transaction": 528,
+        "available": 319,
+        "available_via_transaction": 489,
         "unsupported_by_skill_interface": 6,
     }
     assert summary["totals"]["preferred_routes"] == {
         "bounded_topic_wait": 152,
         "fixed_command": 56,
-        "manifest_dispatch": 72,
-        "transaction_operation": 528,
+        "manifest_dispatch": 111,
+        "transaction_operation": 489,
         "unsupported_boundary": 6,
     }
     assert "semantic_builder" not in summary["totals"]["preferred_routes"]
@@ -378,10 +378,20 @@ def test_public_manifest_dispatch_is_exactly_the_immutable_reviewed_call_allowli
             "ak.wwise.core.blendContainer.getAssignments",
             "ak.wwise.core.mediaPool.get",
             "ak.wwise.core.mediaPool.getFields",
+            "ak.wwise.core.log.get",
             "ak.wwise.core.object.diff",
             "ak.wwise.core.object.isLinked",
             "ak.wwise.core.ping",
+            "ak.wwise.core.profiler.getAudioObjects",
+            "ak.wwise.core.profiler.getBusses",
+            "ak.wwise.core.profiler.getCpuUsage",
             "ak.wwise.core.profiler.getCursorTime",
+            "ak.wwise.core.profiler.getLoadedMedia",
+            "ak.wwise.core.profiler.getMeters",
+            "ak.wwise.core.profiler.getPerformanceMonitor",
+            "ak.wwise.core.profiler.getRTPCs",
+            "ak.wwise.core.profiler.getStreamedMedia",
+            "ak.wwise.core.profiler.getVoices",
             "ak.wwise.core.remote.getConnectionStatus",
             "ak.wwise.core.soundbank.getInclusions",
             "ak.wwise.core.switchContainer.getAssignments",
