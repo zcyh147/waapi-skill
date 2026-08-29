@@ -1961,6 +1961,87 @@ def build_runtime_control_business_transaction_steps(
     )
 
 
+def build_soundengine_business_transaction_steps(
+    *,
+    version: str,
+    label: str,
+    monitor_message: str,
+) -> tuple[ExpectedGatewayStep, ...]:
+    """Seal one monitor-log intent through the SoundEngine Business Draft."""
+
+    api = "ak.soundengine.postMsgMonitor"
+    if version != "2022.1":
+        raise V3ProtocolError(
+            "SoundEngine Fresh proof supports exact Wwise 2022.1"
+        )
+    if not isinstance(label, str) or not re.fullmatch(r"tx[0-9]{2}", label):
+        raise V3ProtocolError("business transaction label must be txNN")
+    if (
+        not isinstance(monitor_message, str)
+        or not monitor_message.strip()
+        or monitor_message != monitor_message.strip()
+        or len(monitor_message.encode("utf-8")) > 512
+    ):
+        raise V3ProtocolError(
+            "SoundEngine monitor message must be one bounded exact value"
+        )
+    draft_start = f"{label}.draft-start"
+    declaration = f"{label}.declare-soundengine-plan"
+    check = f"{label}.check"
+
+    def prefix(revision_step: str) -> tuple[Any, ...]:
+        return (
+            ResponseBinding(draft_start, "/draft/draft_id"),
+            "--task-authority",
+            ResponseBinding(draft_start, "/task_authority"),
+            "--expected-revision",
+            ResponseBinding(revision_step, "/draft/revision"),
+        )
+
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": version,
+        "operation": "waapi.call",
+        "arguments": {
+            "api": api,
+            "args": {"message": monitor_message},
+            "options": {},
+        },
+    }
+    return (
+        ExpectedGatewayStep(
+            name=f"{label}.request-schema",
+            subcommand="request-schema",
+            arguments=(api,),
+        ),
+        ExpectedGatewayStep(
+            name=draft_start,
+            subcommand="draft-start",
+            arguments=(api,),
+        ),
+        ExpectedGatewayStep(
+            name=declaration,
+            subcommand="draft-declare-soundengine-plan",
+            arguments=(
+                *prefix(draft_start),
+                "--monitor-message",
+                monitor_message,
+            ),
+        ),
+        ExpectedGatewayStep(
+            name=check,
+            subcommand="draft-check",
+            arguments=prefix(declaration),
+        ),
+        ExpectedGatewayStep(
+            name=f"{label}.preview",
+            subcommand="preview-from-draft",
+            arguments=prefix(check),
+            expected_operation_request=request,
+        ),
+    )
+
+
 def build_authoring_ui_business_transaction_steps(
     request: Mapping[str, Any],
     *,
@@ -4903,6 +4984,7 @@ __all__ = [
     "build_authoring_ui_business_transaction_steps",
     "build_core_business_transaction_steps",
     "build_project_setting_business_transaction_steps",
+    "build_soundengine_business_transaction_steps",
     "build_compound_undo_business_transaction_steps",
     "OBJECT_LIFECYCLE_BUSINESS_OPERATIONS",
     "build_object_lifecycle_business_transaction_steps",

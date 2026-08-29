@@ -1,0 +1,19 @@
+{
+  "contract": "waapi-skill.soundengine-business-profile/v1",
+  "profile_id": "soundengine_business_1",
+  "model": {
+    "name": "gpt-5.6-terra",
+    "reasoning_effort": "medium",
+    "service_tier": "default",
+    "memory": "disabled"
+  },
+  "units": [
+    {
+      "unit_id": "SOUND22-MONITOR-PREVIEW",
+      "operation": "ak.soundengine.postMsgMonitor",
+      "version": "2022.1",
+      "prompt": "请向当前 Wwise 的监控日志写入“Fresh Agent SoundEngine business probe”。只生成预览，不要执行。",
+      "final_markers": ["Fresh Agent SoundEngine business probe", "监控", "预览"]
+    }
+  ]
+}

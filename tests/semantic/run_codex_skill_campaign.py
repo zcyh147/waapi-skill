@@ -406,6 +406,9 @@ BUSINESS_AGENT_OUTCOME_CONTRACTS = {
     matrix.RUNTIME_CONTROL_BUSINESS_PROFILE_ID: (
         "waapi-skill.runtime-control-business-agent-outcome/v1"
     ),
+    matrix.SOUNDENGINE_BUSINESS_PROFILE_ID: (
+        "waapi-skill.soundengine-business-agent-outcome/v1"
+    ),
     matrix.COMPOUND_UNDO_BUSINESS_PROFILE_ID: (
         "waapi-skill.compound-undo-business-agent-outcome/v1"
     ),
@@ -3474,6 +3477,20 @@ def _validate_bound_business_agent_protocol(
             label="tx01",
         )
         preview_request = steps[-1].expected_operation_request
+    elif profile == matrix.SOUNDENGINE_BUSINESS_PROFILE_ID:
+        from tests.semantic.support.codex_eval_protocol_v3 import (
+            build_soundengine_business_transaction_steps,
+        )
+        from tests.semantic.support.codex_soundengine_business_profile import (
+            MONITOR_MESSAGE,
+        )
+
+        steps = build_soundengine_business_transaction_steps(
+            version=expected_unit.version,
+            label="tx01",
+            monitor_message=MONITOR_MESSAGE,
+        )
+        preview_request = steps[-1].expected_operation_request
     elif profile == matrix.COMPOUND_UNDO_BUSINESS_PROFILE_ID:
         from tests.semantic.support.codex_compound_undo_business_agent_runner import (
             compound_undo_business_child_expectations,
@@ -3514,6 +3531,7 @@ def _validate_bound_business_agent_protocol(
         matrix.CORE_BUSINESS_PROFILE_ID: "tx01",
         matrix.PROJECT_SETTING_BUSINESS_PROFILE_ID: "tx01",
         matrix.RUNTIME_CONTROL_BUSINESS_PROFILE_ID: "tx01",
+        matrix.SOUNDENGINE_BUSINESS_PROFILE_ID: "tx01",
     }
     if profile in optional_discovery_labels:
         label = optional_discovery_labels[profile]
