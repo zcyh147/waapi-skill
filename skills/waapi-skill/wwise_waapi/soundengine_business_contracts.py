@@ -336,7 +336,13 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
             "clear_listeners": "explicit_boolean_intent",
         },
         "input_forms": {
-            "listener_handles": {"flag": "--listener-handle", "repeatable": True},
+            "listener_handles": {
+                "flag": "--listener-handle",
+                "repeatable": True,
+                "minimum_items": 1,
+                "maximum_items": 64,
+                "unique_items": True,
+            },
             "clear_listeners": {"flag": "--clear-listeners", "repeatable": False},
         },
         "constraints": {
@@ -354,7 +360,13 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
         },
         "input_forms": {
             "emitter_handle": {"flag": "--emitter-handle", "repeatable": False},
-            "listener_handles": {"flag": "--listener-handle", "repeatable": True},
+            "listener_handles": {
+                "flag": "--listener-handle",
+                "repeatable": True,
+                "minimum_items": 1,
+                "maximum_items": 64,
+                "unique_items": True,
+            },
             "clear_listeners": {"flag": "--clear-listeners", "repeatable": False},
         },
         "constraints": {
@@ -404,6 +416,8 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
                 "flag": "--position-frame",
                 "repeatable": True,
                 "arity": 9,
+                "minimum_items": 1,
+                "maximum_items": 256,
             },
             "multi_position_mode": {
                 "flag": "--multi-position-mode",

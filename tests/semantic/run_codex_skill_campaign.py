@@ -3482,13 +3482,24 @@ def _validate_bound_business_agent_protocol(
             build_soundengine_business_transaction_steps,
         )
         from tests.semantic.support.codex_soundengine_business_profile import (
+            EVENT_ID,
+            EVENT_NAME,
+            GAME_OBJECT_NAME,
+            LISTENER_HANDLE,
+            LISTENER_ID,
             MONITOR_MESSAGE,
         )
 
         steps = build_soundengine_business_transaction_steps(
             version=expected_unit.version,
             label="tx01",
+            operation=expected_unit.operation,
             monitor_message=MONITOR_MESSAGE,
+            game_object_name=GAME_OBJECT_NAME,
+            event_id=EVENT_ID,
+            event_name=EVENT_NAME,
+            listener_handle=LISTENER_HANDLE,
+            listener_id=LISTENER_ID,
         )
         preview_request = steps[-1].expected_operation_request
     elif profile == matrix.COMPOUND_UNDO_BUSINESS_PROFILE_ID:
@@ -3590,7 +3601,37 @@ def _validate_bound_business_agent_protocol(
                 if isinstance(agent_result, Mapping)
                 else None
             )
-            if observed_request != preview_request:
+            register_soundengine = (
+                profile == matrix.SOUNDENGINE_BUSINESS_PROFILE_ID
+                and expected_unit.operation == "ak.soundengine.registerGameObj"
+            )
+            register_arguments = (
+                observed_request.get("arguments")
+                if isinstance(observed_request, Mapping)
+                else None
+            )
+            register_args = (
+                register_arguments.get("args")
+                if isinstance(register_arguments, Mapping)
+                else None
+            )
+            register_request_matches = bool(
+                register_soundengine
+                and isinstance(observed_request, Mapping)
+                and observed_request.get("contract")
+                == "waapi-skill.operation-request/v1"
+                and observed_request.get("version") == expected_unit.version
+                and observed_request.get("operation") == "waapi.call"
+                and isinstance(register_arguments, Mapping)
+                and register_arguments.get("api")
+                == "ak.soundengine.registerGameObj"
+                and register_arguments.get("options") == {}
+                and isinstance(register_args, Mapping)
+                and register_args.get("name") == "Fresh Weather Listener"
+                and isinstance(register_args.get("gameObject"), int)
+                and not isinstance(register_args.get("gameObject"), bool)
+            ) if register_soundengine else False
+            if not register_request_matches and observed_request != preview_request:
                 raise CampaignEvidenceError("bound Business Agent Preview request drifted")
 
 

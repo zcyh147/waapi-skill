@@ -562,7 +562,7 @@ The separately approved V3 executable profiles are:
 | `core_business_1` | 1 | 1 | Preview-only routing proof that a zero-input Core mutation follows `request-schema` into one Gateway-owned Core business plan and immutable Preview |
 | `project_setting_business_1` | 1 | 1 | Preview-only routing proof that one natural Game Parameter range request becomes a bound object handle and Gateway-owned project-setting plan |
 | `runtime_control_business_1` | 1 | 1 | Preview-only routing proof that one natural Profiler capture request becomes a Gateway-owned runtime-control plan and exact native data-type request |
-| `soundengine_business_1` | 1 | 1 | Preview-only routing proof that one natural monitor-log intent becomes a Gateway-owned SoundEngine plan and exact native request |
+| `soundengine_business_4` | 4 | 4 | Preview-only routing proof for monitor, game-object registration, Event action, and listener spatialization parameter closure |
 | `compound_undo_business_1` | 1 | 1 | Preview-only routing proof that two checked child business changes become one Gateway-compiled Undo Group and one immutable Preview |
 
 The two older six-task integration profile IDs remain internal compatibility
@@ -593,7 +593,7 @@ skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py -
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile core_business_1 --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-core-business
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile project_setting_business_1 --offline-only --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-project-setting-business
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile runtime_control_business_1 --offline-only --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-runtime-control-business
-skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile soundengine_business_1 --offline-only --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-soundengine-business
+skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile soundengine_business_4 --offline-only --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-soundengine-business
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile compound_undo_business_1 --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-compound-undo-business
 ```
 
@@ -630,19 +630,21 @@ Agent receives only the intent to enable Voices capture; Gateway owns the exact
 immutable Preview. The profile rejects typed/native bypass, execution, and any
 additional runtime-control declaration.
 
-`soundengine_business_1` is a single 2022.1 preview-only SoundEngine routing
-probe. It starts no Wwise process and grants no real-host coverage credit. The
-prompt contains only one exact monitor-log message and no URI or Gateway
-mechanics. The Agent must select the SoundEngine business seam, preserve that
-message exactly, and stop at one immutable Preview; Gateway owns the native
-`postMsgMonitor` request, Draft lifecycle, and result-schema boundary.
-Exact candidate `2363c44a650c2d5133e832a8241c4e16c34f565b` passed this profile
-fresh plus identical verify-only in macOS root
-`imac-soundengine-2363c44-r1` and native-Windows root
-`iwin-soundengine-2363c44-r1`. Both roots sealed `wwise_started=false`; the
-Windows runs used temporary active-desktop `InteractiveToken` / `Limited`
-tasks, and both hosts ended with zero Wwise, WAAPI-listener, or scoped-process
-residue.
+`soundengine_business_4` contains four 2022.1 preview-only SoundEngine routing
+probes: monitor-log message, game-object registration, Event Stop/fade, and
+listener 5.1 spatialization. It starts no Wwise process and grants no real-host
+coverage credit. Prompts contain only closed business values plus, for the
+listener case, one fixture-owned opaque game-object handle. The Agent must
+select the SoundEngine seam, bind the Event when required, preserve exact user
+values, and stop at one immutable Preview per task. Gateway owns native IDs,
+reserved sentinels, action/fade enums, channel masks and offsets, Draft
+lifecycle, and result-schema boundaries.
+
+Historical exact candidate `2363c44a650c2d5133e832a8241c4e16c34f565b`
+passed the predecessor one-unit `soundengine_business_1` monitor profile fresh
+plus identical verify-only in macOS root `imac-soundengine-2363c44-r1` and
+native-Windows root `iwin-soundengine-2363c44-r1`. That evidence remains one
+monitor unit only and is not promoted to the four-unit closure profile.
 
 `project_setting_business_1` is a single 2025.1 preview-only routing probe. It
 starts no Wwise process and grants no real-host coverage credit. The prompt

@@ -829,6 +829,98 @@ def test_registered_game_object_handle_drives_unregister_and_retires(
     }
 
 
+def test_reregistered_game_object_uses_distinct_generation_and_cleanup(
+    tmp_path: Path,
+) -> None:
+    env = _env(tmp_path)
+    state_dir = tmp_path / "state"
+    client = _SoundEngineDraftClient(tmp_path)
+    first_handle, first_id = _register_game_object_for_test(
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        env=env,
+        client=client,
+        name="Repeated Weather Listener",
+    )
+    second_handle, second_id = _register_game_object_for_test(
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        env=env,
+        client=client,
+        name="Repeated Weather Listener",
+    )
+
+    assert first_id != second_id
+    assert first_handle != second_handle
+    for handle in (first_handle, second_handle):
+        unregister_preview, _ = _preview_soundengine_plan(
+            tmp_path=tmp_path,
+            state_dir=state_dir,
+            env=env,
+            client=client,
+            operation="ak.soundengine.unregisterGameObj",
+            declaration=["--game-object-handle", handle],
+        )
+        unregistered = _execute_and_verify_soundengine(
+            state_dir=state_dir,
+            env=env,
+            client=client,
+            previewed=unregister_preview,
+        )
+        assert unregistered["agent_result"]["business_result"] == {
+            "contract": "waapi-skill.soundengine-control-result/v1",
+            "retired_game_object_handle_count": 1,
+        }
+
+
+def test_listener_and_multi_position_schemas_disclose_complete_list_bounds(
+    tmp_path: Path,
+) -> None:
+    env = _env(tmp_path)
+    for operation in (
+        "ak.soundengine.setDefaultListeners",
+        "ak.soundengine.setListeners",
+    ):
+        code, schema = gateway.execute_gateway(
+            ["--version", "2022.1", "request-schema", operation],
+            env=env,
+            client_factory=lambda url: pytest.fail(
+                f"offline schema connected to {url}"
+            ),
+        )
+        assert code == 0, schema
+        assert schema["business_adapter"]["declaration"]["input_forms"][
+            "listener_handles"
+        ] == {
+            "flag": "--listener-handle",
+            "repeatable": True,
+            "minimum_items": 1,
+            "maximum_items": 64,
+            "unique_items": True,
+        }
+
+    code, schema = gateway.execute_gateway(
+        [
+            "--version",
+            "2022.1",
+            "request-schema",
+            "ak.soundengine.setMultiplePositions",
+        ],
+        env=env,
+        client_factory=lambda url: pytest.fail(f"offline schema connected to {url}"),
+    )
+    assert code == 0, schema
+    assert schema["business_adapter"]["declaration"]["input_forms"][
+        "position_frames"
+    ] == {
+        "flag": "--position-frame",
+        "repeatable": True,
+        "arity": 9,
+        "minimum_items": 1,
+        "maximum_items": 256,
+    }
+
+
 def test_post_event_binds_event_and_uses_opaque_game_object_handle(
     tmp_path: Path,
 ) -> None:

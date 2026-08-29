@@ -47,6 +47,7 @@ class BusinessAgentRunSpec:
     preview_gates: Callable[[Any, Any, Any, Any], Mapping[str, bool]]
     outcome_factory: Callable[..., Any]
     optional_initial_operations_discovery_operation: str | None = None
+    prepare_broker_state: Callable[[Any, Path], None] | None = None
 
 
 def _only_expected_business_commands(
@@ -152,6 +153,8 @@ def run_business_agent_unit(
         developer_instructions=developer_instructions,
     )
     with broker:
+        if spec.prepare_broker_state is not None:
+            spec.prepare_broker_state(runtime, broker.state_directory)
         with CodexCliTask(config, extra_env=broker.model_environment_overrides()) as task:
             result = task.run_initial(runtime.prompt, output_dir=task_root / "turn-01")
         broker_evidence = broker.evidence()

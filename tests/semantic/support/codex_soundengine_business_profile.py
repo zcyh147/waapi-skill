@@ -1,4 +1,4 @@
-"""Targeted Fresh Agent profile for one SoundEngine Preview."""
+"""Targeted Fresh Agent profile for SoundEngine parameter closure."""
 
 from __future__ import annotations
 
@@ -14,14 +14,29 @@ from tests.semantic.support.codex_business_profile_contract import (
 
 
 PROFILE_CONTRACT = "waapi-skill.soundengine-business-profile/v1"
-PROFILE_ID = "soundengine_business_1"
+PROFILE_ID = "soundengine_business_4"
 MODEL = "gpt-5.6-terra"
 REASONING_EFFORT = "medium"
 SERVICE_TIER = "default"
-UNIT_IDS = ("SOUND22-MONITOR-PREVIEW",)
-OPERATION = "ak.soundengine.postMsgMonitor"
+UNIT_IDS = (
+    "SOUND22-MONITOR-PREVIEW",
+    "SOUND22-GAME-OBJECT-PREVIEW",
+    "SOUND22-EVENT-PREVIEW",
+    "SOUND22-LISTENER-PREVIEW",
+)
+OPERATIONS = (
+    "ak.soundengine.postMsgMonitor",
+    "ak.soundengine.registerGameObj",
+    "ak.soundengine.executeActionOnEvent",
+    "ak.soundengine.setListenerSpatialization",
+)
 VERSION = "2022.1"
 MONITOR_MESSAGE = "Fresh Agent SoundEngine business probe"
+GAME_OBJECT_NAME = "Fresh Weather Listener"
+EVENT_NAME = "Fresh Alarm Event"
+EVENT_ID = "{11111111-2222-3333-4444-555555555555}"
+LISTENER_HANDLE = "goh1-11111111111111111111111111111111"
+LISTENER_ID = 424242
 _FORBIDDEN_PROMPT_MECHANICS = (
     "draft-start",
     "draft-declare",
@@ -84,11 +99,14 @@ def load_soundengine_business_profile(
         model=MODEL,
         reasoning_effort=REASONING_EFFORT,
         service_tier=SERVICE_TIER,
-        expected_unit_count=1,
+        expected_unit_count=4,
         error_type=SoundEngineBusinessProfileError,
         subject="SoundEngine business",
     )
-    parsed = (_parse_unit(source.units[0]),)
+    parsed = tuple(
+        _parse_unit(value, index=index)
+        for index, value in enumerate(source.units)
+    )
     units = select_closed_business_profile_units(
         parsed,
         unit_ids=unit_ids,
@@ -105,15 +123,16 @@ def load_soundengine_business_profile(
     )
 
 
-def _parse_unit(value: Any) -> SoundEngineBusinessUnit:
+def _parse_unit(value: Any, *, index: int) -> SoundEngineBusinessUnit:
     keys = {"unit_id", "operation", "version", "prompt", "final_markers"}
     if not isinstance(value, Mapping) or set(value) != keys:
         raise SoundEngineBusinessProfileError(
             "SoundEngine business unit is not closed"
         )
     if (
-        value.get("unit_id") != UNIT_IDS[0]
-        or value.get("operation") != OPERATION
+        index >= len(UNIT_IDS)
+        or value.get("unit_id") != UNIT_IDS[index]
+        or value.get("operation") != OPERATIONS[index]
         or value.get("version") != VERSION
     ):
         raise SoundEngineBusinessProfileError(
@@ -124,9 +143,15 @@ def _parse_unit(value: Any) -> SoundEngineBusinessUnit:
         raise SoundEngineBusinessProfileError(
             "SoundEngine business prompt is invalid"
         )
-    if MONITOR_MESSAGE not in prompt:
+    required_prompt_value = (
+        MONITOR_MESSAGE,
+        GAME_OBJECT_NAME,
+        EVENT_NAME,
+        LISTENER_HANDLE,
+    )[index]
+    if required_prompt_value not in prompt:
         raise SoundEngineBusinessProfileError(
-            "SoundEngine business prompt lost the exact monitor message"
+            "SoundEngine business prompt lost its exact business value"
         )
     if any(token in prompt.casefold() for token in _FORBIDDEN_PROMPT_MECHANICS):
         raise SoundEngineBusinessProfileError(
@@ -140,14 +165,14 @@ def _parse_unit(value: Any) -> SoundEngineBusinessUnit:
             "SoundEngine business final markers are invalid"
         )
     return SoundEngineBusinessUnit(
-        unit_id=UNIT_IDS[0],
-        operation=OPERATION,
+        unit_id=UNIT_IDS[index],
+        operation=OPERATIONS[index],
         version=VERSION,
         prompt_template=prompt,
         final_markers=tuple(markers),
         scenario=SoundEngineBusinessScenario(
-            id=UNIT_IDS[0],
-            api=OPERATION,
+            id=UNIT_IDS[index],
+            api=OPERATIONS[index],
             prompt_sha256=hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
         ),
     )
@@ -155,8 +180,13 @@ def _parse_unit(value: Any) -> SoundEngineBusinessUnit:
 
 __all__ = [
     "MODEL",
+    "EVENT_ID",
+    "EVENT_NAME",
+    "GAME_OBJECT_NAME",
+    "LISTENER_HANDLE",
+    "LISTENER_ID",
     "MONITOR_MESSAGE",
-    "OPERATION",
+    "OPERATIONS",
     "PROFILE_ID",
     "REASONING_EFFORT",
     "SERVICE_TIER",

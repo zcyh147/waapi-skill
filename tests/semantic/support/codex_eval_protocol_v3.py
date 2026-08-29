@@ -1965,26 +1965,30 @@ def build_soundengine_business_transaction_steps(
     *,
     version: str,
     label: str,
-    monitor_message: str,
+    operation: str = "ak.soundengine.postMsgMonitor",
+    monitor_message: str = "",
+    game_object_name: str = "",
+    event_id: str = "",
+    event_name: str = "",
+    listener_handle: str = "",
+    listener_id: int = 0,
 ) -> tuple[ExpectedGatewayStep, ...]:
-    """Seal one monitor-log intent through the SoundEngine Business Draft."""
+    """Seal one reviewed SoundEngine intent through the Business Draft."""
 
-    api = "ak.soundengine.postMsgMonitor"
     if version != "2022.1":
         raise V3ProtocolError(
             "SoundEngine Fresh proof supports exact Wwise 2022.1"
         )
     if not isinstance(label, str) or not re.fullmatch(r"tx[0-9]{2}", label):
         raise V3ProtocolError("business transaction label must be txNN")
-    if (
-        not isinstance(monitor_message, str)
-        or not monitor_message.strip()
-        or monitor_message != monitor_message.strip()
-        or len(monitor_message.encode("utf-8")) > 512
-    ):
-        raise V3ProtocolError(
-            "SoundEngine monitor message must be one bounded exact value"
-        )
+    supported = {
+        "ak.soundengine.postMsgMonitor",
+        "ak.soundengine.registerGameObj",
+        "ak.soundengine.executeActionOnEvent",
+        "ak.soundengine.setListenerSpatialization",
+    }
+    if operation not in supported:
+        raise V3ProtocolError("SoundEngine Fresh operation is not reviewed")
     draft_start = f"{label}.draft-start"
     declaration = f"{label}.declare-soundengine-plan"
     check = f"{label}.check"
@@ -1998,34 +2002,139 @@ def build_soundengine_business_transaction_steps(
             ResponseBinding(revision_step, "/draft/revision"),
         )
 
+    declaration_arguments: tuple[Any, ...]
+    request: Mapping[str, Any] | None
+    bind_step: ExpectedGatewayStep | None = None
+    revision_step = draft_start
+    if operation == "ak.soundengine.postMsgMonitor":
+        if (
+            not isinstance(monitor_message, str)
+            or not monitor_message.strip()
+            or monitor_message != monitor_message.strip()
+            or len(monitor_message.encode("utf-8")) > 512
+        ):
+            raise V3ProtocolError(
+                "SoundEngine monitor message must be one bounded exact value"
+            )
+        declaration_arguments = ("--monitor-message", monitor_message)
+        native_args: Mapping[str, Any] = {"message": monitor_message}
+    elif operation == "ak.soundengine.registerGameObj":
+        if (
+            not isinstance(game_object_name, str)
+            or not game_object_name.strip()
+            or game_object_name != game_object_name.strip()
+            or len(game_object_name.encode("utf-8")) > 512
+        ):
+            raise V3ProtocolError(
+                "SoundEngine game object name must be one bounded exact value"
+            )
+        declaration_arguments = ("--game-object-name", game_object_name)
+        native_args = {"name": game_object_name}
+    elif operation == "ak.soundengine.executeActionOnEvent":
+        if not isinstance(event_id, str) or not re.fullmatch(
+            r"\{[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}\}",
+            event_id,
+        ):
+            raise V3ProtocolError("SoundEngine Event proof requires one exact GUID")
+        if (
+            not isinstance(event_name, str)
+            or not event_name.strip()
+            or event_name != event_name.strip()
+        ):
+            raise V3ProtocolError("SoundEngine Event proof requires one exact name")
+        bind_name = f"{label}.bind-event"
+        bind_step = ExpectedGatewayStep(
+            name=bind_name,
+            subcommand="draft-bind-object",
+            arguments=(
+                *prefix(draft_start),
+                "--role",
+                "event",
+                "--exact-type-name",
+                "Event",
+                event_name,
+            ),
+        )
+        revision_step = bind_name
+        declaration_arguments = (
+            "--event-handle",
+            ResponseBinding(bind_name, "/bound_object/handle"),
+            "--action",
+            "Stop",
+            "--fade-duration-ms",
+            "250",
+            "--fade-curve",
+            "Linear",
+        )
+        native_args = {
+            "event": event_id.upper(),
+            "actionType": 0,
+            "gameObject": 0xFFFFFFFFFFFFFFFF,
+            "transitionDuration": 250,
+            "fadeCurve": 4,
+        }
+    else:
+        if not isinstance(listener_handle, str) or not re.fullmatch(
+            r"goh1-[0-9a-f]{32}", listener_handle
+        ):
+            raise V3ProtocolError(
+                "SoundEngine listener proof requires one opaque handle"
+            )
+        if (
+            isinstance(listener_id, bool)
+            or not isinstance(listener_id, int)
+            or not 0 <= listener_id <= 0xFFFFFFFFFFFFFFDF
+        ):
+            raise V3ProtocolError(
+                "SoundEngine listener proof requires one valid native fixture ID"
+            )
+        declaration_arguments = (
+            "--listener-handle",
+            listener_handle,
+            "--spatialization",
+            "enabled",
+            "--channel-layout",
+            "5.1",
+        )
+        native_args = {
+            "listener": listener_id,
+            "spatialized": True,
+            "channelConfig": 6 | (1 << 8) | (0x60F << 12),
+            "volumeOffsets": [0.0] * 6,
+        }
+
     request = {
         "contract": "waapi-skill.operation-request/v1",
         "version": version,
         "operation": "waapi.call",
         "arguments": {
-            "api": api,
-            "args": {"message": monitor_message},
+            "api": operation,
+            "args": dict(native_args),
             "options": {},
         },
     }
-    return (
+    steps: list[ExpectedGatewayStep] = [
         ExpectedGatewayStep(
             name=f"{label}.request-schema",
             subcommand="request-schema",
-            arguments=(api,),
+            arguments=(operation,),
         ),
         ExpectedGatewayStep(
             name=draft_start,
             subcommand="draft-start",
-            arguments=(api,),
+            arguments=(operation,),
         ),
-        ExpectedGatewayStep(
+    ]
+    if bind_step is not None:
+        steps.append(bind_step)
+    steps.extend(
+        (
+            ExpectedGatewayStep(
             name=declaration,
             subcommand="draft-declare-soundengine-plan",
             arguments=(
-                *prefix(draft_start),
-                "--monitor-message",
-                monitor_message,
+                    *prefix(revision_step),
+                    *declaration_arguments,
             ),
         ),
         ExpectedGatewayStep(
@@ -2037,9 +2146,15 @@ def build_soundengine_business_transaction_steps(
             name=f"{label}.preview",
             subcommand="preview-from-draft",
             arguments=prefix(check),
-            expected_operation_request=request,
+                expected_operation_request=(
+                    None
+                    if operation == "ak.soundengine.registerGameObj"
+                    else request
+                ),
         ),
+        )
     )
+    return tuple(steps)
 
 
 def build_authoring_ui_business_transaction_steps(
