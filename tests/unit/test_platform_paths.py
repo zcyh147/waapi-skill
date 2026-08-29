@@ -138,6 +138,45 @@ def test_local_wine_cli_dispatch_translates_only_exact_audited_paths(tmp_path: P
     assert adapted.proof["host_dispatch_sha256"] != adapted.proof["wire_dispatch_sha256"]
 
 
+@pytest.mark.parametrize(
+    "uri",
+    (
+        "ak.wwise.console.project.create",
+        "ak.wwise.console.project.open",
+    ),
+)
+def test_local_wine_console_project_dispatch_translates_the_audited_path(
+    tmp_path: Path,
+    uri: str,
+) -> None:
+    home = tmp_path / "home"
+    active_project = home / "case" / "active" / "SampleProject.wproj"
+    target_project = home / "case" / "target" / "TargetProject.wproj"
+    active_project.parent.mkdir(parents=True)
+    active_project.write_text("<Project/>", encoding="utf-8")
+    target_project.parent.mkdir(parents=True)
+    target_project.write_text("<Project/>", encoding="utf-8")
+    args = {"path": str(target_project)}
+
+    adapted = adapt_cli_dispatch_paths(
+        uri=uri,
+        args=args,
+        options={},
+        io_audit=_io_audit(
+            uri,
+            [("args", "$.args.path", str(target_project), str(target_project.resolve()))],
+        ),
+        project_guard=_wine_project_guard(home, active_project),
+        host_os_name="posix",
+        account_home=home,
+    )
+
+    assert requires_wwise_wire_path_adaptation(uri) is True
+    assert adapted.args == {"path": r"Y:\case\target\TargetProject.wproj"}
+    assert adapted.proof["mode"] == "local_posix_wine"
+    assert adapted.proof["translated_path_count"] == 1
+
+
 def test_nested_platform_pairs_flow_from_io_audit_to_transient_wine_dispatch(
     tmp_path: Path,
 ) -> None:

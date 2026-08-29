@@ -6786,6 +6786,37 @@ def test_local_wine_cli_execute_translates_only_the_transient_dispatch_paths(
     assert completion["details"]["wire_path_adaptation"] == proof
 
 
+def test_console_project_open_selects_the_sealed_isolated_io_audit() -> None:
+    target = Path("/tmp/case/TargetProject.wproj")
+    audit = {
+        "contract": "waapi-skill.io-audit/v1",
+        "uri": "ak.wwise.console.project.open",
+        "paths": [
+            {
+                "section": "args",
+                "json_path": "$.args.path",
+                "raw_path": str(target),
+                "resolved_path": str(target),
+            }
+        ],
+    }
+    prepared = {
+        "pre_state": {
+            "execution_contract": {
+                "io_audit": audit,
+            }
+        }
+    }
+
+    selected = waapi_gateway.prepared_wire_path_io_audit(
+        operation="waapi.call",
+        call_uri="ak.wwise.console.project.open",
+        prepared=prepared,
+    )
+
+    assert selected == audit
+
+
 @pytest.mark.skipif(
     os.name == "nt",
     reason="Wine host path translation is POSIX-only",

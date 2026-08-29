@@ -13685,14 +13685,14 @@ def prepared_wire_path_io_audit(
             "The authorized preview lacks sealed execution state for path adaptation.",
         )
     import_guard: Mapping[str, Any] | None = None
-    if operation == "waapi.call" and call_uri.startswith("ak.wwise.cli."):
+    if operation == "waapi.call" and requires_wwise_wire_path_adaptation(call_uri):
         execution_contract = pre_state.get("execution_contract")
         io_audit = (
             execution_contract.get("io_audit")
             if isinstance(execution_contract, Mapping)
             else None
         )
-        context = "CLI"
+        context = "CLI or Console"
     else:
         expected_uri = NAMED_OPERATION_WIRE_PATH_URIS.get(operation)
         if expected_uri != call_uri:

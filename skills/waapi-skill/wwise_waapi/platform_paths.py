@@ -26,6 +26,8 @@ WWISE_WIRE_PATH_INPUT_AUDIT_CONTRACT = (
 )
 WINE_WIRE_PATH_WAAPI_URIS = frozenset(
     {
+        "ak.wwise.console.project.create",
+        "ak.wwise.console.project.open",
         "ak.wwise.core.audio.importTabDelimited",
         "ak.wwise.core.soundbank.convertExternalSources",
         "ak.wwise.core.soundbank.processDefinitionFiles",
@@ -84,8 +86,8 @@ def adapt_cli_dispatch_paths(
     helper deep-copies the dispatch and replaces only the exact JSON paths
     named by that audit.  A translated path must round-trip through the same
     sealed Wine drive mapping before the transient dispatch is returned.  The
-    translation surface is closed to Wwise CLI calls plus reviewed WAAPI
-    functions whose reflected payloads contain OS paths.
+    translation surface is closed to Wwise CLI calls plus reviewed Console and
+    Core WAAPI functions whose reflected payloads contain OS paths.
     """
 
     host_dispatch = {"args": _strict_json_copy(args), "options": _strict_json_copy(options)}
@@ -150,7 +152,15 @@ def adapt_cli_dispatch_paths(
     )
     windows_runtime = isinstance(process_path, str) and _WINDOWS_ABSOLUTE_PATH.match(process_path) is not None
     if not windows_runtime:
-        if isinstance(project_wire_path, str) and Path(project_wire_path).is_absolute():
+        native_posix_process = (
+            isinstance(process_path, str)
+            and Path(process_path).is_absolute()
+        )
+        local_endpoint = (
+            isinstance(endpoint_host, str)
+            and is_loopback_waapi_host(endpoint_host)
+        )
+        if native_posix_process and local_endpoint:
             proof = _identity_adaptation_proof(
                 uri,
                 host_dispatch,
