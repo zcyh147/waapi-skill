@@ -137,6 +137,83 @@ def test_bounded_call_returns_validated_business_result_to_agent(tmp_path: Path)
     ]
 
 
+@pytest.mark.parametrize(
+    ("api", "group_flag", "group_type"),
+    (
+        ("ak.soundengine.getState", "--state-group-id", "StateGroup"),
+        ("ak.soundengine.getSwitch", "--switch-group-id", "SwitchGroup"),
+    ),
+)
+@pytest.mark.parametrize(
+    "malformed_result",
+    (
+        {},
+        {"return": []},
+        {"return": {"id": "not-a-guid", "name": "Gameplay"}},
+        {
+            "return": {
+                "id": "{00000000-0000-0000-0000-000000000001}",
+                "name": "",
+            }
+        },
+    ),
+)
+def test_soundengine_bounded_reads_reject_malformed_wire_results(
+    tmp_path: Path,
+    api: str,
+    group_flag: str,
+    group_type: str,
+    malformed_result: Mapping[str, Any],
+) -> None:
+    version = "2025.1"
+    group_id = "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"
+    project = tmp_path / "SampleProject" / "SampleProject.wproj"
+    project.parent.mkdir()
+    project.write_text("fixture", encoding="utf-8")
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": [_live_info(version)],
+            "ak.wwise.core.getProjectInfo": [
+                {
+                    "id": "{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}",
+                    "name": "SampleProject",
+                    "path": str(project),
+                }
+            ],
+            "ak.wwise.core.object.get": [
+                {
+                    "return": [
+                        {
+                            "id": group_id,
+                            "name": "Gameplay",
+                            "type": group_type,
+                            "path": rf"\{group_type}s\Default Work Unit\Gameplay",
+                        }
+                    ]
+                }
+            ],
+            api: [dict(malformed_result)],
+        }
+    )
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "--version",
+            version,
+            "core-call",
+            api,
+            group_flag,
+            group_id,
+        ],
+        env=_env(tmp_path, version),
+        client_factory=lambda _url: client,
+    )
+
+    assert exit_code == 2, payload
+    assert payload["error_code"] == "SOUNDENGINE_READ_RESULT_INVALID"
+    assert "agent_result" not in payload
+
+
 @pytest.mark.parametrize("api", ("ak.wwise.core.getInfo", "ak.wwise.debug.testCrash"))
 def test_generic_transaction_accepts_only_registered_transaction_lanes(api: str) -> None:
     with pytest.raises(

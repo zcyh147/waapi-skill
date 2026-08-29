@@ -66,7 +66,12 @@ class RuntimeGameObjectHandleRecord:
 
 class RuntimeGameObjectHandleStore:
     def __init__(self, state_dir: Path) -> None:
-        self.records = Path(state_dir) / "soundengine-game-object-handles-v1" / "records"
+        if not isinstance(state_dir, Path):
+            raise TypeError("state_dir must be a pathlib.Path")
+        self.state_dir = state_dir
+        self.root = state_dir / "soundengine-game-object-handles-v1"
+        self.records = self.root / "records"
+        self._ensure_storage_hierarchy()
 
     def issue(
         self,
@@ -112,7 +117,7 @@ class RuntimeGameObjectHandleStore:
                 "GAME_OBJECT_HANDLE_INVALID",
                 "Source transaction identity is invalid.",
             )
-        self.records.mkdir(parents=True, exist_ok=True)
+        self._ensure_storage_hierarchy()
         if len(self._record_paths()) >= _MAX_RECORDS:
             raise RuntimeGameObjectHandleError(
                 "GAME_OBJECT_HANDLE_STORE_LIMIT",
@@ -166,6 +171,7 @@ class RuntimeGameObjectHandleStore:
         *,
         context: RuntimeGameObjectContext,
     ) -> RuntimeGameObjectHandleRecord:
+        self._ensure_storage_hierarchy()
         validated = validate_runtime_game_object_handle(handle)
         path = self.records / f"{validated}.json"
         record = self._load(path)
@@ -182,6 +188,7 @@ class RuntimeGameObjectHandleStore:
         *,
         context: RuntimeGameObjectContext,
     ) -> RuntimeGameObjectHandleRecord:
+        self._ensure_storage_hierarchy()
         matches = [
             record
             for record in self._active_records()
@@ -200,6 +207,7 @@ class RuntimeGameObjectHandleStore:
         *,
         context: RuntimeGameObjectContext,
     ) -> tuple[str, ...]:
+        self._ensure_storage_hierarchy()
         matches = [
             record
             for record in self._active_records()
@@ -213,13 +221,7 @@ class RuntimeGameObjectHandleStore:
         return [self._load(path) for path in self._record_paths()]
 
     def _record_paths(self) -> tuple[Path, ...]:
-        if not self.records.exists():
-            return ()
-        if self.records.is_symlink() or not self.records.is_dir():
-            raise RuntimeGameObjectHandleError(
-                "GAME_OBJECT_HANDLE_STORE_CORRUPT",
-                "Game object handle store is not one local directory.",
-            )
+        self._ensure_storage_hierarchy()
         paths: list[Path] = []
         try:
             with os.scandir(self.records) as entries:
@@ -246,6 +248,7 @@ class RuntimeGameObjectHandleStore:
         return tuple(sorted(paths))
 
     def _load(self, path: Path) -> RuntimeGameObjectHandleRecord:
+        self._ensure_storage_hierarchy()
         if not os.path.lexists(path):
             raise RuntimeGameObjectHandleError(
                 "GAME_OBJECT_HANDLE_NOT_AVAILABLE",
@@ -276,6 +279,34 @@ class RuntimeGameObjectHandleStore:
             raise RuntimeGameObjectHandleError(
                 "GAME_OBJECT_HANDLE_STORE_CORRUPT",
                 "Stored game object handle is invalid.",
+            ) from exc
+
+    def _ensure_storage_hierarchy(self) -> None:
+        for path in (self.state_dir, self.root, self.records):
+            self._ensure_directory(path)
+
+    @staticmethod
+    def _ensure_directory(path: Path) -> None:
+        if os.path.lexists(path):
+            try:
+                metadata = path.lstat()
+            except OSError as exc:
+                raise RuntimeGameObjectHandleError(
+                    "GAME_OBJECT_HANDLE_STORE_CORRUPT",
+                    "Game object handle state path cannot be inspected safely.",
+                ) from exc
+            if path.is_symlink() or not stat.S_ISDIR(metadata.st_mode):
+                raise RuntimeGameObjectHandleError(
+                    "GAME_OBJECT_HANDLE_STORE_CORRUPT",
+                    "Game object handle state path is not a real directory.",
+                )
+            return
+        try:
+            path.mkdir(mode=0o700)
+        except OSError as exc:
+            raise RuntimeGameObjectHandleError(
+                "GAME_OBJECT_HANDLE_STORE_CORRUPT",
+                "Game object handle state path cannot be created safely.",
             ) from exc
 
     @staticmethod

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -78,3 +79,28 @@ def test_game_object_handle_native_scan_fails_before_an_unbounded_directory_walk
     with pytest.raises(RuntimeGameObjectHandleError) as limited:
         store.resolve_native_id(issued.game_object_id, context=_context())
     assert limited.value.error_code == "GAME_OBJECT_HANDLE_STORE_LIMIT"
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX symlink hierarchy proof")
+@pytest.mark.parametrize("linked_component", ("state_dir", "root", "records"))
+def test_game_object_handle_store_rejects_every_symlinked_storage_component(
+    tmp_path: Path,
+    linked_component: str,
+) -> None:
+    external = tmp_path / "external"
+    external.mkdir()
+    state_dir = tmp_path / "state"
+    if linked_component == "state_dir":
+        state_dir.symlink_to(external, target_is_directory=True)
+    else:
+        state_dir.mkdir()
+        root = state_dir / "soundengine-game-object-handles-v1"
+        if linked_component == "root":
+            root.symlink_to(external, target_is_directory=True)
+        else:
+            root.mkdir()
+            (root / "records").symlink_to(external, target_is_directory=True)
+
+    with pytest.raises(RuntimeGameObjectHandleError) as corrupt:
+        RuntimeGameObjectHandleStore(state_dir)
+    assert corrupt.value.error_code == "GAME_OBJECT_HANDLE_STORE_CORRUPT"
