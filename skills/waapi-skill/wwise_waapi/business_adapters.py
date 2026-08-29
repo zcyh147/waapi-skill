@@ -20,6 +20,10 @@ from .core_business_contracts import (
     core_business_contract_data,
     core_business_draft_operations,
 )
+from .cli_console_business_contracts import (
+    CLI_CONSOLE_BUSINESS_OPERATIONS,
+    cli_console_business_contract_data,
+)
 from .object_lifecycle_business_contracts import (
     object_lifecycle_business_contract_data,
 )
@@ -127,6 +131,10 @@ def _compound_undo_contract(operation: str, version: str) -> dict[str, Any]:
 
 def _core_business_contract(operation: str, version: str) -> dict[str, Any]:
     return core_business_contract_data(operation, version)
+
+
+def _cli_console_contract(operation: str, version: str) -> dict[str, Any]:
+    return cli_console_business_contract_data(operation, version)
 
 
 def _object_lifecycle_contract(operation: str, version: str) -> dict[str, Any]:
@@ -355,6 +363,15 @@ def _materialize_core_business(
     from .core_business import materialize_core_business_request
 
     return materialize_core_business_request(operation, session)
+
+
+def _materialize_cli_console(
+    operation: str,
+    session: BusinessDeclarationSession,
+) -> Mapping[str, Any]:
+    from .cli_console_business import materialize_cli_console_business_request
+
+    return materialize_cli_console_business_request(operation, session)
 
 
 def _authoring_ui_is_complete(
@@ -903,6 +920,26 @@ _SOUNDENGINE_CONTROL_DEFINITION = {
     "settings_are_complete_declaration": True,
 }
 
+_CLI_CONSOLE_DEFINITION = {
+    "family": "cli-console-business",
+    "contract_builder": _cli_console_contract,
+    "materializer": _materialize_cli_console,
+    "update_commands": frozenset({"draft-declare-cli-console-plan"}),
+    "initial_projection_actions": (
+        "declare-cli-console-plan",
+        "inspect",
+        "cancel",
+    ),
+    "active_projection_actions": (
+        "declare-cli-console-plan",
+        "check",
+        "inspect",
+        "cancel",
+    ),
+    "auto_apply_preview": True,
+    "settings_are_complete_declaration": True,
+}
+
 
 def _bind_adapter(operation: str, definition: Mapping[str, Any]) -> BusinessAdapter:
     values = dict(definition)
@@ -918,6 +955,10 @@ def _bind_adapter(operation: str, definition: Mapping[str, Any]) -> BusinessAdap
 
 
 _BUSINESS_ADAPTERS = {
+    **{
+        operation: _bind_adapter(operation, _CLI_CONSOLE_DEFINITION)
+        for operation in CLI_CONSOLE_BUSINESS_OPERATIONS
+    },
     **{
         operation: _bind_adapter(operation, _CORE_BUSINESS_DEFINITION)
         for operation in core_business_draft_operations()

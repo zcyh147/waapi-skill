@@ -5,7 +5,7 @@ tests/unit/test_gateway_session_context.py
 tests/unit/test_public_route_coverage_contract.py
 tests/unit/test_public_route_program_matrix.py
 tests/unit/test_stable_read_adapters.py
-tests/unit/test_cli_request_templates.py
+tests/unit/test_cli_console_business_adapter.py
 tests/unit/test_debug_read_gateway.py
 tests/unit/test_debug_lua_operations.py
 tests/unit/test_debug_lua_gateway_full_chain.py

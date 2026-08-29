@@ -3632,7 +3632,17 @@ def _operation_input_mode_index(
 def operation_input_mode(name: str, version: str) -> str:
     """Return the sole normal input mode for one exact operation/version key."""
 
-    spec = describe_operation(name)
+    spec = OPERATION_SPECS.get(name)
+    if spec is None:
+        try:
+            business_adapter(name).contract(version)
+        except (KeyError, ValueError) as exc:
+            raise OperationContractError(
+                "UNKNOWN_OPERATION",
+                f"Unknown closed operation {name!r}.",
+                details={"operation": name, "supported": sorted(OPERATION_SPECS)},
+            ) from exc
+        return BUSINESS_DECLARATION_INPUT_MODE
     if version not in spec.supported_versions:
         raise OperationContractError(
             "UNAVAILABLE_IN_VERSION",

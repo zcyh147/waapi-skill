@@ -153653,7 +153653,7 @@
     "contract": "waapi-skill.typed-request-surface/v1",
     "total_lanes": 824
   },
-  "inventory_sha256": "961b1147c6291a43852f8f7193abc907fda2f51898f29155ae7b2ac8be178d0a",
+  "inventory_sha256": "916fcb085c35ef729510182bff61669988d273b56a74009880beb28d4c880c50",
   "mechanic_owners": {
     "ambiguous_continuation_selection": "gateway_derivation",
     "batch_layout": "gateway_derivation",
@@ -184516,7 +184516,7 @@
     "stable_business_declaration": "A prompt-derived business value remains visible in the public request."
   },
   "source_contracts": {
-    "gateway_parser_sha256": "d2e5430c10f9e09170d647f8fe684ff510d82a6403b289e1416e52ea71b2ad3e",
+    "gateway_parser_sha256": "3f5c8c3650fb80a4d2170699ac7e11a13efbbb022ba505208c68f103b6a26b71",
     "operation_contract_sha256": "44b2583ac1211ffff7a6c55277c4a81e2845f1042605f28122165af4f8936031",
     "public_continuation_sha256": "cc70488a27737b80878a9fe2e09c8c10fbf709ed8c549ce07c0124eb59de749a",
     "typed_request_surface_sha256": "d21ddea15bb098fb5b82d0937189a2f52c81d2059e59a51ceb4e840b70c0a370"

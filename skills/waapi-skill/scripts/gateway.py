@@ -239,6 +239,17 @@ from wwise_waapi.business_declaration_state import (  # noqa: E402  # pyright: i
 from wwise_waapi.business_adapters import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     business_adapter,
 )
+from wwise_waapi.cli_console_business_contracts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    CLI_CONSOLE_BUSINESS_OPERATIONS,
+    cli_console_business_catalog_rows,
+    cli_console_business_contract_data,
+    cli_console_business_versions,
+)
+from wwise_waapi.cli_console_business_cli import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    CliConsoleBusinessCliError,
+    add_cli_console_plan_arguments,
+    cli_console_plan_from_namespace,
+)
 from wwise_waapi.core_business_contracts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     core_business_catalog_rows,
     core_business_contract_data,
@@ -2379,6 +2390,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_business_draft_binding_arguments(draft_declare_artifact_plan)
     add_exact_artifact_plan_arguments(draft_declare_artifact_plan)
+    draft_declare_cli_console_plan = subparsers.add_parser(
+        "draft-declare-cli-console-plan",
+        help=(
+            "Declare one complete project/build outcome while the Gateway owns "
+            "native Wwise CLI and Console request construction"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_declare_cli_console_plan)
+    add_cli_console_plan_arguments(draft_declare_cli_console_plan)
 
     draft_declare_ui_plan = subparsers.add_parser(
         "draft-declare-ui-plan",
@@ -6133,7 +6153,9 @@ def core_business_route_payload(version: str, api: str) -> dict[str, Any]:
     """Expose one reviewed Core declaration without reflected typed fields."""
 
     contract = (
-        media_build_business_contract_data(api, version)
+        cli_console_business_contract_data(api, version)
+        if api in CLI_CONSOLE_BUSINESS_OPERATIONS
+        else media_build_business_contract_data(api, version)
         if api in media_build_business_operations()
         else soundengine_control_business_contract_data(api, version)
         if api in soundengine_control_business_operations()
@@ -6178,6 +6200,8 @@ def core_business_route_payload(version: str, api: str) -> dict[str, Any]:
 
 
 def core_business_route_available(api: str, version: str) -> bool:
+    if api in CLI_CONSOLE_BUSINESS_OPERATIONS:
+        return version in cli_console_business_versions(api)
     if api in media_build_business_operations():
         return version in media_build_business_versions(api)
     if api in soundengine_control_business_operations():
@@ -8865,6 +8889,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             operations.append(projection)
         request_schema_routes = list(
             (
+                *cli_console_business_catalog_rows(),
                 *core_business_catalog_rows(),
                 *media_build_business_catalog_rows(),
                 *runtime_inspection_business_catalog_rows(),
@@ -11955,6 +11980,16 @@ def dispatch_command(
             dispatcher=dispatcher,
             common=common,
         )
+    if args.command == "draft-declare-cli-console-plan":
+        return dispatch_business_cli_console_plan(
+            args,
+            env=env,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+        )
     if args.command in {"draft-declare-ui-plan", "draft-add-ui-command"}:
         return dispatch_business_authoring_ui_update(
             args,
@@ -14975,6 +15010,108 @@ def dispatch_business_exact_artifact_plan(
         if evidence is not None:
             settings["artifact_evidence"] = evidence
         candidate = current.with_settings(settings)
+        adapter.materialize(candidate)
+        return candidate
+
+    record = binding.store.apply_business_update(
+        args.draft_id,
+        task_authority=args.task_authority,
+        expected_revision=args.expected_revision,
+        schema_digest=operation_draft_schema_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        composer_digest=operation_composer_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        context=binding.context,
+        update=update,
+        event_type="settings.revised",
+    )
+    payload = operation_draft_payload(
+        args.command,
+        record,
+        offline=False,
+        state_dir=args.state_dir,
+        task_authority=args.task_authority,
+    )
+    payload.update(
+        {
+            "endpoint": dict(common["endpoint"]),
+            "detected_version": detected_version,
+            "project_call": dispatch_call_summary(binding.project_call),
+        }
+    )
+    return payload
+
+
+def dispatch_business_cli_console_plan(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Bind one complete high-level CLI/Console plan to the live host."""
+
+    state_dir = resolve_transaction_state_directory(args, env=env)
+    pending = OperationDraftStore(state_dir).inspect(
+        args.draft_id,
+        task_authority=args.task_authority,
+    )
+    if live_info.get("isCommandLine") is not True:
+        return command_line_host_required_payload(
+            command=args.command,
+            live_info=live_info,
+            common=common,
+            operation=pending.operation,
+        )
+    binding = _open_business_binding(
+        args,
+        env=env,
+        connection=connection,
+        detected_version=detected_version,
+        live_info=live_info,
+        dispatcher=dispatcher,
+    )
+    adapter = business_adapter(binding.record.operation)
+    if adapter.family != "cli-console-business" or not adapter.accepts_update_command(
+        args.command
+    ):
+        raise GatewayInputError(
+            f"{binding.record.operation} does not expose {args.command}"
+        )
+    raw_session = (
+        binding.record.composition.get("business_session")
+        if binding.record.composition is not None
+        else None
+    )
+    session = (
+        BusinessDeclarationSession.create(binding.context)
+        if raw_session is None
+        else BusinessDeclarationSession.from_dict(raw_session)
+    )
+    if session.context != binding.context:
+        raise OperationDraftBindingDrift(
+            "Live project or Wwise build differs from the CLI/Console plan binding."
+        )
+    try:
+        plan = cli_console_plan_from_namespace(
+            args,
+            operation=binding.record.operation,
+            version=detected_version,
+        )
+    except CliConsoleBusinessCliError as exc:
+        raise GatewayInputError(str(exc)) from exc
+
+    def update(
+        current: BusinessDeclarationSession,
+    ) -> BusinessDeclarationSession:
+        candidate = current.with_settings({"cli_console_plan": plan})
         adapter.materialize(candidate)
         return candidate
 
@@ -21407,6 +21544,11 @@ def _business_next_action_binding(
         "draft-declare-artifact-plan",
         *binding,
     ]
+    declare_cli_console_plan_prefix = [
+        *base,
+        "draft-declare-cli-console-plan",
+        *binding,
+    ]
     declare_ui_plan_prefix = [*base, "draft-declare-ui-plan", *binding]
     add_ui_command_prefix = [*base, "draft-add-ui-command", *binding]
     declare_debug_intent_prefix = [
@@ -22470,6 +22612,61 @@ def _business_next_action_binding(
                     ),
                 ),
                 "append": declaration_shapes[record.operation],
+                "submit_once": True,
+                "native_request_input": "forbidden",
+            },
+        }
+    if adapter.family == "cli-console-business":
+        declaration = business_contract["declaration"]
+        shared = {
+            "contract": "waapi-skill.business-draft-next-action/v1",
+            "responsibility_split": {
+                "agent": (
+                    "select_the_project_build_operation_and_supply_only_closed_"
+                    "business_values_and_exact_user_artifacts"
+                ),
+                "gateway": (
+                    "derive_native_cli_options_version_deltas_platform_mappings_"
+                    "io_root_ordering_and_shell_serialization"
+                ),
+            },
+            "business_contract": business_contract,
+            "forbidden_inputs": [
+                *forbidden_inputs,
+                "native_request",
+                "waapi_args",
+                "waapi_options",
+                "native_cli_option",
+                "custom_command",
+                "shell_fragment",
+                "request_fragment",
+            ],
+            "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+            "then_read_next_response": True,
+            "precompute_or_increment_revision": False,
+        }
+        if session is not None and adapter.is_complete(session):
+            return {
+                **shared,
+                "required_next_phase": "check_complete_cli_console_plan",
+                "check": {
+                    **operation_draft_prefix_copy_binding(check),
+                    "append": [],
+                },
+            }
+        return {
+            **shared,
+            "required_next_phase": "declare_complete_cli_console_plan",
+            "declaration": {
+                **operation_draft_prefix_copy_binding(
+                    declare_cli_console_plan_prefix,
+                    append_action=(
+                        "copy_verbatim_then_append_one_complete_cli_console_plan"
+                    ),
+                ),
+                "required_fields": list(declaration["required_fields"]),
+                "optional_fields": list(declaration["optional_fields"]),
+                "input_forms": dict(declaration["input_forms"]),
                 "submit_once": True,
                 "native_request_input": "forbidden",
             },

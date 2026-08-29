@@ -20,6 +20,9 @@ from wwise_waapi.business_declarations import (
     SUPPORTED_WWISE_VERSIONS,
 )
 from wwise_waapi.core_business_contracts import core_business_draft_operations
+from wwise_waapi.cli_console_business_contracts import (
+    CLI_CONSOLE_BUSINESS_OPERATIONS,
+)
 from wwise_waapi.project_setting_business_contracts import (
     project_setting_business_operations,
 )
@@ -83,6 +86,7 @@ def test_every_business_input_lane_has_exactly_one_registered_adapter() -> None:
             if lane.input_mode == BUSINESS_DECLARATION_INPUT_MODE
         }
         | core_business_draft_operations()
+        | set(CLI_CONSOLE_BUSINESS_OPERATIONS)
         | project_setting_business_operations()
         | source_control_business_draft_operations()
         | runtime_control_business_operations()

@@ -153,33 +153,15 @@ Only explicit WwiseConsole, CLI, command-line, or 命令行 wording selects an `
 
 Without explicit CLI wording, use the connected Authoring operations: `soundbank.generate`, `soundbank.convertExternalSources`, `soundbank.processDefinitionFiles`, and `audio.importTabDelimited`. When the earlier metadata-bound branch does not apply, their first Gateway command is the named `operation-schema`; otherwise complete that branch's one discovery first and then read the same schema. Do not probe a same-named CLI API first. The singular CLI `convertExternalSource`, CLI `generateSoundbank`, and CLI `tabDelimitedImport` are not their connected `ak.wwise.core.*` counterparts.
 
-### Reviewed CLI typed routes
+### Reviewed CLI and Console business routes
 
-For these four exact CLI APIs, use `request-schema <exact-uri>` and follow its sole typed continuation:
+Every reflected `ak.wwise.cli.*` route plus `ak.wwise.console.project.create` and `ak.wwise.console.project.open` uses `request-schema <exact-uri>`. Follow its exact `draft-start`, then submit one complete `draft-declare-cli-console-plan` with only the returned business fields and input forms. These routes require WwiseConsole; an Authoring-host boundary ends the attempt.
 
-- `ak.wwise.cli.convertExternalSource`
-- `ak.wwise.cli.generateSoundbank`
-- `ak.wwise.cli.tabDelimitedImport`
-- `ak.wwise.cli.migrate`
+The declaration forms are fixed: `--value` for one scalar, `--item` for each member of a business collection, `--mapping` for each named platform/value association, and `--toggle <field> enable|disable` for an explicit Boolean outcome. Copy the field names from the current schema. Never type native CLI option names, negative flags, request objects, shell fragments, or array layouts. The Gateway owns version availability, native option spelling, mapping shape and order, `io_root`, and shell serialization.
 
-Apply the 2022-specific reminders below only when the configured schema version is `2022.1`; never reuse them for another lane. `request-schema` owns accepted and blocked fields, reflected types, version deltas, typed handles, and `io_root` policy. Never invent a hidden flag or default Boolean; include a true Boolean only for behavior explicitly requested by the user.
+Stable choices such as `verbosity=normal|quiet|verbose`, `source_control=enabled|disabled`, `decoded_media=write|omit`, `wwise_dat=write|omit`, `tabular_import_mode=create|reuse|replace`, and `migration_policy=migrate|fail` appear only where the current version supports them. Exact project, table, definition, license, source, and output paths remain caller artifacts. Do not infer an optional value the user did not request. Model-supplied global, pre-build, post-build, or other custom command hooks remain prohibited.
 
-Version-delta reminders that must agree with the returned schema:
-
-| API | Field delta |
-|---|---|
-| `generateSoundbank` | `no-source-control`, `root-output-path`, and `use-user-overrides` appear in 2022.1; `license-file` appears in 2023.1; `no-wwise-dat` ends after 2023.1 |
-| `tabDelimitedImport`, `migrate` | `no-source-control` appears in 2023.1 |
-| `convertExternalSource` | `no-wwise-dat` ends after 2023.1 |
-
-Compact 2022 materialization rules not yet represented structurally:
-
-- `platform` is always an array. `bank`, `language`, and `import-definition-file` are a string for one value and an array for several. `project`, `io_root`, `cache`, `root-output-path`, the tab-import file/mode/language, and migrate project are scalar strings.
-- A platform/value mapping (`source-by-platform`, `output`, `soundbank-path`) is a flat two-string pair for one platform and an array of pairs for several; never wrap one pair in an extra array.
-- `convertExternalSource` accepts exactly one `source-file` string shared by platforms or one unique `source-by-platform` pair per platform. In 2022.1 an array processes only its first source and a repeated platform mapping processes only its last entry, so both shapes are rejected; multiple manifests for one platform require a caller-prepared union file or separate transactions. Bind each `output` pair to that platform's final directory. `io_root` is the deepest common absolute ancestor of those outputs and may not be only the filesystem root.
-- `generateSoundbank` maps non-Init Banks, platform arrays, and explicit languages. Init is automatic. Explicit nonlocalized-only, cache-clear, or header requests map to their returned true flags; omit false/default flags. One `soundbank-path` is a flat pair; several use per-platform pairs. Use stated cache/root-output paths or default them below the requested output root as returned by the reviewed mapping. Derive `io_root` only from resolved write paths, never the project path, and reject a filesystem-root-only result. Its verifier is result-schema-only because WwiseConsole may already have torn down the project context.
-- `tabDelimitedImport` uses the stated project, caller TSV, Wwise language, and explicit `createNew`/`useExisting`/`replaceExisting`; `io_root` is the case-owned project directory. Optional true flags are never inferred.
-- `migrate` maps only the case-owned project and its containing `io_root`. `abort-on-load-issues` is included only when explicitly requested; warning summaries do not imply `verbose`. A normal control-server disconnect or continued reachability does not authorize replay; never replay execution, and defer success to the caller-owned reopened-project oracle.
+The Gateway also owns the Wwise 2022 external-source partial-success boundary, all per-version field deltas, collection ceilings, and isolated-I/O checks. On rejection, report the returned repair action instead of reconstructing a native request. `ak.wwise.cli.migrate` still ends after its one execute result: disconnect or continued reachability never authorizes replay, and result-schema-only evidence is not a reopened-project business oracle.
 
 ### Authoring audio conversion
 
@@ -191,7 +173,7 @@ Unknown fields fail. Use only the returned continuation; there is no caller-auth
 
 A rejected or incomplete preview is a hard same-turn boundary. Do not repair JSON, change an operation, or retry preview in that turn. A changed target/value requires a new preview.
 
-Filesystem proofs are local to the Gateway host. File-backed imports, SoundBank I/O, Lua, file-bearing UI commands, recursive object imports, and isolated exact-URI typed routes require a loopback WAAPI endpoint as reported by their schema/boundary. On `LOCAL_WAAPI_HOST_REQUIRED`, report and stop; never treat a local file proof as evidence about a remote host.
+Filesystem proofs are local to the Gateway host. File-backed imports, SoundBank I/O, Lua, file-bearing UI commands, recursive object imports, and isolated exact-URI business routes require a loopback WAAPI endpoint as reported by their schema/boundary. On `LOCAL_WAAPI_HOST_REQUIRED`, report and stop; never treat a local file proof as evidence about a remote host.
 
 Policy behavior:
 
