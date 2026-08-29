@@ -10130,10 +10130,10 @@ def dispatch_runtime_inspection_business_read(
             detected_version=detected_version,
             live_info=live_info,
         )
+        state_dir = resolve_transaction_state_directory(args, env=env)
+        require_runtime_directory_outside_project(state_dir, project=project)
         try:
-            transport_record = RuntimeTransportHandleStore(
-                resolve_transaction_state_directory(args, env=env)
-            ).resolve(
+            transport_record = RuntimeTransportHandleStore(state_dir).resolve(
                 args.runtime_inspection_business_request["transport_handle"],
                 context=context,
             )

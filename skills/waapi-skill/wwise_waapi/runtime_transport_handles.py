@@ -146,6 +146,12 @@ class RuntimeTransportHandleStore:
         if not isinstance(token, bytes) or len(token) != 16:
             raise ValueError("transport handle token source must return 16 bytes")
         handle = f"trh1-{token.hex()}"
+        path = self._path(handle)
+        if os.path.lexists(path):
+            raise RuntimeTransportHandleError(
+                "TRANSPORT_HANDLE_COLLISION",
+                "Generated transport handle already exists.",
+            )
         body = {
             "contract": TRANSPORT_HANDLE_RECORD_CONTRACT,
             "handle": handle,
@@ -157,7 +163,13 @@ class RuntimeTransportHandleStore:
             "active": True,
         }
         payload = {**body, "record_sha256": canonical_sha256(body)}
-        self._write_new(self._path(handle), payload)
+        self._ensure_capacity_for_new_record(transport_id=transport_id, context=context)
+        self._write_new(path, payload)
+        self._retire_native_id(
+            transport_id,
+            context=context,
+            excluding_handle=handle,
+        )
         return self._parse(payload)
 
     def resolve(
@@ -186,12 +198,16 @@ class RuntimeTransportHandleStore:
         *,
         context: RuntimeTransportContext,
     ) -> tuple[str, ...]:
-        paths = sorted(self.records.glob("trh1-*.json"))
-        if len(paths) > _MAX_RECORDS:
-            raise RuntimeTransportHandleError(
-                "TRANSPORT_HANDLE_STORE_LIMIT",
-                "Transport handle store exceeds its fixed record ceiling.",
-            )
+        return self._retire_native_id(transport_id, context=context)
+
+    def _retire_native_id(
+        self,
+        transport_id: int,
+        *,
+        context: RuntimeTransportContext,
+        excluding_handle: str | None = None,
+    ) -> tuple[str, ...]:
+        paths = self._bounded_record_paths()
         retired: list[str] = []
         for path in paths:
             record = self._load(path)
@@ -199,6 +215,7 @@ class RuntimeTransportHandleStore:
                 record.active
                 and record.transport_id == transport_id
                 and record.context == context
+                and record.handle != excluding_handle
             ):
                 body = {
                     "contract": TRANSPORT_HANDLE_RECORD_CONTRACT,
@@ -241,6 +258,11 @@ class RuntimeTransportHandleStore:
         record: RuntimeTransportHandle,
         row: Mapping[str, Any],
     ) -> None:
+        # Wwise exposes no transport-generation field: getList contains only
+        # transport, object, and gameObject, while getState contains only the
+        # playback state.  Exact equality is therefore the strongest native
+        # continuity proof.  A later Gateway issuance for the same native ID
+        # still retires the prior local capability generation in issue().
         if canonical_sha256(row) != record.transport_row_sha256:
             raise RuntimeTransportHandleError(
                 "TRANSPORT_HANDLE_STALE",
@@ -248,13 +270,56 @@ class RuntimeTransportHandleStore:
             )
 
     def _active_records(self) -> tuple[RuntimeTransportHandle, ...]:
-        paths = sorted(self.records.glob("trh1-*.json"))
+        paths = self._bounded_record_paths()
+        return tuple(record for path in paths if (record := self._load(path)).active)
+
+    def _ensure_capacity_for_new_record(
+        self,
+        *,
+        transport_id: int,
+        context: RuntimeTransportContext,
+    ) -> None:
+        paths = self._prune_retired_records(reserve=1)
+        if len(paths) < _MAX_RECORDS:
+            return
+
+        # Reissuing a native identity represents a new Gateway generation.  At
+        # the hard ceiling the replaced generation may be retired first so its
+        # slot can be reclaimed; unrelated active capabilities are never
+        # evicted.
+        retired = self._retire_native_id(transport_id, context=context)
+        if retired:
+            paths = self._prune_retired_records(reserve=1)
+        if len(paths) >= _MAX_RECORDS:
+            raise RuntimeTransportHandleError(
+                "TRANSPORT_HANDLE_STORE_LIMIT",
+                "Transport handle store reached its fixed active-record ceiling.",
+            )
+
+    def _bounded_record_paths(self) -> tuple[Path, ...]:
+        paths = self._prune_retired_records(reserve=0)
         if len(paths) > _MAX_RECORDS:
             raise RuntimeTransportHandleError(
                 "TRANSPORT_HANDLE_STORE_LIMIT",
-                "Transport handle store exceeds its fixed record ceiling.",
+                "Transport handle store exceeds its fixed active-record ceiling.",
             )
-        return tuple(record for path in paths if (record := self._load(path)).active)
+        return paths
+
+    def _prune_retired_records(self, *, reserve: int) -> tuple[Path, ...]:
+        paths = tuple(sorted(self.records.glob("trh1-*.json")))
+        remove_count = max(0, len(paths) + reserve - _MAX_RECORDS)
+        if remove_count == 0:
+            return paths
+
+        retired: list[Path] = []
+        for path in paths:
+            if not self._load(path).active:
+                retired.append(path)
+                if len(retired) == remove_count:
+                    break
+        for path in retired:
+            path.unlink()
+        return tuple(path for path in paths if path not in retired)
 
     def _path(self, handle: str) -> Path:
         return self.records / f"{handle}.json"

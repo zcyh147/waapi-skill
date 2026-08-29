@@ -738,7 +738,9 @@ def test_transport_state_read_maps_gateway_handle_without_exposing_native_id(
     tmp_path: Path,
 ) -> None:
     state_dir = tmp_path / "state"
-    project_file = tmp_path / "SampleProject.wproj"
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    project_file = project_root / "SampleProject.wproj"
     project_file.write_text("fixture", encoding="utf-8")
     transport_handle = _issue_transport_handle(
         state_dir,
@@ -812,6 +814,66 @@ def test_transport_state_read_maps_gateway_handle_without_exposing_native_id(
     }
 
 
+def test_transport_state_rejects_handle_store_inside_live_project(
+    tmp_path: Path,
+) -> None:
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    project_file = project_root / "SampleProject.wproj"
+    project_file.write_text("fixture", encoding="utf-8")
+    state_dir = project_root / ".waapi-skill-state"
+    transport_handle = _issue_transport_handle(
+        state_dir,
+        project_path=project_file,
+    )
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": [
+                {
+                    "displayName": "Wwise",
+                    "isCommandLine": False,
+                    "apiVersion": 1,
+                    "platform": "macosx",
+                    "configuration": "release",
+                    "version": {
+                        "year": 2025,
+                        "major": 1,
+                        "minor": 0,
+                        "build": 1,
+                        "displayName": "v2025.1.0.1",
+                    },
+                }
+            ],
+            "ak.wwise.core.getProjectInfo": [
+                {
+                    "id": "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}",
+                    "name": "SampleProject",
+                    "path": str(project_file),
+                }
+            ],
+        }
+    )
+
+    code, payload = gateway.execute_gateway(
+        [
+            "--version",
+            "2025.1",
+            "--state-dir",
+            str(state_dir),
+            "core-call",
+            TRANSPORT_GET_STATE_URI,
+            "--transport-handle",
+            transport_handle,
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+
+    assert code == 2
+    assert "outside the live Wwise project" in payload["message"]
+    assert all(call[0] != TRANSPORT_GET_STATE_URI for call in client.calls)
+
+
 def test_transport_state_rejects_invented_native_id_before_connection(
     tmp_path: Path,
 ) -> None:
@@ -879,7 +941,9 @@ def test_transport_state_rejects_well_formed_but_non_live_handle_before_state_ca
     tmp_path: Path,
 ) -> None:
     state_dir = tmp_path / "state"
-    project_file = tmp_path / "SampleProject.wproj"
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    project_file = project_root / "SampleProject.wproj"
     project_file.write_text("fixture", encoding="utf-8")
     transport_handle = _issue_transport_handle(
         state_dir,
