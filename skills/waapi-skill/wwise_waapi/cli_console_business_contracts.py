@@ -534,27 +534,26 @@ def cli_console_business_catalog_rows() -> tuple[dict[str, Any], ...]:
     """List the deep project/build routes for offline intent selection."""
 
     intents = {
-        "ak.wwise.cli.addNewPlatform": "add one project platform from a supported base platform",
-        "ak.wwise.cli.convertExternalSource": "convert exact external-source definition files for selected platforms",
-        "ak.wwise.cli.createNewProject": "create a new Wwise project through WwiseConsole",
-        "ak.wwise.cli.dumpObjects": "write a deterministic project object dump",
-        "ak.wwise.cli.generateSoundbank": "generate SoundBanks and related build artifacts through WwiseConsole",
-        "ak.wwise.cli.migrate": "migrate one exact Wwise project",
-        "ak.wwise.cli.moveMediaIdsToSingleFile": "move project media IDs into the single-file layout",
-        "ak.wwise.cli.moveMediaIdsToWorkUnits": "move project media IDs into Work Units",
-        "ak.wwise.cli.tabDelimitedImport": "process one existing tab-delimited import through WwiseConsole",
-        "ak.wwise.cli.updateMediaIdsInSingleFile": "update the project single-file media ID layout",
-        "ak.wwise.cli.verify": "verify one exact Wwise project without changing its business content",
-        "ak.wwise.cli.waapiServer": "start a bounded WwiseConsole WAAPI server configuration",
-        "ak.wwise.console.project.create": "create and open a project through the Console project API",
-        "ak.wwise.console.project.open": "open one exact project with a closed migration policy",
+        "ak.wwise.cli.addNewPlatform": "add one project platform",
+        "ak.wwise.cli.convertExternalSource": "convert external sources",
+        "ak.wwise.cli.createNewProject": "create a project through WwiseConsole",
+        "ak.wwise.cli.dumpObjects": "dump project objects",
+        "ak.wwise.cli.generateSoundbank": "generate SoundBanks and build artifacts",
+        "ak.wwise.cli.migrate": "migrate a project",
+        "ak.wwise.cli.moveMediaIdsToSingleFile": "move media IDs to one file",
+        "ak.wwise.cli.moveMediaIdsToWorkUnits": "move media IDs to Work Units",
+        "ak.wwise.cli.tabDelimitedImport": "process a tab-delimited import",
+        "ak.wwise.cli.updateMediaIdsInSingleFile": "update single-file media IDs",
+        "ak.wwise.cli.verify": "verify a project",
+        "ak.wwise.cli.waapiServer": "run a bounded WAAPI server",
+        "ak.wwise.console.project.create": "create and open a project",
+        "ak.wwise.console.project.open": "open a project with migration policy",
     }
     return tuple(
         {
             "api": operation,
             "intent": intents[operation],
             "supported_versions": list(cli_console_business_versions(operation)),
-            "host_requirement": "wwise-console",
         }
         for operation in CLI_CONSOLE_BUSINESS_OPERATIONS
     )

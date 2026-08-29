@@ -1604,13 +1604,19 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
         "<api>",
     ]
     assert all("next_command" not in row for row in request_schema_routes.values())
-    assert catalog["request_schema_route_count"] == 86
+    assert catalog["request_schema_route_count"] == 100
+    assert catalog["request_schema_route_count"] == len(request_schema_routes)
+    assert "ak.wwise.cli.generateSoundbank" in request_schema_routes
+    assert "ak.wwise.console.project.open" in request_schema_routes
     assert "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion" in request_schema_routes
     assert "ak.wwise.core.mediaPool.get" in request_schema_routes
     assert "ak.wwise.core.sound.setActiveSource" in request_schema_routes
     assert "ak.wwise.core.sourceControl.commit" in request_schema_routes
     encoded_size = waapi_gateway.gateway_json_document_size(catalog)
-    assert encoded_size < 32 * 1024
+    # The 14 exact CLI/Console business routes retain their per-version
+    # availability and one-line intent while keeping the complete catalog
+    # well below the general Gateway result ceiling.
+    assert encoded_size < 36 * 1024
     assert "\n" not in waapi_gateway.gateway_stdout_json_encoder(catalog).encode(catalog)
 
     exit_code, detail_catalog = execute(["operations", "--detail"], tmp_path=tmp_path)

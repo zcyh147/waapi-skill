@@ -985,35 +985,35 @@ def test_operate_maps_only_live_query_accessors_to_mutation_tokens() -> None:
     assert "`draft-check` revalidates scope, token, dependencies, and value" in compact
 
 
-def test_operate_cli_and_authoring_fast_routes_keep_unstructured_materialization_rules() -> None:
+def test_operate_cli_and_console_routes_use_only_the_deep_business_plan() -> None:
     compact = " ".join(OPERATE.split())
     assert "Only explicit WwiseConsole, CLI, command-line, or 命令行 wording" in compact
     assert "alone does not establish CLI intent" in compact
-    for api in (
-        "ak.wwise.cli.convertExternalSource",
-        "ak.wwise.cli.generateSoundbank",
-        "ak.wwise.cli.tabDelimitedImport",
-        "ak.wwise.cli.migrate",
-    ):
-        assert f"`{api}`" in OPERATE
+    assert "Every reflected `ak.wwise.cli.*` route" in OPERATE
+    assert "`ak.wwise.console.project.create`" in OPERATE
+    assert "`ak.wwise.console.project.open`" in OPERATE
     assert "`request-schema <exact-uri>`" in compact
-    assert "never reuse them for another lane" in compact
-    assert "not yet represented structurally" in OPERATE
     for phrase in (
-        "`platform` is always an array",
-        "flat two-string pair for one platform",
-        "array of pairs for several",
-        "array processes only its first source",
-        "repeated platform mapping processes only its last entry",
-        "both shapes are rejected",
-        "final directory",
-        "Init is automatic",
-        "omit false/default flags",
-        "result-schema-only",
-        "normal control-server disconnect or continued reachability does not authorize replay",
-        "caller-owned reopened-project oracle",
+        "`draft-declare-cli-console-plan`",
+        "`--value` for one scalar",
+        "`--item` for each member",
+        "`--mapping` for each named platform/value association",
+        "`--toggle <field> enable|disable`",
+        "Never type native CLI option names",
+        "The Gateway owns version availability",
+        "Model-supplied global, pre-build, post-build",
+        "Wwise 2022 external-source partial-success boundary",
+        "disconnect or continued reachability never authorizes replay",
+        "result-schema-only evidence is not a reopened-project business oracle",
     ):
         assert phrase in compact
+    for retired_prompt_mechanic in (
+        "`platform` is always an array",
+        "flat two-string pair for one platform",
+        "omit false/default flags",
+        "not yet represented structurally",
+    ):
+        assert retired_prompt_mechanic not in OPERATE
     assert "`request-schema ak.wwise.core.audio.convert`" in compact
     assert "user's exact absolute `io_root`" in compact
 
