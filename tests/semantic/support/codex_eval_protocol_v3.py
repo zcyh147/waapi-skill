@@ -1778,6 +1778,7 @@ def build_project_setting_business_transaction_steps(
     version: str,
     label: str,
     object_id: str,
+    object_name: str,
 ) -> tuple[ExpectedGatewayStep, ...]:
     """Seal one Game Parameter range outcome through the business Draft."""
 
@@ -1793,6 +1794,16 @@ def build_project_setting_business_transaction_steps(
         object_id,
     ):
         raise V3ProtocolError("Project-setting Fresh proof requires one exact GUID")
+    if (
+        not isinstance(object_name, str)
+        or not object_name.strip()
+        or object_name != object_name.strip()
+        or len(object_name) > 255
+        or any(separator in object_name for separator in ("\\", "/"))
+    ):
+        raise V3ProtocolError(
+            "Project-setting Fresh proof requires one bounded exact object name"
+        )
     draft_start = f"{label}.draft-start"
     bind = f"{label}.bind-game-parameter"
     declaration = f"{label}.declare-project-setting-plan"
@@ -1840,8 +1851,9 @@ def build_project_setting_business_transaction_steps(
                 *prefix(draft_start),
                 "--role",
                 "game_parameter",
-                "--object-id",
-                object_id,
+                "--exact-type-name",
+                "GameParameter",
+                object_name,
             ),
         ),
         ExpectedGatewayStep(

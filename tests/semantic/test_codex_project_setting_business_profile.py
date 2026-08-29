@@ -19,6 +19,7 @@ from tests.semantic.support.codex_project_setting_business_agent_runner import (
 )
 from tests.semantic.support.codex_project_setting_business_profile import (
     OBJECT_ID,
+    OBJECT_NAME,
     ProjectSettingBusinessProfileError,
     load_project_setting_business_profile,
 )
@@ -92,6 +93,7 @@ def test_project_setting_protocol_is_singular_and_complete() -> None:
         version="2025.1",
         label="tx01",
         object_id=OBJECT_ID,
+        object_name=OBJECT_NAME,
     )
     validate_operation_draft_protocol_steps(steps)
 
@@ -113,6 +115,11 @@ def test_project_setting_protocol_is_singular_and_complete() -> None:
         },
         "options": {},
     }
+    assert steps[2].arguments[-3:] == (
+        "--exact-type-name",
+        "GameParameter",
+        OBJECT_NAME,
+    )
     assert all(
         step.subcommand not in {"typed-call", "draft-apply", "execute"}
         for step in steps

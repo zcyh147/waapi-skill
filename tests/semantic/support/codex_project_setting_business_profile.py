@@ -22,6 +22,7 @@ UNIT_IDS = ("PSET25-GAME-PARAMETER-RANGE-PREVIEW",)
 OPERATION = "ak.wwise.core.gameParameter.setRange"
 VERSION = "2025.1"
 OBJECT_ID = "{33333333-3333-3333-3333-333333333333}"
+OBJECT_NAME = "WeatherIntensity"
 _FORBIDDEN_PROMPT_MECHANICS = (
     "draft-start",
     "draft-declare",
@@ -152,6 +153,7 @@ def _parse_unit(value: Any) -> ProjectSettingBusinessUnit:
 __all__ = [
     "MODEL",
     "OBJECT_ID",
+    "OBJECT_NAME",
     "OPERATION",
     "PROFILE_ID",
     "REASONING_EFFORT",

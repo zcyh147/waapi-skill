@@ -3451,12 +3451,14 @@ def _validate_bound_business_agent_protocol(
         )
         from tests.semantic.support.codex_project_setting_business_profile import (
             OBJECT_ID,
+            OBJECT_NAME,
         )
 
         steps = build_project_setting_business_transaction_steps(
             version=expected_unit.version,
             label="tx01",
             object_id=OBJECT_ID,
+            object_name=OBJECT_NAME,
         )
         preview_request = steps[-1].expected_operation_request
     elif profile == matrix.COMPOUND_UNDO_BUSINESS_PROFILE_ID:

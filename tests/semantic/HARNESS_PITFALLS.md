@@ -264,6 +264,23 @@ prevention checks that are expensive to rediscover.
   complete protocol validator before spending a Fresh root. A pre-Codex block
   is frozen without replay or PASS credit.
 
+### A Draft continuation must not require an ordinary query
+
+- Evidence: #86 roots `imac-pset-7c222be-r1` and
+  `iwin-pset-7c222be-r1` both started the Game Parameter Draft, then followed
+  its instruction that a name-only target required `query-object` before an ID
+  binding. The Broker correctly rejected that read as an interrupting non-Draft
+  command. Both roots are semantic FAILs and receive no replay or PASS credit.
+- Cause: `request-schema` made `draft-start` the exact continuation, while the
+  resulting object-binding continuation disclosed only ID and complete-path
+  routes and described a normal query as the name-resolution path. Those two
+  instructions could not be completed in one uninterrupted Draft.
+- Prevention: every natural business identity needed after `draft-start` must
+  have a copy-ready Draft-local binding route. For globally typed names, fix the
+  Wwise type in the continuation and let `draft-bind-object --exact-type-name`
+  resolve at most two rows and accept exactly one. Keep ordinary reads outside
+  an active Draft; run the complete protocol validator before a Fresh root.
+
 ### Natural raw-API prompts need one bounded operation discovery
 
 - Evidence: #84 Fresh root `imac-core-5a1d501-r2` failed semantically because

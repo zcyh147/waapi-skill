@@ -18,6 +18,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
 )
 from tests.semantic.support.codex_project_setting_business_profile import (
     OBJECT_ID,
+    OBJECT_NAME,
     ProjectSettingBusinessUnit,
 )
 
@@ -80,7 +81,7 @@ def prepare_project_setting_business_runtime(
                 "objects": [
                     {
                         "id": OBJECT_ID,
-                        "name": "WeatherIntensity",
+                        "name": OBJECT_NAME,
                         "type": "GameParameter",
                         "path": (
                             r"\Game Parameters\Default Work Unit"
@@ -102,6 +103,7 @@ def prepare_project_setting_business_runtime(
         version=unit.version,
         label="tx01",
         object_id=OBJECT_ID,
+        object_name=OBJECT_NAME,
     )[-1].expected_operation_request
     assert isinstance(request, Mapping)
     return ProjectSettingBusinessRuntime(
@@ -145,6 +147,7 @@ def _project_setting_business_run_spec(
             version=unit.version,
             label="tx01",
             object_id=OBJECT_ID,
+            object_name=OBJECT_NAME,
         ),
         transaction_count=lambda _runtime: 1,
         preview_gates=lambda expected, _runtime, result, evidence: {

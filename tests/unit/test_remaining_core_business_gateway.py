@@ -10,6 +10,7 @@ from wwise_waapi.business_declaration_state import BusinessDeclarationSession
 from wwise_waapi.operation_drafts import OperationDraftStore
 from wwise_waapi.transactions import TransactionStore
 from wwise_waapi.project_setting_business_contracts import (
+    GAME_PARAMETER_SET_RANGE_URI,
     SOUND_SET_ACTIVE_SOURCE_URI,
     project_setting_business_operations,
     project_setting_business_versions,
@@ -144,6 +145,35 @@ def test_project_setting_draft_start_returns_one_exact_first_role(
     assert "declaration" not in next_action
 
 
+def test_game_parameter_draft_exposes_one_copy_ready_exact_name_binding(
+    tmp_path: Path,
+) -> None:
+    exit_code, payload = gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(tmp_path / "state"),
+            "draft-start",
+            GAME_PARAMETER_SET_RANGE_URI,
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda url: pytest.fail(f"offline start connected to {url}"),
+    )
+
+    assert exit_code == 0, payload
+    binding = payload["draft"]["next_action_binding"]["object_binding"]
+    assert binding["next_role"] == "game_parameter"
+    assert binding["direct_query_before_binding"] == "forbidden"
+    exact_name = binding["by_exact_name"]
+    assert exact_name["fixed_argv_prefix"][-4:] == [
+        "--role",
+        "game_parameter",
+        "--exact-type-name",
+        "GameParameter",
+    ]
+    assert exact_name["append"] == ["<exact-game-parameter-name>"]
+    assert "query" not in binding["selection_rule"]
+
+
 @pytest.mark.parametrize(
     ("operation", "version"),
     [
@@ -273,6 +303,22 @@ class _ProjectSettingDraftClient(_SourceControlDraftClient):
     def call(self, uri: str, args: object = None, options: object = None) -> object:
         if uri == "ak.wwise.core.object.get":
             assert isinstance(args, dict)
+            if args.get("waql") == (
+                'from type GameParameter where name = "WeatherIntensity" take 2'
+            ):
+                return {
+                    "return": [
+                        {
+                            "id": self.game_parameter_id,
+                            "name": "WeatherIntensity",
+                            "type": "GameParameter",
+                            "path": (
+                                r"\Game Parameters\Default Work Unit"
+                                r"\WeatherIntensity"
+                            ),
+                        }
+                    ]
+                }
             requested = args.get("from", {}).get("id", [])
             rows = []
             for object_id in requested:
@@ -346,6 +392,59 @@ def _bind_project_setting_role(
     )
     assert code == 0, payload
     return payload
+
+
+def test_game_parameter_exact_name_binding_resolves_inside_the_draft(
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "state"
+    client = _ProjectSettingDraftClient(tmp_path)
+    code, started = gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(state_dir),
+            "draft-start",
+            GAME_PARAMETER_SET_RANGE_URI,
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda url: pytest.fail(f"offline start connected to {url}"),
+    )
+    assert code == 0, started
+
+    code, bound = gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(state_dir),
+            "draft-bind-object",
+            started["draft"]["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            str(started["draft"]["revision"]),
+            "--role",
+            "game_parameter",
+            "--exact-type-name",
+            "GameParameter",
+            "WeatherIntensity",
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+
+    assert code == 0, bound
+    assert {
+        key: bound["bound_object"][key]
+        for key in ("role", "name", "type")
+    } == {
+        "role": "game_parameter",
+        "name": "WeatherIntensity",
+        "type": "GameParameter",
+    }
+    assert "id" not in bound["bound_object"]
+    assert "path" not in bound["bound_object"]
+    assert bound["draft"]["next_action_binding"]["required_next_phase"] == (
+        "declare_complete_project_setting_plan"
+    )
 
 
 def test_project_setting_gateway_binds_exact_roles_then_seals_readback_preview(

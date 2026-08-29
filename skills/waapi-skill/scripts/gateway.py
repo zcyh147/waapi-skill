@@ -19521,10 +19521,36 @@ def _business_next_action_binding(
         )
         next_role = next((role for role in roles if role not in bound_roles), None)
         if next_role is not None:
+            role_binding = role_object_binding(next_role)
+            if next_role == "game_parameter":
+                exact_name = operation_draft_prefix_copy_binding(
+                    [
+                        *object_bind_prefix,
+                        "--role",
+                        next_role,
+                        "--exact-type-name",
+                        "GameParameter",
+                    ]
+                )
+                exact_name["append"] = ["<exact-game-parameter-name>"]
+                role_binding = {
+                    **role_binding,
+                    "by_exact_name": exact_name,
+                    "direct_query_before_binding": "forbidden",
+                    "selection_rule": (
+                        "user_supplied_exact_game_parameter_name_uses_by_exact_name; "
+                        "user_supplied_complete_path_uses_by_path_segments; "
+                        "user_selected_guid_uses_by_id"
+                    ),
+                    "name_rule": (
+                        "the_gateway_fixes_type_GameParameter_and_requires_one_"
+                        "unique_exact_name_match"
+                    ),
+                }
             return {
                 **shared,
                 "required_next_phase": "bind_next_project_setting_role",
-                "object_binding": role_object_binding(next_role),
+                "object_binding": role_binding,
             }
         return {
             **shared,
