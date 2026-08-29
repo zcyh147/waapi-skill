@@ -222,9 +222,6 @@ BOUNDED_DIRECT_CALL_URIS = frozenset(
     {
         "ak.soundengine.getState",
         "ak.soundengine.getSwitch",
-        "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
-        "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion",
-        "ak.wwise.core.mediaPool.get",
         "ak.wwise.core.mediaPool.getFields",
         "ak.wwise.core.object.diff",
         "ak.wwise.core.object.isLinked",
