@@ -1150,6 +1150,9 @@ def test_soundengine_listener_array_is_an_opaque_handle_business_set(
         "listener_handles": {
             "flag": "--listener-handle",
             "repeatable": True,
+            "minimum_items": 1,
+            "maximum_items": 64,
+            "unique_items": True,
         },
         "clear_listeners": {
             "flag": "--clear-listeners",
