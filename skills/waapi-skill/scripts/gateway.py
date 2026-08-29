@@ -4021,6 +4021,29 @@ def authoring_host_required_payload(
     return payload
 
 
+def runtime_authoring_host_required_payload(
+    *,
+    api: str,
+    command: str,
+    live_info: Mapping[str, Any],
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Return the explicit Authoring boundary for Remote and audition routes."""
+
+    payload = authoring_host_required_payload(
+        api=api,
+        command=command,
+        live_info=live_info,
+        common=common,
+        operation=api,
+    )
+    payload["message"] = (
+        "Remote connections and Authoring audition transports require a live "
+        "Wwise Authoring host; WwiseConsole cannot execute them."
+    )
+    return payload
+
+
 def command_line_host_required_payload(
     *,
     command: str,
@@ -10045,6 +10068,17 @@ def dispatch_runtime_inspection_business_read(
 ) -> dict[str, Any]:
     """Execute one bounded runtime-inspection read from business values."""
 
+    if (
+        args.api.startswith("ak.wwise.core.transport.")
+        and live_info.get("isCommandLine") is not False
+    ):
+        return runtime_authoring_host_required_payload(
+            api=args.api,
+            command=args.command,
+            live_info=live_info,
+            common=common,
+        )
+
     request = args.runtime_inspection_request
     request_validation = validate_semantic_payload(
         request["api"],
@@ -10144,6 +10178,10 @@ def dispatch_runtime_inspection_business_read(
     except RuntimeInspectionBusinessError as exc:
         raise GatewayResultShapeError(
             str(exc),
+            details={
+                "api": args.api,
+                "observed_result": result.get("result"),
+            },
             error_code="RUNTIME_INSPECTION_RESULT_INVALID",
         ) from exc
     return {
@@ -10779,6 +10817,22 @@ def dispatch_business_runtime_control_plan(
     common: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Record one complete runtime control outcome without native fields."""
+
+    state_dir = resolve_transaction_state_directory(args, env=env)
+    pending = OperationDraftStore(state_dir).inspect(
+        args.draft_id,
+        task_authority=args.task_authority,
+    )
+    if (
+        pending.operation == "ak.wwise.core.remote.connect"
+        or pending.operation.startswith("ak.wwise.core.transport.")
+    ) and live_info.get("isCommandLine") is not False:
+        return runtime_authoring_host_required_payload(
+            api=pending.operation,
+            command=args.command,
+            live_info=live_info,
+            common=common,
+        )
 
     binding = _open_business_binding(
         args,

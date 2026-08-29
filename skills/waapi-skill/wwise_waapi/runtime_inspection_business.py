@@ -513,12 +513,19 @@ def normalize_runtime_inspection_result(
         raise RuntimeInspectionBusinessError("runtime inspection result is malformed")
     if operation == PROFILER_GET_CURSOR_TIME_URI:
         position = result.get("return")
+        if position == -1:
+            return {
+                "profiler_cursor": business_request["profiler_cursor"],
+                "available": False,
+                "position_ms": None,
+            }
         if isinstance(position, bool) or not isinstance(position, int) or position < 0:
             raise RuntimeInspectionBusinessError(
-                "Profiler cursor result must contain non-negative integer milliseconds"
+                "Profiler cursor result must contain -1 or non-negative integer milliseconds"
             )
         return {
             "profiler_cursor": business_request["profiler_cursor"],
+            "available": True,
             "position_ms": position,
         }
     if operation == TRANSPORT_GET_STATE_URI:

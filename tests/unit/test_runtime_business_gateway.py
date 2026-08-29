@@ -37,6 +37,9 @@ from wwise_waapi.runtime_inspection_business_contracts import (  # noqa: E402
     runtime_inspection_business_read_operations,
     runtime_inspection_business_versions,
 )
+from wwise_waapi.runtime_inspection_business import (  # noqa: E402
+    normalize_runtime_inspection_result,
+)
 from wwise_waapi.transactions import TransactionStore  # noqa: E402
 from wwise_waapi.execution_contracts import ExecutionContractRegistry  # noqa: E402
 
@@ -189,6 +192,7 @@ def test_log_get_schema_exposes_business_channel_and_bounded_result_only(
         "version": "2025.1",
         "input_mode": "business_declaration",
         "execution_shape": "bounded_read",
+        "host_requirement": "wwise-console-or-authoring",
         "start": {
             "subcommand": "core-call",
             "gateway_argv_prefix": ["core-call", LOG_GET_URI],
@@ -222,6 +226,28 @@ def test_log_get_schema_exposes_business_channel_and_bounded_result_only(
     }
     assert "typed-call" not in json.dumps(payload, sort_keys=True)
     assert "soundbankGenerate" not in json.dumps(payload, sort_keys=True)
+
+
+@pytest.mark.parametrize(
+    "operation",
+    (
+        "ak.wwise.core.remote.connect",
+        "ak.wwise.core.transport.create",
+        TRANSPORT_GET_STATE_URI,
+    ),
+)
+def test_remote_and_transport_contracts_disclose_authoring_host_requirement(
+    tmp_path: Path,
+    operation: str,
+) -> None:
+    code, payload = gateway.execute_gateway(
+        ["--version", "2022.1", "request-schema", operation],
+        env=_env(tmp_path, version="2022.1"),
+        client_factory=lambda url: pytest.fail(f"offline schema connected to {url}"),
+    )
+
+    assert code == 0, payload
+    assert payload["business_adapter"]["host_requirement"] == "wwise-authoring"
 
 
 class FakeClient:
@@ -586,7 +612,68 @@ def test_profiler_cursor_read_maps_business_cursor_and_projects_milliseconds(
     assert (GET_CURSOR_TIME_URI, {"cursor": "user"}, {}) in client.calls
     assert payload["agent_result"] == {
         "profiler_cursor": "user-cursor",
+        "available": True,
         "position_ms": 1234,
+    }
+
+
+def test_profiler_cursor_unavailable_sentinel_is_hidden_from_business_result() -> None:
+    assert normalize_runtime_inspection_result(
+        GET_CURSOR_TIME_URI,
+        {"return": -1},
+        business_request={"profiler_cursor": "user-cursor"},
+        max_results=1,
+    ) == {
+        "profiler_cursor": "user-cursor",
+        "available": False,
+        "position_ms": None,
+    }
+
+
+def test_profiler_cursor_invalid_live_shape_preserves_bounded_diagnostics(
+    tmp_path: Path,
+) -> None:
+    observed = {"return": -2}
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": [
+                {
+                    "displayName": "Wwise",
+                    "isCommandLine": True,
+                    "apiVersion": 1,
+                    "platform": "macosx",
+                    "configuration": "release",
+                    "version": {
+                        "year": 2025,
+                        "major": 1,
+                        "minor": 0,
+                        "build": 1,
+                        "displayName": "v2025.1.0.1",
+                    },
+                }
+            ],
+            GET_CURSOR_TIME_URI: [observed],
+        }
+    )
+
+    code, payload = gateway.execute_gateway(
+        [
+            "--version",
+            "2025.1",
+            "core-call",
+            GET_CURSOR_TIME_URI,
+            "--profiler-cursor",
+            "user-cursor",
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+
+    assert code == 2
+    assert payload["error_code"] == "RUNTIME_INSPECTION_RESULT_INVALID"
+    assert payload["details"] == {
+        "api": GET_CURSOR_TIME_URI,
+        "observed_result": observed,
     }
 
 
@@ -620,7 +707,7 @@ def test_transport_state_read_maps_gateway_handle_without_exposing_native_id(
             "ak.wwise.core.getInfo": [
                 {
                     "displayName": "Wwise",
-                    "isCommandLine": True,
+                    "isCommandLine": False,
                     "apiVersion": 1,
                     "platform": "macosx",
                     "configuration": "release",
@@ -694,6 +781,49 @@ def test_transport_state_rejects_invented_native_id_before_connection(
     assert "copied exactly" in payload["message"]
 
 
+def test_transport_state_returns_authoring_boundary_before_transport_dispatch(
+    tmp_path: Path,
+) -> None:
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": [
+                {
+                    "displayName": "WwiseConsole",
+                    "isCommandLine": True,
+                    "apiVersion": 1,
+                    "platform": "macosx",
+                    "configuration": "release",
+                    "version": {
+                        "year": 2025,
+                        "major": 1,
+                        "minor": 0,
+                        "build": 1,
+                        "displayName": "v2025.1.0.1",
+                    },
+                }
+            ],
+        }
+    )
+
+    code, payload = gateway.execute_gateway(
+        [
+            "--version",
+            "2025.1",
+            "core-call",
+            TRANSPORT_GET_STATE_URI,
+            "--transport-handle",
+            "transport-session-0000004a",
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+
+    assert code == 2
+    assert payload["error_code"] == "AUTHORING_HOST_REQUIRED"
+    assert payload["executed"] is False
+    assert client.calls == [("ak.wwise.core.getInfo", None, None)]
+
+
 def test_transport_state_rejects_well_formed_but_non_live_handle_before_state_call(
     tmp_path: Path,
 ) -> None:
@@ -702,7 +832,7 @@ def test_transport_state_rejects_well_formed_but_non_live_handle_before_state_ca
             "ak.wwise.core.getInfo": [
                 {
                     "displayName": "Wwise",
-                    "isCommandLine": True,
+                    "isCommandLine": False,
                     "apiVersion": 1,
                     "platform": "macosx",
                     "configuration": "release",
@@ -809,10 +939,10 @@ class _RuntimeControlDraftClient:
             year, major = (int(part) for part in self.version.split("."))
             return {
                 "displayName": "Wwise",
-                "isCommandLine": True,
+                "isCommandLine": False,
                 "sessionId": "{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}",
                 "processId": 4242,
-                "processPath": "/Applications/Wwise/WwiseConsole",
+                "processPath": "/Applications/Wwise/Wwise.app",
                 "apiVersion": 1,
                 "platform": "macosx",
                 "configuration": "release",
@@ -886,6 +1016,72 @@ class _RuntimeControlDraftClient:
 
     def disconnect(self) -> None:
         return None
+
+
+@pytest.mark.parametrize(
+    "operation",
+    ("ak.wwise.core.remote.connect", "ak.wwise.core.transport.destroy"),
+)
+def test_remote_and_transport_control_return_authoring_boundary_before_project_read(
+    tmp_path: Path,
+    operation: str,
+) -> None:
+    state_dir = tmp_path / operation
+    code, started = gateway.execute_gateway(
+        [
+            "--version",
+            "2022.1",
+            "--state-dir",
+            str(state_dir),
+            "draft-start",
+            operation,
+        ],
+        env=_env(tmp_path, version="2022.1"),
+        client_factory=lambda url: pytest.fail(f"offline start connected to {url}"),
+    )
+    assert code == 0, started
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": [
+                {
+                    "displayName": "WwiseConsole",
+                    "isCommandLine": True,
+                    "apiVersion": 1,
+                    "platform": "macosx",
+                    "configuration": "release",
+                    "version": {
+                        "year": 2022,
+                        "major": 1,
+                        "minor": 0,
+                        "build": 1,
+                        "displayName": "v2022.1.0.1",
+                    },
+                }
+            ],
+        }
+    )
+
+    code, payload = gateway.execute_gateway(
+        [
+            "--version",
+            "2022.1",
+            "--state-dir",
+            str(state_dir),
+            "draft-declare-runtime-control-plan",
+            started["draft"]["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            str(started["draft"]["revision"]),
+        ],
+        env=_env(tmp_path, version="2022.1"),
+        client_factory=lambda _url: client,
+    )
+
+    assert code == 2
+    assert payload["error_code"] == "AUTHORING_HOST_REQUIRED"
+    assert payload["executed"] is False
+    assert client.calls == [("ak.wwise.core.getInfo", None, None)]
 
 
 @pytest.mark.parametrize(

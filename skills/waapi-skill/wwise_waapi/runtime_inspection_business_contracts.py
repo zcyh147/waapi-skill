@@ -406,6 +406,12 @@ def runtime_inspection_business_catalog_rows() -> tuple[dict[str, Any], ...]:
             "api": operation,
             "intent": intent(operation),
             "supported_versions": list(runtime_inspection_business_versions(operation)),
+            "host_requirement": (
+                "wwise-authoring"
+                if operation.startswith("ak.wwise.core.remote.")
+                or operation.startswith("ak.wwise.core.transport.")
+                else "wwise-console-or-authoring"
+            ),
         }
         for operation in sorted(_CONTRACTS)
     )
@@ -494,6 +500,12 @@ def runtime_inspection_business_contract_data(
         "version": version,
         "input_mode": "business_declaration",
         "execution_shape": execution_shape,
+        "host_requirement": (
+            "wwise-authoring"
+            if operation.startswith("ak.wwise.core.remote.")
+            or operation.startswith("ak.wwise.core.transport.")
+            else "wwise-console-or-authoring"
+        ),
         "start": start,
         "declaration": {
             "subcommand": (

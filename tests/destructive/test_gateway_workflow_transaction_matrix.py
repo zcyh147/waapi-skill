@@ -1344,179 +1344,80 @@ def test_runtime_inspection_business_profiler_and_transport_lifecycle(
     runtime = workflow_sandbox_runtime
     if runtime.version not in {"2022.1", "2025.1"}:
         pytest.skip("Runtime-inspection business evidence targets Wwise 2022.1 and 2025.1")
-    event_id: str | None = None
-    transport_handle: str | None = None
-    try:
-        runtime.packaged_status()
-        cursor = runtime.gateway(
+    runtime.packaged_status()
+    cursor = runtime.gateway(
+        [
+            "core-call",
+            "ak.wwise.core.profiler.getCursorTime",
+            "--profiler-cursor",
+            "user-cursor",
+        ],
+        live=True,
+    )
+    cursor_result = cursor.get("agent_result")
+    assert isinstance(cursor_result, Mapping), cursor
+    assert cursor_result["profiler_cursor"] == "user-cursor"
+    assert isinstance(cursor_result["available"], bool)
+    assert (
+        isinstance(cursor_result["position_ms"], int)
+        if cursor_result["available"]
+        else cursor_result["position_ms"] is None
+    )
+
+    profiler_draft = _start_business_draft(
+        runtime,
+        "ak.wwise.core.profiler.enableProfilerData",
+    )
+    _update_business_draft(
+        runtime,
+        profiler_draft,
+        "draft-declare-runtime-control-plan",
+        ["--capture-data", "voices", "enable"],
+        live=True,
+    )
+    profiler_result = _complete_core_result_schema_draft(
+        runtime,
+        profiler_draft,
+    )
+    assert profiler_result["verify"]["verification"]["business_state_verified"] is False
+
+    authoring_only = ["ak.wwise.core.transport.create"]
+    if runtime.version == "2022.1":
+        authoring_only.append("ak.wwise.core.remote.connect")
+    for operation in authoring_only:
+        draft = _start_business_draft(runtime, operation)
+        code, boundary = runtime.raw_gateway(
             [
-                "core-call",
-                "ak.wwise.core.profiler.getCursorTime",
-                "--profiler-cursor",
-                "user-cursor",
-            ],
-            live=True,
+                "draft-declare-runtime-control-plan",
+                draft.draft_id,
+                "--task-authority",
+                draft.task_authority,
+                "--expected-revision",
+                str(draft.revision),
+            ]
         )
-        cursor_result = cursor.get("agent_result")
-        assert isinstance(cursor_result, Mapping), cursor
-        assert cursor_result["profiler_cursor"] == "user-cursor"
-        assert isinstance(cursor_result["position_ms"], (int, float))
+        assert code == 2, boundary
+        assert boundary["error_code"] == "AUTHORING_HOST_REQUIRED", boundary
+        assert boundary["executed"] is False, boundary
+        assert boundary["details"] == {
+            "is_command_line": True,
+            "required_host": "wwise-authoring",
+        }
 
-        profiler_draft = _start_business_draft(
-            runtime,
-            "ak.wwise.core.profiler.enableProfilerData",
+    runtime.category_results.extend(
+        (
+            {
+                "category": "runtime-profiler-business",
+                "status": "PASS",
+                "verifier_strength": "bounded_read_and_result_schema",
+            },
+            {
+                "category": "runtime-authoring-host-boundary",
+                "status": "PASS",
+                "verifier_strength": "pre_dispatch_explicit_boundary",
+            },
         )
-        _update_business_draft(
-            runtime,
-            profiler_draft,
-            "draft-declare-runtime-control-plan",
-            ["--capture-data", "voices", "enable"],
-            live=True,
-        )
-        profiler_result = _complete_core_result_schema_draft(
-            runtime,
-            profiler_draft,
-        )
-        assert profiler_result["verify"]["verification"]["business_state_verified"] is False
-
-        remote_schema = runtime.gateway(
-            ["request-schema", "ak.wwise.core.remote.getConnectionStatus"],
-            live=False,
-        )
-        remote_continuation = remote_schema.get("continuation")
-        assert isinstance(remote_continuation, Mapping), remote_schema
-        remote_command = remote_continuation.get("gateway_argv")
-        assert isinstance(remote_command, list) and all(
-            isinstance(item, str) for item in remote_command
-        ), remote_schema
-        remote_status = runtime.gateway(remote_command, live=True)
-        remote_result = remote_status.get("agent_result")
-        assert isinstance(remote_result, Mapping), remote_status
-        assert isinstance(remote_result.get("isConnected"), bool), remote_result
-
-        event_id = _create_object(
-            runtime,
-            parent=EVENTS_PARENT,
-            object_type="Event",
-            name=f"WAAPI_RUNTIME_{uuid.uuid4().hex[:12]}",
-        )
-        create_draft = _start_business_draft(
-            runtime,
-            "ak.wwise.core.transport.create",
-        )
-        target_handle = _bind_business_object(
-            runtime,
-            create_draft,
-            object_id=event_id,
-            role="target",
-        )
-        _update_business_draft(
-            runtime,
-            create_draft,
-            "draft-declare-runtime-control-plan",
-            ["--target-handle", target_handle],
-            live=True,
-        )
-        created = _complete_business_draft(runtime, create_draft)
-        created_agent_result = created["verify"].get("agent_result")
-        assert isinstance(created_agent_result, Mapping), created
-        business_result = created_agent_result.get("business_result")
-        assert isinstance(business_result, Mapping), created_agent_result
-        assert business_result.get("contract") == "waapi-skill.runtime-control-result/v1"
-        transport_handle = _required_string(business_result, "transport_handle")
-
-        state = runtime.gateway(
-            [
-                "core-call",
-                "ak.wwise.core.transport.getState",
-                "--transport-handle",
-                transport_handle,
-            ],
-            live=True,
-        )
-        state_result = state.get("agent_result")
-        assert isinstance(state_result, Mapping), state
-        assert state_result.get("transport_handle") == transport_handle
-        assert state_result.get("state") in {"playing", "stopped", "paused"}
-
-        action_draft = _start_business_draft(
-            runtime,
-            "ak.wwise.core.transport.executeAction",
-        )
-        _update_business_draft(
-            runtime,
-            action_draft,
-            "draft-declare-runtime-control-plan",
-            [
-                "--audition-action",
-                "stop",
-                "--transport-scope",
-                "one-transport",
-                "--transport-handle",
-                transport_handle,
-            ],
-            live=True,
-        )
-        _complete_core_result_schema_draft(runtime, action_draft)
-
-        destroy_draft = _start_business_draft(
-            runtime,
-            "ak.wwise.core.transport.destroy",
-        )
-        _update_business_draft(
-            runtime,
-            destroy_draft,
-            "draft-declare-runtime-control-plan",
-            ["--transport-handle", transport_handle],
-            live=True,
-        )
-        _complete_business_draft(runtime, destroy_draft)
-        transport_handle = None
-        runtime.category_results.extend(
-            (
-                {
-                    "category": "runtime-profiler-business",
-                    "status": "PASS",
-                    "verifier_strength": "bounded_read_and_result_schema",
-                },
-                {
-                    "category": "runtime-remote-status-business",
-                    "status": "PASS",
-                    "verifier_strength": "bounded_status_read_no_external_target",
-                },
-                {
-                    "category": "runtime-transport-business",
-                    "status": "PASS",
-                    "verifier_strength": "create_state_action_destroy_full_chain",
-                },
-            )
-        )
-    finally:
-        active_error = sys.exc_info()[1]
-        cleanup_errors: list[str] = []
-        if transport_handle is not None:
-            try:
-                transport_id = int(transport_handle.rsplit("-", 1)[1], 16)
-                runtime.lifecycle.require_client().call(
-                    "ak.wwise.core.transport.destroy",
-                    {"transport": transport_id},
-                    {},
-                )
-            except BaseException as exc:  # noqa: BLE001 - cleanup must retain the primary failure
-                cleanup_errors.append(f"transport: {type(exc).__name__}: {exc}")
-        if event_id is not None:
-            try:
-                _delete_if_present_via_transaction(runtime, event_id)
-            except BaseException as exc:  # noqa: BLE001 - cleanup must retain the primary failure
-                cleanup_errors.append(f"event: {type(exc).__name__}: {exc}")
-        if cleanup_errors:
-            message = "runtime-inspection workflow cleanup failures: " + "; ".join(
-                cleanup_errors
-            )
-            if active_error is not None:
-                active_error.add_note(message)
-            else:
-                raise AssertionError(message)
+    )
 
 
 @pytest.mark.live
