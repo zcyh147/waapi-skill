@@ -204,6 +204,27 @@ prevention checks that are expensive to rediscover.
   an already registered interactive launch path when modal inspection is
   required.
 
+### Offline Fresh replay inherited an unrelated Authoring launch
+
+- Evidence: the #88 `soundengine_business_1` campaign sealed
+  `offline_only=true`, `live_config.used=false`, and `wwise_started=false` for
+  its fresh PASS. Before its identical verify-only replay, an operator-side
+  phase transition nevertheless opened Wwise Launcher and three generations
+  of idle `Wwise2019x64` bottle helpers outside the campaign. No project
+  `Wwise.exe` or WAAPI listener existed, and the campaign evidence confirmed
+  that the harness had not requested Wwise.
+- Cause: the preceding real-Authoring validation procedure was carried into a
+  later offline-only step. This was orchestration outside the sealed campaign,
+  not loss of `--offline-only` inside the runner.
+- Prevention: treat `offline_only=true` as a zero-Wwise phase boundary. Before
+  a fresh run or verify-only replay, require zero Wwise project/Console
+  processes and zero listeners on the selected WAAPI ports, then invoke only
+  the exact campaign command. Inspect liveness from sealed campaign evidence;
+  GUI app-state probes and Authoring launch helpers are not part of this lane.
+  If an unrelated Wwise/Launcher instance appears before the campaign starts,
+  stop, prove that no project process owns the shared bottle, clean only those
+  idle test helpers, re-establish the zero-Wwise preflight, and then continue.
+
 ### Explicit transaction state was dropped from copy-exact continuations
 
 - Evidence: the #88 macOS Authoring project-open Preview used an explicit
