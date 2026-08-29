@@ -10154,12 +10154,30 @@ def dispatch_soundengine_business_read(
         if result.get("ok")
         else None
     )
-    agent_result = result.get("result") if result.get("ok") else None
-    if result.get("ok") and not isinstance(agent_result, Mapping):
+    raw_result = result.get("result") if result.get("ok") else None
+    returned_object = (
+        raw_result.get("return") if isinstance(raw_result, Mapping) else None
+    )
+    if (
+        result.get("ok")
+        and (
+            not isinstance(returned_object, Mapping)
+            or not _canonical_guid(returned_object.get("id"))
+            or not isinstance(returned_object.get("name"), str)
+            or not returned_object["name"]
+        )
+    ):
         raise GatewayResultShapeError(
-            "SoundEngine state/switch result must be one bounded object.",
+            "SoundEngine state/switch result must contain one bounded returned "
+            "object with an exact id and name.",
+            details={"actual_result": raw_result},
             error_code="SOUNDENGINE_READ_RESULT_INVALID",
         )
+    agent_result = (
+        {"id": returned_object["id"], "name": returned_object["name"]}
+        if result.get("ok")
+        else None
+    )
     return {
         "ok": bool(result.get("ok")),
         "status": "ok" if result.get("ok") else "error",

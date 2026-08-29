@@ -105,7 +105,7 @@ def test_bounded_call_returns_validated_business_result_to_agent(tmp_path: Path)
                     ]
                 }
             ],
-            "ak.soundengine.getState": [state_result],
+            "ak.soundengine.getState": [{"return": state_result}],
         }
     )
 

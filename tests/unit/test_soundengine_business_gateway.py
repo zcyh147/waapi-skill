@@ -310,10 +310,10 @@ class _SoundEngineDraftClient:
             return {"return": self.post_event_return}
         if uri == "ak.soundengine.getState":
             self.soundengine_calls.append(uri)
-            return {"id": self.state_id, "name": "Storm"}
+            return {"return": {"id": self.state_id, "name": "Storm"}}
         if uri == "ak.soundengine.getSwitch":
             self.soundengine_calls.append(uri)
-            return {"id": self.switch_id, "name": "Metal"}
+            return {"return": {"id": self.switch_id, "name": "Metal"}}
         if uri == "ak.soundengine.stopPlayingID":
             self.soundengine_calls.append(uri)
             return {}
