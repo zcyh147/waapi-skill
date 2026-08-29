@@ -21,8 +21,10 @@ from ci.test_driver import (
     LIVE_TEST_NODES,
     SUPPORTED_VERSIONS,
     TestDriverError as DriverError,
+    TestEnvironmentError as DriverEnvironmentError,
     default_live_paths,
     parse_request,
+    validate_test_environment,
 )
 
 
@@ -285,6 +287,40 @@ def test_python_driver_rejects_unsafe_mode_version_combinations(
         parse_request(arguments)
 
 
+def test_test_environment_preflight_requires_locked_runtime_and_pytest() -> None:
+    expected = {"pytest": "8.4.2", "waapi-client": "0.8.1"}
+
+    validate_test_environment(
+        repo_root=REPO_ROOT,
+        python_version=(3, 13),
+        distribution_version=expected.__getitem__,
+    )
+    with pytest.raises(DriverEnvironmentError, match="pytest is unavailable"):
+        validate_test_environment(
+            repo_root=REPO_ROOT,
+            python_version=(3, 13),
+            distribution_version=lambda name: (
+                (_ for _ in ()).throw(LookupError(name))
+                if name == "pytest"
+                else expected[name]
+            ),
+        )
+    with pytest.raises(DriverEnvironmentError, match="waapi-client version"):
+        validate_test_environment(
+            repo_root=REPO_ROOT,
+            python_version=(3, 13),
+            distribution_version=lambda name: (
+                "0.0.0" if name == "waapi-client" else expected[name]
+            ),
+        )
+    with pytest.raises(DriverEnvironmentError, match="Python 3.11 through 3.13"):
+        validate_test_environment(
+            repo_root=REPO_ROOT,
+            python_version=(3, 14),
+            distribution_version=expected.__getitem__,
+        )
+
+
 def test_python_driver_owns_all_platform_defaults_and_pytest_nodes() -> None:
     for version in SUPPORTED_VERSIONS:
         windows = default_live_paths(version, "live", windows=True)
@@ -511,22 +547,15 @@ def test_ci_test_bat_and_shell_share_pathlib_config_resolver() -> None:
         REPO_ROOT / "ci" / "run_live_test_command.py"
     ).read_text(encoding="utf-8")
 
-    assert (
-        'poetry --directory "$SCRIPT_DIR/.." run -- python '
-        '"$SCRIPT_DIR/test_driver.py" "$@"'
-    ) in shell_source
-    assert (
-        'call poetry --directory "%~dp0.." run -- python '
-        '"%~dp0test_driver.py" %*'
-    ) in batch_source
+    assert "WAAPI_TEST_PYTHON" in shell_source
+    assert "WAAPI_TEST_PYTHON" in batch_source
+    assert 'exec "$WAAPI_TEST_PYTHON" "$SCRIPT_DIR/test_driver.py" "$@"' in shell_source
+    assert '"%WAAPI_TEST_PYTHON%" "%~dp0test_driver.py" %*' in batch_source
+    assert 'poetry --directory "$SCRIPT_DIR/.." run -- python ' in shell_source
+    assert 'call poetry --directory "%~dp0.." run -- python ' in batch_source
     assert "run_live_test_command" in driver_source
     assert "resolve_live_test_config" in live_runner_source
-    assert batch_source.count(
-        'call poetry --directory "%~dp0.." run -- python '
-        '"%~dp0test_driver.py" %*'
-    ) == 1
-    assert len(shell_source.splitlines()) == 5
-    assert len(batch_source.splitlines()) == 4
+    assert batch_source.count('"%~dp0test_driver.py" %*') == 2
     assert "from wwise_waapi.headless import" not in shell_source
 
 

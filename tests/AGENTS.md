@@ -8,6 +8,12 @@ That Skill-local environment is reserved for the packaged Skill runtime and
 real semantic campaigns, keeping developer tooling separate from the minimal
 user-facing environment.
 
+Before direct-SSH pytest from a newly created Windows candidate worktree, read
+`tests/semantic/HARNESS_PITFALLS.md` section "A clean Windows pytest worktree
+selected the Store Python alias". Select the exact complete developer
+interpreter through `WAAPI_TEST_PYTHON`; the launcher must pass its locked
+runtime preflight before a test-context header or Wwise startup.
+
 ## Common commands
 
 - `ci/test.sh --mode program`

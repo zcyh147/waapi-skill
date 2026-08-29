@@ -172,14 +172,17 @@ prevention checks that are expensive to rediscover.
 - Cause: the SSH `PATH` resolves the disabled Microsoft Store app-execution
   alias before the installed Python, and a new worktree has a distinct Poetry
   environment whose locked dependencies have not been installed.
-- Prevention: for ordinary pytest only, prepend the known installed Python
-  directory to that SSH process, create the worktree-local environment with
-  `POETRY_KEYRING_ENABLED=false` and a null keyring backend, then run
-  `ci\test.bat` directly through SSH. This is not a Fresh campaign and does not
-  use Task Scheduler. Require the test-context header before counting an
-  attempt; launcher failures receive no test result or retry number. From Git
-  Bash, invoke the batch file through `cmd.exe //d //s //c`; `/c` may be path-
-  converted into an interactive prompt and must not receive test credit.
+- Prevention: for ordinary pytest only, set `WAAPI_TEST_PYTHON` to one exact
+  pre-provisioned developer interpreter from the locked Poetry environment,
+  then run `ci\test.bat` directly through SSH. `ci/test_driver.py` verifies
+  Python 3.11-3.13 plus the exact `pytest` and `waapi-client` versions before a
+  test-context header or Wwise startup; an incomplete selection exits 4 with
+  `TEST_ENVIRONMENT_BLOCKED`. Provision a new worktree-local Poetry environment
+  only when no complete interpreter exists. This is not a Fresh campaign and
+  does not use Task Scheduler. Launcher failures receive no test result or
+  retry number. From Git Bash, invoke the batch file through
+  `cmd.exe //d //s //c`; `/c` may be path-converted into an interactive prompt
+  and must not receive test credit.
 
 ### `pwsh -File -` over SSH echoed a script without executing it
 
