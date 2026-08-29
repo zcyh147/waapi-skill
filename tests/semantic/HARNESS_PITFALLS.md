@@ -176,14 +176,26 @@ prevention checks that are expensive to rediscover.
   reported `getInfo.isCommandLine=false` plus
   `ak.wwise.no_project_loaded`. Treat that as executable-start evidence, not
   project-open evidence.
-- Confirmed route: invoke the packaged Wine runner with
-  `start.exe /wait <Y:\\...\\SampleProject.wproj>`. On the same #88 sandbox this
-  launched one macOS-registered Authoring instance, reached the expected
-  `Project Load Log`, and, after the explicitly approved **Accept**, returned
+- Confirmed route: invoke the packaged Wine runner with both explicit Windows
+  arguments: `start.exe /wait <Wwise.exe> <Y:\\...\\SampleProject.wproj>`.
+  Passing only the document to `start.exe` can fall back to the Project
+  Launcher and lose the project argument. The explicit executable-plus-project
+  form loaded the isolated #88 sandbox on both 2022.1 and 2025.1, reached the
+  expected `Project Load Log`, and returned
   `getInfo.isCommandLine=false` plus the exact sandbox Windows path from
-  `getProjectInfo.path`. This is the proven direct project-open route; do not
-  substitute `open -a`, `open --args`, or a bare Wwise.exe argv merely because
-  a window appeared.
+  `getProjectInfo.path`. Do not substitute `open -a`, `open --args`, a bare
+  project document, or a Wwise.exe process with no matching project argv merely
+  because a window appeared.
+- Modal handling: first require WAAPI to report the exclusive-lock reasons
+  `Loading project in progress` and `Waiting for user to close a modal dialog`.
+  Then enumerate the same Wine desktop's top-level windows and click only when
+  exactly one title is `Project Load Log` and exactly one child control has
+  class `Button` and text `Accept`. The #88 runner compiled this bounded helper
+  with the Wwise bottle's packaged Wine Mono `csc.exe`; it accepted the modal
+  on both 2022.1 and 2025.1. A missing, duplicate, renamed, localized, or
+  different button is `BLOCKED`, not permission to send blind Enter/Alt keys.
+  After the click, repeat the exact version, Authoring-host, and sandbox-path
+  checks before any test dispatch.
 - Prevention: derive the Windows path with the same bottle's `winepath -w`,
   open it through that bottle's `start.exe`, and handle only the exact expected
   sandbox warning. Project Launcher **Open Other/Browse** remains the manual
