@@ -1233,6 +1233,85 @@ def test_prompt_audit_accepts_exact_target_and_codex_system_skills(tmp_path: Pat
     assert audit.passed is True
 
 
+def test_prompt_audit_resolves_unique_short_skill_root_locators(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "workspace" / ".agents" / "skills" / "waapi-skill"
+    target.mkdir(parents=True)
+    (target / "SKILL.md").write_text("target\n", encoding="utf-8")
+    system_root = tmp_path / "codex-home" / "skills" / ".system"
+    builtin = system_root / "skill-creator" / "SKILL.md"
+    builtin.parent.mkdir(parents=True)
+    builtin.write_text("builtin\n", encoding="utf-8")
+    payload = [
+        {
+            "role": "developer",
+            "content": (
+                "### Skill roots\n"
+                f"- `r0` = `{system_root}`\n"
+                f"- `r1` = `{target.parent}`\n"
+                "### Available skills\n"
+                "- skill-creator: builtin (file: r0/skill-creator/SKILL.md)\n"
+                "- waapi-skill: target (file: r1/waapi-skill/SKILL.md)"
+            ),
+        }
+    ]
+
+    audit = audit_prompt_input_payload(
+        payload,
+        target_skill_source=target,
+        system_skill_root=system_root,
+    )
+
+    assert audit.skill_inventory == (
+        ("skill-creator", "r0/skill-creator/SKILL.md"),
+        ("waapi-skill", "r1/waapi-skill/SKILL.md"),
+    )
+    assert audit.system_skills == (
+        ("skill-creator", "r0/skill-creator/SKILL.md"),
+    )
+    assert audit.target_skill_count == 1
+    assert audit.target_skill_locator_matches is True
+    assert audit.unexpected_skills == ()
+    assert audit.passed is True
+
+
+def test_prompt_audit_rejects_ambiguous_and_personal_short_skill_roots(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "workspace" / ".agents" / "skills" / "waapi-skill"
+    target.mkdir(parents=True)
+    (target / "SKILL.md").write_text("target\n", encoding="utf-8")
+    personal_root = tmp_path / "home" / ".agents" / "skills"
+    personal = personal_root / "demo" / "SKILL.md"
+    personal.parent.mkdir(parents=True)
+    personal.write_text("personal\n", encoding="utf-8")
+    payload = [
+        {
+            "role": "developer",
+            "content": (
+                "### Skill roots\n"
+                f"- `r1` = `{target.parent}`\n"
+                f"- `r1` = `{tmp_path / 'wrong-root'}`\n"
+                f"- `r2` = `{personal_root}`\n"
+                "### Available skills\n"
+                "- waapi-skill: target (file: r1/waapi-skill/SKILL.md)\n"
+                "- demo: personal (file: r2/demo/SKILL.md)"
+            ),
+        }
+    ]
+
+    audit = audit_prompt_input_payload(payload, target_skill_source=target)
+
+    assert audit.has_target_skill is False
+    assert audit.has_user_agent_skills is True
+    assert audit.unexpected_skills == (
+        ("waapi-skill", "r1/waapi-skill/SKILL.md"),
+        ("demo", "r2/demo/SKILL.md"),
+    )
+    assert audit.passed is False
+
+
 def test_prompt_audit_binds_system_skills_to_exact_disposable_codex_home(tmp_path: Path) -> None:
     target = tmp_path / "waapi-skill"
     target.mkdir()

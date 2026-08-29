@@ -225,6 +225,28 @@ prevention checks that are expensive to rediscover.
   stop, prove that no project process owns the shared bottle, clean only those
   idle test helpers, re-establish the zero-Wwise preflight, and then continue.
 
+### Codex prompt inventory shortened Skill locators behind root aliases
+
+- Evidence: exact #88 macOS root `imac-soundengine4-92fb617-r1` stopped before
+  the first Agent command with 0 PASS / 1 infrastructure BLOCKED / 3 pending.
+  `codex debug prompt-input` listed five bundled system Skills as `r0/...` and
+  the task-local `waapi-skill` as `r1/...`; the old audit treated every short
+  locator as a non-system, non-target path. The root sealed one attempt
+  manifest, started no Wwise, issued no Broker/Gateway command, and was not
+  resumed or replayed.
+- Cause: newer prompt serialization may disclose one `Skill roots` table and
+  use its `rN` aliases in the following Skill inventory. The isolation audit
+  understood only full host paths even though the prompt still contained the
+  exact path mapping.
+- Prevention: parse root mappings only from system/developer instruction
+  content, accept an alias only when it maps to exactly one root, and expand
+  only traversal-free relative Skill locators. After expansion, retain the
+  existing hard gates: bundled Skills must resolve below the exact disposable
+  Codex `.system` root, the target must resolve to the one task-local detached
+  `waapi-skill`, and personal `.agents/skills`, unknown aliases, ambiguous root
+  definitions, duplicates, or mismatched targets remain rejected. Freeze the
+  pre-Agent root and use a new candidate/root after this audit contract changes.
+
 ### Explicit transaction state was dropped from copy-exact continuations
 
 - Evidence: the #88 macOS Authoring project-open Preview used an explicit

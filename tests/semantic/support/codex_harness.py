@@ -437,6 +437,13 @@ _SKILL_LINE_RE = re.compile(
     r"(?m)^\s*-\s+(?P<name>[A-Za-z0-9_.:-]+)\s*:\s*.*?"
     r"\((?:file|source|locator)\s*:\s*(?P<locator>[^)\n]+)\)\s*$"
 )
+_SKILL_ROOT_LINE_RE = re.compile(
+    r"(?m)^\s*-\s*`?(?P<alias>r[0-9]+)`?\s*=\s*"
+    r"`?(?P<root>[^`\r\n]+?)`?\s*$"
+)
+_SKILL_ALIAS_LOCATOR_RE = re.compile(
+    r"^(?P<alias>r[0-9]+)[/\\](?P<relative>.+)$"
+)
 _LEGACY_WORKSPACE_SKILL_RE = re.compile(r"(?im)^\s*workspace\s+skill\s*:\s*(?P<name>[A-Za-z0-9_.:-]+)\s*$")
 _CODEX_INFRASTRUCTURE_ERROR_MARKERS: tuple[tuple[str, tuple[str, ...]], ...] = (
     (
@@ -2891,19 +2898,29 @@ def audit_prompt_input_payload(
     serialized = json.dumps(payload, ensure_ascii=False, sort_keys=True)
     serialized_casefold = serialized.casefold()
     entries = prompt_skill_inventory(payload)
+    skill_roots = prompt_skill_roots(payload)
     target_source = target_skill_source.expanduser().resolve(strict=False) if target_skill_source else None
     system_skills: list[tuple[str, str]] = []
     target_entries: list[tuple[str, str]] = []
     unexpected: list[tuple[str, str]] = []
+    unexpected_resolved: list[str] = []
     for name, locator in entries:
-        if is_codex_system_skill(locator, system_skill_root=system_skill_root):
+        resolved_locator = expand_short_skill_locator(locator, roots=skill_roots)
+        if is_codex_system_skill(
+            resolved_locator,
+            system_skill_root=system_skill_root,
+        ):
             system_skills.append((name, locator))
             continue
-        locator_matches = target_source is None or skill_locator_resolves_to(locator, target_source)
+        locator_matches = target_source is None or skill_locator_resolves_to(
+            resolved_locator,
+            target_source,
+        )
         if name == "waapi-skill" and locator_matches:
             target_entries.append((name, locator))
         else:
             unexpected.append((name, locator))
+            unexpected_resolved.append(resolved_locator)
     target_locator_matches = len(target_entries) == 1
     instruction_texts = prompt_instruction_texts(payload)
     return CodexPromptAudit(
@@ -2913,7 +2930,7 @@ def audit_prompt_input_payload(
         has_target_skill=bool(target_entries),
         has_user_agent_skills=any(
             local_locator_contains_parts(locator, (".agents", "skills"))
-            for _, locator in unexpected
+            for locator in unexpected_resolved
         ),
         has_codex_system_skills=bool(system_skills),
         skill_inventory=entries,
@@ -3006,6 +3023,40 @@ def structured_skill_entries(value: Any) -> list[tuple[str, str]]:
 
 def clean_skill_locator(locator: str) -> str:
     return locator.strip().strip("`\"'")
+
+
+def prompt_skill_roots(payload: Any) -> dict[str, str]:
+    candidates: dict[str, set[str]] = {}
+    for text in prompt_instruction_texts(payload):
+        for match in _SKILL_ROOT_LINE_RE.finditer(text):
+            alias = match.group("alias")
+            root = clean_skill_locator(match.group("root"))
+            if root:
+                candidates.setdefault(alias, set()).add(root)
+    return {
+        alias: next(iter(roots))
+        for alias, roots in candidates.items()
+        if len(roots) == 1
+    }
+
+
+def expand_short_skill_locator(
+    locator: str,
+    *,
+    roots: Mapping[str, str],
+) -> str:
+    match = _SKILL_ALIAS_LOCATOR_RE.fullmatch(locator)
+    if match is None:
+        return locator
+    root = roots.get(match.group("alias"))
+    relative = tuple(
+        part
+        for part in re.split(r"[/\\]", match.group("relative"))
+        if part
+    )
+    if root is None or not relative or any(part in {".", ".."} for part in relative):
+        return locator
+    return str(Path(root).expanduser().joinpath(*relative))
 
 
 def local_locator_contains_parts(
