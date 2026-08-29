@@ -9707,6 +9707,11 @@ class CodexGatewayBroker:
                 step,
                 actual,
             )
+        if step.subcommand == "draft-declare-cli-console-plan":
+            return CodexGatewayBroker._normalize_cli_console_plan_fact_order(
+                step,
+                actual,
+            )
         if step.subcommand not in {
             "draft-declare-new",
             "draft-declare-existing",
@@ -9778,6 +9783,67 @@ class CodexGatewayBroker:
                 actual_groups.remove(derived_language)
         expected_keys = [key(group, expected=True) for group in expected_groups]
         actual_keys = [key(group, expected=False) for group in actual_groups]
+        if (
+            any(item is None for item in (*expected_keys, *actual_keys))
+            or len(set(expected_keys)) != len(expected_keys)
+            or len(set(actual_keys)) != len(actual_keys)
+            or set(expected_keys) != set(actual_keys)
+        ):
+            return tuple(actual)
+        actual_by_key = dict(zip(actual_keys, actual_groups, strict=True))
+        return (
+            *tuple(actual[:fixed_count]),
+            *(
+                token
+                for expected_key in expected_keys
+                for token in actual_by_key[expected_key]
+            ),
+        )
+
+    @staticmethod
+    def _normalize_cli_console_plan_fact_order(
+        step: ExpectedGatewayStep,
+        actual: Sequence[str],
+    ) -> tuple[str, ...]:
+        """Canonicalize independent closed CLI/Console declaration groups."""
+
+        fixed_count = 5
+        if len(step.arguments) < fixed_count or len(actual) < fixed_count:
+            return tuple(actual)
+        option_arity = {
+            "--value": 2,
+            "--item": 2,
+            "--mapping": 3,
+            "--toggle": 2,
+        }
+
+        def parse(values: Sequence[Any]) -> list[tuple[Any, ...]] | None:
+            groups: list[tuple[Any, ...]] = []
+            cursor = fixed_count
+            while cursor < len(values):
+                option = values[cursor]
+                arity = option_arity.get(option) if isinstance(option, str) else None
+                if arity is None or cursor + arity >= len(values):
+                    return None
+                groups.append(tuple(values[cursor : cursor + arity + 1]))
+                cursor += arity + 1
+            return groups
+
+        def key(group: tuple[Any, ...]) -> tuple[Any, ...] | None:
+            option = group[0]
+            field = group[1] if len(group) > 1 else None
+            if not isinstance(option, str) or not isinstance(field, str):
+                return None
+            if option in {"--value", "--toggle"}:
+                return (option, field)
+            return group
+
+        expected_groups = parse(step.arguments)
+        actual_groups = parse(tuple(actual))
+        if expected_groups is None or actual_groups is None:
+            return tuple(actual)
+        expected_keys = [key(group) for group in expected_groups]
+        actual_keys = [key(group) for group in actual_groups]
         if (
             any(item is None for item in (*expected_keys, *actual_keys))
             or len(set(expected_keys)) != len(expected_keys)

@@ -4566,6 +4566,78 @@ def test_import_batch_group_order_is_transport_but_row_order_is_business_meaning
     ) != step.arguments
 
 
+def test_cli_console_plan_group_order_is_transport_not_business_meaning() -> None:
+    fixed = (
+        "od1-" + "1" * 32,
+        "--task-authority",
+        "da1-" + "2" * 40,
+        "--expected-revision",
+        "1",
+    )
+    step = ExpectedGatewayStep(
+        name="tx01.declare-cli-console-plan",
+        subcommand="draft-declare-cli-console-plan",
+        arguments=(
+            *fixed,
+            "--value",
+            "project_file",
+            "/tmp/SemanticProject.wproj",
+            "--item",
+            "platforms",
+            "Windows",
+            "--toggle",
+            "skip_languages",
+            "enable",
+            "--value",
+            "source_control",
+            "disabled",
+            "--mapping",
+            "soundbank_directories_by_platform",
+            "Windows",
+            "GeneratedSoundBanks/FreshAgent",
+            "--value",
+            "verbosity",
+            "quiet",
+        ),
+    )
+    reordered = (
+        *fixed,
+        "--value",
+        "project_file",
+        "/tmp/SemanticProject.wproj",
+        "--item",
+        "platforms",
+        "Windows",
+        "--toggle",
+        "skip_languages",
+        "enable",
+        "--mapping",
+        "soundbank_directories_by_platform",
+        "Windows",
+        "GeneratedSoundBanks/FreshAgent",
+        "--value",
+        "source_control",
+        "disabled",
+        "--value",
+        "verbosity",
+        "quiet",
+    )
+    broker = SimpleNamespace(_payloads_by_step={})
+
+    assert CodexGatewayBroker._normalize_business_declaration_fact_order(
+        broker,
+        step,
+        reordered,
+    ) == step.arguments
+    changed = list(reordered)
+    changed[changed.index("disabled")] = "enabled"
+    assert CodexGatewayBroker._normalize_business_declaration_fact_order(
+        broker,
+        step,
+        tuple(changed),
+    ) != step.arguments
+
+
 def test_business_request_normalizes_only_exact_live_bound_reference_paths() -> None:
     bound_path = r"\Master-Mixer Hierarchy\Default Work Unit\Weather_Bus"
     unknown_path = r"\Master-Mixer Hierarchy\Default Work Unit\Unknown"

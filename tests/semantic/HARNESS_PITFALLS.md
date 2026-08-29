@@ -588,6 +588,23 @@ prevention checks that are expensive to rediscover.
   copy before Wwise starts; keep the immutable source untouched. Use the
   separate reviewed 2025 Auro profile for that fixture layout.
 
+### Independent CLI declaration groups are not a semantic sequence
+
+- Evidence: #89 macOS Fresh root `imac-cli-console-03ebea9-r1` selected the
+  exact SoundBank-build API and supplied every reviewed business value, but put
+  the platform output mapping before the source-control policy. The Broker
+  expected the reverse textual order and rejected the declaration before the
+  Gateway or Wwise; the root remains a frozen semantic FAIL without replay.
+- Cause: the formal protocol treated independently named `--value`, `--item`,
+  `--mapping`, and `--toggle` groups as an ordered workflow even though the
+  production parser builds one closed field map and rejects duplicate fields.
+- Prevention: canonicalize only complete, uniquely keyed CLI/Console groups to
+  the reviewed order before exact Broker comparison. Preserve collection item
+  and mapping contents in their identity keys, and keep every supplied value,
+  duplicate, omission, extra field, and revision binding exact. Do not repair
+  this transport-only difference by adding prompt wording or by weakening the
+  final materialized request comparison.
+
 ### A dynamic Business request is replayed from its durable Draft
 
 - Evidence: #88 macOS root `imac-soundengine4-68411e0-r2` and native-Windows
