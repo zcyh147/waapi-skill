@@ -636,6 +636,13 @@ prompt contains only one exact monitor-log message and no URI or Gateway
 mechanics. The Agent must select the SoundEngine business seam, preserve that
 message exactly, and stop at one immutable Preview; Gateway owns the native
 `postMsgMonitor` request, Draft lifecycle, and result-schema boundary.
+Exact candidate `2363c44a650c2d5133e832a8241c4e16c34f565b` passed this profile
+fresh plus identical verify-only in macOS root
+`imac-soundengine-2363c44-r1` and native-Windows root
+`iwin-soundengine-2363c44-r1`. Both roots sealed `wwise_started=false`; the
+Windows runs used temporary active-desktop `InteractiveToken` / `Limited`
+tasks, and both hosts ended with zero Wwise, WAAPI-listener, or scoped-process
+residue.
 
 `project_setting_business_1` is a single 2025.1 preview-only routing probe. It
 starts no Wwise process and grants no real-host coverage credit. The prompt
