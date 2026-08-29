@@ -379,6 +379,22 @@ prevention checks that are expensive to rediscover.
   and evidence seals, and mark a nonexistent live config explicitly unused.
   Keep ordinary heavy profiles fail-closed to real Wwise.
 
+### Optional-plugin isolation is version-layout-specific
+
+- Evidence: the #87 macOS Authoring preflight for Wwise 2025.1 stopped before
+  Wwise launch because the current broad optional-plugin isolator requires the
+  2022 SampleProject `Master-Mixer Hierarchy` layout. The copied 2025.1 project
+  has no such directory, so `normalize_project_copy` raised
+  `ProjectPrelaunchError` after creating only the disposable copy and I/O root.
+  The source project remained untouched and the preflight receives no real-host
+  credit.
+- Prevention: do not treat `isolate_optional_sample_plugins=true` as a
+  cross-version generic switch. Use it only for a pinned fixture layout that
+  its preconditions accept, or implement and deterministically test a separate
+  version-specific isolator before launching Authoring. Never bypass the
+  required isolation because a newer SampleProject moved or renamed its work
+  units; freeze the failed preflight and select a supported matching version.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:

@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import sys
+from typing import Mapping
 import uuid
 
 import pytest  # pyright: ignore[reportMissingImports]
@@ -199,6 +200,98 @@ def _execute_and_verify(
     )
 
 
+def _preview_runtime_plan(
+    operation: str,
+    declaration_args: list[str],
+    *,
+    env: dict[str, str],
+    state_dir: Path,
+    target_id: str | None = None,
+) -> dict[str, object]:
+    started = _call(
+        ["draft-start", operation],
+        env=env,
+        state_dir=state_dir,
+    )
+    draft = started["draft"]
+    assert isinstance(draft, dict)
+    draft_id = str(draft["draft_id"])
+    authority = str(started["task_authority"])
+    current = draft
+    arguments = list(declaration_args)
+    if target_id is not None:
+        bound = _call(
+            [
+                "draft-bind-object",
+                draft_id,
+                "--task-authority",
+                authority,
+                "--expected-revision",
+                str(current["revision"]),
+                "--role",
+                "target",
+                "--object-id",
+                target_id,
+            ],
+            env=env,
+            state_dir=state_dir,
+        )
+        current = bound["draft"]
+        bound_object = bound["bound_object"]
+        assert isinstance(current, dict)
+        assert isinstance(bound_object, dict)
+        arguments = ["--target-handle", str(bound_object["handle"]), *arguments]
+    declared = _call(
+        [
+            "draft-declare-runtime-control-plan",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            str(current["revision"]),
+            *arguments,
+        ],
+        env=env,
+        state_dir=state_dir,
+    )
+    current = declared["draft"]
+    assert isinstance(current, dict)
+    checked = _call(
+        [
+            "draft-check",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            str(current["revision"]),
+        ],
+        env=env,
+        state_dir=state_dir,
+    )
+    current = checked["draft"]
+    assert isinstance(current, dict)
+    return _call(
+        [
+            "preview-from-draft",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            str(current["revision"]),
+        ],
+        env=env,
+        state_dir=state_dir,
+    )
+
+
+def _runtime_business_result(verified: Mapping[str, object]) -> Mapping[str, object]:
+    agent_result = verified.get("agent_result")
+    assert isinstance(agent_result, Mapping), verified
+    business_result = agent_result.get("business_result")
+    assert isinstance(business_result, Mapping), agent_result
+    return business_result
+
+
 @pytest.mark.live
 @pytest.mark.destructive
 def test_authoring_ui_business_capture_execute_register_unregister(
@@ -322,3 +415,157 @@ def test_authoring_ui_business_capture_execute_register_unregister(
         raise primary_error
     if cleanup_error is not None:
         raise cleanup_error
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_runtime_business_profiler_and_transport_lifecycle_on_authoring(
+    tmp_path: Path,
+) -> None:
+    version = os.environ["WWISE_VERSION"]
+    assert version in {"2022.1", "2025.1"}
+    env = _gateway_env(tmp_path, version=version)
+    state_dir = tmp_path / "runtime-authoring-state"
+
+    status = _call(["status"], env=env, state_dir=state_dir)
+    assert status["is_command_line"] is False
+    project = status["project"]
+    assert isinstance(project, dict)
+    observed_project = Path(
+        localize_waapi_host_path(project["path"])
+    ).resolve(strict=True)
+    expected_project = Path(
+        env["WWISE_AUTHORING_SANDBOX_PROJECT"]
+    ).resolve(strict=True)
+    assert observed_project == expected_project
+
+    event_id = "{1AF4A3BA-682A-4664-AC31-45C0F0E6F8D1}"
+    event = _call(
+        ["query-object", "--exact-id", event_id],
+        env=env,
+        state_dir=state_dir,
+    )
+    assert event["count"] == 1
+    rows = event["objects"]
+    assert isinstance(rows, list) and len(rows) == 1
+    assert rows[0]["type"] == "Event"
+
+    profiler_enabled = False
+    transport_handle: str | None = None
+    primary_error: BaseException | None = None
+    cleanup_errors: list[BaseException] = []
+    try:
+        profiler = _preview_runtime_plan(
+            "ak.wwise.core.profiler.enableProfilerData",
+            ["--capture-data", "voices", "enable"],
+            env=env,
+            state_dir=state_dir,
+        )
+        # Cleanup ownership begins before execute: the call can succeed even if
+        # its weak result-schema verification later fails.
+        profiler_enabled = True
+        profiler_verified = _execute_and_verify(
+            profiler,
+            env=env,
+            state_dir=state_dir,
+        )
+        assert profiler_verified["state"] == (
+            TransactionState.RESULT_SCHEMA_CHECKED.value
+        )
+        created = _preview_runtime_plan(
+            "ak.wwise.core.transport.create",
+            [],
+            env=env,
+            state_dir=state_dir,
+            target_id=event_id,
+        )
+        created_verified = _execute_and_verify(
+            created,
+            env=env,
+            state_dir=state_dir,
+        )
+        assert created_verified["state"] == TransactionState.VERIFIED.value
+        create_result = _runtime_business_result(created_verified)
+        transport_handle = str(create_result["transport_handle"])
+
+        state = _call(
+            [
+                "core-call",
+                "ak.wwise.core.transport.getState",
+                "--transport-handle",
+                transport_handle,
+            ],
+            env=env,
+            state_dir=state_dir,
+        )
+        assert state["agent_result"]["transport_handle"] == transport_handle
+        assert state["agent_result"]["state"] in {"playing", "paused", "stopped"}
+
+        stopped = _preview_runtime_plan(
+            "ak.wwise.core.transport.executeAction",
+            [
+                "--audition-action",
+                "stop",
+                "--transport-scope",
+                "one-transport",
+                "--transport-handle",
+                transport_handle,
+            ],
+            env=env,
+            state_dir=state_dir,
+        )
+        stopped_verified = _execute_and_verify(
+            stopped,
+            env=env,
+            state_dir=state_dir,
+        )
+        assert stopped_verified["state"] == (
+            TransactionState.RESULT_SCHEMA_CHECKED.value
+        )
+
+        destroyed = _preview_runtime_plan(
+            "ak.wwise.core.transport.destroy",
+            ["--transport-handle", transport_handle],
+            env=env,
+            state_dir=state_dir,
+        )
+        destroyed_verified = _execute_and_verify(
+            destroyed,
+            env=env,
+            state_dir=state_dir,
+        )
+        assert destroyed_verified["state"] == TransactionState.VERIFIED.value
+        assert _runtime_business_result(destroyed_verified)[
+            "retired_transport_handle_count"
+        ] == 1
+        transport_handle = None
+    except BaseException as exc:
+        primary_error = exc
+    finally:
+        if transport_handle is not None:
+            try:
+                cleanup = _preview_runtime_plan(
+                    "ak.wwise.core.transport.destroy",
+                    ["--transport-handle", transport_handle],
+                    env=env,
+                    state_dir=state_dir,
+                )
+                _execute_and_verify(cleanup, env=env, state_dir=state_dir)
+            except BaseException as exc:
+                cleanup_errors.append(exc)
+        if profiler_enabled:
+            try:
+                cleanup = _preview_runtime_plan(
+                    "ak.wwise.core.profiler.enableProfilerData",
+                    ["--capture-data", "voices", "disable"],
+                    env=env,
+                    state_dir=state_dir,
+                )
+                _execute_and_verify(cleanup, env=env, state_dir=state_dir)
+            except BaseException as exc:
+                cleanup_errors.append(exc)
+    if primary_error is not None or cleanup_errors:
+        raise BaseExceptionGroup(
+            "Authoring runtime lifecycle or bounded cleanup failed",
+            [*([primary_error] if primary_error is not None else []), *cleanup_errors],
+        )
