@@ -692,13 +692,13 @@ adapters and sealed real-Wwise evidence for 70 cases on 2022.1, five on 2024.1,
 and five on 2025.1. Do not extrapolate those 80 results to the remaining V3
 catalog or to every version/API row.
 
-The current 2022.1 v3 selection is 326 scenarios for 142 APIs: 116 single-turn
-scenarios and 210 cases using the preview/confirm protocol. Seventeen cases
-require more than one separately previewed call, for 230 confirmation turns in
+The current 2022.1 v3 selection is 326 scenarios for 142 APIs: 120 single-turn
+scenarios and 206 cases using the preview/confirm protocol. Fifteen cases
+require more than one separately previewed call, for 224 confirmation turns in
 total. With one fresh memory-isolated Codex task per scenario, that means 326
-fresh tasks and 556 user turns. The representative later-version increments add
+fresh tasks and 550 user turns. The representative later-version increments add
 74 / 27 / 17 tasks for 2023.1 / 2024.1 / 2025.1, so the complete reviewed
-selection is 444 fresh tasks and 792 user turns. Every confirmation binds only
+selection is 444 fresh tasks and 783 user turns. Every confirmation binds only
 the currently visible immutable preview. Do not describe this as a
 dozens-of-conversations run or silently combine APIs to reduce the total;
 changing that cost model requires reviewed composite cases with their own

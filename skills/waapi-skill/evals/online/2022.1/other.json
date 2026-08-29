@@ -5788,8 +5788,8 @@
           "description": "目标 Gameplay SoundBank 的完整 Wwise 对象路径"
         }
       ],
-      "protocol": "preview_confirm",
-      "confirmation_prompt": "可以，读取这个 Bank 的 inclusion 明细。",
+      "protocol": "single",
+      "confirmation_prompt": null,
       "fixture": {
         "adapter": "soundbank_inclusion_fixture",
         "sandbox": "scenario_project_copy",
@@ -5808,12 +5808,6 @@
         }
       ],
       "oracle_assertions": [
-        {
-          "phase": "preview",
-          "adapter": "project_snapshot_unchanged_oracle",
-          "subject_api": "ak.wwise.core.soundbank.getInclusions",
-          "expectation": "确认前目标调用尚未执行，沙箱工程、受控运行时和隔离输出均与预览前快照一致"
-        },
         {
           "phase": "after",
           "adapter": "waapi_soundbank_inclusion_oracle",
@@ -5853,8 +5847,8 @@
           "description": "Main_UI 与 Frontend 两个 SoundBank 的完整 Wwise 对象路径"
         }
       ],
-      "protocol": "preview_confirm",
-      "confirmation_prompt": "这一步预览没问题，执行它；如果还有下一步，先把下一步预览给我。",
+      "protocol": "single",
+      "confirmation_prompt": null,
       "fixture": {
         "adapter": "soundbank_inclusion_fixture",
         "sandbox": "scenario_project_copy",
@@ -5873,12 +5867,6 @@
         }
       ],
       "oracle_assertions": [
-        {
-          "phase": "preview",
-          "adapter": "project_snapshot_unchanged_oracle",
-          "subject_api": "ak.wwise.core.soundbank.getInclusions",
-          "expectation": "确认前目标调用尚未执行，沙箱工程、受控运行时和隔离输出均与预览前快照一致"
-        },
         {
           "phase": "after",
           "adapter": "waapi_soundbank_inclusion_oracle",

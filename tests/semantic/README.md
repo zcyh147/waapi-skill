@@ -89,12 +89,12 @@ them in versioned Skill resources or closed builders after prompt approval;
 never place internal enum integers into the natural user prompt.
 
 The 2022.1 review selection contains 326 scenarios for 142 APIs. It consists of
-116 single-turn cases and 210 cases using the preview/confirm protocol.
-Seventeen cases need more than one separately previewed call, so the selection
-requires 230 confirmation turns: 326 fresh tasks and 556 total user turns. The
+120 single-turn cases and 206 cases using the preview/confirm protocol.
+Fifteen cases need more than one separately previewed call, so the selection
+requires 224 confirmation turns: 326 fresh tasks and 550 total user turns. The
 representative later-version increments add 74 / 27 / 17 tasks for 2023.1 /
 2024.1 / 2025.1. The complete reviewed selection is therefore 444 fresh tasks
-and 792 user turns. This is intentionally not advertised as a “few dozen” run.
+and 783 user turns. This is intentionally not advertised as a “few dozen” run.
 Each case has exactly one primary API; reducing the task count later would
 require separately reviewed composite prompts and oracles rather than silently
 sharing coverage credit.
