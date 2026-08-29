@@ -28,6 +28,22 @@ prevention checks that are expensive to rediscover.
   `Limited`; the same numeric console session owns `explorer.exe`. Ordinary
   pytest and `ci/test.bat` remain direct SSH commands.
 
+### A permitted Windows 267 retry is one effective Gateway command
+
+- Evidence: #86 Windows root `iwin-pset-98d9e70-r4` passed every Broker,
+  Preview, closed-request, and final-response gate. One `request-schema` shell
+  launch failed before PowerShell with `CreateProcessAsUserW failed: 267`, then
+  the Agent followed the Skill's one-time identical retry rule and succeeded.
+  Reconciliation nevertheless counted both records and failed 8 commands
+  against 7 Broker dispatches.
+- Cause: command classification already excluded the proven pre-process 267
+  attempt, but V3 Gateway argv extraction scanned raw command records again.
+- Prevention: both candidate argv and raw-record extraction remove only indexes
+  accepted by `recoverable_preprocess_attempt_indexes`: failed before shell,
+  exact Windows PowerShell provenance, adjacent identical command and argv, and
+  a successful 0/2 successor. Never collapse a non-267, changed, non-adjacent,
+  or twice-failed command.
+
 ### Scheduled Task `Ready` is not campaign completion
 
 - Symptom: Task Scheduler reports `Ready` while token-owned Codex/Python

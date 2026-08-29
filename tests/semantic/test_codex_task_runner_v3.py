@@ -1182,6 +1182,57 @@ def test_v3_gateway_accounting_accepts_copy_then_candidate_runner(tmp_path: Path
     ) == tuple(record.argv for record in records)
 
 
+def test_v3_gateway_accounting_folds_one_identical_windows_267_retry(
+    tmp_path: Path,
+) -> None:
+    skill = tmp_path / "waapi-skill"
+    argv = (
+        "python",
+        str(skill / "scripts" / "run.py"),
+        "gateway.py",
+        "request-schema",
+        "ak.wwise.core.gameParameter.setRange",
+    )
+    command = "pwsh -Command project-setting-request-schema"
+    failed = SimpleNamespace(
+        argv=argv,
+        command=command,
+        status="failed",
+        exit_code=-1,
+        parse_error="",
+        has_shell_operators=False,
+        parser_kind="windows-pwsh-command",
+        aggregated_output=(
+            "execution error: Io(windows sandbox: "
+            "CreateProcessAsUserW failed: 267)"
+        ),
+    )
+    successful = SimpleNamespace(
+        argv=argv,
+        command=command,
+        status="completed",
+        exit_code=0,
+        parse_error="",
+        has_shell_operators=False,
+        parser_kind="windows-pwsh-command",
+        aggregated_output="{}",
+    )
+    result = SimpleNamespace(
+        command_facts=SimpleNamespace(command_records=(failed, successful))
+    )
+
+    assert task_runner._gateway_candidate_argvs(
+        result,
+        skill_source=skill,
+        expected_wwise_version="2025.1",
+    ) == (argv,)
+    assert task_runner._gateway_candidate_records(
+        result,
+        skill_source=skill,
+        expected_wwise_version="2025.1",
+    ) == (successful,)
+
+
 def test_v3_gateway_accounting_canonicalizes_exact_task_local_runner(
     tmp_path: Path,
 ) -> None:

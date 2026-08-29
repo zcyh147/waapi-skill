@@ -923,8 +923,14 @@ def _gateway_candidate_argvs(
         os.path.abspath(os.fspath(source / "scripts" / "run.py"))
         for source in (skill_source, *alternate_skill_sources)
     ))
+    records = result.command_facts.command_records
+    recoverable_indexes = frozenset(
+        recoverable_preprocess_attempt_indexes(records)
+    )
     candidates: list[tuple[str, ...]] = []
-    for record in result.command_facts.command_records:
+    for index, record in enumerate(records):
+        if index in recoverable_indexes:
+            continue
         argv = normalized_gateway_command_argv(
             record.argv,
             expected_wwise_version=expected_wwise_version,
@@ -948,8 +954,14 @@ def _gateway_candidate_records(
         os.path.abspath(os.fspath(source / "scripts" / "run.py"))
         for source in (skill_source, *alternate_skill_sources)
     ))
+    records = result.command_facts.command_records
+    recoverable_indexes = frozenset(
+        recoverable_preprocess_attempt_indexes(records)
+    )
     candidates: list[CodexCommandRecord] = []
-    for record in result.command_facts.command_records:
+    for index, record in enumerate(records):
+        if index in recoverable_indexes:
+            continue
         argv = normalized_gateway_command_argv(
             record.argv,
             expected_wwise_version=expected_wwise_version,
