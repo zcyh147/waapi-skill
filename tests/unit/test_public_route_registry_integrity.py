@@ -154,13 +154,21 @@ def test_only_reviewed_explicit_project_cli_calls_skip_the_post_execution_projec
         == POST_EXECUTION_PROJECT_GUARD_CONTEXT_RUNTIME_ONLY
     ]
 
-    assert len(context_only) == 20
+    assert len(context_only) == 59
     assert {entry.version for entry in context_only} == set(SUPPORTED_WWISE_VERSION_KEYS)
     assert {entry.uri for entry in context_only} == {
+        "ak.wwise.cli.addNewPlatform",
         "ak.wwise.cli.convertExternalSource",
+        "ak.wwise.cli.createNewProject",
+        "ak.wwise.cli.dumpObjects",
         "ak.wwise.cli.generateSoundbank",
         "ak.wwise.cli.migrate",
+        "ak.wwise.cli.moveMediaIdsToSingleFile",
+        "ak.wwise.cli.moveMediaIdsToWorkUnits",
         "ak.wwise.cli.tabDelimitedImport",
+        "ak.wwise.cli.updateMediaIdsInSingleFile",
+        "ak.wwise.cli.verify",
+        "ak.wwise.cli.waapiServer",
     }
     assert all(entry.project_guard_mode == PROJECT_GUARD_INVARIANT for entry in context_only)
     assert all(entry.verification_strategy == "result_schema" for entry in context_only)

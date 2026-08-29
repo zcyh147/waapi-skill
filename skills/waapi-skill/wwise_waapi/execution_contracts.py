@@ -301,10 +301,18 @@ POST_EXECUTION_PROJECT_GUARD_POLICIES = frozenset(
 )
 CONTEXT_RUNTIME_ONLY_POST_EXECUTION_URIS = frozenset(
     {
+        "ak.wwise.cli.addNewPlatform",
         "ak.wwise.cli.convertExternalSource",
+        "ak.wwise.cli.createNewProject",
+        "ak.wwise.cli.dumpObjects",
         "ak.wwise.cli.generateSoundbank",
         "ak.wwise.cli.migrate",
+        "ak.wwise.cli.moveMediaIdsToSingleFile",
+        "ak.wwise.cli.moveMediaIdsToWorkUnits",
         "ak.wwise.cli.tabDelimitedImport",
+        "ak.wwise.cli.updateMediaIdsInSingleFile",
+        "ak.wwise.cli.verify",
+        "ak.wwise.cli.waapiServer",
     }
 )
 POST_EXECUTION_PROJECT_GUARD_POLICY_BY_URI: Mapping[str, str] = MappingProxyType(
@@ -884,9 +892,9 @@ def validate_packaged_execution_contracts(
         == POST_EXECUTION_PROJECT_GUARD_CONTEXT_RUNTIME_ONLY
     )
     expected_context_runtime_only = {
-        (version, uri)
-        for version in SUPPORTED_WWISE_VERSION_KEYS
-        for uri in CONTEXT_RUNTIME_ONLY_POST_EXECUTION_URIS
+        (entry.version, entry.uri)
+        for entry in rows
+        if entry.uri in CONTEXT_RUNTIME_ONLY_POST_EXECUTION_URIS
     }
     actual_context_runtime_only = {
         (entry.version, entry.uri) for entry in context_runtime_only

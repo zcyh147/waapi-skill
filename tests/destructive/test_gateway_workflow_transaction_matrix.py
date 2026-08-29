@@ -1531,6 +1531,7 @@ def test_cli_console_business_build_and_project_verifier_shapes(
     )
     verify_result = _complete_core_result_schema_draft(runtime, verify_draft)
     assert verify_result["verify"]["verification"]["business_state_verified"] is False
+    _restart_workflow_host_after_transport_loss(runtime)
 
     dump_file = output_root / f"objects-{runtime.version}.txt"
     dump_api = "ak.wwise.cli.dumpObjects"
@@ -1550,6 +1551,7 @@ def test_cli_console_business_build_and_project_verifier_shapes(
     dump_result = _complete_core_result_schema_draft(runtime, dump_draft)
     assert dump_file.is_file(), dump_result
     assert dump_file.stat().st_size > 0
+    _restart_workflow_host_after_transport_loss(runtime)
 
     generated_root = output_root / "generated"
     generated_banks = generated_root / "Windows"
@@ -1574,6 +1576,7 @@ def test_cli_console_business_build_and_project_verifier_shapes(
     generate_result = _complete_core_result_schema_draft(runtime, generate_draft)
     generated_files = tuple(generated_root.rglob("*.bnk"))
     assert generated_files, generate_result
+    _restart_workflow_host_after_transport_loss(runtime)
 
     categories = [
         {
