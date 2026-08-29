@@ -32,6 +32,10 @@ from .operation_registry import (
     parse_operation_request,
     prepare_operation,
 )
+from .platform_paths import (
+    WwiseWirePathError,
+    localize_live_wwise_project_path,
+)
 
 
 TRANSACTION_PREVIEW_CONTRACT = "waapi-skill.transaction-preview/v2"
@@ -634,14 +638,28 @@ def validate_transaction_guards(
             )
         if mode == PROJECT_GUARD_TRANSITION_TO_PATH:
             actual_path = _project_snapshot_path(actual_project)
-            actual_canonical_path = (
-                canonical_project_path(actual_path)
-                if actual_project.get("state") == "open" and actual_path is not None
-                else None
-            )
+            actual_path_error: Mapping[str, Any] | None = None
+            if actual_project.get("state") == "open" and actual_path is not None:
+                endpoint = current_project_guard.get("endpoint")
+                wwise = current_project_guard.get("wwise")
+                try:
+                    localized_actual_path = localize_live_wwise_project_path(
+                        actual_path,
+                        endpoint=endpoint if isinstance(endpoint, Mapping) else {},
+                        wwise=wwise if isinstance(wwise, Mapping) else {},
+                    )
+                    actual_canonical_path = canonical_project_path(
+                        localized_actual_path
+                    )
+                except WwiseWirePathError as exc:
+                    actual_canonical_path = None
+                    actual_path_error = exc.as_dict()
+            else:
+                actual_canonical_path = None
             matched = actual_canonical_path == expected_postcondition.get("canonical_path")
         else:
             actual_canonical_path = None
+            actual_path_error = None
             matched = (
                 mode == PROJECT_GUARD_TRANSITION_TO_NONE
                 and actual_project.get("state") == "none"
@@ -651,6 +669,11 @@ def validate_transaction_guards(
             "expected": dict(expected_postcondition),
             "actual": dict(actual_project),
             "actual_canonical_path": actual_canonical_path,
+            **(
+                {"actual_path_error": dict(actual_path_error)}
+                if actual_path_error is not None
+                else {}
+            ),
             "matched": matched,
         }
         if not matched:

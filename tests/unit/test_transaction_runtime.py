@@ -95,6 +95,73 @@ def test_canonical_project_path_uses_source_filesystem_semantics() -> None:
     )
 
 
+@pytest.mark.skipif(
+    not str(SKILL_ROOT).startswith(str(Path.home()) + "/"),
+    reason="Wine Y: project verification requires the repository below the login home",
+)
+def test_project_transition_verification_localizes_a_live_wine_file_path() -> None:
+    target = (
+        Path(__file__).resolve().parents[2]
+        / "tests"
+        / "_org"
+        / "2025.1"
+        / "SampleProject.wproj"
+    ).resolve(strict=True)
+    wire_target = "Y:\\" + "\\".join(target.relative_to(Path.home()).parts)
+    endpoint = {
+        "host": "127.0.0.1",
+        "port": 31337,
+        "url": "ws://127.0.0.1:31337/waapi",
+    }
+    live_info = {
+        "displayName": "Wwise",
+        "isCommandLine": True,
+        "version": {"year": 2025, "major": 1, "minor": 7, "build": 9143},
+        "processPath": r"C:\Program Files\Audiokinetic\Wwise\WwiseConsole.exe",
+        "platform": "x64",
+    }
+    sealed = build_project_guard(
+        endpoint=endpoint,
+        version="2025.1",
+        live_info=live_info,
+        project={"id": "{project}", "name": "SampleProject", "filePath": wire_target},
+        project_guard_mode="transition_to_path",
+        target_project_path=str(target),
+    )
+    observed = build_project_guard(
+        endpoint=endpoint,
+        version="2025.1",
+        live_info=live_info,
+        project={
+            "id": "{project}",
+            "name": "SampleProject",
+            "path": "\\",
+            "filePath": wire_target,
+        },
+        project_guard_mode="transition_to_path",
+        target_project_path=str(target),
+    )
+    artifact = {
+        "contract": TRANSACTION_PREVIEW_CONTRACT,
+        "request": {"version": "2025.1"},
+        "project_guard": sealed,
+        "runtime_guard": build_runtime_guard(SKILL_ROOT, "2025.1"),
+        "expires_at": "2026-07-14T07:00:00.000000Z",
+    }
+
+    validation = validate_transaction_guards(
+        artifact,
+        current_project_guard=observed,
+        skill_root=SKILL_ROOT,
+        now=NOW,
+        project_phase="post_verification",
+    )
+
+    transition = validation["project_transition"]
+    assert transition["matched"] is True
+    assert transition["actual_canonical_path"] == canonical_project_path(str(target))
+
+
 @pytest.mark.parametrize(
     "value",
     (

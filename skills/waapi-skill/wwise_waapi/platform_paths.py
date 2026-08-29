@@ -367,6 +367,69 @@ def requires_wwise_wire_path_adaptation(uri: str) -> bool:
     )
 
 
+def localize_live_wwise_project_path(
+    value: str,
+    *,
+    endpoint: Mapping[str, Any],
+    wwise: Mapping[str, Any],
+    host_os_name: str | None = None,
+    account_home: str | Path | None = None,
+) -> str:
+    """Map one live local-Wine project path back to its host identity.
+
+    Project-transition previews retain the caller's host path, while Wwise
+    running through Wine reports the opened project through its Y:/Z: drive.
+    Verification compares those identities only after the returned wire path
+    round-trips to one existing regular local WPROJ file.
+    """
+
+    if not isinstance(value, str) or not value:
+        raise WwiseWirePathError(
+            "WIRE_PATH_CONTEXT_UNAVAILABLE",
+            "The live Wwise project path is empty or malformed.",
+        )
+    effective_os_name = os.name if host_os_name is None else host_os_name
+    if effective_os_name == "nt":
+        return value
+    process_path = wwise.get("processPath")
+    windows_runtime = (
+        isinstance(process_path, str)
+        and _WINDOWS_ABSOLUTE_PATH.match(process_path) is not None
+    )
+    if not windows_runtime:
+        return value
+    endpoint_host = endpoint.get("host")
+    if not isinstance(endpoint_host, str) or not is_loopback_waapi_host(
+        endpoint_host
+    ):
+        return value
+    localized = _wire_to_host_path(value, account_home=_account_home(account_home))
+    if localized.is_symlink():
+        raise WwiseWirePathError(
+            "WIRE_PATH_ANCHOR_INVALID",
+            "The live Wine project path must not be a symlink.",
+            details={"project_path": value, "localized_project_path": str(localized)},
+        )
+    try:
+        resolved = localized.resolve(strict=True)
+    except (OSError, RuntimeError) as exc:
+        raise WwiseWirePathError(
+            "WIRE_PATH_ANCHOR_INVALID",
+            "The live Wine project path does not resolve to a local file.",
+            details={"project_path": value, "reason": str(exc)},
+        ) from exc
+    if (
+        not resolved.is_file()
+        or resolved.suffix.casefold() != ".wproj"
+    ):
+        raise WwiseWirePathError(
+            "WIRE_PATH_ANCHOR_INVALID",
+            "The live Wine project path does not identify one regular local .wproj file.",
+            details={"project_path": value, "localized_project_path": str(resolved)},
+        )
+    return str(resolved)
+
+
 def _identity_adaptation_proof(
     uri: str,
     dispatch: Mapping[str, Any],
