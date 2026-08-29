@@ -1987,7 +1987,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         "public-execution-contract",
         "Execute one manifest-registered guarded function without model-authored code.",
         ("api",),
-        ("args", "options", "io_root"),
+        ("args", "options", "io_root", "result_projection"),
         argument_contract=_object_contract(
             ("api",),
             {
@@ -2022,8 +2022,15 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                         "inside args."
                     ),
                 },
+                "result_projection": {
+                    "type": "object",
+                    "description": (
+                        "Gateway-owned bounded result projection for the exact "
+                        "closed business route; never forwarded to WAAPI."
+                    ),
+                },
             },
-            optional=("args", "options", "io_root"),
+            optional=("args", "options", "io_root", "result_projection"),
         ),
         constraints=(
             "api must be reflected by the requested Wwise version",
@@ -4125,6 +4132,27 @@ def _public_call_arguments(
             details={"api": api, "fields": list(supplied_forbidden)},
         )
     validation = validate_semantic_payload(api, raw_args, raw_options, version=version)
+    result_projection = arguments.get("result_projection")
+    if result_projection is not None:
+        if api != "ak.wwise.core.sourceControl.getSourceFiles":
+            raise OperationContractError(
+                "RESULT_PROJECTION_NOT_APPLICABLE",
+                "waapi.call result_projection is owned only by the closed source-file listing route.",
+                details={"api": api},
+            )
+        if (
+            not isinstance(result_projection, Mapping)
+            or set(result_projection) != {"kind", "max_results"}
+            or result_projection.get("kind") != "source-control-files"
+            or isinstance(result_projection.get("max_results"), bool)
+            or not isinstance(result_projection.get("max_results"), int)
+            or not 1 <= int(result_projection["max_results"]) <= 1_000
+        ):
+            raise OperationContractError(
+                "INVALID_RESULT_PROJECTION",
+                "source-control file projection requires kind and max_results from 1 to 1000.",
+                details={"api": api},
+            )
     _enforce_versioned_public_call_boundaries(
         version=version,
         api=api,
@@ -4292,8 +4320,58 @@ def _public_call_verification_plan(
     version: str,
     args: Mapping[str, Any],
     strategy: str,
+    result_projection: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     common = {"uri": api, "version": version}
+    if api == "ak.wwise.core.sound.setActiveSource":
+        sound_id = args.get("sound")
+        source_id = args.get("source")
+        if not _valid_object_id(sound_id) or not _valid_object_id(source_id):
+            raise OperationContractError(
+                "INVALID_ARGUMENT",
+                "The closed active-source route requires exact Sound and source GUIDs.",
+            )
+        platform = args.get("platform")
+        if platform is not None and (
+            not isinstance(platform, str) or not platform.strip()
+        ):
+            raise OperationContractError(
+                "INVALID_ARGUMENT",
+                "The closed active-source route requires one exact platform name.",
+            )
+        return {
+            "kind": "project-setting-state",
+            **common,
+            "strategy": "operation_specific_readback",
+            "base_result_strategy": strategy,
+            "object_id": sound_id,
+            "expected_active_source_id": source_id,
+            **({"platform": platform} if platform is not None else {}),
+        }
+    if api == "ak.wwise.core.gameParameter.setRange":
+        object_id = args.get("object")
+        minimum = args.get("min")
+        maximum = args.get("max")
+        if (
+            not _valid_object_id(object_id)
+            or isinstance(minimum, bool)
+            or not isinstance(minimum, (int, float))
+            or isinstance(maximum, bool)
+            or not isinstance(maximum, (int, float))
+        ):
+            raise OperationContractError(
+                "INVALID_ARGUMENT",
+                "The closed Game Parameter range route requires one exact GUID and numeric bounds.",
+            )
+        return {
+            "kind": "project-setting-state",
+            **common,
+            "strategy": "operation_specific_readback",
+            "base_result_strategy": strategy,
+            "object_id": object_id,
+            "expected_minimum": float(minimum),
+            "expected_maximum": float(maximum),
+        }
     if api in {REMOTE_CONNECT_URI, REMOTE_DISCONNECT_URI}:
         return {
             "kind": "remote-connection-state",
@@ -4324,7 +4402,16 @@ def _public_call_verification_plan(
             "base_result_strategy": strategy,
             "transport_id": transport_id,
         }
-    return {"kind": "result-schema", **common, "strategy": strategy}
+    return {
+        "kind": "result-schema",
+        **common,
+        "strategy": strategy,
+        **(
+            {"result_projection": dict(result_projection)}
+            if result_projection is not None
+            else {}
+        ),
+    }
 
 
 def _closed_operation_preview(
@@ -8171,6 +8258,11 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
             version=request.version,
             args=call_args,
             strategy=str(execution_contract["verification_strategy"]),
+            result_projection=(
+                arguments.get("result_projection")
+                if isinstance(arguments.get("result_projection"), Mapping)
+                else None
+            ),
         )
         cleanup = build_transaction_cleanup_spec(
             api,
@@ -14580,6 +14672,93 @@ def verify_prepared_operation(
                 True,
                 validation.as_dict(),
             )
+    elif kind == "project-setting-state":
+        uri = plan.get("uri")
+        version = plan.get("version")
+        object_id = plan.get("object_id")
+        if (
+            uri
+            not in {
+                "ak.wwise.core.sound.setActiveSource",
+                "ak.wwise.core.gameParameter.setRange",
+            }
+            or not isinstance(version, str)
+            or not _valid_object_id(object_id)
+        ):
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                "Project-setting verification lacks its exact URI, version, or object GUID.",
+            )
+        check_result_schema(str(uri), version)
+        if uri == "ak.wwise.core.sound.setActiveSource":
+            expected_source = plan.get("expected_active_source_id")
+            platform = plan.get("platform")
+            if not _valid_object_id(expected_source) or (
+                platform is not None and not isinstance(platform, str)
+            ):
+                raise OperationContractError(
+                    "INVALID_PREVIEW",
+                    "Active-source verification lacks its exact source or platform.",
+                )
+            rows = read_object(
+                object_id=object_id,
+                fields=("id", "name", "type", "path", "activeSource"),
+                platform=platform,
+            )
+            check(
+                "active-source target resolves exactly once",
+                len(rows) == 1,
+                rows,
+            )
+            if len(rows) == 1:
+                actual_source = _reference_identity(
+                    _field_value(rows[0], "activeSource")
+                )
+                check(
+                    "Sound active source matches the requested AudioFileSource",
+                    _same_identity(actual_source, expected_source),
+                    {
+                        "expected": expected_source,
+                        "actual": actual_source,
+                        "platform": platform,
+                    },
+                )
+        else:
+            expected_minimum = plan.get("expected_minimum")
+            expected_maximum = plan.get("expected_maximum")
+            if not isinstance(expected_minimum, (int, float)) or not isinstance(
+                expected_maximum, (int, float)
+            ):
+                raise OperationContractError(
+                    "INVALID_PREVIEW",
+                    "Game Parameter range verification lacks its exact numeric bounds.",
+                )
+            rows = read_object(
+                object_id=object_id,
+                fields=("id", "name", "type", "path", "@Min", "@Max"),
+            )
+            check(
+                "Game Parameter target resolves exactly once",
+                len(rows) == 1,
+                rows,
+            )
+            if len(rows) == 1:
+                actual_minimum = _field_value(rows[0], "@Min")
+                actual_maximum = _field_value(rows[0], "@Max")
+                check(
+                    "Game Parameter minimum matches exactly",
+                    isinstance(actual_minimum, (int, float))
+                    and not isinstance(actual_minimum, bool)
+                    and float(actual_minimum) == float(expected_minimum),
+                    {"expected": expected_minimum, "actual": actual_minimum},
+                )
+                check(
+                    "Game Parameter maximum matches exactly",
+                    isinstance(actual_maximum, (int, float))
+                    and not isinstance(actual_maximum, bool)
+                    and float(actual_maximum) == float(expected_maximum),
+                    {"expected": expected_maximum, "actual": actual_maximum},
+                )
     elif kind == "remote-connection-state":
         uri = plan.get("uri")
         version = plan.get("version")

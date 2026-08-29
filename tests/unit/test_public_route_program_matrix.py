@@ -48,6 +48,8 @@ BUSINESS_STATE_VERIFIED_APIS = frozenset(
         "ak.wwise.core.remote.disconnect",
         "ak.wwise.core.transport.create",
         "ak.wwise.core.transport.destroy",
+        "ak.wwise.core.sound.setActiveSource",
+        "ak.wwise.core.gameParameter.setRange",
     }
 )
 
@@ -266,6 +268,34 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
         read_call=lambda uri, call_args, call_options: {},
     )
     def readback(uri: str, call_args: Mapping[str, Any], call_options: Mapping[str, Any]) -> Mapping[str, Any]:
+        if uri == "ak.wwise.core.object.get":
+            if entry.uri == "ak.wwise.core.sound.setActiveSource":
+                assert call_args == {"from": {"id": [args["sound"]]}}
+                return {
+                    "return": [
+                        {
+                            "id": args["sound"],
+                            "name": "Program Sound",
+                            "type": "Sound",
+                            "path": r"\Program Sound",
+                            "activeSource": {"id": args["source"]},
+                        }
+                    ]
+                }
+            if entry.uri == "ak.wwise.core.gameParameter.setRange":
+                assert call_args == {"from": {"id": [args["object"]]}}
+                return {
+                    "return": [
+                        {
+                            "id": args["object"],
+                            "name": "Program Game Parameter",
+                            "type": "GameParameter",
+                            "path": r"\Game Parameters\Program Game Parameter",
+                            "@Min": args["min"],
+                            "@Max": args["max"],
+                        }
+                    ]
+                }
         assert call_options == {}
         if uri == "ak.wwise.core.remote.getConnectionStatus":
             return {

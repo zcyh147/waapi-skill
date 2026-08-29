@@ -182,6 +182,7 @@ from wwise_waapi.execution_contracts import (  # noqa: E402  # pyright: ignore[r
     PROJECT_GUARD_INVARIANT,
     PROJECT_GUARD_MODES,
     PROJECT_GUARD_TRANSITION_TO_PATH,
+    UNDO_GROUP_MEMBER_URIS,
 )
 from wwise_waapi.operation_registry import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     BUSINESS_DECLARATION_INPUT_MODE,
@@ -246,6 +247,29 @@ from wwise_waapi.core_business_contracts import (  # noqa: E402  # pyright: igno
 )
 from wwise_waapi.core_business import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     materialize_core_business_request,
+)
+from wwise_waapi.project_setting_business_contracts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    project_setting_business_catalog_rows,
+    project_setting_business_contract_data,
+    project_setting_business_operations,
+    project_setting_business_versions,
+)
+from wwise_waapi.source_control_business_contracts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    SOURCE_CONTROL_GET_SOURCE_FILES_URI,
+    SOURCE_CONTROL_SET_PROVIDER_URI,
+    source_control_business_catalog_rows,
+    source_control_business_contract_data,
+    source_control_business_draft_operations,
+    source_control_business_operations,
+    source_control_business_versions,
+)
+from wwise_waapi.source_control_business import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    project_source_control_result,
+)
+from wwise_waapi.source_control_business_cli import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    SourceControlBusinessCliError,
+    add_source_control_arguments,
+    source_control_plan_from_namespace,
 )
 from wwise_waapi.media_build_business_contracts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     MEDIA_POOL_GET_URI,
@@ -2354,6 +2378,41 @@ def build_parser() -> argparse.ArgumentParser:
         nargs=4,
         default=[],
         metavar=("EDGE_POSITION", "FADE_MODE", "FADE_POSITION_OR_NONE", "SHAPE"),
+    )
+
+    draft_declare_project_setting_plan = subparsers.add_parser(
+        "draft-declare-project-setting-plan",
+        help=(
+            "Declare one complete Game Parameter range or Sound active-source "
+            "outcome while the Gateway owns the native request"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_declare_project_setting_plan)
+    draft_declare_project_setting_plan.add_argument(
+        "--role",
+        action="append",
+        nargs=2,
+        default=[],
+        metavar=("BUSINESS_FIELD", "BOUND_OBJECT_HANDLE"),
+    )
+    draft_declare_source_control_plan = subparsers.add_parser(
+        "draft-declare-source-control-plan",
+        help=(
+            "Declare one complete source-control file action or bounded external "
+            "read while the Gateway owns native path construction"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_declare_source_control_plan)
+    add_source_control_arguments(
+        draft_declare_source_control_plan,
+        include_max_results=True,
+    )
+    draft_declare_project_setting_plan.add_argument(
+        "--value",
+        action="append",
+        nargs=2,
+        default=[],
+        metavar=("BUSINESS_FIELD", "VALUE"),
     )
 
     draft_declare_field_change = subparsers.add_parser(
@@ -5683,6 +5742,10 @@ def core_business_route_payload(version: str, api: str) -> dict[str, Any]:
     contract = (
         media_build_business_contract_data(api, version)
         if api in media_build_business_operations()
+        else project_setting_business_contract_data(api, version)
+        if api in project_setting_business_operations()
+        else source_control_business_contract_data(api, version)
+        if api in source_control_business_operations()
         else core_business_contract_data(api, version)
     )
     start = contract["start"]
@@ -5717,6 +5780,10 @@ def core_business_route_payload(version: str, api: str) -> dict[str, Any]:
 def core_business_route_available(api: str, version: str) -> bool:
     if api in media_build_business_operations():
         return version in media_build_business_versions(api)
+    if api in project_setting_business_operations():
+        return version in project_setting_business_versions(api)
+    if api in source_control_business_operations():
+        return version in source_control_business_versions(api)
     if api in core_business_operations():
         return version in core_business_versions(api)
     return False
@@ -7394,6 +7461,21 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             and capability.preferred_route == "fixed_command"
         ):
             return fixed_command_route_payload(capability)
+        if args.command == "request-schema" and args.api == SOURCE_CONTROL_SET_PROVIDER_URI:
+            boundary = source_control_business_contract_data(args.api, versions[0])[
+                "boundary"
+            ]
+            raise GatewayInputError(
+                "Source-control provider selection and credentials require a "
+                "human-owned Wwise Project Settings or approved local credential "
+                f"workflow ({boundary['error_code']}); credentials are forbidden "
+                "in Gateway arguments."
+            )
+        if args.command == "request-schema" and args.api in UNDO_GROUP_MEMBER_URIS:
+            raise GatewayInputError(
+                f"{args.api} is a compound Undo member and has no standalone "
+                "public request; use operation-schema waapi.undoGroup."
+            )
         if (
             args.command == "request-schema"
             and core_business_route_available(args.api, versions[0])
@@ -8375,7 +8457,12 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 **row,
                 "next_command": ["request-schema", row["api"]],
             }
-            for row in (*core_business_catalog_rows(), *media_build_business_catalog_rows())
+            for row in (
+                *core_business_catalog_rows(),
+                *media_build_business_catalog_rows(),
+                *project_setting_business_catalog_rows(),
+                *source_control_business_catalog_rows(),
+            )
         ]
         return {
             "contract": GATEWAY_RESULT_CONTRACT,
@@ -10184,6 +10271,246 @@ def dispatch_business_core_plan(
     return payload
 
 
+def dispatch_business_project_setting_plan(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Record one complete project-setting plan without native request fields."""
+
+    binding = _open_business_binding(
+        args,
+        env=env,
+        connection=connection,
+        detected_version=detected_version,
+        live_info=live_info,
+        dispatcher=dispatcher,
+    )
+    adapter = business_adapter(binding.record.operation)
+    if adapter.family != "project-setting-business" or not adapter.accepts_update_command(
+        args.command
+    ):
+        raise GatewayInputError(
+            f"{binding.record.operation} does not expose {args.command}"
+        )
+    raw_session = (
+        binding.record.composition.get("business_session")
+        if binding.record.composition is not None
+        else None
+    )
+    session = (
+        BusinessDeclarationSession.create(binding.context)
+        if raw_session is None
+        else BusinessDeclarationSession.from_dict(raw_session)
+    )
+    if session.context != binding.context:
+        raise OperationDraftBindingDrift(
+            "Live project or Wwise build differs from the project-setting binding."
+        )
+    contract = project_setting_business_contract_data(
+        binding.record.operation,
+        detected_version,
+    )
+    field_types = contract["declaration"]["field_types"]
+    plan: dict[str, Any] = {}
+    for name, handle in args.role:
+        if field_types.get(name) not in {
+            "bound_sound_handle",
+            "bound_audio_file_source_handle",
+            "bound_game_parameter_handle",
+        }:
+            raise GatewayInputError(
+                f"Project-setting role {name!r} is not disclosed for this operation"
+            )
+        if name in plan:
+            raise GatewayInputError(
+                f"Project-setting field {name!r} was supplied twice"
+            )
+        plan[name] = handle
+    for name, raw in args.value:
+        value_type = field_types.get(name)
+        if value_type == "finite_number":
+            try:
+                value = float(raw)
+            except ValueError as exc:
+                raise GatewayInputError(
+                    f"Project-setting field {name!r} requires one finite number"
+                ) from exc
+            if not math.isfinite(value):
+                raise GatewayInputError(
+                    f"Project-setting field {name!r} requires one finite number"
+                )
+        elif value_type in {"platform_name", "range_curve_update_outcome"}:
+            value = raw
+        else:
+            raise GatewayInputError(
+                f"Project-setting value {name!r} is not disclosed for this operation"
+            )
+        if name in plan:
+            raise GatewayInputError(
+                f"Project-setting field {name!r} was supplied twice"
+            )
+        plan[name] = value
+
+    def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
+        candidate = current.with_settings({"project_setting_plan": plan})
+        adapter.materialize(candidate)
+        return candidate
+
+    record = binding.store.apply_business_update(
+        args.draft_id,
+        task_authority=args.task_authority,
+        expected_revision=args.expected_revision,
+        schema_digest=operation_draft_schema_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        composer_digest=operation_composer_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        context=binding.context,
+        update=update,
+        event_type="settings.revised",
+    )
+    payload = operation_draft_payload(
+        args.command,
+        record,
+        offline=False,
+        task_authority=args.task_authority,
+    )
+    payload.update(
+        {
+            "endpoint": dict(common["endpoint"]),
+            "detected_version": detected_version,
+            "project_call": dispatch_call_summary(binding.project_call),
+        }
+    )
+    return payload
+
+
+def _source_control_roots_from_project(
+    project: Mapping[str, Any],
+) -> dict[str, str]:
+    directories = project.get("directories")
+    if not isinstance(directories, Mapping):
+        raise GatewayResultShapeError(
+            "Live project information lacks source-control directory roots.",
+            error_code="SOURCE_CONTROL_ROOTS_UNAVAILABLE",
+        )
+    project_root = directories.get("root")
+    originals_root = directories.get("originals")
+    if not all(
+        isinstance(value, str) and bool(value)
+        for value in (project_root, originals_root)
+    ):
+        raise GatewayResultShapeError(
+            "Live project information contains invalid source-control roots.",
+            error_code="SOURCE_CONTROL_ROOTS_UNAVAILABLE",
+        )
+    return {
+        "project": str(project_root),
+        "originals": str(originals_root),
+    }
+
+
+def dispatch_business_source_control_plan(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Record one closed external source-control plan and sealed live roots."""
+
+    binding = _open_business_binding(
+        args,
+        env=env,
+        connection=connection,
+        detected_version=detected_version,
+        live_info=live_info,
+        dispatcher=dispatcher,
+    )
+    adapter = business_adapter(binding.record.operation)
+    if adapter.family != "source-control-business" or not adapter.accepts_update_command(
+        args.command
+    ):
+        raise GatewayInputError(
+            f"{binding.record.operation} does not expose {args.command}"
+        )
+    raw_session = (
+        binding.record.composition.get("business_session")
+        if binding.record.composition is not None
+        else None
+    )
+    session = (
+        BusinessDeclarationSession.create(binding.context)
+        if raw_session is None
+        else BusinessDeclarationSession.from_dict(raw_session)
+    )
+    if session.context != binding.context:
+        raise OperationDraftBindingDrift(
+            "Live project or Wwise build differs from the source-control binding."
+        )
+    try:
+        plan = source_control_plan_from_namespace(
+            args,
+            operation=binding.record.operation,
+        )
+    except SourceControlBusinessCliError as exc:
+        raise GatewayInputError(str(exc)) from exc
+    roots = _source_control_roots_from_project(binding.project)
+
+    def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
+        candidate = current.with_settings(
+            {
+                "source_control_roots": roots,
+                "source_control_plan": plan,
+            }
+        )
+        adapter.materialize(candidate)
+        return candidate
+
+    record = binding.store.apply_business_update(
+        args.draft_id,
+        task_authority=args.task_authority,
+        expected_revision=args.expected_revision,
+        schema_digest=operation_draft_schema_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        composer_digest=operation_composer_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        context=binding.context,
+        update=update,
+        event_type="settings.revised",
+    )
+    payload = operation_draft_payload(
+        args.command,
+        record,
+        offline=False,
+        task_authority=args.task_authority,
+    )
+    payload.update(
+        {
+            "endpoint": dict(common["endpoint"]),
+            "detected_version": detected_version,
+            "project_call": dispatch_call_summary(binding.project_call),
+        }
+    )
+    return payload
+
+
 def dispatch_command(
     args: argparse.Namespace,
     *,
@@ -10213,6 +10540,26 @@ def dispatch_command(
         )
     if args.command == "draft-declare-core-plan":
         return dispatch_business_core_plan(
+            args,
+            env=env,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+        )
+    if args.command == "draft-declare-project-setting-plan":
+        return dispatch_business_project_setting_plan(
+            args,
+            env=env,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+        )
+    if args.command == "draft-declare-source-control-plan":
+        return dispatch_business_source_control_plan(
             args,
             env=env,
             connection=connection,
@@ -16126,7 +16473,24 @@ def dispatch_transaction_command(
                 cleanup=payload["cleanup"],
             )
             if agent_result["operation"] in {"waapi.call", "waapi.undoGroup"}:
-                agent_result["result"] = execution_result.get("result")
+                projected_result = execution_result.get("result")
+                verification_plan = prepared.get("verification_plan")
+                if (
+                    agent_result["operation"] == "waapi.call"
+                    and isinstance(projected_result, Mapping)
+                    and isinstance(verification_plan, Mapping)
+                    and verification_plan.get("uri")
+                    == SOURCE_CONTROL_GET_SOURCE_FILES_URI
+                    and isinstance(
+                        verification_plan.get("result_projection"), Mapping
+                    )
+                ):
+                    projected_result = project_source_control_result(
+                        SOURCE_CONTROL_GET_SOURCE_FILES_URI,
+                        projected_result,
+                        verification_plan["result_projection"],
+                    )
+                agent_result["result"] = projected_result
             payload["agent_result"] = agent_result
         return payload
     raise GatewayInputError(f"unsupported transaction command: {args.command}")
@@ -19014,6 +19378,16 @@ def _business_next_action_binding(
         "draft-declare-core-plan",
         *binding,
     ]
+    declare_project_setting_plan_prefix = [
+        *base,
+        "draft-declare-project-setting-plan",
+        *binding,
+    ]
+    declare_source_control_plan_prefix = [
+        *base,
+        "draft-declare-source-control-plan",
+        *binding,
+    ]
     revise_prefix = [*base, "draft-revise-declaration", *binding]
     remove_prefix = [*base, "draft-remove-declaration", *binding]
     check = [*base, "draft-check", *binding]
@@ -19097,6 +19471,131 @@ def _business_next_action_binding(
                 "bind_each_required_role_then_copy_its_returned_handle_into_"
                 "the_same_named_declaration_field"
             ),
+        }
+    if adapter.family == "project-setting-business":
+        roles = business_contract["binding"]["roles"]
+        shared = {
+            "contract": "waapi-skill.business-draft-next-action/v1",
+            "responsibility_split": {
+                "agent": "natural_language_to_closed_project_setting_outcome",
+                "gateway": "bound_objects_and_business_values_to_exact_waapi_preview",
+            },
+            "business_contract": business_contract,
+            "forbidden_inputs": [
+                *forbidden_inputs,
+                "native_curve_update_enum",
+                "complete_request",
+            ],
+            "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+            "then_read_next_response": True,
+            "precompute_or_increment_revision": False,
+        }
+        if session is not None and adapter.is_complete(session):
+            return {
+                **shared,
+                "required_next_phase": "check_complete_project_setting_plan",
+                "check": {
+                    **operation_draft_prefix_copy_binding(check),
+                    "append": [],
+                },
+            }
+        declaration = {
+            **operation_draft_prefix_copy_binding(
+                declare_project_setting_plan_prefix,
+                append_action=(
+                    "copy_verbatim_then_append_one_complete_project_setting_plan"
+                ),
+            ),
+            "append_fields": business_contract["declaration"],
+            "submit_once": True,
+            "native_request_input": "forbidden",
+        }
+        bound_roles = (
+            set()
+            if session is None
+            else {
+                row.get("role")
+                for row in session.handles.as_dict()["objects"]
+                if isinstance(row, Mapping) and isinstance(row.get("role"), str)
+            }
+        )
+        next_role = next((role for role in roles if role not in bound_roles), None)
+        if next_role is not None:
+            return {
+                **shared,
+                "required_next_phase": "bind_next_project_setting_role",
+                "object_binding": role_object_binding(next_role),
+            }
+        return {
+            **shared,
+            "required_next_phase": "declare_complete_project_setting_plan",
+            "declaration": declaration,
+        }
+    if adapter.family == "source-control-business":
+        shared = {
+            "contract": "waapi-skill.business-draft-next-action/v1",
+            "responsibility_split": {
+                "agent": "natural_language_to_closed_source_control_file_action",
+                "gateway": (
+                    "live_roots_and_file_locators_to_exact_absolute_paths_and_preview"
+                ),
+            },
+            "business_contract": business_contract,
+            "forbidden_inputs": [
+                *forbidden_inputs,
+                "native_absolute_path_for_project_or_originals_locator",
+                "source_control_provider_credentials",
+                "complete_request",
+            ],
+            "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+            "then_read_next_response": True,
+            "precompute_or_increment_revision": False,
+        }
+        if session is not None and adapter.is_complete(session):
+            return {
+                **shared,
+                "required_next_phase": "check_complete_source_control_plan",
+                "check": {
+                    **operation_draft_prefix_copy_binding(check),
+                    "append": [],
+                },
+            }
+        return {
+            **shared,
+            "required_next_phase": "declare_complete_source_control_plan",
+            "declaration": {
+                **operation_draft_prefix_copy_binding(
+                    declare_source_control_plan_prefix,
+                    append_action=(
+                        "copy_verbatim_then_append_one_complete_source_control_plan"
+                    ),
+                ),
+                "append_fields": business_contract["declaration"],
+                "file_locator_flags": {
+                    "project-relative": "--project-file <exact-relative-path>",
+                    "originals-relative": "--originals-file <exact-relative-path>",
+                    "exact-user-path-under-io-root": [
+                        "--exact-file <exact-absolute-path>",
+                        "--io-root <exact-approved-absolute-root>",
+                    ],
+                },
+                "move_pair_flag": (
+                    "--move <project|originals|exact> <source-path> "
+                    "<project|originals|exact> <destination-path>"
+                ),
+                "stable_scalar_flags": {
+                    "commit_message": "--commit-message <exact-user-message>",
+                    "usage_scope": "--usage-scope <all|used|unused>",
+                    "originals_folder": "--originals-folder <exact-relative-folder>",
+                    "recursive": "--recursive | --no-recursive",
+                    "include_usage_objects": (
+                        "--include-usage-objects | --no-usage-objects"
+                    ),
+                    "max_results": "--max-results <1..1000>",
+                },
+                "submit_once": True,
+                "native_request_input": "forbidden",
+            },
         }
     if adapter.family == "core-project-object":
         roles = business_contract["binding"]["roles"]

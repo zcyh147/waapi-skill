@@ -27,6 +27,14 @@ from .object_metadata_business_contracts import (
     object_metadata_business_contract_data,
 )
 from .object_graph_business_contracts import object_graph_business_contract_data
+from .project_setting_business_contracts import (
+    project_setting_business_contract_data,
+    project_setting_business_operations,
+)
+from .source_control_business_contracts import (
+    source_control_business_contract_data,
+    source_control_business_draft_operations,
+)
 from .switch_assignment_business_contracts import (
     switch_assignment_business_contract_data,
 )
@@ -125,6 +133,14 @@ def _object_graph_contract(operation: str, version: str) -> dict[str, Any]:
     return object_graph_business_contract_data(operation, version)
 
 
+def _project_setting_contract(operation: str, version: str) -> dict[str, Any]:
+    return project_setting_business_contract_data(operation, version)
+
+
+def _source_control_contract(operation: str, version: str) -> dict[str, Any]:
+    return source_control_business_contract_data(operation, version)
+
+
 def _switch_assignment_contract(
     operation: str,
     version: str,
@@ -197,6 +213,28 @@ def _materialize_object_graph(
     from .object_graph_business import materialize_object_graph_business_request
 
     return materialize_object_graph_business_request(operation, session)
+
+
+def _materialize_project_setting(
+    operation: str,
+    session: BusinessDeclarationSession,
+) -> Mapping[str, Any]:
+    from .project_setting_business import (
+        materialize_project_setting_business_request,
+    )
+
+    return materialize_project_setting_business_request(operation, session)
+
+
+def _materialize_source_control(
+    operation: str,
+    session: BusinessDeclarationSession,
+) -> Mapping[str, Any]:
+    from .source_control_business import (
+        materialize_source_control_business_request,
+    )
+
+    return materialize_source_control_business_request(operation, session)
 
 
 def _materialize_switch_assignment(
@@ -754,6 +792,39 @@ _CORE_BUSINESS_DEFINITION = {
     "supports_field_discovery": True,
 }
 
+_PROJECT_SETTING_DEFINITION = {
+    "family": "project-setting-business",
+    "contract_builder": _project_setting_contract,
+    "materializer": _materialize_project_setting,
+    "update_commands": frozenset({"draft-declare-project-setting-plan"}),
+    "initial_projection_actions": ("bind-object", "inspect", "cancel"),
+    "active_projection_actions": (
+        "bind-object",
+        "declare-project-setting-plan",
+        "check",
+        "inspect",
+        "cancel",
+    ),
+    "auto_apply_preview": True,
+    "settings_are_complete_declaration": True,
+}
+
+_SOURCE_CONTROL_DEFINITION = {
+    "family": "source-control-business",
+    "contract_builder": _source_control_contract,
+    "materializer": _materialize_source_control,
+    "update_commands": frozenset({"draft-declare-source-control-plan"}),
+    "initial_projection_actions": ("declare-source-control-plan", "inspect", "cancel"),
+    "active_projection_actions": (
+        "declare-source-control-plan",
+        "check",
+        "inspect",
+        "cancel",
+    ),
+    "auto_apply_preview": True,
+    "settings_are_complete_declaration": True,
+}
+
 
 def _bind_adapter(operation: str, definition: Mapping[str, Any]) -> BusinessAdapter:
     values = dict(definition)
@@ -772,6 +843,14 @@ _BUSINESS_ADAPTERS = {
     **{
         operation: _bind_adapter(operation, _CORE_BUSINESS_DEFINITION)
         for operation in core_business_draft_operations()
+    },
+    **{
+        operation: _bind_adapter(operation, _PROJECT_SETTING_DEFINITION)
+        for operation in project_setting_business_operations()
+    },
+    **{
+        operation: _bind_adapter(operation, _SOURCE_CONTROL_DEFINITION)
+        for operation in source_control_business_draft_operations()
     },
     "audio.import": _bind_adapter("audio.import", _AUDIO_IMPORT_DEFINITION),
     "audio.importTabDelimited": _bind_adapter(

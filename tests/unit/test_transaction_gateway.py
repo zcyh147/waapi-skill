@@ -1177,7 +1177,8 @@ def test_compound_member_is_not_prematurely_exposed_by_request_schema(
         version=version,
     )
     assert schema_exit == 2
-    assert "typed compound-operation adapter" in schema["message"]
+    assert "compound Undo" in schema["message"]
+    assert "waapi.undoGroup" in schema["message"]
 
 
 def preview_and_confirm_public_call(
@@ -1466,7 +1467,7 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
         "request-schema",
         "ak.wwise.core.project.save",
     ]
-    assert catalog["request_schema_route_count"] == 23
+    assert catalog["request_schema_route_count"] == 34
     assert request_schema_routes[
         "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion"
     ]["next_command"] == [
@@ -1477,8 +1478,20 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
         "request-schema",
         "ak.wwise.core.mediaPool.get",
     ]
+    assert request_schema_routes[
+        "ak.wwise.core.sound.setActiveSource"
+    ]["next_command"] == [
+        "request-schema",
+        "ak.wwise.core.sound.setActiveSource",
+    ]
+    assert request_schema_routes[
+        "ak.wwise.core.sourceControl.commit"
+    ]["next_command"] == [
+        "request-schema",
+        "ak.wwise.core.sourceControl.commit",
+    ]
     compact_json = json.dumps(catalog, ensure_ascii=False, indent=2, sort_keys=True).encode("utf-8")
-    assert len(compact_json) < 30_000
+    assert len(compact_json) < 32 * 1024
 
     exit_code, detail_catalog = execute(["operations", "--detail"], tmp_path=tmp_path)
 
