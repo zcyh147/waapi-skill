@@ -1,0 +1,19 @@
+{
+  "contract": "waapi-skill.cli-console-business-profile/v1",
+  "profile_id": "cli_console_business_1",
+  "model": {
+    "name": "gpt-5.6-terra",
+    "reasoning_effort": "medium",
+    "service_tier": "default",
+    "memory": "disabled"
+  },
+  "units": [
+    {
+      "unit_id": "CLI25-SOUNDBANK-BUILD-PREVIEW",
+      "operation": "ak.wwise.cli.generateSoundbank",
+      "version": "2025.1",
+      "prompt": "请为 Wwise 工程 {project_file} 生成 Windows 平台全部非本地化 SoundBank 的预览，把该平台的 Bank 输出到相对目录 GeneratedSoundBanks/FreshAgent，关闭源代码管理操作并静默运行。只生成预览，不执行。",
+      "final_markers": ["SoundBank", "预览"]
+    }
+  ]
+}

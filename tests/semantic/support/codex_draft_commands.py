@@ -24,6 +24,7 @@ DRAFT_GATEWAY_SUBCOMMANDS = frozenset(
         "draft-declare-soundbank-plan",
         "draft-declare-artifact-plan",
         "draft-declare-core-plan",
+        "draft-declare-cli-console-plan",
         "draft-declare-project-setting-plan",
         "draft-declare-runtime-control-plan",
         "draft-declare-soundengine-plan",

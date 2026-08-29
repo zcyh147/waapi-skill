@@ -186,6 +186,26 @@ prevention checks that are expensive to rediscover.
   `getProjectInfo.path`. Do not substitute `open -a`, `open --args`, a bare
   project document, or a Wwise.exe process with no matching project argv merely
   because a window appeared.
+
+### Console project transitions cross the same Wine path boundary twice
+
+- Evidence: #89 macOS `ak.wwise.console.project.open` first rejected the exact
+  existing sandbox POSIX path as nonexistent. After transient dispatch gained
+  audited Y:/Z: translation, execution succeeded but verification still
+  compared the stored POSIX path with Wwise's equivalent `Y:\...` readback and
+  reported `PROJECT_TRANSITION_MISMATCH`. The Project object also exposed the
+  hierarchy `path` as `\` and the filesystem identity in `filePath`.
+- Cause: Console project create/open had been omitted from the closed Wine
+  path-adaptation set, absolute project-path selection accepted a non-filesystem
+  hierarchy path first, and the transition verifier canonicalized host and Wine
+  syntax without first proving that they named the same local file.
+- Prevention: include only the reviewed Console create/open URIs in transient
+  path adaptation, select the first strict absolute `path`/`projectPath`/
+  `filePath`, and during local-Wine verification round-trip the live Y:/Z: path
+  to one existing regular non-symlink `.wproj` before comparing host identity.
+  Native Windows remains identity mode; remote or unsupported drives are never
+  localized. Final candidate `41d07ab` passed all four #89 Wwise 2025.1 shapes
+  on both hosts plus 2022.1 SoundBank generation on both hosts.
 - Modal handling: first require WAAPI to report the exclusive-lock reasons
   `Loading project in progress` and `Waiting for user to close a modal dialog`.
   Then enumerate the same Wine desktop's top-level windows and click only when

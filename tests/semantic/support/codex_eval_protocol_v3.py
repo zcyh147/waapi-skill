@@ -1773,6 +1773,116 @@ def build_core_business_transaction_steps(
     )
 
 
+def build_cli_console_business_transaction_steps(
+    *,
+    api: str,
+    version: str,
+    label: str,
+    project_file: str,
+    output_directory: str,
+) -> tuple[ExpectedGatewayStep, ...]:
+    """Seal one SoundBank build intent through the deep CLI Business Draft."""
+
+    if api != "ak.wwise.cli.generateSoundbank" or version != "2025.1":
+        raise V3ProtocolError(
+            "CLI/Console business Fresh proof supports exact 2025.1 SoundBank generation"
+        )
+    if not isinstance(label, str) or not re.fullmatch(r"tx[0-9]{2}", label):
+        raise V3ProtocolError("business transaction label must be txNN")
+    if (
+        not isinstance(project_file, str)
+        or not Path(project_file).is_absolute()
+        or not project_file.casefold().endswith(".wproj")
+    ):
+        raise V3ProtocolError(
+            "CLI/Console business Fresh proof requires one absolute WPROJ path"
+        )
+    if output_directory != "GeneratedSoundBanks/FreshAgent":
+        raise V3ProtocolError(
+            "CLI/Console business Fresh proof requires the reviewed relative output"
+        )
+    draft_start = f"{label}.draft-start"
+    declaration = f"{label}.declare-cli-console-plan"
+    check = f"{label}.check"
+
+    def prefix(revision_step: str) -> tuple[Any, ...]:
+        return (
+            ResponseBinding(draft_start, "/draft/draft_id"),
+            "--task-authority",
+            ResponseBinding(draft_start, "/task_authority"),
+            "--expected-revision",
+            ResponseBinding(revision_step, "/draft/revision"),
+        )
+
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": version,
+        "operation": "waapi.call",
+        "arguments": {
+            "api": api,
+            "args": {
+                "project": project_file,
+                "platform": ["Windows"],
+                "skip-languages": True,
+                "no-source-control": True,
+                "soundbank-path": ["Windows", output_directory],
+                "quiet": True,
+            },
+            "options": {},
+            "io_root": str(Path(project_file).parent),
+        },
+    }
+    return (
+        ExpectedGatewayStep(
+            name=f"{label}.request-schema",
+            subcommand="request-schema",
+            arguments=(api,),
+        ),
+        ExpectedGatewayStep(
+            name=draft_start,
+            subcommand="draft-start",
+            arguments=(api,),
+        ),
+        ExpectedGatewayStep(
+            name=declaration,
+            subcommand="draft-declare-cli-console-plan",
+            arguments=(
+                *prefix(draft_start),
+                "--value",
+                "project_file",
+                project_file,
+                "--item",
+                "platforms",
+                "Windows",
+                "--toggle",
+                "skip_languages",
+                "enable",
+                "--value",
+                "source_control",
+                "disabled",
+                "--mapping",
+                "soundbank_directories_by_platform",
+                "Windows",
+                output_directory,
+                "--value",
+                "verbosity",
+                "quiet",
+            ),
+        ),
+        ExpectedGatewayStep(
+            name=check,
+            subcommand="draft-check",
+            arguments=prefix(declaration),
+        ),
+        ExpectedGatewayStep(
+            name=f"{label}.preview",
+            subcommand="preview-from-draft",
+            arguments=prefix(check),
+            expected_operation_request=request,
+        ),
+    )
+
+
 def build_project_setting_business_transaction_steps(
     *,
     version: str,
@@ -5097,6 +5207,7 @@ __all__ = [
     "build_audio_import_composer_protocol",
     "build_audio_import_composer_transaction_steps",
     "build_authoring_ui_business_transaction_steps",
+    "build_cli_console_business_transaction_steps",
     "build_core_business_transaction_steps",
     "build_project_setting_business_transaction_steps",
     "build_soundengine_business_transaction_steps",

@@ -409,6 +409,9 @@ BUSINESS_AGENT_OUTCOME_CONTRACTS = {
     matrix.SOUNDENGINE_BUSINESS_PROFILE_ID: (
         "waapi-skill.soundengine-business-agent-outcome/v1"
     ),
+    matrix.CLI_CONSOLE_BUSINESS_PROFILE_ID: (
+        "waapi-skill.cli-console-business-agent-outcome/v1"
+    ),
     matrix.COMPOUND_UNDO_BUSINESS_PROFILE_ID: (
         "waapi-skill.compound-undo-business-agent-outcome/v1"
     ),
@@ -3312,6 +3315,7 @@ def _validate_business_agent_outcome(
                 broker,
                 expected_unit=expected_unit,
                 profile=profile,
+                scenario_root=scenario_root,
             )
 
 
@@ -3339,6 +3343,7 @@ def _validate_bound_business_agent_protocol(
     *,
     expected_unit: Any,
     profile: str,
+    scenario_root: Path | None = None,
 ) -> None:
     """Rebuild one non-import Business Agent protocol from frozen suite facts."""
 
@@ -3502,6 +3507,34 @@ def _validate_bound_business_agent_protocol(
             listener_id=LISTENER_ID,
         )
         preview_request = steps[-1].expected_operation_request
+    elif profile == matrix.CLI_CONSOLE_BUSINESS_PROFILE_ID:
+        from tests.semantic.support.codex_cli_console_business_profile import (
+            OUTPUT_DIRECTORY,
+        )
+        from tests.semantic.support.codex_eval_protocol_v3 import (
+            build_cli_console_business_transaction_steps,
+        )
+
+        if scenario_root is None:
+            raise CampaignEvidenceError(
+                "CLI/Console Business Agent audit lacks its scenario root"
+            )
+        project_file = (
+            scenario_root
+            / "evidence"
+            / "codex-task"
+            / "runtime"
+            / "project"
+            / "SemanticProject.wproj"
+        ).resolve(strict=True)
+        steps = build_cli_console_business_transaction_steps(
+            api=expected_unit.operation,
+            version=expected_unit.version,
+            label="tx01",
+            project_file=str(project_file),
+            output_directory=OUTPUT_DIRECTORY,
+        )
+        preview_request = steps[-1].expected_operation_request
     elif profile == matrix.COMPOUND_UNDO_BUSINESS_PROFILE_ID:
         from tests.semantic.support.codex_compound_undo_business_agent_runner import (
             compound_undo_business_child_expectations,
@@ -3543,6 +3576,7 @@ def _validate_bound_business_agent_protocol(
         matrix.PROJECT_SETTING_BUSINESS_PROFILE_ID: "tx01",
         matrix.RUNTIME_CONTROL_BUSINESS_PROFILE_ID: "tx01",
         matrix.SOUNDENGINE_BUSINESS_PROFILE_ID: "tx01",
+        matrix.CLI_CONSOLE_BUSINESS_PROFILE_ID: "tx01",
     }
     if profile in optional_discovery_labels:
         label = optional_discovery_labels[profile]
