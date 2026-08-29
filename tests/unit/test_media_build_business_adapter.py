@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import base64
+import os
 import struct
 from pathlib import Path
 
 import pytest
+from wwise_waapi.execution_contracts import ExecutionContractRegistry
 from wwise_waapi.media_build_business import (
     MediaBuildBusinessError,
     materialize_media_build_business_request,
@@ -45,6 +47,18 @@ def test_issue_85_contract_seals_all_sixteen_version_api_rows() -> None:
             "core-call",
             operation,
         ]
+
+
+def test_issue_85_execution_contracts_are_direct_bounded_reads() -> None:
+    registry = ExecutionContractRegistry()
+
+    for operation in sorted(media_build_business_operations()):
+        for version in media_build_business_versions(operation):
+            contract = registry.describe(version, operation)
+            assert contract.route == "bounded_call"
+            assert contract.effect == "read"
+            assert contract.gateway_commands == ("request-schema", "core-call")
+            assert contract.requires_authorization is False
 
 
 def test_peak_region_business_read_compiles_and_decodes_known_pcm_pairs() -> None:
@@ -313,15 +327,33 @@ def test_media_pool_business_plan_rejects_hostile_or_native_values(
 def test_media_pool_audio_similarity_requires_an_exact_regular_file(
     tmp_path: Path,
 ) -> None:
-    audio_file = tmp_path / "reference.wav"
+    audio_file = tmp_path / "reference ; $ [测试].wav"
     audio_file.write_bytes(b"RIFF")
-    validate_media_pool_business_plan(
+    prepared = materialize_media_build_business_request(
+        MEDIA_POOL_GET_URI,
+        "2025.1",
         {
             "max_results": 10,
             "audio_similarity_files": [str(audio_file)],
             "weighted_audio_similarity_files": [[str(audio_file), 0.75]],
-        }
+        },
+        available_media_fields=["Filename"],
     )
+    assert [row["value"] for row in prepared["args"]["filters"]] == [
+        str(audio_file),
+        str(audio_file),
+    ]
+
+    native_mixed_separator = (
+        str(audio_file).replace("\\", "/") if os.name == "nt" else str(audio_file)
+    )
+    prepared = materialize_media_build_business_request(
+        MEDIA_POOL_GET_URI,
+        "2025.1",
+        {"max_results": 10, "audio_similarity_files": [native_mixed_separator]},
+        available_media_fields=["Filename"],
+    )
+    assert prepared["args"]["filters"][0]["value"] == str(audio_file)
 
     link = tmp_path / "link.wav"
     link.symlink_to(audio_file)
@@ -335,6 +367,45 @@ def test_media_pool_audio_similarity_requires_an_exact_regular_file(
                 "max_results": 10,
                 "audio_similarity_files": [str(tmp_path / "missing.wav")],
             }
+        )
+
+
+@pytest.mark.parametrize(
+    "foreign_path",
+    (
+        r"C:\Media\reference.wav",
+        r"\\server\share\reference.wav",
+    ),
+)
+def test_media_pool_audio_similarity_rejects_foreign_host_path_flavors(
+    foreign_path: str,
+) -> None:
+    if os.name == "nt":
+        pytest.skip("drive and UNC spellings are native on Windows")
+
+    with pytest.raises(
+        MediaBuildBusinessError,
+        match="cannot be localized on this host",
+    ):
+        validate_media_pool_business_plan(
+            {"max_results": 10, "audio_similarity_files": [foreign_path]}
+        )
+
+
+@pytest.mark.parametrize(
+    "unsafe_path",
+    (
+        r"C:\Media\..\reference.wav",
+        r"\\server\share\folder/../reference.wav",
+        r"C:\Media\CON.wav",
+    ),
+)
+def test_media_pool_audio_similarity_rejects_unsafe_windows_paths(
+    unsafe_path: str,
+) -> None:
+    with pytest.raises(MediaBuildBusinessError, match="safe absolute host path"):
+        validate_media_pool_business_plan(
+            {"max_results": 10, "audio_similarity_files": [unsafe_path]}
         )
 
 

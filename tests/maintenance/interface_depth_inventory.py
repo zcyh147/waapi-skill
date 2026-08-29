@@ -365,6 +365,8 @@ def _matches(
         return False
     if match.get("dedicated_operation_uri") is True and lane["uri"] not in dedicated_uris:
         return False
+    if "uris" in match and lane["uri"] not in match["uris"]:
+        return False
     if "uri_prefixes" in match and not any(
         lane["uri"].startswith(prefix) for prefix in match["uri_prefixes"]
     ):

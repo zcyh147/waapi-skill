@@ -335,8 +335,8 @@ def test_all_semantic_read_records_resolve_to_public_gateway_routes() -> None:
     assert len(semantic_reads) == 71
     assert sum(entry.preferred_route == "fixed_command" for entry in semantic_reads) == 30
     assert sum(entry.preferred_route == "bounded_topic_wait" for entry in semantic_reads) == 25
-    assert sum(entry.preferred_route == "manifest_dispatch" for entry in semantic_reads) == 11
-    assert sum(entry.preferred_route == "transaction_operation" for entry in semantic_reads) == 5
+    assert sum(entry.preferred_route == "manifest_dispatch" for entry in semantic_reads) == 16
+    assert sum(entry.preferred_route == "transaction_operation" for entry in semantic_reads) == 0
     assert all(entry.preferred_route != "semantic_builder" for entry in entries)
     assert all(
         entry.gateway_commands
@@ -351,11 +351,11 @@ def test_all_semantic_read_records_resolve_to_public_gateway_routes() -> None:
     assert object_get.gateway_commands == ("query-object", "buses")
     assert property_info.gateway_commands == ("metadata discover",)
     assert imported.gateway_commands == ("wait-topic", "stream-topic")
-    assert inclusions.gateway_commands == ("request-schema",)
-    assert inclusions.preferred_route == "transaction_operation"
-    assert inclusions.transaction_operations == ("waapi.call",)
+    assert inclusions.gateway_commands == ("request-schema", "core-call")
+    assert inclusions.preferred_route == "manifest_dispatch"
+    assert inclusions.transaction_operations == ()
     assert inclusions.safety.read_only is True
-    assert inclusions.safety.requires_authorization is True
+    assert inclusions.safety.requires_authorization is False
 
     public = object_get.as_dict(detail=True)["interface"]
     assert "semantic_builder_ref" not in public

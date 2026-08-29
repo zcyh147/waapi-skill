@@ -374,6 +374,20 @@ def test_completed_core_family_retains_the_authoritative_issue_84_row_seal() -> 
         "eb0692ad57f0a504bf110f38355997bb"
         "9abca7519ed412c4ed97c223a6a0decf"
     )
+    sealed_rows = set(media["rows"])
+    actual_rows = {
+        f"{row['version']}|{row['item_type']}|{row['uri']}": row
+        for row in inventory["native_lanes"]
+        if f"{row['version']}|{row['item_type']}|{row['uri']}" in sealed_rows
+    }
+    assert set(actual_rows) == sealed_rows
+    assert all(
+        row["classification"] == "generic-core-media-build"
+        and row["disposition"] == "already_deep"
+        and row["owner_issue"] is None
+        and row["route"] == "bounded_call"
+        for row in actual_rows.values()
+    )
 
 
 def test_every_supported_named_operation_uses_or_migrates_to_the_business_path() -> None:

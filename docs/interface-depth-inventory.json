@@ -153330,7 +153330,7 @@
     "contract": "waapi-skill.typed-request-surface/v1",
     "total_lanes": 824
   },
-  "inventory_sha256": "e09a2813da62962f50d87b6c13f436b5bd57b34f0f070e786c0133a10e37b385",
+  "inventory_sha256": "bd7a4d9224eb03b5c43978c4b3df8cbb4b70bd46db820645eb5c707006b2be1f",
   "mechanic_owners": {
     "ambiguous_continuation_selection": "gateway_derivation",
     "batch_layout": "gateway_derivation",
@@ -154610,10 +154610,11 @@
       "classification": "generic-core-media-build",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "already_deep",
-      "execution_policy_sha256": "6536a242ec23fbbc5b4452572a7bdd8bececa02b8edd469627e1bdc2788a6982",
+      "execution_policy_sha256": "e7b91db75c80ca1db6afa9acfc5f68980c7212af9f93c11787ab58ad98aafa2c",
       "field_contract_sha256": "c08b232394e5b52a233adb7f87a5531f9ad13335efe72fa76305d4293d7f8a66",
       "host": "wwise-console",
       "item_type": "function",
@@ -154641,10 +154642,11 @@
       "classification": "generic-core-media-build",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "already_deep",
-      "execution_policy_sha256": "d45f700b3e3d25fc0949b21e13519f4656a06dd6708bfa21d1cc7f4b75b74fdc",
+      "execution_policy_sha256": "9453f1626517c85d833bef1b030dfebb69c0adc85192aa758a34a46348d1c1fe",
       "field_contract_sha256": "ab5e7bc17c5ebba7d1e3fc4490af874d1ea0d67d00b5bc3b48b7c4ff51ce0646",
       "host": "wwise-console",
       "item_type": "function",
@@ -155721,10 +155723,11 @@
       "classification": "generic-core-media-build",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "already_deep",
-      "execution_policy_sha256": "6934ce61b4fdb1c4ff690d9702d779e9a4c3ea0cb1ab1f123ce5bc1542d0c666",
+      "execution_policy_sha256": "1a5acae5938f2f1ac0f15d71b23deaffb9628de6484ecab5eced8d248f44361d",
       "field_contract_sha256": "62820a5ccf0c9d5f0858230aa99b1d0466b651752c13d18630a66bec8f26981b",
       "host": "wwise-console",
       "item_type": "function",
@@ -155742,7 +155745,7 @@
         "wire_type": "gateway_owned"
       },
       "owner_issue": null,
-      "route": "transaction",
+      "route": "bounded_call",
       "schema_sha256": "02503cffa4dfa7a6aaa71998a9efd5af1cadb951cd645b2e985bf150af1e9c15",
       "uri": "ak.wwise.core.soundbank.getInclusions",
       "version": "2021.1"
@@ -159022,10 +159025,11 @@
       "classification": "generic-core-media-build",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "already_deep",
-      "execution_policy_sha256": "2c97a65c7d25d8469e4bb659d45dc03f18547cb240d1cb1d69b3db4f837734fa",
+      "execution_policy_sha256": "42e68d1bf26a37e5e108b54f7aafa858bb296cb463402fe740c8315e5ced11b0",
       "field_contract_sha256": "c08b232394e5b52a233adb7f87a5531f9ad13335efe72fa76305d4293d7f8a66",
       "host": "wwise-console",
       "item_type": "function",
@@ -159053,10 +159057,11 @@
       "classification": "generic-core-media-build",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "already_deep",
-      "execution_policy_sha256": "723ddff913ea9cd38827696ab86ac9d666ebaa7bf9f7cebdd403a41657d82f58",
+      "execution_policy_sha256": "78e911e7cc9d5dce38bc083b94e5d5a6b60e405e5864999d951cd241c6961778",
       "field_contract_sha256": "ab5e7bc17c5ebba7d1e3fc4490af874d1ea0d67d00b5bc3b48b7c4ff51ce0646",
       "host": "wwise-console",
       "item_type": "function",
@@ -160356,10 +160361,11 @@
       "classification": "generic-core-media-build",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "already_deep",
-      "execution_policy_sha256": "545e1aaac27417c92537c67685a408d67ae10f8abf447aba4b8455da210138db",
+      "execution_policy_sha256": "983a2906877b96581e21cca315cd82059c7d6fb690c821157523b44fa32e749d",
       "field_contract_sha256": "62820a5ccf0c9d5f0858230aa99b1d0466b651752c13d18630a66bec8f26981b",
       "host": "wwise-console",
       "item_type": "function",
@@ -160377,7 +160383,7 @@
         "wire_type": "gateway_owned"
       },
       "owner_issue": null,
-      "route": "transaction",
+      "route": "bounded_call",
       "schema_sha256": "02503cffa4dfa7a6aaa71998a9efd5af1cadb951cd645b2e985bf150af1e9c15",
       "uri": "ak.wwise.core.soundbank.getInclusions",
       "version": "2022.1"
@@ -164270,10 +164276,11 @@
       "classification": "generic-core-media-build",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "already_deep",
-      "execution_policy_sha256": "49ed464274f52d6424a10de8d11badfd7ebb5c538903cddbfeca670201989a63",
+      "execution_policy_sha256": "b40fddd0d94c6b303425b1b6f61b365521a80ca4ae3cbf1dec96a7bb852c8f26",
       "field_contract_sha256": "c08b232394e5b52a233adb7f87a5531f9ad13335efe72fa76305d4293d7f8a66",
       "host": "wwise-console",
       "item_type": "function",
@@ -164301,10 +164308,11 @@
       "classification": "generic-core-media-build",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "already_deep",
-      "execution_policy_sha256": "3af024548ec31fa1660ac8f39b95cb9b35e46e9217acacaf0af51bf957f9f5b7",
+      "execution_policy_sha256": "c0a14063b677ca7aea27eed6c7b2afd3af01f062060b4902f37b384488326c12",
       "field_contract_sha256": "ab5e7bc17c5ebba7d1e3fc4490af874d1ea0d67d00b5bc3b48b7c4ff51ce0646",
       "host": "wwise-console",
       "item_type": "function",
@@ -165998,10 +166006,11 @@
       "classification": "generic-core-media-build",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "already_deep",
-      "execution_policy_sha256": "c0ccd3f9943e1face869ba02d72c37471dd47975c67586a009796c4adac0cde2",
+      "execution_policy_sha256": "d6754bc71b494c455a1fe321f8f9ce58078c5f1e94558092de45955cfd5a353f",
       "field_contract_sha256": "62820a5ccf0c9d5f0858230aa99b1d0466b651752c13d18630a66bec8f26981b",
       "host": "wwise-console",
       "item_type": "function",
@@ -166019,7 +166028,7 @@
         "wire_type": "gateway_owned"
       },
       "owner_issue": null,
-      "route": "transaction",
+      "route": "bounded_call",
       "schema_sha256": "70bf73e92728b9f35d78284a3c951c64c8bca7e18077f277a75e8a0e983bd998",
       "uri": "ak.wwise.core.soundbank.getInclusions",
       "version": "2023.1"
@@ -170486,10 +170495,11 @@
       "classification": "generic-core-media-build",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "already_deep",
-      "execution_policy_sha256": "7bceb80f05b0395d7ca28c6339839200412e8404d0edba246e9f60269f03ac99",
+      "execution_policy_sha256": "f8feda23c4904fcce8057b3578732a68e12b09b1b7d84766988b510d3ca14f1e",
       "field_contract_sha256": "c08b232394e5b52a233adb7f87a5531f9ad13335efe72fa76305d4293d7f8a66",
       "host": "wwise-console",
       "item_type": "function",
@@ -170517,10 +170527,11 @@
       "classification": "generic-core-media-build",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "already_deep",
-      "execution_policy_sha256": "80d3cee4b832c85b899884384b7e34dae6cf5ec098e7d4a80de8b75b0d385a5f",
+      "execution_policy_sha256": "2e4f8b43840d968ea660e35e40012fd418c359de48e35c78dae57d3b8aecd28d",
       "field_contract_sha256": "ab5e7bc17c5ebba7d1e3fc4490af874d1ea0d67d00b5bc3b48b7c4ff51ce0646",
       "host": "wwise-console",
       "item_type": "function",
@@ -172380,10 +172391,11 @@
       "classification": "generic-core-media-build",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "already_deep",
-      "execution_policy_sha256": "03810febc95adf1dc7aaaddc51082f66937630017d9bc6e9bc6c10b25d16ed36",
+      "execution_policy_sha256": "a715515d0e63f981fc36603e0417af0c65dcd588b6d4e5c3654d06c10802f823",
       "field_contract_sha256": "62820a5ccf0c9d5f0858230aa99b1d0466b651752c13d18630a66bec8f26981b",
       "host": "wwise-console",
       "item_type": "function",
@@ -172401,7 +172413,7 @@
         "wire_type": "gateway_owned"
       },
       "owner_issue": null,
-      "route": "transaction",
+      "route": "bounded_call",
       "schema_sha256": "12f07dab8273e599d830e5762f60630f9bb4f499deb4cf71c124af59aa6980fb",
       "uri": "ak.wwise.core.soundbank.getInclusions",
       "version": "2024.1"
@@ -176695,10 +176707,11 @@
       "classification": "generic-core-media-build",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "already_deep",
-      "execution_policy_sha256": "b4b1f375e63f25fc6c1ccd70e577c673adc77fc476ba64006cc46729cc8520b2",
+      "execution_policy_sha256": "675f4fae455756e29ed0d1398ed5a1a1308c8ec56678fd6cd205d6e1e726a332",
       "field_contract_sha256": "c08b232394e5b52a233adb7f87a5531f9ad13335efe72fa76305d4293d7f8a66",
       "host": "wwise-console",
       "item_type": "function",
@@ -176726,10 +176739,11 @@
       "classification": "generic-core-media-build",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "already_deep",
-      "execution_policy_sha256": "ef582fe4d20a51850d6488e24fe9cd0ae54287b9acc64686cde77d47edb5f667",
+      "execution_policy_sha256": "b31f8ebc26f6eb0ee1429af2a5a52d13cb7c018ae7abaecb77d542a69a7d3f6d",
       "field_contract_sha256": "ab5e7bc17c5ebba7d1e3fc4490af874d1ea0d67d00b5bc3b48b7c4ff51ce0646",
       "host": "wwise-console",
       "item_type": "function",
@@ -177113,10 +177127,11 @@
       "classification": "generic-core-media-build",
       "construction_shape": "draft",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "already_deep",
-      "execution_policy_sha256": "bb5823dbcd960c5a8a72f29352a9601fd7f3e4046c3b9066ee54310ee2f45ede",
+      "execution_policy_sha256": "b7c5f348861f9c3a87a59096baa617941a25e8b55c6664e58778af2a73abb767",
       "field_contract_sha256": "7039576af8259d29117b179725160a4703ff9bda4e0928ce8e1f76881fcd488c",
       "host": "wwise-console",
       "item_type": "function",
@@ -178719,10 +178734,11 @@
       "classification": "generic-core-media-build",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "already_deep",
-      "execution_policy_sha256": "d0c4f7d04edf5ad282adc5e98a10da4aff911b82c04bcc23c9e1d52c877c5f45",
+      "execution_policy_sha256": "1811bb8b324e6d88772767df46559e8d8e7fdb16d4b77842674833c6d5c9fea1",
       "field_contract_sha256": "62820a5ccf0c9d5f0858230aa99b1d0466b651752c13d18630a66bec8f26981b",
       "host": "wwise-console",
       "item_type": "function",
@@ -178740,7 +178756,7 @@
         "wire_type": "gateway_owned"
       },
       "owner_issue": null,
-      "route": "transaction",
+      "route": "bounded_call",
       "schema_sha256": "12f07dab8273e599d830e5762f60630f9bb4f499deb4cf71c124af59aa6980fb",
       "uri": "ak.wwise.core.soundbank.getInclusions",
       "version": "2025.1"
@@ -185204,8 +185220,8 @@
   "source_contracts": {
     "gateway_parser_sha256": "07f25eca89241c45adae9400d83dbc7ce704995bd81416ec3c69ba6c72e15a7e",
     "operation_contract_sha256": "bd3f63201dec616a6b57dbd4be326a6e72fbf0642367c773a331491a56c914f5",
-    "public_continuation_sha256": "cfe389eb94efa9fa5a0df9d08d2317abf1ba91a1a5d7fded6d5d15e0c6481349",
-    "typed_request_surface_sha256": "80aef4bed3064ea1859c65d3bcf6d5068a42318a9278d7a691ffa73e2bf00c99"
+    "public_continuation_sha256": "e856b685076e61b14b4062d5f57bcd92e205c08f175b69d51dd883f20b86cc8b",
+    "typed_request_surface_sha256": "2040252326e175d55e5c04bca095bf68c47789302f8b0d243c931e663db30156"
   },
   "summary": {
     "migration_ticket_families": 6,

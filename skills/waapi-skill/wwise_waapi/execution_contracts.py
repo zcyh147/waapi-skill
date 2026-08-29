@@ -32,6 +32,7 @@ from .core_business_contracts import (
     core_business_read_operations,
 )
 from .manifest import ManifestStore
+from .media_build_business_contracts import media_build_business_operations
 from .versions import SUPPORTED_WWISE_VERSION_KEYS
 
 
@@ -236,7 +237,7 @@ BOUNDED_DIRECT_CALL_URIS = frozenset(
         "ak.wwise.waapi.getSchema",
         "ak.wwise.waapi.getTopics",
     }
-) | core_business_read_operations()
+) | core_business_read_operations() | media_build_business_operations()
 
 
 FILESYSTEM_OR_EXTERNAL_PREFIXES = (
@@ -661,7 +662,7 @@ class ExecutionContractRegistry:
                 accepted_authorization_modes=(),
                 program_case="fixed-command-dispatch",
             )
-        if uri in BOUNDED_DIRECT_CALL_URIS or uri in core_business_read_operations():
+        if uri in BOUNDED_DIRECT_CALL_URIS:
             return ExecutionContract(
                 version=version,
                 uri=uri,
@@ -670,7 +671,9 @@ class ExecutionContractRegistry:
                 effect="read",
                 gateway_commands=(
                     ("request-schema", "core-call")
-                    if uri in core_business_operations()
+                    if uri in (
+                        core_business_operations() | media_build_business_operations()
+                    )
                     else ("request-schema",)
                 ),
                 timeout_seconds=10.0,

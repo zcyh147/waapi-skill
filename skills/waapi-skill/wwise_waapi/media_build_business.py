@@ -11,6 +11,8 @@ import struct
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+from .filesystem_security import metadata_is_link_or_reparse
+from .host_paths import HostPathError, localize_waapi_host_path
 from .media_build_business_contracts import (
     MEDIA_POOL_GET_URI,
     PEAKS_REGION_URI,
@@ -168,14 +170,20 @@ def _resolve_media_field(meaning: str, available_fields: Sequence[str]) -> str:
 
 def _validate_exact_audio_file(value: Any, *, field: str) -> str:
     raw = _bounded_text(value, field=field)
-    path = Path(raw)
-    if not path.is_absolute():
-        raise MediaBuildBusinessError(f"{field} must be an absolute audio-file path")
     try:
-        mode = path.lstat().st_mode
+        localized = localize_waapi_host_path(raw)
+    except HostPathError as exc:
+        if exc.error_code == "INVALID_HOST_PATH":
+            message = f"{field} must be a safe absolute host path"
+        else:
+            message = f"{field} cannot be localized on this host"
+        raise MediaBuildBusinessError(message) from exc
+    path = Path(localized)
+    try:
+        metadata = path.lstat()
     except OSError as exc:
         raise MediaBuildBusinessError(f"{field} must name an existing audio file") from exc
-    if stat.S_ISLNK(mode) or not stat.S_ISREG(mode):
+    if metadata_is_link_or_reparse(metadata) or not stat.S_ISREG(metadata.st_mode):
         raise MediaBuildBusinessError(
             f"{field} must name a non-symlink regular audio file"
         )

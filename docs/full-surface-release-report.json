@@ -25,13 +25,13 @@
     "unique_topic_uris": 33
   },
   "execution_routes": {
-    "bounded_call": 69,
+    "bounded_call": 74,
     "bounded_topic_wait": 154,
     "compound_transaction_member": 15,
     "fixed_command": 56,
     "isolated_transaction": 141,
     "managed_transaction": 260,
-    "transaction": 129
+    "transaction": 124
   },
   "host_lanes": {
     "wwise-authoring": 25,
@@ -40,7 +40,7 @@
   "intentionally_blocked_field_occurrences": 79,
   "source_inventory": {
     "contract": "waapi-skill.typed-request-surface/v1",
-    "inventory_sha256": "80aef4bed3064ea1859c65d3bcf6d5068a42318a9278d7a691ffa73e2bf00c99",
+    "inventory_sha256": "2040252326e175d55e5c04bca095bf68c47789302f8b0d243c931e663db30156",
     "versions": [
       "2021.1",
       "2022.1",

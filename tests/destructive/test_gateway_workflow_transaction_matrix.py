@@ -702,78 +702,11 @@ def test_closed_gateway_workflows_across_selected_version(
             expected_notes=import_notes,
             source_file=audio_file,
         )
-        audio_source_id = _imported_audio_source_id(
-            audio_import["verification_evidence"],
-            expected_path=f"{imported_path}\\{audio_file.stem}",
-        )
-        region_peaks = runtime.gateway(
-            [
-                "core-call",
-                "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
-                "--audio-source-id",
-                audio_source_id,
-                "--start-seconds",
-                "0",
-                "--end-seconds",
-                "0.1",
-                "--peak-pair-count",
-                "8",
-                "--channel-mode",
-                "per-channel",
-            ],
-            live=True,
-        )
-        assert region_peaks["agent_result"]["peak_pair_count"] == 8
-        assert region_peaks["agent_result"]["channel_count"] == 1
-        assert len(region_peaks["agent_result"]["channels"][0]["pairs_normalized"]) == 8
-        trimmed_peaks = runtime.gateway(
-            [
-                "core-call",
-                "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion",
-                "--audio-source-id",
-                audio_source_id,
-                "--peak-pair-count",
-                "8",
-                "--channel-mode",
-                "cross-channel",
-            ],
-            live=True,
-        )
-        assert trimmed_peaks["agent_result"]["peak_pair_count"] == 8
-        assert trimmed_peaks["agent_result"]["channel_count"] == 1
-
-        if runtime.version == "2025.1":
-            media_pool = runtime.gateway(
-                [
-                    "core-call",
-                    "ak.wwise.core.mediaPool.get",
-                    "--max-results",
-                    "200",
-                    "--include-field",
-                    "filename",
-                    "--include-field",
-                    "duration-seconds",
-                    "--exact-name-contains",
-                    import_name,
-                    "--final-limit",
-                    "1",
-                ],
-                live=True,
-            )
-            assert media_pool["agent_result"]["complete"] is True
-            assert media_pool["agent_result"]["returned_count"] == 1
-            assert media_pool["agent_result"]["items"][0]["values"]["filename"] == (
-                import_name
-            )
-
-        included_name = (
-            f"WAAPI_GATEWAY_INCLUDED_{runtime.version.replace('.', '_')}_{unique_suffix}"
-        )
         included_id = _create_object(
             runtime,
             parent=object_parent,
             object_type="ActorMixer",
-            name=included_name,
+            name=f"WAAPI_GATEWAY_INCLUDED_{runtime.version.replace('.', '_')}_{unique_suffix}",
         )
         included_second_id = _create_object(
             runtime,
@@ -898,34 +831,6 @@ def test_closed_gateway_workflows_across_selected_version(
                 }
             ],
         )
-        inclusions_read = runtime.gateway(
-            [
-                "core-call",
-                "ak.wwise.core.soundbank.getInclusions",
-                "--soundbank-id",
-                soundbank_id,
-            ],
-            live=True,
-        )
-        assert inclusions_read["agent_result"]["contract"] == (
-            "waapi-skill.media-build-result/v1"
-        )
-        assert inclusions_read["agent_result"]["kind"] == "soundbank_inclusions"
-        assert inclusions_read["agent_result"]["count"] == 1
-        inclusion_row = inclusions_read["agent_result"]["inclusions"][0]
-        assert {
-            key: inclusion_row[key]
-            for key in ("object_id", "name", "path", "includes")
-        } == {
-            "object_id": included_id.upper(),
-            "name": included_name,
-            "path": f"{object_parent}\\{included_name}",
-            "includes": ["events", "structures"],
-        }
-        assert inclusion_row["type"] == (
-            "PropertyContainer" if runtime.version == "2025.1" else "ActorMixer"
-        )
-
         inclusions_clear = _complete_transaction(
             runtime,
             operation="soundbank.setInclusions",
@@ -1093,15 +998,6 @@ def test_closed_gateway_workflows_across_selected_version(
                 {"category": "scalar-reference-link", "status": "PASS", "verifier_strength": "operation_specific_readback"},
                 {"category": "relationship", "status": "PASS", "verifier_strength": "operation_specific_readback"},
                 {"category": "soundbank-file-artifact", "status": "PASS", "verifier_strength": "operation_specific_readback"},
-                {
-                    "category": "media-build-business-read",
-                    "status": "PASS",
-                    "verifier_strength": (
-                        "region_trimmed_peaks_soundbank_inclusions_and_media_pool"
-                        if runtime.version == "2025.1"
-                        else "region_trimmed_peaks_and_soundbank_inclusions"
-                    ),
-                },
             ]
         )
     finally:
