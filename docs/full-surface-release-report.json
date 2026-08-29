@@ -30,8 +30,8 @@
     "compound_transaction_member": 15,
     "fixed_command": 56,
     "isolated_transaction": 141,
-    "managed_transaction": 226,
-    "transaction": 119
+    "managed_transaction": 232,
+    "transaction": 113
   },
   "host_lanes": {
     "wwise-authoring": 25,
@@ -40,7 +40,7 @@
   "intentionally_blocked_field_occurrences": 79,
   "source_inventory": {
     "contract": "waapi-skill.typed-request-surface/v1",
-    "inventory_sha256": "566ae35e6d0ef099d8ac7e0b2588eb66337f4334a93a924ac7c2c6a3b8c06bda",
+    "inventory_sha256": "d21ddea15bb098fb5b82d0937189a2f52c81d2059e59a51ceb4e840b70c0a370",
     "versions": [
       "2021.1",
       "2022.1",

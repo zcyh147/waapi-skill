@@ -455,7 +455,7 @@ def test_unmigrated_nonzero_function_does_not_disclose_a_broken_continuation(
 
 
 def test_flat_generic_mutation_requires_apply_before_connection(tmp_path: Path) -> None:
-    api = "ak.wwise.core.remote.connect"
+    api = "ak.soundengine.postMsgMonitor"
     version = "2021.1"
     exit_code, schema = waapi_gateway.execute_gateway(
         ["request-schema", api],
@@ -463,7 +463,9 @@ def test_flat_generic_mutation_requires_apply_before_connection(tmp_path: Path) 
         client_factory=lambda _url: pytest.fail("discovery must remain offline"),
     )
     assert exit_code == 0, schema
-    host = next(field["handle"] for field in schema["fields"] if field["name"] == "host")
+    message = next(
+        field["handle"] for field in schema["fields"] if field["name"] == "message"
+    )
     assert schema["continuation"]["subcommand"] == "typed-call"
     assert schema["continuation"]["apply"] is True
     assert set(schema["continuation"]["fact_flags"]) == {"scalar"}
@@ -474,7 +476,7 @@ def test_flat_generic_mutation_requires_apply_before_connection(tmp_path: Path) 
         [
             "typed-call", api,
             "--schema-digest", schema["schema_digest"],
-            "--set", host, "string", "127.0.0.1",
+            "--set", message, "string", "Weather runtime probe",
         ],
         env=_env(tmp_path, version),
         client_factory=lambda _url: pytest.fail("mutation boundary must remain offline"),

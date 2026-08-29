@@ -569,7 +569,7 @@ def test_every_permitted_complex_generic_lane_has_one_draft_adapter() -> None:
                 "remove_typed_fact",
             ]
 
-    assert len(lanes) == 21
+    assert len(lanes) == 16
     assert ("2022.1", "ak.soundengine.setPosition") in lanes
     assert ("2025.1", "ak.wwise.core.mediaPool.get") in lanes
 

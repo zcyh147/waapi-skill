@@ -553,6 +553,78 @@ def test_gateway_voice_contributions_resolves_business_object_identities(
     )
 
 
+def test_gateway_voice_contributions_accepts_copy_ready_voice_and_bus_handles(
+    tmp_path: Path,
+) -> None:
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": _live_info("2025.1"),
+            GET_VOICES_URI: {
+                "return": [
+                    {
+                        "pipelineID": 17,
+                        "gameObjectID": 1001,
+                        "objectGUID": "{11111111-1111-1111-1111-111111111111}",
+                        "objectName": "Rain",
+                        "gameObjectName": "Weather",
+                    }
+                ]
+            },
+            GET_BUSSES_URI: {
+                "return": [
+                    {
+                        "pipelineID": pipeline_id,
+                        "gameObjectID": 1001,
+                        "objectGUID": object_guid,
+                        "objectName": name,
+                        "gameObjectName": "Weather",
+                    }
+                    for pipeline_id, object_guid, name in (
+                        (21, "{22222222-2222-2222-2222-222222222222}", "Weather Bus"),
+                        (22, "{33333333-3333-3333-3333-333333333333}", "Master Bus"),
+                    )
+                ]
+            },
+            GET_VOICE_CONTRIBUTIONS_URI: {
+                "return": {
+                    "volume": -3.0,
+                    "LPF": 2.0,
+                    "HPF": 1.0,
+                    "DSF": -0.5,
+                    "objects": [],
+                }
+            },
+        }
+    )
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "profiler-voice-contributions",
+            "--capture",
+            "latest",
+            "--voice-instance-handle",
+            "voice-instance-00000011",
+            "--bus-instance-handle",
+            "bus-instance-00000015",
+            "--bus-instance-handle",
+            "bus-instance-00000016",
+        ],
+        env=_gateway_env(tmp_path, "2025.1"),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 0, payload
+    assert client.calls[-1] == (
+        GET_VOICE_CONTRIBUTIONS_URI,
+        {
+            "voicePipelineID": 17,
+            "bussesPipelineID": [21, 22],
+            "time": "capture",
+        },
+        {},
+    )
+
+
 def test_profiler_read_parser_has_no_native_time_or_pipeline_parameters() -> None:
     parser = waapi_gateway.build_parser()
     subparsers = next(
@@ -572,6 +644,8 @@ def test_profiler_read_parser_has_no_native_time_or_pipeline_parameters() -> Non
         "--capture-ms",
         "--voice-object-id",
         "--bus-object-id",
+        "--voice-instance-handle",
+        "--bus-instance-handle",
     } <= options
     assert not {"--time", "--voice-pipeline-id", "--bus-pipeline-id"} & options
 

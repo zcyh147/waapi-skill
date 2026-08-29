@@ -1034,7 +1034,7 @@ def test_flat_generic_mutation_enters_existing_preview_with_exact_args(
     tmp_path: Path,
 ) -> None:
     version = "2021.1"
-    api = "ak.wwise.core.remote.connect"
+    api = "ak.soundengine.postMsgMonitor"
     state_dir = tmp_path / "state"
     schema_exit, schema = execute(
         ["request-schema", api],
@@ -1048,8 +1048,7 @@ def test_flat_generic_mutation_enters_existing_preview_with_exact_args(
         [
             "typed-call", api,
             "--schema-digest", schema["schema_digest"],
-            "--set", handles["host"], "string", "127.0.0.1",
-            "--set", handles["commandPort"], "integer", "24024",
+            "--set", handles["message"], "string", "Weather runtime probe",
             "--apply",
         ],
         tmp_path=tmp_path,
@@ -1074,13 +1073,13 @@ def test_flat_generic_mutation_enters_existing_preview_with_exact_args(
         "operation": "waapi.call",
         "arguments": {
             "api": api,
-            "args": {"host": "127.0.0.1", "commandPort": 24024},
+            "args": {"message": "Weather runtime probe"},
             "options": {},
         },
     }
     assert artifact["prepared_operation"]["dispatch"] == {
         "uri": api,
-        "args": {"host": "127.0.0.1", "commandPort": 24024},
+        "args": {"message": "Weather runtime probe"},
         "options": {},
     }
 
@@ -1467,7 +1466,7 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
         "request-schema",
         "ak.wwise.core.project.save",
     ]
-    assert catalog["request_schema_route_count"] == 34
+    assert catalog["request_schema_route_count"] == 60
     assert request_schema_routes[
         "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion"
     ]["next_command"] == [
@@ -1490,8 +1489,9 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
         "request-schema",
         "ak.wwise.core.sourceControl.commit",
     ]
-    compact_json = json.dumps(catalog, ensure_ascii=False, indent=2, sort_keys=True).encode("utf-8")
-    assert len(compact_json) < 32 * 1024
+    encoded_size = waapi_gateway.gateway_json_document_size(catalog)
+    assert encoded_size < 32 * 1024
+    assert "\n" not in waapi_gateway.gateway_stdout_json_encoder(catalog).encode(catalog)
 
     exit_code, detail_catalog = execute(["operations", "--detail"], tmp_path=tmp_path)
 
@@ -5425,7 +5425,6 @@ def test_lifecycle_opener_cleanup_spec_survives_the_full_gateway_chain(tmp_path:
     assert verify_payload["cleanup"]["status"] == "pending"
     assert verify_payload["cleanup"]["projection"]["status"] == "pending"
     assert verify_payload["agent_result"]["cleanup"] == verify_payload["cleanup"]
-
     cleanup_payloads = (
         preview_cleanup,
         transaction["preview_summary"]["cleanup"],
@@ -5586,6 +5585,10 @@ def test_transport_create_materializes_destroy_request_in_execute_verify_and_age
         "transport": transport_id
     }
     assert verify_payload["agent_result"]["cleanup"] == verify_payload["cleanup"]
+    assert verify_payload["agent_result"]["business_result"] == {
+        "contract": "waapi-skill.runtime-control-result/v1",
+        "transport_handle": "transport-session-00000049",
+    }
     assert verify_payload["agent_result"]["cleanup"]["projection"]["binding"]["materialized"] is True
     assert (
         verify_payload["cleanup"]["projection"]["cleanup_spec_sha256"]

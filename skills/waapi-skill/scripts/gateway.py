@@ -296,12 +296,14 @@ from wwise_waapi.runtime_inspection_business_contracts import (  # noqa: E402  #
     runtime_inspection_business_catalog_rows,
     runtime_inspection_business_contract_data,
     runtime_inspection_business_operations,
+    runtime_inspection_business_read_operations,
     runtime_inspection_business_versions,
 )
 from wwise_waapi.runtime_inspection_business import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     RuntimeInspectionBusinessError,
     materialize_runtime_inspection_business_request,
     normalize_runtime_inspection_result,
+    profiler_pipeline_id_from_handle,
 )
 from wwise_waapi.business_declarations import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     MAX_BUSINESS_NAME_BYTES,
@@ -1366,10 +1368,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--capture-ms",
         help="Exact non-negative capture time in milliseconds",
     )
-    profiler_voice_contributions.add_argument(
+    profiler_voice_identity = profiler_voice_contributions.add_mutually_exclusive_group(
+        required=True
+    )
+    profiler_voice_identity.add_argument(
         "--voice-object-id",
-        required=True,
         help="Exact canonical Wwise object GUID for the requested active voice",
+    )
+    profiler_voice_identity.add_argument(
+        "--voice-instance-handle",
+        help="Copy-ready handle returned by a bounded Profiler voice result",
     )
     profiler_voice_contributions.add_argument(
         "--game-object-id",
@@ -1382,6 +1390,15 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Repeat exact canonical Wwise Bus GUIDs in the requested voice-path "
             "order; omit for the dry path"
+        ),
+    )
+    profiler_voice_contributions.add_argument(
+        "--bus-instance-handle",
+        action="append",
+        default=[],
+        help=(
+            "Repeat copy-ready handles from bounded Profiler bus results in the "
+            "requested voice-path order; omit for the dry path"
         ),
     )
     profiler_voice_contributions.set_defaults(
@@ -1406,7 +1423,7 @@ def build_parser() -> argparse.ArgumentParser:
             sorted(
                 core_business_operations()
                 | media_build_business_operations()
-                | runtime_inspection_business_operations()
+                | runtime_inspection_business_read_operations()
             )
         ),
     )
@@ -2442,6 +2459,65 @@ def build_parser() -> argparse.ArgumentParser:
         "--platform-name",
         help="Optional exact installed platform for the active source",
     )
+    draft_declare_runtime_control_plan = subparsers.add_parser(
+        "draft-declare-runtime-control-plan",
+        help=(
+            "Declare one complete runtime inspection/control outcome while the "
+            "Gateway owns native enums, handles, and request construction"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_declare_runtime_control_plan)
+    draft_declare_runtime_control_plan.add_argument(
+        "--cursor-move",
+        choices=(
+            "first-frame",
+            "last-frame",
+            "next-frame",
+            "previous-frame",
+        ),
+    )
+    draft_declare_runtime_control_plan.add_argument(
+        "--cursor-target-ms",
+        type=int,
+    )
+    draft_declare_runtime_control_plan.add_argument(
+        "--capture-data",
+        action="append",
+        nargs=2,
+        default=[],
+        metavar=("DATA_SET", "ENABLE_OR_DISABLE"),
+    )
+    draft_declare_runtime_control_plan.add_argument("--message")
+    draft_declare_runtime_control_plan.add_argument("--log-channel")
+    draft_declare_runtime_control_plan.add_argument(
+        "--severity",
+        choices=("message", "warning", "error", "fatal"),
+    )
+    draft_declare_runtime_control_plan.add_argument("--remote-host")
+    draft_declare_runtime_control_plan.add_argument("--application-name")
+    draft_declare_runtime_control_plan.add_argument("--command-port", type=int)
+    draft_declare_runtime_control_plan.add_argument(
+        "--notification-port",
+        type=int,
+    )
+    draft_declare_runtime_control_plan.add_argument("--target-handle")
+    draft_declare_runtime_control_plan.add_argument("--game-object-id", type=int)
+    draft_declare_runtime_control_plan.add_argument("--transport-handle")
+    draft_declare_runtime_control_plan.add_argument(
+        "--audition-action",
+        choices=("play", "stop", "pause", "toggle-play-stop", "play-directly"),
+    )
+    draft_declare_runtime_control_plan.add_argument(
+        "--transport-scope",
+        choices=("one-transport", "all-active"),
+    )
+    draft_declare_runtime_control_plan.add_argument(
+        "--audition-media",
+        choices=("originals", "converted"),
+    )
+    draft_declare_runtime_control_plan.add_argument("--meter-object-handle")
+    draft_declare_runtime_control_plan.add_argument("--capture-output-directory")
+    draft_declare_runtime_control_plan.add_argument("--capture-name")
     draft_declare_source_control_plan = subparsers.add_parser(
         "draft-declare-source-control-plan",
         help=(
@@ -3555,6 +3631,7 @@ def gateway_stdout_json_encoder(value: Any | None = None) -> json.JSONEncoder:
         isinstance(value, Mapping)
         and value.get("command")
         in {
+            "operations",
             "operation-schema",
             "query-schema",
             "topic-schema",
@@ -4282,7 +4359,7 @@ def preflight_core_business_input(
     versions = resolve_catalog_versions(args, env=env)
     if len(versions) != 1:
         raise GatewayInputError("core-call requires one exact Wwise version")
-    if args.api in runtime_inspection_business_operations():
+    if args.api in runtime_inspection_business_read_operations():
         try:
             runtime_inspection_business_contract_data(args.api, versions[0])
             request, limit, business_request = materialize_runtime_inspection_business_request(
@@ -5062,15 +5139,34 @@ def preflight_stable_read_input(
             time=args.time,
         )
         return
-    if not _canonical_guid(args.voice_object_id):
+    if args.voice_instance_handle is not None:
+        try:
+            args.voice_pipeline_id = profiler_pipeline_id_from_handle(
+                args.voice_instance_handle,
+                kind="voice",
+            )
+        except RuntimeInspectionBusinessError as exc:
+            raise GatewayInputError(str(exc)) from exc
+        if args.game_object_id is not None:
+            raise GatewayInputError(
+                "--game-object-id is only used with --voice-object-id; a voice "
+                "instance handle is already exact"
+            )
+    elif not _canonical_guid(args.voice_object_id):
         raise GatewayInputError(
             "profiler-voice-contributions --voice-object-id must be a canonical GUID"
         )
     bus_object_ids = tuple(args.bus_object_id)
-    if len(bus_object_ids) > MAX_BUS_PIPELINE_IDS:
+    bus_instance_handles = tuple(args.bus_instance_handle)
+    if bus_object_ids and bus_instance_handles:
+        raise GatewayInputError(
+            "profiler-voice-contributions accepts either Bus object identities or "
+            "Gateway Bus instance handles, not both"
+        )
+    if max(len(bus_object_ids), len(bus_instance_handles)) > MAX_BUS_PIPELINE_IDS:
         raise GatewayInputError(
             "profiler-voice-contributions accepts at most "
-            f"{MAX_BUS_PIPELINE_IDS} --bus-object-id values"
+            f"{MAX_BUS_PIPELINE_IDS} ordered Bus identities"
         )
     if (
         any(not _canonical_guid(value) for value in bus_object_ids)
@@ -5080,6 +5176,18 @@ def preflight_stable_read_input(
             "profiler-voice-contributions --bus-object-id values must be unique "
             "canonical GUIDs"
         )
+    if bus_instance_handles:
+        try:
+            args.bus_pipeline_id = [
+                profiler_pipeline_id_from_handle(value, kind="bus")
+                for value in bus_instance_handles
+            ]
+        except RuntimeInspectionBusinessError as exc:
+            raise GatewayInputError(str(exc)) from exc
+        if len(set(args.bus_pipeline_id)) != len(args.bus_pipeline_id):
+            raise GatewayInputError(
+                "profiler-voice-contributions Bus instance handles must be unique"
+            )
     if args.game_object_id is not None:
         if re.fullmatch(r"[0-9]+", args.game_object_id) is None:
             raise GatewayInputError(
@@ -8136,7 +8244,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             )
         if args.operation in (
             media_build_business_operations()
-            | runtime_inspection_business_operations()
+            | runtime_inspection_business_read_operations()
         ):
             raise GatewayInputError(
                 f"{args.operation} uses request-schema and its closed Core business "
@@ -9438,6 +9546,58 @@ def resolve_profiler_voice_path(
             normalized.append(dict(row))
         return normalized, result
 
+    if args.voice_pipeline_id is not None:
+        voices, voice_result = read_rows("ak.wwise.core.profiler.getVoices")
+        if not voice_result.get("ok", True):
+            return dict(voice_result)
+        voice_matches = [
+            row for row in voices if row["pipelineID"] == args.voice_pipeline_id
+        ]
+        if len(voice_matches) != 1:
+            return {
+                "ok": True,
+                "status": "needs_clarification",
+                **dict(common),
+                "operation": "profiler-voice-contributions",
+                "agent_result": {
+                    "voice_instance_handle": args.voice_instance_handle,
+                    "matching_voice_count": len(voice_matches),
+                    "repair": "refresh the bounded Profiler voice result and copy its current handle",
+                },
+            }
+        if args.bus_pipeline_id:
+            busses, bus_result = read_rows("ak.wwise.core.profiler.getBusses")
+            if not bus_result.get("ok", True):
+                return dict(bus_result)
+            voice_game_object = voice_matches[0]["gameObjectID"]
+            for handle, pipeline_id in zip(
+                args.bus_instance_handle,
+                args.bus_pipeline_id,
+                strict=True,
+            ):
+                matches = [
+                    row
+                    for row in busses
+                    if row["pipelineID"] == pipeline_id
+                    and row["gameObjectID"] == voice_game_object
+                ]
+                if len(matches) != 1:
+                    return {
+                        "ok": True,
+                        "status": "needs_clarification",
+                        **dict(common),
+                        "operation": "profiler-voice-contributions",
+                        "agent_result": {
+                            "bus_instance_handle": handle,
+                            "matching_bus_count": len(matches),
+                            "repair": (
+                                "refresh the bounded Profiler bus result for the "
+                                "selected voice and copy its current handle"
+                            ),
+                        },
+                    }
+        return int(args.voice_pipeline_id), tuple(args.bus_pipeline_id)
+
     voices_or_rows = read_rows("ak.wwise.core.profiler.getVoices")
     voices, voice_result = voices_or_rows
     if not voice_result.get("ok", True):
@@ -9897,6 +10057,56 @@ def dispatch_runtime_inspection_business_read(
         args.api,
         live_info=live_info,
     )
+    transport_binding_call = None
+    if args.api == "ak.wwise.core.transport.getState":
+        transport_id = request["args"].get("transport")
+        list_capability = live_capability(
+            detected_version,
+            "ak.wwise.core.transport.getList",
+            live_info=live_info,
+        )
+        transport_binding_call = dispatch(
+            dispatcher,
+            "ak.wwise.core.transport.getList",
+            connection=connection,
+            version=detected_version,
+            args={},
+            options={},
+            allow_destructive=True,
+            result_limit_bytes=int(
+                list_capability.execution_contract["result_limit_bytes"]
+            ),
+            operation_timeout=float(
+                list_capability.execution_contract["timeout_seconds"]
+            ),
+        )
+        list_payload = transport_binding_call.get("result")
+        rows = list_payload.get("list") if isinstance(list_payload, Mapping) else None
+        matches = (
+            [
+                row
+                for row in rows
+                if isinstance(row, Mapping) and row.get("transport") == transport_id
+            ]
+            if isinstance(rows, list)
+            else []
+        )
+        if (
+            transport_binding_call.get("ok") is not True
+            or not isinstance(rows, list)
+            or any(not isinstance(row, Mapping) for row in rows)
+            or len(matches) != 1
+        ):
+            raise GatewayResultShapeError(
+                "Transport handle does not resolve to exactly one live Authoring transport.",
+                details={
+                    "transport_handle": args.runtime_inspection_business_request.get(
+                        "transport_handle"
+                    ),
+                    "match_count": len(matches),
+                },
+                error_code="TRANSPORT_HANDLE_NOT_LIVE",
+            )
     result = dispatch(
         dispatcher,
         request["api"],
@@ -9947,6 +10157,11 @@ def dispatch_runtime_inspection_business_read(
             "max_results": args.runtime_inspection_limit,
         },
         "call": dispatch_call_summary(result),
+        **(
+            {"transport_binding_call": dispatch_call_summary(transport_binding_call)}
+            if transport_binding_call is not None
+            else {}
+        ),
         "schema_validation": {
             "request": request_validation.as_dict(),
             "result": result_validation.as_dict() if result_validation else None,
@@ -10553,6 +10768,168 @@ def dispatch_business_project_setting_plan(
     return payload
 
 
+def dispatch_business_runtime_control_plan(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Record one complete runtime control outcome without native fields."""
+
+    binding = _open_business_binding(
+        args,
+        env=env,
+        connection=connection,
+        detected_version=detected_version,
+        live_info=live_info,
+        dispatcher=dispatcher,
+    )
+    adapter = business_adapter(binding.record.operation)
+    if adapter.family != "runtime-control-business" or not adapter.accepts_update_command(
+        args.command
+    ):
+        raise GatewayInputError(
+            f"{binding.record.operation} does not expose {args.command}"
+        )
+    raw_session = (
+        binding.record.composition.get("business_session")
+        if binding.record.composition is not None
+        else None
+    )
+    session = (
+        BusinessDeclarationSession.create(binding.context)
+        if raw_session is None
+        else BusinessDeclarationSession.from_dict(raw_session)
+    )
+    if session.context != binding.context:
+        raise OperationDraftBindingDrift(
+            "Live project or Wwise build differs from the runtime-control binding."
+        )
+    contract = adapter.contract(detected_version)
+    field_types = contract["declaration"]["field_types"]
+    supplied = {
+        "cursor_move": args.cursor_move,
+        "cursor_target_ms": args.cursor_target_ms,
+        "capture_data_changes": args.capture_data or None,
+        "message": args.message,
+        "log_channel": args.log_channel,
+        "severity": args.severity,
+        "remote_host": args.remote_host,
+        "application_name": args.application_name,
+        "command_port": args.command_port,
+        "notification_port": args.notification_port,
+        "target_handle": args.target_handle,
+        "game_object_id": args.game_object_id,
+        "transport_handle": args.transport_handle,
+        "audition_action": args.audition_action,
+        "transport_scope": args.transport_scope,
+        "audition_media": args.audition_media,
+        "meter_object_handle": args.meter_object_handle,
+        "capture_output_directory": args.capture_output_directory,
+        "capture_name": args.capture_name,
+    }
+    plan = {
+        name: value
+        for name, value in supplied.items()
+        if value is not None and name in field_types
+    }
+    undisclosed = [
+        name
+        for name, value in supplied.items()
+        if value is not None and name not in field_types
+    ]
+    if undisclosed:
+        raise GatewayInputError(
+            "Runtime-control fields are not disclosed for this operation: "
+            + ", ".join(sorted(undisclosed))
+        )
+    candidate = session.with_settings({"runtime_control_plan": plan})
+    materialized = adapter.materialize(candidate)
+    arguments = materialized.get("arguments")
+    native_args = arguments.get("args") if isinstance(arguments, Mapping) else None
+    transport_id = (
+        native_args.get("transport") if isinstance(native_args, Mapping) else None
+    )
+    transport_binding_call = None
+    if transport_id is not None:
+        transport_rows = binding.read_call(
+            "ak.wwise.core.transport.getList",
+            {},
+            {},
+        ).get("list")
+        matches = (
+            [
+                row
+                for row in transport_rows
+                if isinstance(row, Mapping) and row.get("transport") == transport_id
+            ]
+            if isinstance(transport_rows, list)
+            else []
+        )
+        if (
+            not isinstance(transport_rows, list)
+            or any(not isinstance(row, Mapping) for row in transport_rows)
+            or len(matches) != 1
+        ):
+            raise GatewayResultShapeError(
+                "Transport handle does not resolve to exactly one live Authoring transport.",
+                details={
+                    "transport_handle": plan.get("transport_handle"),
+                    "match_count": len(matches),
+                },
+                error_code="TRANSPORT_HANDLE_NOT_LIVE",
+            )
+        transport_binding_call = {
+            "transport_handle": plan.get("transport_handle"),
+            "live_match": True,
+        }
+
+    def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
+        candidate = current.with_settings({"runtime_control_plan": plan})
+        adapter.materialize(candidate)
+        return candidate
+
+    record = binding.store.apply_business_update(
+        args.draft_id,
+        task_authority=args.task_authority,
+        expected_revision=args.expected_revision,
+        schema_digest=operation_draft_schema_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        composer_digest=operation_composer_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        context=binding.context,
+        update=update,
+        event_type="settings.revised",
+    )
+    payload = operation_draft_payload(
+        args.command,
+        record,
+        offline=False,
+        task_authority=args.task_authority,
+    )
+    payload.update(
+        {
+            "endpoint": dict(common["endpoint"]),
+            "detected_version": detected_version,
+            "project_call": dispatch_call_summary(binding.project_call),
+            **(
+                {"transport_binding": transport_binding_call}
+                if transport_binding_call is not None
+                else {}
+            ),
+        }
+    )
+    return payload
+
+
 def _source_control_roots_from_project(
     project: Mapping[str, Any],
 ) -> dict[str, str]:
@@ -10709,6 +11086,16 @@ def dispatch_command(
         )
     if args.command == "draft-declare-project-setting-plan":
         return dispatch_business_project_setting_plan(
+            args,
+            env=env,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+        )
+    if args.command == "draft-declare-runtime-control-plan":
+        return dispatch_business_runtime_control_plan(
             args,
             env=env,
             connection=connection,
@@ -19542,6 +19929,11 @@ def _business_next_action_binding(
         "draft-declare-project-setting-plan",
         *binding,
     ]
+    declare_runtime_control_plan_prefix = [
+        *base,
+        "draft-declare-runtime-control-plan",
+        *binding,
+    ]
     declare_source_control_plan_prefix = [
         *base,
         "draft-declare-source-control-plan",
@@ -19630,6 +20022,126 @@ def _business_next_action_binding(
                 "bind_each_required_role_then_copy_its_returned_handle_into_"
                 "the_same_named_declaration_field"
             ),
+        }
+    if adapter.family == "runtime-control-business":
+        roles = business_contract["binding"]["roles"]
+        shared = {
+            "contract": "waapi-skill.business-draft-next-action/v1",
+            "responsibility_split": {
+                "agent": "natural_language_to_closed_runtime_control_outcome",
+                "gateway": (
+                    "business_outcome_to_exact_native_request_preview_and_lifecycle"
+                ),
+            },
+            "business_contract": business_contract,
+            "forbidden_inputs": [
+                *forbidden_inputs,
+                "native_cursor_enum",
+                "native_runtime_handle",
+                "complete_request",
+            ],
+            "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+            "then_read_next_response": True,
+            "precompute_or_increment_revision": False,
+        }
+        if session is not None and adapter.is_complete(session):
+            return {
+                **shared,
+                "required_next_phase": "check_complete_runtime_control_plan",
+                "check": {
+                    **operation_draft_prefix_copy_binding(check),
+                    "append": [],
+                },
+            }
+        bound_roles = (
+            set()
+            if session is None
+            else {
+                row.get("role")
+                for row in session.handles.as_dict()["objects"]
+                if isinstance(row, Mapping) and isinstance(row.get("role"), str)
+            }
+        )
+        next_role = next((role for role in roles if role not in bound_roles), None)
+        if next_role is not None:
+            return {
+                **shared,
+                "required_next_phase": "bind_next_runtime_control_role",
+                "object_binding": role_object_binding(next_role),
+            }
+        append_by_operation = {
+            "ak.wwise.core.profiler.moveCursor": [
+                "--cursor-move first-frame|last-frame|next-frame|previous-frame"
+            ],
+            "ak.wwise.core.profiler.setCursorTime": [
+                "--cursor-target-ms <non-negative-integer-milliseconds>"
+            ],
+            "ak.wwise.core.profiler.enableProfilerData": [
+                "--capture-data <disclosed-version-data-set> enable|disable (repeat)"
+            ],
+            "ak.wwise.core.log.addItem": [
+                "--message <exact-bounded-message>",
+                "[--log-channel <disclosed-log-view>]",
+                "[--severity message|warning|error|fatal]",
+            ],
+            "ak.wwise.core.log.clear": [
+                "--log-channel <disclosed-log-view>"
+            ],
+            "ak.wwise.core.remote.connect": [
+                "--remote-host <exact-host-or-prof-capture>",
+                "[--application-name <exact-application-name>]",
+                "[--command-port <1..65535>]",
+                *(
+                    ["[--notification-port <1..65535>] (Wwise 2021.1 only)"]
+                    if record.version == "2021.1"
+                    else []
+                ),
+            ],
+            "ak.wwise.core.transport.create": [
+                "--target-handle <bound-target-handle>",
+                "[--game-object-id <unsigned-64-bit-id>]",
+            ],
+            "ak.wwise.core.transport.destroy": [
+                "--transport-handle <gateway-transport-session-handle>"
+            ],
+            "ak.wwise.core.transport.executeAction": [
+                "--audition-action play|stop|pause|toggle-play-stop|play-directly",
+                "--transport-scope one-transport|all-active",
+                "[--transport-handle <gateway-transport-session-handle>]",
+            ],
+            "ak.wwise.core.transport.prepare": [
+                "--target-handle <bound-target-handle>"
+            ],
+            "ak.wwise.core.transport.useOriginals": [
+                "--audition-media originals|converted"
+            ],
+            "ak.wwise.core.profiler.registerMeter": [
+                "--meter-object-handle <bound-meter-object-handle>"
+            ],
+            "ak.wwise.core.profiler.unregisterMeter": [
+                "--meter-object-handle <bound-meter-object-handle>"
+            ],
+            "ak.wwise.core.profiler.saveCapture": [
+                "--capture-output-directory <exact-authorized-absolute-directory>",
+                "--capture-name <host-valid-capture-name>",
+            ],
+        }
+        declaration = {
+            **operation_draft_prefix_copy_binding(
+                declare_runtime_control_plan_prefix,
+                append_action=(
+                    "copy_verbatim_then_append_one_complete_runtime_control_plan"
+                ),
+            ),
+            "append_fields": business_contract["declaration"],
+            "append": append_by_operation[record.operation],
+            "submit_once": True,
+            "native_request_input": "forbidden",
+        }
+        return {
+            **shared,
+            "required_next_phase": "declare_complete_runtime_control_plan",
+            "declaration": declaration,
         }
     if adapter.family == "project-setting-business":
         roles = business_contract["binding"]["roles"]
@@ -22671,6 +23183,34 @@ def transaction_agent_result(
         result["authorization"] = dict(authorization)
     if cleanup is not None:
         result["cleanup"] = dict(cleanup)
+        arguments = request.get("arguments")
+        projection = cleanup.get("projection")
+        companion = (
+            projection.get("companion_request")
+            if isinstance(projection, Mapping)
+            else None
+        )
+        companion_args = (
+            companion.get("args") if isinstance(companion, Mapping) else None
+        )
+        transport_id = (
+            companion_args.get("transport")
+            if isinstance(companion_args, Mapping)
+            else None
+        )
+        if (
+            isinstance(arguments, Mapping)
+            and arguments.get("api") == "ak.wwise.core.transport.create"
+            and isinstance(companion, Mapping)
+            and companion.get("api") == "ak.wwise.core.transport.destroy"
+            and isinstance(transport_id, int)
+            and not isinstance(transport_id, bool)
+            and 1 <= transport_id <= 0xFFFFFFFF
+        ):
+            result["business_result"] = {
+                "contract": "waapi-skill.runtime-control-result/v1",
+                "transport_handle": f"transport-session-{transport_id:08x}",
+            }
     if next_command is not None:
         # A preview mirrors the exact top-level continuation here so the final
         # machine-readable field also ends on the selected continuation.

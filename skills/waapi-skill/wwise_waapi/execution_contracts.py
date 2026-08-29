@@ -323,6 +323,7 @@ POST_EXECUTION_PROJECT_GUARD_POLICY_BY_URI: Mapping[str, str] = MappingProxyType
 MANAGED_SESSION_PREFIXES = (
     "ak.soundengine.",
     "ak.wwise.debug.",
+    "ak.wwise.core.log.",
     "ak.wwise.core.profiler.",
     "ak.wwise.core.remote.",
     "ak.wwise.core.transport.",

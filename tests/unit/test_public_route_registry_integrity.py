@@ -62,9 +62,9 @@ def test_every_registry_row_has_one_complete_route_contract() -> None:
         "excluded": 6,
         "fixed_command": 56,
         "isolated_transaction": 141,
-        "managed_transaction": 214,
+        "managed_transaction": 220,
         "compound_transaction_member": 15,
-        "transaction": 119,
+        "transaction": 113,
     }
 
     for row in rows:

@@ -35662,76 +35662,6 @@
     {
       "model_values": [
         {
-          "channel": "fixed.profiler-voice-contributions",
-          "name": "capture",
-          "path": [
-            "fixed_command",
-            "profiler-voice-contributions",
-            "capture"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.profiler-voice-contributions",
-          "name": "capture-ms",
-          "path": [
-            "fixed_command",
-            "profiler-voice-contributions",
-            "capture-ms"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.profiler-voice-contributions",
-          "name": "voice-object-id",
-          "path": [
-            "fixed_command",
-            "profiler-voice-contributions",
-            "voice-object-id"
-          ],
-          "required": true,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.profiler-voice-contributions",
-          "name": "game-object-id",
-          "path": [
-            "fixed_command",
-            "profiler-voice-contributions",
-            "game-object-id"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.profiler-voice-contributions",
-          "name": "bus-object-id",
-          "path": [
-            "fixed_command",
-            "profiler-voice-contributions",
-            "bus-object-id"
-          ],
-          "required": false,
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        }
-      ],
-      "sha256": "3c2ba3dd1ec51bed572fb5b78e360b3eff9cb9ca8930357bd70783b149fb222e"
-    },
-    {
-      "model_values": [
-        {
           "channel": "options",
           "name": "platform",
           "path": [
@@ -68550,6 +68480,102 @@
         }
       ],
       "sha256": "6e3fee17b9dfa782db154d1ca7eca26594b3b1d00267def8c1370103b4dfd231"
+    },
+    {
+      "model_values": [
+        {
+          "channel": "fixed.profiler-voice-contributions",
+          "name": "capture",
+          "path": [
+            "fixed_command",
+            "profiler-voice-contributions",
+            "capture"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.profiler-voice-contributions",
+          "name": "capture-ms",
+          "path": [
+            "fixed_command",
+            "profiler-voice-contributions",
+            "capture-ms"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.profiler-voice-contributions",
+          "name": "voice-object-id",
+          "path": [
+            "fixed_command",
+            "profiler-voice-contributions",
+            "voice-object-id"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.profiler-voice-contributions",
+          "name": "voice-instance-handle",
+          "path": [
+            "fixed_command",
+            "profiler-voice-contributions",
+            "voice-instance-handle"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.profiler-voice-contributions",
+          "name": "game-object-id",
+          "path": [
+            "fixed_command",
+            "profiler-voice-contributions",
+            "game-object-id"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.profiler-voice-contributions",
+          "name": "bus-object-id",
+          "path": [
+            "fixed_command",
+            "profiler-voice-contributions",
+            "bus-object-id"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.profiler-voice-contributions",
+          "name": "bus-instance-handle",
+          "path": [
+            "fixed_command",
+            "profiler-voice-contributions",
+            "bus-instance-handle"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        }
+      ],
+      "sha256": "6ea6a270ee716ef606c3e60a51fc56b8a562a48ae8b1ad9156140b19eee81004"
     },
     {
       "model_values": [
@@ -153393,7 +153419,7 @@
     "contract": "waapi-skill.typed-request-surface/v1",
     "total_lanes": 824
   },
-  "inventory_sha256": "f036937bb2702c396f5c807dab19897a95d5e7f56ba7d418b6a2d81e4577c634",
+  "inventory_sha256": "5112234e40539b80a4358546a8feeb0356058bec9d9dc96134cdbcb4411911c5",
   "mechanic_owners": {
     "ambiguous_continuation_selection": "gateway_derivation",
     "batch_layout": "gateway_derivation",
@@ -155479,7 +155505,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "5507cd9e0844d900099a6c5aaa2308b959cd741e8d40bbed07b01fcc8f588f3a",
-      "field_contract_sha256": "3c2ba3dd1ec51bed572fb5b78e360b3eff9cb9ca8930357bd70783b149fb222e",
+      "field_contract_sha256": "6ea6a270ee716ef606c3e60a51fc56b8a562a48ae8b1ad9156140b19eee81004",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -160050,7 +160076,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "d0a704eca6fc2a9569be9d0f20ef492d941e0669c97ce42e3a2e79fa629160b2",
-      "field_contract_sha256": "3c2ba3dd1ec51bed572fb5b78e360b3eff9cb9ca8930357bd70783b149fb222e",
+      "field_contract_sha256": "6ea6a270ee716ef606c3e60a51fc56b8a562a48ae8b1ad9156140b19eee81004",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -164494,7 +164520,7 @@
         "request-schema"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "e62c60b82a674c715e03401482d41ead129402df3d85d64aa0401f4f85982e08",
+      "execution_policy_sha256": "f2c1ec264b15a62f9ef98e979e28f7c5d92b0924e7e7d3446687aee14b41da2b",
       "field_contract_sha256": "d751949778089c13601c29996e55d0cbefc523603ebd282851f489aee00d7e9b",
       "host": "wwise-console",
       "item_type": "function",
@@ -164515,7 +164541,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "transaction",
+      "route": "managed_transaction",
       "schema_sha256": "8203e07f18690af68ae59c599ed16c5df649bc8edf658cbed54203de05a2735d",
       "uri": "ak.wwise.core.log.addItem",
       "version": "2023.1"
@@ -164528,7 +164554,7 @@
         "request-schema"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "f8c872eabb830ce52b61898675f68f7f6f009fa14dffbb451aa7400339f7a8d0",
+      "execution_policy_sha256": "9698b848062d8a50259d7bed61389ab6745bf1c845c704031389eae03e5e08b6",
       "field_contract_sha256": "df3ec4ebad7037086a824d994f0cc15e197ea5188086727dbaf7582f1db32a6a",
       "host": "wwise-console",
       "item_type": "function",
@@ -164549,7 +164575,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "transaction",
+      "route": "managed_transaction",
       "schema_sha256": "bfaf2be46d2247b3e93c0db48b346a28b4de116c3bc6408a6f4b5ac5374ba3fc",
       "uri": "ak.wwise.core.log.clear",
       "version": "2023.1"
@@ -165660,7 +165686,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "4e388d81936a5e97408b65b58f9436bb1c75eb4d247c8ac443e71f7f4eee0f88",
-      "field_contract_sha256": "3c2ba3dd1ec51bed572fb5b78e360b3eff9cb9ca8930357bd70783b149fb222e",
+      "field_contract_sha256": "6ea6a270ee716ef606c3e60a51fc56b8a562a48ae8b1ad9156140b19eee81004",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -170832,7 +170858,7 @@
         "request-schema"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "e0c408723bed14d03c93757e9028638b25a86a22aac5b5d87cb67b82c1306d5d",
+      "execution_policy_sha256": "93f1e0b9758cd990c7cbe500434d522f151f5b81315ea888fce0ef44e65c6637",
       "field_contract_sha256": "d751949778089c13601c29996e55d0cbefc523603ebd282851f489aee00d7e9b",
       "host": "wwise-console",
       "item_type": "function",
@@ -170853,7 +170879,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "transaction",
+      "route": "managed_transaction",
       "schema_sha256": "f5db24ca7a9dfd32818c9cdfde1fb939cbdd93fed4188915e53379e57fb04d96",
       "uri": "ak.wwise.core.log.addItem",
       "version": "2024.1"
@@ -170866,7 +170892,7 @@
         "request-schema"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "300e670a1e4c66e966ddb29fba92c6acc2a183f0a559c3273e0b7e4d8702efa5",
+      "execution_policy_sha256": "3c59ae6dc615a7c10e4cb58d0054a3fd97d67cc8514ea9be894781d31c6ce981",
       "field_contract_sha256": "df3ec4ebad7037086a824d994f0cc15e197ea5188086727dbaf7582f1db32a6a",
       "host": "wwise-console",
       "item_type": "function",
@@ -170887,7 +170913,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "transaction",
+      "route": "managed_transaction",
       "schema_sha256": "4a3aee5e54eb066aaaddaccd8f05cfcff395aeb744fc1467853b56285d873d99",
       "uri": "ak.wwise.core.log.clear",
       "version": "2024.1"
@@ -172064,7 +172090,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "db9fead7f8bf51ff78dfd92f94a33b25c05acdff469a21ae554603c3fbe053a3",
-      "field_contract_sha256": "3c2ba3dd1ec51bed572fb5b78e360b3eff9cb9ca8930357bd70783b149fb222e",
+      "field_contract_sha256": "6ea6a270ee716ef606c3e60a51fc56b8a562a48ae8b1ad9156140b19eee81004",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -177004,7 +177030,7 @@
         "request-schema"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "0a4a7e5bd2847848f7e74588a02410af8f37994e72b22f2d6c9e756c9976001b",
+      "execution_policy_sha256": "580fd687f066df06502883e3bfefa1094c678d0cd5454b005378ec37087c3891",
       "field_contract_sha256": "359e579997ae8ded29c6d0ee6f57545722996afd91045a4146b94c3cf1f35d4d",
       "host": "wwise-console",
       "item_type": "function",
@@ -177025,7 +177051,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "transaction",
+      "route": "managed_transaction",
       "schema_sha256": "f5db24ca7a9dfd32818c9cdfde1fb939cbdd93fed4188915e53379e57fb04d96",
       "uri": "ak.wwise.core.log.addItem",
       "version": "2025.1"
@@ -177038,7 +177064,7 @@
         "request-schema"
       ],
       "disposition": "migration_required",
-      "execution_policy_sha256": "666297c61058e473bcd2617603e007e77eb08982ef10e9f901daf752b81158d5",
+      "execution_policy_sha256": "ef7330f2efafda47abe017efb79eed2e3227115e4ea2e9112181d1ecc6226f8d",
       "field_contract_sha256": "df3ec4ebad7037086a824d994f0cc15e197ea5188086727dbaf7582f1db32a6a",
       "host": "wwise-console",
       "item_type": "function",
@@ -177059,7 +177085,7 @@
         "wire_type": "model_owned_leak"
       },
       "owner_issue": 57,
-      "route": "transaction",
+      "route": "managed_transaction",
       "schema_sha256": "4a3aee5e54eb066aaaddaccd8f05cfcff395aeb744fc1467853b56285d873d99",
       "uri": "ak.wwise.core.log.clear",
       "version": "2025.1"
@@ -178299,7 +178325,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "72fe287054d05d9875c1fb3ba00ebc4625ecdee2e4d6716c87de314ae175f1d8",
-      "field_contract_sha256": "3c2ba3dd1ec51bed572fb5b78e360b3eff9cb9ca8930357bd70783b149fb222e",
+      "field_contract_sha256": "6ea6a270ee716ef606c3e60a51fc56b8a562a48ae8b1ad9156140b19eee81004",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -185158,10 +185184,10 @@
     "stable_business_declaration": "A prompt-derived business value remains visible in the public request."
   },
   "source_contracts": {
-    "gateway_parser_sha256": "4303158c579d76e5aebeabce56a8b611eb9cbe4017c67dbf35b2cb47fd9242b1",
+    "gateway_parser_sha256": "9deec3f1ed24abecdc6e325a4b8d60c83d637e4f6656b334f17abb1e8fd3eba6",
     "operation_contract_sha256": "44b2583ac1211ffff7a6c55277c4a81e2845f1042605f28122165af4f8936031",
-    "public_continuation_sha256": "85e9b548fc48e459e603ba0618eeacd25c631087ef2e0e360ceec51f91a093aa",
-    "typed_request_surface_sha256": "566ae35e6d0ef099d8ac7e0b2588eb66337f4334a93a924ac7c2c6a3b8c06bda"
+    "public_continuation_sha256": "fe9aa541cce05746421842f4f609b9bd9d83695b7676bfd8a6b75f6f0037fc92",
+    "typed_request_surface_sha256": "d21ddea15bb098fb5b82d0937189a2f52c81d2059e59a51ceb4e840b70c0a370"
   },
   "summary": {
     "migration_ticket_families": 5,

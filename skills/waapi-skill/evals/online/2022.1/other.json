@@ -4084,8 +4084,8 @@
       "scenario_family": "soundbank_error_window",
       "scenario_index": 1,
       "prompt": "查一下刚才 SoundBank 构建开始到结束这段时间的日志，只要 error 和 warning；按平台、Bank 和消息类型归类，并把能定位到对象的条目带上对象信息。",
-      "protocol": "preview_confirm",
-      "confirmation_prompt": "可以，读取这段构建日志并整理。",
+      "protocol": "single",
+      "confirmation_prompt": null,
       "fixture": {
         "adapter": "authoring_log_fixture",
         "sandbox": "scenario_project_copy",
@@ -4142,8 +4142,8 @@
       "scenario_family": "import_diagnostic_correlation",
       "scenario_index": 2,
       "prompt": "把今天这次 Dialogue_Chapter09 导入相关的日志找出来，按成功、缺失媒体和命名冲突分组；同一对象的重复消息合并，但要保留首次与末次时间。",
-      "protocol": "preview_confirm",
-      "confirmation_prompt": "确认，请读取并归类这次导入日志。",
+      "protocol": "single",
+      "confirmation_prompt": null,
       "fixture": {
         "adapter": "authoring_log_fixture",
         "sandbox": "scenario_project_copy",
