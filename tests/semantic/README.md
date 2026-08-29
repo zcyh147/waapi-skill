@@ -561,6 +561,7 @@ The separately approved V3 executable profiles are:
 | `switch_assignment_business_1` | 1 | 1 | Preview-only routing proof for one independent Switch assignment through three opaque business-object handles and Gateway-owned native materialization |
 | `core_business_1` | 1 | 1 | Preview-only routing proof that a zero-input Core mutation follows `request-schema` into one Gateway-owned Core business plan and immutable Preview |
 | `project_setting_business_1` | 1 | 1 | Preview-only routing proof that one natural Game Parameter range request becomes a bound object handle and Gateway-owned project-setting plan |
+| `runtime_control_business_1` | 1 | 1 | Preview-only routing proof that one natural Profiler capture request becomes a Gateway-owned runtime-control plan and exact native data-type request |
 | `compound_undo_business_1` | 1 | 1 | Preview-only routing proof that two checked child business changes become one Gateway-compiled Undo Group and one immutable Preview |
 
 The two older six-task integration profile IDs remain internal compatibility
@@ -590,6 +591,7 @@ skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py -
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile switch_assignment_business_1 --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-switch-assignment-business
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile core_business_1 --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-core-business
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile project_setting_business_1 --offline-only --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-project-setting-business
+skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile runtime_control_business_1 --offline-only --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-runtime-control-business
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile compound_undo_business_1 --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-compound-undo-business
 ```
 
@@ -618,6 +620,13 @@ the save intent and no Gateway mechanics. The Agent must follow the raw Core
 URI's `request-schema` continuation, declare the complete zero-input Core plan,
 and stop at one immutable Preview without `typed-call`, `draft-apply`, or
 execution.
+
+`runtime_control_business_1` is a single 2025.1 preview-only Profiler routing
+probe. It starts no Wwise process and grants no real-host coverage credit. The
+Agent receives only the intent to enable Voices capture; Gateway owns the exact
+`voices` data-type token, enable flag, native array/request shape, Draft, and
+immutable Preview. The profile rejects typed/native bypass, execution, and any
+additional runtime-control declaration.
 
 `project_setting_business_1` is a single 2025.1 preview-only routing probe. It
 starts no Wwise process and grants no real-host coverage credit. The prompt

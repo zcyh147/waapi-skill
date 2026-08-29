@@ -28,6 +28,29 @@ prevention checks that are expensive to rediscover.
   `Limited`; the same numeric console session owns `explorer.exe`. Ordinary
   pytest and `ci/test.bat` remain direct SSH commands.
 
+### Do not overlap a formal Windows Fresh root with unrelated long Codex work
+
+- Evidence: exact candidate `f8968f7` root `iwin-runtime-f8968f7-r2` ran in an
+  attested active-desktop `InteractiveToken` / `Limited` task, created a fresh
+  thread, then timed out after 241 seconds with one progress reply, zero Skill
+  reads, zero commands, zero Broker records, and zero Wwise dispatch. Frozen
+  root `iwin-runtime-f8968f7-r3` increased only the sealed Codex timeout to 600
+  seconds; after 445 seconds Codex exited zero but reported that its first
+  required Skill read had not returned. It likewise produced zero completed
+  commands or Broker records. Both roots sealed `BLOCKED`, started no Wwise,
+  changed no workspace file, and ended with zero scoped process/task residue.
+- Concurrent state: the same desktop was running a separate long-lived Codex
+  development/test workflow using Wwise Console and REAPER. A read-only host
+  snapshot showed moderate rather than exhausted CPU/memory, so this does not
+  prove local resource starvation; it does prove that a larger Fresh timeout
+  alone is not a repair.
+- Prevention: when the user has disclosed another long Codex workflow on the
+  same Windows desktop, postpone the formal Fresh root until that workflow is
+  idle. macOS and Windows campaigns may still run in parallel with each other.
+  Do not keep increasing the timeout or opening new roots after the same
+  pre-Skill-read stall repeats; freeze the evidence, remove the task, and keep
+  product/deterministic work moving on the other host.
+
 ### A permitted Windows 267 retry is one effective Gateway command
 
 - Evidence: #86 Windows root `iwin-pset-98d9e70-r4` passed every Broker,
@@ -81,6 +104,12 @@ prevention checks that are expensive to rediscover.
   copying live configuration. Run the original campaign inside a profile-free
   PowerShell action wrapper that records stdout, stderr, and exit code; SSH only
   registers, starts, polls, reads, and removes it.
+- Pre-root addendum: the first `f8968f7` runtime-control launcher returned task
+  result 1 before Python because PowerShell opened stdout redirection inside the
+  ignored `skills/waapi-skill-workspace` directory before that directory
+  existed. It created no campaign root, Codex process, or semantic evidence.
+  Create the workspace/log parent before the redirected native command and put
+  wrapper-preflight errors in an already-existing directory.
 
 ### macOS foreground ownership and TCC
 
