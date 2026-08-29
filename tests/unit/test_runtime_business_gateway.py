@@ -1379,19 +1379,20 @@ def test_profiler_save_capture_joins_authorized_directory_and_prof_extension(
 ) -> None:
     output = tmp_path / "captures"
     output.mkdir()
+    capture_name = "Weather A" if sys.platform == "win32" else 'Weather "A"'
     artifact = _seal_runtime_control_preview(
         tmp_path,
         operation="ak.wwise.core.profiler.saveCapture",
         version="2025.1",
         declaration=(
             "--capture-output-directory", str(output),
-            "--capture-name", 'Weather "A"',
+            "--capture-name", capture_name,
         ),
     )
 
     assert artifact["request"]["arguments"] == {
         "api": "ak.wwise.core.profiler.saveCapture",
-        "args": {"file": str(output / 'Weather "A".prof')},
+        "args": {"file": str(output / f"{capture_name}.prof")},
         "options": {},
         "io_root": str(output),
     }
