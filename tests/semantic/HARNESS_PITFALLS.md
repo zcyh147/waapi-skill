@@ -28,6 +28,24 @@ prevention checks that are expensive to rediscover.
   `Limited`; the same numeric console session owns `explorer.exe`. Ordinary
   pytest and `ci/test.bat` remain direct SSH commands.
 
+### Windows SSH verify-only still needs the sealed standalone Codex path
+
+- Evidence: after native-Windows root `iwin-runtime-114e948-r4` passed fresh in
+  an active-desktop task, a direct SSH `--resume --verify-only` invocation
+  stopped with exit 2 before reading the root because Session 0 did not discover
+  the standalone Codex executable. The identical verify-only command with the
+  exact `codex_binary` sealed by that root exited 0; it started neither Codex nor
+  Wwise and changed no evidence.
+- Cause: verify-only does not execute a new Agent turn, but campaign preflight
+  still resolves and attests the configured Codex binary. User-owned standalone
+  install locations visible to the interactive task are not necessarily
+  discoverable from SSH Session 0.
+- Prevention: read the exact absolute `codex_binary` from the sealed campaign
+  configuration and pass it back through `--codex-binary` for direct-SSH
+  verify-only. Treat discovery failure as a launcher diagnostic, not a semantic
+  retry, and still require zero root-token processes plus the unchanged sealed
+  attempt manifest.
+
 ### Do not overlap a formal Windows Fresh root with unrelated long Codex work
 
 - Evidence: exact candidate `f8968f7` root `iwin-runtime-f8968f7-r2` ran in an
@@ -120,6 +138,37 @@ prevention checks that are expensive to rediscover.
 - Prevention: put the exact Skill-local Python and campaign argv directly in a
   `RunAtLoad=true`, `KeepAlive=false` LaunchAgent. Prove one run, sealed output,
   and zero scoped processes, then boot it out.
+
+### Authoring old-cache modal is not a project-version mismatch
+
+- Evidence: isolated Wwise 2022.1 Authoring copies used for #87 displayed the
+  exact modal `The project cache has been deleted because it was generated with
+  an older version of Wwise.` After one acknowledged `OK`, `getInfo` reported
+  v2022.1.19 build 8584, `isCommandLine=false`, and `getProjectInfo.path`
+  matched the exact copied sandbox; the transport and Remote lifecycle tests
+  then passed.
+- Cause: the copied/prelaunch-normalized project references a disposable cache
+  whose version marker is older than the running Authoring build. Wwise deletes
+  and rebuilds that cache; it is not refusing or converting the authored
+  project.
+- Prevention: inspect the full modal text before interacting. Acknowledge only
+  this exact known cache message, once, then require matching `getInfo` version,
+  exact sandbox project path, and non-command-line host readiness. Any different
+  conversion, migration, save, plug-in, or license dialog remains blocked for
+  explicit diagnosis.
+
+### Optional SampleProject isolation must match the fixture generation
+
+- Evidence: a #87 Wwise 2025.1 preflight stopped before Authoring because the
+  broad optional-plugin isolator's pinned SampleProject work-unit/layout proofs
+  matched the 2022.1 fixture rather than the 2025.1 copy. No Wwise process or
+  behavior evidence was credited. The successful matching-Authoring lanes used
+  the exact 2022.1 source generation and ended with zero optional-plugin
+  instances.
+- Prevention: do not apply the broad 2022.1 SampleProject isolator to a later
+  fixture generation. Select the version-matched reviewed isolation profile or
+  stop before Wwise; never weaken a pinned work-unit hash/path merely to get
+  past preflight.
 
 ### Compound Draft topology assumed one terminal per Draft
 
