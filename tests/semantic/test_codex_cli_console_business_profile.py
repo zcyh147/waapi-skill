@@ -45,6 +45,7 @@ def test_cli_console_business_profile_is_one_closed_terra_preview() -> None:
     assert unit.operation == "ak.wwise.cli.generateSoundbank"
     assert unit.version == "2025.1"
     assert unit.user_turn_count == unit.transaction_count == 1
+    assert "WwiseConsole 命令行" in unit.prompt_template
 
 
 def test_cli_console_business_profile_rejects_unknown_filters() -> None:

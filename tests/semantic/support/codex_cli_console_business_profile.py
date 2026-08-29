@@ -122,6 +122,7 @@ def _parse_unit(value: Any) -> CliConsoleBusinessUnit:
         or not prompt.strip()
         or prompt.count(PROJECT_PLACEHOLDER) != 1
         or OUTPUT_DIRECTORY not in prompt
+        or "WwiseConsole" not in prompt
     ):
         raise CliConsoleBusinessProfileError("CLI/Console business prompt is invalid")
     if any(token in prompt.casefold() for token in _FORBIDDEN_PROMPT_MECHANICS):
