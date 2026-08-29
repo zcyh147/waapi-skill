@@ -1773,15 +1773,15 @@ def test_capability_matrix_is_available_offline_without_config_or_client(tmp_pat
     assert payload["summary"]["totals"]["total"] == 814
     assert payload["summary"]["totals"]["schema_status"] == {"ok": 814}
     assert payload["summary"]["totals"]["interface_status"] == {
-        "available": 275,
-        "available_via_transaction": 533,
+        "available": 280,
+        "available_via_transaction": 528,
         "unsupported_by_skill_interface": 6,
     }
     assert payload["summary"]["totals"]["preferred_routes"] == {
         "bounded_topic_wait": 152,
         "fixed_command": 56,
-        "manifest_dispatch": 67,
-        "transaction_operation": 533,
+        "manifest_dispatch": 72,
+        "transaction_operation": 528,
         "unsupported_boundary": 6,
     }
     assert payload["summary"]["by_version"]["2024.1"]["preferred_routes"][

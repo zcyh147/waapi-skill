@@ -292,15 +292,15 @@ def test_catalog_summary_reconciles_all_five_version_totals() -> None:
     assert summary["totals"]["total"] == 814
     assert summary["totals"]["schema_status"] == {"ok": 814}
     assert summary["totals"]["interface_status"] == {
-        "available": 275,
-        "available_via_transaction": 533,
+        "available": 280,
+        "available_via_transaction": 528,
         "unsupported_by_skill_interface": 6,
     }
     assert summary["totals"]["preferred_routes"] == {
         "bounded_topic_wait": 152,
         "fixed_command": 56,
-        "manifest_dispatch": 67,
-        "transaction_operation": 533,
+        "manifest_dispatch": 72,
+        "transaction_operation": 528,
         "unsupported_boundary": 6,
     }
     assert "semantic_builder" not in summary["totals"]["preferred_routes"]
