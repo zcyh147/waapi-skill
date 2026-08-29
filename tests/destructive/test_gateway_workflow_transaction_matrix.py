@@ -1442,8 +1442,13 @@ def test_soundengine_business_draft_is_real_and_result_schema_bounded(
         ["--monitor-message", message],
         live=True,
     )
-    result = _complete_core_result_schema_draft(runtime, draft)
-    preview = result["preview"]
+    _update_business_draft(runtime, draft, "draft-check", live=True)
+    preview = _update_business_draft(
+        runtime,
+        draft,
+        "preview-from-draft",
+        live=True,
+    )
     transaction_id = _required_string(preview, "transaction_id")
     artifact = TransactionStore(runtime.state_dir).load_preview(
         transaction_id
@@ -1453,7 +1458,39 @@ def test_soundengine_business_draft_is_real_and_result_schema_bounded(
         "args": {"message": message},
         "options": {},
     }, artifact
-    verified = result["verify"]
+    shown = runtime.gateway(
+        ["transaction-show", transaction_id, "--summary-only"],
+        live=False,
+    )
+    confirmation = shown.get("confirmation")
+    assert isinstance(confirmation, Mapping), shown
+    runtime.gateway(
+        [
+            "confirm",
+            transaction_id,
+            "--confirmation-token",
+            _required_string(confirmation, "token"),
+        ],
+        live=False,
+    )
+    execute_code, executed = runtime.raw_gateway(["execute", transaction_id])
+    if execute_code == 2:
+        dispatch_result = executed.get("dispatch_result")
+        assert isinstance(dispatch_result, Mapping), executed
+        assert dispatch_result["waapi_error_uri"] == "ak.wwise.unavailable", executed
+        assert executed["state"] == TransactionState.INDETERMINATE.value, executed
+        assert executed["automatic_retry"] is False, executed
+        runtime.category_results.append(
+            {
+                "category": "cli-soundengine",
+                "status": "blocked",
+                "verifier_strength": "business_draft_then_explicit_host_boundary",
+                "reason": "WwiseConsole returned ak.wwise.unavailable",
+            }
+        )
+        return
+    assert execute_code == 0, json.dumps(executed, ensure_ascii=False, sort_keys=True)
+    verified = runtime.gateway(["verify", transaction_id], live=True)
     assert verified["state"] == TransactionState.RESULT_SCHEMA_CHECKED.value
     assert verified["verified"] is False
     runtime.category_results.append(
