@@ -316,7 +316,11 @@ from wwise_waapi.runtime_transport_handles import (  # noqa: E402  # pyright: ig
     validate_runtime_transport_handle,
 )
 from wwise_waapi.soundengine_business_contracts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    EXECUTE_ACTION_ON_EVENT_URI,
+    POST_EVENT_URI,
     REGISTER_GAME_OBJECT_URI,
+    STOP_ALL_URI,
+    STOP_PLAYING_ID_URI,
     UNREGISTER_GAME_OBJECT_URI,
     soundengine_control_business_contract_data,
     soundengine_control_business_operations,
@@ -326,6 +330,10 @@ from wwise_waapi.runtime_game_object_handles import (  # noqa: E402  # pyright: 
     RuntimeGameObjectContext,
     RuntimeGameObjectHandleError,
     RuntimeGameObjectHandleStore,
+)
+from wwise_waapi.runtime_playing_handles import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    RuntimePlayingHandleError,
+    RuntimePlayingHandleStore,
 )
 from wwise_waapi.business_declarations import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     MAX_BUSINESS_NAME_BYTES,
@@ -2552,6 +2560,10 @@ def build_parser() -> argparse.ArgumentParser:
     draft_declare_soundengine_plan.add_argument("--game-object-name")
     draft_declare_soundengine_plan.add_argument("--game-object-handle")
     draft_declare_soundengine_plan.add_argument("--event-handle")
+    draft_declare_soundengine_plan.add_argument("--action")
+    draft_declare_soundengine_plan.add_argument("--playing-handle")
+    draft_declare_soundengine_plan.add_argument("--fade-duration-ms", type=int)
+    draft_declare_soundengine_plan.add_argument("--fade-curve")
     draft_declare_source_control_plan = subparsers.add_parser(
         "draft-declare-source-control-plan",
         help=(
@@ -11211,6 +11223,10 @@ def dispatch_business_soundengine_plan(
         "game_object_name": args.game_object_name,
         "game_object_handle": args.game_object_handle,
         "event_handle": args.event_handle,
+        "action": args.action,
+        "playing_handle": args.playing_handle,
+        "fade_duration_ms": args.fade_duration_ms,
+        "fade_curve": args.fade_curve,
     }
     plan = {
         name: value
@@ -11239,6 +11255,17 @@ def dispatch_business_soundengine_plan(
                 live_info=live_info,
             ),
         )
+    playing_record = None
+    if "playing_handle" in plan:
+        playing_record = RuntimePlayingHandleStore(binding.state_dir).resolve(
+            plan["playing_handle"],
+            context=_runtime_game_object_context_from_live(
+                endpoint=common["endpoint"],
+                project=binding.project,
+                detected_version=detected_version,
+                live_info=live_info,
+            ),
+        )
 
     def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
         candidate = current.with_settings(
@@ -11247,6 +11274,11 @@ def dispatch_business_soundengine_plan(
                 **(
                     {"runtime_game_object_binding": game_object_record.as_dict()}
                     if game_object_record is not None
+                    else {}
+                ),
+                **(
+                    {"runtime_playing_binding": playing_record.as_dict()}
+                    if playing_record is not None
                     else {}
                 ),
             }
@@ -17118,10 +17150,20 @@ def dispatch_transaction_command(
         game_object_binding_validation = None
         game_object_id = (
             call_args.get("gameObject")
-            if call_uri == UNREGISTER_GAME_OBJECT_URI
+            if call_uri
+            in {
+                UNREGISTER_GAME_OBJECT_URI,
+                POST_EVENT_URI,
+                EXECUTE_ACTION_ON_EVENT_URI,
+                STOP_ALL_URI,
+            }
             else None
         )
-        if isinstance(game_object_id, int) and not isinstance(game_object_id, bool):
+        if (
+            isinstance(game_object_id, int)
+            and not isinstance(game_object_id, bool)
+            and 0 <= game_object_id <= 0xFFFFFFFFFFFFFFDF
+        ):
             try:
                 if project is None:
                     raise RuntimeGameObjectHandleError(
@@ -17145,6 +17187,58 @@ def dispatch_transaction_command(
                     "native_observability": "gateway_registration_lifecycle_only",
                 }
             except RuntimeGameObjectHandleError as exc:
+                repreview = store.require_repreview(
+                    transaction_id,
+                    expected_authorization=record.state,
+                    details={"error_code": exc.error_code},
+                )
+                return {
+                    "ok": False,
+                    "status": "repreview_required",
+                    **common,
+                    "transaction_id": transaction_id,
+                    "state": repreview.state.value,
+                    "artifact_hash": preview.artifact_hash,
+                    "error_code": exc.error_code,
+                    "message": str(exc),
+                    "role_validation": role_validation,
+                    "guard_validation": guard_validation,
+                    "project_call": project_call,
+                    "executed": False,
+                    "verified": False,
+                    "cleanup": transaction_cleanup_payload(prepared, phase="preview"),
+                    "automatic_retry": False,
+                }
+        playing_binding_validation = None
+        playing_id = (
+            call_args.get("playingId")
+            if call_uri == STOP_PLAYING_ID_URI
+            else None
+        )
+        if isinstance(playing_id, int) and not isinstance(playing_id, bool):
+            try:
+                if project is None:
+                    raise RuntimePlayingHandleError(
+                        "PLAYING_HANDLE_CONTEXT_DRIFT",
+                        "SoundEngine execution lacks its live project identity.",
+                    )
+                playing_record = RuntimePlayingHandleStore(
+                    store.state_dir
+                ).resolve_native_id(
+                    playing_id,
+                    context=_runtime_game_object_context_from_live(
+                        endpoint=common["endpoint"],
+                        project=project,
+                        detected_version=detected_version,
+                        live_info=live_info,
+                    ),
+                )
+                playing_binding_validation = {
+                    "playing_handle": playing_record.handle,
+                    "active": True,
+                    "native_observability": "gateway_post_event_lifecycle_only",
+                }
+            except RuntimePlayingHandleError as exc:
                 repreview = store.require_repreview(
                     transaction_id,
                     expected_authorization=record.state,
@@ -17312,6 +17406,7 @@ def dispatch_transaction_command(
                     "project_call": project_call,
                     "transport_binding_validation": transport_binding_validation,
                     "game_object_binding_validation": game_object_binding_validation,
+                    "playing_binding_validation": playing_binding_validation,
                     "automatic_retry": False,
                     **wire_path_output,
                 },
@@ -17334,6 +17429,7 @@ def dispatch_transaction_command(
                     "project_call": project_call,
                     "transport_binding_validation": transport_binding_validation,
                     "game_object_binding_validation": game_object_binding_validation,
+                    "playing_binding_validation": playing_binding_validation,
                     **wire_path_output,
                 }
             )
@@ -17353,6 +17449,7 @@ def dispatch_transaction_command(
             "project_call": project_call,
             "transport_binding_validation": transport_binding_validation,
             "game_object_binding_validation": game_object_binding_validation,
+            "playing_binding_validation": playing_binding_validation,
             "executed": True,
             "verified": False,
             "cleanup": transaction_cleanup_payload(
@@ -17679,6 +17776,68 @@ def dispatch_transaction_command(
                         }
                     )
                     return payload
+            if transaction_api == POST_EVENT_URI:
+                if project is None:  # pragma: no cover - invariant project guard
+                    raise GatewayResultShapeError(
+                        "SoundEngine verification lacks its live project identity.",
+                        error_code="INVALID_STATUS_RESULT",
+                    )
+                execution_payload = execution_result.get("result")
+                playing_id = (
+                    execution_payload.get("return")
+                    if isinstance(execution_payload, Mapping)
+                    else None
+                )
+                native_args = transaction_arguments.get("args")
+                event_id = (
+                    native_args.get("event")
+                    if isinstance(native_args, Mapping)
+                    else None
+                )
+                game_object_id = (
+                    native_args.get("gameObject")
+                    if isinstance(native_args, Mapping)
+                    else None
+                )
+                try:
+                    issued = RuntimePlayingHandleStore(store.state_dir).issue(
+                        playing_id=playing_id,
+                        event_id=event_id,
+                        game_object_id=game_object_id,
+                        context=_runtime_game_object_context_from_live(
+                            endpoint=common["endpoint"],
+                            project=project,
+                            detected_version=detected_version,
+                            live_info=live_info,
+                        ),
+                        source_transaction_id=transaction_id,
+                        source_artifact_hash=preview.artifact_hash,
+                    )
+                    agent_result["business_result"] = {
+                        "contract": "waapi-skill.soundengine-control-result/v1",
+                        "playing_handle": issued.handle,
+                    }
+                except (RuntimePlayingHandleError, OSError, ValueError) as exc:
+                    payload.update(
+                        {
+                            "ok": False,
+                            "status": (
+                                "soundengine_playback_not_started"
+                                if getattr(exc, "error_code", None)
+                                == "PLAYING_HANDLE_NOT_STARTED"
+                                else "playing_handle_persistence_failed"
+                            ),
+                            "error_code": getattr(
+                                exc,
+                                "error_code",
+                                "PLAYING_HANDLE_PERSISTENCE_FAILED",
+                            ),
+                            "message": str(exc),
+                            "agent_result": None,
+                            "automatic_retry": False,
+                        }
+                    )
+                    return payload
             if transaction_api == REGISTER_GAME_OBJECT_URI:
                 if project is None:  # pragma: no cover - invariant project guard
                     raise GatewayResultShapeError(
@@ -17774,8 +17933,61 @@ def dispatch_transaction_command(
                         }
                     )
                     return payload
+            if transaction_api == STOP_PLAYING_ID_URI:
+                if project is None:  # pragma: no cover - invariant project guard
+                    raise GatewayResultShapeError(
+                        "SoundEngine verification lacks its live project identity.",
+                        error_code="INVALID_STATUS_RESULT",
+                    )
+                native_args = transaction_arguments.get("args")
+                playing_id = (
+                    native_args.get("playingId")
+                    if isinstance(native_args, Mapping)
+                    else None
+                )
+                try:
+                    retired = RuntimePlayingHandleStore(
+                        store.state_dir
+                    ).retire_native_id(
+                        playing_id,
+                        context=_runtime_game_object_context_from_live(
+                            endpoint=common["endpoint"],
+                            project=project,
+                            detected_version=detected_version,
+                            live_info=live_info,
+                        ),
+                    )
+                    agent_result["business_result"] = {
+                        "contract": "waapi-skill.soundengine-control-result/v1",
+                        "retired_playing_handle_count": len(retired),
+                    }
+                except (RuntimePlayingHandleError, OSError, ValueError) as exc:
+                    payload.update(
+                        {
+                            "ok": False,
+                            "status": "playing_handle_retirement_failed",
+                            "error_code": getattr(
+                                exc,
+                                "error_code",
+                                "PLAYING_HANDLE_RETIREMENT_FAILED",
+                            ),
+                            "message": str(exc),
+                            "agent_result": None,
+                            "automatic_retry": False,
+                        }
+                    )
+                    return payload
             if agent_result["operation"] in {"waapi.call", "waapi.undoGroup"}:
                 projected_result = execution_result.get("result")
+                if (
+                    transaction_api == POST_EVENT_URI
+                    and isinstance(agent_result.get("business_result"), Mapping)
+                ):
+                    projected_result = {
+                        "playing_handle": agent_result["business_result"][
+                            "playing_handle"
+                        ]
+                    }
                 verification_plan = prepared.get("verification_plan")
                 if (
                     agent_result["operation"] == "waapi.call"
@@ -20859,6 +21071,21 @@ def _business_next_action_binding(
                             "[--game-object-handle <gateway-runtime-game-object-handle>]"
                         ]
                     ),
+                ],
+                "ak.soundengine.stopPlayingID": [
+                    "--playing-handle <gateway-runtime-playing-handle>",
+                    "[--fade-duration-ms <nonnegative-whole-milliseconds>]",
+                    "[--fade-curve <Log3|Sine|Log1|InvSCurve|Linear|SCurve|Exp1|SineRecip|Exp3>]",
+                ],
+                "ak.soundengine.executeActionOnEvent": [
+                    "--event-handle <bound-event-handle>",
+                    "--action <Stop|Pause|Resume|Break|ReleaseEnvelope>",
+                    "[--game-object-handle <gateway-runtime-game-object-handle>]",
+                    "[--fade-duration-ms <nonnegative-whole-milliseconds>]",
+                    "[--fade-curve <Log3|Sine|Log1|InvSCurve|Linear|SCurve|Exp1|SineRecip|Exp3>]",
+                ],
+                "ak.soundengine.stopAll": [
+                    "[--game-object-handle <gateway-runtime-game-object-handle>]",
                 ],
             }[record.operation],
             "submit_once": True,

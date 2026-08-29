@@ -97,12 +97,17 @@ class _SoundEngineDraftClient:
         if uri in {
             "ak.soundengine.registerGameObj",
             "ak.soundengine.unregisterGameObj",
+            "ak.soundengine.executeActionOnEvent",
+            "ak.soundengine.stopAll",
         }:
             self.soundengine_calls.append(uri)
             return {}
         if uri == "ak.soundengine.postEvent":
             self.soundengine_calls.append(uri)
             return {"return": 1234}
+        if uri == "ak.soundengine.stopPlayingID":
+            self.soundengine_calls.append(uri)
+            return {}
         raise AssertionError(f"unexpected WAAPI call {uri}: {args!r} {options!r}")
 
     def disconnect(self) -> None:
@@ -651,6 +656,301 @@ def test_post_event_binds_event_and_uses_opaque_game_object_handle(
         "type": "Event",
         "path": r"\Events\Default Work Unit\Play_Weather",
     }
+
+
+def test_post_event_issues_opaque_playing_handle_that_drives_stop(
+    tmp_path: Path,
+) -> None:
+    env = _env(tmp_path)
+    state_dir = tmp_path / "state"
+    client = _SoundEngineDraftClient(tmp_path)
+    register_preview, _ = _preview_soundengine_plan(
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        env=env,
+        client=client,
+        operation="ak.soundengine.registerGameObj",
+        declaration=["--game-object-name", "Weather Listener"],
+    )
+    registered = _execute_and_verify_soundengine(
+        state_dir=state_dir,
+        env=env,
+        client=client,
+        previewed=register_preview,
+    )
+    game_object_handle = registered["agent_result"]["business_result"][
+        "game_object_handle"
+    ]
+    post_preview, _ = _preview_soundengine_plan(
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        env=env,
+        client=client,
+        operation="ak.soundengine.postEvent",
+        declaration=[
+            "--event-handle",
+            "<bound:event>",
+            "--game-object-handle",
+            game_object_handle,
+        ],
+        role_bindings=(("event", client.event_id),),
+    )
+    posted = _execute_and_verify_soundengine(
+        state_dir=state_dir,
+        env=env,
+        client=client,
+        previewed=post_preview,
+    )
+    business_result = posted["agent_result"]["business_result"]
+    assert business_result["contract"] == (
+        "waapi-skill.soundengine-control-result/v1"
+    )
+    playing_handle = business_result["playing_handle"]
+    assert playing_handle.startswith("plh1-")
+    assert posted["agent_result"]["result"] == {
+        "playing_handle": playing_handle,
+    }
+
+    operation = "ak.soundengine.stopPlayingID"
+    code, schema = gateway.execute_gateway(
+        ["--version", "2022.1", "request-schema", operation],
+        env=env,
+        client_factory=lambda url: pytest.fail(f"offline schema connected to {url}"),
+    )
+    assert code == 0, schema
+    declaration = schema["business_adapter"]["declaration"]
+    assert declaration["required_fields"] == ["playing_handle"]
+    assert declaration["optional_fields"] == [
+        "fade_duration_ms",
+        "fade_curve",
+    ]
+    stop_preview, artifact = _preview_soundengine_plan(
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        env=env,
+        client=client,
+        operation=operation,
+        declaration=[
+            "--playing-handle",
+            playing_handle,
+            "--fade-duration-ms",
+            "180",
+            "--fade-curve",
+            "Linear",
+        ],
+    )
+    assert artifact["request"]["arguments"] == {
+        "api": operation,
+        "args": {
+            "playingId": 1234,
+            "transitionDuration": 180,
+            "fadeCurve": 4,
+        },
+        "options": {},
+    }
+    stopped = _execute_and_verify_soundengine(
+        state_dir=state_dir,
+        env=env,
+        client=client,
+        previewed=stop_preview,
+    )
+    assert stopped["agent_result"]["business_result"] == {
+        "contract": "waapi-skill.soundengine-control-result/v1",
+        "retired_playing_handle_count": 1,
+    }
+    assert stopped["agent_result"]["result"] == {}
+
+
+def test_stop_playing_revalidates_handle_at_execute_and_never_reuses_it(
+    tmp_path: Path,
+) -> None:
+    env = _env(tmp_path)
+    state_dir = tmp_path / "state"
+    client = _SoundEngineDraftClient(tmp_path)
+    register_preview, _ = _preview_soundengine_plan(
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        env=env,
+        client=client,
+        operation="ak.soundengine.registerGameObj",
+        declaration=["--game-object-name", "Weather Listener"],
+    )
+    registered = _execute_and_verify_soundengine(
+        state_dir=state_dir,
+        env=env,
+        client=client,
+        previewed=register_preview,
+    )
+    post_preview, _ = _preview_soundengine_plan(
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        env=env,
+        client=client,
+        operation="ak.soundengine.postEvent",
+        declaration=[
+            "--event-handle",
+            "<bound:event>",
+            "--game-object-handle",
+            registered["agent_result"]["business_result"]["game_object_handle"],
+        ],
+        role_bindings=(("event", client.event_id),),
+    )
+    posted = _execute_and_verify_soundengine(
+        state_dir=state_dir,
+        env=env,
+        client=client,
+        previewed=post_preview,
+    )
+    playing_handle = posted["agent_result"]["business_result"]["playing_handle"]
+    first_preview, _ = _preview_soundengine_plan(
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        env=env,
+        client=client,
+        operation="ak.soundengine.stopPlayingID",
+        declaration=["--playing-handle", playing_handle],
+    )
+    stale_preview, stale_artifact = _preview_soundengine_plan(
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        env=env,
+        client=client,
+        operation="ak.soundengine.stopPlayingID",
+        declaration=["--playing-handle", playing_handle],
+    )
+    assert stale_artifact["request"]["arguments"]["args"] == {
+        "playingId": 1234,
+        "transitionDuration": 0,
+        "fadeCurve": 4,
+    }
+    _execute_and_verify_soundengine(
+        state_dir=state_dir,
+        env=env,
+        client=client,
+        previewed=first_preview,
+    )
+
+    transaction_id = str(stale_preview["transaction_id"])
+    snapshot = TransactionStore(state_dir).load_snapshot(transaction_id)
+    code, confirmed = gateway.execute_gateway(
+        [
+            "--version",
+            "2022.1",
+            "--state-dir",
+            str(state_dir),
+            "confirm",
+            transaction_id,
+            "--confirmation-token",
+            snapshot.confirmation_token,
+        ],
+        env=env,
+        client_factory=lambda url: pytest.fail(f"offline confirm connected to {url}"),
+    )
+    assert code == 0, confirmed
+    calls_before = list(client.soundengine_calls)
+    code, stopped = gateway.execute_gateway(
+        [
+            "--version",
+            "2022.1",
+            "--state-dir",
+            str(state_dir),
+            "execute",
+            transaction_id,
+        ],
+        env=env,
+        client_factory=lambda _url: client,
+    )
+    assert code == 2, stopped
+    assert stopped["status"] == "repreview_required"
+    assert stopped["error_code"] == "PLAYING_HANDLE_NOT_AVAILABLE"
+    assert stopped["executed"] is False
+    assert client.soundengine_calls == calls_before
+
+
+def test_event_action_and_stop_all_hide_native_enums_and_wildcards(
+    tmp_path: Path,
+) -> None:
+    env = _env(tmp_path)
+    state_dir = tmp_path / "state"
+    client = _SoundEngineDraftClient(tmp_path)
+    register_preview, register_artifact = _preview_soundengine_plan(
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        env=env,
+        client=client,
+        operation="ak.soundengine.registerGameObj",
+        declaration=["--game-object-name", "Weather Listener"],
+    )
+    registered = _execute_and_verify_soundengine(
+        state_dir=state_dir,
+        env=env,
+        client=client,
+        previewed=register_preview,
+    )
+    game_object_handle = registered["agent_result"]["business_result"][
+        "game_object_handle"
+    ]
+    game_object_id = register_artifact["request"]["arguments"]["args"][
+        "gameObject"
+    ]
+
+    action_preview, action_artifact = _preview_soundengine_plan(
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        env=env,
+        client=client,
+        operation="ak.soundengine.executeActionOnEvent",
+        declaration=[
+            "--event-handle",
+            "<bound:event>",
+            "--action",
+            "Pause",
+            "--game-object-handle",
+            game_object_handle,
+            "--fade-duration-ms",
+            "250",
+            "--fade-curve",
+            "SCurve",
+        ],
+        role_bindings=(("event", client.event_id),),
+    )
+    assert action_artifact["request"]["arguments"] == {
+        "api": "ak.soundengine.executeActionOnEvent",
+        "args": {
+            "event": client.event_id,
+            "actionType": 1,
+            "gameObject": game_object_id,
+            "transitionDuration": 250,
+            "fadeCurve": 5,
+        },
+        "options": {},
+    }
+    _execute_and_verify_soundengine(
+        state_dir=state_dir,
+        env=env,
+        client=client,
+        previewed=action_preview,
+    )
+
+    stop_all_preview, stop_all_artifact = _preview_soundengine_plan(
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        env=env,
+        client=client,
+        operation="ak.soundengine.stopAll",
+        declaration=[],
+    )
+    assert stop_all_artifact["request"]["arguments"] == {
+        "api": "ak.soundengine.stopAll",
+        "args": {"gameObject": 0xFFFFFFFFFFFFFFFF},
+        "options": {},
+    }
+    _execute_and_verify_soundengine(
+        state_dir=state_dir,
+        env=env,
+        client=client,
+        previewed=stop_all_preview,
+    )
 
 
 def test_post_event_stops_before_dispatch_when_bound_event_drifts(

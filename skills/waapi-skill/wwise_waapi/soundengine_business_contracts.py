@@ -10,6 +10,9 @@ SOUNDENGINE_CONTROL_BUSINESS_CONTRACT = (
 )
 POST_MONITOR_MESSAGE_URI = "ak.soundengine.postMsgMonitor"
 POST_EVENT_URI = "ak.soundengine.postEvent"
+EXECUTE_ACTION_ON_EVENT_URI = "ak.soundengine.executeActionOnEvent"
+STOP_ALL_URI = "ak.soundengine.stopAll"
+STOP_PLAYING_ID_URI = "ak.soundengine.stopPlayingID"
 REGISTER_GAME_OBJECT_URI = "ak.soundengine.registerGameObj"
 UNREGISTER_GAME_OBJECT_URI = "ak.soundengine.unregisterGameObj"
 _ALL_VERSIONS = ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
@@ -55,6 +58,74 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
             },
             "game_object_handle": {
                 "flag": "--game-object-handle",
+                "repeatable": False,
+            },
+        },
+    },
+    EXECUTE_ACTION_ON_EVENT_URI: {
+        "versions": _ALL_VERSIONS,
+        "roles": ("event",),
+        "required_fields": ("event_handle", "action"),
+        "optional_fields": (
+            "game_object_handle",
+            "fade_duration_ms",
+            "fade_curve",
+        ),
+        "field_types": {
+            "event_handle": "bound_event_handle",
+            "action": "wwise_event_action_name",
+            "game_object_handle": "gateway_runtime_game_object_handle",
+            "fade_duration_ms": "nonnegative_transition_duration_ms",
+            "fade_curve": "wwise_fade_curve_name",
+        },
+        "input_forms": {
+            "event_handle": {"flag": "--event-handle", "repeatable": False},
+            "action": {"flag": "--action", "repeatable": False},
+            "game_object_handle": {
+                "flag": "--game-object-handle",
+                "repeatable": False,
+            },
+            "fade_duration_ms": {
+                "flag": "--fade-duration-ms",
+                "repeatable": False,
+            },
+            "fade_curve": {"flag": "--fade-curve", "repeatable": False},
+        },
+    },
+    STOP_ALL_URI: {
+        "versions": _ALL_VERSIONS,
+        "required_fields": (),
+        "optional_fields": ("game_object_handle",),
+        "field_types": {
+            "game_object_handle": "gateway_runtime_game_object_handle",
+        },
+        "input_forms": {
+            "game_object_handle": {
+                "flag": "--game-object-handle",
+                "repeatable": False,
+            },
+        },
+    },
+    STOP_PLAYING_ID_URI: {
+        "versions": _ALL_VERSIONS,
+        "required_fields": ("playing_handle",),
+        "optional_fields": ("fade_duration_ms", "fade_curve"),
+        "field_types": {
+            "playing_handle": "gateway_runtime_playing_handle",
+            "fade_duration_ms": "nonnegative_transition_duration_ms",
+            "fade_curve": "wwise_fade_curve_name",
+        },
+        "input_forms": {
+            "playing_handle": {
+                "flag": "--playing-handle",
+                "repeatable": False,
+            },
+            "fade_duration_ms": {
+                "flag": "--fade-duration-ms",
+                "repeatable": False,
+            },
+            "fade_curve": {
+                "flag": "--fade-curve",
                 "repeatable": False,
             },
         },
@@ -174,6 +245,8 @@ def soundengine_control_business_contract_data(
                 if operation == REGISTER_GAME_OBJECT_URI
                 else ["runtime_game_object_handle", "handle_retirement"]
                 if operation == UNREGISTER_GAME_OBJECT_URI
+                else ["runtime_playing_handle", "handle_retirement"]
+                if operation == STOP_PLAYING_ID_URI
                 else []
             ),
             "native_request",
@@ -198,6 +271,9 @@ def soundengine_control_business_contract_data(
 __all__ = [
     "POST_MONITOR_MESSAGE_URI",
     "POST_EVENT_URI",
+    "EXECUTE_ACTION_ON_EVENT_URI",
+    "STOP_ALL_URI",
+    "STOP_PLAYING_ID_URI",
     "REGISTER_GAME_OBJECT_URI",
     "UNREGISTER_GAME_OBJECT_URI",
     "SOUNDENGINE_CONTROL_BUSINESS_CONTRACT",
