@@ -445,6 +445,40 @@ def test_game_parameter_exact_name_binding_resolves_inside_the_draft(
     assert bound["draft"]["next_action_binding"]["required_next_phase"] == (
         "declare_complete_project_setting_plan"
     )
+    assert bound["draft"]["next_action_binding"]["declaration"]["append"] == [
+        "--game-parameter-handle <bound-game-parameter-handle>",
+        "--minimum <finite-number>",
+        "--maximum <finite-number>",
+        "--curve-update-outcome stretch|preserve-x",
+    ]
+
+    code, declared = gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(state_dir),
+            "draft-declare-project-setting-plan",
+            started["draft"]["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            str(bound["draft"]["revision"]),
+            "--game-parameter-handle",
+            bound["bound_object"]["handle"],
+            "--minimum",
+            "-10",
+            "--maximum",
+            "100",
+            "--curve-update-outcome",
+            "stretch",
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+
+    assert code == 0, declared
+    assert declared["draft"]["next_action_binding"]["required_next_phase"] == (
+        "check_complete_project_setting_plan"
+    )
 
 
 def test_project_setting_gateway_binds_exact_roles_then_seals_readback_preview(
@@ -495,14 +529,11 @@ def test_project_setting_gateway_binds_exact_roles_then_seals_readback_preview(
             authority,
             "--expected-revision",
             str(source["draft"]["revision"]),
-            "--role",
-            "sound_handle",
+            "--sound-handle",
             sound_handle,
-            "--role",
-            "source_handle",
+            "--source-handle",
             source_handle,
-            "--value",
-            "platform_name",
+            "--platform-name",
             "Windows",
         ],
         env=_env(tmp_path),

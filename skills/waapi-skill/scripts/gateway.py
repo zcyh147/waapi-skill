@@ -2389,11 +2389,33 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_business_draft_binding_arguments(draft_declare_project_setting_plan)
     draft_declare_project_setting_plan.add_argument(
-        "--role",
-        action="append",
-        nargs=2,
-        default=[],
-        metavar=("BUSINESS_FIELD", "BOUND_OBJECT_HANDLE"),
+        "--sound-handle",
+        help="Opaque handle returned for the exact Sound role",
+    )
+    draft_declare_project_setting_plan.add_argument(
+        "--source-handle",
+        help="Opaque handle returned for the exact AudioFileSource role",
+    )
+    draft_declare_project_setting_plan.add_argument(
+        "--game-parameter-handle",
+        help="Opaque handle returned for the exact Game Parameter role",
+    )
+    draft_declare_project_setting_plan.add_argument(
+        "--minimum",
+        help="Requested finite Game Parameter minimum",
+    )
+    draft_declare_project_setting_plan.add_argument(
+        "--maximum",
+        help="Requested finite Game Parameter maximum",
+    )
+    draft_declare_project_setting_plan.add_argument(
+        "--curve-update-outcome",
+        choices=("stretch", "preserve-x"),
+        help="How existing Game Parameter curves respond to the new range",
+    )
+    draft_declare_project_setting_plan.add_argument(
+        "--platform-name",
+        help="Optional exact installed platform for the active source",
     )
     draft_declare_source_control_plan = subparsers.add_parser(
         "draft-declare-source-control-plan",
@@ -2406,13 +2428,6 @@ def build_parser() -> argparse.ArgumentParser:
     add_source_control_arguments(
         draft_declare_source_control_plan,
         include_max_results=True,
-    )
-    draft_declare_project_setting_plan.add_argument(
-        "--value",
-        action="append",
-        nargs=2,
-        default=[],
-        metavar=("BUSINESS_FIELD", "VALUE"),
     )
 
     draft_declare_field_change = subparsers.add_parser(
@@ -10318,23 +10333,26 @@ def dispatch_business_project_setting_plan(
     )
     field_types = contract["declaration"]["field_types"]
     plan: dict[str, Any] = {}
-    for name, handle in args.role:
-        if field_types.get(name) not in {
+    supplied = {
+        "sound_handle": args.sound_handle,
+        "source_handle": args.source_handle,
+        "game_parameter_handle": args.game_parameter_handle,
+        "minimum": args.minimum,
+        "maximum": args.maximum,
+        "curve_update_outcome": args.curve_update_outcome,
+        "platform_name": args.platform_name,
+    }
+    for name, raw in supplied.items():
+        if raw is None:
+            continue
+        value_type = field_types.get(name)
+        if value_type in {
             "bound_sound_handle",
             "bound_audio_file_source_handle",
             "bound_game_parameter_handle",
         }:
-            raise GatewayInputError(
-                f"Project-setting role {name!r} is not disclosed for this operation"
-            )
-        if name in plan:
-            raise GatewayInputError(
-                f"Project-setting field {name!r} was supplied twice"
-            )
-        plan[name] = handle
-    for name, raw in args.value:
-        value_type = field_types.get(name)
-        if value_type == "finite_number":
+            value: Any = raw
+        elif value_type == "finite_number":
             try:
                 value = float(raw)
             except ValueError as exc:
@@ -10349,11 +10367,7 @@ def dispatch_business_project_setting_plan(
             value = raw
         else:
             raise GatewayInputError(
-                f"Project-setting value {name!r} is not disclosed for this operation"
-            )
-        if name in plan:
-            raise GatewayInputError(
-                f"Project-setting field {name!r} was supplied twice"
+                f"Project-setting field {name!r} is not disclosed for this operation"
             )
         plan[name] = value
 
@@ -19507,6 +19521,20 @@ def _business_next_action_binding(
                 ),
             ),
             "append_fields": business_contract["declaration"],
+            "append": (
+                [
+                    "--game-parameter-handle <bound-game-parameter-handle>",
+                    "--minimum <finite-number>",
+                    "--maximum <finite-number>",
+                    "--curve-update-outcome stretch|preserve-x",
+                ]
+                if record.operation == "ak.wwise.core.gameParameter.setRange"
+                else [
+                    "--sound-handle <bound-sound-handle>",
+                    "--source-handle <bound-audio-file-source-handle>",
+                    "[--platform-name <exact-installed-platform-name>]",
+                ]
+            ),
             "submit_once": True,
             "native_request_input": "forbidden",
         }

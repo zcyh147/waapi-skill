@@ -288,6 +288,13 @@ prevention checks that are expensive to rediscover.
   with every production read shape exercised by offline Fresh profiles, and
   prove each added shape directly against its profile fixture before starting
   another Fresh root.
+- Second follow-up: roots `imac-pset-3531da5-r3` and
+  `iwin-pset-3531da5-r3` completed the typed-name binding, but the Broker still
+  expected the internal generic `--role/--value` declaration while both Agents
+  naturally emitted dedicated flags from the disclosed business field names.
+  Do not teach Agents internal field envelopes. Project-setting declarations
+  expose dedicated business flags and a complete `append` shape, and the sealed
+  protocol must use that same public continuation.
 
 ### Natural raw-API prompts need one bounded operation discovery
 
