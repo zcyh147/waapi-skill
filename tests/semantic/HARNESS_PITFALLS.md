@@ -176,14 +176,23 @@ prevention checks that are expensive to rediscover.
   reported `getInfo.isCommandLine=false` plus
   `ak.wwise.no_project_loaded`. Treat that as executable-start evidence, not
   project-open evidence.
-- Prevention: launch one Wwise Authoring instance without a document, then open
-  the disposable `.wproj` through Project Launcher **Open Other/Browse** or an
-  existing reviewed Gateway project-transition route. Continue only after
+- Confirmed route: invoke the packaged Wine runner with
+  `start.exe /wait <Y:\\...\\SampleProject.wproj>`. On the same #88 sandbox this
+  launched one macOS-registered Authoring instance, reached the expected
+  `Project Load Log`, and, after the explicitly approved **Accept**, returned
+  `getInfo.isCommandLine=false` plus the exact sandbox Windows path from
+  `getProjectInfo.path`. This is the proven direct project-open route; do not
+  substitute `open -a`, `open --args`, or a bare Wwise.exe argv merely because
+  a window appeared.
+- Prevention: derive the Windows path with the same bottle's `winepath -w`,
+  open it through that bottle's `start.exe`, and handle only the exact expected
+  sandbox warning. Project Launcher **Open Other/Browse** remains the manual
+  fallback. Continue only after
   `getInfo.isCommandLine=false` and `getProjectInfo.path` resolves to that exact
   sandbox copy. A listening 8080 socket proves Authoring readiness only; it
   does not prove that a project is loaded. Close the association error and
   restart the launch flow instead of retrying `open -a ... <wproj>` or claiming
-  success from the Windows-shaped path alone.
+  success from a Windows-shaped path or visible window alone.
 - GUI-control pitfall: Computer Use `get_app_state` transparently launches a
   missing macOS app. A Wwise.exe started directly through Wine can be healthy
   without macOS registering the enclosing `.app` as running, so even a prior
@@ -194,6 +203,23 @@ prevention checks that are expensive to rediscover.
   contains the sandbox path. Use exact process/WAAPI evidence for liveness and
   an already registered interactive launch path when modal inspection is
   required.
+
+### Explicit transaction state was dropped from copy-exact continuations
+
+- Evidence: the #88 macOS Authoring project-open Preview used an explicit
+  external `--state-dir`, but its returned `next_command.shell_command` omitted
+  that global argument. Executing the selected field verbatim failed with
+  `TransactionNotFound`; no project-open dispatch reached Wwise.
+- Cause: `transaction_next_command` encoded only the subcommand argv and
+  assumed that the next shell inherited the same ambient state configuration.
+  A CLI-selected state root is process-local and cannot be recovered from that
+  assumption.
+- Prevention: every copy-exact continuation generated from an invocation with
+  explicit `--state-dir` carries that same resolved absolute argument before
+  the subcommand in `full_argv`, POSIX `shell_command`, and both native-Windows
+  envelopes. Keep `gateway_argv` as the subcommand projection, execute only the
+  selected encoded field, and test paths containing spaces plus both Windows
+  decoders. Never reconstruct the missing global argument by hand.
 
 ### Compound Draft topology assumed one terminal per Draft
 

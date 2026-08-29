@@ -8500,6 +8500,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
         payload = operation_draft_payload(
             args.command,
             started.record,
+            state_dir=args.state_dir,
             task_authority=started.task_authority,
         )
         payload["task_authority"] = started.task_authority
@@ -8539,6 +8540,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
         return operation_draft_payload(
             args.command,
             record,
+            state_dir=args.state_dir,
             compact_actions=parsed_actions if args.compact else None,
             prior_record=inspected if args.compact else None,
             task_authority=args.task_authority,
@@ -8576,6 +8578,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
         return operation_draft_payload(
             args.command,
             record,
+            state_dir=args.state_dir,
         )
 
     if args.command == "config-show":
@@ -8947,6 +8950,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 start["next_command"] = transaction_next_command(
                     "draft-start",
                     gateway_argv,
+                    state_dir=args.state_dir,
                 )
             business_contract["start"] = start
             payload["business_adapter"] = business_contract
@@ -9020,6 +9024,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                         "--confirmation-token",
                         confirmation_token,
                     ],
+                    state_dir=args.state_dir,
                     requires_explicit_user_confirmation=True,
                 )
             elif record.state is TransactionState.POLICY_AUTHORIZED:
@@ -9036,6 +9041,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     payload["next_command"] = transaction_next_command(
                         "execute",
                         ["execute", transaction_id],
+                        state_dir=args.state_dir,
                     )
                 else:
                     payload["policy_execution_blocked"] = True
@@ -9051,9 +9057,19 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 transaction_id,
                 confirmation_token=args.confirmation_token,
             )
-            return transaction_state_payload("confirm", record, offline=True)
+            return transaction_state_payload(
+                "confirm",
+                record,
+                offline=True,
+                state_dir=args.state_dir,
+            )
         record = store.reject(transaction_id, details={"reason": args.reason})
-        return transaction_state_payload("reject", record, offline=True)
+        return transaction_state_payload(
+            "reject",
+            record,
+            offline=True,
+            state_dir=args.state_dir,
+        )
     raise GatewayInputError(f"unsupported offline command: {args.command}")
 
 
@@ -11097,6 +11113,7 @@ def dispatch_business_core_plan(
         args.command,
         record,
         offline=False,
+        state_dir=args.state_dir,
         task_authority=args.task_authority,
     )
     payload.update(
@@ -11219,6 +11236,7 @@ def dispatch_business_project_setting_plan(
         args.command,
         record,
         offline=False,
+        state_dir=args.state_dir,
         task_authority=args.task_authority,
     )
     payload.update(
@@ -11440,6 +11458,7 @@ def dispatch_business_runtime_control_plan(
         args.command,
         record,
         offline=False,
+        state_dir=args.state_dir,
         task_authority=args.task_authority,
     )
     payload.update(
@@ -11670,6 +11689,7 @@ def dispatch_business_soundengine_plan(
         args.command,
         record,
         offline=False,
+        state_dir=args.state_dir,
         task_authority=args.task_authority,
     )
     payload.update(
@@ -11787,6 +11807,7 @@ def dispatch_business_source_control_plan(
         args.command,
         record,
         offline=False,
+        state_dir=args.state_dir,
         task_authority=args.task_authority,
     )
     payload.update(
@@ -13910,6 +13931,7 @@ def dispatch_operation_draft_check(
                     "--expected-revision",
                     str(materialized.record.revision + 1),
                 ],
+                state_dir=args.state_dir,
             )
 
         compiled_business = adapter.compile_preview(
@@ -13966,6 +13988,7 @@ def dispatch_operation_draft_check(
         args.command,
         record,
         offline=False,
+        state_dir=args.state_dir,
     )
     payload.update(
         {
@@ -13994,6 +14017,7 @@ def dispatch_operation_draft_check(
     payload["next_command"] = transaction_next_command(
         "preview-from-draft",
         preview_arguments,
+        state_dir=args.state_dir,
     )
     return payload
 
@@ -14765,6 +14789,7 @@ def dispatch_offline_business_draft_update(
     return operation_draft_payload(
         args.command,
         record,
+        state_dir=args.state_dir,
         task_authority=args.task_authority,
     )
 
@@ -14843,6 +14868,7 @@ def dispatch_business_soundbank_plan(
         args.command,
         record,
         offline=False,
+        state_dir=args.state_dir,
         task_authority=args.task_authority,
     )
     payload.update(
@@ -14954,6 +14980,7 @@ def dispatch_business_exact_artifact_plan(
         args.command,
         record,
         offline=False,
+        state_dir=args.state_dir,
         task_authority=args.task_authority,
     )
     payload.update(
@@ -15082,6 +15109,7 @@ def dispatch_business_authoring_ui_update(
         args.command,
         record,
         offline=False,
+        state_dir=args.state_dir,
         task_authority=args.task_authority,
     )
     payload.update(
@@ -15171,6 +15199,7 @@ def dispatch_business_debug_intent(
         args.command,
         record,
         offline=False,
+        state_dir=args.state_dir,
         task_authority=args.task_authority,
     )
     payload.update(
@@ -15283,6 +15312,7 @@ def dispatch_business_compound_undo_plan(
         args.command,
         record,
         offline=False,
+        state_dir=args.state_dir,
         task_authority=args.task_authority,
     )
     payload.update(
@@ -15689,6 +15719,7 @@ def dispatch_business_object_binding(
         args.command,
         record,
         offline=False,
+        state_dir=args.state_dir,
         task_authority=args.task_authority,
     )
     payload.update(
@@ -15797,6 +15828,7 @@ def dispatch_business_field_binding(
         args.command,
         record,
         offline=False,
+        state_dir=args.state_dir,
         task_authority=args.task_authority,
     )
     payload.update(
@@ -16046,6 +16078,7 @@ def dispatch_business_field_discovery(
         args.command,
         record,
         offline=False,
+        state_dir=args.state_dir,
         task_authority=args.task_authority,
     )
     payload.update(
@@ -16227,6 +16260,7 @@ def dispatch_business_type_discovery(
         args.command,
         record,
         offline=False,
+        state_dir=args.state_dir,
         task_authority=args.task_authority,
     )
     payload.update(
@@ -16586,6 +16620,7 @@ def create_transaction_preview(
                 policy=current_policy,
                 common=common,
                 project_call=project_call,
+                continuation_state_dir=args.state_dir,
                 expected_prepared_digest=expected_prepared_digest,
                 expected_runtime_guard_fingerprint=(
                     expected_runtime_guard_fingerprint
@@ -16678,6 +16713,7 @@ def create_transaction_preview(
             policy=current_policy,
             common=common,
             project_call=project_call,
+            continuation_state_dir=args.state_dir,
             candidate_artifact=artifact,
             expected_prepared_digest=expected_prepared_digest,
             expected_runtime_guard_fingerprint=(
@@ -16702,6 +16738,7 @@ def create_transaction_preview(
         next_command = transaction_next_command(
             "execute",
             ["execute", transaction_id],
+            state_dir=args.state_dir,
         )
         status = TransactionState.POLICY_AUTHORIZED.value
     else:
@@ -16718,6 +16755,7 @@ def create_transaction_preview(
         next_command = transaction_next_command(
             "transaction-show",
             ["transaction-show", transaction_id, "--summary-only"],
+            state_dir=args.state_dir,
             requires_later_user_message=True,
         )
         status = TransactionState.AWAITING_CONFIRMATION.value
@@ -16781,6 +16819,7 @@ def _resume_reserved_transaction_preview(
     policy: str,
     common: Mapping[str, Any],
     project_call: Mapping[str, Any],
+    continuation_state_dir: str | Path | None = None,
     candidate_artifact: Mapping[str, Any] | None = None,
     expected_prepared_digest: str | None = None,
     expected_runtime_guard_fingerprint: str | None = None,
@@ -16884,6 +16923,7 @@ def _resume_reserved_transaction_preview(
         next_command = transaction_next_command(
             "execute",
             ["execute", transaction_id],
+            state_dir=continuation_state_dir,
         )
     else:
         authorization = {
@@ -16898,6 +16938,7 @@ def _resume_reserved_transaction_preview(
         next_command = transaction_next_command(
             "transaction-show",
             ["transaction-show", transaction_id, "--summary-only"],
+            state_dir=continuation_state_dir,
             requires_later_user_message=True,
         )
     cleanup = transaction_cleanup_payload(prepared, phase="preview")
@@ -17394,6 +17435,7 @@ def dispatch_transaction_command(
                 "next_command": transaction_next_command(
                     "verify",
                     ["verify", transaction_id],
+                    state_dir=args.state_dir,
                 ),
             }
         call_args = require_mapping(dispatch_payload.get("args", {}), "prepared dispatch args")
@@ -17930,6 +17972,7 @@ def dispatch_transaction_command(
             execute_payload["next_command"] = transaction_next_command(
                 "verify",
                 ["verify", transaction_id],
+                state_dir=args.state_dir,
             )
         return project_successful_transaction_execute_payload(execute_payload)
 
@@ -21082,6 +21125,7 @@ def transaction_next_command(
     command: str,
     gateway_argv: Sequence[str],
     *,
+    state_dir: str | Path | None = None,
     requires_explicit_user_confirmation: bool = False,
     requires_later_user_message: bool = False,
 ) -> dict[str, Any]:
@@ -21092,8 +21136,14 @@ def transaction_next_command(
         "python",
         str(GATEWAY_RUNNER_PATH),
         "gateway.py",
-        *normalized,
     ]
+    if state_dir is not None:
+        configured_state_dir = Path(state_dir)
+        if not configured_state_dir.is_absolute():
+            raise GatewayInputError("continuation state directory must be absolute")
+        normalized_state_dir = configured_state_dir.resolve(strict=False)
+        full_argv.extend(["--state-dir", str(normalized_state_dir)])
+    full_argv.extend(normalized)
     payload: dict[str, Any] = {
         "contract": TRANSACTION_NEXT_COMMAND_CONTRACT,
         "command": command,
@@ -21191,7 +21241,13 @@ def operation_draft_prefix_copy_binding(
     }
 
 
-def transaction_state_payload(command: str, record: Any, *, offline: bool) -> dict[str, Any]:
+def transaction_state_payload(
+    command: str,
+    record: Any,
+    *,
+    offline: bool,
+    state_dir: str | Path | None = None,
+) -> dict[str, Any]:
     payload = {
         "contract": GATEWAY_RESULT_CONTRACT,
         "ok": True,
@@ -21206,6 +21262,7 @@ def transaction_state_payload(command: str, record: Any, *, offline: bool) -> di
         payload["next_command"] = transaction_next_command(
             "execute",
             ["execute", record.transaction_id],
+            state_dir=state_dir,
         )
     return payload
 
@@ -23963,6 +24020,7 @@ def operation_draft_payload(
     record: OperationDraftRecord,
     *,
     offline: bool = True,
+    state_dir: str | Path | None = None,
     compact_actions: Sequence[Mapping[str, Any]] | None = None,
     prior_record: OperationDraftRecord | None = None,
     task_authority: str | None = None,
@@ -24275,6 +24333,7 @@ def operation_draft_payload(
             draft["next_command"] = transaction_next_command(
                 "draft-check",
                 check_argv[3:],
+                state_dir=state_dir,
             )
         elif (
             record.operation == "audio.import"

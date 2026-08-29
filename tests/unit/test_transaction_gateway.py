@@ -96,6 +96,7 @@ def expected_transaction_next_command(
     command: str,
     gateway_argv: Sequence[str],
     *,
+    state_dir: Path | None = None,
     requires_explicit_user_confirmation: bool = False,
     requires_later_user_message: bool = False,
 ) -> dict[str, Any]:
@@ -104,8 +105,10 @@ def expected_transaction_next_command(
         "python",
         str(SCRIPT_PATH.with_name("run.py")),
         "gateway.py",
-        *normalized,
     ]
+    if state_dir is not None:
+        full_argv.extend(["--state-dir", str(state_dir.resolve())])
+    full_argv.extend(normalized)
     expected: dict[str, Any] = {
         "contract": "waapi-skill.gateway-next-command/v2",
         "command": command,
@@ -151,6 +154,44 @@ def expected_transaction_next_command(
     else:
         expected["shell_command"] = shell_command
     return expected
+
+
+def test_transaction_next_command_preserves_explicit_state_dir_in_copy_envelope(
+    tmp_path: Path,
+) -> None:
+    state_dir = (tmp_path / "isolated state").resolve()
+
+    continuation = waapi_gateway.transaction_next_command(
+        "confirm",
+        ["confirm", "tx1-example", "--confirmation-token", "ct1-example"],
+        state_dir=state_dir,
+        requires_explicit_user_confirmation=True,
+    )
+
+    assert continuation["gateway_argv"] == [
+        "confirm",
+        "tx1-example",
+        "--confirmation-token",
+        "ct1-example",
+    ]
+    assert continuation["full_argv"][:5] == [
+        "python",
+        str(SCRIPT_PATH.with_name("run.py")),
+        "gateway.py",
+        "--state-dir",
+        str(state_dir),
+    ]
+    source_field = continuation["copy_instruction"]["source_field"]
+    if source_field == "model_command":
+        assert decode_windows_model_argv(continuation[source_field]) == tuple(
+            continuation["full_argv"]
+        )
+    elif os.name == "nt":
+        assert decode_windows_powershell_argv(continuation[source_field]) == tuple(
+            continuation["full_argv"]
+        )
+    else:
+        assert shlex.split(continuation[source_field]) == continuation["full_argv"]
 
 
 def assert_confirmation_binding(
@@ -788,11 +829,13 @@ def preview(
         assert payload["next_command"] == expected_transaction_next_command(
             "execute",
             ["execute", payload["transaction_id"]],
+            state_dir=state_dir,
         )
     else:
         assert payload["next_command"] == expected_transaction_next_command(
             "transaction-show",
             ["transaction-show", payload["transaction_id"], "--summary-only"],
+            state_dir=state_dir,
             requires_later_user_message=True,
         )
     assert list(payload).index("session_context") < list(payload).index("next_command")
@@ -819,6 +862,7 @@ def confirm(
     assert payload["next_command"] == expected_transaction_next_command(
         "execute",
         ["execute", transaction_id],
+        state_dir=state_dir,
     )
     assert list(payload)[-1] == "next_command"
     return payload
@@ -940,6 +984,7 @@ def test_allow_changes_keeps_dangerous_host_control_on_confirmation_path(
             payload["transaction_id"],
             "--summary-only",
         ],
+        state_dir=state_dir,
         requires_later_user_message=True,
     )
     assert [
@@ -2021,6 +2066,7 @@ def test_transaction_show_reads_immutable_artifact_and_journal_without_wwise(tmp
     assert payload["next_command"] == expected_transaction_next_command(
         "confirm",
         ["confirm", "tx-show", "--confirmation-token", token],
+        state_dir=state_dir,
         requires_explicit_user_confirmation=True,
     )
     assert list(payload).index("confirmation") > list(payload).index("events")
@@ -2079,6 +2125,7 @@ def test_transaction_show_advertises_exact_confirm_argv_only_while_awaiting(
             "--confirmation-token",
             awaiting_token,
         ],
+        state_dir=state_dir,
         requires_explicit_user_confirmation=True,
     )
     assert list(awaiting)[-1] == "next_command"
@@ -2133,6 +2180,7 @@ def test_transaction_show_summary_omits_raw_artifact_bulk_but_keeps_review_evide
     assert payload["next_command"] == expected_transaction_next_command(
         "confirm",
         ["confirm", "tx-summary", "--confirmation-token", token],
+        state_dir=state_dir,
         requires_explicit_user_confirmation=True,
     )
     assert list(payload).index("next_command") > list(payload).index("events")
@@ -3012,6 +3060,7 @@ def test_confirm_accepts_state_scoped_confirmation_token_without_connecting(
     assert payload["next_command"] == expected_transaction_next_command(
         "execute",
         ["execute", "tx-confirm-token"],
+        state_dir=state_dir,
     )
     assert store.load("tx-confirm-token").state is TransactionState.CONFIRMED
 
@@ -3303,6 +3352,7 @@ def test_preview_apply_ask_before_changes_still_requires_show_token_and_confirm(
     assert shown["next_command"] == expected_transaction_next_command(
         "confirm",
         ["confirm", transaction_id, "--confirmation-token", token],
+        state_dir=state_dir,
         requires_explicit_user_confirmation=True,
     )
 
@@ -3317,6 +3367,7 @@ def test_preview_apply_ask_before_changes_still_requires_show_token_and_confirm(
     assert confirmed["next_command"] == expected_transaction_next_command(
         "execute",
         ["execute", transaction_id],
+        state_dir=state_dir,
     )
 
 
@@ -3421,6 +3472,7 @@ def test_preview_apply_allow_changes_records_policy_authority_without_confirmati
     assert transaction["next_command"] == expected_transaction_next_command(
         "execute",
         ["execute", transaction_id],
+        state_dir=state_dir,
     )
 
     store = TransactionStore(state_dir)
@@ -3452,6 +3504,7 @@ def test_preview_apply_allow_changes_records_policy_authority_without_confirmati
     assert shown["next_command"] == expected_transaction_next_command(
         "execute",
         ["execute", transaction_id],
+        state_dir=state_dir,
     )
     assert "requires_later_user_message" not in shown["next_command"]
     assert not any(
@@ -3510,6 +3563,7 @@ def test_policy_authorized_allow_changes_executes_once_and_can_verify(
     assert executed["next_command"] == expected_transaction_next_command(
         "verify",
         ["verify", transaction["transaction_id"]],
+        state_dir=state_dir,
     )
 
     verify_client = FakeClient(
@@ -3667,6 +3721,7 @@ def test_preview_without_apply_stays_review_only_under_allow_changes(
             transaction["transaction_id"],
             "--summary-only",
         ],
+        state_dir=state_dir,
         requires_later_user_message=True,
     )
     snapshot = TransactionStore(state_dir).load_snapshot(
@@ -4307,6 +4362,7 @@ def test_large_successful_execute_is_bounded_but_journal_and_verify_stay_exact(
     assert execute_payload["next_command"] == expected_transaction_next_command(
         "verify",
         ["verify", transaction["transaction_id"]],
+        state_dir=state_dir,
     )
     assert list(execute_payload)[-1] == "next_command"
     assert execute_payload["dispatch_result"]["result"] == {

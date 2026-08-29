@@ -712,8 +712,10 @@ def test_audio_import_batch_declaration_is_atomic_complete_and_compact(
         )
     )
     # Native Windows must retain the canonical encoded PowerShell audit
-    # envelope; POSIX has no equivalent expansion in next_command.
-    assert response_size <= (8_000 if sys.platform == "win32" else 4_500)
+    # envelope; POSIX has no equivalent expansion in next_command.  The
+    # copy-exact continuation also retains an explicit caller state directory
+    # so the next phase cannot silently fall back to another transaction store.
+    assert response_size <= (8_000 if sys.platform == "win32" else 4_800)
 
     stored = OperationDraftStore(tmp_path / "state").inspect(
         started["draft"]["draft_id"],
