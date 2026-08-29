@@ -176,6 +176,14 @@ DEFAULT_CORE_BUSINESS_SUITE = (
     / "core-business"
     / "profile.json"
 )
+DEFAULT_PROJECT_SETTING_BUSINESS_SUITE = (
+    REPO_ROOT
+    / "tests"
+    / "semantic"
+    / "data"
+    / "project-setting-business"
+    / "profile.json"
+)
 DEFAULT_COMPOUND_UNDO_BUSINESS_SUITE = (
     REPO_ROOT
     / "tests"
@@ -250,6 +258,9 @@ DEFAULT_SWITCH_ASSIGNMENT_BUSINESS_ITERATION_ROOT = (
 DEFAULT_CORE_BUSINESS_ITERATION_ROOT = (
     SKILL_ROOT.parent / "waapi-skill-workspace" / "core-business-1"
 )
+DEFAULT_PROJECT_SETTING_BUSINESS_ITERATION_ROOT = (
+    SKILL_ROOT.parent / "waapi-skill-workspace" / "project-setting-business-1"
+)
 DEFAULT_COMPOUND_UNDO_BUSINESS_ITERATION_ROOT = (
     SKILL_ROOT.parent / "waapi-skill-workspace" / "compound-undo-business-1"
 )
@@ -309,6 +320,7 @@ OBJECT_METADATA_BUSINESS_PROFILE_ID = "object_metadata_business_1"
 OBJECT_GRAPH_BUSINESS_PROFILE_ID = "object_graph_business_1"
 SWITCH_ASSIGNMENT_BUSINESS_PROFILE_ID = "switch_assignment_business_1"
 CORE_BUSINESS_PROFILE_ID = "core_business_1"
+PROJECT_SETTING_BUSINESS_PROFILE_ID = "project_setting_business_1"
 COMPOUND_UNDO_BUSINESS_PROFILE_ID = "compound_undo_business_1"
 AUTHORING_UI_BUSINESS_PROFILE_ID = "authoring_ui_business_2"
 INTEGRATION_WORKFLOWS_V1_PROFILE_ID = "integration_workflows_cross_version_6"
@@ -412,6 +424,21 @@ OFFLINE_BUSINESS_AGENT_PROFILES = {
         options_name="CoreBusinessAgentOptions",
         run_name="run_core_business_agent_unit",
     ),
+    PROJECT_SETTING_BUSINESS_PROFILE_ID: OfflineBusinessAgentProfileDescriptor(
+        suite_path=DEFAULT_PROJECT_SETTING_BUSINESS_SUITE,
+        iteration_root=DEFAULT_PROJECT_SETTING_BUSINESS_ITERATION_ROOT,
+        supported_versions=frozenset({"2025.1"}),
+        preflight_contract="waapi-skill.project-setting-business-preflight/v1",
+        profile_module=(
+            "tests.semantic.support.codex_project_setting_business_profile"
+        ),
+        loader_name="load_project_setting_business_profile",
+        runner_module=(
+            "tests.semantic.support.codex_project_setting_business_agent_runner"
+        ),
+        options_name="ProjectSettingBusinessAgentOptions",
+        run_name="run_project_setting_business_agent_unit",
+    ),
     COMPOUND_UNDO_BUSINESS_PROFILE_ID: OfflineBusinessAgentProfileDescriptor(
         suite_path=DEFAULT_COMPOUND_UNDO_BUSINESS_SUITE,
         iteration_root=DEFAULT_COMPOUND_UNDO_BUSINESS_ITERATION_ROOT,
@@ -462,6 +489,7 @@ EXECUTABLE_V3_PROFILE_IDS = frozenset(
         OBJECT_GRAPH_BUSINESS_PROFILE_ID,
         SWITCH_ASSIGNMENT_BUSINESS_PROFILE_ID,
         CORE_BUSINESS_PROFILE_ID,
+        PROJECT_SETTING_BUSINESS_PROFILE_ID,
         COMPOUND_UNDO_BUSINESS_PROFILE_ID,
         AUTHORING_UI_BUSINESS_PROFILE_ID,
         INTEGRATION_WORKFLOWS_V1_PROFILE_ID,

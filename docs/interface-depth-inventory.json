@@ -3455,6 +3455,57 @@
         "2025.1|function|ak.wwise.core.workUnit.unload"
       ],
       "rows_sha256": "caf467378cbabccb637cd93d18cc4e87e5356d409ce110da1f040825af4245ed"
+    },
+    {
+      "github_issue": 86,
+      "id": "generic-core-remaining",
+      "row_count": 43,
+      "rows": [
+        "2021.1|function|ak.wwise.core.undo.cancelGroup",
+        "2021.1|function|ak.wwise.core.undo.endGroup",
+        "2022.1|function|ak.wwise.core.sound.setActiveSource",
+        "2022.1|function|ak.wwise.core.undo.cancelGroup",
+        "2022.1|function|ak.wwise.core.undo.endGroup",
+        "2023.1|function|ak.wwise.core.sound.setActiveSource",
+        "2023.1|function|ak.wwise.core.sourceControl.add",
+        "2023.1|function|ak.wwise.core.sourceControl.checkOut",
+        "2023.1|function|ak.wwise.core.sourceControl.commit",
+        "2023.1|function|ak.wwise.core.sourceControl.delete",
+        "2023.1|function|ak.wwise.core.sourceControl.getSourceFiles",
+        "2023.1|function|ak.wwise.core.sourceControl.getStatus",
+        "2023.1|function|ak.wwise.core.sourceControl.move",
+        "2023.1|function|ak.wwise.core.sourceControl.revert",
+        "2023.1|function|ak.wwise.core.sourceControl.setProvider",
+        "2023.1|function|ak.wwise.core.undo.cancelGroup",
+        "2023.1|function|ak.wwise.core.undo.endGroup",
+        "2024.1|function|ak.wwise.core.gameParameter.setRange",
+        "2024.1|function|ak.wwise.core.sound.setActiveSource",
+        "2024.1|function|ak.wwise.core.sourceControl.add",
+        "2024.1|function|ak.wwise.core.sourceControl.checkOut",
+        "2024.1|function|ak.wwise.core.sourceControl.commit",
+        "2024.1|function|ak.wwise.core.sourceControl.delete",
+        "2024.1|function|ak.wwise.core.sourceControl.getSourceFiles",
+        "2024.1|function|ak.wwise.core.sourceControl.getStatus",
+        "2024.1|function|ak.wwise.core.sourceControl.move",
+        "2024.1|function|ak.wwise.core.sourceControl.revert",
+        "2024.1|function|ak.wwise.core.sourceControl.setProvider",
+        "2024.1|function|ak.wwise.core.undo.cancelGroup",
+        "2024.1|function|ak.wwise.core.undo.endGroup",
+        "2025.1|function|ak.wwise.core.gameParameter.setRange",
+        "2025.1|function|ak.wwise.core.sound.setActiveSource",
+        "2025.1|function|ak.wwise.core.sourceControl.add",
+        "2025.1|function|ak.wwise.core.sourceControl.checkOut",
+        "2025.1|function|ak.wwise.core.sourceControl.commit",
+        "2025.1|function|ak.wwise.core.sourceControl.delete",
+        "2025.1|function|ak.wwise.core.sourceControl.getSourceFiles",
+        "2025.1|function|ak.wwise.core.sourceControl.getStatus",
+        "2025.1|function|ak.wwise.core.sourceControl.move",
+        "2025.1|function|ak.wwise.core.sourceControl.revert",
+        "2025.1|function|ak.wwise.core.sourceControl.setProvider",
+        "2025.1|function|ak.wwise.core.undo.cancelGroup",
+        "2025.1|function|ak.wwise.core.undo.endGroup"
+      ],
+      "rows_sha256": "a7541ae6dad3c8c033b13089c13c1faad9a2688aee985c72e5c414fdb812fa8a"
     }
   ],
   "contract": "waapi-skill.interface-depth-inventory/v1",
@@ -153342,7 +153393,7 @@
     "contract": "waapi-skill.typed-request-surface/v1",
     "total_lanes": 824
   },
-  "inventory_sha256": "6e3a3c61db16b71dd1b779b572aff71680c32867ec0a19d44cd9dc7d63842c62",
+  "inventory_sha256": "680e46d1739472c7dce4abe62e1c2aa9015bb38190d5f1d88edcabed03b4b31a",
   "mechanic_owners": {
     "ambiguous_continuation_selection": "gateway_derivation",
     "batch_layout": "gateway_derivation",
@@ -156086,70 +156137,62 @@
       "version": "2021.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "draft",
       "continuation_commands": [
         "operation-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "bd36376f92119b8d59bf13d974fa345f18561da88f68b16e6696327dc4f82110",
       "field_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "compound_transaction_member",
       "schema_sha256": "43f8ee611668e5aeee947e15bf13c04d7135ed092616bf5cac01b41eabb9b1ad",
       "uri": "ak.wwise.core.undo.cancelGroup",
       "version": "2021.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "draft",
       "continuation_commands": [
         "operation-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "8d785310b69eb8db5e2650dc355bea361a77b345b286cebe73252be38f57253e",
       "field_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "compound_transaction_member",
       "schema_sha256": "8d102f622b8de965782b0c99c055184ef99df6582aacf84fa80995da830814b5",
       "uri": "ak.wwise.core.undo.endGroup",
@@ -160272,35 +160315,31 @@
       "version": "2022.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "d5cb3802c33220266efc301e00c519d32850a5a24baea66081fd225ac8a4097f",
       "field_contract_sha256": "e28025cbc05ca0bfa17d07ee6d610646f766f3acfb54105f6fcc274e7fe66204",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "transaction",
       "schema_sha256": "9b942c2fde04872a57e3ad06593b3a8aaf845e2e740759fc9ebfbbc8e9eed3d0",
       "uri": "ak.wwise.core.sound.setActiveSource",
@@ -160789,70 +160828,62 @@
       "version": "2022.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "draft",
       "continuation_commands": [
         "operation-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "340f98a2b6823b9d9f88ea38c0934c1edc533bc201551bac0c36624be5b55c95",
       "field_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "compound_transaction_member",
       "schema_sha256": "43f8ee611668e5aeee947e15bf13c04d7135ed092616bf5cac01b41eabb9b1ad",
       "uri": "ak.wwise.core.undo.cancelGroup",
       "version": "2022.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "draft",
       "continuation_commands": [
         "operation-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "b78a22a02122bca75e516df16b2552a8a14f6c7caad4b8856f2cef1ad9ced0a2",
       "field_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "compound_transaction_member",
       "schema_sha256": "8d102f622b8de965782b0c99c055184ef99df6582aacf84fa80995da830814b5",
       "uri": "ak.wwise.core.undo.endGroup",
@@ -165917,35 +165948,31 @@
       "version": "2023.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "cce1aecd76cc682ef4e3c38b4379e703eb011572122ae0a287aff86ce968f2c2",
       "field_contract_sha256": "e28025cbc05ca0bfa17d07ee6d610646f766f3acfb54105f6fcc274e7fe66204",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "transaction",
       "schema_sha256": "9b942c2fde04872a57e3ad06593b3a8aaf845e2e740759fc9ebfbbc8e9eed3d0",
       "uri": "ak.wwise.core.sound.setActiveSource",
@@ -166108,315 +166135,279 @@
       "version": "2023.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "bb9c9965b1af0834f6777825478b7bfc1596a583c14d12ad4f0b97d7f23bf3fa",
       "field_contract_sha256": "bb9f35bf35e3f05f3309fac5ec4cfd8639ec84cabf86b5a95988b12a20412a54",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "isolated_transaction",
       "schema_sha256": "17d3da966e18aa7d88547d0759f1a770ef7cc76e2923130f49a4a9803327f2b2",
       "uri": "ak.wwise.core.sourceControl.add",
       "version": "2023.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "a9e69135deda794af9ddad9ed2511caacdac805f9bade75f3d7b7f0c7e366e0f",
       "field_contract_sha256": "bb9f35bf35e3f05f3309fac5ec4cfd8639ec84cabf86b5a95988b12a20412a54",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "isolated_transaction",
       "schema_sha256": "c4e6ff6ab6214ae8aeb1a61bd33423d72b6669f1808e2c9b180101db7c10a955",
       "uri": "ak.wwise.core.sourceControl.checkOut",
       "version": "2023.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "5c22ea33798b34281962789c1e0fb5b99bb931d7688c4924f122bcc02a5c0b64",
       "field_contract_sha256": "e6edbb46e7e2da068eafc663e6ed6b00be8e3e4aafbd35e8423830009b67525a",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "isolated_transaction",
       "schema_sha256": "e5ad766085e9b5baaa0260d9ab655cded182424db40640d8093a05bfdcbfd558",
       "uri": "ak.wwise.core.sourceControl.commit",
       "version": "2023.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "1b0988f3134209b50cd24d8c91d8c2178e2d795603cd94c04b2e25f8718f49aa",
       "field_contract_sha256": "bb9f35bf35e3f05f3309fac5ec4cfd8639ec84cabf86b5a95988b12a20412a54",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "isolated_transaction",
       "schema_sha256": "d698fac2a92b2c7ab5645a2472278071497212d9344cfd6eec8c38516f840c90",
       "uri": "ak.wwise.core.sourceControl.delete",
       "version": "2023.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "eef1c099b0406e264191e1ec924f1bb70e64f253a6df1d6c123ad56ad8526e57",
       "field_contract_sha256": "4f517a3564d855b5adf5284e8837ce60b1246046bc6bc29ad69e19cbd9f47d94",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "isolated_transaction",
       "schema_sha256": "1fda50058744883a43647273c0008f23f57a766c57a9f414b1b66aaf1d00499b",
       "uri": "ak.wwise.core.sourceControl.getSourceFiles",
       "version": "2023.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "f6ee2e9208b4f0d34297df76f76257db252cb9fa08115de2f778ffe52c4557b4",
       "field_contract_sha256": "bb9f35bf35e3f05f3309fac5ec4cfd8639ec84cabf86b5a95988b12a20412a54",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "isolated_transaction",
       "schema_sha256": "b3dbd4cdaffd5b5bcc77ac9a1492de065b21276320d28f2fb99d462198836747",
       "uri": "ak.wwise.core.sourceControl.getStatus",
       "version": "2023.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "7f2edc64ea44286372c0e771827cff99840972dcd03263b1fe2e81bd23258e9e",
       "field_contract_sha256": "f99ff69d6878d13ab19369e25f877f4da1b087d62492b86799b16ed0c47e93fa",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "isolated_transaction",
       "schema_sha256": "d6da67e49ec4c515ec54229058ba4380514f1f623e4e903959f9b0dc3744f241",
       "uri": "ak.wwise.core.sourceControl.move",
       "version": "2023.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "1b1a808524977a26eb59b8bb7a1818fb1c040b0c0035a71cea6b505fa29e7de5",
       "field_contract_sha256": "bb9f35bf35e3f05f3309fac5ec4cfd8639ec84cabf86b5a95988b12a20412a54",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "isolated_transaction",
       "schema_sha256": "46f4da699c76774b23ee73e0442b4f72cda1d1a5438082dd1726ece621c57ecc",
       "uri": "ak.wwise.core.sourceControl.revert",
       "version": "2023.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "5f7888079b969ba8bd56d79787de02af7430e45c789677de3e5d0fab6b9f38da",
       "field_contract_sha256": "30ab5a28e4493f5f38a7586a30d9d7a429c7ff6468376ee01ce97f61a3fc08e4",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "isolated_transaction",
       "schema_sha256": "3339a255e2c2cb5c4c545cd94e5c8e09f5130e3ba3a76f5bc48062366eb4b28d",
       "uri": "ak.wwise.core.sourceControl.setProvider",
@@ -166783,70 +166774,62 @@
       "version": "2023.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "draft",
       "continuation_commands": [
         "operation-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "cfb0d36963a1e225a2ac16a10fecafa7a390dfd1ade679ae60dd60e7322ed76a",
       "field_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "compound_transaction_member",
       "schema_sha256": "2a42cc9b907d7c2b2a6b6218c0e58049fad1ab1457e171fe34f5273a3144ce58",
       "uri": "ak.wwise.core.undo.cancelGroup",
       "version": "2023.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "draft",
       "continuation_commands": [
         "operation-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "f31a160905e5df8e38cdffb868716245fc142dbc51adcffb7c94459de56da9c6",
       "field_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "compound_transaction_member",
       "schema_sha256": "8d102f622b8de965782b0c99c055184ef99df6582aacf84fa80995da830814b5",
       "uri": "ak.wwise.core.undo.endGroup",
@@ -170723,35 +170706,31 @@
       "version": "2024.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "70cd52a167b7154914760fe6a7f38ba5a50fca5289c11304b4ecbe357732b540",
       "field_contract_sha256": "3bebb506482d32609bf72132249091fc8615fe8d04bcaeb4d1cf3eca374b7ab9",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "transaction",
       "schema_sha256": "342cdb93cb442aa74dd64ac97331bd3d63bea8a46ca52bd777dc2667cff51db8",
       "uri": "ak.wwise.core.gameParameter.setRange",
@@ -172302,35 +172281,31 @@
       "version": "2024.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "ca6fd6344adb47feb9418aca46165569346e89526e5d0e240039ba615804dd95",
       "field_contract_sha256": "e28025cbc05ca0bfa17d07ee6d610646f766f3acfb54105f6fcc274e7fe66204",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "transaction",
       "schema_sha256": "208c0c053c2ac5d790caf1a54671db66d01ee61f0e18fdb5730f2c1aee772927",
       "uri": "ak.wwise.core.sound.setActiveSource",
@@ -172493,315 +172468,279 @@
       "version": "2024.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "aa62d6dd31e604b0dd0799db57cc2d169b14d996536caef83415d4603993161f",
       "field_contract_sha256": "bb9f35bf35e3f05f3309fac5ec4cfd8639ec84cabf86b5a95988b12a20412a54",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "isolated_transaction",
       "schema_sha256": "3271a3533f3835f362b0dd19f06ad82f123150c92b932f216abd9434ff1a0cc1",
       "uri": "ak.wwise.core.sourceControl.add",
       "version": "2024.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "1f8eadeee8a3cd273358e832947d3ee57996c0d645a2fa262f667757375b89a2",
       "field_contract_sha256": "bb9f35bf35e3f05f3309fac5ec4cfd8639ec84cabf86b5a95988b12a20412a54",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "isolated_transaction",
       "schema_sha256": "0658f7bfdf49cdc673045a266afc9c868577a7f304f50666fac3f708cd2594e4",
       "uri": "ak.wwise.core.sourceControl.checkOut",
       "version": "2024.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "ead375100945ee167816af36edc42eb6d692f239a7844fd991b16296842598b8",
       "field_contract_sha256": "e6edbb46e7e2da068eafc663e6ed6b00be8e3e4aafbd35e8423830009b67525a",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "isolated_transaction",
       "schema_sha256": "e591c47c9a63359fe8851ffa52a7bc9461e1cdb89eae5defaee2479020214782",
       "uri": "ak.wwise.core.sourceControl.commit",
       "version": "2024.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "8ba701ae6268719fe874e0a6b7ddb3017d186fe1d3915bda6cc5c07265ee88ef",
       "field_contract_sha256": "bb9f35bf35e3f05f3309fac5ec4cfd8639ec84cabf86b5a95988b12a20412a54",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "isolated_transaction",
       "schema_sha256": "be195724259f34994858663e4d80ccfa7a7632e3b163ccd2d1ed8dd76a8ee0ee",
       "uri": "ak.wwise.core.sourceControl.delete",
       "version": "2024.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "e03a2031b0d5a919ed5f3a51d85053713a9161c6eb421bf76b2469eab84aba17",
       "field_contract_sha256": "4f517a3564d855b5adf5284e8837ce60b1246046bc6bc29ad69e19cbd9f47d94",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "isolated_transaction",
       "schema_sha256": "b65951dd04ac0ad98efa12fb0a94a679c0efec7e1f8c832d305f76605355b876",
       "uri": "ak.wwise.core.sourceControl.getSourceFiles",
       "version": "2024.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "d070da854d5754c97999a7f098a71868e4ed36686776cb3ebb54d38eecd82a9c",
       "field_contract_sha256": "bb9f35bf35e3f05f3309fac5ec4cfd8639ec84cabf86b5a95988b12a20412a54",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "isolated_transaction",
       "schema_sha256": "d62acc040a7241d58cc3aa5bb096207a90713a42ee4063cb62cd45cceef3ace9",
       "uri": "ak.wwise.core.sourceControl.getStatus",
       "version": "2024.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "4d27c5e5bd418880a961027eff66b79e27486860f81edcbc7e102ce9b0b6d897",
       "field_contract_sha256": "f99ff69d6878d13ab19369e25f877f4da1b087d62492b86799b16ed0c47e93fa",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "isolated_transaction",
       "schema_sha256": "a70b7454d4c51d32bc1924bf8da0e97c81e901583e25ad9484c25f4d29fb1045",
       "uri": "ak.wwise.core.sourceControl.move",
       "version": "2024.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "edb9a6c22c60b0fd6bb71f40c1bd4bcc363afb521f4cb506ac7130ae7e475ce6",
       "field_contract_sha256": "bb9f35bf35e3f05f3309fac5ec4cfd8639ec84cabf86b5a95988b12a20412a54",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "isolated_transaction",
       "schema_sha256": "7fb82cd508d0770b4f25cc2742c779ce5887653dbf07e8da07f8062de3ddd2da",
       "uri": "ak.wwise.core.sourceControl.revert",
       "version": "2024.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "9c28e36b8b34a0164a5fbefca61537578340831281534e0649fcdb9510985467",
       "field_contract_sha256": "30ab5a28e4493f5f38a7586a30d9d7a429c7ff6468376ee01ce97f61a3fc08e4",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "isolated_transaction",
       "schema_sha256": "247c8203151cee140c3493c8eb963e1ec222b67b8141ad9dc7a1c3e6a893eb0d",
       "uri": "ak.wwise.core.sourceControl.setProvider",
@@ -173168,70 +173107,62 @@
       "version": "2024.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "draft",
       "continuation_commands": [
         "operation-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "85e2ffba3924a8d6cdf370188a8653ea029f7bb1186584b2760693e11055f001",
       "field_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "compound_transaction_member",
       "schema_sha256": "7ed48dd018d89f9213bfdb5bd3fdb5c57eb5c76b56b99c274ec56ab3873fa471",
       "uri": "ak.wwise.core.undo.cancelGroup",
       "version": "2024.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "draft",
       "continuation_commands": [
         "operation-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "eea1f9f9f962d1f94e678a821d441a1c73e95c83c8f6c453331458ca16602a43",
       "field_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "compound_transaction_member",
       "schema_sha256": "64b792d80cd97c66ebf34e0706c478e830de0cffd90de42aa70d465454b73f09",
       "uri": "ak.wwise.core.undo.endGroup",
@@ -176935,35 +176866,31 @@
       "version": "2025.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "78072c77629aa27280e5ccaa652905a3af075c9576c9c0ec5fc0d8faaf3c6ba9",
       "field_contract_sha256": "3bebb506482d32609bf72132249091fc8615fe8d04bcaeb4d1cf3eca374b7ab9",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "transaction",
       "schema_sha256": "342cdb93cb442aa74dd64ac97331bd3d63bea8a46ca52bd777dc2667cff51db8",
       "uri": "ak.wwise.core.gameParameter.setRange",
@@ -178645,35 +178572,31 @@
       "version": "2025.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "eae88f4419ce20ab02e71d8237ee12db48d33022f8fdd28baf417037c78e47d3",
       "field_contract_sha256": "e28025cbc05ca0bfa17d07ee6d610646f766f3acfb54105f6fcc274e7fe66204",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "transaction",
       "schema_sha256": "208c0c053c2ac5d790caf1a54671db66d01ee61f0e18fdb5730f2c1aee772927",
       "uri": "ak.wwise.core.sound.setActiveSource",
@@ -178836,315 +178759,279 @@
       "version": "2025.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "907b40b99a2c41e3227dcef0a29058a2ed97080aff1e93528bdfdbd2d3345370",
       "field_contract_sha256": "bb9f35bf35e3f05f3309fac5ec4cfd8639ec84cabf86b5a95988b12a20412a54",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "isolated_transaction",
       "schema_sha256": "3271a3533f3835f362b0dd19f06ad82f123150c92b932f216abd9434ff1a0cc1",
       "uri": "ak.wwise.core.sourceControl.add",
       "version": "2025.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "978f34e7bcf8229d00426bcc74797afb923e6faca179c967fd8b6a33c7ecab3f",
       "field_contract_sha256": "bb9f35bf35e3f05f3309fac5ec4cfd8639ec84cabf86b5a95988b12a20412a54",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "isolated_transaction",
       "schema_sha256": "0658f7bfdf49cdc673045a266afc9c868577a7f304f50666fac3f708cd2594e4",
       "uri": "ak.wwise.core.sourceControl.checkOut",
       "version": "2025.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "f18eac0b562c2173ee11a3d174fdeebd30186cbd78d8b13231f524bd21af4554",
       "field_contract_sha256": "e6edbb46e7e2da068eafc663e6ed6b00be8e3e4aafbd35e8423830009b67525a",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "isolated_transaction",
       "schema_sha256": "e591c47c9a63359fe8851ffa52a7bc9461e1cdb89eae5defaee2479020214782",
       "uri": "ak.wwise.core.sourceControl.commit",
       "version": "2025.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "8f83ad8d89cec228988be5498cc4ac49463ed92d251f0a4c5a7a97354b3b8915",
       "field_contract_sha256": "bb9f35bf35e3f05f3309fac5ec4cfd8639ec84cabf86b5a95988b12a20412a54",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "isolated_transaction",
       "schema_sha256": "be195724259f34994858663e4d80ccfa7a7632e3b163ccd2d1ed8dd76a8ee0ee",
       "uri": "ak.wwise.core.sourceControl.delete",
       "version": "2025.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "28a8d5fb26b0693dbae507211e6242f4f6383411eaa6f730e5b8b349c994c547",
       "field_contract_sha256": "4f517a3564d855b5adf5284e8837ce60b1246046bc6bc29ad69e19cbd9f47d94",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "isolated_transaction",
       "schema_sha256": "476d2e182cec0ac3cf4e3132f16ade42df655563e5eb7eab5bdb89050fc9da3f",
       "uri": "ak.wwise.core.sourceControl.getSourceFiles",
       "version": "2025.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "c4f7473cf3c789e39bfa681b2bbdf46188e14a04c92a71adcd3dfc5a97d916f5",
       "field_contract_sha256": "bb9f35bf35e3f05f3309fac5ec4cfd8639ec84cabf86b5a95988b12a20412a54",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "isolated_transaction",
       "schema_sha256": "d62acc040a7241d58cc3aa5bb096207a90713a42ee4063cb62cd45cceef3ace9",
       "uri": "ak.wwise.core.sourceControl.getStatus",
       "version": "2025.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "7ae7a74c98181c89aa8fe1361163eb05ebea418bb4c0e62a73e0b4c345df5246",
       "field_contract_sha256": "f99ff69d6878d13ab19369e25f877f4da1b087d62492b86799b16ed0c47e93fa",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "isolated_transaction",
       "schema_sha256": "a70b7454d4c51d32bc1924bf8da0e97c81e901583e25ad9484c25f4d29fb1045",
       "uri": "ak.wwise.core.sourceControl.move",
       "version": "2025.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "2e535534facd803bdd1984c5d4409a20d54fffbbe316f4b23efeef57b4ca04ba",
       "field_contract_sha256": "bb9f35bf35e3f05f3309fac5ec4cfd8639ec84cabf86b5a95988b12a20412a54",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "isolated_transaction",
       "schema_sha256": "7fb82cd508d0770b4f25cc2742c779ce5887653dbf07e8da07f8062de3ddd2da",
       "uri": "ak.wwise.core.sourceControl.revert",
       "version": "2025.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "7dd64cdb51a282b011fd6026711631dfe7437d6ae9d780436c7ab4acc64159d2",
       "field_contract_sha256": "30ab5a28e4493f5f38a7586a30d9d7a429c7ff6468376ee01ce97f61a3fc08e4",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "isolated_transaction",
       "schema_sha256": "247c8203151cee140c3493c8eb963e1ec222b67b8141ad9dc7a1c3e6a893eb0d",
       "uri": "ak.wwise.core.sourceControl.setProvider",
@@ -179511,70 +179398,62 @@
       "version": "2025.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "draft",
       "continuation_commands": [
         "operation-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "ebbee87024990c9d2053cde31d45860600df59e8e0210f7dcddc9e3181b3a797",
       "field_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "compound_transaction_member",
       "schema_sha256": "7ed48dd018d89f9213bfdb5bd3fdb5c57eb5c76b56b99c274ec56ab3873fa471",
       "uri": "ak.wwise.core.undo.cancelGroup",
       "version": "2025.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown.",
       "classification": "generic-core-remaining",
       "construction_shape": "draft",
       "continuation_commands": [
         "operation-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "ac09fba03878834512c6da023fbb7d933576dcade513d07d4b4d8756854c073d",
       "field_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "compound_transaction_member",
       "schema_sha256": "64b792d80cd97c66ebf34e0706c478e830de0cffd90de42aa70d465454b73f09",
       "uri": "ak.wwise.core.undo.endGroup",
@@ -185236,10 +185115,10 @@
     "typed_request_surface_sha256": "2040252326e175d55e5c04bca095bf68c47789302f8b0d243c931e663db30156"
   },
   "summary": {
-    "migration_ticket_families": 6,
+    "migration_ticket_families": 5,
     "native_dispositions": {
-      "already_deep": 190,
-      "migration_required": 495,
+      "already_deep": 233,
+      "migration_required": 452,
       "prohibited_boundary": 139
     },
     "native_lanes": 824,
@@ -185330,64 +185209,6 @@
       ],
       "rows_sha256": "3f5b7464510f32b6f06dc4c6c3e0a7da700159ad07b8aff69b4b759bed41b9e1",
       "title": "Deepen Wwise CLI and Console project/build operations"
-    },
-    {
-      "blocked_by_family": "generic-core-media-build",
-      "deterministic_tests": "Every exact row/version, provider and path boundaries, compound-only rejection, hostile values, continuation completeness, repair, and non-bypass.",
-      "github_issue": 86,
-      "id": "generic-core-remaining",
-      "parent_issue": 57,
-      "proportional_evidence": "Matching-host representatives for each effect/verifier family; use Fresh Agent only where route choice or business vocabulary changed.",
-      "public_behavior": "Expose bounded business requests for parameter ranges, active sources, source-control actions, and compound-only Undo members; preserve provider and compound boundaries.",
-      "removal_boundary": "Remove generic typed construction for these rows after parity; do not expose Undo members outside the compound compiler or arbitrary source-control escape hatches.",
-      "row_count": 43,
-      "rows": [
-        "2021.1|function|ak.wwise.core.undo.cancelGroup",
-        "2021.1|function|ak.wwise.core.undo.endGroup",
-        "2022.1|function|ak.wwise.core.sound.setActiveSource",
-        "2022.1|function|ak.wwise.core.undo.cancelGroup",
-        "2022.1|function|ak.wwise.core.undo.endGroup",
-        "2023.1|function|ak.wwise.core.sound.setActiveSource",
-        "2023.1|function|ak.wwise.core.sourceControl.add",
-        "2023.1|function|ak.wwise.core.sourceControl.checkOut",
-        "2023.1|function|ak.wwise.core.sourceControl.commit",
-        "2023.1|function|ak.wwise.core.sourceControl.delete",
-        "2023.1|function|ak.wwise.core.sourceControl.getSourceFiles",
-        "2023.1|function|ak.wwise.core.sourceControl.getStatus",
-        "2023.1|function|ak.wwise.core.sourceControl.move",
-        "2023.1|function|ak.wwise.core.sourceControl.revert",
-        "2023.1|function|ak.wwise.core.sourceControl.setProvider",
-        "2023.1|function|ak.wwise.core.undo.cancelGroup",
-        "2023.1|function|ak.wwise.core.undo.endGroup",
-        "2024.1|function|ak.wwise.core.gameParameter.setRange",
-        "2024.1|function|ak.wwise.core.sound.setActiveSource",
-        "2024.1|function|ak.wwise.core.sourceControl.add",
-        "2024.1|function|ak.wwise.core.sourceControl.checkOut",
-        "2024.1|function|ak.wwise.core.sourceControl.commit",
-        "2024.1|function|ak.wwise.core.sourceControl.delete",
-        "2024.1|function|ak.wwise.core.sourceControl.getSourceFiles",
-        "2024.1|function|ak.wwise.core.sourceControl.getStatus",
-        "2024.1|function|ak.wwise.core.sourceControl.move",
-        "2024.1|function|ak.wwise.core.sourceControl.revert",
-        "2024.1|function|ak.wwise.core.sourceControl.setProvider",
-        "2024.1|function|ak.wwise.core.undo.cancelGroup",
-        "2024.1|function|ak.wwise.core.undo.endGroup",
-        "2025.1|function|ak.wwise.core.gameParameter.setRange",
-        "2025.1|function|ak.wwise.core.sound.setActiveSource",
-        "2025.1|function|ak.wwise.core.sourceControl.add",
-        "2025.1|function|ak.wwise.core.sourceControl.checkOut",
-        "2025.1|function|ak.wwise.core.sourceControl.commit",
-        "2025.1|function|ak.wwise.core.sourceControl.delete",
-        "2025.1|function|ak.wwise.core.sourceControl.getSourceFiles",
-        "2025.1|function|ak.wwise.core.sourceControl.getStatus",
-        "2025.1|function|ak.wwise.core.sourceControl.move",
-        "2025.1|function|ak.wwise.core.sourceControl.revert",
-        "2025.1|function|ak.wwise.core.sourceControl.setProvider",
-        "2025.1|function|ak.wwise.core.undo.cancelGroup",
-        "2025.1|function|ak.wwise.core.undo.endGroup"
-      ],
-      "rows_sha256": "a7541ae6dad3c8c033b13089c13c1faad9a2688aee985c72e5c414fdb812fa8a",
-      "title": "Deepen remaining Core Game Parameter, source-control, sound-source, and Undo-member routes"
     },
     {
       "blocked_by_family": "generic-core-remaining",

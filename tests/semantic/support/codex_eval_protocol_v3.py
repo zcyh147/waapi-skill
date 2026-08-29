@@ -1773,6 +1773,110 @@ def build_core_business_transaction_steps(
     )
 
 
+def build_project_setting_business_transaction_steps(
+    *,
+    version: str,
+    label: str,
+    object_id: str,
+) -> tuple[ExpectedGatewayStep, ...]:
+    """Seal one Game Parameter range outcome through the business Draft."""
+
+    api = "ak.wwise.core.gameParameter.setRange"
+    if version != "2025.1":
+        raise V3ProtocolError(
+            "Project-setting Fresh proof supports exact Wwise 2025.1"
+        )
+    if not isinstance(label, str) or not re.fullmatch(r"tx[0-9]{2}", label):
+        raise V3ProtocolError("business transaction label must be txNN")
+    if not isinstance(object_id, str) or not re.fullmatch(
+        r"\{[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}\}",
+        object_id,
+    ):
+        raise V3ProtocolError("Project-setting Fresh proof requires one exact GUID")
+    draft_start = f"{label}.draft-start"
+    bind = f"{label}.bind-game-parameter"
+    declaration = f"{label}.declare-project-setting-plan"
+    check = f"{label}.check"
+
+    def prefix(revision_step: str) -> tuple[Any, ...]:
+        return (
+            ResponseBinding(draft_start, "/draft/draft_id"),
+            "--task-authority",
+            ResponseBinding(draft_start, "/task_authority"),
+            "--expected-revision",
+            ResponseBinding(revision_step, "/draft/revision"),
+        )
+
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": version,
+        "operation": "waapi.call",
+        "arguments": {
+            "api": api,
+            "args": {
+                "object": object_id.upper(),
+                "min": -10.0,
+                "max": 100.0,
+                "onCurveUpdate": "stretch",
+            },
+            "options": {},
+        },
+    }
+    return (
+        ExpectedGatewayStep(
+            name=f"{label}.request-schema",
+            subcommand="request-schema",
+            arguments=(api,),
+        ),
+        ExpectedGatewayStep(
+            name=draft_start,
+            subcommand="draft-start",
+            arguments=(api,),
+        ),
+        ExpectedGatewayStep(
+            name=bind,
+            subcommand="draft-bind-object",
+            arguments=(
+                *prefix(draft_start),
+                "--role",
+                "game_parameter",
+                "--object-id",
+                object_id,
+            ),
+        ),
+        ExpectedGatewayStep(
+            name=declaration,
+            subcommand="draft-declare-project-setting-plan",
+            arguments=(
+                *prefix(bind),
+                "--role",
+                "game_parameter_handle",
+                ResponseBinding(bind, "/bound_object/handle"),
+                "--value",
+                "minimum",
+                "-10",
+                "--value",
+                "maximum",
+                "100",
+                "--value",
+                "curve_update_outcome",
+                "stretch",
+            ),
+        ),
+        ExpectedGatewayStep(
+            name=check,
+            subcommand="draft-check",
+            arguments=prefix(declaration),
+        ),
+        ExpectedGatewayStep(
+            name=f"{label}.preview",
+            subcommand="preview-from-draft",
+            arguments=prefix(check),
+            expected_operation_request=request,
+        ),
+    )
+
+
 def build_authoring_ui_business_transaction_steps(
     request: Mapping[str, Any],
     *,
@@ -4714,6 +4818,7 @@ __all__ = [
     "build_audio_import_composer_transaction_steps",
     "build_authoring_ui_business_transaction_steps",
     "build_core_business_transaction_steps",
+    "build_project_setting_business_transaction_steps",
     "build_compound_undo_business_transaction_steps",
     "OBJECT_LIFECYCLE_BUSINESS_OPERATIONS",
     "build_object_lifecycle_business_transaction_steps",

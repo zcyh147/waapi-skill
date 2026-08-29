@@ -400,6 +400,9 @@ BUSINESS_AGENT_OUTCOME_CONTRACTS = {
     matrix.CORE_BUSINESS_PROFILE_ID: (
         "waapi-skill.core-business-agent-outcome/v1"
     ),
+    matrix.PROJECT_SETTING_BUSINESS_PROFILE_ID: (
+        "waapi-skill.project-setting-business-agent-outcome/v1"
+    ),
     matrix.COMPOUND_UNDO_BUSINESS_PROFILE_ID: (
         "waapi-skill.compound-undo-business-agent-outcome/v1"
     ),
@@ -3442,6 +3445,20 @@ def _validate_bound_business_agent_protocol(
             label="tx01",
         )
         preview_request = steps[-1].expected_operation_request
+    elif profile == matrix.PROJECT_SETTING_BUSINESS_PROFILE_ID:
+        from tests.semantic.support.codex_eval_protocol_v3 import (
+            build_project_setting_business_transaction_steps,
+        )
+        from tests.semantic.support.codex_project_setting_business_profile import (
+            OBJECT_ID,
+        )
+
+        steps = build_project_setting_business_transaction_steps(
+            version=expected_unit.version,
+            label="tx01",
+            object_id=OBJECT_ID,
+        )
+        preview_request = steps[-1].expected_operation_request
     elif profile == matrix.COMPOUND_UNDO_BUSINESS_PROFILE_ID:
         from tests.semantic.support.codex_compound_undo_business_agent_runner import (
             compound_undo_business_child_expectations,
@@ -3480,6 +3497,7 @@ def _validate_bound_business_agent_protocol(
     optional_discovery_labels = {
         matrix.COMPOUND_UNDO_BUSINESS_PROFILE_ID: "tx03",
         matrix.CORE_BUSINESS_PROFILE_ID: "tx01",
+        matrix.PROJECT_SETTING_BUSINESS_PROFILE_ID: "tx01",
     }
     if profile in optional_discovery_labels:
         label = optional_discovery_labels[profile]

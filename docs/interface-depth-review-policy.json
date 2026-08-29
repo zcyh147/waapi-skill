@@ -218,22 +218,14 @@
     },
     {
       "id": "generic-core-remaining",
-      "disposition": "migration_required",
-      "owner_issue": 57,
+      "disposition": "already_deep",
+      "owner_issue": null,
       "match": {"uri_prefixes": ["ak.wwise.core."]},
-      "leaked_mechanics": ["native_object_path", "wire_type", "request_fragment"]
+      "leaked_mechanics": [],
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Candidate 590a416 passed macOS Program 4124/2 skipped, native-Windows Program 4109/17 skipped, and the 2025.1 project-setting plus external source-control proportional real workflow on both hosts with clean sandbox and process teardown."
     }
   ],
   "ticket_blueprints": {
-    "generic-core-remaining": {
-      "title": "Deepen remaining Core Game Parameter, source-control, sound-source, and Undo-member routes",
-      "parent_issue": 57,
-      "blocked_by_family": "generic-core-media-build",
-      "public_behavior": "Expose bounded business requests for parameter ranges, active sources, source-control actions, and compound-only Undo members; preserve provider and compound boundaries.",
-      "deterministic_tests": "Every exact row/version, provider and path boundaries, compound-only rejection, hostile values, continuation completeness, repair, and non-bypass.",
-      "removal_boundary": "Remove generic typed construction for these rows after parity; do not expose Undo members outside the compound compiler or arbitrary source-control escape hatches.",
-      "proportional_evidence": "Matching-host representatives for each effect/verifier family; use Fresh Agent only where route choice or business vocabulary changed."
-    },
     "generic-core-runtime-inspection": {
       "title": "Deepen log, profiler, remote, and transport inspection/control routes",
       "parent_issue": 57,
@@ -290,10 +282,14 @@
       "github_issue": 85,
       "row_count": 16,
       "rows_sha256": "eb0692ad57f0a504bf110f38355997bb9abca7519ed412c4ed97c223a6a0decf"
+    },
+    "generic-core-remaining": {
+      "github_issue": 86,
+      "row_count": 43,
+      "rows_sha256": "a7541ae6dad3c8c033b13089c13c1faad9a2688aee985c72e5c414fdb812fa8a"
     }
   },
   "ticket_issue_numbers": {
-    "generic-core-remaining": 86,
     "generic-core-runtime-inspection": 87,
     "generic-soundengine-runtime": 88,
     "generic-cli-console": 89,

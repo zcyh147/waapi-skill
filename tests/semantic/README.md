@@ -560,6 +560,7 @@ The separately approved V3 executable profiles are:
 | `modification_policy_9` | 9 | 15 | Three isolated repetitions of each canonical project-modification policy on one reviewed object.create business case |
 | `switch_assignment_business_1` | 1 | 1 | Preview-only routing proof for one independent Switch assignment through three opaque business-object handles and Gateway-owned native materialization |
 | `core_business_1` | 1 | 1 | Preview-only routing proof that a zero-input Core mutation follows `request-schema` into one Gateway-owned Core business plan and immutable Preview |
+| `project_setting_business_1` | 1 | 1 | Preview-only routing proof that one natural Game Parameter range request becomes a bound object handle and Gateway-owned project-setting plan |
 | `compound_undo_business_1` | 1 | 1 | Preview-only routing proof that two checked child business changes become one Gateway-compiled Undo Group and one immutable Preview |
 
 The two older six-task integration profile IDs remain internal compatibility
@@ -588,6 +589,7 @@ skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py -
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile modification_policy_9 --campaign-root skills/waapi-skill-workspace/campaign-modification-policy-9
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile switch_assignment_business_1 --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-switch-assignment-business
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile core_business_1 --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-core-business
+skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile project_setting_business_1 --offline-only --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-project-setting-business
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile compound_undo_business_1 --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-compound-undo-business
 ```
 
@@ -616,6 +618,13 @@ the save intent and no Gateway mechanics. The Agent must follow the raw Core
 URI's `request-schema` continuation, declare the complete zero-input Core plan,
 and stop at one immutable Preview without `typed-call`, `draft-apply`, or
 execution.
+
+`project_setting_business_1` is a single 2025.1 preview-only routing probe. It
+starts no Wwise process and grants no real-host coverage credit. The prompt
+names one Game Parameter and the requested range and curve-update outcome, but
+contains no WAAPI URI, object GUID, or Gateway mechanics. The Agent must select
+the project-setting route, bind the exact object, declare the closed business
+values, and stop at one immutable Preview.
 
 `compound_undo_business_1` is a single 2022.1 preview-only routing probe. It
 starts no Wwise process and grants no real-host coverage credit. The Agent
