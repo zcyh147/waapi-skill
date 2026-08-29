@@ -343,7 +343,7 @@ def test_every_migration_row_has_exactly_one_rollup_and_ticket_family() -> None:
     assert set(tickets) == expected
     assert {family["github_issue"] for family in inventory["ticket_families"]} == {
         *range(77, 94),
-    } - {77, 78, 79, 80, 81, 82, 83, 84, 92, 93}
+    } - {77, 78, 79, 80, 81, 82, 83, 84, 85, 92, 93}
     assert all(
         row["owner_issue"] in {56, 57}
         for row in (*inventory["native_lanes"], *inventory["operation_lanes"])
@@ -365,6 +365,14 @@ def test_completed_core_family_retains_the_authoritative_issue_84_row_seal() -> 
     assert core["rows_sha256"] == (
         "caf467378cbabccb637cd93d18cc4e87e"
         "5356d409ce110da1f040825af4245ed"
+    )
+
+    media = completed["generic-core-media-build"]
+    assert media["github_issue"] == 85
+    assert media["row_count"] == len(media["rows"]) == 16
+    assert media["rows_sha256"] == (
+        "eb0692ad57f0a504bf110f38355997bb"
+        "9abca7519ed412c4ed97c223a6a0decf"
     )
 
 

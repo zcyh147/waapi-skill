@@ -203,10 +203,11 @@
     },
     {
       "id": "generic-core-media-build",
-      "disposition": "migration_required",
-      "owner_issue": 57,
+      "disposition": "already_deep",
+      "owner_issue": null,
       "match": {"uri_prefixes": ["ak.wwise.core.audioSourcePeaks.", "ak.wwise.core.mediaPool.", "ak.wwise.core.soundbank."]},
-      "leaked_mechanics": ["native_object_path", "wire_type", "dependency_order", "batch_layout", "request_fragment"]
+      "leaked_mechanics": [],
+      "audit_evidence": "The public media-build-business/v1 Adapter covers all 16 exact peak-region, trimmed-peak, Media Pool, and SoundBank inclusion lanes. Callers provide exact AudioFileSource or SoundBank identities, finite time/count values, or bounded Media Pool business meanings and filters. The Gateway owns exact native fields, live exact-case Media Pool field binding, binary peak decoding, inclusion identity enrichment, projection, sorting, result ceilings, and completeness boundaries. request-schema exposes only core-call, while typed-call, typed containers, typed Draft start/continuation, and native request fragments are blocked."
     },
     {
       "id": "generic-core-runtime-inspection",
@@ -224,15 +225,6 @@
     }
   ],
   "ticket_blueprints": {
-    "generic-core-media-build": {
-      "title": "Deepen generic media peaks, media-pool, and SoundBank read routes",
-      "parent_issue": 57,
-      "blocked_by_family": "generic-core-project-object",
-      "public_behavior": "Accept media regions, pool queries, and SoundBank inclusion reads as bounded business requests; derive native selectors, projections, and request layout.",
-      "deterministic_tests": "All exact rows and version deltas, bounds, hostile numeric values, result ceilings, continuation completeness, and dedicated-route non-bypass.",
-      "removal_boundary": "Remove typed handle/wire-type construction for the audited rows while retaining direct bounded read lifecycles.",
-      "proportional_evidence": "One real representative per distinct read shape on matching versions; Fresh Agent only for routing ambiguity introduced by the new declarations."
-    },
     "generic-core-remaining": {
       "title": "Deepen remaining Core Game Parameter, source-control, sound-source, and Undo-member routes",
       "parent_issue": 57,
@@ -293,10 +285,14 @@
       "github_issue": 84,
       "row_count": 55,
       "rows_sha256": "caf467378cbabccb637cd93d18cc4e87e5356d409ce110da1f040825af4245ed"
+    },
+    "generic-core-media-build": {
+      "github_issue": 85,
+      "row_count": 16,
+      "rows_sha256": "eb0692ad57f0a504bf110f38355997bb9abca7519ed412c4ed97c223a6a0decf"
     }
   },
   "ticket_issue_numbers": {
-    "generic-core-media-build": 85,
     "generic-core-remaining": 86,
     "generic-core-runtime-inspection": 87,
     "generic-soundengine-runtime": 88,

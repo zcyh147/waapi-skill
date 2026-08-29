@@ -188,7 +188,7 @@ code-only construction report, not real-host or Fresh Agent evidence.
 
 ## Verification scope
 
-The focused macOS Program gate currently contains 4040 passing tests with two
+The focused macOS Program gate currently contains 4042 passing tests with two
 platform-specific skips and exercises
 all 808 packaged route-contract version/API rows with
 in-process fake clients. It validates exact URI dispatch, reflected request and

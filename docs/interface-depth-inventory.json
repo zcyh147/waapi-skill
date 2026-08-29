@@ -3358,6 +3358,30 @@
   ],
   "completed_family_seals": [
     {
+      "github_issue": 85,
+      "id": "generic-core-media-build",
+      "row_count": 16,
+      "rows": [
+        "2021.1|function|ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
+        "2021.1|function|ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion",
+        "2021.1|function|ak.wwise.core.soundbank.getInclusions",
+        "2022.1|function|ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
+        "2022.1|function|ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion",
+        "2022.1|function|ak.wwise.core.soundbank.getInclusions",
+        "2023.1|function|ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
+        "2023.1|function|ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion",
+        "2023.1|function|ak.wwise.core.soundbank.getInclusions",
+        "2024.1|function|ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
+        "2024.1|function|ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion",
+        "2024.1|function|ak.wwise.core.soundbank.getInclusions",
+        "2025.1|function|ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
+        "2025.1|function|ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion",
+        "2025.1|function|ak.wwise.core.mediaPool.get",
+        "2025.1|function|ak.wwise.core.soundbank.getInclusions"
+      ],
+      "rows_sha256": "eb0692ad57f0a504bf110f38355997bb9abca7519ed412c4ed97c223a6a0decf"
+    },
+    {
       "github_issue": 84,
       "id": "generic-core-project-object",
       "row_count": 55,
@@ -153306,7 +153330,7 @@
     "contract": "waapi-skill.typed-request-surface/v1",
     "total_lanes": 824
   },
-  "inventory_sha256": "99f10ad48ecd9cd668963d5d8d38e42ee2e043ead38655fe752002cba96301ff",
+  "inventory_sha256": "e09a2813da62962f50d87b6c13f436b5bd57b34f0f070e786c0133a10e37b385",
   "mechanic_owners": {
     "ambiguous_continuation_selection": "gateway_derivation",
     "batch_layout": "gateway_derivation",
@@ -154582,74 +154606,62 @@
       "version": "2021.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public media-build-business/v1 Adapter covers all 16 exact peak-region, trimmed-peak, Media Pool, and SoundBank inclusion lanes. Callers provide exact AudioFileSource or SoundBank identities, finite time/count values, or bounded Media Pool business meanings and filters. The Gateway owns exact native fields, live exact-case Media Pool field binding, binary peak decoding, inclusion identity enrichment, projection, sorting, result ceilings, and completeness boundaries. request-schema exposes only core-call, while typed-call, typed containers, typed Draft start/continuation, and native request fragments are blocked.",
       "classification": "generic-core-media-build",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "6536a242ec23fbbc5b4452572a7bdd8bececa02b8edd469627e1bdc2788a6982",
       "field_contract_sha256": "c08b232394e5b52a233adb7f87a5531f9ad13335efe72fa76305d4293d7f8a66",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "dependency_order",
-        "batch_layout",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
-        "batch_layout": "model_owned_leak",
-        "dependency_order": "model_owned_leak",
+        "batch_layout": "gateway_owned",
+        "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "bounded_call",
       "schema_sha256": "ae8d7959922d966711cc725a748d6006df3c2712a5ebf52d49976e9729bb4ade",
       "uri": "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
       "version": "2021.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public media-build-business/v1 Adapter covers all 16 exact peak-region, trimmed-peak, Media Pool, and SoundBank inclusion lanes. Callers provide exact AudioFileSource or SoundBank identities, finite time/count values, or bounded Media Pool business meanings and filters. The Gateway owns exact native fields, live exact-case Media Pool field binding, binary peak decoding, inclusion identity enrichment, projection, sorting, result ceilings, and completeness boundaries. request-schema exposes only core-call, while typed-call, typed containers, typed Draft start/continuation, and native request fragments are blocked.",
       "classification": "generic-core-media-build",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "d45f700b3e3d25fc0949b21e13519f4656a06dd6708bfa21d1cc7f4b75b74fdc",
       "field_contract_sha256": "ab5e7bc17c5ebba7d1e3fc4490af874d1ea0d67d00b5bc3b48b7c4ff51ce0646",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "dependency_order",
-        "batch_layout",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
-        "batch_layout": "model_owned_leak",
-        "dependency_order": "model_owned_leak",
+        "batch_layout": "gateway_owned",
+        "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "bounded_call",
       "schema_sha256": "5a2512f9befbaa570ec72a67e84ec0555cc4ce60c262ccc468368be4b7339ad5",
       "uri": "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion",
@@ -155705,37 +155717,31 @@
       "version": "2021.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public media-build-business/v1 Adapter covers all 16 exact peak-region, trimmed-peak, Media Pool, and SoundBank inclusion lanes. Callers provide exact AudioFileSource or SoundBank identities, finite time/count values, or bounded Media Pool business meanings and filters. The Gateway owns exact native fields, live exact-case Media Pool field binding, binary peak decoding, inclusion identity enrichment, projection, sorting, result ceilings, and completeness boundaries. request-schema exposes only core-call, while typed-call, typed containers, typed Draft start/continuation, and native request fragments are blocked.",
       "classification": "generic-core-media-build",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "6934ce61b4fdb1c4ff690d9702d779e9a4c3ea0cb1ab1f123ce5bc1542d0c666",
       "field_contract_sha256": "62820a5ccf0c9d5f0858230aa99b1d0466b651752c13d18630a66bec8f26981b",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "dependency_order",
-        "batch_layout",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
-        "batch_layout": "model_owned_leak",
-        "dependency_order": "model_owned_leak",
+        "batch_layout": "gateway_owned",
+        "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "transaction",
       "schema_sha256": "02503cffa4dfa7a6aaa71998a9efd5af1cadb951cd645b2e985bf150af1e9c15",
       "uri": "ak.wwise.core.soundbank.getInclusions",
@@ -159012,74 +159018,62 @@
       "version": "2022.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public media-build-business/v1 Adapter covers all 16 exact peak-region, trimmed-peak, Media Pool, and SoundBank inclusion lanes. Callers provide exact AudioFileSource or SoundBank identities, finite time/count values, or bounded Media Pool business meanings and filters. The Gateway owns exact native fields, live exact-case Media Pool field binding, binary peak decoding, inclusion identity enrichment, projection, sorting, result ceilings, and completeness boundaries. request-schema exposes only core-call, while typed-call, typed containers, typed Draft start/continuation, and native request fragments are blocked.",
       "classification": "generic-core-media-build",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "2c97a65c7d25d8469e4bb659d45dc03f18547cb240d1cb1d69b3db4f837734fa",
       "field_contract_sha256": "c08b232394e5b52a233adb7f87a5531f9ad13335efe72fa76305d4293d7f8a66",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "dependency_order",
-        "batch_layout",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
-        "batch_layout": "model_owned_leak",
-        "dependency_order": "model_owned_leak",
+        "batch_layout": "gateway_owned",
+        "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "bounded_call",
       "schema_sha256": "e5ff9398f030bcd5cf9073f19252504c5b76f7c3b13e93f7af27bf13d045b6a8",
       "uri": "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
       "version": "2022.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public media-build-business/v1 Adapter covers all 16 exact peak-region, trimmed-peak, Media Pool, and SoundBank inclusion lanes. Callers provide exact AudioFileSource or SoundBank identities, finite time/count values, or bounded Media Pool business meanings and filters. The Gateway owns exact native fields, live exact-case Media Pool field binding, binary peak decoding, inclusion identity enrichment, projection, sorting, result ceilings, and completeness boundaries. request-schema exposes only core-call, while typed-call, typed containers, typed Draft start/continuation, and native request fragments are blocked.",
       "classification": "generic-core-media-build",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "723ddff913ea9cd38827696ab86ac9d666ebaa7bf9f7cebdd403a41657d82f58",
       "field_contract_sha256": "ab5e7bc17c5ebba7d1e3fc4490af874d1ea0d67d00b5bc3b48b7c4ff51ce0646",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "dependency_order",
-        "batch_layout",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
-        "batch_layout": "model_owned_leak",
-        "dependency_order": "model_owned_leak",
+        "batch_layout": "gateway_owned",
+        "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "bounded_call",
       "schema_sha256": "7a68c066743a2fef82722628d16688dee503ad7416e11503b5fddb0413dd2a66",
       "uri": "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion",
@@ -160358,37 +160352,31 @@
       "version": "2022.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public media-build-business/v1 Adapter covers all 16 exact peak-region, trimmed-peak, Media Pool, and SoundBank inclusion lanes. Callers provide exact AudioFileSource or SoundBank identities, finite time/count values, or bounded Media Pool business meanings and filters. The Gateway owns exact native fields, live exact-case Media Pool field binding, binary peak decoding, inclusion identity enrichment, projection, sorting, result ceilings, and completeness boundaries. request-schema exposes only core-call, while typed-call, typed containers, typed Draft start/continuation, and native request fragments are blocked.",
       "classification": "generic-core-media-build",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "545e1aaac27417c92537c67685a408d67ae10f8abf447aba4b8455da210138db",
       "field_contract_sha256": "62820a5ccf0c9d5f0858230aa99b1d0466b651752c13d18630a66bec8f26981b",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "dependency_order",
-        "batch_layout",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
-        "batch_layout": "model_owned_leak",
-        "dependency_order": "model_owned_leak",
+        "batch_layout": "gateway_owned",
+        "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "transaction",
       "schema_sha256": "02503cffa4dfa7a6aaa71998a9efd5af1cadb951cd645b2e985bf150af1e9c15",
       "uri": "ak.wwise.core.soundbank.getInclusions",
@@ -164278,74 +164266,62 @@
       "version": "2023.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public media-build-business/v1 Adapter covers all 16 exact peak-region, trimmed-peak, Media Pool, and SoundBank inclusion lanes. Callers provide exact AudioFileSource or SoundBank identities, finite time/count values, or bounded Media Pool business meanings and filters. The Gateway owns exact native fields, live exact-case Media Pool field binding, binary peak decoding, inclusion identity enrichment, projection, sorting, result ceilings, and completeness boundaries. request-schema exposes only core-call, while typed-call, typed containers, typed Draft start/continuation, and native request fragments are blocked.",
       "classification": "generic-core-media-build",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "49ed464274f52d6424a10de8d11badfd7ebb5c538903cddbfeca670201989a63",
       "field_contract_sha256": "c08b232394e5b52a233adb7f87a5531f9ad13335efe72fa76305d4293d7f8a66",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "dependency_order",
-        "batch_layout",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
-        "batch_layout": "model_owned_leak",
-        "dependency_order": "model_owned_leak",
+        "batch_layout": "gateway_owned",
+        "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "bounded_call",
       "schema_sha256": "e5ff9398f030bcd5cf9073f19252504c5b76f7c3b13e93f7af27bf13d045b6a8",
       "uri": "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
       "version": "2023.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public media-build-business/v1 Adapter covers all 16 exact peak-region, trimmed-peak, Media Pool, and SoundBank inclusion lanes. Callers provide exact AudioFileSource or SoundBank identities, finite time/count values, or bounded Media Pool business meanings and filters. The Gateway owns exact native fields, live exact-case Media Pool field binding, binary peak decoding, inclusion identity enrichment, projection, sorting, result ceilings, and completeness boundaries. request-schema exposes only core-call, while typed-call, typed containers, typed Draft start/continuation, and native request fragments are blocked.",
       "classification": "generic-core-media-build",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "3af024548ec31fa1660ac8f39b95cb9b35e46e9217acacaf0af51bf957f9f5b7",
       "field_contract_sha256": "ab5e7bc17c5ebba7d1e3fc4490af874d1ea0d67d00b5bc3b48b7c4ff51ce0646",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "dependency_order",
-        "batch_layout",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
-        "batch_layout": "model_owned_leak",
-        "dependency_order": "model_owned_leak",
+        "batch_layout": "gateway_owned",
+        "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "bounded_call",
       "schema_sha256": "7a68c066743a2fef82722628d16688dee503ad7416e11503b5fddb0413dd2a66",
       "uri": "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion",
@@ -166018,37 +165994,31 @@
       "version": "2023.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public media-build-business/v1 Adapter covers all 16 exact peak-region, trimmed-peak, Media Pool, and SoundBank inclusion lanes. Callers provide exact AudioFileSource or SoundBank identities, finite time/count values, or bounded Media Pool business meanings and filters. The Gateway owns exact native fields, live exact-case Media Pool field binding, binary peak decoding, inclusion identity enrichment, projection, sorting, result ceilings, and completeness boundaries. request-schema exposes only core-call, while typed-call, typed containers, typed Draft start/continuation, and native request fragments are blocked.",
       "classification": "generic-core-media-build",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "c0ccd3f9943e1face869ba02d72c37471dd47975c67586a009796c4adac0cde2",
       "field_contract_sha256": "62820a5ccf0c9d5f0858230aa99b1d0466b651752c13d18630a66bec8f26981b",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "dependency_order",
-        "batch_layout",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
-        "batch_layout": "model_owned_leak",
-        "dependency_order": "model_owned_leak",
+        "batch_layout": "gateway_owned",
+        "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "transaction",
       "schema_sha256": "70bf73e92728b9f35d78284a3c951c64c8bca7e18077f277a75e8a0e983bd998",
       "uri": "ak.wwise.core.soundbank.getInclusions",
@@ -170512,74 +170482,62 @@
       "version": "2024.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public media-build-business/v1 Adapter covers all 16 exact peak-region, trimmed-peak, Media Pool, and SoundBank inclusion lanes. Callers provide exact AudioFileSource or SoundBank identities, finite time/count values, or bounded Media Pool business meanings and filters. The Gateway owns exact native fields, live exact-case Media Pool field binding, binary peak decoding, inclusion identity enrichment, projection, sorting, result ceilings, and completeness boundaries. request-schema exposes only core-call, while typed-call, typed containers, typed Draft start/continuation, and native request fragments are blocked.",
       "classification": "generic-core-media-build",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "7bceb80f05b0395d7ca28c6339839200412e8404d0edba246e9f60269f03ac99",
       "field_contract_sha256": "c08b232394e5b52a233adb7f87a5531f9ad13335efe72fa76305d4293d7f8a66",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "dependency_order",
-        "batch_layout",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
-        "batch_layout": "model_owned_leak",
-        "dependency_order": "model_owned_leak",
+        "batch_layout": "gateway_owned",
+        "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "bounded_call",
       "schema_sha256": "e8ce6f0c96d67d630a2e11d6faf159108989df545d12dfb8709e645be044acfb",
       "uri": "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
       "version": "2024.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public media-build-business/v1 Adapter covers all 16 exact peak-region, trimmed-peak, Media Pool, and SoundBank inclusion lanes. Callers provide exact AudioFileSource or SoundBank identities, finite time/count values, or bounded Media Pool business meanings and filters. The Gateway owns exact native fields, live exact-case Media Pool field binding, binary peak decoding, inclusion identity enrichment, projection, sorting, result ceilings, and completeness boundaries. request-schema exposes only core-call, while typed-call, typed containers, typed Draft start/continuation, and native request fragments are blocked.",
       "classification": "generic-core-media-build",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "80d3cee4b832c85b899884384b7e34dae6cf5ec098e7d4a80de8b75b0d385a5f",
       "field_contract_sha256": "ab5e7bc17c5ebba7d1e3fc4490af874d1ea0d67d00b5bc3b48b7c4ff51ce0646",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "dependency_order",
-        "batch_layout",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
-        "batch_layout": "model_owned_leak",
-        "dependency_order": "model_owned_leak",
+        "batch_layout": "gateway_owned",
+        "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "bounded_call",
       "schema_sha256": "fb56045988196d4b4e3755a2d3e82c7cb08d5ebc2572b4e59f86fcf9ff42a29f",
       "uri": "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion",
@@ -172418,37 +172376,31 @@
       "version": "2024.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public media-build-business/v1 Adapter covers all 16 exact peak-region, trimmed-peak, Media Pool, and SoundBank inclusion lanes. Callers provide exact AudioFileSource or SoundBank identities, finite time/count values, or bounded Media Pool business meanings and filters. The Gateway owns exact native fields, live exact-case Media Pool field binding, binary peak decoding, inclusion identity enrichment, projection, sorting, result ceilings, and completeness boundaries. request-schema exposes only core-call, while typed-call, typed containers, typed Draft start/continuation, and native request fragments are blocked.",
       "classification": "generic-core-media-build",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "03810febc95adf1dc7aaaddc51082f66937630017d9bc6e9bc6c10b25d16ed36",
       "field_contract_sha256": "62820a5ccf0c9d5f0858230aa99b1d0466b651752c13d18630a66bec8f26981b",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "dependency_order",
-        "batch_layout",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
-        "batch_layout": "model_owned_leak",
-        "dependency_order": "model_owned_leak",
+        "batch_layout": "gateway_owned",
+        "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "transaction",
       "schema_sha256": "12f07dab8273e599d830e5762f60630f9bb4f499deb4cf71c124af59aa6980fb",
       "uri": "ak.wwise.core.soundbank.getInclusions",
@@ -176739,74 +176691,62 @@
       "version": "2025.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public media-build-business/v1 Adapter covers all 16 exact peak-region, trimmed-peak, Media Pool, and SoundBank inclusion lanes. Callers provide exact AudioFileSource or SoundBank identities, finite time/count values, or bounded Media Pool business meanings and filters. The Gateway owns exact native fields, live exact-case Media Pool field binding, binary peak decoding, inclusion identity enrichment, projection, sorting, result ceilings, and completeness boundaries. request-schema exposes only core-call, while typed-call, typed containers, typed Draft start/continuation, and native request fragments are blocked.",
       "classification": "generic-core-media-build",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "b4b1f375e63f25fc6c1ccd70e577c673adc77fc476ba64006cc46729cc8520b2",
       "field_contract_sha256": "c08b232394e5b52a233adb7f87a5531f9ad13335efe72fa76305d4293d7f8a66",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "dependency_order",
-        "batch_layout",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
-        "batch_layout": "model_owned_leak",
-        "dependency_order": "model_owned_leak",
+        "batch_layout": "gateway_owned",
+        "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "bounded_call",
       "schema_sha256": "99d3fe9543135e678193d349e4847ff11a85aa5fd9fc1919fa569e46feb2ca69",
       "uri": "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
       "version": "2025.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public media-build-business/v1 Adapter covers all 16 exact peak-region, trimmed-peak, Media Pool, and SoundBank inclusion lanes. Callers provide exact AudioFileSource or SoundBank identities, finite time/count values, or bounded Media Pool business meanings and filters. The Gateway owns exact native fields, live exact-case Media Pool field binding, binary peak decoding, inclusion identity enrichment, projection, sorting, result ceilings, and completeness boundaries. request-schema exposes only core-call, while typed-call, typed containers, typed Draft start/continuation, and native request fragments are blocked.",
       "classification": "generic-core-media-build",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "ef582fe4d20a51850d6488e24fe9cd0ae54287b9acc64686cde77d47edb5f667",
       "field_contract_sha256": "ab5e7bc17c5ebba7d1e3fc4490af874d1ea0d67d00b5bc3b48b7c4ff51ce0646",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "dependency_order",
-        "batch_layout",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
-        "batch_layout": "model_owned_leak",
-        "dependency_order": "model_owned_leak",
+        "batch_layout": "gateway_owned",
+        "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "bounded_call",
       "schema_sha256": "7cdcb2142ff7ceeda9402787d00c60fa403733da4ae1e08496e8c3bb58740149",
       "uri": "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion",
@@ -177169,37 +177109,31 @@
       "version": "2025.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public media-build-business/v1 Adapter covers all 16 exact peak-region, trimmed-peak, Media Pool, and SoundBank inclusion lanes. Callers provide exact AudioFileSource or SoundBank identities, finite time/count values, or bounded Media Pool business meanings and filters. The Gateway owns exact native fields, live exact-case Media Pool field binding, binary peak decoding, inclusion identity enrichment, projection, sorting, result ceilings, and completeness boundaries. request-schema exposes only core-call, while typed-call, typed containers, typed Draft start/continuation, and native request fragments are blocked.",
       "classification": "generic-core-media-build",
       "construction_shape": "draft",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "bb5823dbcd960c5a8a72f29352a9601fd7f3e4046c3b9066ee54310ee2f45ede",
       "field_contract_sha256": "7039576af8259d29117b179725160a4703ff9bda4e0928ce8e1f76881fcd488c",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "dependency_order",
-        "batch_layout",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
-        "batch_layout": "model_owned_leak",
-        "dependency_order": "model_owned_leak",
+        "batch_layout": "gateway_owned",
+        "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "bounded_call",
       "schema_sha256": "d39266f6b4dc7efd6e5c22026e28c208aff2a8c5e2437b0289f6443ac4257169",
       "uri": "ak.wwise.core.mediaPool.get",
@@ -178781,37 +178715,31 @@
       "version": "2025.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public media-build-business/v1 Adapter covers all 16 exact peak-region, trimmed-peak, Media Pool, and SoundBank inclusion lanes. Callers provide exact AudioFileSource or SoundBank identities, finite time/count values, or bounded Media Pool business meanings and filters. The Gateway owns exact native fields, live exact-case Media Pool field binding, binary peak decoding, inclusion identity enrichment, projection, sorting, result ceilings, and completeness boundaries. request-schema exposes only core-call, while typed-call, typed containers, typed Draft start/continuation, and native request fragments are blocked.",
       "classification": "generic-core-media-build",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "d0c4f7d04edf5ad282adc5e98a10da4aff911b82c04bcc23c9e1d52c877c5f45",
       "field_contract_sha256": "62820a5ccf0c9d5f0858230aa99b1d0466b651752c13d18630a66bec8f26981b",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "dependency_order",
-        "batch_layout",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
-        "batch_layout": "model_owned_leak",
-        "dependency_order": "model_owned_leak",
+        "batch_layout": "gateway_owned",
+        "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "transaction",
       "schema_sha256": "12f07dab8273e599d830e5762f60630f9bb4f499deb4cf71c124af59aa6980fb",
       "uri": "ak.wwise.core.soundbank.getInclusions",
@@ -185280,10 +185208,10 @@
     "typed_request_surface_sha256": "80aef4bed3064ea1859c65d3bcf6d5068a42318a9278d7a691ffa73e2bf00c99"
   },
   "summary": {
-    "migration_ticket_families": 7,
+    "migration_ticket_families": 6,
     "native_dispositions": {
-      "already_deep": 174,
-      "migration_required": 511,
+      "already_deep": 190,
+      "migration_required": 495,
       "prohibited_boundary": 139
     },
     "native_lanes": 824,
@@ -185374,37 +185302,6 @@
       ],
       "rows_sha256": "3f5b7464510f32b6f06dc4c6c3e0a7da700159ad07b8aff69b4b759bed41b9e1",
       "title": "Deepen Wwise CLI and Console project/build operations"
-    },
-    {
-      "blocked_by_family": "generic-core-project-object",
-      "deterministic_tests": "All exact rows and version deltas, bounds, hostile numeric values, result ceilings, continuation completeness, and dedicated-route non-bypass.",
-      "github_issue": 85,
-      "id": "generic-core-media-build",
-      "parent_issue": 57,
-      "proportional_evidence": "One real representative per distinct read shape on matching versions; Fresh Agent only for routing ambiguity introduced by the new declarations.",
-      "public_behavior": "Accept media regions, pool queries, and SoundBank inclusion reads as bounded business requests; derive native selectors, projections, and request layout.",
-      "removal_boundary": "Remove typed handle/wire-type construction for the audited rows while retaining direct bounded read lifecycles.",
-      "row_count": 16,
-      "rows": [
-        "2021.1|function|ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
-        "2021.1|function|ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion",
-        "2021.1|function|ak.wwise.core.soundbank.getInclusions",
-        "2022.1|function|ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
-        "2022.1|function|ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion",
-        "2022.1|function|ak.wwise.core.soundbank.getInclusions",
-        "2023.1|function|ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
-        "2023.1|function|ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion",
-        "2023.1|function|ak.wwise.core.soundbank.getInclusions",
-        "2024.1|function|ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
-        "2024.1|function|ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion",
-        "2024.1|function|ak.wwise.core.soundbank.getInclusions",
-        "2025.1|function|ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
-        "2025.1|function|ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion",
-        "2025.1|function|ak.wwise.core.mediaPool.get",
-        "2025.1|function|ak.wwise.core.soundbank.getInclusions"
-      ],
-      "rows_sha256": "eb0692ad57f0a504bf110f38355997bb9abca7519ed412c4ed97c223a6a0decf",
-      "title": "Deepen generic media peaks, media-pool, and SoundBank read routes"
     },
     {
       "blocked_by_family": "generic-core-media-build",
