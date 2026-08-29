@@ -84,9 +84,10 @@ Use the listed route for the corresponding intent:
 | inspect project default Work Units | `project-default-work-units` |
 | list profiler game objects at a time/cursor | `profiler-game-objects` |
 | inspect one voice-path contribution tree | `profiler-voice-contributions` |
-| build a migrated API request from closed business values | run `request-schema`; execute its sole continuation |
+| migrated business request | run `request-schema`, then its sole continuation |
+| register/unregister a runtime Game Object | `request-schema ak.soundengine.registerGameObj` / `request-schema ak.soundengine.unregisterGameObj`; never `object.create` |
 | inspect the private WAL tree | `debug-wal-tree` |
-| ask a Debug Wwise build to validate one reflected call shape without executing it | `debug-validate-call` with an optional exact user-owned artifact |
+| validate one reflected call in Debug Wwise | `debug-validate-call` |
 | inspect packaged API support, schema, route, or boundary | `capabilities` / `describe` |
 | run a reviewed reflected capability | `request-schema <exact-uri>` and its sole continuation |
 | object lookup | use the `query-object` business declaration; disclose advanced WAQL only when needed |

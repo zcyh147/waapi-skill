@@ -108,6 +108,19 @@ def test_skill_limits_windows_267_recovery_to_one_identical_shell_replay() -> No
     assert "A second 267 or any other shell failure stops" in skill
 
 
+def test_runtime_game_object_registration_never_routes_to_object_create() -> None:
+    skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+    operate = (SKILL_ROOT / "references" / "waapi-operate.md").read_text(
+        encoding="utf-8"
+    )
+
+    for document in (skill, operate):
+        compact = " ".join(document.split())
+        assert "runtime Game Object" in compact
+        assert "`request-schema ak.soundengine.registerGameObj`" in compact
+        assert "never `object.create`" in compact
+
+
 def test_query_reference_has_no_raw_client_fallback() -> None:
     query_reference = (SKILL_ROOT / "references" / "waapi-query.md").read_text(encoding="utf-8")
     query_flat = " ".join(query_reference.split())

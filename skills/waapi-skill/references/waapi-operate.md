@@ -98,7 +98,7 @@ Batch size never establishes file-workflow intent. If a table workflow is explic
 Keep execution domains distinct:
 
 - durable Authoring project edits use the matching `ak.wwise.core.*` route or semantic operation;
-- live playback/Game Object/Bank/RTPC/Switch/State values use `ak.soundengine.*`;
+- runtime actions use `ak.soundengine.*`; register a runtime Game Object with `request-schema ak.soundengine.registerGameObj`; never `object.create`;
 - Authoring audition transport uses `ak.wwise.core.transport.*`;
 - an explicitly requested menu/GUI action uses `ui.commands.execute`.
 
