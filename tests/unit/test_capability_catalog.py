@@ -196,13 +196,13 @@ def test_selection_guidance_registry_contains_only_reflected_bounded_records() -
 def test_2025_media_pool_reads_use_the_bounded_direct_route() -> None:
     catalog = CapabilityCatalog()
 
-    for uri in (
-        "ak.wwise.core.mediaPool.get",
-        "ak.wwise.core.mediaPool.getFields",
-    ):
+    for uri, gateway_commands in {
+        "ak.wwise.core.mediaPool.get": ("request-schema", "core-call"),
+        "ak.wwise.core.mediaPool.getFields": ("request-schema",),
+    }.items():
         capability = catalog.describe("2025.1", uri)
         assert capability.preferred_route == "manifest_dispatch"
-        assert capability.gateway_commands == ("request-schema",)
+        assert capability.gateway_commands == gateway_commands
         assert capability.safety.read_only is True
         assert capability.safety.requires_authorization is False
 
@@ -383,6 +383,7 @@ def test_public_manifest_dispatch_is_exactly_the_immutable_reviewed_call_allowli
             "ak.wwise.core.ping",
             "ak.wwise.core.profiler.getCursorTime",
             "ak.wwise.core.remote.getConnectionStatus",
+            "ak.wwise.core.soundbank.getInclusions",
             "ak.wwise.core.switchContainer.getAssignments",
             "ak.wwise.core.transport.getState",
             "ak.wwise.ui.commands.getCommands",
