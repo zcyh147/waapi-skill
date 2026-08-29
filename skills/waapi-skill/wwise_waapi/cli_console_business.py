@@ -291,9 +291,9 @@ def _native_args(operation: str, plan: Mapping[str, Any]) -> dict[str, Any]:
     elif operation == "ak.wwise.cli.convertExternalSource":
         copy("platforms", "platform")
         copy("source_files", "source-file")
-        copy("source_files_by_platform", "source-by-platform")
+        _mapping(plan, args, "source_files_by_platform", "source-by-platform")
         copy("output_directory", "output")
-        copy("output_directories_by_platform", "output")
+        _mapping(plan, args, "output_directories_by_platform", "output")
         _negative_policy(plan, args, "wwise_dat", "no-wwise-dat", "omit")
         _verbosity(plan, args)
     elif operation == "ak.wwise.cli.createNewProject":
@@ -324,11 +324,8 @@ def _native_args(operation: str, plan: Mapping[str, Any]) -> dict[str, Any]:
             "license_text": "license",
             "license_file": "license-file",
             "external_source_output_directory": "output",
-            "output_directories_by_platform": "output",
             "root_output_directory": "root-output-path",
-            "soundbank_directories_by_platform": "soundbank-path",
             "external_source_files": "source-file",
-            "external_source_files_by_platform": "source-by-platform",
             "save_project": "save",
             "readable_soundbanks": "readable-soundbanks",
             "stable_guids": "use-stable-guid",
@@ -336,6 +333,19 @@ def _native_args(operation: str, plan: Mapping[str, Any]) -> dict[str, Any]:
         }
         for public, native in mapping.items():
             copy(public, native)
+        _mapping(plan, args, "output_directories_by_platform", "output")
+        _mapping(
+            plan,
+            args,
+            "soundbank_directories_by_platform",
+            "soundbank-path",
+        )
+        _mapping(
+            plan,
+            args,
+            "external_source_files_by_platform",
+            "source-by-platform",
+        )
         if "tabular_import_mode" in plan:
             args["tab-delimited-operation"] = _IMPORT_MODES[str(plan["tabular_import_mode"])]
         _negative_policy(plan, args, "decoded_media", "no-decode", "omit")
@@ -396,6 +406,18 @@ def _negative_policy(
 ) -> None:
     if public in plan and plan[public] == negative_value:
         args[native] = True
+
+
+def _mapping(
+    plan: Mapping[str, Any],
+    args: dict[str, Any],
+    public: str,
+    native: str,
+) -> None:
+    rows = plan.get(public)
+    if not isinstance(rows, list) or not rows:
+        return
+    args[native] = list(rows[0]) if len(rows) == 1 else [list(row) for row in rows]
 
 
 def _verbosity(plan: Mapping[str, Any], args: dict[str, Any]) -> None:

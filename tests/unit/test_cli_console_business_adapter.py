@@ -607,7 +607,8 @@ def test_generate_soundbank_plan_derives_flags_mappings_and_modes(tmp_path) -> N
         ["Mac", str(output / "Mac")],
     ]
     assert args["soundbank-path"] == [
-        ["Windows", str(output / "Win" / "Banks")]
+        "Windows",
+        str(output / "Win" / "Banks"),
     ]
     assert args["quiet"] is True
     assert args["no-source-control"] is True
@@ -637,7 +638,8 @@ def test_generate_soundbank_keeps_relative_native_output_below_gateway_root(
     )
 
     assert request["arguments"]["args"]["soundbank-path"] == [
-        ["Windows", "GeneratedSoundBanks/Windows"]
+        "Windows",
+        "GeneratedSoundBanks/Windows",
     ]
     assert request["arguments"]["io_root"] == str(tmp_path)
     parse_operation_request(request, expected_version="2025.1")
