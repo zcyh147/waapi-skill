@@ -204,7 +204,7 @@ prevention checks that are expensive to rediscover.
   an already registered interactive launch path when modal inspection is
   required.
 
-### Offline Fresh replay inherited an unrelated Authoring launch
+### macOS offline Fresh replay inherited an unrelated Authoring launch
 
 - Evidence: the #88 `soundengine_business_1` campaign sealed
   `offline_only=true`, `live_config.used=false`, and `wwise_started=false` for
@@ -216,14 +216,17 @@ prevention checks that are expensive to rediscover.
 - Cause: the preceding real-Authoring validation procedure was carried into a
   later offline-only step. This was orchestration outside the sealed campaign,
   not loss of `--offline-only` inside the runner.
-- Prevention: treat `offline_only=true` as a zero-Wwise phase boundary. Before
-  a fresh run or verify-only replay, require zero Wwise project/Console
-  processes and zero listeners on the selected WAAPI ports, then invoke only
-  the exact campaign command. Inspect liveness from sealed campaign evidence;
-  GUI app-state probes and Authoring launch helpers are not part of this lane.
-  If an unrelated Wwise/Launcher instance appears before the campaign starts,
-  stop, prove that no project process owns the shared bottle, clean only those
-  idle test helpers, re-establish the zero-Wwise preflight, and then continue.
+- Prevention: on macOS, treat `offline_only=true` as a zero-Wwise phase
+  boundary because Authoring, Console, and their helpers share the Audiokinetic
+  CrossOver bottle. Before a fresh run or verify-only replay, require zero
+  Wwise project/Console processes and zero listeners on the selected WAAPI
+  ports, then invoke only the exact campaign command. Inspect liveness from
+  sealed campaign evidence; GUI app-state probes and Authoring launch helpers
+  are not part of this lane. If an unrelated Wwise/Launcher instance appears
+  before the campaign starts, stop, prove that no project process owns the
+  shared bottle, clean only those idle test helpers, re-establish the zero-Wwise
+  preflight, and then continue. Native Windows has no shared-bottle constraint;
+  use the scoped rule below instead.
 
 ### Codex prompt inventory shortened Skill locators behind root aliases
 
@@ -556,6 +559,46 @@ prevention checks that are expensive to rediscover.
   Composer replay only for Drafts that truly have no Business session. A
   model-authored placeholder for a Gateway-owned dynamic ID is not an
   acceptable witness or workaround.
+
+### Final prose is not an exact-term oracle
+
+- Evidence: #88 macOS root `imac-soundengine4-425793e-r5` completed the exact
+  Broker protocol and closed Preview for all four selected units. Monitor and
+  Game Object were nevertheless recorded as FAIL only because the final prose
+  said `Profiler Capture Log` instead of `监控`, and `运行时对象` instead of
+  `游戏对象`. Both replies explicitly said a Preview was generated and nothing
+  was executed; every structural, integrity, no-execute, and closed-request
+  gate passed. The sealed root remains unchanged, while manual review and the
+  user's explicit acceptance classify those two outcomes as semantic passes.
+- Cause: `preview_reported` duplicated business validation with exact noun
+  markers even though the canonical request and Broker evidence already owned
+  the target, values, route, and execution status.
+- Prevention: use structured request, real-Wwise/readback, Broker, and
+  execution-state gates for business truth. Final prose need only make the
+  Preview status clear; ordinary synonyms, translations, word order, and
+  omitted implementation nouns do not fail a run. Keep grossly contradictory
+  claims visible for review, but never require a model to repeat fixed wording.
+
+### An unrelated Windows Console is not an offline Fresh conflict
+
+- Evidence: the #88 native-Windows Monitor verify-only controller stopped
+  before task creation when it saw the user's independent ReWwire
+  `WwiseConsole.exe waapi-server` process. That Console listened on port 18090;
+  neither 8080 nor 8090 was occupied, and the sealed Fresh campaign was
+  `offline_only=true`, `live_config.used=false`, and `wwise_started=false`.
+  After the controller was scoped correctly, the identical verify-only audit
+  passed with task and campaign exit 0 while the same Console remained PID
+  12464 on port 18090 before and after; no task or campaign descendant remained.
+- Cause: an operator-side controller treated the machine-wide count of
+  `Wwise.exe` and `WwiseConsole.exe` as an exclusivity lock. Windows supports
+  concurrent Console processes, and a verify-only replay starts neither Codex
+  nor Wwise.
+- Prevention: for native-Windows offline Fresh and verify-only work, attest the
+  sealed offline campaign contract and check only the scheduled task plus
+  campaign-owned descendants. Existing unrelated Console processes and their
+  distinct listeners are observations, not blockers. For a live campaign,
+  reserve and verify its exact port, sandbox, project, and owned lifecycle;
+  never require every Wwise process on the host to be absent.
 
 ## New-root preflight
 
