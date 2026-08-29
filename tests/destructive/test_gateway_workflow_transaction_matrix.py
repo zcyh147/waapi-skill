@@ -1422,101 +1422,46 @@ def test_runtime_inspection_business_profiler_and_transport_lifecycle(
 
 @pytest.mark.live
 @pytest.mark.destructive
-def test_soundengine_call_is_result_schema_only_or_explicitly_host_blocked(
+def test_soundengine_business_draft_is_real_and_result_schema_bounded(
     workflow_sandbox_runtime: _WorkflowSandboxRuntime,
 ) -> None:
-    """Exercise one CLI/SoundEngine category without overstating its effect."""
+    """Exercise the public SoundEngine business Draft without overstating effect."""
 
     runtime = workflow_sandbox_runtime
     api = "ak.soundengine.postMsgMonitor"
     schema = runtime.gateway(["request-schema", api], live=False)
-    digest = schema.get("schema_digest")
-    fields = schema.get("fields")
-    assert isinstance(digest, str) and digest, schema
-    assert isinstance(fields, list), schema
-    message_field = next(
-        field
-        for field in fields
-        if isinstance(field, Mapping) and field.get("name") == "message"
-    )
-    message_handle = message_field.get("handle")
-    assert isinstance(message_handle, str) and message_handle, schema
-    preview = runtime.gateway(
-        [
-            "typed-call",
-            api,
-            "--schema-digest",
-            digest,
-            "--apply",
-            "--set",
-            message_handle,
-            "string",
-            f"waapi-skill result-schema probe {runtime.version}",
-        ],
+    assert schema["input_shape"] == "business_declaration", schema
+    assert schema["business_adapter"]["legacy_typed_call_public"] is False, schema
+    assert "fields" not in schema, schema
+    message = f"waapi-skill result-schema probe {runtime.version}"
+    draft = _start_business_draft(runtime, api)
+    _update_business_draft(
+        runtime,
+        draft,
+        "draft-declare-soundengine-plan",
+        ["--monitor-message", message],
         live=True,
     )
-    transaction_id = preview.get("transaction_id")
-    assert isinstance(transaction_id, str) and transaction_id, preview
-    shown = runtime.gateway(
-        ["transaction-show", transaction_id, "--summary-only"],
-        live=False,
-    )
-    confirmation = shown.get("confirmation")
-    assert isinstance(confirmation, Mapping), shown
-    token = confirmation.get("token")
-    assert isinstance(token, str) and token, shown
-    runtime.gateway(
-        ["confirm", transaction_id, "--confirmation-token", token],
-        live=False,
-    )
-    execute_argv = [
-        "--host",
-        runtime.lifecycle.host,
-        "--port",
-        str(runtime.port),
-        "--version",
-        runtime.version,
-        "--timeout",
-        "30",
-        "--state-dir",
-        str(runtime.state_dir),
-        "execute",
-        transaction_id,
-    ]
-    execute_code, executed = waapi_gateway.execute_gateway(
-        execute_argv,
-        env=runtime.env,
-    )
-    if execute_code == 2:
-        dispatch_result = executed.get("dispatch_result")
-        assert isinstance(dispatch_result, Mapping), executed
-        assert dispatch_result["waapi_error_uri"] == "ak.wwise.unavailable", executed
-        assert executed["state"] == TransactionState.INDETERMINATE.value, executed
-        assert executed["automatic_retry"] is False, executed
-        runtime.category_results.append(
-            {
-                "category": "cli-soundengine",
-                "status": "blocked",
-                "verifier_strength": "host_unavailable",
-                "reason": "WwiseConsole returned ak.wwise.unavailable",
-            }
-        )
-        return
-    assert execute_code == 0, json.dumps(executed, ensure_ascii=False, sort_keys=True)
-    assert executed["state"] == TransactionState.EXECUTED_UNVERIFIED.value, executed
-    verified = runtime.gateway(["verify", transaction_id], live=True)
-    assert verified["state"] == TransactionState.RESULT_SCHEMA_CHECKED.value, verified
-    assert verified["verified"] is False, verified
-    verification = verified.get("verification")
-    assert isinstance(verification, Mapping), verified
-    assert verification["business_state_verified"] is False, verification
-    assert verification["verification_strength"] in {
-        "result_schema_only",
-        "complete_reflected_schema",
-        "partial_reflected_schema",
-    }, verification
+    result = _complete_core_result_schema_draft(runtime, draft)
+    preview = result["preview"]
+    transaction_id = _required_string(preview, "transaction_id")
+    artifact = TransactionStore(runtime.state_dir).load_preview(
+        transaction_id
+    ).artifact
+    assert artifact["request"]["arguments"] == {
+        "api": api,
+        "args": {"message": message},
+        "options": {},
+    }, artifact
+    verified = result["verify"]
+    assert verified["state"] == TransactionState.RESULT_SCHEMA_CHECKED.value
+    assert verified["verified"] is False
     runtime.category_results.append(
-        {"category": "cli-soundengine", "status": "PASS", "verifier_strength": "result_schema_only"}
+        {
+            "category": "cli-soundengine",
+            "status": "PASS",
+            "verifier_strength": "business_draft_and_result_schema_only",
+        }
     )
 
 
