@@ -1276,6 +1276,66 @@ def test_prompt_audit_resolves_unique_short_skill_root_locators(
     assert audit.passed is True
 
 
+@pytest.mark.parametrize(
+    ("root", "locator", "expected"),
+    (
+        (
+            "/opt/codex/skills/.system",
+            "r0/skill-creator/SKILL.md",
+            "/opt/codex/skills/.system/skill-creator/SKILL.md",
+        ),
+        (
+            r"C:\Users\cbos\.codex\skills\.system",
+            r"r0\skill-creator/SKILL.md",
+            r"C:\Users\cbos\.codex\skills\.system\skill-creator\SKILL.md",
+        ),
+        (
+            r"\\server\codex-share\skills\.system",
+            "r0/skill-creator/SKILL.md",
+            r"\\server\codex-share\skills\.system\skill-creator\SKILL.md",
+        ),
+    ),
+)
+def test_short_skill_locator_expansion_preserves_the_root_lexical_flavor(
+    root: str,
+    locator: str,
+    expected: str,
+) -> None:
+    assert codex_harness_module.expand_short_skill_locator(
+        locator,
+        roots={"r0": root},
+    ) == expected
+
+
+@pytest.mark.parametrize(
+    "locator",
+    (
+        "/Users/test/.agents/skills/demo/SKILL.md",
+        r"C:\Users\test\.agents\skills\demo\SKILL.md",
+        r"C:/Users/test/.agents\skills/demo/SKILL.md",
+        r"\\server\share\.agents\skills\demo\SKILL.md",
+    ),
+)
+def test_skill_locator_classification_is_independent_of_the_runner_host(
+    locator: str,
+) -> None:
+    assert codex_harness_module.local_locator_contains_parts(
+        locator,
+        (".agents", "skills"),
+    )
+
+
+def test_windows_skill_locator_classification_uses_windows_case_semantics() -> None:
+    assert codex_harness_module.local_locator_contains_parts(
+        r"C:\USERS\TEST\.CODEX\SKILLS\.SYSTEM\skill-creator\SKILL.md",
+        (".codex", "skills", ".system"),
+    )
+    assert not codex_harness_module.local_locator_contains_parts(
+        "/Users/test/.CODEX/SKILLS/.SYSTEM/skill-creator/SKILL.md",
+        (".codex", "skills", ".system"),
+    )
+
+
 def test_prompt_audit_rejects_ambiguous_and_personal_short_skill_roots(
     tmp_path: Path,
 ) -> None:

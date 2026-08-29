@@ -3056,23 +3056,48 @@ def expand_short_skill_locator(
     )
     if root is None or not relative or any(part in {".", ".."} for part in relative):
         return locator
-    return str(Path(root).expanduser().joinpath(*relative))
+    pure_root, _windows = _skill_locator_pure_path(root)
+    if not pure_root.is_absolute():
+        return locator
+    return str(pure_root.joinpath(*relative))
+
+
+def _skill_locator_pure_path(
+    locator: str,
+) -> tuple[PurePosixPath | PureWindowsPath, bool]:
+    """Select a locator's owning lexical flavor without consulting the host."""
+
+    windows = PureWindowsPath(locator)
+    posix = PurePosixPath(locator)
+    if windows.drive:
+        return windows, True
+    if posix.is_absolute():
+        return posix, False
+    if "\\" in locator:
+        return windows, True
+    return posix, False
 
 
 def local_locator_contains_parts(
     locator: str,
     expected_parts: Sequence[str],
 ) -> bool:
-    """Match a locator using only the active host's filesystem semantics."""
+    """Match path components using the locator's owning lexical semantics."""
 
     if not locator or not expected_parts:
         return False
-    parts = Path(locator).expanduser().parts
+    pure, windows = _skill_locator_pure_path(locator)
+    parts = pure.parts
     width = len(expected_parts)
-    expected = Path(*expected_parts)
+    if windows:
+        comparable = tuple(part.casefold() for part in parts)
+        expected = tuple(part.casefold() for part in expected_parts)
+    else:
+        comparable = parts
+        expected = tuple(expected_parts)
     return any(
-        Path(*parts[index : index + width]) == expected
-        for index in range(len(parts) - width + 1)
+        comparable[index : index + width] == expected
+        for index in range(len(comparable) - width + 1)
     )
 
 

@@ -290,6 +290,7 @@ def _preview_soundengine_plan(
     *,
     env: dict[str, str],
     state_dir: Path,
+    role_bindings: tuple[tuple[str, str], ...] = (),
 ) -> dict[str, object]:
     started = _call(
         ["draft-start", operation],
@@ -300,6 +301,36 @@ def _preview_soundengine_plan(
     assert isinstance(draft, dict)
     draft_id = str(draft["draft_id"])
     authority = str(started["task_authority"])
+    current = draft
+    bound_handles: dict[str, str] = {}
+    for role, object_id in role_bindings:
+        bound = _call(
+            [
+                "draft-bind-object",
+                draft_id,
+                "--task-authority",
+                authority,
+                "--expected-revision",
+                str(current["revision"]),
+                "--role",
+                role,
+                "--object-id",
+                object_id,
+            ],
+            env=env,
+            state_dir=state_dir,
+        )
+        current = bound["draft"]
+        assert isinstance(current, dict)
+        bound_object = bound["bound_object"]
+        assert isinstance(bound_object, dict)
+        bound_handles[role] = str(bound_object["handle"])
+    declaration_args = [
+        bound_handles[value.removeprefix("<bound:").removesuffix(">")]
+        if value.startswith("<bound:") and value.endswith(">")
+        else value
+        for value in declaration_args
+    ]
     declared = _call(
         [
             "draft-declare-soundengine-plan",
@@ -307,7 +338,7 @@ def _preview_soundengine_plan(
             "--task-authority",
             authority,
             "--expected-revision",
-            str(draft["revision"]),
+            str(current["revision"]),
             *declaration_args,
         ],
         env=env,
@@ -674,16 +705,23 @@ def test_soundengine_business_runtime_and_spatial_families_on_authoring(
     ) == Path(env["WWISE_AUTHORING_SANDBOX_PROJECT"]).resolve(strict=True)
 
     handles: list[str] = []
+    playing_handle: str | None = None
     primary_error: BaseException | None = None
     cleanup_errors: list[BaseException] = []
 
-    def complete(operation: str, declaration: list[str]) -> dict[str, object]:
+    def complete(
+        operation: str,
+        declaration: list[str],
+        *,
+        role_bindings: tuple[tuple[str, str], ...] = (),
+    ) -> dict[str, object]:
         return _execute_and_verify(
             _preview_soundengine_plan(
                 operation,
                 declaration,
                 env=env,
                 state_dir=state_dir,
+                role_bindings=role_bindings,
             ),
             env=env,
             state_dir=state_dir,
@@ -706,6 +744,108 @@ def test_soundengine_business_runtime_and_spatial_families_on_authoring(
             assert handle.startswith("goh1-")
             handles.append(handle)
         emitter, listener = handles
+
+        event_id = "{1AF4A3BA-682A-4664-AC31-45C0F0E6F8D1}"
+        state_group_id = "{AF599241-DE64-4286-BB8B-B0260EE20B80}"
+        state_id = "{43C6702F-3A30-4D5C-B16D-C862BE5989EF}"
+        switch_group_id = "{9127B7FC-12D5-45F1-99E7-D9EC0CF8E8B1}"
+        switch_id = "{E82D7064-8509-42A1-96E4-8E3AD2F878FA}"
+        for object_id, object_type in (
+            (event_id, "Event"),
+            (state_group_id, "StateGroup"),
+            (state_id, "State"),
+            (switch_group_id, "SwitchGroup"),
+            (switch_id, "Switch"),
+        ):
+            resolved = _call(
+                ["query-object", "--exact-id", object_id],
+                env=env,
+                state_dir=state_dir,
+            )
+            rows = resolved["objects"]
+            assert isinstance(rows, list) and len(rows) == 1
+            assert rows[0]["type"] == object_type
+
+        posted = complete(
+            "ak.soundengine.postEvent",
+            [
+                "--event-handle", "<bound:event>",
+                "--game-object-handle", emitter,
+            ],
+            role_bindings=(("event", event_id),),
+        )
+        posted_business = _runtime_business_result(posted)
+        playing_handle = str(posted_business["playing_handle"])
+        assert playing_handle.startswith("plh1-")
+        seeked = complete(
+            "ak.soundengine.seekOnEvent",
+            [
+                "--event-handle", "<bound:event>",
+                "--playing-handle", playing_handle,
+                "--position-percent", "25",
+                "--nearest-marker",
+            ],
+            role_bindings=(("event", event_id),),
+        )
+        assert seeked["state"] == TransactionState.RESULT_SCHEMA_CHECKED.value
+        stopped = complete(
+            "ak.soundengine.stopPlayingID",
+            ["--playing-handle", playing_handle],
+        )
+        retired_count = _runtime_business_result(stopped)[
+            "retired_playing_handle_count"
+        ]
+        playing_handle = None
+        assert retired_count == 1
+
+        complete(
+            "ak.soundengine.setState",
+            [
+                "--state-group-handle", "<bound:state_group>",
+                "--state-handle", "<bound:state>",
+            ],
+            role_bindings=(
+                ("state_group", state_group_id),
+                ("state", state_id),
+            ),
+        )
+        state = _call(
+            [
+                "core-call",
+                "ak.soundengine.getState",
+                "--state-group-id",
+                state_group_id,
+            ],
+            env=env,
+            state_dir=state_dir,
+        )
+        assert state["agent_result"] == {"id": state_id, "name": "a_Stealth"}
+
+        complete(
+            "ak.soundengine.setSwitch",
+            [
+                "--switch-group-handle", "<bound:switch_group>",
+                "--switch-handle", "<bound:switch>",
+                "--game-object-handle", emitter,
+            ],
+            role_bindings=(
+                ("switch_group", switch_group_id),
+                ("switch", switch_id),
+            ),
+        )
+        switch = _call(
+            [
+                "core-call",
+                "ak.soundengine.getSwitch",
+                "--switch-group-id",
+                switch_group_id,
+                "--game-object-handle",
+                emitter,
+            ],
+            env=env,
+            state_dir=state_dir,
+        )
+        assert switch["agent_result"] == {"id": switch_id, "name": "Walking"}
 
         operations = (
             (
@@ -773,6 +913,17 @@ def test_soundengine_business_runtime_and_spatial_families_on_authoring(
     except BaseException as exc:
         primary_error = exc
     finally:
+        if playing_handle is not None:
+            try:
+                stopped = complete(
+                    "ak.soundengine.stopPlayingID",
+                    ["--playing-handle", playing_handle],
+                )
+                assert _runtime_business_result(stopped)[
+                    "retired_playing_handle_count"
+                ] == 1
+            except BaseException as exc:
+                cleanup_errors.append(exc)
         for handle in reversed(handles):
             try:
                 unregistered = complete(

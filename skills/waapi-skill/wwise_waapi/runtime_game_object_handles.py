@@ -6,6 +6,7 @@ import json
 import os
 import re
 import secrets
+import stat
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -16,7 +17,10 @@ RUNTIME_GAME_OBJECT_HANDLE_CONTRACT = (
     "waapi-skill.soundengine-game-object-handle/v1"
 )
 _HANDLE = re.compile(r"^goh1-[0-9a-f]{32}$")
+_RECORD_FILE = re.compile(r"^goh1-[0-9a-f]{32}\.json$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
+_MAX_RECORD_BYTES = 16 * 1024
+_MAX_RECORDS = 1024
 
 
 class RuntimeGameObjectHandleError(ValueError):
@@ -99,7 +103,21 @@ class RuntimeGameObjectHandleStore:
                 "GAME_OBJECT_HANDLE_INVALID",
                 "Source artifact hash is invalid.",
             )
+        if (
+            not isinstance(source_transaction_id, str)
+            or not source_transaction_id
+            or len(source_transaction_id.encode("utf-8")) > 128
+        ):
+            raise RuntimeGameObjectHandleError(
+                "GAME_OBJECT_HANDLE_INVALID",
+                "Source transaction identity is invalid.",
+            )
         self.records.mkdir(parents=True, exist_ok=True)
+        if len(self._record_paths()) >= _MAX_RECORDS:
+            raise RuntimeGameObjectHandleError(
+                "GAME_OBJECT_HANDLE_STORE_LIMIT",
+                "Game object handle store reached its fixed record ceiling.",
+            )
         for _ in range(8):
             handle = f"goh1-{secrets.token_hex(16)}"
             path = self.records / f"{handle}.json"
@@ -121,10 +139,16 @@ class RuntimeGameObjectHandleStore:
                 source_artifact_hash=source_artifact_hash,
                 binding_digest=canonical_sha256(binding),
             )
+            encoded = canonical_json_bytes(record.as_dict())
+            if len(encoded) > _MAX_RECORD_BYTES:
+                raise RuntimeGameObjectHandleError(
+                    "GAME_OBJECT_HANDLE_INVALID",
+                    "Game object handle record exceeds its fixed byte ceiling.",
+                )
             temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
             try:
                 with temporary.open("xb") as stream:
-                    stream.write(canonical_json_bytes(record.as_dict()))
+                    stream.write(encoded)
                     stream.flush()
                     os.fsync(stream.fileno())
                 os.replace(temporary, path)
@@ -144,19 +168,7 @@ class RuntimeGameObjectHandleStore:
     ) -> RuntimeGameObjectHandleRecord:
         validated = validate_runtime_game_object_handle(handle)
         path = self.records / f"{validated}.json"
-        if not path.is_file() or path.is_symlink():
-            raise RuntimeGameObjectHandleError(
-                "GAME_OBJECT_HANDLE_NOT_AVAILABLE",
-                "Game object handle is unavailable or already retired.",
-            )
-        try:
-            payload = json.loads(path.read_text(encoding="utf-8"))
-            record = self._record_from_payload(payload)
-        except (OSError, UnicodeError, json.JSONDecodeError, TypeError, ValueError) as exc:
-            raise RuntimeGameObjectHandleError(
-                "GAME_OBJECT_HANDLE_INVALID",
-                "Stored game object handle is invalid.",
-            ) from exc
+        record = self._load(path)
         if record.context != context:
             raise RuntimeGameObjectHandleError(
                 "GAME_OBJECT_HANDLE_CONTEXT_DRIFT",
@@ -198,27 +210,73 @@ class RuntimeGameObjectHandleStore:
         return tuple(record.handle for record in matches)
 
     def _active_records(self) -> list[RuntimeGameObjectHandleRecord]:
-        if not self.records.is_dir():
-            return []
-        records: list[RuntimeGameObjectHandleRecord] = []
-        for path in sorted(self.records.glob("goh1-*.json")):
-            if path.is_symlink() or not path.is_file():
-                raise RuntimeGameObjectHandleError(
-                    "GAME_OBJECT_HANDLE_INVALID",
-                    "Game object handle store contains an invalid record path.",
-                )
-            try:
-                records.append(
-                    self._record_from_payload(
-                        json.loads(path.read_text(encoding="utf-8"))
-                    )
-                )
-            except (OSError, UnicodeError, json.JSONDecodeError, TypeError, ValueError) as exc:
-                raise RuntimeGameObjectHandleError(
-                    "GAME_OBJECT_HANDLE_INVALID",
-                    "Game object handle store contains an invalid record.",
-                ) from exc
-        return records
+        return [self._load(path) for path in self._record_paths()]
+
+    def _record_paths(self) -> tuple[Path, ...]:
+        if not self.records.exists():
+            return ()
+        if self.records.is_symlink() or not self.records.is_dir():
+            raise RuntimeGameObjectHandleError(
+                "GAME_OBJECT_HANDLE_STORE_CORRUPT",
+                "Game object handle store is not one local directory.",
+            )
+        paths: list[Path] = []
+        try:
+            with os.scandir(self.records) as entries:
+                for entry in entries:
+                    if len(paths) >= _MAX_RECORDS:
+                        raise RuntimeGameObjectHandleError(
+                            "GAME_OBJECT_HANDLE_STORE_LIMIT",
+                            "Game object handle store exceeds its fixed record ceiling.",
+                        )
+                    if (
+                        _RECORD_FILE.fullmatch(entry.name) is None
+                        or not entry.is_file(follow_symlinks=False)
+                    ):
+                        raise RuntimeGameObjectHandleError(
+                            "GAME_OBJECT_HANDLE_STORE_CORRUPT",
+                            "Game object handle store contains an invalid record path.",
+                        )
+                    paths.append(Path(entry.path))
+        except OSError as exc:
+            raise RuntimeGameObjectHandleError(
+                "GAME_OBJECT_HANDLE_STORE_CORRUPT",
+                "Game object handle store cannot be enumerated safely.",
+            ) from exc
+        return tuple(sorted(paths))
+
+    def _load(self, path: Path) -> RuntimeGameObjectHandleRecord:
+        if not os.path.lexists(path):
+            raise RuntimeGameObjectHandleError(
+                "GAME_OBJECT_HANDLE_NOT_AVAILABLE",
+                "Game object handle is unavailable or already retired.",
+            )
+        try:
+            metadata = path.lstat()
+        except OSError as exc:
+            raise RuntimeGameObjectHandleError(
+                "GAME_OBJECT_HANDLE_STORE_CORRUPT",
+                "Stored game object handle cannot be inspected safely.",
+            ) from exc
+        if (
+            not stat.S_ISREG(metadata.st_mode)
+            or path.is_symlink()
+            or metadata.st_size > _MAX_RECORD_BYTES
+        ):
+            raise RuntimeGameObjectHandleError(
+                "GAME_OBJECT_HANDLE_STORE_CORRUPT",
+                "Stored game object handle is not one bounded regular file.",
+            )
+        try:
+            data = path.read_bytes()
+            if len(data) > _MAX_RECORD_BYTES:
+                raise ValueError("record grew beyond its fixed byte ceiling")
+            return self._record_from_payload(json.loads(data))
+        except (OSError, UnicodeError, json.JSONDecodeError, TypeError, ValueError) as exc:
+            raise RuntimeGameObjectHandleError(
+                "GAME_OBJECT_HANDLE_STORE_CORRUPT",
+                "Stored game object handle is invalid.",
+            ) from exc
 
     @staticmethod
     def _record_from_payload(payload: object) -> RuntimeGameObjectHandleRecord:
