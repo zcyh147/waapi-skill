@@ -1504,66 +1504,95 @@ def test_soundengine_business_draft_is_real_and_result_schema_bounded(
 
 @pytest.mark.live
 @pytest.mark.destructive
-def test_cli_console_business_build_and_project_verifier_shapes(
+def test_cli_console_business_project_verify(
     workflow_sandbox_runtime: _WorkflowSandboxRuntime,
 ) -> None:
-    """Exercise the deep CLI/Console seam across its distinct real oracles."""
+    """Verify one project through the deep CLI declaration and weak oracle."""
 
     runtime = workflow_sandbox_runtime
-    project_file = str(runtime.sandbox.sandbox_project)
-    output_root = runtime.sandbox.sandbox_root / "cli-console-business-output"
-    output_root.mkdir(parents=True, exist_ok=False)
-
-    verify_api = "ak.wwise.cli.verify"
-    verify_schema = runtime.gateway(["request-schema", verify_api], live=False)
-    assert verify_schema["input_shape"] == "business_declaration", verify_schema
-    assert verify_schema["native_request_fields_disclosed"] is False, verify_schema
-    verify_draft = _start_business_draft(runtime, verify_api)
+    api = "ak.wwise.cli.verify"
+    schema = runtime.gateway(["request-schema", api], live=False)
+    assert schema["input_shape"] == "business_declaration", schema
+    assert schema["native_request_fields_disclosed"] is False, schema
+    draft = _start_business_draft(runtime, api)
     _update_business_draft(
         runtime,
-        verify_draft,
+        draft,
         "draft-declare-cli-console-plan",
         [
-            "--value", "project_file", project_file,
+            "--value", "project_file", str(runtime.sandbox.sandbox_project),
             "--value", "verbosity", "quiet",
         ],
         live=True,
     )
-    verify_result = _complete_core_result_schema_draft(runtime, verify_draft)
-    assert verify_result["verify"]["verification"]["business_state_verified"] is False
-    _restart_workflow_host_after_transport_loss(runtime)
+    result = _complete_core_result_schema_draft(runtime, draft)
+    assert result["verify"]["verification"]["business_state_verified"] is False
+    runtime.category_results.append(
+        {
+            "category": "cli-console-project-verify",
+            "status": "PASS",
+            "verifier_strength": "result_schema_and_external_harness_completion",
+        }
+    )
 
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_cli_console_business_object_dump(
+    workflow_sandbox_runtime: _WorkflowSandboxRuntime,
+) -> None:
+    """Write and inspect one exact object-dump artifact."""
+
+    runtime = workflow_sandbox_runtime
+    output_root = runtime.sandbox.sandbox_root / "cli-console-object-dump"
+    output_root.mkdir(parents=True, exist_ok=False)
     dump_file = output_root / f"objects-{runtime.version}.txt"
-    dump_api = "ak.wwise.cli.dumpObjects"
-    dump_draft = _start_business_draft(runtime, dump_api)
+    draft = _start_business_draft(runtime, "ak.wwise.cli.dumpObjects")
     _update_business_draft(
         runtime,
-        dump_draft,
+        draft,
         "draft-declare-cli-console-plan",
         [
-            "--value", "project_file", project_file,
+            "--value", "project_file", str(runtime.sandbox.sandbox_project),
             "--value", "output_file", str(dump_file),
             "--value", "content", "property_sets",
             "--toggle", "include_session_objects", "disable",
         ],
         live=True,
     )
-    dump_result = _complete_core_result_schema_draft(runtime, dump_draft)
-    assert dump_file.is_file(), dump_result
+    result = _complete_core_result_schema_draft(runtime, draft)
+    assert dump_file.is_file(), result
     assert dump_file.stat().st_size > 0
-    _restart_workflow_host_after_transport_loss(runtime)
+    runtime.category_results.append(
+        {
+            "category": "cli-console-object-dump",
+            "status": "PASS",
+            "verifier_strength": "result_schema_plus_exact_file_oracle",
+        }
+    )
 
-    generated_root = output_root / "generated"
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_cli_console_business_soundbank_generate(
+    workflow_sandbox_runtime: _WorkflowSandboxRuntime,
+) -> None:
+    """Generate real SoundBanks through Gateway-owned platform mapping."""
+
+    runtime = workflow_sandbox_runtime
+    generated_root = runtime.sandbox.sandbox_root / "cli-console-generated"
     generated_banks = generated_root / "Windows"
-    generated_root.mkdir()
-    generate_api = "ak.wwise.cli.generateSoundbank"
-    generate_draft = _start_business_draft(runtime, generate_api)
+    generated_banks.mkdir(parents=True, exist_ok=False)
+    api = "ak.wwise.cli.generateSoundbank"
+    schema = runtime.gateway(["request-schema", api], live=False)
+    assert schema["input_shape"] == "business_declaration", schema
+    draft = _start_business_draft(runtime, api)
     _update_business_draft(
         runtime,
-        generate_draft,
+        draft,
         "draft-declare-cli-console-plan",
         [
-            "--value", "project_file", project_file,
+            "--value", "project_file", str(runtime.sandbox.sandbox_project),
             "--item", "platforms", "Windows",
             "--toggle", "skip_languages", "enable",
             "--value", "source_control", "disabled",
@@ -1573,42 +1602,49 @@ def test_cli_console_business_build_and_project_verifier_shapes(
         ],
         live=True,
     )
-    generate_result = _complete_core_result_schema_draft(runtime, generate_draft)
+    result = _complete_core_result_schema_draft(runtime, draft)
     generated_files = tuple(generated_root.rglob("*.bnk"))
-    assert generated_files, generate_result
-    _restart_workflow_host_after_transport_loss(runtime)
-
-    categories = [
+    assert generated_files, result
+    runtime.category_results.append(
         {
-            "category": "cli-console-business-result-schema",
+            "category": "cli-console-soundbank-generate",
             "status": "PASS",
-            "verifier_strength": "project_verify_plus_exact_file_and_soundbank_oracles",
+            "verifier_strength": "result_schema_plus_soundbank_file_oracle",
         }
-    ]
-    if runtime.version in {"2023.1", "2024.1", "2025.1"}:
-        open_api = "ak.wwise.console.project.open"
-        open_draft = _start_business_draft(runtime, open_api)
-        _update_business_draft(
-            runtime,
-            open_draft,
-            "draft-declare-cli-console-plan",
-            [
-                "--value", "project_file", project_file,
-                "--toggle", "auto_checkout", "disable",
-                "--value", "migration_policy", "fail",
-            ],
-            live=True,
-        )
-        opened = _complete_business_draft(runtime, open_draft)
-        assert opened["verify"]["verification"]["business_state_verified"] is True
-        categories.append(
-            {
-                "category": "cli-console-project-transition",
-                "status": "PASS",
-                "verifier_strength": "result_schema_and_project_transition",
-            }
-        )
-    runtime.category_results.extend(categories)
+    )
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_cli_console_business_project_open_transition(
+    workflow_sandbox_runtime: _WorkflowSandboxRuntime,
+) -> None:
+    """Open the same sandbox through the project-transition verifier."""
+
+    runtime = workflow_sandbox_runtime
+    if runtime.version not in {"2023.1", "2024.1", "2025.1"}:
+        pytest.skip("Console project.open is reflected only in Wwise 2023.1+")
+    draft = _start_business_draft(runtime, "ak.wwise.console.project.open")
+    _update_business_draft(
+        runtime,
+        draft,
+        "draft-declare-cli-console-plan",
+        [
+            "--value", "project_file", str(runtime.sandbox.sandbox_project),
+            "--toggle", "auto_checkout", "disable",
+            "--value", "migration_policy", "fail",
+        ],
+        live=True,
+    )
+    opened = _complete_business_draft(runtime, draft)
+    assert opened["verify"]["verification"]["business_state_verified"] is True
+    runtime.category_results.append(
+        {
+            "category": "cli-console-project-transition",
+            "status": "PASS",
+            "verifier_strength": "result_schema_and_project_transition",
+        }
+    )
 
 
 @pytest.mark.live
