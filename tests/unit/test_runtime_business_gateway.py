@@ -9,6 +9,8 @@ from typing import Any, Mapping, Sequence
 
 import pytest
 
+from wwise_waapi.canonical import canonical_sha256
+
 
 LOG_GET_URI = "ak.wwise.core.log.get"
 GET_CURSOR_TIME_URI = "ak.wwise.core.profiler.getCursorTime"
@@ -39,6 +41,10 @@ from wwise_waapi.runtime_inspection_business_contracts import (  # noqa: E402
 )
 from wwise_waapi.runtime_inspection_business import (  # noqa: E402
     normalize_runtime_inspection_result,
+)
+from wwise_waapi.runtime_transport_handles import (  # noqa: E402
+    RuntimeTransportContext,
+    RuntimeTransportHandleStore,
 )
 from wwise_waapi.transactions import TransactionStore  # noqa: E402
 from wwise_waapi.execution_contracts import ExecutionContractRegistry  # noqa: E402
@@ -104,6 +110,35 @@ def _env(tmp_path: Path, *, version: str = "2025.1") -> dict[str, str]:
         "WWISE_VERSION": version,
         "WWISE_WAAPI_PORT": "31337",
     }
+
+
+def _issue_transport_handle(
+    state_dir: Path,
+    *,
+    project_path: Path,
+    version: str = "2025.1",
+    transport_id: int = 74,
+    project_id: str = "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}",
+) -> str:
+    return RuntimeTransportHandleStore(state_dir).issue(
+        transport_id=transport_id,
+        context=RuntimeTransportContext(
+            endpoint_url="ws://127.0.0.1:31337/waapi",
+            project_id=project_id,
+            project_path=str(project_path),
+            wwise_version=version,
+            wwise_build=f"v{version}.0.1",
+        ),
+        source_transaction_id="tx1-testtransport00000000",
+        source_artifact_hash="a" * 64,
+        transport_row_sha256=canonical_sha256(
+            {
+                "transport": transport_id,
+                "object": "{11111111-1111-1111-1111-111111111111}",
+                "gameObject": 1,
+            }
+        ),
+    ).handle
 
 
 def test_runtime_business_direct_read_inventory_is_exactly_49_rows() -> None:
@@ -702,6 +737,13 @@ def test_profiler_voice_read_rejects_invented_handle_before_connection(
 def test_transport_state_read_maps_gateway_handle_without_exposing_native_id(
     tmp_path: Path,
 ) -> None:
+    state_dir = tmp_path / "state"
+    project_file = tmp_path / "SampleProject.wproj"
+    project_file.write_text("fixture", encoding="utf-8")
+    transport_handle = _issue_transport_handle(
+        state_dir,
+        project_path=project_file,
+    )
     client = FakeClient(
         {
             "ak.wwise.core.getInfo": [
@@ -718,6 +760,13 @@ def test_transport_state_read_maps_gateway_handle_without_exposing_native_id(
                         "build": 1,
                         "displayName": "v2025.1.0.1",
                     },
+                }
+            ],
+            "ak.wwise.core.getProjectInfo": [
+                {
+                    "id": "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}",
+                    "name": "SampleProject",
+                    "path": str(project_file),
                 }
             ],
             "ak.wwise.core.transport.getList": [
@@ -739,10 +788,12 @@ def test_transport_state_read_maps_gateway_handle_without_exposing_native_id(
         [
             "--version",
             "2025.1",
+            "--state-dir",
+            str(state_dir),
             "core-call",
             TRANSPORT_GET_STATE_URI,
             "--transport-handle",
-            "transport-session-0000004a",
+            transport_handle,
         ],
         env=_env(tmp_path),
         client_factory=lambda _url: client,
@@ -751,12 +802,12 @@ def test_transport_state_read_maps_gateway_handle_without_exposing_native_id(
     assert code == 0, payload
     assert (TRANSPORT_GET_STATE_URI, {"transport": 74}, {}) in client.calls
     assert payload["agent_result"] == {
-        "transport_handle": "transport-session-0000004a",
+        "transport_handle": transport_handle,
         "state": "paused",
     }
     assert payload["business_request"] == {
         "operation": TRANSPORT_GET_STATE_URI,
-        "transport_handle": "transport-session-0000004a",
+        "transport_handle": transport_handle,
         "max_results": 1,
     }
 
@@ -812,7 +863,7 @@ def test_transport_state_returns_authoring_boundary_before_transport_dispatch(
             "core-call",
             TRANSPORT_GET_STATE_URI,
             "--transport-handle",
-            "transport-session-0000004a",
+            "trh1-" + "61" * 16,
         ],
         env=_env(tmp_path),
         client_factory=lambda _url: client,
@@ -827,6 +878,13 @@ def test_transport_state_returns_authoring_boundary_before_transport_dispatch(
 def test_transport_state_rejects_well_formed_but_non_live_handle_before_state_call(
     tmp_path: Path,
 ) -> None:
+    state_dir = tmp_path / "state"
+    project_file = tmp_path / "SampleProject.wproj"
+    project_file.write_text("fixture", encoding="utf-8")
+    transport_handle = _issue_transport_handle(
+        state_dir,
+        project_path=project_file,
+    )
     client = FakeClient(
         {
             "ak.wwise.core.getInfo": [
@@ -845,15 +903,22 @@ def test_transport_state_rejects_well_formed_but_non_live_handle_before_state_ca
                     },
                 }
             ],
+            "ak.wwise.core.getProjectInfo": [
+                {
+                    "id": "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}",
+                    "name": "SampleProject",
+                    "path": str(project_file),
+                }
+            ],
             "ak.wwise.core.transport.getList": [{"list": []}],
         }
     )
 
     code, payload = gateway.execute_gateway(
         [
-            "--version", "2025.1",
+            "--version", "2025.1", "--state-dir", str(state_dir),
             "core-call", TRANSPORT_GET_STATE_URI,
-            "--transport-handle", "transport-session-0000004a",
+            "--transport-handle", transport_handle,
         ],
         env=_env(tmp_path),
         client_factory=lambda _url: client,
@@ -1199,6 +1264,17 @@ def _seal_runtime_control_preview(
 ) -> dict[str, object]:
     state_dir = tmp_path / ("state-" + operation.rsplit(".", 1)[-1])
     client = _RuntimeControlDraftClient(tmp_path, version=version)
+    declaration_values = tuple(declaration)
+    if "transport-session-0000004a" in declaration_values:
+        issued_handle = _issue_transport_handle(
+            state_dir,
+            project_path=client.project_file,
+            version=version,
+        )
+        declaration_values = tuple(
+            issued_handle if value == "transport-session-0000004a" else value
+            for value in declaration_values
+        )
     code, started = gateway.execute_gateway(
         [
             "--version", version,
@@ -1218,7 +1294,7 @@ def _seal_runtime_control_preview(
             "draft-declare-runtime-control-plan", draft_id,
             "--task-authority", authority,
             "--expected-revision", str(started["draft"]["revision"]),
-            *declaration,
+            *declaration_values,
         ],
         env=_env(tmp_path, version=version),
         client_factory=lambda _url: client,
@@ -1334,8 +1410,8 @@ def _seal_runtime_control_preview(
             ("--transport-handle", "transport-session-0000004a"),
             {"args": {"transport": 74}, "options": {}},
         ),
-        (
-            "ak.wwise.core.transport.executeAction",
+            (
+                "ak.wwise.core.transport.executeAction",
             "2025.1",
             ("--audition-action", "toggle-play-stop", "--transport-scope", "all-active"),
             {"args": {"action": "playStop"}, "options": {}},
@@ -1572,11 +1648,11 @@ def test_runtime_object_control_binds_role_then_seals_native_guid_preview(
             "2025.1",
             (
                 "--audition-action", "play",
-                "--transport-scope", "one-transport",
-                "--transport-handle", "transport-session-0000004b",
+                    "--transport-scope", "one-transport",
+                    "--transport-handle", "transport-session-0000004b",
+                ),
+                "TRANSPORT_HANDLE_INVALID",
             ),
-            "TRANSPORT_HANDLE_NOT_LIVE",
-        ),
         (
             "ak.wwise.core.transport.executeAction",
             "2025.1",

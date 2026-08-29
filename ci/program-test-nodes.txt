@@ -46,6 +46,7 @@ tests/unit/test_media_build_business_gateway.py
 tests/unit/test_remaining_core_business_adapter.py
 tests/unit/test_remaining_core_business_gateway.py
 tests/unit/test_runtime_business_gateway.py
+tests/unit/test_runtime_transport_handles.py
 tests/unit/test_operation_composer_gateway.py
 tests/unit/test_operation_composer_migration_inventory.py
 tests/unit/test_operation_draft_seal.py

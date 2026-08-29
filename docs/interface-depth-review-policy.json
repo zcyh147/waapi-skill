@@ -211,10 +211,11 @@
     },
     {
       "id": "generic-core-runtime-inspection",
-      "disposition": "migration_required",
-      "owner_issue": 57,
+      "disposition": "already_deep",
+      "owner_issue": null,
       "match": {"uri_prefixes": ["ak.wwise.core.log.", "ak.wwise.core.profiler.", "ak.wwise.core.remote.", "ak.wwise.core.transport."]},
-      "leaked_mechanics": ["wire_type", "request_fragment"]
+      "leaked_mechanics": [],
+      "audit_evidence": "The public runtime-inspection-business/v1 direct-read contracts and runtime-control-business/v1 Draft declarations cover all 94 exact log, Profiler, Remote, and Transport lanes. Callers supply bounded capture/filter/time intent, stable control outcomes, exact target names, and opaque Gateway-issued handles. The Gateway owns native data-type and action tokens, projections, handle encoding and validation, request arrays and fragments, host requirements, dependency order, immutable Preview, authorization, verification, and the sole continuation. Direct reads expose only core-call; runtime controls expose only the closed Draft declaration path; typed-call, typed-zero-call, raw request fragments, and weaker generic bypass are blocked before dispatch."
     },
     {
       "id": "generic-core-remaining",
@@ -226,15 +227,6 @@
     }
   ],
   "ticket_blueprints": {
-    "generic-core-runtime-inspection": {
-      "title": "Deepen log, profiler, remote, and transport inspection/control routes",
-      "parent_issue": 57,
-      "blocked_by_family": "generic-core-remaining",
-      "public_behavior": "Accept named capture, cursor, meter, remote, transport, and result-filter intent; derive native enums, projections, handles, and ordering while retaining direct bounded reads where applicable.",
-      "deterministic_tests": "All exact rows/versions, read versus runtime-mutation policy, cursor/meter/transport lifecycles, hostile scalars, time/result bounds, continuation completeness, and cleanup.",
-      "removal_boundary": "Remove raw request-schema construction, including the two fixed-command typed escape paths, after their business routes reach parity.",
-      "proportional_evidence": "Representative real profiler, remote, and transport lifecycles on matching hosts; Fresh Agent only for changed multi-step routing."
-    },
     "generic-soundengine-runtime": {
       "title": "Deepen the complete SoundEngine runtime command surface",
       "parent_issue": 57,
@@ -287,10 +279,14 @@
       "github_issue": 86,
       "row_count": 43,
       "rows_sha256": "a7541ae6dad3c8c033b13089c13c1faad9a2688aee985c72e5c414fdb812fa8a"
+    },
+    "generic-core-runtime-inspection": {
+      "github_issue": 87,
+      "row_count": 94,
+      "rows_sha256": "b66b1f4d66d8d77b456b98041c7e14fa2d383e02bae02b4a17fabfb85261d593"
     }
   },
   "ticket_issue_numbers": {
-    "generic-core-runtime-inspection": 87,
     "generic-soundengine-runtime": 88,
     "generic-cli-console": 89,
     "generic-host-ui-debug-waapi": 90,

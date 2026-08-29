@@ -18,6 +18,7 @@ from tests.support.canonical_preview import bind_canonical_preview_fixture
 from tests.support.compound_undo import compound_undo_request
 
 from wwise_waapi.builders.schema import validate_semantic_payload  # pyright: ignore[reportMissingImports]
+from wwise_waapi.canonical import canonical_sha256
 from wwise_waapi.execution_contracts import (  # pyright: ignore[reportMissingImports]
     PROJECT_GUARD_TRANSITION_TO_NONE,
     PROJECT_GUARD_TRANSITION_TO_PATH,
@@ -45,6 +46,11 @@ from wwise_waapi.typed_requests import (  # pyright: ignore[reportMissingImports
     request_contract,
 )
 from wwise_waapi.transactions import TransactionState, TransactionStore
+from wwise_waapi.runtime_transport_handles import (
+    RuntimeTransportContext,
+    RuntimeTransportHandleError,
+    RuntimeTransportHandleStore,
+)
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[2] / "skills" / "waapi-skill" / "scripts" / "gateway.py"
@@ -5565,7 +5571,7 @@ def test_transport_create_materializes_destroy_request_in_execute_verify_and_age
             "ak.wwise.core.getInfo": [live_info(year=2025)],
             "ak.wwise.core.getProjectInfo": [project()],
             "ak.wwise.core.transport.getList": [
-                {"list": [{"transport": transport_id, "object": OBJECT_GUID, "gameObject": 1}]}
+                {"list": [{"transport": transport_id, "object": OBJECT_GUID, "gameObject": 1}]},
             ],
             "ak.wwise.core.transport.getState": [{"state": "stopped"}],
         }
@@ -5585,10 +5591,21 @@ def test_transport_create_materializes_destroy_request_in_execute_verify_and_age
         "transport": transport_id
     }
     assert verify_payload["agent_result"]["cleanup"] == verify_payload["cleanup"]
-    assert verify_payload["agent_result"]["business_result"] == {
-        "contract": "waapi-skill.runtime-control-result/v1",
-        "transport_handle": "transport-session-00000049",
-    }
+    business_result = verify_payload["agent_result"]["business_result"]
+    assert business_result["contract"] == "waapi-skill.runtime-control-result/v1"
+    transport_handle = business_result["transport_handle"]
+    assert re.fullmatch(r"trh1-[0-9a-f]{32}", transport_handle)
+    issued = RuntimeTransportHandleStore(state_dir).resolve(
+        transport_handle,
+        context=RuntimeTransportContext(
+            endpoint_url="ws://127.0.0.1:31337/waapi",
+            project_id=PROJECT_GUID,
+            project_path=project()["path"],
+            wwise_version="2025.1",
+            wwise_build="v2025.1.19",
+        ),
+    )
+    assert issued.transport_id == transport_id
     assert verify_payload["agent_result"]["cleanup"]["projection"]["binding"]["materialized"] is True
     assert (
         verify_payload["cleanup"]["projection"]["cleanup_spec_sha256"]
@@ -5605,6 +5622,142 @@ def test_transport_create_materializes_destroy_request_in_execute_verify_and_age
         {"transport": transport_id},
         {},
     ) in verify_client.calls
+
+
+def test_verified_transport_destroy_retires_every_gateway_handle_for_reused_id(
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "transport-retire-state"
+    transport_id = 73
+    context = RuntimeTransportContext(
+        endpoint_url="ws://127.0.0.1:31337/waapi",
+        project_id=PROJECT_GUID,
+        project_path=project()["path"],
+        wwise_version="2025.1",
+        wwise_build="v2025.1.19",
+    )
+    handle_store = RuntimeTransportHandleStore(state_dir)
+    live_transport_row = {
+        "transport": transport_id,
+        "object": OBJECT_GUID,
+        "gameObject": 1,
+    }
+    issued = handle_store.issue(
+        transport_id=transport_id,
+        context=context,
+        source_transaction_id="tx1-testtransportretire00",
+        source_artifact_hash="f" * 64,
+        transport_row_sha256=canonical_sha256(live_transport_row),
+    )
+    request = generic_public_call_request(
+        "ak.wwise.core.transport.destroy",
+        {"transport": transport_id},
+    )
+    transaction = preview_and_confirm_public_call(
+        request,
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+    )
+
+    execute_exit, execute_payload = execute(
+        ["execute", transaction["transaction_id"]],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        version="2025.1",
+        client=FakeClient(
+            {
+                "ak.wwise.core.getInfo": [live_info(year=2025)],
+                "ak.wwise.core.getProjectInfo": [project()],
+                "ak.wwise.core.transport.getList": [
+                    {"list": [live_transport_row]}
+                ],
+                "ak.wwise.core.transport.destroy": [{}],
+            }
+        ),
+    )
+    assert execute_exit == 0, execute_payload
+    verify_exit, verify_payload = execute(
+        ["verify", transaction["transaction_id"]],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        version="2025.1",
+        client=FakeClient(
+            {
+                "ak.wwise.core.getInfo": [live_info(year=2025)],
+                "ak.wwise.core.getProjectInfo": [project()],
+                "ak.wwise.core.transport.getList": [{"list": []}],
+            }
+        ),
+    )
+
+    assert verify_exit == 0, verify_payload
+    assert verify_payload["agent_result"]["business_result"] == {
+        "contract": "waapi-skill.runtime-control-result/v1",
+        "retired_transport_handle_count": 1,
+    }
+    with pytest.raises(RuntimeTransportHandleError) as caught:
+        handle_store.resolve(issued.handle, context=context)
+    assert caught.value.error_code == "TRANSPORT_HANDLE_RETIRED"
+
+
+def test_transport_execution_rejects_same_numeric_id_reused_for_another_row(
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "transport-reuse-state"
+    transport_id = 73
+    context = RuntimeTransportContext(
+        endpoint_url="ws://127.0.0.1:31337/waapi",
+        project_id=PROJECT_GUID,
+        project_path=project()["path"],
+        wwise_version="2025.1",
+        wwise_build="v2025.1.19",
+    )
+    original_row = {
+        "transport": transport_id,
+        "object": OBJECT_GUID,
+        "gameObject": 1,
+    }
+    RuntimeTransportHandleStore(state_dir).issue(
+        transport_id=transport_id,
+        context=context,
+        source_transaction_id="tx1-testtransportreuse000",
+        source_artifact_hash="f" * 64,
+        transport_row_sha256=canonical_sha256(original_row),
+    )
+    transaction = preview_and_confirm_public_call(
+        generic_public_call_request(
+            "ak.wwise.core.transport.destroy",
+            {"transport": transport_id},
+        ),
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+    )
+    reused_row = {
+        "transport": transport_id,
+        "object": "{99999999-9999-9999-9999-999999999999}",
+        "gameObject": 2,
+    }
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": [live_info(year=2025)],
+            "ak.wwise.core.getProjectInfo": [project()],
+            "ak.wwise.core.transport.getList": [{"list": [reused_row]}],
+        }
+    )
+
+    execute_exit, execute_payload = execute(
+        ["execute", transaction["transaction_id"]],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        version="2025.1",
+        client=client,
+    )
+
+    assert execute_exit == 2
+    assert execute_payload["status"] == "repreview_required"
+    assert execute_payload["error_code"] == "TRANSPORT_HANDLE_STALE"
+    assert execute_payload["executed"] is False
+    assert all(call[0] != "ak.wwise.core.transport.destroy" for call in client.calls)
 
 
 def test_transport_verify_guard_failure_keeps_result_bound_destroy_request(

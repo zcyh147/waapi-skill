@@ -343,7 +343,7 @@ def test_every_migration_row_has_exactly_one_rollup_and_ticket_family() -> None:
     assert set(tickets) == expected
     assert {family["github_issue"] for family in inventory["ticket_families"]} == {
         *range(77, 94),
-    } - {77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 92, 93}
+    } - {77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 92, 93}
     assert all(
         row["owner_issue"] in {56, 57}
         for row in (*inventory["native_lanes"], *inventory["operation_lanes"])
@@ -386,6 +386,36 @@ def test_completed_core_family_retains_the_authoritative_issue_84_row_seal() -> 
         and row["disposition"] == "already_deep"
         and row["owner_issue"] is None
         and row["route"] == "bounded_call"
+        for row in actual_rows.values()
+    )
+
+
+def test_completed_runtime_inspection_family_retains_issue_87_row_seal() -> None:
+    inventory = _inventory()
+    completed = {
+        family["id"]: family
+        for family in inventory["completed_family_seals"]
+    }
+    runtime = completed["generic-core-runtime-inspection"]
+
+    assert runtime["github_issue"] == 87
+    assert runtime["row_count"] == len(runtime["rows"]) == 94
+    assert runtime["rows_sha256"] == (
+        "b66b1f4d66d8d77b456b98041c7e14fa"
+        "2d383e02bae02b4a17fabfb85261d593"
+    )
+    sealed_rows = set(runtime["rows"])
+    actual_rows = {
+        f"{row['version']}|{row['item_type']}|{row['uri']}": row
+        for row in inventory["native_lanes"]
+        if f"{row['version']}|{row['item_type']}|{row['uri']}" in sealed_rows
+    }
+    assert set(actual_rows) == sealed_rows
+    assert all(
+        row["classification"] == "generic-core-runtime-inspection"
+        and row["disposition"] == "already_deep"
+        and row["owner_issue"] is None
+        and row["leaked_mechanics"] == []
         for row in actual_rows.values()
     )
 

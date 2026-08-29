@@ -33,6 +33,7 @@ from .runtime_inspection_business_contracts import (
     TRANSPORT_USE_ORIGINALS_URI,
     runtime_inspection_business_contract_data,
 )
+from .runtime_transport_handles import TRANSPORT_HANDLE_RECORD_CONTRACT
 
 
 class RuntimeInspectionBusinessError(ValueError):
@@ -58,7 +59,7 @@ _PROFILER_CURSORS = {
 }
 _PROFILER_BUS_HANDLE = re.compile(r"^bus-instance-([0-9a-f]{8})$")
 _PROFILER_VOICE_HANDLE = re.compile(r"^voice-instance-([0-9a-f]{8})$")
-_TRANSPORT_HANDLE = re.compile(r"^transport-session-([0-9a-f]{8})$")
+_TRANSPORT_HANDLE = re.compile(r"^trh1-[0-9a-f]{32}$")
 _CURSOR_MOVES = {
     "first-frame": "first",
     "last-frame": "last",
@@ -341,14 +342,32 @@ def _pipeline_handle(value: Any, *, kind: str) -> str | None:
     return f"{kind}-instance-{value:08x}"
 
 
-def _transport_id(value: str | None) -> int:
-    match = _TRANSPORT_HANDLE.fullmatch(value or "")
-    if match is None:
+def _transport_id(
+    value: str | None,
+    binding: Mapping[str, Any] | None,
+) -> int:
+    if not isinstance(value, str) or _TRANSPORT_HANDLE.fullmatch(value) is None:
         raise RuntimeInspectionBusinessError(
             "transport_handle must be copied exactly from a Gateway transport result"
         )
-    transport_id = int(match.group(1), 16)
-    if transport_id == 0:
+    if (
+        not isinstance(binding, Mapping)
+        or binding.get("contract") != TRANSPORT_HANDLE_RECORD_CONTRACT
+        or binding.get("handle") != value
+        or not isinstance(binding.get("context"), Mapping)
+        or not isinstance(binding.get("source_transaction_id"), str)
+        or not isinstance(binding.get("source_artifact_hash"), str)
+        or not isinstance(binding.get("record_sha256"), str)
+    ):
+        raise RuntimeInspectionBusinessError(
+            "transport_handle lacks its Gateway-issued live binding"
+        )
+    transport_id = binding.get("transport_id")
+    if (
+        isinstance(transport_id, bool)
+        or not isinstance(transport_id, int)
+        or not 1 <= transport_id <= 0xFFFFFFFF
+    ):
         raise RuntimeInspectionBusinessError(
             "transport_handle must identify a non-zero live transport"
         )
@@ -367,6 +386,7 @@ def materialize_runtime_inspection_business_request(
     bus_instance_handle: str | None = None,
     voice_instance_handle: str | None = None,
     transport_handle: str | None = None,
+    transport_binding: Mapping[str, Any] | None = None,
 ) -> tuple[dict[str, Any], int, dict[str, Any]]:
     limit = _result_limit(max_results)
     if operation == LOG_GET_URI:
@@ -445,7 +465,12 @@ def materialize_runtime_inspection_business_request(
         return (
             {
                 "api": operation,
-                "args": {"transport": _transport_id(transport_handle)},
+                "args": {
+                    "transport": _transport_id(
+                        transport_handle,
+                        transport_binding,
+                    )
+                },
                 "options": {},
             },
             1,
@@ -584,13 +609,18 @@ def materialize_runtime_control_business_request(
         operation,
         session.context.wwise_version,
     )
-    if set(session.settings) != {"runtime_control_plan"}:
+    allowed_setting_sets = (
+        {"runtime_control_plan"},
+        {"runtime_control_plan", "runtime_transport_binding"},
+    )
+    if set(session.settings) not in allowed_setting_sets:
         raise business_repair(
             "RUNTIME_CONTROL_PLAN_INCOMPLETE",
             field="runtime_control_plan",
             action="submit the one complete Gateway-disclosed runtime control plan",
         )
     plan = session.settings["runtime_control_plan"]
+    transport_binding = session.settings.get("runtime_transport_binding")
     if not isinstance(plan, Mapping):
         raise business_repair(
             "RUNTIME_CONTROL_PLAN_INVALID",
@@ -768,7 +798,12 @@ def materialize_runtime_control_business_request(
             args["gameObject"] = game_object_id
     elif operation == TRANSPORT_DESTROY_URI:
         require_fields({"transport_handle"})
-        args = {"transport": _transport_id(plan.get("transport_handle"))}
+        args = {
+            "transport": _transport_id(
+                plan.get("transport_handle"),
+                transport_binding,
+            )
+        }
     elif operation == TRANSPORT_EXECUTE_ACTION_URI:
         require_fields(
             {"audition_action", "transport_scope"},
@@ -785,7 +820,10 @@ def materialize_runtime_control_business_request(
         scope = plan.get("transport_scope")
         args = {"action": action}
         if scope == "one-transport":
-            args["transport"] = _transport_id(plan.get("transport_handle"))
+            args["transport"] = _transport_id(
+                plan.get("transport_handle"),
+                transport_binding,
+            )
         elif scope == "all-active":
             if "transport_handle" in plan:
                 raise business_repair(
@@ -872,6 +910,15 @@ def materialize_runtime_control_business_request(
         args = {"file": str(directory.pure_path / file_name)}
     else:  # pragma: no cover - contract registry invariant
         raise ValueError("unsupported runtime control operation")
+    if (
+        transport_binding is not None
+        and operation not in {TRANSPORT_DESTROY_URI, TRANSPORT_EXECUTE_ACTION_URI}
+    ):
+        raise business_repair(
+            "RUNTIME_CONTROL_PLAN_FIELDS_INVALID",
+            field="transport_handle",
+            action="omit a transport handle for this operation",
+        )
     return parse_operation_request(
         {
             "contract": "waapi-skill.operation-request/v1",

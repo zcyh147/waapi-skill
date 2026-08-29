@@ -293,6 +293,10 @@ from wwise_waapi.media_build_business_cli import (  # noqa: E402  # pyright: ign
     media_build_input_from_namespace,
 )
 from wwise_waapi.runtime_inspection_business_contracts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    TRANSPORT_CREATE_URI,
+    TRANSPORT_DESTROY_URI,
+    TRANSPORT_EXECUTE_ACTION_URI,
+    TRANSPORT_GET_STATE_URI,
     runtime_inspection_business_catalog_rows,
     runtime_inspection_business_contract_data,
     runtime_inspection_business_operations,
@@ -304,6 +308,12 @@ from wwise_waapi.runtime_inspection_business import (  # noqa: E402  # pyright: 
     materialize_runtime_inspection_business_request,
     normalize_runtime_inspection_result,
     profiler_pipeline_id_from_handle,
+)
+from wwise_waapi.runtime_transport_handles import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    RuntimeTransportContext,
+    RuntimeTransportHandleError,
+    RuntimeTransportHandleStore,
+    validate_runtime_transport_handle,
 )
 from wwise_waapi.business_declarations import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     MAX_BUSINESS_NAME_BYTES,
@@ -4385,6 +4395,30 @@ def preflight_core_business_input(
     if args.api in runtime_inspection_business_read_operations():
         try:
             runtime_inspection_business_contract_data(args.api, versions[0])
+            if args.api == TRANSPORT_GET_STATE_URI:
+                validate_runtime_transport_handle(args.transport_handle)
+                if any(
+                    value is not None
+                    for value in (
+                        args.log_channel,
+                        args.max_results,
+                        args.profiler_position,
+                        args.profiler_cursor,
+                        args.result_view,
+                        args.bus_instance_handle,
+                        args.voice_instance_handle,
+                    )
+                ):
+                    raise RuntimeInspectionBusinessError(
+                        "transport.getState accepts only transport_handle"
+                    )
+                args.runtime_inspection_request = None
+                args.runtime_inspection_limit = 1
+                args.runtime_inspection_business_request = {
+                    "transport_handle": args.transport_handle,
+                }
+                args.core_business_version = versions[0]
+                return
             request, limit, business_request = materialize_runtime_inspection_business_request(
                 args.api,
                 versions[0],
@@ -9512,8 +9546,8 @@ def resolve_profiler_voice_path(
             args=request_args,
             options=request_options,
             # These are read-only implementation dependencies of the closed
-            # voice-contribution Adapter. Their separate public routes remain
-            # transaction-gated until #87 migrates them.
+            # voice-contribution Adapter. Their separate public routes now use
+            # the same Gateway-owned runtime-inspection business contracts.
             allow_destructive=True,
             result_limit_bytes=STABLE_READ_RESULT_LIMIT_BYTES,
         )
@@ -9851,6 +9885,7 @@ def dispatch_core_business_read(
     if args.api in runtime_inspection_business_operations():
         return dispatch_runtime_inspection_business_read(
             args,
+            env=env,
             connection=connection,
             detected_version=detected_version,
             live_info=live_info,
@@ -10060,6 +10095,7 @@ def dispatch_core_business_read(
 def dispatch_runtime_inspection_business_read(
     args: argparse.Namespace,
     *,
+    env: Mapping[str, str],
     connection: GatewayConnection,
     detected_version: str,
     live_info: Mapping[str, Any],
@@ -10079,7 +10115,54 @@ def dispatch_runtime_inspection_business_read(
             common=common,
         )
 
-    request = args.runtime_inspection_request
+    project_call = None
+    transport_record = None
+    if args.api == TRANSPORT_GET_STATE_URI:
+        project, project_call = current_project(
+            dispatcher,
+            connection=connection,
+            version=detected_version,
+        )
+        assert project is not None
+        context = _runtime_transport_context_from_live(
+            endpoint=common["endpoint"],
+            project=project,
+            detected_version=detected_version,
+            live_info=live_info,
+        )
+        try:
+            transport_record = RuntimeTransportHandleStore(
+                resolve_transaction_state_directory(args, env=env)
+            ).resolve(
+                args.runtime_inspection_business_request["transport_handle"],
+                context=context,
+            )
+        except RuntimeTransportHandleError as exc:
+            raise GatewayResultShapeError(
+                str(exc),
+                details=exc.details,
+                error_code=exc.error_code,
+            ) from exc
+        try:
+            request, _limit, _business_request = (
+                materialize_runtime_inspection_business_request(
+                    args.api,
+                    detected_version,
+                    log_channel=None,
+                    max_results=None,
+                    transport_handle=transport_record.handle,
+                    transport_binding=transport_record.binding_dict(),
+                )
+            )
+        except RuntimeInspectionBusinessError as exc:  # pragma: no cover - store invariant
+            raise GatewayResultShapeError(
+                str(exc),
+                error_code="TRANSPORT_HANDLE_STORE_CORRUPT",
+            ) from exc
+    else:
+        request = args.runtime_inspection_request
+    if not isinstance(request, Mapping):  # pragma: no cover - preflight invariant
+        raise GatewayInputError("Runtime-inspection request was not materialized")
     request_validation = validate_semantic_payload(
         request["api"],
         request["args"],
@@ -10092,7 +10175,7 @@ def dispatch_runtime_inspection_business_read(
         live_info=live_info,
     )
     transport_binding_call = None
-    if args.api == "ak.wwise.core.transport.getState":
+    if args.api == TRANSPORT_GET_STATE_URI:
         transport_id = request["args"].get("transport")
         list_capability = live_capability(
             detected_version,
@@ -10141,6 +10224,18 @@ def dispatch_runtime_inspection_business_read(
                 },
                 error_code="TRANSPORT_HANDLE_NOT_LIVE",
             )
+        assert transport_record is not None
+        try:
+            RuntimeTransportHandleStore.validate_live_row(
+                transport_record,
+                matches[0],
+            )
+        except RuntimeTransportHandleError as exc:
+            raise GatewayResultShapeError(
+                str(exc),
+                details=exc.details,
+                error_code=exc.error_code,
+            ) from exc
     result = dispatch(
         dispatcher,
         request["api"],
@@ -10148,9 +10243,8 @@ def dispatch_runtime_inspection_business_read(
         version=detected_version,
         args=request["args"],
         options=request["options"],
-        # The legacy native-surface partition gates the whole runtime family
-        # until #87 migrates it.  This closed route is a bounded read whose
-        # request and result ceiling are both Gateway-owned.
+        # The dispatcher flag admits this reviewed runtime family; callers still
+        # cross only the bounded Gateway-owned request and result contracts.
         allow_destructive=True,
         result_limit_bytes=int(capability.execution_contract["result_limit_bytes"]),
         operation_timeout=float(capability.execution_contract["timeout_seconds"]),
@@ -10195,6 +10289,11 @@ def dispatch_runtime_inspection_business_read(
             "max_results": args.runtime_inspection_limit,
         },
         "call": dispatch_call_summary(result),
+        **(
+            {"project_call": dispatch_call_summary(project_call)}
+            if project_call is not None
+            else {}
+        ),
         **(
             {"transport_binding_call": dispatch_call_summary(transport_binding_call)}
             if transport_binding_call is not None
@@ -10901,7 +11000,43 @@ def dispatch_business_runtime_control_plan(
             "Runtime-control fields are not disclosed for this operation: "
             + ", ".join(sorted(undisclosed))
         )
-    candidate = session.with_settings({"runtime_control_plan": plan})
+    transport_record = None
+    requires_transport_binding = (
+        binding.record.operation == TRANSPORT_DESTROY_URI
+        or (
+            binding.record.operation == TRANSPORT_EXECUTE_ACTION_URI
+            and plan.get("transport_scope") == "one-transport"
+        )
+    )
+    if "transport_handle" in plan and requires_transport_binding:
+        context = _runtime_transport_context_from_live(
+            endpoint=common["endpoint"],
+            project=binding.project,
+            detected_version=detected_version,
+            live_info=live_info,
+        )
+        try:
+            transport_record = RuntimeTransportHandleStore(
+                binding.state_dir
+            ).resolve(
+                plan["transport_handle"],
+                context=context,
+            )
+        except RuntimeTransportHandleError as exc:
+            raise GatewayResultShapeError(
+                str(exc),
+                details=exc.details,
+                error_code=exc.error_code,
+            ) from exc
+    candidate_settings = {
+        "runtime_control_plan": plan,
+        **(
+            {"runtime_transport_binding": transport_record.binding_dict()}
+            if transport_record is not None
+            else {}
+        ),
+    }
+    candidate = session.with_settings(candidate_settings)
     materialized = adapter.materialize(candidate)
     arguments = materialized.get("arguments")
     native_args = arguments.get("args") if isinstance(arguments, Mapping) else None
@@ -10937,13 +11072,25 @@ def dispatch_business_runtime_control_plan(
                 },
                 error_code="TRANSPORT_HANDLE_NOT_LIVE",
             )
+        if transport_record is not None:
+            try:
+                RuntimeTransportHandleStore.validate_live_row(
+                    transport_record,
+                    matches[0],
+                )
+            except RuntimeTransportHandleError as exc:
+                raise GatewayResultShapeError(
+                    str(exc),
+                    details=exc.details,
+                    error_code=exc.error_code,
+                ) from exc
         transport_binding_call = {
             "transport_handle": plan.get("transport_handle"),
             "live_match": True,
         }
 
     def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
-        candidate = current.with_settings({"runtime_control_plan": plan})
+        candidate = current.with_settings(candidate_settings)
         adapter.materialize(candidate)
         return candidate
 
@@ -14611,6 +14758,39 @@ def _business_context_from_live(
     )
 
 
+def _runtime_transport_context_from_live(
+    *,
+    endpoint: Mapping[str, Any],
+    project: Mapping[str, Any],
+    detected_version: str,
+    live_info: Mapping[str, Any],
+) -> RuntimeTransportContext:
+    version = live_info.get("version")
+    display_name = version.get("displayName") if isinstance(version, Mapping) else None
+    endpoint_url = endpoint.get("url")
+    if not isinstance(endpoint_url, str) or not endpoint_url:
+        host = endpoint.get("host")
+        port = endpoint.get("port")
+        if not isinstance(host, str) or isinstance(port, bool) or not isinstance(port, int):
+            raise GatewayResultShapeError(
+                "Live endpoint identity is unavailable for transport handle binding.",
+                error_code="INVALID_STATUS_RESULT",
+            )
+        endpoint_url = f"ws://{host}:{port}/waapi"
+    if not isinstance(display_name, str) or not display_name:
+        raise GatewayResultShapeError(
+            "Live Wwise build identity is unavailable for transport handle binding.",
+            error_code="INVALID_STATUS_RESULT",
+        )
+    return RuntimeTransportContext(
+        endpoint_url=endpoint_url,
+        project_id=str(project["id"]),
+        project_path=str(project["path"]),
+        wwise_version=detected_version,
+        wwise_build=display_name,
+    )
+
+
 def _business_object_path_from_segments(values: Any) -> str:
     if (
         not isinstance(values, list)
@@ -16667,6 +16847,87 @@ def dispatch_transaction_command(
                 project_call=project_call,
                 verification_plan=verification_plan,
             )
+        transport_binding_validation = None
+        transport_id = (
+            call_args.get("transport")
+            if call_uri in {TRANSPORT_DESTROY_URI, TRANSPORT_EXECUTE_ACTION_URI}
+            else None
+        )
+        if isinstance(transport_id, int) and not isinstance(transport_id, bool):
+            try:
+                if project is None:
+                    raise RuntimeTransportHandleError(
+                        "TRANSPORT_HANDLE_CONTEXT_DRIFT",
+                        "Transport execution lacks its live project identity.",
+                    )
+                transport_context = _runtime_transport_context_from_live(
+                    endpoint=common["endpoint"],
+                    project=project,
+                    detected_version=detected_version,
+                    live_info=live_info,
+                )
+                handle_store = RuntimeTransportHandleStore(store.state_dir)
+                transport_record = handle_store.resolve_native_id(
+                    transport_id,
+                    context=transport_context,
+                )
+                transport_list = read_call(
+                    "ak.wwise.core.transport.getList",
+                    {},
+                    {},
+                ).get("list")
+                matches = (
+                    [
+                        row
+                        for row in transport_list
+                        if isinstance(row, Mapping)
+                        and row.get("transport") == transport_id
+                    ]
+                    if isinstance(transport_list, list)
+                    else []
+                )
+                if len(matches) != 1:
+                    raise RuntimeTransportHandleError(
+                        "TRANSPORT_HANDLE_NOT_LIVE",
+                        "Transport handle no longer resolves to exactly one live row.",
+                        details={"match_count": len(matches)},
+                    )
+                RuntimeTransportHandleStore.validate_live_row(
+                    transport_record,
+                    matches[0],
+                )
+                transport_binding_validation = {
+                    "transport_handle": transport_record.handle,
+                    "live_match": True,
+                    "row_identity_match": True,
+                }
+            except RuntimeTransportHandleError as exc:
+                repreview = store.require_repreview(
+                    transaction_id,
+                    expected_authorization=record.state,
+                    details={
+                        "error_code": exc.error_code,
+                        "transport_binding": exc.details,
+                    },
+                )
+                return {
+                    "ok": False,
+                    "status": "repreview_required",
+                    **common,
+                    "transaction_id": transaction_id,
+                    "state": repreview.state.value,
+                    "artifact_hash": preview.artifact_hash,
+                    "error_code": exc.error_code,
+                    "message": str(exc),
+                    "details": exc.details,
+                    "role_validation": role_validation,
+                    "guard_validation": guard_validation,
+                    "project_call": project_call,
+                    "executed": False,
+                    "verified": False,
+                    "cleanup": transaction_cleanup_payload(prepared, phase="preview"),
+                    "automatic_retry": False,
+                }
         runtime_call_args = call_args
         runtime_call_options = call_options
         wire_path_adaptation: Mapping[str, Any] | None = None
@@ -16810,6 +17071,7 @@ def dispatch_transaction_command(
                     "role_validation": role_validation,
                     "guard_validation": guard_validation,
                     "project_call": project_call,
+                    "transport_binding_validation": transport_binding_validation,
                     "automatic_retry": False,
                     **wire_path_output,
                 },
@@ -16830,6 +17092,7 @@ def dispatch_transaction_command(
                     "role_validation": role_validation,
                     "guard_validation": guard_validation,
                     "project_call": project_call,
+                    "transport_binding_validation": transport_binding_validation,
                     **wire_path_output,
                 }
             )
@@ -16847,6 +17110,7 @@ def dispatch_transaction_command(
             "role_validation": role_validation,
             "guard_validation": guard_validation,
             "project_call": project_call,
+            "transport_binding_validation": transport_binding_validation,
             "executed": True,
             "verified": False,
             "cleanup": transaction_cleanup_payload(
@@ -17063,8 +17327,12 @@ def dispatch_transaction_command(
             "automatic_retry": False,
         }
         if verification.ok:
+            transaction_request = require_mapping(
+                artifact.get("request"),
+                "transaction request",
+            )
             agent_result = transaction_agent_result(
-                request=require_mapping(artifact.get("request"), "transaction request"),
+                request=transaction_request,
                 transaction_id=transaction_id,
                 artifact_hash=preview.artifact_hash,
                 state=final_record.state.value,
@@ -17072,6 +17340,103 @@ def dispatch_transaction_command(
                 verified=verification.business_state_verified,
                 cleanup=payload["cleanup"],
             )
+            transaction_arguments = transaction_request.get("arguments")
+            transaction_api = (
+                transaction_arguments.get("api")
+                if isinstance(transaction_arguments, Mapping)
+                else None
+            )
+            if transaction_api in {TRANSPORT_CREATE_URI, TRANSPORT_DESTROY_URI}:
+                if project is None:  # pragma: no cover - invariant project guard
+                    raise GatewayResultShapeError(
+                        "Transport verification lacks its live project identity.",
+                        error_code="INVALID_STATUS_RESULT",
+                    )
+                transport_context = _runtime_transport_context_from_live(
+                    endpoint=common["endpoint"],
+                    project=project,
+                    detected_version=detected_version,
+                    live_info=live_info,
+                )
+                handle_store = RuntimeTransportHandleStore(store.state_dir)
+                try:
+                    if transaction_api == TRANSPORT_CREATE_URI:
+                        execution_payload = execution_result.get("result")
+                        transport_id = (
+                            execution_payload.get("transport")
+                            if isinstance(execution_payload, Mapping)
+                            else None
+                        )
+                        list_readbacks = [
+                            row
+                            for row in verification.readbacks
+                            if row.get("uri")
+                            == "ak.wwise.core.transport.getList"
+                            and isinstance(row.get("result"), Mapping)
+                        ]
+                        transport_list = (
+                            list_readbacks[-1]["result"].get("list")
+                            if list_readbacks
+                            else None
+                        )
+                        bound_rows = (
+                            [
+                                row
+                                for row in transport_list
+                                if isinstance(row, Mapping)
+                                and row.get("transport") == transport_id
+                            ]
+                            if isinstance(transport_list, list)
+                            else []
+                        )
+                        if len(bound_rows) != 1:
+                            raise RuntimeTransportHandleError(
+                                "TRANSPORT_HANDLE_NOT_LIVE",
+                                "Verified transport cannot be bound to one exact live row.",
+                                details={"match_count": len(bound_rows)},
+                            )
+                        issued = handle_store.issue(
+                            transport_id=transport_id,
+                            context=transport_context,
+                            source_transaction_id=transaction_id,
+                            source_artifact_hash=preview.artifact_hash,
+                            transport_row_sha256=canonical_sha256(bound_rows[0]),
+                        )
+                        agent_result["business_result"] = {
+                            "contract": "waapi-skill.runtime-control-result/v1",
+                            "transport_handle": issued.handle,
+                        }
+                    else:
+                        native_args = transaction_arguments.get("args")
+                        transport_id = (
+                            native_args.get("transport")
+                            if isinstance(native_args, Mapping)
+                            else None
+                        )
+                        retired = handle_store.retire_native_id(
+                            transport_id,
+                            context=transport_context,
+                        )
+                        agent_result["business_result"] = {
+                            "contract": "waapi-skill.runtime-control-result/v1",
+                            "retired_transport_handle_count": len(retired),
+                        }
+                except (RuntimeTransportHandleError, OSError, ValueError) as exc:
+                    payload.update(
+                        {
+                            "ok": False,
+                            "status": "transport_handle_persistence_failed",
+                            "error_code": getattr(
+                                exc,
+                                "error_code",
+                                "TRANSPORT_HANDLE_PERSISTENCE_FAILED",
+                            ),
+                            "message": str(exc),
+                            "agent_result": None,
+                            "automatic_retry": False,
+                        }
+                    )
+                    return payload
             if agent_result["operation"] in {"waapi.call", "waapi.undoGroup"}:
                 projected_result = execution_result.get("result")
                 verification_plan = prepared.get("verification_plan")
@@ -23237,34 +23602,6 @@ def transaction_agent_result(
         result["authorization"] = dict(authorization)
     if cleanup is not None:
         result["cleanup"] = dict(cleanup)
-        arguments = request.get("arguments")
-        projection = cleanup.get("projection")
-        companion = (
-            projection.get("companion_request")
-            if isinstance(projection, Mapping)
-            else None
-        )
-        companion_args = (
-            companion.get("args") if isinstance(companion, Mapping) else None
-        )
-        transport_id = (
-            companion_args.get("transport")
-            if isinstance(companion_args, Mapping)
-            else None
-        )
-        if (
-            isinstance(arguments, Mapping)
-            and arguments.get("api") == "ak.wwise.core.transport.create"
-            and isinstance(companion, Mapping)
-            and companion.get("api") == "ak.wwise.core.transport.destroy"
-            and isinstance(transport_id, int)
-            and not isinstance(transport_id, bool)
-            and 1 <= transport_id <= 0xFFFFFFFF
-        ):
-            result["business_result"] = {
-                "contract": "waapi-skill.runtime-control-result/v1",
-                "transport_handle": f"transport-session-{transport_id:08x}",
-            }
     if next_command is not None:
         # A preview mirrors the exact top-level continuation here so the final
         # machine-readable field also ends on the selected continuation.
