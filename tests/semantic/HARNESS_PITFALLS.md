@@ -538,6 +538,25 @@ prevention checks that are expensive to rediscover.
   required isolation because a newer SampleProject moved or renamed its work
   units; freeze the failed preflight and select a supported matching version.
 
+### A dynamic Business request is replayed from its durable Draft
+
+- Evidence: #88 macOS root `imac-soundengine4-68411e0-r2` and native-Windows
+  root `iwin-soundengine4-92fb617-r1` both produced the correct
+  `registerGameObj` Preview, including a Gateway-generated native game-object
+  ID, but the Broker changed the successful runner result to FAIL. It tried to
+  reconstruct the request with the removed shallow Operation Composer and
+  reported that no shallow Adapter existed.
+- Cause: the semantic protocol intentionally omitted a static request witness
+  because the native ID is derived from the live Draft authority. The Broker
+  treated that absence as proof of a legacy Composer flow even though the
+  durable Draft contained a complete `business_session`.
+- Prevention: when a production Draft contains a durable Business session,
+  replay it through the exact Business Adapter selected by `draft-start` and
+  compare the Agent's Preview with that materialized request. Use the shallow
+  Composer replay only for Drafts that truly have no Business session. A
+  model-authored placeholder for a Gateway-owned dynamic ID is not an
+  acceptable witness or workaround.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:

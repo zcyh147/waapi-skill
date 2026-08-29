@@ -105,6 +105,40 @@ def test_operations_catalog_lists_all_soundengine_business_routes(
     assert all("next_command" not in row for row in rows.values())
 
 
+def test_event_draft_exposes_one_copy_ready_exact_name_binding(
+    tmp_path: Path,
+) -> None:
+    operation = "ak.soundengine.executeActionOnEvent"
+    code, started = gateway.execute_gateway(
+        [
+            "--version",
+            "2022.1",
+            "--state-dir",
+            str(tmp_path / "state"),
+            "draft-start",
+            operation,
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda url: pytest.fail(f"offline start connected to {url}"),
+    )
+
+    assert code == 0, started
+    next_action = started["draft"]["next_action_binding"]
+    assert next_action["required_next_phase"] == "bind_next_soundengine_role"
+    binding = next_action["object_binding"]
+    assert binding["next_role"] == "event"
+    assert binding["direct_query_before_binding"] == "forbidden"
+    exact_name = binding["by_exact_name"]
+    assert exact_name["fixed_argv_prefix"][-4:] == [
+        "--role",
+        "event",
+        "--exact-type-name",
+        "Event",
+    ]
+    assert exact_name["append"] == ["<exact-event-name>"]
+    assert "query" not in binding["selection_rule"]
+
+
 def _env(tmp_path: Path, version: str = "2022.1") -> dict[str, str]:
     config = tmp_path / "config.json"
     config.write_text(

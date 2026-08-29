@@ -11784,6 +11784,54 @@ class CodexGatewayBroker:
             if isinstance(start_payload, Mapping)
             else None
         )
+        if (self.skill_source / "wwise_waapi").is_dir():
+            draft_id = (
+                start_draft.get("draft_id")
+                if isinstance(start_draft, Mapping)
+                else None
+            )
+            authority = (
+                start_payload.get("task_authority")
+                if isinstance(start_payload, Mapping)
+                else None
+            )
+            state_directory = self._state_directory or self._existing_state_directory
+            if (
+                isinstance(draft_id, str)
+                and isinstance(authority, str)
+                and state_directory is not None
+            ):
+                try:
+                    record = OperationDraftStore(state_directory).inspect(
+                        draft_id,
+                        task_authority=authority,
+                    )
+                except Exception as exc:
+                    raise GatewayInvocationError(
+                        "Dynamic business request replay cannot inspect its durable "
+                        "Draft"
+                    ) from exc
+                raw_session = (
+                    record.composition.get("business_session")
+                    if isinstance(record.composition, Mapping)
+                    else None
+                )
+                if raw_session is not None:
+                    try:
+                        session = BusinessDeclarationSession.from_dict(raw_session)
+                        adapter = business_adapter(operation)
+                        return adapter.materialize(
+                            session,
+                            allow_cleaned_file_evidence=(
+                                self._runner_environment == {}
+                                and adapter.supports_cleaned_file_evidence
+                            ),
+                        )
+                    except Exception as exc:
+                        raise GatewayInvocationError(
+                            "Dynamic business request cannot be replayed from the "
+                            "durable Draft"
+                        ) from exc
         version = (
             start_draft.get("binding", {}).get("version")
             if isinstance(start_draft, Mapping)

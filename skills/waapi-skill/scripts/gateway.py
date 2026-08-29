@@ -21556,10 +21556,49 @@ def _business_next_action_binding(
         )
         next_role = next((role for role in roles if role not in bound_roles), None)
         if next_role is not None:
+            role_binding = role_object_binding(next_role)
+            exact_type = {
+                "event": "Event",
+                "state_group": "StateGroup",
+                "state": "State",
+                "switch_group": "SwitchGroup",
+                "switch": "Switch",
+                "trigger": "Trigger",
+                "game_parameter": "GameParameter",
+                "sound_bank": "SoundBank",
+                "aux_bus": "AuxBus",
+            }.get(next_role)
+            if exact_type is not None:
+                exact_name = operation_draft_prefix_copy_binding(
+                    [
+                        *object_bind_prefix,
+                        "--role",
+                        next_role,
+                        "--exact-type-name",
+                        exact_type,
+                    ]
+                )
+                exact_name["append"] = [
+                    f"<exact-{next_role.replace('_', '-')}-name>"
+                ]
+                role_binding = {
+                    **role_binding,
+                    "by_exact_name": exact_name,
+                    "direct_query_before_binding": "forbidden",
+                    "selection_rule": (
+                        "user_supplied_exact_name_uses_by_exact_name; "
+                        "user_supplied_complete_path_uses_by_path_segments; "
+                        "user_selected_guid_uses_by_id"
+                    ),
+                    "name_rule": (
+                        f"the_gateway_fixes_type_{exact_type}_and_requires_one_"
+                        "unique_exact_name_match"
+                    ),
+                }
             return {
                 **shared,
                 "required_next_phase": "bind_next_soundengine_role",
-                "object_binding": role_object_binding(next_role),
+                "object_binding": role_binding,
             }
         declaration = {
             **operation_draft_prefix_copy_binding(

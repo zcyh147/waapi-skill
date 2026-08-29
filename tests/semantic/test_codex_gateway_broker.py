@@ -78,6 +78,7 @@ from .support.codex_eval_protocol_v3 import (  # pyright: ignore[reportMissingIm
     build_compound_undo_business_transaction_steps,
     build_core_business_transaction_steps,
     build_object_set_composer_transaction_steps,
+    build_soundengine_business_transaction_steps,
     build_transaction_protocol,
     typed_read_draft_steps,
 )
@@ -5401,6 +5402,83 @@ def test_raw_core_durable_replay_selects_the_exact_api_adapter(
         preview
     ) == expected
     assert selected == ["ak.wwise.core.project.save"]
+
+
+def test_dynamic_soundengine_request_replays_its_durable_business_adapter(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    steps = build_soundengine_business_transaction_steps(
+        version="2022.1",
+        label="tx01",
+        operation="ak.soundengine.registerGameObj",
+        game_object_name="Fresh Weather Listener",
+    )
+    start = next(step for step in steps if step.subcommand == "draft-start")
+    preview = next(
+        step for step in steps if step.subcommand == "preview-from-draft"
+    )
+    assert preview.expected_operation_request is None
+    skill = make_fake_skill(tmp_path)
+    (skill / "wwise_waapi").mkdir()
+    state = tmp_path / "state"
+    state.mkdir()
+    dynamic_request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "waapi.call",
+        "arguments": {
+            "api": "ak.soundengine.registerGameObj",
+            "args": {
+                "gameObject": 4092176131199699083,
+                "name": "Fresh Weather Listener",
+            },
+            "options": {},
+        },
+    }
+    session = SimpleNamespace()
+    monkeypatch.setattr(
+        broker_module,
+        "OperationDraftStore",
+        lambda _state: SimpleNamespace(
+            inspect=lambda *_args, **_kwargs: SimpleNamespace(
+                composition={"business_session": {}}
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        broker_module.BusinessDeclarationSession,
+        "from_dict",
+        lambda _value: session,
+    )
+    selected: list[str] = []
+
+    def select_adapter(operation: str) -> SimpleNamespace:
+        selected.append(operation)
+        return SimpleNamespace(
+            supports_cleaned_file_evidence=False,
+            materialize=lambda *_args, **_kwargs: dynamic_request,
+        )
+
+    monkeypatch.setattr(broker_module, "business_adapter", select_adapter)
+    broker = CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=steps,
+        expected_wwise_version="2022.1",
+    )
+    broker._state_directory = state  # noqa: SLF001
+    broker._payloads_by_step[start.name] = {  # noqa: SLF001
+        "task_authority": "da1-" + "2" * 40,
+        "draft": {
+            "draft_id": "od1-" + "1" * 32,
+            "binding": {"version": "2022.1"},
+        },
+    }
+
+    assert broker._replay_expected_operation_draft_request(  # noqa: SLF001
+        preview
+    ) == dynamic_request
+    assert selected == ["ak.soundengine.registerGameObj"]
 
 
 def test_sealed_business_draft_replay_survives_successful_media_cleanup(
