@@ -553,6 +553,21 @@ prevention checks that are expensive to rediscover.
   required isolation because a newer SampleProject moved or renamed its work
   units; freeze the failed preflight and select a supported matching version.
 
+### A generated SoundBank file does not override WwiseConsole failure
+
+- Evidence: #89 direct Wwise 2022.1 diagnosis wrote `Init.bnk` and the related
+  metadata files, but still exited 1 because the copied SampleProject's Init
+  Bank referenced the unavailable ReWwire Sender and Auro Headphone effects.
+  `--continue-on-error` preserved the files but did not change the failed exit.
+- Cause: WwiseConsole always generates Init alongside the requested Banks. A
+  file-only oracle can therefore observe a usable artifact from a command that
+  Wwise truthfully classified as partially failed.
+- Prevention: keep the nonzero exit fail-closed and never promote it to PASS
+  merely because `.bnk` files exist. For the pinned 2022 SampleProject, run the
+  existing identity-checked optional-plugin isolator on the disposable project
+  copy before Wwise starts; keep the immutable source untouched. Use the
+  separate reviewed 2025 Auro profile for that fixture layout.
+
 ### A dynamic Business request is replayed from its durable Draft
 
 - Evidence: #88 macOS root `imac-soundengine4-68411e0-r2` and native-Windows

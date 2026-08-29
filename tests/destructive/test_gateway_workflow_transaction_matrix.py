@@ -508,7 +508,7 @@ def workflow_sandbox_runtime(tmp_path_factory: pytest.TempPathFactory) -> Iterat
         source_hash_before = _hash_mutation_bearing_project_files(sandbox.source_root)
         source_tree_before = _source_tree_inventory(sandbox.source_root)
         assert source_hash_before[1] > 0, "immutable SampleProject source has no .wproj/.wwu files to hash"
-        if version == "2025.1":
+        if version in {"2022.1", "2025.1"}:
             prelaunch_io_root = case_sandbox_root / "prelaunch-io"
             prelaunch_io_root.mkdir(parents=True, exist_ok=False)
             prelaunch = normalize_project_copy(
@@ -517,10 +517,22 @@ def workflow_sandbox_runtime(tmp_path_factory: pytest.TempPathFactory) -> Iterat
                 owned_root=case_sandbox_root,
                 request=ProjectPrelaunchRequest(
                     scenario_id="gateway-workflow-transaction-matrix",
-                    auro_isolation_profile=WWISE_2025_SOUNDBANK_AURO_PROFILE,
+                    isolate_optional_sample_plugins=version == "2022.1",
+                    auro_isolation_profile=(
+                        WWISE_2025_SOUNDBANK_AURO_PROFILE
+                        if version == "2025.1"
+                        else None
+                    ),
                 ),
             )
-            assert prelaunch.auro_soundbank_isolation is not None
+            if version == "2022.1":
+                assert prelaunch.optional_plugin_isolation is not None
+                assert (
+                    prelaunch.optional_plugin_isolation.remaining_optional_plugin_instances
+                    == 0
+                )
+            else:
+                assert prelaunch.auro_soundbank_isolation is not None
         lifecycle = launch_sandboxed_wwise(sandbox, env)
         assert lifecycle.port is not None
         assert sandbox.metadata.selected_port == lifecycle.port
