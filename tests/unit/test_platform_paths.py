@@ -68,7 +68,8 @@ def _wine_project_guard(home: Path, project: Path, *, host: str = "127.0.0.1") -
         },
         "project": {
             "state": "open",
-            "path": "Y:\\" + "\\".join(relative.parts),
+            "path": "\\",
+            "filePath": "Y:\\" + "\\".join(relative.parts),
         },
     }
 

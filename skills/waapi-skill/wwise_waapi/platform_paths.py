@@ -146,7 +146,13 @@ def adapt_cli_dispatch_paths(
         (
             project.get(field)
             for field in ("path", "projectPath", "filePath")
-            if isinstance(project.get(field), str) and project.get(field)
+            if (
+                isinstance(project.get(field), str)
+                and (
+                    _WINDOWS_ABSOLUTE_PATH.match(project.get(field)) is not None
+                    or Path(project.get(field)).is_absolute()
+                )
+            )
         ),
         None,
     )
