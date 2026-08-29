@@ -284,6 +284,31 @@ def _preview_runtime_plan(
     )
 
 
+def _preview_zero_input_plan(
+    operation: str,
+    *,
+    env: dict[str, str],
+    state_dir: Path,
+) -> dict[str, object]:
+    schema = _call(
+        ["request-schema", operation],
+        env=env,
+        state_dir=state_dir,
+    )
+    assert schema["input_shape"] == "zero"
+    continuation = schema["continuation"]
+    assert isinstance(continuation, dict)
+    assert continuation["subcommand"] == "typed-zero-call"
+    gateway_argv = continuation["gateway_argv"]
+    assert isinstance(gateway_argv, list)
+    assert all(isinstance(value, str) for value in gateway_argv)
+    return _call(
+        list(gateway_argv),
+        env=env,
+        state_dir=state_dir,
+    )
+
+
 def _runtime_business_result(verified: Mapping[str, object]) -> Mapping[str, object]:
     agent_result = verified.get("agent_result")
     assert isinstance(agent_result, Mapping), verified
@@ -569,3 +594,100 @@ def test_runtime_business_profiler_and_transport_lifecycle_on_authoring(
             "Authoring runtime lifecycle or bounded cleanup failed",
             [*([primary_error] if primary_error is not None else []), *cleanup_errors],
         )
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_runtime_business_remote_connection_lifecycle_on_authoring(
+    tmp_path: Path,
+) -> None:
+    version = os.environ["WWISE_VERSION"]
+    assert version == "2022.1"
+    env = _gateway_env(tmp_path, version=version)
+    state_dir = tmp_path / "remote-authoring-state"
+
+    status = _call(["status"], env=env, state_dir=state_dir)
+    assert status["is_command_line"] is False
+    project = status["project"]
+    assert isinstance(project, dict)
+    observed_project = Path(
+        localize_waapi_host_path(project["path"])
+    ).resolve(strict=True)
+    expected_project = Path(
+        env["WWISE_AUTHORING_SANDBOX_PROJECT"]
+    ).resolve(strict=True)
+    assert observed_project == expected_project
+
+    remote_host = os.environ["WWISE_AUTHORING_REMOTE_HOST"]
+    application_name = os.environ["WWISE_AUTHORING_REMOTE_APPLICATION_NAME"]
+    command_port = int(os.environ["WWISE_AUTHORING_REMOTE_COMMAND_PORT"])
+    assert remote_host.strip() == remote_host and remote_host
+    assert application_name.strip() == application_name and application_name
+    assert 1 <= command_port <= 65535
+
+    remote_may_be_connected = False
+    primary_error: BaseException | None = None
+    cleanup_error: BaseException | None = None
+    try:
+        connect = _preview_runtime_plan(
+            "ak.wwise.core.remote.connect",
+            [
+                "--remote-host",
+                remote_host,
+                "--application-name",
+                application_name,
+                "--command-port",
+                str(command_port),
+            ],
+            env=env,
+            state_dir=state_dir,
+        )
+        # Own cleanup before dispatch: connect can take effect even when its
+        # non-retried response or later verification is ambiguous.
+        remote_may_be_connected = True
+        connected = _execute_and_verify(
+            connect,
+            env=env,
+            state_dir=state_dir,
+        )
+        assert connected["state"] == TransactionState.VERIFIED.value
+
+        disconnect = _preview_zero_input_plan(
+            "ak.wwise.core.remote.disconnect",
+            env=env,
+            state_dir=state_dir,
+        )
+        disconnected = _execute_and_verify(
+            disconnect,
+            env=env,
+            state_dir=state_dir,
+        )
+        assert disconnected["state"] == TransactionState.VERIFIED.value
+        remote_may_be_connected = False
+    except BaseException as exc:
+        primary_error = exc
+    finally:
+        if remote_may_be_connected:
+            try:
+                cleanup = _preview_zero_input_plan(
+                    "ak.wwise.core.remote.disconnect",
+                    env=env,
+                    state_dir=state_dir,
+                )
+                cleanup_verified = _execute_and_verify(
+                    cleanup,
+                    env=env,
+                    state_dir=state_dir,
+                )
+                assert cleanup_verified["state"] == TransactionState.VERIFIED.value
+            except BaseException as exc:
+                cleanup_error = exc
+    if primary_error is not None and cleanup_error is not None:
+        raise BaseExceptionGroup(
+            "Authoring Remote lifecycle failed and bounded disconnect also failed",
+            [primary_error, cleanup_error],
+        )
+    if primary_error is not None:
+        raise primary_error
+    if cleanup_error is not None:
+        raise cleanup_error
