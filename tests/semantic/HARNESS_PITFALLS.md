@@ -43,6 +43,12 @@ prevention checks that are expensive to rediscover.
   exact Windows PowerShell provenance, adjacent identical command and argv, and
   a successful 0/2 successor. Never collapse a non-267, changed, non-adjacent,
   or twice-failed command.
+- Follow-up: `iwin-pset-81aeb6e-r5` then passed Broker, reconciliation,
+  Preview, closed-request, and final-response gates, but the shared Business
+  runner's unexpected-command cardinality still counted the same excluded 267
+  record. Every command-cardinality consumer must use the identical effective
+  record set; `unexpected_commands=[]` plus one proven 267 is not an Agent
+  command violation.
 
 ### Scheduled Task `Ready` is not campaign completion
 

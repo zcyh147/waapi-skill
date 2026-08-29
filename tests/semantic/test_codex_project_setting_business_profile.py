@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import sys
 from types import SimpleNamespace
+from types import SimpleNamespace
 
 import pytest
 
@@ -18,6 +19,9 @@ from tests.semantic.support.codex_gateway_broker import (
 )
 from tests.semantic.support.codex_project_setting_business_agent_runner import (
     prepare_project_setting_business_runtime,
+)
+from tests.semantic.support.codex_business_agent_runner import (
+    _only_expected_business_commands,
 )
 from tests.semantic.support.codex_project_setting_business_profile import (
     OBJECT_ID,
@@ -133,6 +137,40 @@ def test_business_fixture_shim_resolves_one_exact_typed_name(
             "path": r"\Game Parameters\Default Work Unit\WeatherIntensity",
         }
     ]
+
+
+def test_business_command_gate_folds_one_identical_windows_267_retry() -> None:
+    command = "pwsh -Command request-schema"
+    argv = ("python", "run.py", "gateway.py", "request-schema", "api")
+    common = {
+        "command": command,
+        "argv": argv,
+        "parse_error": "",
+        "has_shell_operators": False,
+        "parser_kind": "windows-pwsh-command",
+    }
+    failed = SimpleNamespace(
+        **common,
+        status="failed",
+        exit_code=-1,
+        aggregated_output=(
+            "execution error: Io(windows sandbox: "
+            "CreateProcessAsUserW failed: 267)"
+        ),
+    )
+    successful = SimpleNamespace(
+        **common,
+        status="completed",
+        exit_code=0,
+        aggregated_output="{}",
+    )
+    facts = SimpleNamespace(
+        command_records=(failed, successful),
+        unexpected_commands=(),
+        allowed_read_commands=(),
+    )
+
+    assert _only_expected_business_commands(facts, (argv,)) is True
 
 
 def test_project_setting_protocol_is_singular_and_complete() -> None:

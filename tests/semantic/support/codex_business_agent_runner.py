@@ -14,6 +14,7 @@ from tests.semantic.support.codex_harness import (
     CodexHarnessConfig,
     WindowsPowerShellCoreHost,
     prepare_workspace_skill_install,
+    recoverable_preprocess_attempt_indexes,
     semantic_task_developer_instructions,
 )
 from tests.semantic.support.codex_task_runner_v3 import _gateway_candidate_argvs
@@ -46,6 +47,20 @@ class BusinessAgentRunSpec:
     preview_gates: Callable[[Any, Any, Any, Any], Mapping[str, bool]]
     outcome_factory: Callable[..., Any]
     optional_initial_operations_discovery_operation: str | None = None
+
+
+def _only_expected_business_commands(
+    facts: Any,
+    gateway_argvs: Sequence[Sequence[str]],
+) -> bool:
+    records = facts.command_records
+    recoverable = recoverable_preprocess_attempt_indexes(records)
+    effective_count = len(records) - len(recoverable)
+    return (
+        not facts.unexpected_commands
+        and effective_count
+        == len(gateway_argvs) + len(facts.allowed_read_commands)
+    )
 
 
 def _expected_gateway_subcommands(
@@ -156,8 +171,7 @@ def run_business_agent_unit(
         "exact_protocol": broker_evidence.passed and reconciliation.passed,
         "production_skill_read": facts.skill_read
         and set(facts.skill_read_files) == {"SKILL.md", "references/waapi-operate.md"},
-        "no_unexpected_commands": len(facts.command_records)
-        == len(argvs) + len(facts.allowed_read_commands),
+        "no_unexpected_commands": _only_expected_business_commands(facts, argvs),
         "no_inline_python": not facts.inline_python_commands,
         "no_direct_waapi": not facts.direct_waapi_client_commands,
         "no_workspace_changes": result.file_change_count == 0,
