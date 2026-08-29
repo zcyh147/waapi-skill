@@ -78,10 +78,33 @@ def _env(tmp_path: Path, version: str = "2022.1") -> dict[str, str]:
 
 
 def test_bounded_call_returns_validated_business_result_to_agent(tmp_path: Path) -> None:
+    state_group_id = "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"
+    project = tmp_path / "SampleProject" / "SampleProject.wproj"
+    project.parent.mkdir()
+    project.write_text("fixture", encoding="utf-8")
     state_result = {"id": "{00000000-0000-0000-0000-000000000001}", "name": "Gameplay"}
     client = FakeClient(
         {
             "ak.wwise.core.getInfo": [_live_info()],
+            "ak.wwise.core.getProjectInfo": [
+                {
+                    "id": "{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}",
+                    "name": "SampleProject",
+                    "path": str(project),
+                }
+            ],
+            "ak.wwise.core.object.get": [
+                {
+                    "return": [
+                        {
+                            "id": state_group_id,
+                            "name": "Gameplay",
+                            "type": "StateGroup",
+                            "path": r"\States\Default Work Unit\Gameplay",
+                        }
+                    ]
+                }
+            ],
             "ak.soundengine.getState": [state_result],
         }
     )
@@ -92,22 +115,13 @@ def test_bounded_call_returns_validated_business_result_to_agent(tmp_path: Path)
         client_factory=lambda url: pytest.fail(f"schema connected to {url}"),
     )
     assert schema_code == 0, schema
-    state_group = next(
-        field for field in schema["fields"]
-        if field["name"] == "stateGroup" and field["shape"] == "branch"
-    )
-    typed_state_group = next(
-        field for field in schema["fields"]
-        if field.get("parent_handle") == state_group["handle"]
-        and field.get("patterns", [""])[0].startswith("^(StateGroup")
-    )
+    assert schema["business_adapter"]["execution_shape"] == "bounded_read"
     exit_code, payload = waapi_gateway.execute_gateway(
         [
-            "typed-call",
+            "core-call",
             "ak.soundengine.getState",
-            "--schema-digest", schema["schema_digest"],
-            "--choose", state_group["handle"], typed_state_group["handle"],
-            "--set", typed_state_group["handle"], "string", "StateGroup:Gameplay",
+            "--state-group-id",
+            state_group_id,
         ],
         env=_env(tmp_path),
         client_factory=lambda url: client,
@@ -115,8 +129,12 @@ def test_bounded_call_returns_validated_business_result_to_agent(tmp_path: Path)
 
     assert exit_code == 0, json.dumps(payload, indent=2)
     assert payload["agent_result"] == state_result
-    assert payload["typed_request"]["schema_digest"] == schema["schema_digest"]
-    assert [call[0] for call in client.calls] == ["ak.wwise.core.getInfo", "ak.soundengine.getState"]
+    assert [call[0] for call in client.calls] == [
+        "ak.wwise.core.getInfo",
+        "ak.wwise.core.getProjectInfo",
+        "ak.wwise.core.object.get",
+        "ak.soundengine.getState",
+    ]
 
 
 @pytest.mark.parametrize("api", ("ak.wwise.core.getInfo", "ak.wwise.debug.testCrash"))

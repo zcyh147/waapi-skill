@@ -64,6 +64,7 @@ waapi_gateway.execute_gateway = bind_canonical_preview_fixture(waapi_gateway)
 
 PARENT_GUID = "{22222222-2222-2222-2222-222222222222}"
 OBJECT_GUID = "{33333333-3333-3333-3333-333333333333}"
+SOUND_BANK_GUID = "{55555555-5555-5555-5555-555555555555}"
 
 
 def _composer_fields(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -365,6 +366,15 @@ def object_row(*, path: str = OBJECT_PATH, notes: str = "before") -> dict[str, A
         "path": path,
         "parent": {"id": PARENT_GUID},
         "notes": notes,
+    }
+
+
+def sound_bank_row() -> dict[str, Any]:
+    return {
+        "id": SOUND_BANK_GUID,
+        "name": "Main",
+        "type": "SoundBank",
+        "path": r"\SoundBanks\Default Work Unit\Main",
     }
 
 
@@ -1036,106 +1046,75 @@ def test_zero_input_generic_mutation_enters_existing_preview_lifecycle(
     }
 
 
-def test_flat_generic_mutation_enters_existing_preview_with_exact_args(
+def test_soundengine_scalar_mutation_exposes_only_its_business_declaration(
     tmp_path: Path,
 ) -> None:
     version = "2021.1"
     api = "ak.soundengine.postMsgMonitor"
-    state_dir = tmp_path / "state"
     schema_exit, schema = execute(
         ["request-schema", api],
         tmp_path=tmp_path,
         version=version,
     )
     assert schema_exit == 0
-    handles = {field["name"]: field["handle"] for field in schema["fields"]}
-
-    exit_code, payload = execute(
-        [
-            "typed-call", api,
-            "--schema-digest", schema["schema_digest"],
-            "--set", handles["message"], "string", "Weather runtime probe",
-            "--apply",
-        ],
-        tmp_path=tmp_path,
-        state_dir=state_dir,
-        version=version,
-        policy="ask_before_changes",
-        client=FakeClient(
-            {
-                "ak.wwise.core.getInfo": [live_info(year=2021)],
-                "ak.wwise.core.object.get": [
-                    {"return": [{**project(), "type": "Project"}]}
-                ],
+    assert schema["input_shape"] == "business_declaration"
+    assert schema["native_request_fields_disclosed"] is False
+    assert "fields" not in schema
+    assert schema["business_adapter"]["declaration"] == {
+        "subcommand": "draft-declare-soundengine-plan",
+        "required_fields": ["monitor_message"],
+        "optional_fields": [],
+        "field_types": {"monitor_message": "bounded_exact_monitor_message"},
+        "input_forms": {
+            "monitor_message": {
+                "flag": "--monitor-message",
+                "repeatable": False,
             }
-        ),
-    )
-    assert exit_code == 0, json.dumps(payload, indent=2)
-    assert payload["state"] == TransactionState.AWAITING_CONFIRMATION.value
-    artifact = TransactionStore(state_dir).load_preview(payload["transaction_id"]).artifact
-    assert artifact["request"] == {
-        "contract": OPERATION_REQUEST_CONTRACT,
-        "version": version,
-        "operation": "waapi.call",
-        "arguments": {
-            "api": api,
-            "args": {"message": "Weather runtime probe"},
-            "options": {},
         },
     }
-    assert artifact["prepared_operation"]["dispatch"] == {
-        "uri": api,
-        "args": {"message": "Weather runtime probe"},
-        "options": {},
+    assert schema["continuation"] == {
+        "subcommand": "draft-start",
+        "gateway_argv": ["draft-start", api],
+        "copy_exactly": True,
+        "append_arguments": "forbidden",
     }
 
 
-def test_flat_generic_simple_array_enters_preview_with_exact_order(
+def test_soundengine_listener_array_is_an_opaque_handle_business_set(
     tmp_path: Path,
 ) -> None:
     version = "2021.1"
     api = "ak.soundengine.setDefaultListeners"
-    state_dir = tmp_path / "state"
     schema_exit, schema = execute(
         ["request-schema", api],
         tmp_path=tmp_path,
         version=version,
     )
     assert schema_exit == 0
-    listeners = next(field for field in schema["fields"] if field["name"] == "listeners")
-    assert set(schema["continuation"]["fact_flags"]) == {
-        "array_item",
-        "container",
+    declaration = schema["business_adapter"]["declaration"]
+    assert declaration["required_fields"] == []
+    assert declaration["optional_fields"] == [
+        "listener_handles",
+        "clear_listeners",
+    ]
+    assert declaration["field_types"] == {
+        "listener_handles": "gateway_runtime_game_object_handle_list",
+        "clear_listeners": "explicit_boolean_intent",
     }
-
-    exit_code, payload = execute(
-        [
-            "typed-call", api,
-            "--schema-digest", schema["schema_digest"],
-            "--append", listeners["handle"], "integer", "17",
-            "--append", listeners["handle"], "integer", "23",
-            "--apply",
-        ],
-        tmp_path=tmp_path,
-        state_dir=state_dir,
-        version=version,
-        policy="ask_before_changes",
-        client=FakeClient(
-            {
-                "ak.wwise.core.getInfo": [live_info(year=2021)],
-                "ak.wwise.core.object.get": [
-                    {"return": [{**project(), "type": "Project"}]}
-                ],
-            }
-        ),
-    )
-    assert exit_code == 0, json.dumps(payload, indent=2)
-    artifact = TransactionStore(state_dir).load_preview(payload["transaction_id"]).artifact
-    assert artifact["request"]["arguments"] == {
-        "api": api,
-        "args": {"listeners": [17, 23]},
-        "options": {},
+    assert declaration["input_forms"] == {
+        "listener_handles": {
+            "flag": "--listener-handle",
+            "repeatable": True,
+        },
+        "clear_listeners": {
+            "flag": "--clear-listeners",
+            "repeatable": False,
+        },
     }
+    assert declaration["constraints"] == {
+        "exactly_one_of": [["listener_handles", "clear_listeners"]]
+    }
+    assert "fields" not in schema
 
 
 def test_zero_input_managed_read_dispatches_directly_with_its_route_contract(
@@ -1205,6 +1184,110 @@ def preview_and_confirm_public_call(
             }
         ),
     )
+    confirm(
+        transaction["transaction_id"],
+        transaction["artifact_hash"],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+    )
+    return transaction
+
+
+def preview_and_confirm_soundengine_bank(
+    operation: str,
+    *,
+    tmp_path: Path,
+    state_dir: Path,
+) -> dict[str, Any]:
+    version = "2025.1"
+
+    def live_client() -> FakeClient:
+        return FakeClient(
+            {
+                "ak.wwise.core.getInfo": [live_info(year=2025)],
+                "ak.wwise.core.getProjectInfo": [project()],
+                "ak.wwise.core.object.get": [
+                    {"return": [sound_bank_row()]},
+                    {"return": [sound_bank_row()]},
+                    {"return": [sound_bank_row()]},
+                ],
+            }
+        )
+
+    code, started = execute(
+        ["draft-start", operation],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        version=version,
+    )
+    assert code == 0, started
+    draft = started["draft"]
+    code, bound = execute(
+        [
+            "draft-bind-object",
+            draft["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            str(draft["revision"]),
+            "--role",
+            "sound_bank",
+            "--object-id",
+            SOUND_BANK_GUID,
+        ],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=live_client(),
+        version=version,
+    )
+    assert code == 0, bound
+    code, declared = execute(
+        [
+            "draft-declare-soundengine-plan",
+            draft["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            str(bound["draft"]["revision"]),
+            "--sound-bank-handle",
+            bound["bound_object"]["handle"],
+        ],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=live_client(),
+        version=version,
+    )
+    assert code == 0, declared
+    code, checked = execute(
+        [
+            "draft-check",
+            draft["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            str(declared["draft"]["revision"]),
+        ],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=live_client(),
+        version=version,
+    )
+    assert code == 0, checked
+    code, transaction = execute(
+        [
+            "preview-from-draft",
+            draft["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            str(checked["draft"]["revision"]),
+        ],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=live_client(),
+        version=version,
+    )
+    assert code == 0, transaction
     confirm(
         transaction["transaction_id"],
         transaction["artifact_hash"],
@@ -1468,33 +1551,16 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
     }
     project_save = request_schema_routes["ak.wwise.core.project.save"]
     assert "save the current Wwise project" in project_save["intent"]
-    assert project_save["next_command"] == [
+    assert catalog["request_schema_command_template"] == [
         "request-schema",
-        "ak.wwise.core.project.save",
+        "<api>",
     ]
-    assert catalog["request_schema_route_count"] == 60
-    assert request_schema_routes[
-        "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion"
-    ]["next_command"] == [
-        "request-schema",
-        "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
-    ]
-    assert request_schema_routes["ak.wwise.core.mediaPool.get"]["next_command"] == [
-        "request-schema",
-        "ak.wwise.core.mediaPool.get",
-    ]
-    assert request_schema_routes[
-        "ak.wwise.core.sound.setActiveSource"
-    ]["next_command"] == [
-        "request-schema",
-        "ak.wwise.core.sound.setActiveSource",
-    ]
-    assert request_schema_routes[
-        "ak.wwise.core.sourceControl.commit"
-    ]["next_command"] == [
-        "request-schema",
-        "ak.wwise.core.sourceControl.commit",
-    ]
+    assert all("next_command" not in row for row in request_schema_routes.values())
+    assert catalog["request_schema_route_count"] == 86
+    assert "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion" in request_schema_routes
+    assert "ak.wwise.core.mediaPool.get" in request_schema_routes
+    assert "ak.wwise.core.sound.setActiveSource" in request_schema_routes
+    assert "ak.wwise.core.sourceControl.commit" in request_schema_routes
     encoded_size = waapi_gateway.gateway_json_document_size(catalog)
     assert encoded_size < 32 * 1024
     assert "\n" not in waapi_gateway.gateway_stdout_json_encoder(catalog).encode(catalog)
@@ -5362,13 +5428,8 @@ def test_object_create_plugin_runs_full_preview_confirm_execute_verify_chain(
 
 def test_lifecycle_opener_cleanup_spec_survives_the_full_gateway_chain(tmp_path: Path) -> None:
     state_dir = tmp_path / "load-bank-state"
-    sound_bank = {"name": "Main", "ids": [1, 2]}
-    request = generic_public_call_request(
+    transaction = preview_and_confirm_soundengine_bank(
         "ak.soundengine.loadBank",
-        {"soundBank": sound_bank},
-    )
-    transaction = preview_and_confirm_public_call(
-        request,
         tmp_path=tmp_path,
         state_dir=state_dir,
     )
@@ -5380,7 +5441,7 @@ def test_lifecycle_opener_cleanup_spec_survives_the_full_gateway_chain(tmp_path:
     assert preview_cleanup["projection"]["status"] == "not_started"
     assert preview_cleanup["spec"]["companion_request"] == {
         "api": "ak.soundengine.unloadBank",
-        "args": {"soundBank": sound_bank},
+        "args": {"soundBank": SOUND_BANK_GUID},
         "options": {},
     }
     show_exit, show_payload = execute(
@@ -5393,7 +5454,7 @@ def test_lifecycle_opener_cleanup_spec_survives_the_full_gateway_chain(tmp_path:
     assert show_payload["preview_summary"]["cleanup"]["spec"] == preview_cleanup["spec"]
     assert show_payload["preview_summary"]["cleanup"]["spec"]["companion_request"] == {
         "api": "ak.soundengine.unloadBank",
-        "args": {"soundBank": sound_bank},
+        "args": {"soundBank": SOUND_BANK_GUID},
         "options": {},
     }
 
@@ -5406,6 +5467,7 @@ def test_lifecycle_opener_cleanup_spec_survives_the_full_gateway_chain(tmp_path:
             {
                 "ak.wwise.core.getInfo": [live_info(year=2025)],
                 "ak.wwise.core.getProjectInfo": [project()],
+                "ak.wwise.core.object.get": [{"return": [sound_bank_row()]}],
                 "ak.soundengine.loadBank": [{}],
             }
         ),
@@ -5458,13 +5520,8 @@ def test_load_bank_cleanup_binding_cannot_be_overridden_by_execution_result(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     state_dir = tmp_path / "load-bank-result-override-state"
-    confirmed_sound_bank = {"name": "Confirmed", "ids": [7, 8]}
-    request = generic_public_call_request(
+    transaction = preview_and_confirm_soundengine_bank(
         "ak.soundengine.loadBank",
-        {"soundBank": confirmed_sound_bank},
-    )
-    transaction = preview_and_confirm_public_call(
-        request,
         tmp_path=tmp_path,
         state_dir=state_dir,
     )
@@ -5494,6 +5551,7 @@ def test_load_bank_cleanup_binding_cannot_be_overridden_by_execution_result(
         {
             "ak.wwise.core.getInfo": [live_info(year=2025)],
             "ak.wwise.core.getProjectInfo": [project()],
+            "ak.wwise.core.object.get": [{"return": [sound_bank_row()]}],
         }
     )
     execute_exit, execute_payload = execute(
@@ -5508,18 +5566,18 @@ def test_load_bank_cleanup_binding_cannot_be_overridden_by_execution_result(
     assert execute_payload["dispatch_result"]["result"]["soundBank"]["name"] == "Injected"
     assert execute_payload["cleanup"]["projection"]["companion_request"] == {
         "api": "ak.soundengine.unloadBank",
-        "args": {"soundBank": confirmed_sound_bank},
+        "args": {"soundBank": SOUND_BANK_GUID},
         "options": {},
     }
     assert execute_payload["cleanup"]["spec"]["companion_request"]["args"] == {
-        "soundBank": confirmed_sound_bank
+        "soundBank": SOUND_BANK_GUID
     }
     assert not any(call[0] == "ak.soundengine.loadBank" for call in execute_client.calls)
     stored_spec = TransactionStore(state_dir).load_preview(
         transaction["transaction_id"]
     ).artifact["prepared_operation"]["cleanup"]
     assert stored_spec == transaction["cleanup"]["spec"]
-    assert stored_spec["companion_request"]["args"] == {"soundBank": confirmed_sound_bank}
+    assert stored_spec["companion_request"]["args"] == {"soundBank": SOUND_BANK_GUID}
 
 
 def test_transport_create_materializes_destroy_request_in_execute_verify_and_agent_result(
@@ -5976,12 +6034,8 @@ def test_transaction_readback_normalizes_only_single_exact_unknown_object(
 
 def test_lifecycle_opener_execution_exception_reports_unknown_cleanup(tmp_path: Path) -> None:
     state_dir = tmp_path / "indeterminate-cleanup-state"
-    request = generic_public_call_request(
+    transaction = preview_and_confirm_soundengine_bank(
         "ak.soundengine.loadBank",
-        {"soundBank": "Main"},
-    )
-    transaction = preview_and_confirm_public_call(
-        request,
         tmp_path=tmp_path,
         state_dir=state_dir,
     )
@@ -5994,6 +6048,7 @@ def test_lifecycle_opener_execution_exception_reports_unknown_cleanup(tmp_path: 
             {
                 "ak.wwise.core.getInfo": [live_info(year=2025)],
                 "ak.wwise.core.getProjectInfo": [project()],
+                "ak.wwise.core.object.get": [{"return": [sound_bank_row()]}],
                 "ak.soundengine.loadBank": [],
             },
             errors={
@@ -6067,12 +6122,8 @@ def test_work_unit_load_is_available_reversal_through_the_full_gateway_chain(
 
 def test_lifecycle_closer_is_not_reported_as_needing_more_cleanup(tmp_path: Path) -> None:
     state_dir = tmp_path / "unload-bank-state"
-    request = generic_public_call_request(
+    transaction = preview_and_confirm_soundengine_bank(
         "ak.soundengine.unloadBank",
-        {"soundBank": "Main"},
-    )
-    transaction = preview_and_confirm_public_call(
-        request,
         tmp_path=tmp_path,
         state_dir=state_dir,
     )
@@ -6090,6 +6141,7 @@ def test_lifecycle_closer_is_not_reported_as_needing_more_cleanup(tmp_path: Path
             {
                 "ak.wwise.core.getInfo": [live_info(year=2025)],
                 "ak.wwise.core.getProjectInfo": [project()],
+                "ak.wwise.core.object.get": [{"return": [sound_bank_row()]}],
                 "ak.soundengine.unloadBank": [{}],
             }
         ),

@@ -16,9 +16,9 @@
     ]
   },
   "source_contracts": {
-    "gateway_parser_sha256": "9deec3f1ed24abecdc6e325a4b8d60c83d637e4f6656b334f17abb1e8fd3eba6",
+    "gateway_parser_sha256": "d2e5430c10f9e09170d647f8fe684ff510d82a6403b289e1416e52ea71b2ad3e",
     "operation_contract_sha256": "44b2583ac1211ffff7a6c55277c4a81e2845f1042605f28122165af4f8936031",
-    "public_continuation_sha256": "fe9aa541cce05746421842f4f609b9bd9d83695b7676bfd8a6b75f6f0037fc92",
+    "public_continuation_sha256": "cc70488a27737b80878a9fe2e09c8c10fbf709ed8c549ce07c0124eb59de749a",
     "typed_request_surface_sha256": "d21ddea15bb098fb5b82d0937189a2f52c81d2059e59a51ceb4e840b70c0a370"
   },
   "ownership_classes": {
@@ -182,10 +182,11 @@
     },
     {
       "id": "generic-soundengine-runtime",
-      "disposition": "migration_required",
-      "owner_issue": 57,
+      "disposition": "already_deep",
+      "owner_issue": null,
       "match": {"uri_prefixes": ["ak.soundengine."]},
-      "leaked_mechanics": ["wire_type", "dependency_order", "batch_layout", "request_fragment"]
+      "leaked_mechanics": [],
+      "audit_evidence": "The public soundengine-control-business/v1 Adapter covers all 26 operations and 124 supported version/API rows. Mutations accept bound Wwise object roles, opaque runtime game-object and playing handles, stable action/mode/layout names, finite business values, percentages, decibels, and bounded position or routing rows; the Gateway derives native IDs, reserved sentinels, enums, overload branches, nested arrays, channel configuration, gain conversion, lifecycle retirement, execution-time handle revalidation, exact identity drift checks, immutable Preview, and result projection. getState and getSwitch use direct bounded reads with exact group identity validation. Normal typed-call, typed container, and shallow Composer ingress is removed. Final #88 dual-host real and Fresh evidence remains a release gate rather than an interface-depth claim."
     },
     {
       "id": "generic-cli-console",
@@ -227,15 +228,6 @@
     }
   ],
   "ticket_blueprints": {
-    "generic-soundengine-runtime": {
-      "title": "Deepen the complete SoundEngine runtime command surface",
-      "parent_issue": 57,
-      "blocked_by_family": "generic-core-runtime-inspection",
-      "public_behavior": "Expose events, game objects, listeners, positions, RTPCs, switches, states, banks, and playback actions as stable domain values; derive native overloads, IDs, arrays, and wire types.",
-      "deterministic_tests": "All 124 exact version lanes, overload and enum mapping, hostile IDs/scalars, multi-position and aux-send bounds, command continuation, result ceilings, and non-bypass.",
-      "removal_boundary": "Delete model-authored typed handles, branch choices, native arrays, and wire types for SoundEngine rows after parity.",
-      "proportional_evidence": "Representative real calls per distinct command/result family on matching hosts; targeted Fresh Agent workflows for event/game-object/listener parameter closure."
-    },
     "generic-cli-console": {
       "title": "Deepen Wwise CLI and Console project/build operations",
       "parent_issue": 57,
@@ -284,10 +276,14 @@
       "github_issue": 87,
       "row_count": 94,
       "rows_sha256": "b66b1f4d66d8d77b456b98041c7e14fa2d383e02bae02b4a17fabfb85261d593"
+    },
+    "generic-soundengine-runtime": {
+      "github_issue": 88,
+      "row_count": 124,
+      "rows_sha256": "5075fdcc32810059d6a3fee10499ff6823eea0be4c300dfb717bede6697c6ced"
     }
   },
   "ticket_issue_numbers": {
-    "generic-soundengine-runtime": 88,
     "generic-cli-console": 89,
     "generic-host-ui-debug-waapi": 90,
     "generic-topics": 91

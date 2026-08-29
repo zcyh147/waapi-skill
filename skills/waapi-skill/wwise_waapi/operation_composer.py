@@ -1463,6 +1463,12 @@ def materialize_operation_request(
 
     if not isinstance(allow_cleaned_file_evidence, bool):
         raise TypeError("allow_cleaned_file_evidence must be a boolean")
+    if operation_uses_business_declaration(operation, version):
+        raise OperationComposerError(
+            f"No shallow Operation Composer Adapter is available for {operation!r}.",
+            error_code="OPERATION_DRAFT_ADAPTER_UNAVAILABLE",
+            details={"operation": operation, "version": version},
+        )
 
     normalized = _normalize_composition(composition, operation=operation, version=version)
     if operation.startswith("ak.") or operation in DRAFT_TYPED_OPERATIONS:

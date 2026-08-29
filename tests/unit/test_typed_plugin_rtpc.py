@@ -87,13 +87,14 @@ def test_legacy_typed_composition_is_not_a_production_fallback(
 
     with pytest.raises(
         OperationComposerError,
-        match="business composition fields are invalid",
-    ):
+        match="No shallow Operation Composer Adapter is available",
+    ) as rejected:
         materialize_operation_request(
             operation,
             "2025.1",
             legacy_composition,
         )
+    assert rejected.value.error_code == "OPERATION_DRAFT_ADAPTER_UNAVAILABLE"
 
 
 @pytest.mark.parametrize("version", VERSIONS)

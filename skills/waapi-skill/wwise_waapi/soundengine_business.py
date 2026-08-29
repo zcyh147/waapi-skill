@@ -18,9 +18,18 @@ from .soundengine_business_contracts import (
     REGISTER_GAME_OBJECT_URI,
     RESET_GAME_PARAMETER_URI,
     SEEK_ON_EVENT_URI,
+    SET_DEFAULT_LISTENERS_URI,
+    SET_AUX_SENDS_URI,
+    SET_GAME_PARAMETER_URI,
+    SET_LISTENERS_URI,
+    SET_LISTENER_SPATIALIZATION_URI,
+    SET_MULTIPLE_POSITIONS_URI,
+    SET_OBSTRUCTION_OCCLUSION_URI,
+    SET_OUTPUT_BUS_VOLUME_URI,
+    SET_POSITION_URI,
+    SET_SCALING_FACTOR_URI,
     SET_STATE_URI,
     SET_SWITCH_URI,
-    SET_GAME_PARAMETER_URI,
     STOP_ALL_URI,
     STOP_PLAYING_ID_URI,
     UNLOAD_BANK_URI,
@@ -49,6 +58,379 @@ _EVENT_ACTIONS = {
 }
 _INVALID_GAME_OBJECT = 0xFFFFFFFFFFFFFFFF
 _INVALID_PLAYING_ID = 0
+_MULTI_POSITION_MODES = {
+    "SingleSource": 0,
+    "MultiSources": 1,
+    "MultiDirections": 2,
+}
+_SPEAKER_MASKS = {
+    "FL": 0x1,
+    "FR": 0x2,
+    "C": 0x4,
+    "LFE": 0x8,
+    "BL": 0x10,
+    "BR": 0x20,
+    "BC": 0x100,
+    "SL": 0x200,
+    "SR": 0x400,
+    "TOP": 0x800,
+    "HFL": 0x1000,
+    "HFC": 0x2000,
+    "HFR": 0x4000,
+    "HBL": 0x8000,
+    "HBC": 0x10000,
+    "HBR": 0x20000,
+    "HSL": 0x40000,
+    "HSR": 0x80000,
+}
+_STANDARD_CHANNEL_LAYOUTS = {
+    "1.0": ("C",),
+    "1.1": ("C", "LFE"),
+    "2.0": ("FL", "FR"),
+    "2.1": ("FL", "FR", "LFE"),
+    "3.0": ("FL", "FR", "C"),
+    "3.1": ("FL", "FR", "C", "LFE"),
+    "4.0": ("FL", "FR", "SL", "SR"),
+    "4.1": ("FL", "FR", "SL", "SR", "LFE"),
+    "5.0": ("FL", "FR", "C", "SL", "SR"),
+    "5.1": ("FL", "FR", "C", "SL", "SR", "LFE"),
+    "6.0": ("FL", "FR", "BL", "BR", "SL", "SR"),
+    "6.1": ("FL", "FR", "BL", "BR", "SL", "SR", "LFE"),
+    "7.0": ("FL", "FR", "C", "BL", "BR", "SL", "SR"),
+    "7.1": ("FL", "FR", "C", "BL", "BR", "SL", "SR", "LFE"),
+}
+_AMBISONIC_CHANNEL_COUNTS = frozenset((1, 4, 9, 16, 25, 36))
+_HEIGHT_SIDE_SPEAKER_VERSIONS = frozenset(("2024.1", "2025.1"))
+
+
+def _runtime_game_object_id(
+    bindings: object,
+    handle: object,
+    *,
+    field: str,
+) -> int:
+    if not isinstance(handle, str) or not isinstance(bindings, Mapping):
+        raise business_repair(
+            "GAME_OBJECT_HANDLE_INVALID",
+            field=field,
+            action="copy one active game object handle from a Gateway result",
+        )
+    record = bindings.get(handle)
+    game_object_id = record.get("game_object_id") if isinstance(record, Mapping) else None
+    if (
+        isinstance(game_object_id, bool)
+        or not isinstance(game_object_id, int)
+        or not 0 <= game_object_id <= 0xFFFFFFFFFFFFFFDF
+    ):
+        raise business_repair(
+            "GAME_OBJECT_HANDLE_INVALID",
+            field=field,
+            action="bind the active game object handle again",
+        )
+    return game_object_id
+
+
+def _position_frame(values: object) -> dict[str, dict[str, float]]:
+    if (
+        not isinstance(values, list)
+        or len(values) != 9
+        or any(
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not isfinite(value)
+            for value in values
+        )
+    ):
+        raise business_repair(
+            "POSITION_FRAME_INVALID",
+            field="position_frame",
+            action="provide nine finite numbers in position, front, top order",
+        )
+    numbers = [float(value) for value in values]
+    front = numbers[3:6]
+    top = numbers[6:9]
+    cross = (
+        front[1] * top[2] - front[2] * top[1],
+        front[2] * top[0] - front[0] * top[2],
+        front[0] * top[1] - front[1] * top[0],
+    )
+    if (
+        sum(value * value for value in front) <= 1e-12
+        or sum(value * value for value in top) <= 1e-12
+        or sum(value * value for value in cross) <= 1e-12
+    ):
+        raise business_repair(
+            "POSITION_ORIENTATION_INVALID",
+            field="position_frame",
+            action="provide nonzero, nonparallel front and top orientation vectors",
+        )
+    return {
+        "position": {"x": numbers[0], "y": numbers[1], "z": numbers[2]},
+        "orientationFront": {"x": front[0], "y": front[1], "z": front[2]},
+        "orientationTop": {"x": top[0], "y": top[1], "z": top[2]},
+    }
+
+
+def _finite_decibels(
+    value: object,
+    *,
+    error_code: str,
+    field: str,
+    action: str,
+) -> float:
+    try:
+        decibels = float(value)
+    except (TypeError, ValueError) as exc:
+        raise business_repair(
+            error_code,
+            field=field,
+            action=action,
+        ) from exc
+    if not isfinite(decibels) or not -200 <= decibels <= 200:
+        raise business_repair(
+            error_code,
+            field=field,
+            action=action,
+        )
+    return decibels
+
+
+def _compile_named_offsets(
+    raw_offsets: object,
+    *,
+    speakers: tuple[str, ...],
+) -> list[float]:
+    if not isinstance(raw_offsets, list) or len(raw_offsets) > len(speakers):
+        raise business_repair(
+            "SPEAKER_OFFSET_LIST_INVALID",
+            field="speaker_offsets_db",
+            action="provide at most one decibel offset per speaker in the layout",
+        )
+    offsets: dict[str, float] = {}
+    for row in raw_offsets:
+        if not isinstance(row, list) or len(row) != 2:
+            raise business_repair(
+                "SPEAKER_OFFSET_INVALID",
+                field="speaker_offsets_db",
+                action="provide each offset as one speaker name and decibel value",
+            )
+        speaker, raw_db = row
+        if not isinstance(speaker, str) or speaker not in speakers or speaker in offsets:
+            raise business_repair(
+                "SPEAKER_OFFSET_INVALID",
+                field="speaker_offsets_db",
+                allowed_speakers=list(speakers),
+                action="use each layout speaker at most once with -200..200 dB",
+            )
+        offsets[speaker] = _finite_decibels(
+            raw_db,
+            error_code="SPEAKER_OFFSET_INVALID",
+            field="speaker_offsets_db",
+            action="use each layout speaker at most once with -200..200 dB",
+        )
+    return [offsets.get(speaker, 0.0) for speaker in speakers]
+
+
+def _compile_indexed_offsets(raw_offsets: object, *, channel_count: int) -> list[float]:
+    if not isinstance(raw_offsets, list) or len(raw_offsets) > channel_count:
+        raise business_repair(
+            "CHANNEL_OFFSET_LIST_INVALID",
+            field="channel_offsets_db",
+            action="provide at most one decibel offset per one-based channel index",
+        )
+    offsets: dict[int, float] = {}
+    for row in raw_offsets:
+        if not isinstance(row, list) or len(row) != 2:
+            raise business_repair(
+                "CHANNEL_OFFSET_INVALID",
+                field="channel_offsets_db",
+                action="provide each offset as one one-based channel index and decibel value",
+            )
+        raw_index, raw_db = row
+        try:
+            index = int(raw_index)
+        except (TypeError, ValueError) as exc:
+            raise business_repair(
+                "CHANNEL_OFFSET_INVALID",
+                field="channel_offsets_db",
+                action="use each one-based channel index at most once",
+            ) from exc
+        if str(index) != str(raw_index).strip() or not 1 <= index <= channel_count or index in offsets:
+            raise business_repair(
+                "CHANNEL_OFFSET_INVALID",
+                field="channel_offsets_db",
+                channel_count=channel_count,
+                action="use each one-based channel index at most once",
+            )
+        offsets[index] = _finite_decibels(
+            raw_db,
+            error_code="CHANNEL_OFFSET_INVALID",
+            field="channel_offsets_db",
+            action="provide a finite -200..200 dB value for each changed channel",
+        )
+    return [offsets.get(index, 0.0) for index in range(1, channel_count + 1)]
+
+
+def _compile_listener_spatialization(
+    plan: Mapping[str, Any],
+    game_object_bindings: object,
+    *,
+    version: str,
+) -> dict[str, Any]:
+    required = {"listener_handle", "spatialization"}
+    optional = {
+        "channel_layout",
+        "channel_layout_kind",
+        "channel_speakers",
+        "channel_count",
+        "speaker_offsets_db",
+        "channel_offsets_db",
+    }
+    if not required <= set(plan) or set(plan) - (required | optional):
+        raise business_repair(
+            "SOUNDENGINE_PLAN_FIELDS_INVALID",
+            field="soundengine_plan",
+            required=sorted(required),
+            optional=sorted(optional),
+            action="submit exactly the fields disclosed for this SoundEngine command",
+        )
+    spatialization = plan.get("spatialization")
+    if spatialization not in {"enabled", "disabled"}:
+        raise business_repair(
+            "BUSINESS_VALUE_INVALID",
+            field="spatialization",
+            allowed=["enabled", "disabled"],
+            action="copy one disclosed spatialization state exactly",
+        )
+
+    preset = plan.get("channel_layout")
+    kind = plan.get("channel_layout_kind")
+    if (preset is None) == (kind is None):
+        raise business_repair(
+            "CHANNEL_LAYOUT_DESCRIPTOR_INVALID",
+            field="channel_layout",
+            action="provide exactly one standard preset or one Wwise channel layout kind",
+        )
+    raw_speakers = plan.get("channel_speakers")
+    raw_count = plan.get("channel_count")
+    raw_speaker_offsets = plan.get("speaker_offsets_db", [])
+    raw_channel_offsets = plan.get("channel_offsets_db", [])
+
+    if preset is not None:
+        speakers = _STANDARD_CHANNEL_LAYOUTS.get(preset)
+        if speakers is None:
+            raise business_repair(
+                "BUSINESS_VALUE_INVALID",
+                field="channel_layout",
+                allowed=list(_STANDARD_CHANNEL_LAYOUTS),
+                action="copy one disclosed Wwise standard channel layout exactly",
+            )
+        if raw_speakers is not None or raw_count is not None or raw_channel_offsets:
+            raise business_repair(
+                "CHANNEL_LAYOUT_DESCRIPTOR_INVALID",
+                field="channel_layout",
+                action="combine a standard preset only with optional named speaker offsets",
+            )
+        channel_mask = sum(_SPEAKER_MASKS[speaker] for speaker in speakers)
+        channel_config = len(speakers) | (1 << 8) | (channel_mask << 12)
+        volume_offsets = _compile_named_offsets(
+            raw_speaker_offsets,
+            speakers=speakers,
+        )
+    elif kind == "Standard":
+        if (
+            not isinstance(raw_speakers, list)
+            or not raw_speakers
+            or raw_count is not None
+            or raw_channel_offsets
+            or any(not isinstance(speaker, str) for speaker in raw_speakers)
+            or len(set(raw_speakers)) != len(raw_speakers)
+            or any(speaker not in _SPEAKER_MASKS for speaker in raw_speakers)
+            or (
+                version not in _HEIGHT_SIDE_SPEAKER_VERSIONS
+                and any(speaker in {"HSL", "HSR"} for speaker in raw_speakers)
+            )
+        ):
+            raise business_repair(
+                "STANDARD_CHANNEL_SPEAKERS_INVALID",
+                field="channel_speakers",
+                allowed_speakers=[
+                    speaker
+                    for speaker in _SPEAKER_MASKS
+                    if version in _HEIGHT_SIDE_SPEAKER_VERSIONS
+                    or speaker not in {"HSL", "HSR"}
+                ],
+                action="provide each version-supported Wwise speaker name once",
+            )
+        ordered = tuple(
+            sorted(
+                (speaker for speaker in raw_speakers if speaker != "LFE"),
+                key=_SPEAKER_MASKS.__getitem__,
+            )
+            + (["LFE"] if "LFE" in raw_speakers else [])
+        )
+        channel_mask = sum(_SPEAKER_MASKS[speaker] for speaker in ordered)
+        channel_config = len(ordered) | (1 << 8) | (channel_mask << 12)
+        volume_offsets = _compile_named_offsets(
+            raw_speaker_offsets,
+            speakers=ordered,
+        )
+    elif kind in {"Anonymous", "Ambisonic"}:
+        if (
+            isinstance(raw_count, bool)
+            or not isinstance(raw_count, int)
+            or not 1 <= raw_count <= 255
+            or raw_speakers is not None
+            or raw_speaker_offsets
+            or (kind == "Ambisonic" and raw_count not in _AMBISONIC_CHANNEL_COUNTS)
+        ):
+            raise business_repair(
+                "CHANNEL_COUNT_INVALID",
+                field="channel_count",
+                allowed=(
+                    sorted(_AMBISONIC_CHANNEL_COUNTS)
+                    if kind == "Ambisonic"
+                    else "1..255"
+                ),
+                action="provide a valid channel count for the selected Wwise layout kind",
+            )
+        channel_config = raw_count | ((2 if kind == "Ambisonic" else 0) << 8)
+        volume_offsets = _compile_indexed_offsets(
+            raw_channel_offsets,
+            channel_count=raw_count,
+        )
+    elif kind == "Objects":
+        if (
+            raw_speakers is not None
+            or raw_count is not None
+            or raw_speaker_offsets
+            or raw_channel_offsets
+        ):
+            raise business_repair(
+                "OBJECT_CHANNEL_LAYOUT_INVALID",
+                field="channel_layout_kind",
+                action="use Objects without fixed speakers, channel count, or offsets",
+            )
+        channel_config = 3 << 8
+        volume_offsets = []
+    else:
+        raise business_repair(
+            "CHANNEL_LAYOUT_KIND_INVALID",
+            field="channel_layout_kind",
+            allowed=["Standard", "Anonymous", "Ambisonic", "Objects"],
+            action="copy one disclosed Wwise channel layout kind exactly",
+        )
+
+    return {
+        "listener": _runtime_game_object_id(
+            game_object_bindings,
+            plan.get("listener_handle"),
+            field="listener_handle",
+        ),
+        "spatialized": spatialization == "enabled",
+        "channelConfig": channel_config,
+        "volumeOffsets": volume_offsets,
+    }
 
 
 def materialize_soundengine_control_business_request(
@@ -64,6 +446,7 @@ def materialize_soundengine_control_business_request(
     if not set(session.settings) <= {
         "soundengine_plan",
         "runtime_game_object_binding",
+        "runtime_game_object_bindings",
         "runtime_playing_binding",
     } or "soundengine_plan" not in session.settings:
         raise business_repair(
@@ -73,6 +456,7 @@ def materialize_soundengine_control_business_request(
         )
     plan = session.settings["soundengine_plan"]
     game_object_binding = session.settings.get("runtime_game_object_binding")
+    game_object_bindings = session.settings.get("runtime_game_object_bindings", {})
     playing_binding = session.settings.get("runtime_playing_binding")
     if not isinstance(plan, Mapping):
         raise business_repair(
@@ -725,6 +1109,369 @@ def materialize_soundengine_control_business_request(
                 action="copy the handle returned for the SoundBank role",
             )
         native_args = {"soundBank": sound_bank.object_id}
+    elif operation == SET_DEFAULT_LISTENERS_URI:
+        if set(plan) - {"listener_handles", "clear_listeners"}:
+            raise business_repair(
+                "SOUNDENGINE_PLAN_FIELDS_INVALID",
+                field="soundengine_plan",
+                required=[],
+                optional=["listener_handles", "clear_listeners"],
+                action="submit exactly the fields disclosed for this SoundEngine command",
+            )
+        handles = plan.get("listener_handles")
+        clear = plan.get("clear_listeners")
+        if (handles is None) == (clear is None) or (
+            clear is not None and clear is not True
+        ):
+            raise business_repair(
+                "LISTENER_SET_INVALID",
+                field="listener_handles",
+                action="provide listener handles or the explicit clear-listeners intent, not both",
+            )
+        if handles is not None and (
+            not isinstance(handles, list)
+            or not 1 <= len(handles) <= 64
+            or len(set(handles)) != len(handles)
+        ):
+            raise business_repair(
+                "LISTENER_SET_INVALID",
+                field="listener_handles",
+                action="provide 1 through 64 distinct active listener handles",
+            )
+        native_args = {
+            "listeners": [] if clear else [
+                _runtime_game_object_id(
+                    game_object_bindings, handle, field="listener_handles"
+                )
+                for handle in handles
+            ]
+        }
+    elif operation == SET_LISTENERS_URI:
+        if "emitter_handle" not in plan or set(plan) - {
+            "emitter_handle",
+            "listener_handles",
+            "clear_listeners",
+        }:
+            raise business_repair(
+                "SOUNDENGINE_PLAN_FIELDS_INVALID",
+                field="soundengine_plan",
+                required=["emitter_handle"],
+                optional=["listener_handles", "clear_listeners"],
+                action="submit exactly the fields disclosed for this SoundEngine command",
+            )
+        handles = plan.get("listener_handles")
+        clear = plan.get("clear_listeners")
+        if (handles is None) == (clear is None) or (
+            clear is not None and clear is not True
+        ):
+            raise business_repair(
+                "LISTENER_SET_INVALID",
+                field="listener_handles",
+                action="provide listener handles or the explicit clear-listeners intent, not both",
+            )
+        if handles is not None and (
+            not isinstance(handles, list)
+            or not 1 <= len(handles) <= 64
+            or len(set(handles)) != len(handles)
+        ):
+            raise business_repair(
+                "LISTENER_SET_INVALID",
+                field="listener_handles",
+                action="provide 1 through 64 distinct active listener handles",
+            )
+        native_args = {
+            "emitter": _runtime_game_object_id(
+                game_object_bindings,
+                plan.get("emitter_handle"),
+                field="emitter_handle",
+            ),
+            "listeners": [] if clear else [
+                _runtime_game_object_id(
+                    game_object_bindings, handle, field="listener_handles"
+                )
+                for handle in handles
+            ],
+        }
+    elif operation == SET_POSITION_URI:
+        if set(plan) != {"game_object_handle", "position_frame"}:
+            raise business_repair(
+                "SOUNDENGINE_PLAN_FIELDS_INVALID",
+                field="soundengine_plan",
+                required=["game_object_handle", "position_frame"],
+                optional=[],
+                action="submit exactly the fields disclosed for this SoundEngine command",
+            )
+        if not isinstance(game_object_binding, Mapping):
+            raise business_repair(
+                "GAME_OBJECT_HANDLE_INVALID",
+                field="game_object_handle",
+                action="copy one active game object handle from a Gateway result",
+            )
+        native_args = {
+            "gameObject": game_object_binding.get("game_object_id"),
+            "position": _position_frame(plan.get("position_frame")),
+        }
+    elif operation == SET_MULTIPLE_POSITIONS_URI:
+        if set(plan) != {
+            "game_object_handle",
+            "position_frames",
+            "multi_position_mode",
+        }:
+            raise business_repair(
+                "SOUNDENGINE_PLAN_FIELDS_INVALID",
+                field="soundengine_plan",
+                required=[
+                    "game_object_handle",
+                    "position_frames",
+                    "multi_position_mode",
+                ],
+                optional=[],
+                action="submit exactly the fields disclosed for this SoundEngine command",
+            )
+        frames = plan.get("position_frames")
+        if not isinstance(frames, list) or not 1 <= len(frames) <= 256:
+            raise business_repair(
+                "POSITION_FRAME_LIST_INVALID",
+                field="position_frames",
+                action="provide 1 through 256 complete position frames",
+            )
+        mode = plan.get("multi_position_mode")
+        if mode not in _MULTI_POSITION_MODES:
+            raise business_repair(
+                "BUSINESS_VALUE_INVALID",
+                field="multi_position_mode",
+                allowed=list(_MULTI_POSITION_MODES),
+                action="copy one disclosed Wwise multi-position mode exactly",
+            )
+        if not isinstance(game_object_binding, Mapping):
+            raise business_repair(
+                "GAME_OBJECT_HANDLE_INVALID",
+                field="game_object_handle",
+                action="copy one active game object handle from a Gateway result",
+            )
+        native_args = {
+            "gameObject": game_object_binding.get("game_object_id"),
+            "positions": [
+                {"position": _position_frame(frame)} for frame in frames
+            ],
+            "multiPositionType": _MULTI_POSITION_MODES[mode],
+        }
+    elif operation == SET_OBSTRUCTION_OCCLUSION_URI:
+        if set(plan) != {
+            "emitter_handle",
+            "listener_handle",
+            "obstruction_percent",
+            "occlusion_percent",
+        }:
+            raise business_repair(
+                "SOUNDENGINE_PLAN_FIELDS_INVALID",
+                field="soundengine_plan",
+                required=[
+                    "emitter_handle",
+                    "listener_handle",
+                    "obstruction_percent",
+                    "occlusion_percent",
+                ],
+                optional=[],
+                action="submit exactly the fields disclosed for this SoundEngine command",
+            )
+        obstruction = plan.get("obstruction_percent")
+        occlusion = plan.get("occlusion_percent")
+        if any(
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not isfinite(value)
+            or not 0 <= value <= 100
+            for value in (obstruction, occlusion)
+        ):
+            raise business_repair(
+                "BUSINESS_VALUE_INVALID",
+                field="obstruction_percent",
+                action="provide obstruction and occlusion percentages from 0 through 100",
+            )
+        native_args = {
+            "emitter": _runtime_game_object_id(
+                game_object_bindings,
+                plan.get("emitter_handle"),
+                field="emitter_handle",
+            ),
+            "listener": _runtime_game_object_id(
+                game_object_bindings,
+                plan.get("listener_handle"),
+                field="listener_handle",
+            ),
+            "obstructionLevel": obstruction / 100.0,
+            "occlusionLevel": occlusion / 100.0,
+        }
+    elif operation == SET_SCALING_FACTOR_URI:
+        if set(plan) != {"game_object_handle", "attenuation_scale_percent"}:
+            raise business_repair(
+                "SOUNDENGINE_PLAN_FIELDS_INVALID",
+                field="soundengine_plan",
+                required=["game_object_handle", "attenuation_scale_percent"],
+                optional=[],
+                action="submit exactly the fields disclosed for this SoundEngine command",
+            )
+        scale = plan.get("attenuation_scale_percent")
+        if (
+            isinstance(scale, bool)
+            or not isinstance(scale, (int, float))
+            or not isfinite(scale)
+            or scale <= 0
+        ):
+            raise business_repair(
+                "BUSINESS_VALUE_INVALID",
+                field="attenuation_scale_percent",
+                action="provide one positive finite attenuation scale percentage",
+            )
+        if not isinstance(game_object_binding, Mapping):
+            raise business_repair(
+                "GAME_OBJECT_HANDLE_INVALID",
+                field="game_object_handle",
+                action="copy one active game object handle from a Gateway result",
+            )
+        native_args = {
+            "gameObject": game_object_binding.get("game_object_id"),
+            "attenuationScalingFactor": scale / 100.0,
+        }
+    elif operation == SET_OUTPUT_BUS_VOLUME_URI:
+        if set(plan) != {"emitter_handle", "listener_handle", "volume_db"}:
+            raise business_repair(
+                "SOUNDENGINE_PLAN_FIELDS_INVALID",
+                field="soundengine_plan",
+                required=["emitter_handle", "listener_handle", "volume_db"],
+                optional=[],
+                action="submit exactly the fields disclosed for this SoundEngine command",
+            )
+        volume_db = plan.get("volume_db")
+        if (
+            isinstance(volume_db, bool)
+            or not isinstance(volume_db, (int, float))
+            or not isfinite(volume_db)
+            or not -200 <= volume_db <= 200
+        ):
+            raise business_repair(
+                "BUSINESS_VALUE_INVALID",
+                field="volume_db",
+                action="provide finite decibels from -200 through 200",
+            )
+        native_args = {
+            "emitter": _runtime_game_object_id(
+                game_object_bindings,
+                plan.get("emitter_handle"),
+                field="emitter_handle",
+            ),
+            "listener": _runtime_game_object_id(
+                game_object_bindings,
+                plan.get("listener_handle"),
+                field="listener_handle",
+            ),
+            "controlValue": 10.0 ** (volume_db / 20.0),
+        }
+    elif operation == SET_LISTENER_SPATIALIZATION_URI:
+        native_args = _compile_listener_spatialization(
+            plan,
+            game_object_bindings,
+            version=session.context.wwise_version,
+        )
+    elif operation == SET_AUX_SENDS_URI:
+        if "emitter_handle" not in plan or set(plan) - {
+            "emitter_handle",
+            "aux_sends",
+            "clear_aux_sends",
+        }:
+            raise business_repair(
+                "SOUNDENGINE_PLAN_FIELDS_INVALID",
+                field="soundengine_plan",
+                required=["emitter_handle"],
+                optional=["aux_sends", "clear_aux_sends"],
+                action="submit exactly the fields disclosed for this SoundEngine command",
+            )
+        rows = plan.get("aux_sends")
+        clear = plan.get("clear_aux_sends")
+        if (rows is None) == (clear is None) or (
+            clear is not None and clear is not True
+        ):
+            raise business_repair(
+                "AUX_SEND_LIST_INVALID",
+                field="aux_sends",
+                action="provide auxiliary send rows or explicit clear-aux-sends intent, not both",
+            )
+        if rows is not None and (
+            not isinstance(rows, list) or not 1 <= len(rows) <= 4
+        ):
+            raise business_repair(
+                "AUX_SEND_LIST_INVALID",
+                field="aux_sends",
+                action="provide 1 through 4 complete auxiliary send rows",
+            )
+        native_rows = []
+        seen: set[tuple[int, str]] = set()
+        for row in rows or []:
+            if not isinstance(row, list) or len(row) != 3:
+                raise business_repair(
+                    "AUX_SEND_ROW_INVALID",
+                    field="aux_sends",
+                    action="provide listener handle, Aux Bus handle, and send percentage",
+                )
+            listener_handle, aux_bus_handle, raw_percent = row
+            listener_id = _runtime_game_object_id(
+                game_object_bindings,
+                listener_handle,
+                field="aux_sends.listener_handle",
+            )
+            if not isinstance(aux_bus_handle, str):
+                raise business_repair(
+                    "AUX_SEND_ROW_INVALID",
+                    field="aux_sends.aux_bus_handle",
+                    action="bind the exact Aux Bus and copy its returned handle",
+                )
+            aux_bus = session.handles.resolve_object(aux_bus_handle)
+            if aux_bus.role != "aux_bus" or aux_bus.object_type != "AuxBus":
+                raise business_repair(
+                    "BOUND_OBJECT_ROLE_MISMATCH",
+                    field="aux_sends.aux_bus_handle",
+                    expected_role="aux_bus",
+                    allowed_types=["AuxBus"],
+                    actual_role=aux_bus.role,
+                    actual_type=aux_bus.object_type,
+                    action="copy a handle returned for the Aux Bus role",
+                )
+            try:
+                send_percent = float(raw_percent)
+            except (TypeError, ValueError) as exc:
+                raise business_repair(
+                    "AUX_SEND_ROW_INVALID",
+                    field="aux_sends.send_percent",
+                    action="provide a percentage from 0 through 100",
+                ) from exc
+            identity = (listener_id, aux_bus.object_id)
+            if (
+                not isfinite(send_percent)
+                or not 0 <= send_percent <= 100
+                or identity in seen
+            ):
+                raise business_repair(
+                    "AUX_SEND_ROW_INVALID",
+                    field="aux_sends",
+                    action="use each listener and Aux Bus pair once with 0..100 percent",
+                )
+            seen.add(identity)
+            native_rows.append(
+                {
+                    "listener": listener_id,
+                    "auxBus": aux_bus.object_id,
+                    "controlValue": send_percent / 100.0,
+                }
+            )
+        native_args = {
+            "gameObject": _runtime_game_object_id(
+                game_object_bindings,
+                plan.get("emitter_handle"),
+                field="emitter_handle",
+            ),
+            "auxSendValues": native_rows,
+        }
     elif operation == UNREGISTER_GAME_OBJECT_URI:
         if set(plan) != {"game_object_handle"}:
             raise business_repair(

@@ -29,6 +29,9 @@ from wwise_waapi.operation_registry import (
     validate_prepared_roles,
     verify_prepared_operation,
 )
+from wwise_waapi.soundengine_business_contracts import (
+    soundengine_control_business_operations,
+)
 from wwise_waapi.typed_operations import compound_child_request_contract
 from wwise_waapi.typed_requests import TypedRequestFact, materialize_typed_request
 from wwise_waapi.transaction_cleanup import CLEANUP_SPEC_CONTRACT
@@ -52,6 +55,7 @@ BUSINESS_STATE_VERIFIED_APIS = frozenset(
         "ak.wwise.core.gameParameter.setRange",
     }
 )
+SOUNDENGINE_BUSINESS_APIS = frozenset(soundengine_control_business_operations())
 
 
 def _row_id(entry: CapabilityRecord) -> str:
@@ -136,6 +140,15 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
         version=entry.version,
     )
     assert result_validation.section == "result"
+
+    if entry.uri in SOUNDENGINE_BUSINESS_APIS:
+        # This matrix still proves the reflected native bottom call above.  The
+        # public route is now the closed business Draft/read contract exercised
+        # in test_soundengine_business_gateway; feeding synthesized native args
+        # into Registry preparation would test the retired caller boundary.
+        assert contract["gateway_commands"] == ["request-schema"]
+        assert entry.preferred_route in {"transaction_operation", "manifest_dispatch"}
+        return
 
     if contract["route"] == "compound_transaction_member":
         assert entry.transaction_operations == ("waapi.undoGroup",)

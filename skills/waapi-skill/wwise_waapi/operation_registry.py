@@ -8317,6 +8317,31 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                     },
                 )
             roles[role_name] = resolved
+        if api == "ak.soundengine.setGameObjectAuxSendValues":
+            aux_rows = call_args.get("auxSendValues")
+            if not isinstance(aux_rows, list):
+                raise OperationContractError(
+                    "INVALID_IDENTITY",
+                    "SoundEngine auxiliary sends must remain one bounded row list.",
+                )
+            for index, row in enumerate(aux_rows, start=1):
+                aux_bus_id = row.get("auxBus") if isinstance(row, Mapping) else None
+                role_name = f"aux_bus_{index}"
+                resolved = _resolve_identity(
+                    {"kind": "id", "value": aux_bus_id},
+                    role=role_name,
+                    read=read,
+                )
+                if resolved.row.get("type") != "AuxBus":
+                    raise OperationContractError(
+                        "INVALID_IDENTITY",
+                        "SoundEngine auxiliary send target must remain an AuxBus.",
+                        details={
+                            "id": resolved.object,
+                            "actual_type": resolved.row.get("type"),
+                        },
+                    )
+                roles[role_name] = resolved
         for group_role, value_role in (
             ("state_group", "state"),
             ("switch_group", "switch"),

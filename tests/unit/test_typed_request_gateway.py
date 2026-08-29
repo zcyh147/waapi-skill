@@ -11,7 +11,7 @@ import pytest
 from wwise_waapi.versions import SUPPORTED_WWISE_VERSION_KEYS
 
 
-INLINE_READ_URI = "ak.soundengine.getState"
+INLINE_READ_URI = "ak.wwise.waapi.getSchema"
 
 
 SCRIPT_PATH = (
@@ -154,7 +154,7 @@ def test_request_schema_returns_one_typed_continuation_for_tracer(
     assert payload["continuation"]["schema_digest"] == payload["schema_digest"]
     assert "args-json" not in json.dumps(payload)
     assert "options-json" not in json.dumps(payload)
-    assert "stateGroup" in {
+    assert "uri" in {
         field["name"] for field in payload["fields"] if "parent_handle" not in field
     }
     assert all(str(field["handle"]).startswith("trh1-") for field in payload["fields"])
@@ -169,7 +169,7 @@ def test_typed_call_materializes_and_dispatches_without_preview(
     client = FakeClient(
         {
             "ak.wwise.core.getInfo": _live_info(version),
-            INLINE_READ_URI: {"return": ["State:Combat"]},
+            INLINE_READ_URI: {"argsSchema": {}},
         }
     )
     exit_code, payload = waapi_gateway.execute_gateway(
@@ -180,9 +180,9 @@ def test_typed_call_materializes_and_dispatches_without_preview(
             contract["schema_digest"],
             *_typed_scalar_args(
                 contract,
-                "stateGroup",
+                "uri",
                 "string",
-                "StateGroup:MusicState",
+                "ak.wwise.core.getInfo",
             ),
         ],
         env=_env(tmp_path, version),
@@ -190,13 +190,13 @@ def test_typed_call_materializes_and_dispatches_without_preview(
     )
 
     assert exit_code == 0, payload
-    assert payload["agent_result"] == {"return": ["State:Combat"]}
+    assert payload["agent_result"] == {"argsSchema": {}}
     assert list(payload)[-1] == "agent_result"
     assert client.calls == [
         ("ak.wwise.core.getInfo", None, None),
         (
             INLINE_READ_URI,
-            {"stateGroup": "StateGroup:MusicState"},
+            {"uri": "ak.wwise.core.getInfo"},
             {},
         ),
     ]
@@ -216,9 +216,9 @@ def test_invalid_typed_facts_fail_before_connection(
         facts.extend(
             _typed_scalar_args(
                 contract,
-                "stateGroup",
+                "uri",
                 "string",
-                "StateGroup:MusicState",
+                "ak.wwise.core.getInfo",
             )
         )
         if case == "unknown":
@@ -252,9 +252,9 @@ def test_typed_call_rejects_configured_live_version_drift(tmp_path: Path) -> Non
             contract["schema_digest"],
             *_typed_scalar_args(
                 contract,
-                "stateGroup",
+                "uri",
                 "string",
-                "StateGroup:MusicState",
+                "ak.wwise.core.getInfo",
             ),
         ],
         env=_env(tmp_path, "2025.1"),
@@ -481,7 +481,9 @@ def test_soundengine_business_mutation_blocks_typed_bypass_before_connection(
     assert "closed Core business" in payload["message"]
 
 
-def test_flat_generic_optional_array_can_be_explicitly_empty(tmp_path: Path) -> None:
+def test_migrated_soundengine_read_rejects_retired_typed_optional_array(
+    tmp_path: Path,
+) -> None:
     version = "2025.1"
     api = "ak.soundengine.getState"
     exit_code, schema = waapi_gateway.execute_gateway(
@@ -490,37 +492,19 @@ def test_flat_generic_optional_array_can_be_explicitly_empty(tmp_path: Path) -> 
         client_factory=lambda _url: pytest.fail("schema must remain offline"),
     )
     assert exit_code == 0, schema
-    handles = _field_handles(schema)
-    state_group_args = _typed_scalar_args(
-        schema,
-        "stateGroup",
-        "string",
-        "StateGroup:MusicState",
-    )
-    assert "container" in schema["continuation"]["fact_flags"]
-    client = FakeClient(
-        {
-            "ak.wwise.core.getInfo": _live_info(version),
-            api: {"return": []},
-        }
-    )
+    assert schema["input_shape"] == "business_declaration"
+    assert schema["continuation"]["subcommand"] == "core-call"
 
     exit_code, payload = waapi_gateway.execute_gateway(
         [
             "typed-call", api,
-            "--schema-digest", schema["schema_digest"],
-            *state_group_args,
-            "--present", handles["return"],
+            "--schema-digest", "0" * 64,
         ],
         env=_env(tmp_path, version),
-        client_factory=lambda _url: client,
+        client_factory=lambda _url: pytest.fail("retired typed read must stay offline"),
     )
-    assert exit_code == 0, payload
-    assert client.calls[-1] == (
-        api,
-        {"stateGroup": "StateGroup:MusicState"},
-        {"return": []},
-    )
+    assert exit_code == 2, payload
+    assert "closed Core business" in payload["message"]
 
 
 @pytest.mark.parametrize(

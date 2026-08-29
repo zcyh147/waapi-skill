@@ -691,4 +691,8 @@ def test_operations_catalog_lists_all_media_business_routes(tmp_path: Path) -> N
         if row["api"] in media_build_business_operations()
     }
     assert set(rows) == media_build_business_operations()
-    assert all(row["next_command"] == ["request-schema", api] for api, row in rows.items())
+    assert payload["request_schema_command_template"] == [
+        "request-schema",
+        "<api>",
+    ]
+    assert all("next_command" not in row for row in rows.values())
