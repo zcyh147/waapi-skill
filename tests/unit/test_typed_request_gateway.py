@@ -454,7 +454,9 @@ def test_unmigrated_nonzero_function_does_not_disclose_a_broken_continuation(
     assert "continuation" not in payload
 
 
-def test_flat_generic_mutation_requires_apply_before_connection(tmp_path: Path) -> None:
+def test_soundengine_business_mutation_blocks_typed_bypass_before_connection(
+    tmp_path: Path,
+) -> None:
     api = "ak.soundengine.postMsgMonitor"
     version = "2021.1"
     exit_code, schema = waapi_gateway.execute_gateway(
@@ -463,26 +465,20 @@ def test_flat_generic_mutation_requires_apply_before_connection(tmp_path: Path) 
         client_factory=lambda _url: pytest.fail("discovery must remain offline"),
     )
     assert exit_code == 0, schema
-    message = next(
-        field["handle"] for field in schema["fields"] if field["name"] == "message"
-    )
-    assert schema["continuation"]["subcommand"] == "typed-call"
-    assert schema["continuation"]["apply"] is True
-    assert set(schema["continuation"]["fact_flags"]) == {"scalar"}
-    assert "args" not in json.dumps(schema["continuation"])
-    assert "options" not in json.dumps(schema["continuation"])
+    assert schema["input_shape"] == "business_declaration"
+    assert schema["continuation"]["subcommand"] == "draft-start"
+    assert "fields" not in schema
 
     exit_code, payload = waapi_gateway.execute_gateway(
         [
             "typed-call", api,
-            "--schema-digest", schema["schema_digest"],
-            "--set", message, "string", "Weather runtime probe",
+            "--schema-digest", "0" * 64,
         ],
         env=_env(tmp_path, version),
         client_factory=lambda _url: pytest.fail("mutation boundary must remain offline"),
     )
     assert exit_code == 2
-    assert "requires --apply" in payload["message"]
+    assert "closed Core business" in payload["message"]
 
 
 def test_flat_generic_optional_array_can_be_explicitly_empty(tmp_path: Path) -> None:

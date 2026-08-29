@@ -8269,6 +8269,22 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
             call_args,
             execution_contract,
         )
+        if api == "ak.soundengine.postEvent":
+            event = _resolve_identity(
+                {"kind": "id", "value": call_args.get("event")},
+                role="event",
+                read=read,
+            )
+            if event.row.get("type") != "Event":
+                raise OperationContractError(
+                    "INVALID_IDENTITY",
+                    "SoundEngine postEvent target must remain an Event.",
+                    details={
+                        "id": event.object,
+                        "actual_type": event.row.get("type"),
+                    },
+                )
+            roles["event"] = event
         metadata["execution_contract"] = execution_contract
     elif request.operation in {
         "lua.executeCliFile",
@@ -12626,6 +12642,78 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                 },
             }
         )
+        role_snapshots: list[tuple[str, Any, Mapping[str, Any]]] = []
+        for role, snapshot_value in roles.items():
+            if not isinstance(snapshot_value, Mapping):
+                raise OperationContractError(
+                    "INVALID_PREVIEW",
+                    f"Resolved role {role!r} is malformed.",
+                )
+            object_id = snapshot_value.get("object")
+            expected_row = snapshot_value.get("row")
+            if object_id is None or not isinstance(expected_row, Mapping):
+                raise OperationContractError(
+                    "INVALID_PREVIEW",
+                    f"Resolved role {role!r} lacks object/row evidence.",
+                )
+            _identity_key(object_id)
+            role_snapshots.append((str(role), object_id, expected_row))
+        if role_snapshots:
+            role_batch = _bounded_multi_identity_read(
+                [object_id for _, object_id, _ in role_snapshots],
+                fields=IDENTITY_RETURN_FIELDS,
+                read=read_call,
+                context="Prepared waapi.call business role validation",
+            )
+            readbacks.append(
+                {
+                    "role": "resolved-roles",
+                    "roles": [role for role, _, _ in role_snapshots],
+                    "uri": OBJECT_GET_URI,
+                    "args": role_batch["args"],
+                    "options": role_batch["options"],
+                    "result": role_batch["result"],
+                }
+            )
+            passed = passed and role_batch["exact"]
+            assertions.append(
+                {
+                    "name": "waapi.call resolved role GUID batch is exact",
+                    "passed": role_batch["exact"],
+                    "evidence": {
+                        "requested_unique_ids": role_batch["args"]["from"]["id"],
+                        "missing_ids": role_batch["missing_ids"],
+                        "duplicate_ids": role_batch["duplicate_ids"],
+                        "extra_rows": role_batch["extra_rows"],
+                        "malformed_rows": role_batch["malformed_rows"],
+                    },
+                }
+            )
+            for role, object_id, expected_row in role_snapshots:
+                rows = role_batch["rows_by_key"].get(_identity_key(object_id), [])
+                role_passed = len(rows) == 1
+                if role_passed:
+                    actual = rows[0]
+                    role_passed = all(
+                        (
+                            _same_identity(actual.get(field_name), expected_row.get(field_name))
+                            if field_name == "id"
+                            else actual.get(field_name) == expected_row.get(field_name)
+                        )
+                        for field_name in ("id", "name", "type", "path")
+                        if field_name in expected_row
+                    )
+                passed = passed and role_passed
+                assertions.append(
+                    {
+                        "name": f"waapi.call {role} identity is unchanged",
+                        "passed": role_passed,
+                        "evidence": {
+                            "expected": dict(expected_row),
+                            "actual": rows,
+                        },
+                    }
+                )
         return {
             "contract": ROLE_VALIDATION_CONTRACT,
             "operation": operation,

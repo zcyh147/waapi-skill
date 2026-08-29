@@ -29,6 +29,9 @@ from wwise_waapi.source_control_business_contracts import (
 from wwise_waapi.runtime_inspection_business_contracts import (
     runtime_control_business_operations,
 )
+from wwise_waapi.soundengine_business_contracts import (
+    soundengine_control_business_operations,
+)
 from wwise_waapi.object_lifecycle_business import (
     materialize_object_lifecycle_business_request,
 )
@@ -73,13 +76,18 @@ def test_business_adapter_registry_selects_one_family_at_one_seam() -> None:
 
 
 def test_every_business_input_lane_has_exactly_one_registered_adapter() -> None:
-    assert business_adapter_operations() == {
-        lane.operation
-        for lane in OPERATION_INPUT_MODE_LANES
-        if lane.input_mode == BUSINESS_DECLARATION_INPUT_MODE
-    } | core_business_draft_operations() | project_setting_business_operations() | (
-        source_control_business_draft_operations()
-    ) | runtime_control_business_operations()
+    assert business_adapter_operations() == (
+        {
+            lane.operation
+            for lane in OPERATION_INPUT_MODE_LANES
+            if lane.input_mode == BUSINESS_DECLARATION_INPUT_MODE
+        }
+        | core_business_draft_operations()
+        | project_setting_business_operations()
+        | source_control_business_draft_operations()
+        | runtime_control_business_operations()
+        | soundengine_control_business_operations()
+    )
 
 
 def test_object_lifecycle_adapter_rejects_audio_only_cleaned_file_replay() -> None:

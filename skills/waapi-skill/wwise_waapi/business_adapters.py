@@ -39,6 +39,10 @@ from .runtime_inspection_business_contracts import (
     runtime_control_business_operations,
     runtime_inspection_business_contract_data,
 )
+from .soundengine_business_contracts import (
+    soundengine_control_business_contract_data,
+    soundengine_control_business_operations,
+)
 from .switch_assignment_business_contracts import (
     switch_assignment_business_contract_data,
 )
@@ -149,6 +153,10 @@ def _runtime_control_contract(operation: str, version: str) -> dict[str, Any]:
     return runtime_inspection_business_contract_data(operation, version)
 
 
+def _soundengine_control_contract(operation: str, version: str) -> dict[str, Any]:
+    return soundengine_control_business_contract_data(operation, version)
+
+
 def _switch_assignment_contract(
     operation: str,
     version: str,
@@ -254,6 +262,17 @@ def _materialize_runtime_control(
     )
 
     return materialize_runtime_control_business_request(operation, session)
+
+
+def _materialize_soundengine_control(
+    operation: str,
+    session: BusinessDeclarationSession,
+) -> Mapping[str, Any]:
+    from .soundengine_business import (
+        materialize_soundengine_control_business_request,
+    )
+
+    return materialize_soundengine_control_business_request(operation, session)
 
 
 def _materialize_switch_assignment(
@@ -864,6 +883,26 @@ _RUNTIME_CONTROL_DEFINITION = {
     "settings_are_complete_declaration": True,
 }
 
+_SOUNDENGINE_CONTROL_DEFINITION = {
+    "family": "soundengine-control-business",
+    "contract_builder": _soundengine_control_contract,
+    "materializer": _materialize_soundengine_control,
+    "update_commands": frozenset({"draft-declare-soundengine-plan"}),
+    "initial_projection_actions": (
+        "declare-soundengine-plan",
+        "inspect",
+        "cancel",
+    ),
+    "active_projection_actions": (
+        "declare-soundengine-plan",
+        "check",
+        "inspect",
+        "cancel",
+    ),
+    "auto_apply_preview": True,
+    "settings_are_complete_declaration": True,
+}
+
 
 def _bind_adapter(operation: str, definition: Mapping[str, Any]) -> BusinessAdapter:
     values = dict(definition)
@@ -894,6 +933,10 @@ _BUSINESS_ADAPTERS = {
     **{
         operation: _bind_adapter(operation, _RUNTIME_CONTROL_DEFINITION)
         for operation in runtime_control_business_operations()
+    },
+    **{
+        operation: _bind_adapter(operation, _SOUNDENGINE_CONTROL_DEFINITION)
+        for operation in soundengine_control_business_operations()
     },
     "audio.import": _bind_adapter("audio.import", _AUDIO_IMPORT_DEFINITION),
     "audio.importTabDelimited": _bind_adapter(

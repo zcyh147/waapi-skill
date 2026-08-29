@@ -315,6 +315,18 @@ from wwise_waapi.runtime_transport_handles import (  # noqa: E402  # pyright: ig
     RuntimeTransportHandleStore,
     validate_runtime_transport_handle,
 )
+from wwise_waapi.soundengine_business_contracts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    REGISTER_GAME_OBJECT_URI,
+    UNREGISTER_GAME_OBJECT_URI,
+    soundengine_control_business_contract_data,
+    soundengine_control_business_operations,
+    soundengine_control_business_versions,
+)
+from wwise_waapi.runtime_game_object_handles import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    RuntimeGameObjectContext,
+    RuntimeGameObjectHandleError,
+    RuntimeGameObjectHandleStore,
+)
 from wwise_waapi.business_declarations import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     MAX_BUSINESS_NAME_BYTES,
     MAX_BUSINESS_PATH_BYTES,
@@ -2528,6 +2540,18 @@ def build_parser() -> argparse.ArgumentParser:
     draft_declare_runtime_control_plan.add_argument("--meter-object-handle")
     draft_declare_runtime_control_plan.add_argument("--capture-output-directory")
     draft_declare_runtime_control_plan.add_argument("--capture-name")
+    draft_declare_soundengine_plan = subparsers.add_parser(
+        "draft-declare-soundengine-plan",
+        help=(
+            "Declare one complete SoundEngine outcome while the Gateway owns "
+            "native IDs, overloads, arrays, and request construction"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_declare_soundengine_plan)
+    draft_declare_soundengine_plan.add_argument("--monitor-message")
+    draft_declare_soundengine_plan.add_argument("--game-object-name")
+    draft_declare_soundengine_plan.add_argument("--game-object-handle")
+    draft_declare_soundengine_plan.add_argument("--event-handle")
     draft_declare_source_control_plan = subparsers.add_parser(
         "draft-declare-source-control-plan",
         help=(
@@ -5969,6 +5993,8 @@ def core_business_route_payload(version: str, api: str) -> dict[str, Any]:
     contract = (
         media_build_business_contract_data(api, version)
         if api in media_build_business_operations()
+        else soundengine_control_business_contract_data(api, version)
+        if api in soundengine_control_business_operations()
         else runtime_inspection_business_contract_data(api, version)
         if api in runtime_inspection_business_operations()
         else project_setting_business_contract_data(api, version)
@@ -6009,6 +6035,8 @@ def core_business_route_payload(version: str, api: str) -> dict[str, Any]:
 def core_business_route_available(api: str, version: str) -> bool:
     if api in media_build_business_operations():
         return version in media_build_business_versions(api)
+    if api in soundengine_control_business_operations():
+        return version in soundengine_control_business_versions(api)
     if api in runtime_inspection_business_operations():
         return version in runtime_inspection_business_versions(api)
     if api in project_setting_business_operations():
@@ -11131,6 +11159,133 @@ def dispatch_business_runtime_control_plan(
     return payload
 
 
+def dispatch_business_soundengine_plan(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Record one complete SoundEngine outcome without native request fields."""
+
+    binding = _open_business_binding(
+        args,
+        env=env,
+        connection=connection,
+        detected_version=detected_version,
+        live_info=live_info,
+        dispatcher=dispatcher,
+    )
+    adapter = business_adapter(binding.record.operation)
+    if (
+        adapter.family != "soundengine-control-business"
+        or not adapter.accepts_update_command(args.command)
+    ):
+        raise GatewayInputError(
+            f"{binding.record.operation} does not expose {args.command}"
+        )
+    raw_session = (
+        binding.record.composition.get("business_session")
+        if binding.record.composition is not None
+        else None
+    )
+    session = (
+        BusinessDeclarationSession.create(binding.context)
+        if raw_session is None
+        else BusinessDeclarationSession.from_dict(raw_session)
+    )
+    if session.context != binding.context:
+        raise OperationDraftBindingDrift(
+            "Live project or Wwise build differs from the SoundEngine binding."
+        )
+    contract = soundengine_control_business_contract_data(
+        binding.record.operation,
+        detected_version,
+    )
+    field_types = contract["declaration"]["field_types"]
+    supplied = {
+        "monitor_message": args.monitor_message,
+        "game_object_name": args.game_object_name,
+        "game_object_handle": args.game_object_handle,
+        "event_handle": args.event_handle,
+    }
+    plan = {
+        name: value
+        for name, value in supplied.items()
+        if value is not None and name in field_types
+    }
+    undisclosed = [
+        name
+        for name, value in supplied.items()
+        if value is not None and name not in field_types
+    ]
+    if undisclosed:
+        raise GatewayInputError(
+            "SoundEngine fields are not disclosed for this operation: "
+            + ", ".join(sorted(undisclosed))
+        )
+
+    game_object_record = None
+    if "game_object_handle" in plan:
+        game_object_record = RuntimeGameObjectHandleStore(binding.state_dir).resolve(
+            plan["game_object_handle"],
+            context=_runtime_game_object_context_from_live(
+                endpoint=common["endpoint"],
+                project=binding.project,
+                detected_version=detected_version,
+                live_info=live_info,
+            ),
+        )
+
+    def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
+        candidate = current.with_settings(
+            {
+                "soundengine_plan": plan,
+                **(
+                    {"runtime_game_object_binding": game_object_record.as_dict()}
+                    if game_object_record is not None
+                    else {}
+                ),
+            }
+        )
+        adapter.materialize(candidate)
+        return candidate
+
+    record = binding.store.apply_business_update(
+        args.draft_id,
+        task_authority=args.task_authority,
+        expected_revision=args.expected_revision,
+        schema_digest=operation_draft_schema_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        composer_digest=operation_composer_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        context=binding.context,
+        update=update,
+        event_type="settings.revised",
+    )
+    payload = operation_draft_payload(
+        args.command,
+        record,
+        offline=False,
+        task_authority=args.task_authority,
+    )
+    payload.update(
+        {
+            "endpoint": dict(common["endpoint"]),
+            "detected_version": detected_version,
+            "project_call": dispatch_call_summary(binding.project_call),
+        }
+    )
+    return payload
+
+
 def _source_control_roots_from_project(
     project: Mapping[str, Any],
 ) -> dict[str, str]:
@@ -11297,6 +11452,16 @@ def dispatch_command(
         )
     if args.command == "draft-declare-runtime-control-plan":
         return dispatch_business_runtime_control_plan(
+            args,
+            env=env,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+        )
+    if args.command == "draft-declare-soundengine-plan":
+        return dispatch_business_soundengine_plan(
             args,
             env=env,
             connection=connection,
@@ -14791,6 +14956,28 @@ def _runtime_transport_context_from_live(
     )
 
 
+def _runtime_game_object_context_from_live(
+    *,
+    endpoint: Mapping[str, Any],
+    project: Mapping[str, Any],
+    detected_version: str,
+    live_info: Mapping[str, Any],
+) -> RuntimeGameObjectContext:
+    transport_context = _runtime_transport_context_from_live(
+        endpoint=endpoint,
+        project=project,
+        detected_version=detected_version,
+        live_info=live_info,
+    )
+    return RuntimeGameObjectContext(
+        endpoint_url=transport_context.endpoint_url,
+        project_id=transport_context.project_id,
+        project_path=transport_context.project_path,
+        wwise_version=transport_context.wwise_version,
+        wwise_build=transport_context.wwise_build,
+    )
+
+
 def _business_object_path_from_segments(values: Any) -> str:
     if (
         not isinstance(values, list)
@@ -16928,6 +17115,58 @@ def dispatch_transaction_command(
                     "cleanup": transaction_cleanup_payload(prepared, phase="preview"),
                     "automatic_retry": False,
                 }
+        game_object_binding_validation = None
+        game_object_id = (
+            call_args.get("gameObject")
+            if call_uri == UNREGISTER_GAME_OBJECT_URI
+            else None
+        )
+        if isinstance(game_object_id, int) and not isinstance(game_object_id, bool):
+            try:
+                if project is None:
+                    raise RuntimeGameObjectHandleError(
+                        "GAME_OBJECT_HANDLE_CONTEXT_DRIFT",
+                        "SoundEngine execution lacks its live project identity.",
+                    )
+                game_object_record = RuntimeGameObjectHandleStore(
+                    store.state_dir
+                ).resolve_native_id(
+                    game_object_id,
+                    context=_runtime_game_object_context_from_live(
+                        endpoint=common["endpoint"],
+                        project=project,
+                        detected_version=detected_version,
+                        live_info=live_info,
+                    ),
+                )
+                game_object_binding_validation = {
+                    "game_object_handle": game_object_record.handle,
+                    "active": True,
+                    "native_observability": "gateway_registration_lifecycle_only",
+                }
+            except RuntimeGameObjectHandleError as exc:
+                repreview = store.require_repreview(
+                    transaction_id,
+                    expected_authorization=record.state,
+                    details={"error_code": exc.error_code},
+                )
+                return {
+                    "ok": False,
+                    "status": "repreview_required",
+                    **common,
+                    "transaction_id": transaction_id,
+                    "state": repreview.state.value,
+                    "artifact_hash": preview.artifact_hash,
+                    "error_code": exc.error_code,
+                    "message": str(exc),
+                    "role_validation": role_validation,
+                    "guard_validation": guard_validation,
+                    "project_call": project_call,
+                    "executed": False,
+                    "verified": False,
+                    "cleanup": transaction_cleanup_payload(prepared, phase="preview"),
+                    "automatic_retry": False,
+                }
         runtime_call_args = call_args
         runtime_call_options = call_options
         wire_path_adaptation: Mapping[str, Any] | None = None
@@ -17072,6 +17311,7 @@ def dispatch_transaction_command(
                     "guard_validation": guard_validation,
                     "project_call": project_call,
                     "transport_binding_validation": transport_binding_validation,
+                    "game_object_binding_validation": game_object_binding_validation,
                     "automatic_retry": False,
                     **wire_path_output,
                 },
@@ -17093,6 +17333,7 @@ def dispatch_transaction_command(
                     "guard_validation": guard_validation,
                     "project_call": project_call,
                     "transport_binding_validation": transport_binding_validation,
+                    "game_object_binding_validation": game_object_binding_validation,
                     **wire_path_output,
                 }
             )
@@ -17111,6 +17352,7 @@ def dispatch_transaction_command(
             "guard_validation": guard_validation,
             "project_call": project_call,
             "transport_binding_validation": transport_binding_validation,
+            "game_object_binding_validation": game_object_binding_validation,
             "executed": True,
             "verified": False,
             "cleanup": transaction_cleanup_payload(
@@ -17430,6 +17672,101 @@ def dispatch_transaction_command(
                                 exc,
                                 "error_code",
                                 "TRANSPORT_HANDLE_PERSISTENCE_FAILED",
+                            ),
+                            "message": str(exc),
+                            "agent_result": None,
+                            "automatic_retry": False,
+                        }
+                    )
+                    return payload
+            if transaction_api == REGISTER_GAME_OBJECT_URI:
+                if project is None:  # pragma: no cover - invariant project guard
+                    raise GatewayResultShapeError(
+                        "SoundEngine verification lacks its live project identity.",
+                        error_code="INVALID_STATUS_RESULT",
+                    )
+                native_args = transaction_arguments.get("args")
+                game_object_id = (
+                    native_args.get("gameObject")
+                    if isinstance(native_args, Mapping)
+                    else None
+                )
+                game_object_name = (
+                    native_args.get("name")
+                    if isinstance(native_args, Mapping)
+                    else None
+                )
+                try:
+                    issued = RuntimeGameObjectHandleStore(store.state_dir).issue(
+                        game_object_id=game_object_id,
+                        game_object_name=game_object_name,
+                        context=_runtime_game_object_context_from_live(
+                            endpoint=common["endpoint"],
+                            project=project,
+                            detected_version=detected_version,
+                            live_info=live_info,
+                        ),
+                        source_transaction_id=transaction_id,
+                        source_artifact_hash=preview.artifact_hash,
+                    )
+                    agent_result["business_result"] = {
+                        "contract": "waapi-skill.soundengine-control-result/v1",
+                        "game_object_handle": issued.handle,
+                        "game_object_name": issued.game_object_name,
+                    }
+                except (RuntimeGameObjectHandleError, OSError, ValueError) as exc:
+                    payload.update(
+                        {
+                            "ok": False,
+                            "status": "game_object_handle_persistence_failed",
+                            "error_code": getattr(
+                                exc,
+                                "error_code",
+                                "GAME_OBJECT_HANDLE_PERSISTENCE_FAILED",
+                            ),
+                            "message": str(exc),
+                            "agent_result": None,
+                            "automatic_retry": False,
+                        }
+                    )
+                    return payload
+            if transaction_api == UNREGISTER_GAME_OBJECT_URI:
+                if project is None:  # pragma: no cover - invariant project guard
+                    raise GatewayResultShapeError(
+                        "SoundEngine verification lacks its live project identity.",
+                        error_code="INVALID_STATUS_RESULT",
+                    )
+                native_args = transaction_arguments.get("args")
+                game_object_id = (
+                    native_args.get("gameObject")
+                    if isinstance(native_args, Mapping)
+                    else None
+                )
+                try:
+                    retired = RuntimeGameObjectHandleStore(
+                        store.state_dir
+                    ).retire_native_id(
+                        game_object_id,
+                        context=_runtime_game_object_context_from_live(
+                            endpoint=common["endpoint"],
+                            project=project,
+                            detected_version=detected_version,
+                            live_info=live_info,
+                        ),
+                    )
+                    agent_result["business_result"] = {
+                        "contract": "waapi-skill.soundengine-control-result/v1",
+                        "retired_game_object_handle_count": len(retired),
+                    }
+                except (RuntimeGameObjectHandleError, OSError, ValueError) as exc:
+                    payload.update(
+                        {
+                            "ok": False,
+                            "status": "game_object_handle_retirement_failed",
+                            "error_code": getattr(
+                                exc,
+                                "error_code",
+                                "GAME_OBJECT_HANDLE_RETIREMENT_FAILED",
                             ),
                             "message": str(exc),
                             "agent_result": None,
@@ -20353,6 +20690,11 @@ def _business_next_action_binding(
         "draft-declare-runtime-control-plan",
         *binding,
     ]
+    declare_soundengine_plan_prefix = [
+        *base,
+        "draft-declare-soundengine-plan",
+        *binding,
+    ]
     declare_source_control_plan_prefix = [
         *base,
         "draft-declare-source-control-plan",
@@ -20441,6 +20783,91 @@ def _business_next_action_binding(
                 "bind_each_required_role_then_copy_its_returned_handle_into_"
                 "the_same_named_declaration_field"
             ),
+        }
+    if adapter.family == "soundengine-control-business":
+        roles = business_contract["binding"]["roles"]
+        shared = {
+            "contract": "waapi-skill.business-draft-next-action/v1",
+            "responsibility_split": {
+                "agent": "natural_language_to_closed_soundengine_outcome",
+                "gateway": (
+                    "business_outcome_to_exact_native_request_preview_and_lifecycle"
+                ),
+            },
+            "business_contract": business_contract,
+            "forbidden_inputs": [
+                *forbidden_inputs,
+                "native_soundengine_id",
+                "native_overload_branch",
+                "native_array",
+                "wire_type",
+                "complete_request",
+            ],
+            "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+            "then_read_next_response": True,
+            "precompute_or_increment_revision": False,
+        }
+        if session is not None and adapter.is_complete(session):
+            return {
+                **shared,
+                "required_next_phase": "check_complete_soundengine_plan",
+                "check": {
+                    **operation_draft_prefix_copy_binding(check),
+                    "append": [],
+                },
+            }
+        bound_roles = (
+            set()
+            if session is None
+            else {
+                row.get("role")
+                for row in session.handles.as_dict()["objects"]
+                if isinstance(row, Mapping) and isinstance(row.get("role"), str)
+            }
+        )
+        next_role = next((role for role in roles if role not in bound_roles), None)
+        if next_role is not None:
+            return {
+                **shared,
+                "required_next_phase": "bind_next_soundengine_role",
+                "object_binding": role_object_binding(next_role),
+            }
+        declaration = {
+            **operation_draft_prefix_copy_binding(
+                declare_soundengine_plan_prefix,
+                append_action=(
+                    "copy_verbatim_then_append_one_complete_soundengine_plan"
+                ),
+            ),
+            "append_fields": business_contract["declaration"],
+            "append": {
+                "ak.soundengine.postMsgMonitor": [
+                    "--monitor-message <exact-bounded-message>"
+                ],
+                "ak.soundengine.registerGameObj": [
+                    "--game-object-name <exact-runtime-game-object-name>"
+                ],
+                "ak.soundengine.unregisterGameObj": [
+                    "--game-object-handle <gateway-runtime-game-object-handle>"
+                ],
+                "ak.soundengine.postEvent": [
+                    "--event-handle <bound-event-handle>",
+                    *(
+                        ["--game-object-handle <gateway-runtime-game-object-handle>"]
+                        if record.version in {"2021.1", "2022.1", "2023.1"}
+                        else [
+                            "[--game-object-handle <gateway-runtime-game-object-handle>]"
+                        ]
+                    ),
+                ],
+            }[record.operation],
+            "submit_once": True,
+            "native_request_input": "forbidden",
+        }
+        return {
+            **shared,
+            "required_next_phase": "declare_complete_soundengine_plan",
+            "declaration": declaration,
         }
     if adapter.family == "runtime-control-business":
         roles = business_contract["binding"]["roles"]
