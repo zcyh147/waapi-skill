@@ -347,9 +347,11 @@ def test_run_main_does_not_confuse_config_set_field_with_global_selector(
 def test_run_bootstrap_if_needed_invokes_setup_when_venv_missing(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr(run_script, "VENV_DIR", tmp_path / ".venv")
     invoked: list[list[str]] = []
+    observed_options: dict[str, object] = {}
 
-    def fake_run(cmd, check=True):
+    def fake_run(cmd, **options):
         invoked.append([str(part) for part in cmd])
+        observed_options.update(options)
 
         class Result:
             returncode = 0
@@ -359,6 +361,10 @@ def test_run_bootstrap_if_needed_invokes_setup_when_venv_missing(monkeypatch: py
     monkeypatch.setattr(run_script.subprocess, "run", fake_run)
     run_script.bootstrap_if_needed()
     assert invoked and invoked[0][0] == str(run_script.sys.executable)
+    assert observed_options == {
+        "check": True,
+        "stdout": run_script.sys.stderr,
+    }
 
 
 @pytest.mark.parametrize("setup_state", ("missing", "symlink"))

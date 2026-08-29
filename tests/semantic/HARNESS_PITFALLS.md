@@ -138,6 +138,10 @@ prevention checks that are expensive to rediscover.
 - Prevention: run the candidate's `scripts/setup_environment.py`, then launch
   with that candidate's `.venv` interpreter. Formal campaign preflight rejects
   a missing or different interpreter before creating a root or starting Codex.
+  Independently, `run.py` owns a machine-readable stdout contract: any automatic
+  bootstrap progress, pip output, and venv-path receipt is redirected to stderr.
+  `test_run_bootstrap_if_needed_invokes_setup_when_venv_missing` seals that
+  invariant so a clean ordinary real-test worktree cannot prefix Gateway JSON.
 
 ### A clean Windows pytest worktree selected the Store Python alias
 

@@ -105,7 +105,15 @@ def bootstrap_if_needed() -> None:
     if VENV_DIR.exists():
         return
     setup_script = resolve_packaged_script(SKILL_DIR, "setup_environment.py")
-    subprocess.run([sys.executable, str(setup_script)], check=True)
+    # The launched Gateway owns stdout as one machine-readable JSON document.
+    # A first-run environment bootstrap may invoke pip and print the venv path;
+    # keep all of that progress visible on stderr so it cannot prefix the
+    # Gateway payload and break callers that parse stdout directly.
+    subprocess.run(
+        [sys.executable, str(setup_script)],
+        check=True,
+        stdout=sys.stderr,
+    )
 
 
 def _wait_for_interrupted_child(
