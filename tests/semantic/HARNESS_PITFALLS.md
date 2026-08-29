@@ -157,6 +157,44 @@ prevention checks that are expensive to rediscover.
   conversion, migration, save, plug-in, or license dialog remains blocked for
   explicit diagnosis.
 
+### macOS document-open hands `.wproj` to the wrong Wine boundary
+
+- Evidence: the #88 macOS Authoring preflight launched Wwise 2025.1 with
+  `open -a Wwise <sandbox>/SampleProject.wproj`. The Wine wrapper displayed
+  “There is no Windows program configured to open this type of file” (and its
+  localized equivalent), while WAAPI later listened with
+  `ak.wwise.no_project_loaded`. The disposable copy was unchanged and no test
+  command ran.
+- Cause: macOS document association forwards the host path to the Wine wrapper;
+  it is not the Wwise Project Launcher's Windows-path-aware project-open flow.
+- Follow-up evidence: this wrapper's `wwise_launcher` discards application
+  arguments, so `open --args` cannot repair the handoff. Its Wine bottle maps
+  the user home to `Y:` and the filesystem root to `Z:`, and `winepath -w`
+  correctly converted the sandbox path. Directly invoking the packaged Wine
+  runner with `Wwise.exe Y:\\...\\SampleProject.wproj` avoided the association
+  error and started the intended executable, but the 2025.1 instance still
+  reported `getInfo.isCommandLine=false` plus
+  `ak.wwise.no_project_loaded`. Treat that as executable-start evidence, not
+  project-open evidence.
+- Prevention: launch one Wwise Authoring instance without a document, then open
+  the disposable `.wproj` through Project Launcher **Open Other/Browse** or an
+  existing reviewed Gateway project-transition route. Continue only after
+  `getInfo.isCommandLine=false` and `getProjectInfo.path` resolves to that exact
+  sandbox copy. A listening 8080 socket proves Authoring readiness only; it
+  does not prove that a project is loaded. Close the association error and
+  restart the launch flow instead of retrying `open -a ... <wproj>` or claiming
+  success from the Windows-shaped path alone.
+- GUI-control pitfall: Computer Use `get_app_state` transparently launches a
+  missing macOS app. A Wwise.exe started directly through Wine can be healthy
+  without macOS registering the enclosing `.app` as running, so even a prior
+  Wwise.exe process/argv check does not make this probe safe. Do not target the
+  `.app` with `get_app_state` during a direct-Wine launch. The probe can create
+  a second no-project launcher over the intended sandbox instance; close only
+  that launcher's wrapper process group and preserve the Wwise.exe whose argv
+  contains the sandbox path. Use exact process/WAAPI evidence for liveness and
+  an already registered interactive launch path when modal inspection is
+  required.
+
 ### Compound Draft topology assumed one terminal per Draft
 
 - Evidence: #83 Fresh `r1` on both hosts blocked before Codex with
