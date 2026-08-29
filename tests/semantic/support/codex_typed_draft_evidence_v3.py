@@ -82,6 +82,7 @@ _BUSINESS_DRAFT_EVENT_OPTIONS = {
     "draft-declare-artifact-plan": frozenset({"settings.revised"}),
     "draft-declare-core-plan": frozenset({"settings.revised"}),
     "draft-declare-project-setting-plan": frozenset({"settings.revised"}),
+    "draft-declare-runtime-control-plan": frozenset({"settings.revised"}),
     "draft-declare-source-control-plan": frozenset({"settings.revised"}),
     "draft-declare-ui-plan": frozenset({"settings.revised"}),
     "draft-add-ui-command": frozenset({"settings.revised"}),

@@ -25,6 +25,7 @@ DRAFT_GATEWAY_SUBCOMMANDS = frozenset(
         "draft-declare-artifact-plan",
         "draft-declare-core-plan",
         "draft-declare-project-setting-plan",
+        "draft-declare-runtime-control-plan",
         "draft-declare-source-control-plan",
         "draft-declare-ui-plan",
         "draft-add-ui-command",
