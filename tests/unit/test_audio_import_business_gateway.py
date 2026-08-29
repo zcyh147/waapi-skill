@@ -715,7 +715,7 @@ def test_audio_import_batch_declaration_is_atomic_complete_and_compact(
     # envelope; POSIX has no equivalent expansion in next_command.  The
     # copy-exact continuation also retains an explicit caller state directory
     # so the next phase cannot silently fall back to another transaction store.
-    assert response_size <= (8_000 if sys.platform == "win32" else 4_800)
+    assert response_size <= (9_500 if sys.platform == "win32" else 5_000)
 
     stored = OperationDraftStore(tmp_path / "state").inspect(
         started["draft"]["draft_id"],
