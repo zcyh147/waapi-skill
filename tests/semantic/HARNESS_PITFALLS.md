@@ -155,6 +155,22 @@ prevention checks that are expensive to rediscover.
   Bash, invoke the batch file through `cmd.exe //d //s //c`; `/c` may be path-
   converted into an interactive prompt and must not receive test credit.
 
+### `pwsh -File -` over SSH echoed a script without executing it
+
+- Symptom: the SSH command returned zero after printing only `PS ...>` and
+  continuation `>>` prompts; there was no candidate attestation, test-context
+  header, pytest output, or post-run status.
+- Cause: on the fusion-win11 OpenSSH/Git-Bash chain, `pwsh.exe -File -` consumed
+  standard input as an interactive session. A multiline block remained at the
+  continuation prompt until EOF, and the shell exit code did not prove that
+  the script body ran.
+- Prevention: copy one bounded, profile-free `.ps1` to a temporary Windows
+  path, execute its absolute path with
+  `pwsh.exe -NoProfile -NonInteractive -File <path>`, require both the exact
+  candidate hash and `== Test Context ==` before credit, then remove the
+  temporary script. Stdin echo, prompts, or exit zero alone are zero test
+  attempts.
+
 ### A rejected runner path can be a real Agent error
 
 - Evidence: #83 macOS `r6` used the correct candidate runner for six commands,
