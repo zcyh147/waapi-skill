@@ -605,6 +605,24 @@ prevention checks that are expensive to rediscover.
   this transport-only difference by adding prompt wording or by weakening the
   final materialized request comparison.
 
+### SoundBank build intent must identify its execution channel
+
+- Evidence: #89 native-Windows root `iwin-cli-console-dcd0bd0-r1` received a
+  generic “generate SoundBanks” request, selected the already valid named
+  `soundbank.generate` operation from `operations`, and was rejected because
+  this targeted profile expected the distinct WwiseConsole CLI route. The root
+  remains a frozen semantic FAIL; no Preview, execute, or Wwise process ran.
+- Cause: both the connected Core SoundBank API and WwiseConsole command-line
+  API satisfy generic build wording. The test prompt omitted the user-visible
+  execution-channel choice, so treating either route as the only semantic
+  answer would grade an ambiguity rather than Agent capability.
+- Prevention: a Fresh routing case for the CLI/Console family must say
+  `WwiseConsole 命令行` (or an equivalent explicit channel) while still hiding
+  URIs, Gateway commands, Draft mechanics, and native options. Final candidate
+  `d6d6709` passed 1/1 fresh plus identical verify-only on both hosts; the
+  Windows run used an attested `InteractiveToken` / `Limited` task and removed
+  it after zero scoped residual processes.
+
 ### A dynamic Business request is replayed from its durable Draft
 
 - Evidence: #88 macOS root `imac-soundengine4-68411e0-r2` and native-Windows

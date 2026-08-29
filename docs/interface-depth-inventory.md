@@ -6,7 +6,7 @@ This report is generated from the exact five-version public surface and the revi
 
 - Native function/Topic lanes: **824**
 - Named-operation lanes: **153**
-- Migration families: **3**
+- Migration families: **2**
 - Unowned migration rows: **0**
 
 Every exact row, version, schema digest, continuation command, field ownership, disposition, and owner is recorded in `interface-depth-inventory.json`.
@@ -29,7 +29,6 @@ Business scalar values remain visible. Native paths, metadata scope, property/re
 
 | Family | Roll-up | Exact rows | Versions | Unique API/operation names | Row digest |
 | --- | ---: | ---: | --- | ---: | --- |
-| [`generic-cli-console`](https://github.com/zcyh147/waapi-skill/issues/89) | #57 | 65 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 14 | `3f5b7464510f32b6f06dc4c6c3e0a7da700159ad07b8aff69b4b759bed41b9e1` |
 | [`generic-host-ui-debug-waapi`](https://github.com/zcyh147/waapi-skill/issues/90) | #57 | 15 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 5 | `8d701d66442416c74f627e468842139fa8971b441b9b813be95cd9e7d3712ee0` |
 | [`generic-topics`](https://github.com/zcyh147/waapi-skill/issues/91) | #57 | 154 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 33 | `48f62fffb957f2ed581bee75cb11ddd6624411b77fc307813d1984b5ce015982` |
 
@@ -37,6 +36,7 @@ Business scalar values remain visible. Native paths, metadata scope, property/re
 
 | Family | Completed issue | Exact rows | Row digest |
 | --- | ---: | ---: | --- |
+| `generic-cli-console` | #89 | 65 | `3f5b7464510f32b6f06dc4c6c3e0a7da700159ad07b8aff69b4b759bed41b9e1` |
 | `generic-core-media-build` | #85 | 16 | `eb0692ad57f0a504bf110f38355997bb9abca7519ed412c4ed97c223a6a0decf` |
 | `generic-core-project-object` | #84 | 55 | `caf467378cbabccb637cd93d18cc4e87e5356d409ce110da1f040825af4245ed` |
 | `generic-core-remaining` | #86 | 43 | `a7541ae6dad3c8c033b13089c13c1faad9a2688aee985c72e5c414fdb812fa8a` |
@@ -47,6 +47,7 @@ Business scalar values remain visible. Native paths, metadata scope, property/re
 
 | Classification | Disposition | Exact lanes | Audit evidence |
 | --- | --- | ---: | --- |
+| `generic-cli-console` | `already_deep` | 65 | The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts. |
 | `generic-core-media-build` | `already_deep` | 16 | The public media-build-business/v1 Adapter covers all 16 exact peak-region, trimmed-peak, Media Pool, and SoundBank inclusion lanes. Callers provide exact AudioFileSource or SoundBank identities, finite time/count values, or bounded Media Pool business meanings and filters. The Gateway owns exact native fields, live exact-case Media Pool field binding, binary peak decoding, inclusion identity enrichment, projection, sorting, result ceilings, and completeness boundaries. request-schema exposes only core-call, while typed-call, typed containers, typed Draft start/continuation, and native request fragments are blocked. |
 | `generic-core-project-object` | `already_deep` | 55 | The public core-business/v1 declarations cover all 55 exact Core project, object, audio, Blend, Switch, and Work Unit lanes. Bounded reads accept exact object choices plus user-facing field meaning where needed; mutations accept live-bound object and Field Handles, stable Wwise-facing values, exact I/O authority, curves, edges, platforms, and languages. The Gateway derives native GUID placement, property tokens, enum spellings, arrays, nested point and edge structures, request revisions, Preview lifecycle, result bounds, and the sole continuation; request-schema exposes no typed fields and typed-call or draft-apply cannot bypass the business route. |
 | `generic-core-remaining` | `already_deep` | 43 | The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. Game Parameter names use a Gateway-fixed typed-name binding and dedicated range flags. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Packaged candidate 98d9e70 passed macOS Program 4126/2 skipped; final evidence candidate a0a0178 passed native-Windows Program 4111/17 skipped and macOS Non-live 9324/111 skipped/27 deselected. The 2025.1 project-setting plus external source-control proportional real workflow passed on both hosts at 590a416, and the final packaged Skill passed Fresh Agent plus verify-only cumulatively on macOS and Windows with clean task/process teardown. |

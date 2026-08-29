@@ -190,10 +190,11 @@
     },
     {
       "id": "generic-cli-console",
-      "disposition": "migration_required",
-      "owner_issue": 57,
+      "disposition": "already_deep",
+      "owner_issue": null,
       "match": {"uri_prefixes": ["ak.wwise.cli.", "ak.wwise.console."]},
-      "leaked_mechanics": ["native_object_path", "wire_type", "dependency_order", "batch_layout", "request_fragment"]
+      "leaked_mechanics": [],
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts."
     },
     {
       "id": "generic-host-ui-debug-waapi",
@@ -228,15 +229,6 @@
     }
   ],
   "ticket_blueprints": {
-    "generic-cli-console": {
-      "title": "Deepen Wwise CLI and Console project/build operations",
-      "parent_issue": 57,
-      "blocked_by_family": "generic-soundengine-runtime",
-      "public_behavior": "Accept project, platform, build, migration, verification, and exact file intent; derive command-specific native options, ordering, batching, and shell-safe serialization.",
-      "deterministic_tests": "All exact rows/version deltas, option mapping, exact artifacts, hostile macOS/Windows paths, blocked custom commands, isolated-I/O policy, continuation serialization, and non-bypass.",
-      "removal_boundary": "Remove generic typed request construction and prompt-level CLI option assembly; keep prohibited custom-command boundaries and exact artifacts.",
-      "proportional_evidence": "Representative real CLI/Console operations per distinct verifier shape on both OSes, including native-Windows path/PowerShell transport; Fresh Agent for build-intent routing."
-    },
     "generic-host-ui-debug-waapi": {
       "title": "Deepen remaining host UI, debug validation, tone, project, and WAAPI schema routes",
       "parent_issue": 57,
@@ -281,10 +273,14 @@
       "github_issue": 88,
       "row_count": 124,
       "rows_sha256": "5075fdcc32810059d6a3fee10499ff6823eea0be4c300dfb717bede6697c6ced"
+    },
+    "generic-cli-console": {
+      "github_issue": 89,
+      "row_count": 65,
+      "rows_sha256": "3f5b7464510f32b6f06dc4c6c3e0a7da700159ad07b8aff69b4b759bed41b9e1"
     }
   },
   "ticket_issue_numbers": {
-    "generic-cli-console": 89,
     "generic-host-ui-debug-waapi": 90,
     "generic-topics": 91
   },
