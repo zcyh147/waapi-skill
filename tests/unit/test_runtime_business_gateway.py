@@ -745,6 +745,7 @@ def test_transport_state_read_maps_gateway_handle_without_exposing_native_id(
     transport_handle = _issue_transport_handle(
         state_dir,
         project_path=project_file,
+        transport_id=0,
     )
     client = FakeClient(
         {
@@ -775,7 +776,7 @@ def test_transport_state_read_maps_gateway_handle_without_exposing_native_id(
                 {
                     "list": [
                         {
-                            "transport": 74,
+                            "transport": 0,
                             "object": "{11111111-1111-1111-1111-111111111111}",
                             "gameObject": 1,
                         }
@@ -802,7 +803,7 @@ def test_transport_state_read_maps_gateway_handle_without_exposing_native_id(
     )
 
     assert code == 0, payload
-    assert (TRANSPORT_GET_STATE_URI, {"transport": 74}, {}) in client.calls
+    assert (TRANSPORT_GET_STATE_URI, {"transport": 0}, {}) in client.calls
     assert payload["agent_result"] == {
         "transport_handle": transport_handle,
         "state": "paused",

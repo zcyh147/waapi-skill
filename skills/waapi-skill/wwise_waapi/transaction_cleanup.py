@@ -353,12 +353,12 @@ def _transport_id_from_execution_result(execution_result: Mapping[str, Any]) -> 
     if (
         isinstance(transport_id, bool)
         or not isinstance(transport_id, int)
-        or not 1 <= transport_id <= UINT32_MAX
+        or not 0 <= transport_id <= UINT32_MAX
     ):
         raise TransactionCleanupError(
             "INVALID_TRANSPORT_ID",
             "transport.create returned an invalid cleanup transport ID.",
-            details={"transport": transport_id, "minimum": 1, "maximum": UINT32_MAX},
+            details={"transport": transport_id, "minimum": 0, "maximum": UINT32_MAX},
         )
     return transport_id
 

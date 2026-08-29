@@ -124,9 +124,9 @@ class RuntimeTransportHandleStore:
         if (
             isinstance(transport_id, bool)
             or not isinstance(transport_id, int)
-            or not 1 <= transport_id <= 0xFFFFFFFF
+            or not 0 <= transport_id <= 0xFFFFFFFF
         ):
-            raise ValueError("transport_id must be a non-zero uint32")
+            raise ValueError("transport_id must be a uint32")
         if not isinstance(context, RuntimeTransportContext):
             raise TypeError("context must be RuntimeTransportContext")
         transaction_id = _required_text(
@@ -395,7 +395,7 @@ class RuntimeTransportHandleStore:
             if (
                 isinstance(transport_id, bool)
                 or not isinstance(transport_id, int)
-                or not 1 <= transport_id <= 0xFFFFFFFF
+                or not 0 <= transport_id <= 0xFFFFFFFF
                 or not isinstance(payload["active"], bool)
                 or not isinstance(payload["source_artifact_hash"], str)
                 or not _SHA256.fullmatch(payload["source_artifact_hash"])

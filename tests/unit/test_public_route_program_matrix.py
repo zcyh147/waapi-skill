@@ -93,9 +93,9 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
 
     args, options, expected_result = request_and_result_from_schema(entry.schema)
     if entry.uri == "ak.wwise.core.transport.create":
-        # The reflected result schema makes transport optional, but the packaged
-        # business verifier deliberately requires a real non-zero uint32 ID.
-        expected_result = {"transport": 1}
+        # The reflected field is optional, but the business verifier requires
+        # a real uint32 ID. Wwise 2022.1 may assign zero to the first transport.
+        expected_result = {"transport": 0}
     if (
         entry.version in {"2024.1", "2025.1"}
         and entry.uri == "ak.wwise.core.audio.convert"
@@ -304,11 +304,11 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
             }
         if uri == "ak.wwise.core.transport.getList":
             if entry.uri == "ak.wwise.core.transport.create":
-                return {"list": [{"transport": 1}]}
+                return {"list": [{"transport": 0}]}
             if entry.uri == "ak.wwise.core.transport.destroy":
                 return {"list": []}
         if uri == "ak.wwise.core.transport.getState":
-            assert call_args == {"transport": 1}
+            assert call_args == {"transport": 0}
             return {"state": "stopped"}
         raise AssertionError(f"unexpected program verification readback: {uri}")
 

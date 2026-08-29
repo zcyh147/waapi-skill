@@ -5899,7 +5899,8 @@ def test_public_remote_lifecycle_uses_connection_status_business_readback(
 
 
 def test_public_transport_create_requires_returned_id_list_membership_and_state_readback() -> None:
-    transport_id = 73
+    # Real Wwise 2022.1 Authoring assigns zero to the first live transport.
+    transport_id = 0
     prepared = prepare_operation(
         parse_operation_request(
             request(
@@ -5943,13 +5944,13 @@ def test_public_transport_create_requires_returned_id_list_membership_and_state_
     ]
     assertion_names = {item["name"] for item in verified.assertions if item["passed"]}
     assert assertion_names >= {
-        "transport.create returned a non-zero uint32 transport ID",
+        "transport.create returned a uint32 transport ID",
         "created transport ID appears exactly once in transport.getList",
         "created transport ID resolves through transport.getState",
     }
 
 
-@pytest.mark.parametrize("invalid_id", [None, 0, True, -1, 0x100000000, "73"])
+@pytest.mark.parametrize("invalid_id", [None, True, -1, 0x100000000, "73"])
 def test_public_transport_create_never_reads_or_claims_verified_for_invalid_returned_id(
     invalid_id: Any,
 ) -> None:
@@ -5982,7 +5983,7 @@ def test_public_transport_create_never_reads_or_claims_verified_for_invalid_retu
     transport_assertion = next(
         item
         for item in verification.assertions
-        if item["name"] == "transport.create returned a non-zero uint32 transport ID"
+        if item["name"] == "transport.create returned a uint32 transport ID"
     )
     assert transport_assertion["passed"] is False
 
@@ -6022,7 +6023,7 @@ def test_public_transport_create_fails_if_list_or_state_does_not_prove_existence
 
 
 def test_public_transport_destroy_uses_request_id_and_proves_absence_from_get_list() -> None:
-    transport_id = 73
+    transport_id = 0
     prepared = prepare_operation(
         parse_operation_request(
             request(
@@ -6070,7 +6071,7 @@ def test_public_transport_destroy_uses_request_id_and_proves_absence_from_get_li
     )["passed"] is False
 
 
-@pytest.mark.parametrize("invalid_id", [0, True, -1, 0x100000000, "73"])
+@pytest.mark.parametrize("invalid_id", [True, -1, 0x100000000, "73"])
 def test_public_transport_destroy_rejects_invalid_transport_id_before_preview(invalid_id: Any) -> None:
     with pytest.raises(OperationContractError) as invalid:
         parse_operation_request(

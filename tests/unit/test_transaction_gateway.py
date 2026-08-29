@@ -5526,7 +5526,8 @@ def test_transport_create_materializes_destroy_request_in_execute_verify_and_age
     tmp_path: Path,
 ) -> None:
     state_dir = tmp_path / "transport-state"
-    transport_id = 73
+    # Wwise 2022.1 Authoring proves that zero is a live uint32 transport ID.
+    transport_id = 0
     request = generic_public_call_request(
         "ak.wwise.core.transport.create",
         {"object": OBJECT_GUID},

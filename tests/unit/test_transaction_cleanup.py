@@ -166,7 +166,7 @@ def test_transport_binding_materializes_only_from_a_valid_execution_result() -> 
     materialized = project_transaction_cleanup(
         spec,
         phase="verified",
-        execution_result={"result": {"transport": 12}},
+        execution_result={"result": {"transport": 0}},
     )
 
     assert preview["binding"]["materialized"] is False  # type: ignore[index]
@@ -174,7 +174,7 @@ def test_transport_binding_materializes_only_from_a_valid_execution_result() -> 
     assert unresolved["status"] == "pending"
     assert unresolved["binding"]["materialized"] is False  # type: ignore[index]
     assert materialized["binding"]["materialized"] is True  # type: ignore[index]
-    assert materialized["companion_request"]["args"] == {"transport": 12}  # type: ignore[index]
+    assert materialized["companion_request"]["args"] == {"transport": 0}  # type: ignore[index]
 
 
 @pytest.mark.parametrize(
@@ -184,7 +184,6 @@ def test_transport_binding_materializes_only_from_a_valid_execution_result() -> 
         {"result": {}},
         {"result": {"transport": None}},
         {"result": {"transport": True}},
-        {"result": {"transport": 0}},
         {"result": {"transport": -1}},
         {"result": {"transport": 1 << 32}},
         {"result": {"transport": 1.0}},

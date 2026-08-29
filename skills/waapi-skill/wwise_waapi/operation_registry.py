@@ -4161,7 +4161,7 @@ def _public_call_arguments(
     if api == TRANSPORT_DESTROY_URI and not _valid_transport_id(raw_args.get("transport")):
         raise OperationContractError(
             "INVALID_ARGUMENT",
-            "ak.wwise.core.transport.destroy requires a non-zero uint32 transport ID.",
+            "ak.wwise.core.transport.destroy requires a uint32 transport ID.",
             details={"api": api, "transport": raw_args.get("transport")},
         )
     io_root = arguments.get("io_root")
@@ -4392,7 +4392,7 @@ def _public_call_verification_plan(
         if not _valid_transport_id(transport_id):
             raise OperationContractError(
                 "INVALID_ARGUMENT",
-                "ak.wwise.core.transport.destroy requires a non-zero uint32 transport ID.",
+                "ak.wwise.core.transport.destroy requires a uint32 transport ID.",
                 details={"api": api, "transport": transport_id},
             )
         return {
@@ -14792,7 +14792,7 @@ def verify_prepared_operation(
         transport_id = _execution_payload(execution_result).get("transport")
         valid_transport_id = _valid_transport_id(transport_id)
         check(
-            "transport.create returned a non-zero uint32 transport ID",
+            "transport.create returned a uint32 transport ID",
             valid_transport_id,
             {"transport": transport_id},
         )
@@ -20092,7 +20092,7 @@ def _valid_object_id(value: Any) -> bool:
 
 
 def _valid_transport_id(value: Any) -> bool:
-    return not isinstance(value, bool) and isinstance(value, int) and 1 <= value <= 0xFFFFFFFF
+    return not isinstance(value, bool) and isinstance(value, int) and 0 <= value <= 0xFFFFFFFF
 
 
 def _transport_list_rows(result: Mapping[str, Any]) -> tuple[list[dict[str, Any]], bool]:

@@ -28,9 +28,9 @@ def test_transport_handle_is_opaque_and_resolves_only_from_its_store(tmp_path: P
         tmp_path,
         token_bytes=lambda size: b"a" * size,
     )
-    live_row = {"transport": 74, "object": "{11111111-1111-1111-1111-111111111111}"}
+    live_row = {"transport": 0, "object": "{11111111-1111-1111-1111-111111111111}"}
     issued = store.issue(
-        transport_id=74,
+        transport_id=0,
         context=_context(),
         source_transaction_id="tx1-00000000000000000000",
         source_artifact_hash="b" * 64,
@@ -40,7 +40,7 @@ def test_transport_handle_is_opaque_and_resolves_only_from_its_store(tmp_path: P
     assert issued.handle == "trh1-" + "61" * 16
     assert "0000004a" not in issued.handle
     assert store.resolve(issued.handle, context=_context()) == issued
-    assert store.resolve_native_id(74, context=_context()) == issued
+    assert store.resolve_native_id(0, context=_context()) == issued
     store.validate_live_row(issued, live_row)
 
     with pytest.raises(RuntimeTransportHandleError) as stale:

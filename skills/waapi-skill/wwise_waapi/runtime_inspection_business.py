@@ -366,10 +366,10 @@ def _transport_id(
     if (
         isinstance(transport_id, bool)
         or not isinstance(transport_id, int)
-        or not 1 <= transport_id <= 0xFFFFFFFF
+        or not 0 <= transport_id <= 0xFFFFFFFF
     ):
         raise RuntimeInspectionBusinessError(
-            "transport_handle must identify a non-zero live transport"
+            "transport_handle must identify a live uint32 transport"
         )
     return transport_id
 
