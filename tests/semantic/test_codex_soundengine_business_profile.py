@@ -15,6 +15,7 @@ from tests.semantic.support.codex_gateway_broker import (
     validate_operation_draft_protocol_steps,
 )
 from tests.semantic.support.codex_soundengine_business_agent_runner import (
+    _final_response_reports_preview,
     prepare_soundengine_business_broker_state,
     prepare_soundengine_business_runtime,
 )
@@ -64,6 +65,17 @@ def test_soundengine_profile_is_four_closed_terra_previews() -> None:
     )
     assert "SoundEngine 运行时 Profiler Capture Log" in profile.units[0].prompt_template
     assert "Authoring Log" not in profile.units[0].prompt_template
+    assert profile.units[0].final_markers == (
+        "Fresh Agent SoundEngine business probe",
+    )
+    assert profile.units[1].final_markers == ("Fresh Weather Listener",)
+    assert profile.units[2].final_markers == (
+        "Fresh Alarm Event",
+        "Stop",
+        "250",
+        "Linear",
+    )
+    assert profile.units[3].final_markers == ("5.1",)
 
 
 def test_soundengine_profile_rejects_unknown_filters() -> None:
@@ -72,6 +84,21 @@ def test_soundengine_profile_rejects_unknown_filters() -> None:
         match="unknown SoundEngine business",
     ):
         load_soundengine_business_profile(PROFILE, unit_ids=("missing",))
+
+
+def test_soundengine_final_prose_is_not_graded_by_exact_term_repetition() -> None:
+    assert _final_response_reports_preview(
+        "已生成预览：写入 Profiler Capture Log，未执行。",
+        markers=("监控", "业务值不必逐字复述"),
+    )
+    assert _final_response_reports_preview(
+        "Preview generated for the runtime object; nothing was executed.",
+        markers=("游戏对象",),
+    )
+    assert not _final_response_reports_preview(
+        "请求已处理，当前项目没有变化。",
+        markers=(),
+    )
 
 
 def test_soundengine_runtimes_contain_exact_closed_parameter_closure_requests(
