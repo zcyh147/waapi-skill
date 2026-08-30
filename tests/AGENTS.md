@@ -234,6 +234,16 @@ by default, while optional values use business `--include` names such as
 or `--return-field` flags, and never split a Wwise path string locally to
 reconstruct the segment list.
 
+Real category evidence uses the shared two-phase v3 finalizer. Pytest's exact
+setup/call reports determine each selected node's PASS, FAIL, SKIP, or BLOCKED
+state; a session failure counter is not an outcome oracle. The finalizer first
+moves the sandbox into the evidence quarantine and writes a `prepared` /
+`PENDING` row. Only after transaction materialization, host shutdown, lock
+release, source-integrity checks, and quarantine cleanup all succeed may it
+append a `final` / `PASS` row. A prepared row grants no credit. Any earlier
+failure writes a final non-PASS row and retains the quarantine; a late evidence
+or cleanup failure must never leave a final PASS.
+
 ### SoundBank file-operation fixtures
 
 Keep the file-authority sequence explicit in real SoundBank workflows. The
