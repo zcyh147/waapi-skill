@@ -153911,7 +153911,7 @@
     "contract": "waapi-skill.typed-request-surface/v1",
     "total_lanes": 824
   },
-  "inventory_sha256": "a5fc7f896febf31f8b0655c6e7036f1b97f32cac1201cf148087f3e18b3bea03",
+  "inventory_sha256": "6c88212741b5400f47d070ed196604443212eae7ca20939837debd712f3393d6",
   "mechanic_owners": {
     "ambiguous_continuation_selection": "gateway_derivation",
     "batch_layout": "gateway_derivation",
@@ -183425,7 +183425,7 @@
     },
     {
       "argument_contract_sha256": "c6045ce498260deea17abbadb38b8f701a21164fa97491e0d158400a1519430c",
-      "audit_evidence": "The public compound-undo-business/v1 Adapter accepts one display name plus an ordered user-requested business sequence of already checked closed Business Draft capabilities; snapshots each exact child request and schema at declaration time; rejects children that own the same final outcome before Preview; derives child bindings, revisions, the fixed native begin/child/end phase dependency order with cancel-on-failure, one aggregate business-outcome verification, and one immutable Preview inside the Gateway; and removes public Undo child schemas, call handles, native request fragments, dependency edges, and Composer action ordering grammar for all five lanes. Generic typed children are explicitly prohibited until their separate #57 migration supplies closed business parameters and business-outcome verification.",
+      "audit_evidence": "The public compound-undo-business/v1 Adapter accepts one display name plus an ordered user-requested business sequence of already checked closed Business Draft capabilities; snapshots each exact child request and schema at declaration time; rejects children that own the same final outcome before Preview; derives child bindings, revisions, the fixed native begin/child/end phase dependency order with cancel-on-failure, one aggregate business-outcome verification, and one immutable Preview inside the Gateway; and removes public Undo child schemas, call handles, native request fragments, dependency edges, and Composer action ordering grammar for all five lanes. Compound Undo accepts only already checked closed Business Draft capabilities; generic typed children remain prohibited and no shallow fallback exists.",
       "classification": "named-compound-undo",
       "contract_sha256": "67646370ccd690ef196ad8fd338ff6f9f423312fc4782866aa1d09019dc00b6e",
       "disposition": "already_deep",
@@ -183450,7 +183450,7 @@
     },
     {
       "argument_contract_sha256": "c6045ce498260deea17abbadb38b8f701a21164fa97491e0d158400a1519430c",
-      "audit_evidence": "The public compound-undo-business/v1 Adapter accepts one display name plus an ordered user-requested business sequence of already checked closed Business Draft capabilities; snapshots each exact child request and schema at declaration time; rejects children that own the same final outcome before Preview; derives child bindings, revisions, the fixed native begin/child/end phase dependency order with cancel-on-failure, one aggregate business-outcome verification, and one immutable Preview inside the Gateway; and removes public Undo child schemas, call handles, native request fragments, dependency edges, and Composer action ordering grammar for all five lanes. Generic typed children are explicitly prohibited until their separate #57 migration supplies closed business parameters and business-outcome verification.",
+      "audit_evidence": "The public compound-undo-business/v1 Adapter accepts one display name plus an ordered user-requested business sequence of already checked closed Business Draft capabilities; snapshots each exact child request and schema at declaration time; rejects children that own the same final outcome before Preview; derives child bindings, revisions, the fixed native begin/child/end phase dependency order with cancel-on-failure, one aggregate business-outcome verification, and one immutable Preview inside the Gateway; and removes public Undo child schemas, call handles, native request fragments, dependency edges, and Composer action ordering grammar for all five lanes. Compound Undo accepts only already checked closed Business Draft capabilities; generic typed children remain prohibited and no shallow fallback exists.",
       "classification": "named-compound-undo",
       "contract_sha256": "2cd7eead40ae47aea820f31dd792da32f30e10c01c52ef9a3f60fa6fb6e7c059",
       "disposition": "already_deep",
@@ -183475,7 +183475,7 @@
     },
     {
       "argument_contract_sha256": "c6045ce498260deea17abbadb38b8f701a21164fa97491e0d158400a1519430c",
-      "audit_evidence": "The public compound-undo-business/v1 Adapter accepts one display name plus an ordered user-requested business sequence of already checked closed Business Draft capabilities; snapshots each exact child request and schema at declaration time; rejects children that own the same final outcome before Preview; derives child bindings, revisions, the fixed native begin/child/end phase dependency order with cancel-on-failure, one aggregate business-outcome verification, and one immutable Preview inside the Gateway; and removes public Undo child schemas, call handles, native request fragments, dependency edges, and Composer action ordering grammar for all five lanes. Generic typed children are explicitly prohibited until their separate #57 migration supplies closed business parameters and business-outcome verification.",
+      "audit_evidence": "The public compound-undo-business/v1 Adapter accepts one display name plus an ordered user-requested business sequence of already checked closed Business Draft capabilities; snapshots each exact child request and schema at declaration time; rejects children that own the same final outcome before Preview; derives child bindings, revisions, the fixed native begin/child/end phase dependency order with cancel-on-failure, one aggregate business-outcome verification, and one immutable Preview inside the Gateway; and removes public Undo child schemas, call handles, native request fragments, dependency edges, and Composer action ordering grammar for all five lanes. Compound Undo accepts only already checked closed Business Draft capabilities; generic typed children remain prohibited and no shallow fallback exists.",
       "classification": "named-compound-undo",
       "contract_sha256": "55a488b419dd17930bbed2ea6131294318505a9372cec4b3a7840830e5acc731",
       "disposition": "already_deep",
@@ -183500,7 +183500,7 @@
     },
     {
       "argument_contract_sha256": "c6045ce498260deea17abbadb38b8f701a21164fa97491e0d158400a1519430c",
-      "audit_evidence": "The public compound-undo-business/v1 Adapter accepts one display name plus an ordered user-requested business sequence of already checked closed Business Draft capabilities; snapshots each exact child request and schema at declaration time; rejects children that own the same final outcome before Preview; derives child bindings, revisions, the fixed native begin/child/end phase dependency order with cancel-on-failure, one aggregate business-outcome verification, and one immutable Preview inside the Gateway; and removes public Undo child schemas, call handles, native request fragments, dependency edges, and Composer action ordering grammar for all five lanes. Generic typed children are explicitly prohibited until their separate #57 migration supplies closed business parameters and business-outcome verification.",
+      "audit_evidence": "The public compound-undo-business/v1 Adapter accepts one display name plus an ordered user-requested business sequence of already checked closed Business Draft capabilities; snapshots each exact child request and schema at declaration time; rejects children that own the same final outcome before Preview; derives child bindings, revisions, the fixed native begin/child/end phase dependency order with cancel-on-failure, one aggregate business-outcome verification, and one immutable Preview inside the Gateway; and removes public Undo child schemas, call handles, native request fragments, dependency edges, and Composer action ordering grammar for all five lanes. Compound Undo accepts only already checked closed Business Draft capabilities; generic typed children remain prohibited and no shallow fallback exists.",
       "classification": "named-compound-undo",
       "contract_sha256": "8c036ed1c2f5d563054fefacd8c1a0e6b2f444e1fba7fdbe591b5a8f64cebc26",
       "disposition": "already_deep",
@@ -183525,7 +183525,7 @@
     },
     {
       "argument_contract_sha256": "c6045ce498260deea17abbadb38b8f701a21164fa97491e0d158400a1519430c",
-      "audit_evidence": "The public compound-undo-business/v1 Adapter accepts one display name plus an ordered user-requested business sequence of already checked closed Business Draft capabilities; snapshots each exact child request and schema at declaration time; rejects children that own the same final outcome before Preview; derives child bindings, revisions, the fixed native begin/child/end phase dependency order with cancel-on-failure, one aggregate business-outcome verification, and one immutable Preview inside the Gateway; and removes public Undo child schemas, call handles, native request fragments, dependency edges, and Composer action ordering grammar for all five lanes. Generic typed children are explicitly prohibited until their separate #57 migration supplies closed business parameters and business-outcome verification.",
+      "audit_evidence": "The public compound-undo-business/v1 Adapter accepts one display name plus an ordered user-requested business sequence of already checked closed Business Draft capabilities; snapshots each exact child request and schema at declaration time; rejects children that own the same final outcome before Preview; derives child bindings, revisions, the fixed native begin/child/end phase dependency order with cancel-on-failure, one aggregate business-outcome verification, and one immutable Preview inside the Gateway; and removes public Undo child schemas, call handles, native request fragments, dependency edges, and Composer action ordering grammar for all five lanes. Compound Undo accepts only already checked closed Business Draft capabilities; generic typed children remain prohibited and no shallow fallback exists.",
       "classification": "named-compound-undo",
       "contract_sha256": "c596e0e6696fff718b71252af15fb14a83c522ff0f2c2d4649ec93a358be88c1",
       "disposition": "already_deep",

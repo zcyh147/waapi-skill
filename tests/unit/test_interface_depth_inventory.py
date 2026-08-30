@@ -20,6 +20,7 @@ from tests.maintenance.interface_depth_inventory import (
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+REVIEW_POLICY_PATH = REPO_ROOT / "docs" / "interface-depth-review-policy.json"
 
 
 def _inventory() -> dict[str, object]:
@@ -56,6 +57,19 @@ def test_generated_inventory_is_current_and_exactly_covers_both_surfaces() -> No
     assert len(operations) == 153
     assert {(row["operation"], row["version"]) for row in operations} == expected_operations
     assert INVENTORY_DOC_PATH.read_text(encoding="utf-8") == render_interface_depth_inventory(inventory)
+
+
+def test_compound_undo_retains_a_permanent_closed_child_boundary() -> None:
+    policy = json.loads(REVIEW_POLICY_PATH.read_text(encoding="utf-8"))
+    compound = next(
+        row
+        for row in policy["named_operation_groups"]
+        if row["id"] == "named-compound-undo"
+    )
+    evidence = compound["audit_evidence"]
+    assert "#57 migration" not in evidence
+    assert "generic typed children remain prohibited" in evidence
+    assert "no shallow fallback exists" in evidence
 
 
 def test_maintenance_entrypoint_runs_directly_from_the_repository_root() -> None:
