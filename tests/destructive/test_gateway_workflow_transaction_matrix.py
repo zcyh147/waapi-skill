@@ -723,7 +723,7 @@ def test_closed_gateway_workflows_across_selected_version(
     object_parent = CONTAINERS_PARENT if runtime.version == "2025.1" else ACTOR_MIXER_PARENT
     unique_suffix = uuid.uuid4().hex[:12]
 
-    imported_id: str | None = None
+    imported_ids: list[str] = []
     soundbank_id: str | None = None
     included_id: str | None = None
     included_second_id: str | None = None
@@ -737,39 +737,54 @@ def test_closed_gateway_workflows_across_selected_version(
         runtime.packaged_status()
         if runtime.version == "2021.1":
             _save_sandbox_project(runtime)
-        import_name = f"WAAPI_GATEWAY_AUDIO_{runtime.version.replace('.', '_')}_{unique_suffix}"
-        audio_file = _write_fixture_wav(runtime.sandbox.sandbox_path / "GatewayWorkflowAudio", import_name)
-        assert path_is_under(audio_file.resolve(strict=True), runtime.sandbox.sandbox_path.resolve(strict=True))
-        requested_object_path = f"{object_parent}\\<Sound>{import_name}"
-        import_notes = f"closed gateway audio import {import_name}"
+        import_rows: list[dict[str, str]] = []
+        for ordinal in ("FIRST", "SECOND"):
+            import_name = (
+                f"WAAPI_GATEWAY_AUDIO_{ordinal}_"
+                f"{runtime.version.replace('.', '_')}_{unique_suffix}"
+            )
+            audio_file = _write_fixture_wav(
+                runtime.sandbox.sandbox_path / "GatewayWorkflowAudio",
+                import_name,
+            )
+            assert path_is_under(
+                audio_file.resolve(strict=True),
+                runtime.sandbox.sandbox_path.resolve(strict=True),
+            )
+            import_rows.append(
+                {
+                    "object_path": f"{object_parent}\\<Sound>{import_name}",
+                    "audio_file": str(audio_file),
+                    "object_type": "Sound",
+                    "import_language": "SFX",
+                    "notes": f"closed gateway audio import {ordinal.lower()} {import_name}",
+                }
+            )
         audio_import = _complete_transaction(
             runtime,
             operation="audio.import",
-            arguments={
-                "imports": [
-                    {
-                        "object_path": requested_object_path,
-                        "audio_file": str(audio_file),
-                        "object_type": "Sound",
-                        "import_language": "SFX",
-                        "notes": import_notes,
-                    }
-                ]
-            },
+            arguments={"imports": import_rows},
         )
-        imported_row = _imported_object(audio_import["execute"], requested_object_path)
-        imported_id = _required_string(imported_row, "id")
-        imported_path = _required_string(imported_row, "path")
-        assert imported_path == _untyped_object_path(requested_object_path), imported_row
-        validate_audio_import_business_evidence(
-            execution=audio_import["execute"],
-            verification=audio_import["verification_evidence"],
-            version=runtime.version,
-            expected_target_path=imported_path,
-            expected_target_id=imported_id,
-            expected_notes=import_notes,
-            source_file=audio_file,
-        )
+        for expected in import_rows:
+            imported_row = _imported_object(
+                audio_import["execute"],
+                expected["object_path"],
+            )
+            imported_id = _required_string(imported_row, "id")
+            imported_ids.append(imported_id)
+            imported_path = _required_string(imported_row, "path")
+            assert imported_path == _untyped_object_path(
+                expected["object_path"]
+            ), imported_row
+            validate_audio_import_business_evidence(
+                execution=audio_import["execute"],
+                verification=audio_import["verification_evidence"],
+                version=runtime.version,
+                expected_target_path=imported_path,
+                expected_target_id=imported_id,
+                expected_notes=expected["notes"],
+                source_file=expected["audio_file"],
+            )
         included_id = _create_object(
             runtime,
             parent=object_parent,
@@ -1073,7 +1088,7 @@ def test_closed_gateway_workflows_across_selected_version(
         cleanup_errors: list[str] = []
         # Delete leaves before their parents, and remove the SwitchContainer before its referenced group.
         cleanup_order = (
-            imported_id,
+            *imported_ids,
             soundbank_id,
             included_id,
             included_second_id,
