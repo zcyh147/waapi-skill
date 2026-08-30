@@ -3415,7 +3415,6 @@ def test_soundbank_topic_protocol_selects_finite_stream_for_explicit_stream_case
     assert [step.name for step in steps] == [
         "soundbank.generated.schema",
         "soundbank.generated.schema.soundbank.match-group",
-        "soundbank.generated.schema.soundbank.entry",
         "soundbank.generated.stream",
     ]
     assert steps[-1].arguments[:2] == (
@@ -3429,7 +3428,6 @@ def test_soundbank_topic_protocol_selects_finite_stream_for_explicit_stream_case
     protocol = build_optional_topic_schema_protocol(steps)
     selected_names = [
         "soundbank.generated.schema",
-        "soundbank.generated.schema.soundbank.entry",
         "soundbank.generated.schema.soundbank.match-group",
         "soundbank.generated.stream",
     ]

@@ -517,7 +517,12 @@ def soundbank_topic_protocol_steps(
                     group=scope,
                 )
             )
-        if has_entry:
+        stream_match_group_is_complete = (
+            lifecycle_command == "stream-topic"
+            and scope in canonical_match
+            and has_match_group
+        )
+        if has_entry and not stream_match_group_is_complete:
             steps.append(
                 topic_schema_step(
                     f"soundbank.generated.schema.{scope}.entry",
