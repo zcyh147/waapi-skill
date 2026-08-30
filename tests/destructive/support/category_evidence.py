@@ -89,13 +89,22 @@ def append_category_evidence(
             "exact category evidence requires invocation and transactions together"
         )
     if invocation is not None and transactions is not None:
-        required_invocation_fields = {
+        v2_invocation_fields = {
             "selected_test_nodeids",
             "started_at_unix_ns",
             "finished_at_unix_ns",
             "outcome",
         }
-        if set(invocation) != required_invocation_fields:
+        v3_invocation_fields = {
+            *v2_invocation_fields,
+            "node_outcomes",
+            "phase",
+        }
+        invocation_fields = frozenset(invocation)
+        if invocation_fields not in {
+            frozenset(v2_invocation_fields),
+            frozenset(v3_invocation_fields),
+        }:
             raise AssertionError("exact category evidence invocation fields are invalid")
         nodeids = invocation["selected_test_nodeids"]
         started_at = invocation["started_at_unix_ns"]
@@ -109,9 +118,28 @@ def append_category_evidence(
             or not isinstance(finished_at, int)
             or isinstance(finished_at, bool)
             or finished_at < started_at
-            or invocation["outcome"] not in {"PASS", "FAIL"}
+            or invocation["outcome"]
+            not in {"PENDING", "PASS", "FAIL", "SKIP", "BLOCKED"}
         ):
             raise AssertionError("exact category evidence invocation values are invalid")
+        if invocation_fields == v3_invocation_fields:
+            node_outcomes = invocation["node_outcomes"]
+            phase = invocation["phase"]
+            if (
+                not isinstance(node_outcomes, list)
+                or not node_outcomes
+                or len(node_outcomes) != len(nodeids)
+                or any(
+                    set(row) != {"nodeid", "outcome"}
+                    or row["nodeid"] not in nodeids
+                    or row["outcome"] not in {"PASS", "FAIL", "SKIP", "BLOCKED"}
+                    for row in node_outcomes
+                )
+                or {row["nodeid"] for row in node_outcomes} != set(nodeids)
+                or phase not in {"prepared", "final"}
+                or (phase == "prepared") != (invocation["outcome"] == "PENDING")
+            ):
+                raise AssertionError("exact category evidence v3 invocation values are invalid")
         required_transaction_fields = {
             "transaction_id",
             "state",
@@ -122,7 +150,9 @@ def append_category_evidence(
             raise AssertionError("exact category evidence transaction fields are invalid")
     payload = {
         "contract": (
-            "waapi-skill.host-category-evidence/v2"
+            "waapi-skill.host-category-evidence/v3"
+            if invocation is not None and "phase" in invocation
+            else "waapi-skill.host-category-evidence/v2"
             if invocation is not None
             else "waapi-skill.host-category-evidence/v1"
         ),

@@ -187,3 +187,43 @@ def test_exact_transaction_outcomes_reads_all_materialized_states(
             "event_sequence": 1,
         },
     ]
+
+
+def test_exact_evidence_v3_preserves_prepared_phase_without_pass_credit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    target = tmp_path / "prepared.jsonl"
+    monkeypatch.setenv("WWISE_CATEGORY_EVIDENCE_PATH", str(target))
+    monkeypatch.setattr(category_evidence, "current_evidence_platform", lambda: "macos")
+    nodeid = "tests/destructive/test_example.py::test_one"
+
+    category_evidence.append_category_evidence(
+        repo_root=tmp_path,
+        candidate="d" * 40,
+        version="2025.1",
+        host={"display_name": "WwiseConsole"},
+        categories=[
+            {
+                "category": "object-topology",
+                "status": "PASS",
+                "verifier_strength": "readback",
+            }
+        ],
+        source={},
+        residual_state={"sandbox": "quarantined_pending_release"},
+        invocation={
+            "selected_test_nodeids": [nodeid],
+            "node_outcomes": [{"nodeid": nodeid, "outcome": "PASS"}],
+            "started_at_unix_ns": 1,
+            "finished_at_unix_ns": 2,
+            "phase": "prepared",
+            "outcome": "PENDING",
+        },
+        transactions=[],
+    )
+
+    payload = json.loads(target.read_text(encoding="utf-8"))
+    assert payload["contract"] == "waapi-skill.host-category-evidence/v3"
+    assert payload["invocation"]["phase"] == "prepared"
+    assert payload["invocation"]["outcome"] == "PENDING"

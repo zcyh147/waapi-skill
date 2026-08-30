@@ -32,16 +32,16 @@ from tests.destructive.support.live_environment import (  # pyright: ignore[repo
     resolve_sample_project_source,
 )
 from tests.destructive.support.category_evidence import (  # pyright: ignore[reportMissingImports]  # noqa: E402
-    append_category_evidence,
     exact_git_candidate,
-    exact_transaction_outcomes,
+)
+from tests.destructive.support.exact_real_evidence import (  # pyright: ignore[reportMissingImports]  # noqa: E402
+    finalize_exact_real_evidence,
 )
 from tests.destructive.support.sandbox_fixture import (  # pyright: ignore[reportMissingImports]  # noqa: E402
     DEFAULT_SANDBOX_ROOT,
     LiveSandboxLock,
     SandboxFixtureError,
     SandboxProject,
-    cleanup_sandbox,
     launch_sandboxed_wwise,
     prepare_sample_project_sandbox,
     shutdown_sandboxed_wwise,
@@ -568,14 +568,7 @@ def workflow_sandbox_runtime(
     state_dir = task_root / "state"
     candidate = exact_git_candidate(REPO_ROOT)
     category_results: list[dict[str, Any]] = []
-    tests_failed_before = request.session.testsfailed
     started_at_unix_ns = time.time_ns()
-    selected_test_nodeids = [
-        item.nodeid
-        for item in request.session.items
-        if Path(str(item.path)).resolve(strict=False) == Path(__file__).resolve(strict=True)
-    ]
-    quarantine_path: Path | None = None
 
     lock.__enter__()
     try:
@@ -654,6 +647,7 @@ def workflow_sandbox_runtime(
         )
         yield runtime
     finally:
+        active_error = sys.exc_info()[1]
         active_lifecycle = runtime.lifecycle if runtime is not None else lifecycle
         if active_lifecycle is not None and sandbox is not None:
             try:
@@ -685,27 +679,6 @@ def workflow_sandbox_runtime(
             except BaseException as exc:  # noqa: BLE001 - sandbox cleanup still has to run
                 deferred_error = deferred_error or exc
 
-        invocation_failed = request.session.testsfailed > tests_failed_before
-        cleanup_failed = invocation_failed or deferred_error is not None
-        if sandbox is not None:
-            try:
-                quarantine_path = cleanup_sandbox(
-                    sandbox,
-                    keep=cleanup_failed,
-                    failed=cleanup_failed,
-                )
-            except BaseException as exc:  # noqa: BLE001 - lock release must still run
-                deferred_error = deferred_error or exc
-        cleanup_failed = cleanup_failed or deferred_error is not None
-
-        if case_sandbox_root.exists() and (
-            not cleanup_failed or quarantine_path is not None
-        ):
-            try:
-                shutil.rmtree(case_sandbox_root)
-            except BaseException as exc:  # noqa: BLE001 - lock release must still run
-                deferred_error = deferred_error or exc
-
         if sandbox is not None and active_lifecycle is not None:
             if not any(item.get("category") == "authoring-ui" for item in category_results):
                 category_results.append(
@@ -716,56 +689,40 @@ def workflow_sandbox_runtime(
                         "reason": "configured matching host is WwiseConsole, not Wwise Authoring",
                     }
                 )
+            deferred_error = finalize_exact_real_evidence(
+                repo_root=REPO_ROOT,
+                candidate=candidate,
+                version=version,
+                request=request,
+                module_file=Path(__file__),
+                started_at_unix_ns=started_at_unix_ns,
+                active_error=active_error,
+                deferred_error=deferred_error,
+                sandbox=sandbox,
+                lock=lock,
+                state_dir=state_dir,
+                host={
+                    "display_name": sandbox.metadata.get_info_display_name,
+                    "is_command_line": True,
+                    "version": sandbox.metadata.get_info_version,
+                },
+                categories=category_results,
+                source={
+                    "project": str(sandbox.source_project),
+                    "hash_before": source_hash_before[0] if source_hash_before else None,
+                    "hash_after": source_hash_after[0] if source_hash_after else None,
+                    "mtime_before_ns": source_mtime_before_ns,
+                    "mtime_after_ns": source_mtime_after_ns,
+                    "tree_metadata_before": source_tree_before[0] if source_tree_before else None,
+                    "tree_metadata_after": source_tree_after[0] if source_tree_after else None,
+                },
+                case_cleanup_root=case_sandbox_root,
+            )
+        else:
             try:
-                append_category_evidence(
-                    repo_root=REPO_ROOT,
-                    candidate=candidate,
-                    version=version,
-                    host={
-                        "display_name": sandbox.metadata.get_info_display_name,
-                        "is_command_line": True,
-                        "version": sandbox.metadata.get_info_version,
-                    },
-                    categories=category_results,
-                    source={
-                        "project": str(sandbox.source_project),
-                        "hash_before": source_hash_before[0] if source_hash_before else None,
-                        "hash_after": source_hash_after[0] if source_hash_after else None,
-                        "mtime_before_ns": source_mtime_before_ns,
-                        "mtime_after_ns": source_mtime_after_ns,
-                        "tree_metadata_before": source_tree_before[0] if source_tree_before else None,
-                        "tree_metadata_after": source_tree_after[0] if source_tree_after else None,
-                    },
-                    residual_state={
-                        "sandbox": (
-                            "quarantined"
-                            if quarantine_path is not None
-                            else "retained"
-                            if sandbox.sandbox_path.exists()
-                            else "deleted"
-                        ),
-                        "sandbox_path": str(sandbox.sandbox_path),
-                        "quarantine_path": str(quarantine_path) if quarantine_path else None,
-                        "process_cleanup": sandbox.metadata.process_cleanup_result,
-                        "residual_processes": (
-                            sandbox.metadata.process_cleanup_details or {}
-                        ).get("residual_processes", []),
-                    },
-                    invocation={
-                        "selected_test_nodeids": selected_test_nodeids,
-                        "started_at_unix_ns": started_at_unix_ns,
-                        "finished_at_unix_ns": time.time_ns(),
-                        "outcome": "FAIL" if cleanup_failed else "PASS",
-                    },
-                    transactions=exact_transaction_outcomes(state_dir),
-                )
-            except BaseException as exc:  # noqa: BLE001 - evidence is part of the gate
+                lock.__exit__(None, None, None)
+            except BaseException as exc:  # noqa: BLE001
                 deferred_error = deferred_error or exc
-
-        try:
-            lock.__exit__(None, None, None)
-        except BaseException as exc:  # noqa: BLE001 - preserve the first teardown failure
-            deferred_error = deferred_error or exc
 
         if deferred_error is not None:
             raise deferred_error
