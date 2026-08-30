@@ -174,6 +174,20 @@ prevention checks that are expensive to rediscover.
   `RunAtLoad=true`, `KeepAlive=false` LaunchAgent. Prove one run, sealed output,
   and zero scoped processes, then boot it out.
 
+### A macOS verify-only replay can discover a different Codex binary
+
+- Symptom: a passing LaunchAgent root immediately rejects a foreground
+  `--resume --verify-only` invocation because the immutable campaign config no
+  longer matches, even though verify-only would start neither Codex nor Wwise.
+- Cause: the LaunchAgent default `PATH` can select the Codex binary packaged in
+  the desktop app while an interactive shell selects a Homebrew Codex binary.
+  The formal config fingerprints the exact executable, version, and digest for
+  replay even when that replay will not execute it.
+- Prevention: read the sealed campaign config or pin `--codex-binary` on the
+  initial LaunchAgent. Pass that exact absolute binary path on verify-only as
+  well; never relax the immutable comparison or treat two Codex installations
+  as equivalent.
+
 ### Authoring old-cache modal is not a project-version mismatch
 
 - Evidence: isolated Wwise 2022.1 Authoring copies used for #87 displayed the
