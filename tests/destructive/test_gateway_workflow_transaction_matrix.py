@@ -493,11 +493,16 @@ def _discover_business_field(
 
 
 def _query_exact_path_id(runtime: _WorkflowSandboxRuntime, path: str) -> str:
+    path_segments = tuple(segment for segment in path.split("\\") if segment)
+    assert path == "\\" + "\\".join(path_segments)
     payload = runtime.gateway(
         [
             "query-object",
-            "--path",
-            path,
+            *(
+                item
+                for segment in path_segments
+                for item in ("--path-segment", segment)
+            ),
         ],
         live=True,
     )
