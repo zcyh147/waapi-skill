@@ -218,6 +218,14 @@ the valid first-launch metadata with an unstarted replacement. Never add an
 unbounded sleep or select a new port to hide this state: the original port must
 become bindable inside the fixed release window or the fixture fails closed.
 
+Real fixtures must follow the current closed query interface too. Exact GUID
+readback uses `query-object --exact-id`; exact hierarchy lookup repeats one
+`--path-segment` per already-closed business name. Identity fields are returned
+by default, while optional values use business `--include` names such as
+`notes` or `volume-db`. Never restore the retired `--object-id`, raw `--path`,
+or `--return-field` flags, and never split a Wwise path string locally to
+reconstruct the segment list.
+
 ### SoundBank file-operation fixtures
 
 Keep the file-authority sequence explicit in real SoundBank workflows. The

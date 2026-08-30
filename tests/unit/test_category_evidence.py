@@ -160,3 +160,30 @@ def test_exact_evidence_rejects_partial_v2_fields(
             residual_state={},
             invocation={"outcome": "PASS"},
         )
+
+
+def test_exact_transaction_outcomes_reads_all_materialized_states(
+    tmp_path: Path,
+) -> None:
+    from wwise_waapi.transactions import TransactionStore
+
+    store = TransactionStore(tmp_path)
+    first = store.create_preview("first", {"operation": "one"})
+    second = store.create_preview("second", {"operation": "two"})
+
+    outcomes = category_evidence.exact_transaction_outcomes(tmp_path)
+
+    assert outcomes == [
+        {
+            "transaction_id": "first",
+            "state": "draft",
+            "artifact_hash": first.artifact_hash,
+            "event_sequence": 1,
+        },
+        {
+            "transaction_id": "second",
+            "state": "draft",
+            "artifact_hash": second.artifact_hash,
+            "event_sequence": 1,
+        },
+    ]

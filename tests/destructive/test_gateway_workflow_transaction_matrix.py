@@ -34,6 +34,7 @@ from tests.destructive.support.live_environment import (  # pyright: ignore[repo
 from tests.destructive.support.category_evidence import (  # pyright: ignore[reportMissingImports]  # noqa: E402
     append_category_evidence,
     exact_git_candidate,
+    exact_transaction_outcomes,
 )
 from tests.destructive.support.sandbox_fixture import (  # pyright: ignore[reportMissingImports]  # noqa: E402
     DEFAULT_SANDBOX_ROOT,
@@ -522,27 +523,6 @@ def _query_exact_path_id(
     return _required_string(rows[0], "id")
 
 
-def _transaction_outcomes(state_dir: Path) -> list[dict[str, Any]]:
-    transactions_dir = state_dir / "transactions"
-    if not transactions_dir.exists():
-        return []
-    store = TransactionStore(state_dir)
-    outcomes: list[dict[str, Any]] = []
-    for transaction_dir in sorted(transactions_dir.iterdir(), key=lambda path: path.name):
-        if not transaction_dir.is_dir():
-            continue
-        record = store.load(transaction_dir.name)
-        outcomes.append(
-            {
-                "transaction_id": record.transaction_id,
-                "state": record.state.value,
-                "artifact_hash": record.artifact_hash,
-                "event_sequence": record.event_sequence,
-            }
-        )
-    return outcomes
-
-
 def _restart_workflow_host_after_transport_loss(
     runtime: _WorkflowSandboxRuntime,
 ) -> None:
@@ -777,7 +757,7 @@ def workflow_sandbox_runtime(
                         "finished_at_unix_ns": time.time_ns(),
                         "outcome": "FAIL" if cleanup_failed else "PASS",
                     },
-                    transactions=_transaction_outcomes(state_dir),
+                    transactions=exact_transaction_outcomes(state_dir),
                 )
             except BaseException as exc:  # noqa: BLE001 - evidence is part of the gate
                 deferred_error = deferred_error or exc

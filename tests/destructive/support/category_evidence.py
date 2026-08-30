@@ -11,6 +11,8 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from wwise_waapi.transactions import TransactionStore
+
 
 EVIDENCE_ROOT = Path(".waapi-skill-state/evidence/full-typed-input")
 
@@ -36,6 +38,29 @@ def exact_git_candidate(repo_root: Path) -> str:
     if len(candidate) != 40:
         raise AssertionError("real category evidence requires an exact Git candidate")
     return candidate
+
+
+def exact_transaction_outcomes(state_dir: Path) -> list[dict[str, Any]]:
+    """Return every durable transaction's exact final materialized state."""
+
+    transactions_dir = state_dir / "transactions"
+    if not transactions_dir.exists():
+        return []
+    store = TransactionStore(state_dir)
+    outcomes: list[dict[str, Any]] = []
+    for transaction_dir in sorted(transactions_dir.iterdir(), key=lambda path: path.name):
+        if not transaction_dir.is_dir():
+            continue
+        record = store.load(transaction_dir.name)
+        outcomes.append(
+            {
+                "transaction_id": record.transaction_id,
+                "state": record.state.value,
+                "artifact_hash": record.artifact_hash,
+                "event_sequence": record.event_sequence,
+            }
+        )
+    return outcomes
 
 
 def append_category_evidence(
@@ -127,4 +152,9 @@ def append_category_evidence(
         handle.write(json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n")
 
 
-__all__ = ["append_category_evidence", "current_evidence_platform", "exact_git_candidate"]
+__all__ = [
+    "append_category_evidence",
+    "current_evidence_platform",
+    "exact_git_candidate",
+    "exact_transaction_outcomes",
+]

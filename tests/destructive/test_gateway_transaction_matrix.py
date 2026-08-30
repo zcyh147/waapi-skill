@@ -23,6 +23,7 @@ from tests.destructive.support.live_environment import (  # pyright: ignore[repo
 from tests.destructive.support.category_evidence import (  # pyright: ignore[reportMissingImports]
     append_category_evidence,
     exact_git_candidate,
+    exact_transaction_outcomes,
 )
 from tests.destructive.support.sandbox_fixture import (  # pyright: ignore[reportMissingImports]
     DEFAULT_SANDBOX_ROOT,
@@ -250,7 +251,10 @@ class _PackagedTopicWait:
 
 
 @pytest.fixture(scope="module")
-def gateway_sandbox_runtime(tmp_path_factory: pytest.TempPathFactory) -> Iterator[_GatewaySandboxRuntime]:
+def gateway_sandbox_runtime(
+    request: pytest.FixtureRequest,
+    tmp_path_factory: pytest.TempPathFactory,
+) -> Iterator[_GatewaySandboxRuntime]:
     env = dict(os.environ)
     version = env.get("WWISE_VERSION", "")
     if version not in SUPPORTED_WWISE_VERSION_KEYS:
@@ -265,11 +269,21 @@ def gateway_sandbox_runtime(tmp_path_factory: pytest.TempPathFactory) -> Iterato
     source_tree_before: tuple[str, int] | None = None
     source_hash_after: tuple[str, int, int] | None = None
     source_tree_after: tuple[str, int] | None = None
+    source_mtime_before_ns: int | None = None
+    source_mtime_after_ns: int | None = None
     deferred_error: BaseException | None = None
     task_root = tmp_path_factory.mktemp(f"gateway-transaction-{version.replace('.', '-')}")
     state_dir = task_root / "state"
     candidate = exact_git_candidate(REPO_ROOT)
     category_results: list[dict[str, Any]] = []
+    tests_failed_before = request.session.testsfailed
+    started_at_unix_ns = time.time_ns()
+    selected_test_nodeids = [
+        item.nodeid
+        for item in request.session.items
+        if Path(str(item.path)).resolve(strict=False) == Path(__file__).resolve(strict=True)
+    ]
+    quarantine_path: Path | None = None
 
     lock.__enter__()
     try:
@@ -280,6 +294,7 @@ def gateway_sandbox_runtime(tmp_path_factory: pytest.TempPathFactory) -> Iterato
         )
         source_hash_before = _hash_mutation_bearing_project_files(sandbox.source_root)
         source_tree_before = _source_tree_inventory(sandbox.source_root)
+        source_mtime_before_ns = sandbox.source_project.stat().st_mtime_ns
         assert source_hash_before[1] > 0, "immutable SampleProject source has no .wproj/.wwu files to hash"
         lifecycle = launch_sandboxed_wwise(sandbox, env)
         assert lifecycle.port is not None
@@ -330,10 +345,16 @@ def gateway_sandbox_runtime(tmp_path_factory: pytest.TempPathFactory) -> Iterato
         if sandbox is not None and source_hash_before is not None:
             try:
                 source_hash_after = _hash_mutation_bearing_project_files(sandbox.source_root)
+                source_mtime_after_ns = sandbox.source_project.stat().st_mtime_ns
                 if source_hash_after != source_hash_before:
                     raise AssertionError(
                         "immutable SampleProject source hash changed during gateway transaction test: "
                         f"before={source_hash_before[0]} after={source_hash_after[0]}"
+                    )
+                if source_mtime_after_ns != source_mtime_before_ns:
+                    raise AssertionError(
+                        "immutable SampleProject project mtime changed during gateway transaction test: "
+                        f"before={source_mtime_before_ns} after={source_mtime_after_ns}"
                     )
                 if source_tree_before is not None:
                     source_tree_after = _source_tree_inventory(sandbox.source_root)
@@ -346,11 +367,18 @@ def gateway_sandbox_runtime(tmp_path_factory: pytest.TempPathFactory) -> Iterato
             except BaseException as exc:  # noqa: BLE001 - sandbox cleanup still has to run
                 deferred_error = deferred_error or exc
 
+        invocation_failed = request.session.testsfailed > tests_failed_before
+        cleanup_failed = invocation_failed or deferred_error is not None
         if sandbox is not None:
             try:
-                cleanup_sandbox(sandbox, keep=False, failed=False)
+                quarantine_path = cleanup_sandbox(
+                    sandbox,
+                    keep=cleanup_failed,
+                    failed=cleanup_failed,
+                )
             except BaseException as exc:  # noqa: BLE001 - lock release must still run
                 deferred_error = deferred_error or exc
+        cleanup_failed = cleanup_failed or deferred_error is not None
 
         if sandbox is not None and lifecycle is not None:
             try:
@@ -368,16 +396,33 @@ def gateway_sandbox_runtime(tmp_path_factory: pytest.TempPathFactory) -> Iterato
                         "project": str(sandbox.source_project),
                         "hash_before": source_hash_before[0] if source_hash_before else None,
                         "hash_after": source_hash_after[0] if source_hash_after else None,
+                        "mtime_before_ns": source_mtime_before_ns,
+                        "mtime_after_ns": source_mtime_after_ns,
                         "tree_metadata_before": source_tree_before[0] if source_tree_before else None,
                         "tree_metadata_after": source_tree_after[0] if source_tree_after else None,
                     },
                     residual_state={
-                        "sandbox": "deleted" if not sandbox.sandbox_path.exists() else "retained",
+                        "sandbox": (
+                            "quarantined"
+                            if quarantine_path is not None
+                            else "retained"
+                            if sandbox.sandbox_path.exists()
+                            else "deleted"
+                        ),
+                        "sandbox_path": str(sandbox.sandbox_path),
+                        "quarantine_path": str(quarantine_path) if quarantine_path else None,
                         "process_cleanup": sandbox.metadata.process_cleanup_result,
                         "residual_processes": (
                             sandbox.metadata.process_cleanup_details or {}
                         ).get("residual_processes", []),
                     },
+                    invocation={
+                        "selected_test_nodeids": selected_test_nodeids,
+                        "started_at_unix_ns": started_at_unix_ns,
+                        "finished_at_unix_ns": time.time_ns(),
+                        "outcome": "FAIL" if cleanup_failed else "PASS",
+                    },
+                    transactions=exact_transaction_outcomes(state_dir),
                 )
             except BaseException as exc:  # noqa: BLE001 - evidence is part of the gate
                 deferred_error = deferred_error or exc
@@ -443,7 +488,10 @@ def test_gateway_transaction_object_lifecycle_across_selected_version(
         assert str(renamed_row["id"]).casefold() == created_id.casefold(), renamed_row
         assert renamed_row["name"] == renamed_object_name, renamed_row
         assert renamed_row["path"] == f"{parent_path}\\{renamed_object_name}", renamed_row
-        _assert_query_object_absent(runtime, selector=("--path", created_path))
+        _assert_query_object_absent(
+            runtime,
+            path_segments=(*_object_parent_segments(runtime.version), object_name),
+        )
 
         _complete_transaction(
             runtime,
@@ -479,14 +527,14 @@ def test_gateway_transaction_object_lifecycle_across_selected_version(
         assert property_row["name"] == renamed_object_name, property_row
         assert property_row["path"] == f"{parent_path}\\{renamed_object_name}", property_row
         assert property_row["notes"] == updated_notes, property_row
-        assert float(property_row["Volume"]) == pytest.approx(expected_volume), property_row
+        assert float(property_row["volume_db"]) == pytest.approx(expected_volume), property_row
     finally:
         _complete_transaction(
             runtime,
             operation="object.delete",
             arguments={"object": {"kind": "id", "value": created_id}},
         )
-        _assert_query_object_absent(runtime, selector=("--object-id", created_id))
+        _assert_query_object_absent(runtime, exact_id=created_id)
 
 
 @pytest.mark.live
@@ -549,7 +597,7 @@ def test_gateway_wait_topic_matches_runner_owned_object_create_and_unsubscribes(
             )
             _assert_query_object_absent(
                 runtime,
-                selector=("--object-id", created_id),
+                exact_id=created_id,
             )
 
 
@@ -959,9 +1007,12 @@ def _query_one_object_by_id(
     *,
     fields: Sequence[str],
 ) -> Mapping[str, Any]:
-    command = ["query-object", "--object-id", object_id]
+    command = ["query-object", "--exact-id", object_id]
+    business_includes = {"notes": "notes", "Volume": "volume-db"}
     for field in fields:
-        command.extend(("--return-field", field))
+        include = business_includes.get(field)
+        if include is not None:
+            command.extend(("--include", include))
     payload = runtime.gateway(command, live=True)
     objects = payload.get("objects")
     assert payload.get("count") == 1, payload
@@ -974,21 +1025,19 @@ def _query_one_object_by_id(
 def _assert_query_object_absent(
     runtime: _GatewaySandboxRuntime,
     *,
-    selector: Sequence[str],
+    exact_id: str | None = None,
+    path_segments: Sequence[str] = (),
 ) -> None:
-    assert len(selector) == 2 and selector[0] in {"--object-id", "--path"}, selector
+    assert (exact_id is None) != (not path_segments), (exact_id, path_segments)
+    selector = ["--exact-id", exact_id] if exact_id is not None else [
+        item
+        for segment in path_segments
+        for item in ("--path-segment", segment)
+    ]
     payload = runtime.gateway(
         [
             "query-object",
             *selector,
-            "--return-field",
-            "id",
-            "--return-field",
-            "name",
-            "--return-field",
-            "type",
-            "--return-field",
-            "path",
         ],
         live=True,
     )
