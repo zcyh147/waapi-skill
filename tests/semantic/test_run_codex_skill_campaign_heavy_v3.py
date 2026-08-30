@@ -3441,7 +3441,9 @@ def test_soundbank_topic_protocol_selects_finite_stream_for_explicit_stream_case
     assert [step.name for step in selected] == selected_names
 
 
-def test_soundbank_topic_protocol_seals_result_only_soundbank_disclosure() -> None:
+def test_fixed_count_topic_allows_soundbank_match_then_result_entry() -> None:
+    """A fixed wait may inspect both SoundBank match and result projections."""
+
     steps = soundbank_topic_protocol_steps(
         scenario_id="O22-SB-GENERATED-01",
         topic="ak.wwise.core.soundbank.generated",
@@ -3450,15 +3452,52 @@ def test_soundbank_topic_protocol_seals_result_only_soundbank_disclosure() -> No
         match={"platform": {"name": "Windows"}},
         options={"return": ["id", "name", "type", "path"]},
     )
-    disclosure = next(
-        step
-        for step in steps
-        if step.name == "soundbank.generated.schema.soundbank.disclosure"
+    protocol = build_optional_topic_schema_protocol(steps)
+    selected_names = [
+        "soundbank.generated.schema",
+        "soundbank.generated.schema.soundbank.match-group",
+        "soundbank.generated.schema.soundbank.entry",
+        "soundbank.generated.schema.platform.entry",
+        "soundbank.generated.wait",
+    ]
+
+    selected = campaign._consumed_heavy_v3_protocol_steps(  # noqa: SLF001
+        protocol,
+        len(selected_names),
+        selected_step_names=selected_names,
     )
 
-    assert disclosure.subcommand == "topic-schema"
-    assert disclosure.arguments[0] == "ak.wwise.core.soundbank.generated"
-    assert disclosure.arguments[2] == "soundbank"
+    assert [step.name for step in selected] == selected_names
+
+
+def test_soundbank_topic_protocol_seals_result_only_soundbank_disclosures() -> None:
+    steps = soundbank_topic_protocol_steps(
+        scenario_id="O22-SB-GENERATED-01",
+        topic="ak.wwise.core.soundbank.generated",
+        version="2021.1",
+        event_count=3,
+        match={"platform": {"name": "Windows"}},
+        options={"return": ["id", "name", "type", "path"]},
+    )
+    disclosures = [
+        step
+        for step in steps
+        if step.name.startswith("soundbank.generated.schema.soundbank.")
+    ]
+
+    assert [step.name for step in disclosures] == [
+        "soundbank.generated.schema.soundbank.match-group",
+        "soundbank.generated.schema.soundbank.entry",
+    ]
+    assert all(step.subcommand == "topic-schema" for step in disclosures)
+    assert all(
+        step.arguments[0] == "ak.wwise.core.soundbank.generated"
+        for step in disclosures
+    )
+    assert [step.arguments[1:] for step in disclosures] == [
+        ("--match-group", "soundbank"),
+        ("--entry", "soundbank"),
+    ]
 
 
 def _synthetic_audio_transaction_request() -> dict[str, Any]:
