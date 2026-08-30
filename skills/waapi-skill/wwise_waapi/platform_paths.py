@@ -11,6 +11,7 @@ from pathlib import Path, PurePath, PurePosixPath, PureWindowsPath
 from typing import Any, Iterable, Mapping
 
 from .endpoint_scope import is_loopback_waapi_host
+from .host_paths import HostPathError, parse_absolute_host_path
 
 try:  # ``pwd`` is unavailable on native Windows.
     import pwd
@@ -241,7 +242,45 @@ def adapt_cli_dispatch_paths(
                 "The Authoring project transition target is not a canonical local POSIX path.",
                 details={"canonical_target_project_path": target_path},
             )
-        anchor_host = Path(target_path.removeprefix("posix:")).resolve(strict=False)
+        target_host_path = target_path.removeprefix("posix:")
+        try:
+            parsed_target = parse_absolute_host_path(target_host_path)
+        except HostPathError as exc:
+            raise WwiseWirePathError(
+                "WIRE_PATH_CONTEXT_UNAVAILABLE",
+                "The Authoring project transition target is not one normalized non-traversing POSIX path.",
+                details={"canonical_target_project_path": target_path},
+            ) from exc
+        if (
+            parsed_target.flavor != "posix"
+            or f"posix:{parsed_target.pure_path.as_posix()}" != target_path
+        ):
+            raise WwiseWirePathError(
+                "WIRE_PATH_CONTEXT_UNAVAILABLE",
+                "The Authoring project transition target changed under canonical path parsing.",
+                details={"canonical_target_project_path": target_path},
+            )
+        anchor_host = Path(parsed_target.pure_path).resolve(strict=False)
+        transition_target_audits = [
+            row
+            for row in audit_paths
+            if isinstance(row, Mapping)
+            and row.get("section") == "args"
+            and row.get("json_path") == "$.args.path"
+            and isinstance(row.get("resolved_path"), str)
+        ]
+        if (
+            len(transition_target_audits) != 1
+            or Path(str(transition_target_audits[0]["resolved_path"])).resolve(
+                strict=False
+            )
+            != anchor_host
+        ):
+            raise WwiseWirePathError(
+                "WIRE_PATH_AUDIT_MISMATCH",
+                "The Authoring project transition target differs from its exact audited path.",
+                details={"canonical_target_project_path": target_path},
+            )
         if (
             not anchor_host.is_absolute()
             or anchor_host.is_symlink()
