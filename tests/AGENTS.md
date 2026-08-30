@@ -378,6 +378,19 @@ profile-free `.ps1`, copy and run it through SSH, then remove it. An inline
 the exact campaign-root token; existing Codex app-server or proxy processes
 without that token are unrelated and remain untouched.
 
+An ended Windows desktop-development task can leave hundreds of long-lived
+`node_repl.exe` children plus old session-0 Codex app-server/proxy trees. They
+may coincide with standalone Fresh runs whose exact profile-free Skill read has
+`started` events but no `completed` event. This observation is a cleanup signal,
+not proof that every such process caused the failure. Never terminate these
+trees merely because a Fresh root blocked. First freeze that root, obtain the
+user's confirmation that the owning task has ended, enumerate PID ancestry and
+command lines, and preserve `explorer.exe`, the desktop Codex/ChatGPT parent,
+Wwise, and any unowned worker. Only then may the confirmed ended-task
+session-0 app-server/proxy tree and its `node_repl`/code-mode descendants be
+removed. Prove zero selected residue, re-attest the active desktop, and use a
+new campaign root; cleanup never makes the blocked root retryable.
+
 ### macOS Fresh Agent launch ownership
 
 A formal macOS campaign may outlive the Codex app's unified command session.
