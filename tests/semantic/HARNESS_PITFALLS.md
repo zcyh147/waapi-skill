@@ -737,6 +737,29 @@ prevention checks that are expensive to rediscover.
   reserve and verify its exact port, sandbox, project, and owned lifecycle;
   never require every Wwise process on the host to be absent.
 
+### Long Windows task controllers do not belong in `-EncodedCommand`
+
+- Evidence: the first two #91 final-candidate TYP24 launch attempts encoded the
+  complete registration controller as UTF-16LE Base64. PowerShell reported
+  that `-EncodedCommand` was not properly encoded, even though the same local
+  encoder works for short status probes. Neither attempt created a Scheduled
+  Task, temporary root, or campaign root. Transferring the same controller and
+  action wrapper as temporary UTF-8 `.ps1` files immediately registered the
+  attested `InteractiveToken` / `Limited` task; both final Windows Fresh roots
+  and both verify-only audits then passed.
+- Cause: Windows OpenSSH reconstructs a native remote command line. A large
+  Base64 controller can cross or approach one of the intervening command-line
+  length/serialization limits and arrive truncated, so PowerShell rejects the
+  envelope before parsing the script. The error does not prove that the
+  campaign, standalone Codex, Broker, or Task Scheduler is broken.
+- Prevention: reserve `-EncodedCommand` for small read-only probes and polling.
+  For a formal campaign, transfer a temporary profile-free controller and
+  action wrapper over SSH, invoke only the controller with `pwsh -File`, and
+  keep the actual campaign inside the registered interactive task. Attest the
+  exported `InteractiveToken` and registered `Limited` principal, record exit
+  code and logs, remove the task and temporary scripts, preserve the campaign
+  evidence, and never retry a failed semantic root.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:

@@ -301,7 +301,7 @@ def test_continuation_and_shell_mechanics_are_detected_per_exact_lane() -> None:
     assert len(topics) == 154
     assert all(
         row["mechanic_states"]["ambiguous_continuation_selection"]
-        == "model_owned_leak"
+        == "gateway_owned"
         and row["continuation_commands"] == ["wait-topic", "stream-topic"]
         for row in topics
     )
@@ -346,9 +346,7 @@ def test_every_migration_row_has_exactly_one_rollup_and_ticket_family() -> None:
         if row["disposition"] == "migration_required"
     }
     assert set(tickets) == expected
-    assert {family["github_issue"] for family in inventory["ticket_families"]} == {
-        *range(77, 94),
-    } - {77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 92, 93}
+    assert {family["github_issue"] for family in inventory["ticket_families"]} == set()
     assert all(
         row["owner_issue"] in {56, 57}
         for row in (*inventory["native_lanes"], *inventory["operation_lanes"])
@@ -418,6 +416,36 @@ def test_completed_runtime_inspection_family_retains_issue_87_row_seal() -> None
     assert set(actual_rows) == sealed_rows
     assert all(
         row["classification"] == "generic-core-runtime-inspection"
+        and row["disposition"] == "already_deep"
+        and row["owner_issue"] is None
+        and row["leaked_mechanics"] == []
+        for row in actual_rows.values()
+    )
+
+
+def test_completed_topic_family_retains_issue_91_row_seal() -> None:
+    inventory = _inventory()
+    completed = {
+        family["id"]: family
+        for family in inventory["completed_family_seals"]
+    }
+    topics = completed["generic-topics"]
+
+    assert topics["github_issue"] == 91
+    assert topics["row_count"] == len(topics["rows"]) == 154
+    assert topics["rows_sha256"] == (
+        "48f62fffb957f2ed581bee75cb11ddd6"
+        "624411b77fc307813d1984b5ce015982"
+    )
+    sealed_rows = set(topics["rows"])
+    actual_rows = {
+        f"{row['version']}|{row['item_type']}|{row['uri']}": row
+        for row in inventory["native_lanes"]
+        if f"{row['version']}|{row['item_type']}|{row['uri']}" in sealed_rows
+    }
+    assert set(actual_rows) == sealed_rows
+    assert all(
+        row["classification"] == "generic-topics"
         and row["disposition"] == "already_deep"
         and row["owner_issue"] is None
         and row["leaked_mechanics"] == []
