@@ -47,6 +47,8 @@ def append_category_evidence(
     categories: Sequence[Mapping[str, Any]],
     source: Mapping[str, Any],
     residual_state: Mapping[str, Any],
+    invocation: Mapping[str, Any] | None = None,
+    transactions: Sequence[Mapping[str, Any]] | None = None,
 ) -> None:
     if len(candidate) != 40 or any(character not in "0123456789abcdef" for character in candidate):
         raise AssertionError("category evidence candidate is not an exact Git commit")
@@ -57,8 +59,48 @@ def append_category_evidence(
         if category["status"] not in {"PASS", "FAIL", "blocked"}:
             raise AssertionError("category evidence status is not closed")
     platform_name = current_evidence_platform()
+    if (invocation is None) != (transactions is None):
+        raise AssertionError(
+            "exact category evidence requires invocation and transactions together"
+        )
+    if invocation is not None and transactions is not None:
+        required_invocation_fields = {
+            "selected_test_nodeids",
+            "started_at_unix_ns",
+            "finished_at_unix_ns",
+            "outcome",
+        }
+        if set(invocation) != required_invocation_fields:
+            raise AssertionError("exact category evidence invocation fields are invalid")
+        nodeids = invocation["selected_test_nodeids"]
+        started_at = invocation["started_at_unix_ns"]
+        finished_at = invocation["finished_at_unix_ns"]
+        if (
+            not isinstance(nodeids, list)
+            or not nodeids
+            or not all(isinstance(nodeid, str) and nodeid for nodeid in nodeids)
+            or not isinstance(started_at, int)
+            or isinstance(started_at, bool)
+            or not isinstance(finished_at, int)
+            or isinstance(finished_at, bool)
+            or finished_at < started_at
+            or invocation["outcome"] not in {"PASS", "FAIL"}
+        ):
+            raise AssertionError("exact category evidence invocation values are invalid")
+        required_transaction_fields = {
+            "transaction_id",
+            "state",
+            "artifact_hash",
+            "event_sequence",
+        }
+        if any(set(transaction) != required_transaction_fields for transaction in transactions):
+            raise AssertionError("exact category evidence transaction fields are invalid")
     payload = {
-        "contract": "waapi-skill.host-category-evidence/v1",
+        "contract": (
+            "waapi-skill.host-category-evidence/v2"
+            if invocation is not None
+            else "waapi-skill.host-category-evidence/v1"
+        ),
         "recorded_at_unix": int(time.time()),
         "platform": platform_name,
         "candidate": candidate,
@@ -68,6 +110,9 @@ def append_category_evidence(
         "source": dict(source),
         "residual_state": dict(residual_state),
     }
+    if invocation is not None and transactions is not None:
+        payload["invocation"] = dict(invocation)
+        payload["transactions"] = [dict(transaction) for transaction in transactions]
     configured = os.getenv("WWISE_CATEGORY_EVIDENCE_PATH")
     if configured is None and platform_name == "macos":
         configured = os.getenv("WWISE_MACOS_CATEGORY_EVIDENCE_PATH")

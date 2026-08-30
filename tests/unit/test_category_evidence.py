@@ -85,3 +85,78 @@ def test_legacy_macos_override_does_not_capture_windows_evidence(
     )
     assert windows_target.exists()
     assert not legacy_target.exists()
+
+
+def test_exact_evidence_v2_preserves_invocation_and_transaction_outcomes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    target = tmp_path / "exact.jsonl"
+    monkeypatch.setenv("WWISE_CATEGORY_EVIDENCE_PATH", str(target))
+    monkeypatch.setattr(category_evidence, "current_evidence_platform", lambda: "macos")
+
+    category_evidence.append_category_evidence(
+        repo_root=tmp_path,
+        candidate="b" * 40,
+        version="2022.1",
+        host={"display_name": "WwiseConsole", "version": "2022.1.19.8584"},
+        categories=[
+            {
+                "category": "object-topology",
+                "status": "PASS",
+                "verifier_strength": "operation_specific_readback",
+            }
+        ],
+        source={"mtime_before_ns": 10, "mtime_after_ns": 10},
+        residual_state={"sandbox": "deleted", "quarantine_path": None},
+        invocation={
+            "selected_test_nodeids": ["tests/destructive/test_example.py::test_one"],
+            "started_at_unix_ns": 100,
+            "finished_at_unix_ns": 200,
+            "outcome": "PASS",
+        },
+        transactions=[
+            {
+                "transaction_id": "tx1-0123456789abcdefghjk",
+                "state": "verified",
+                "artifact_hash": "c" * 64,
+                "event_sequence": 5,
+            }
+        ],
+    )
+
+    payload = json.loads(target.read_text(encoding="utf-8"))
+    assert payload["contract"] == "waapi-skill.host-category-evidence/v2"
+    assert payload["invocation"]["outcome"] == "PASS"
+    assert payload["transactions"] == [
+        {
+            "artifact_hash": "c" * 64,
+            "event_sequence": 5,
+            "state": "verified",
+            "transaction_id": "tx1-0123456789abcdefghjk",
+        }
+    ]
+
+
+def test_exact_evidence_rejects_partial_v2_fields(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(category_evidence, "current_evidence_platform", lambda: "macos")
+    with pytest.raises(AssertionError, match="invocation and transactions together"):
+        category_evidence.append_category_evidence(
+            repo_root=tmp_path,
+            candidate="a" * 40,
+            version="2025.1",
+            host={"display_name": "WwiseConsole"},
+            categories=[
+                {
+                    "category": "object-topology",
+                    "status": "PASS",
+                    "verifier_strength": "operation_specific_readback",
+                }
+            ],
+            source={},
+            residual_state={},
+            invocation={"outcome": "PASS"},
+        )

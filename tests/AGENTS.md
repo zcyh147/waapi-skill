@@ -225,8 +225,10 @@ operation I/O root must own both the active sandbox project and every exact
 input/output artifact, and the sandbox project must be saved and non-dirty
 before each file-processing Preview. Copy the `project.save` continuation
 returned by `request-schema`: 2022.1 returns a complete zero-input
-`gateway_argv`, while 2025.1 returns an inline `gateway_argv_prefix` because
-its save schema includes an optional source-control boolean.
+`gateway_argv`; 2025.1 returns a `business_declaration`, so follow its
+Gateway-owned `draft-start` continuation and explicitly declare the closed
+`auto_check_out` business choice before check, Preview, confirmation, and
+execute. Do not reconstruct the retired inline `gateway_argv_prefix` shape.
 
 Wwise 2022.1 has a real silent-effect boundary for SoundBank Definition rows:
 an ordinary Event row using the official quoted-name form can return success

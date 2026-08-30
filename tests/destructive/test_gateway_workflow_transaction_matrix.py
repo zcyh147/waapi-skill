@@ -9,6 +9,7 @@ import shutil
 import struct
 import subprocess
 import sys
+import time
 import uuid
 import wave
 import xml.etree.ElementTree as ET
@@ -73,11 +74,15 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 GATEWAY_PATH = REPO_ROOT / "skills" / "waapi-skill" / "scripts" / "gateway.py"
 ACTOR_MIXER_PARENT = r"\Actor-Mixer Hierarchy\Default Work Unit"
 CONTAINERS_PARENT = r"\Containers\Default Work Unit"
+ACTOR_MIXER_PARENT_SEGMENTS = ("Actor-Mixer Hierarchy", "Default Work Unit")
+CONTAINERS_PARENT_SEGMENTS = ("Containers", "Default Work Unit")
 SOUNDBANK_PARENT = r"\SoundBanks\Default Work Unit"
 EVENTS_PARENT = r"\Events\Default Work Unit"
 GAME_PARAMETERS_PARENT = r"\Game Parameters\Default Work Unit"
 FIXTURE_SWITCH_GROUP_PATH = r"\Switches\SS_Impact\SS_FS_Type"
 FIXTURE_SWITCH_PATH = FIXTURE_SWITCH_GROUP_PATH + r"\Crawl"
+FIXTURE_SWITCH_GROUP_SEGMENTS = ("Switches", "SS_Impact", "SS_FS_Type")
+FIXTURE_SWITCH_SEGMENTS = (*FIXTURE_SWITCH_GROUP_SEGMENTS, "Crawl")
 SWITCH_GROUP_REFERENCE = "SwitchGroupOrStateGroup"
 SFX_BUS_ID = "{ED2BCAC8-D7B6-4448-8900-439B557894F4}"
 
@@ -493,9 +498,12 @@ def _discover_business_field(
     return _required_string(candidates[0], "handle")
 
 
-def _query_exact_path_id(runtime: _WorkflowSandboxRuntime, path: str) -> str:
-    path_segments = tuple(segment for segment in path.split("\\") if segment)
-    assert path == "\\" + "\\".join(path_segments)
+def _query_exact_path_id(
+    runtime: _WorkflowSandboxRuntime,
+    *,
+    path_segments: Sequence[str],
+    expected_path: str,
+) -> str:
     payload = runtime.gateway(
         [
             "query-object",
@@ -510,8 +518,29 @@ def _query_exact_path_id(runtime: _WorkflowSandboxRuntime, path: str) -> str:
     rows = payload.get("objects")
     assert payload.get("count") == 1 and isinstance(rows, list), payload
     assert len(rows) == 1 and isinstance(rows[0], Mapping), rows
-    assert rows[0].get("path") == path, rows[0]
+    assert rows[0].get("path") == expected_path, rows[0]
     return _required_string(rows[0], "id")
+
+
+def _transaction_outcomes(state_dir: Path) -> list[dict[str, Any]]:
+    transactions_dir = state_dir / "transactions"
+    if not transactions_dir.exists():
+        return []
+    store = TransactionStore(state_dir)
+    outcomes: list[dict[str, Any]] = []
+    for transaction_dir in sorted(transactions_dir.iterdir(), key=lambda path: path.name):
+        if not transaction_dir.is_dir():
+            continue
+        record = store.load(transaction_dir.name)
+        outcomes.append(
+            {
+                "transaction_id": record.transaction_id,
+                "state": record.state.value,
+                "artifact_hash": record.artifact_hash,
+                "event_sequence": record.event_sequence,
+            }
+        )
+    return outcomes
 
 
 def _restart_workflow_host_after_transport_loss(
@@ -532,7 +561,10 @@ def _restart_workflow_host_after_transport_loss(
 
 
 @pytest.fixture(scope="module")
-def workflow_sandbox_runtime(tmp_path_factory: pytest.TempPathFactory) -> Iterator[_WorkflowSandboxRuntime]:
+def workflow_sandbox_runtime(
+    request: pytest.FixtureRequest,
+    tmp_path_factory: pytest.TempPathFactory,
+) -> Iterator[_WorkflowSandboxRuntime]:
     env = dict(os.environ)
     version = env.get("WWISE_VERSION", "")
     if version not in SUPPORTED_WWISE_VERSION_KEYS:
@@ -547,6 +579,8 @@ def workflow_sandbox_runtime(tmp_path_factory: pytest.TempPathFactory) -> Iterat
     source_tree_before: tuple[str, int] | None = None
     source_hash_after: tuple[str, int, int] | None = None
     source_tree_after: tuple[str, int] | None = None
+    source_mtime_before_ns: int | None = None
+    source_mtime_after_ns: int | None = None
     deferred_error: BaseException | None = None
     runtime: _WorkflowSandboxRuntime | None = None
     task_root = tmp_path_factory.mktemp(f"gateway-workflows-{version.replace('.', '-')}")
@@ -554,6 +588,14 @@ def workflow_sandbox_runtime(tmp_path_factory: pytest.TempPathFactory) -> Iterat
     state_dir = task_root / "state"
     candidate = exact_git_candidate(REPO_ROOT)
     category_results: list[dict[str, Any]] = []
+    tests_failed_before = request.session.testsfailed
+    started_at_unix_ns = time.time_ns()
+    selected_test_nodeids = [
+        item.nodeid
+        for item in request.session.items
+        if Path(str(item.path)).resolve(strict=False) == Path(__file__).resolve(strict=True)
+    ]
+    quarantine_path: Path | None = None
 
     lock.__enter__()
     try:
@@ -564,6 +606,7 @@ def workflow_sandbox_runtime(tmp_path_factory: pytest.TempPathFactory) -> Iterat
         )
         source_hash_before = _hash_mutation_bearing_project_files(sandbox.source_root)
         source_tree_before = _source_tree_inventory(sandbox.source_root)
+        source_mtime_before_ns = sandbox.source_project.stat().st_mtime_ns
         assert source_hash_before[1] > 0, "immutable SampleProject source has no .wproj/.wwu files to hash"
         if version in {"2022.1", "2025.1"}:
             prelaunch_io_root = case_sandbox_root / "prelaunch-io"
@@ -641,10 +684,16 @@ def workflow_sandbox_runtime(tmp_path_factory: pytest.TempPathFactory) -> Iterat
         if sandbox is not None and source_hash_before is not None:
             try:
                 source_hash_after = _hash_mutation_bearing_project_files(sandbox.source_root)
+                source_mtime_after_ns = sandbox.source_project.stat().st_mtime_ns
                 if source_hash_after != source_hash_before:
                     raise AssertionError(
                         "immutable SampleProject source hash changed during gateway workflow test: "
                         f"before={source_hash_before[0]} after={source_hash_after[0]}"
+                    )
+                if source_mtime_after_ns != source_mtime_before_ns:
+                    raise AssertionError(
+                        "immutable SampleProject project mtime changed during gateway workflow test: "
+                        f"before={source_mtime_before_ns} after={source_mtime_after_ns}"
                     )
                 if source_tree_before is not None:
                     source_tree_after = _source_tree_inventory(sandbox.source_root)
@@ -656,13 +705,22 @@ def workflow_sandbox_runtime(tmp_path_factory: pytest.TempPathFactory) -> Iterat
             except BaseException as exc:  # noqa: BLE001 - sandbox cleanup still has to run
                 deferred_error = deferred_error or exc
 
+        invocation_failed = request.session.testsfailed > tests_failed_before
+        cleanup_failed = invocation_failed or deferred_error is not None
         if sandbox is not None:
             try:
-                cleanup_sandbox(sandbox, keep=False, failed=False)
+                quarantine_path = cleanup_sandbox(
+                    sandbox,
+                    keep=cleanup_failed,
+                    failed=cleanup_failed,
+                )
             except BaseException as exc:  # noqa: BLE001 - lock release must still run
                 deferred_error = deferred_error or exc
+        cleanup_failed = cleanup_failed or deferred_error is not None
 
-        if case_sandbox_root.exists():
+        if case_sandbox_root.exists() and (
+            not cleanup_failed or quarantine_path is not None
+        ):
             try:
                 shutil.rmtree(case_sandbox_root)
             except BaseException as exc:  # noqa: BLE001 - lock release must still run
@@ -693,16 +751,33 @@ def workflow_sandbox_runtime(tmp_path_factory: pytest.TempPathFactory) -> Iterat
                         "project": str(sandbox.source_project),
                         "hash_before": source_hash_before[0] if source_hash_before else None,
                         "hash_after": source_hash_after[0] if source_hash_after else None,
+                        "mtime_before_ns": source_mtime_before_ns,
+                        "mtime_after_ns": source_mtime_after_ns,
                         "tree_metadata_before": source_tree_before[0] if source_tree_before else None,
                         "tree_metadata_after": source_tree_after[0] if source_tree_after else None,
                     },
                     residual_state={
-                        "sandbox": "deleted" if not sandbox.sandbox_path.exists() else "retained",
+                        "sandbox": (
+                            "quarantined"
+                            if quarantine_path is not None
+                            else "retained"
+                            if sandbox.sandbox_path.exists()
+                            else "deleted"
+                        ),
+                        "sandbox_path": str(sandbox.sandbox_path),
+                        "quarantine_path": str(quarantine_path) if quarantine_path else None,
                         "process_cleanup": sandbox.metadata.process_cleanup_result,
                         "residual_processes": (
                             sandbox.metadata.process_cleanup_details or {}
                         ).get("residual_processes", []),
                     },
+                    invocation={
+                        "selected_test_nodeids": selected_test_nodeids,
+                        "started_at_unix_ns": started_at_unix_ns,
+                        "finished_at_unix_ns": time.time_ns(),
+                        "outcome": "FAIL" if cleanup_failed else "PASS",
+                    },
+                    transactions=_transaction_outcomes(state_dir),
                 )
             except BaseException as exc:  # noqa: BLE001 - evidence is part of the gate
                 deferred_error = deferred_error or exc
@@ -1026,9 +1101,14 @@ def test_closed_gateway_workflows_across_selected_version(
         )
         switch_group_id = _query_exact_path_id(
             runtime,
-            FIXTURE_SWITCH_GROUP_PATH,
+            path_segments=FIXTURE_SWITCH_GROUP_SEGMENTS,
+            expected_path=FIXTURE_SWITCH_GROUP_PATH,
         )
-        switch_id = _query_exact_path_id(runtime, FIXTURE_SWITCH_PATH)
+        switch_id = _query_exact_path_id(
+            runtime,
+            path_segments=FIXTURE_SWITCH_SEGMENTS,
+            expected_path=FIXTURE_SWITCH_PATH,
+        )
         _complete_transaction(
             runtime,
             operation="object.setReference",
@@ -1917,7 +1997,15 @@ def test_exact_tab_import_business_draft_binds_location_and_preserves_table(
     table_sha256 = hashlib.sha256(table_file.read_bytes()).hexdigest()
     imported_id: str | None = None
     try:
-        location_id = _query_exact_path_id(runtime, object_parent)
+        location_id = _query_exact_path_id(
+            runtime,
+            path_segments=(
+                CONTAINERS_PARENT_SEGMENTS
+                if runtime.version == "2025.1"
+                else ACTOR_MIXER_PARENT_SEGMENTS
+            ),
+            expected_path=object_parent,
+        )
         result = _complete_transaction(
             runtime,
             operation="audio.importTabDelimited",
@@ -2851,8 +2939,18 @@ def test_object_graph_business_draft_executes_weather_graph_plugin_bulk_set_and_
         created = _complete_business_draft(runtime, create)
         weather_id = _created_object_id(created["execute"])
 
-        rain_id = _query_exact_path_id(runtime, f"{root_path}\\{rain_name}")
-        wind_id = _query_exact_path_id(runtime, f"{root_path}\\{wind_name}")
+        rain_path = f"{root_path}\\{rain_name}"
+        wind_path = f"{root_path}\\{wind_name}"
+        rain_id = _query_exact_path_id(
+            runtime,
+            path_segments=(*root_segments, weather_name, rain_name),
+            expected_path=rain_path,
+        )
+        wind_id = _query_exact_path_id(
+            runtime,
+            path_segments=(*root_segments, weather_name, wind_name),
+            expected_path=wind_path,
+        )
 
         plugin = _start_business_draft(runtime, "object.createPlugin")
         rain_plugin_handle = _bind_business_object(

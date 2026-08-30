@@ -298,6 +298,27 @@ def test_keep_on_failure_preserves_under_evidence_root(monkeypatch: pytest.Monke
     shutil.rmtree(preserved)
 
 
+def test_explicit_keep_preserves_failure_without_environment_switch(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    console = make_console(tmp_path)
+    source_project = make_sample_project(tmp_path / "source")
+    sandbox = prepare_sample_project_sandbox(
+        base_env(console, source_project, tmp_path / "sandbox-root")
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv(ENV_WWISE_SANDBOX_KEEP_ON_FAILURE, raising=False)
+
+    preserved = cleanup_sandbox(sandbox, keep=True, failed=True)
+
+    assert preserved is not None and preserved.exists()
+    assert preserved.parent == (tmp_path / KEEP_ON_FAILURE_ROOT).resolve(strict=False)
+    metadata = json.loads((preserved / "sandbox-metadata.json").read_text(encoding="utf-8"))
+    assert metadata["keep_decision"] == f"kept:{preserved}"
+    shutil.rmtree(preserved)
+
+
 def test_rejects_sandbox_roots_that_overlap_source(tmp_path: Path) -> None:
     console = make_console(tmp_path)
     source_root = tmp_path / "source"
