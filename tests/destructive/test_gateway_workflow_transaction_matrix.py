@@ -6,10 +6,10 @@ import json
 import math
 import os
 import shutil
+import struct
 import subprocess
 import sys
 import uuid
-import wave
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
@@ -176,6 +176,63 @@ class _BusinessDraft:
     draft_id: str
     task_authority: str
     revision: int
+
+
+@dataclass(frozen=True, slots=True)
+class _PcmWaveHeader:
+    channels: int
+    sample_width_bytes: int
+    sample_rate_hz: int
+    frame_count: int
+
+
+def _read_pcm_wave_header(path: Path) -> _PcmWaveHeader:
+    """Read classic PCM or WAVE_FORMAT_EXTENSIBLE without codec libraries."""
+
+    payload = path.read_bytes()
+    assert len(payload) >= 44
+    assert payload[:4] == b"RIFF"
+    assert payload[8:12] == b"WAVE"
+    cursor = 12
+    format_chunk: bytes | None = None
+    data_size: int | None = None
+    while cursor + 8 <= len(payload):
+        chunk_id = payload[cursor : cursor + 4]
+        chunk_size = struct.unpack_from("<I", payload, cursor + 4)[0]
+        chunk_start = cursor + 8
+        chunk_end = chunk_start + chunk_size
+        assert chunk_end <= len(payload)
+        if chunk_id == b"fmt ":
+            format_chunk = payload[chunk_start:chunk_end]
+        elif chunk_id == b"data":
+            data_size = chunk_size
+        cursor = chunk_end + (chunk_size & 1)
+    assert format_chunk is not None and len(format_chunk) >= 16
+    assert data_size is not None
+    format_tag, channels, sample_rate, _, block_align, bits_per_sample = (
+        struct.unpack_from("<HHIIHH", format_chunk)
+    )
+    if format_tag == 0xFFFE:
+        assert len(format_chunk) >= 40
+        assert struct.unpack_from("<H", format_chunk, 16)[0] >= 22
+        assert struct.unpack_from("<H", format_chunk, 18)[0] in {
+            0,
+            bits_per_sample,
+        }
+        assert format_chunk[24:40] == bytes.fromhex(
+            "0100000000001000800000aa00389b71"
+        )
+    else:
+        assert format_tag == 1
+    sample_width = (bits_per_sample + 7) // 8
+    assert block_align == channels * sample_width
+    assert data_size % block_align == 0
+    return _PcmWaveHeader(
+        channels=channels,
+        sample_width_bytes=sample_width,
+        sample_rate_hz=sample_rate,
+        frame_count=data_size // block_align,
+    )
 
 
 def _start_business_draft(
@@ -1622,6 +1679,97 @@ def test_cli_console_business_soundbank_generate(
             "category": "cli-console-soundbank-generate",
             "status": "PASS",
             "verifier_strength": "result_schema_plus_soundbank_file_oracle",
+        }
+    )
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_host_ui_debug_business_schema_read(
+    workflow_sandbox_runtime: _WorkflowSandboxRuntime,
+) -> None:
+    """Read one real reflected schema through the bounded business route."""
+
+    runtime = workflow_sandbox_runtime
+    target = "ak.wwise.core.object.get"
+    command = ["waapi-schema", target]
+    if runtime.version in {"2024.1", "2025.1"}:
+        command.append("--include-examples")
+    schema = runtime.gateway(command, live=True)
+    assert schema["schema_target"] == target
+    assert schema["call"]["api"] == "ak.wwise.waapi.getSchema"
+    assert schema["call"]["ok"] is True
+    request_validation = schema["schema_validation"]["request"]
+    result_validation = schema["schema_validation"]["result"]
+    assert request_validation["uri"] == "ak.wwise.waapi.getSchema"
+    assert request_validation["section"] == "request"
+    assert request_validation["validated_nodes"] > 0
+    assert result_validation["uri"] == "ak.wwise.waapi.getSchema"
+    assert result_validation["section"] == "result"
+    assert result_validation["validated_nodes"] > 0
+    agent_result = schema["agent_result"]
+    assert isinstance(agent_result, Mapping)
+    assert agent_result
+    runtime.category_results.append(
+        {
+            "category": "host-ui-debug-waapi-schema",
+            "status": "PASS",
+            "verifier_strength": "real_result_schema_and_bounded_projection",
+        }
+    )
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_host_ui_debug_business_generates_exact_tone_wav(
+    workflow_sandbox_runtime: _WorkflowSandboxRuntime,
+) -> None:
+    """Generate one real WAV from business audio units and inspect the artifact."""
+
+    runtime = workflow_sandbox_runtime
+    if runtime.version not in {"2023.1", "2024.1", "2025.1"}:
+        pytest.skip("generateToneWAV is reflected only in Wwise 2023.1+")
+    output_root = runtime.sandbox.sandbox_root / "host-ui-debug-tone"
+    output_root.mkdir(parents=True, exist_ok=False)
+    output_file = output_root / f"tone-{runtime.version}.wav"
+    operation = "ak.wwise.debug.generateToneWAV"
+    schema = runtime.gateway(["request-schema", operation], live=False)
+    assert schema["input_shape"] == "business_declaration", schema
+    draft = _start_business_draft(runtime, operation)
+    _update_business_draft(
+        runtime,
+        draft,
+        "draft-declare-host-plan",
+        [
+            "--value", "output_file", str(output_file),
+            "--value", "waveform", "sine",
+            "--value", "frequency_hz", "440",
+            "--value", "channel_layout", "2.0",
+            "--value", "bit_depth", "int16",
+            "--value", "sample_rate_hz", "48000",
+            "--value", "attack_seconds", "0.05",
+            "--value", "sustain_seconds", "1",
+            "--value", "release_seconds", "0.1",
+            "--value", "sustain_db", "-6",
+            "--toggle", "anonymous_channels", "enable",
+            "--item", "waveform_channels", "0",
+            "--item", "waveform_channels", "1",
+        ],
+        live=True,
+    )
+    result = _complete_core_result_schema_draft(runtime, draft)
+    assert output_file.is_file(), result
+    assert output_file.stat().st_size > 44
+    generated = _read_pcm_wave_header(output_file)
+    assert generated.channels == 2
+    assert generated.sample_width_bytes == 2
+    assert generated.sample_rate_hz == 48000
+    assert generated.frame_count == pytest.approx(55200, abs=4)
+    runtime.category_results.append(
+        {
+            "category": "host-ui-debug-tone-wav",
+            "status": "PASS",
+            "verifier_strength": "result_schema_plus_exact_wav_header_oracle",
         }
     )
 

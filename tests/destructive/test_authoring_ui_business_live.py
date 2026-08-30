@@ -169,6 +169,65 @@ def _preview_business_plan(
     )
 
 
+def _preview_host_plan(
+    operation: str,
+    declaration_args: list[str],
+    *,
+    env: dict[str, str],
+    state_dir: Path,
+) -> dict[str, object]:
+    started = _call(
+        ["draft-start", operation],
+        env=env,
+        state_dir=state_dir,
+    )
+    draft = started["draft"]
+    assert isinstance(draft, dict)
+    draft_id = str(draft["draft_id"])
+    authority = str(started["task_authority"])
+    declared = _call(
+        [
+            "draft-declare-host-plan",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            str(draft["revision"]),
+            *declaration_args,
+        ],
+        env=env,
+        state_dir=state_dir,
+    )
+    current = declared["draft"]
+    assert isinstance(current, dict)
+    checked = _call(
+        [
+            "draft-check",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            str(current["revision"]),
+        ],
+        env=env,
+        state_dir=state_dir,
+    )
+    current = checked["draft"]
+    assert isinstance(current, dict)
+    return _call(
+        [
+            "preview-from-draft",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            str(current["revision"]),
+        ],
+        env=env,
+        state_dir=state_dir,
+    )
+
+
 def _execute_and_verify(
     preview: dict[str, object],
     *,
@@ -405,6 +464,105 @@ def _runtime_business_result(verified: Mapping[str, object]) -> Mapping[str, obj
     business_result = agent_result.get("business_result")
     assert isinstance(business_result, Mapping), agent_result
     return business_result
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_host_ui_debug_project_close_and_open_transition(
+    tmp_path: Path,
+) -> None:
+    """Close and reopen the exact private Authoring sandbox through host plans."""
+
+    version = os.environ["WWISE_VERSION"]
+    if version != "2022.1":
+        pytest.skip("representative UI project open/close proof uses Wwise 2022.1")
+    env = _gateway_env(tmp_path, version=version)
+    state_dir = tmp_path / "host-ui-debug-project-state"
+    project_file = Path(env["WWISE_AUTHORING_SANDBOX_PROJECT"]).resolve(
+        strict=True
+    )
+
+    status = _call(["status"], env=env, state_dir=state_dir)
+    assert status["is_command_line"] is False
+    project = status["project"]
+    assert isinstance(project, dict)
+    assert Path(localize_waapi_host_path(project["path"])).resolve(
+        strict=True
+    ) == project_file
+
+    saved = _preview_business_plan(
+        "ui.commands.execute",
+        ["--command-id", "SaveProject"],
+        env=env,
+        state_dir=state_dir,
+    )
+    _execute_and_verify(saved, env=env, state_dir=state_dir)
+
+    project_may_be_closed = False
+    primary_error: BaseException | None = None
+    cleanup_error: BaseException | None = None
+
+    def open_exact_project(*, discard_current: bool) -> dict[str, object]:
+        preview = _preview_host_plan(
+            "ak.wwise.ui.project.open",
+            [
+                "--value", "project_file", str(project_file),
+                "--toggle", "discard_unsaved_current_project",
+                "enable" if discard_current else "disable",
+                "--value", "upgrade_policy", "fail",
+            ],
+            env=env,
+            state_dir=state_dir,
+        )
+        return _execute_and_verify(preview, env=env, state_dir=state_dir)
+
+    try:
+        close_preview = _preview_host_plan(
+            "ak.wwise.ui.project.close",
+            ["--toggle", "discard_unsaved_changes", "disable"],
+            env=env,
+            state_dir=state_dir,
+        )
+        project_may_be_closed = True
+        closed = _execute_and_verify(
+            close_preview,
+            env=env,
+            state_dir=state_dir,
+        )
+        assert closed["state"] == TransactionState.VERIFIED.value
+        assert closed["verification"]["business_state_verified"] is True
+        assert closed["guard_validation"]["project_transition"]["matched"] is True
+
+        opened = open_exact_project(discard_current=False)
+        assert opened["state"] == TransactionState.VERIFIED.value
+        assert opened["verification"]["business_state_verified"] is True
+        assert opened["guard_validation"]["project_transition"]["matched"] is True
+        project_may_be_closed = False
+
+        reopened_status = _call(["status"], env=env, state_dir=state_dir)
+        reopened_project = reopened_status["project"]
+        assert isinstance(reopened_project, dict)
+        assert Path(localize_waapi_host_path(reopened_project["path"])).resolve(
+            strict=True
+        ) == project_file
+    except BaseException as exc:
+        primary_error = exc
+    finally:
+        if project_may_be_closed:
+            try:
+                cleanup = open_exact_project(discard_current=True)
+                assert cleanup["state"] == TransactionState.VERIFIED.value
+            except BaseException as exc:
+                cleanup_error = exc
+    if primary_error is not None and cleanup_error is not None:
+        raise BaseExceptionGroup(
+            "UI project transition failed and exact-project recovery failed",
+            [primary_error, cleanup_error],
+        )
+    if primary_error is not None:
+        raise primary_error
+    if cleanup_error is not None:
+        raise cleanup_error
 
 
 @pytest.mark.live

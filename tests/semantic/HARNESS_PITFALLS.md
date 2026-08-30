@@ -594,6 +594,24 @@ prevention checks that are expensive to rediscover.
   copy before Wwise starts; keep the immutable source untouched. Use the
   separate reviewed 2025 Auro profile for that fixture layout.
 
+### Python 3.11 `wave` does not parse Wwise extensible PCM
+
+- Evidence: the first #90 real Wwise 2025.1 Tone tracer bullet successfully
+  dispatched `ak.wwise.debug.generateToneWAV` and wrote a nonempty WAV, but the
+  test oracle raised `wave.Error: unknown format: 65534` before checking its
+  audio format. Wwise had emitted standard `WAVE_FORMAT_EXTENSIBLE` PCM rather
+  than classic format tag `1`.
+- Cause: Python 3.11's standard `wave` reader does not support extensible PCM.
+  Treating that parser failure as a product failure would discard valid Wwise
+  output; treating file existence alone as PASS would lose the business
+  oracle.
+- Prevention: inspect the RIFF `fmt ` and `data` chunks independently. Accept
+  classic PCM or extensible PCM only when the sub-format GUID is PCM, then
+  verify channel count, container bit depth, sample rate, block alignment, and
+  frame count. Wwise may write extensible `wValidBitsPerSample` as either zero
+  or the container bit depth. Do not weaken the check to file size or upgrade
+  the repository interpreter merely to make this artifact readable.
+
 ### Independent CLI declaration groups are not a semantic sequence
 
 - Evidence: #89 macOS Fresh root `imac-cli-console-03ebea9-r1` selected the
