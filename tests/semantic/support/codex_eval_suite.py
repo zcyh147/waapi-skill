@@ -113,6 +113,7 @@ GATEWAY_STEP_IDS = frozenset(
         "buses",
         "selected",
         "metadata",
+        "topic-schema",
         "wait-topic",
         "call",
     }
@@ -216,7 +217,7 @@ EXPECTED_PROTOCOL_PHASES: Mapping[str, Mapping[str, tuple[tuple[str, ...], tuple
     },
     "object_created_topic_read_only": {
         "single": (
-            ("wait-topic",),
+            ("topic-schema", "wait-topic"),
             _COMMON_HARD_GATES + ("live_read_only", "oracle_matches"),
         )
     },

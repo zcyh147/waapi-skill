@@ -15,6 +15,7 @@ from tests.semantic.support.codex_gateway_broker import (
     ResponseBinding,
     SemanticJsonArgument,
 )
+from wwise_waapi.topic_business import topic_business_contract
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -123,7 +124,7 @@ def screening_sessions() -> tuple[EvalSession, ...]:
         ("R2", "single", ("buses",)),
         ("R3", "single", ("selected",)),
         ("R4", "single", ("metadata",)),
-        ("R5", "single", ("wait-topic",)),
+        ("R5", "single", ("topic-schema", "wait-topic")),
         ("R6", "single", ("call",)),
     ],
 )
@@ -241,19 +242,23 @@ def test_fixed_read_cases_bind_exact_packaged_arguments() -> None:
         "types",
         "--summary-only",
     )
-    topic = build_expected_gateway_steps(sessions["R5"], FIXTURES["R5"])[0]
+    schema, topic = build_expected_gateway_steps(sessions["R5"], FIXTURES["R5"])
+    assert schema.arguments == ("ak.wwise.core.object.created",)
     assert topic.gateway_global_arguments == ("--timeout", "10")
-    assert topic.arguments[:2] == (
+    assert topic.arguments[:3] == (
         "ak.wwise.core.object.created",
-        "--options-json",
+        "--topic-contract-digest",
+        topic_business_contract(
+            "2022.1", "ak.wwise.core.object.created"
+        ).contract_digest,
     )
-    assert isinstance(topic.arguments[2], SemanticJsonArgument)
-    assert topic.arguments[2].expected == {"return": ["id", "name", "type", "path"]}
-    assert topic.arguments[3] == "--match-json"
-    assert isinstance(topic.arguments[4], SemanticJsonArgument)
-    assert topic.arguments[4].expected == {
-        "object": {"type": FIXTURES["R5"]["topic_probe_event_type"]}
-    }
+    assert topic.arguments[3:] == (
+        "--topic-option", "include", "id",
+        "--topic-option", "include", "name",
+        "--topic-option", "include", "type",
+        "--topic-option", "include", "path",
+        "--event-match", "object-type", FIXTURES["R5"]["topic_probe_event_type"],
+    )
     reflection = build_expected_gateway_steps(sessions["R6"], {})[0]
     assert reflection.arguments[:2] == (
         "ak.wwise.waapi.getFunctions",
