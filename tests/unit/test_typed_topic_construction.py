@@ -471,6 +471,15 @@ def test_topic_schema_leads_with_handle_free_business_input(tmp_path: Path) -> N
         "exact_entry_row": "--event-entry-row <scope> <indices-or-dash> <exact-key> <item-index> <field> <value>",
         "typed_exact_entry_row": "--event-entry-row-as <scope> <indices-or-dash> <exact-key> <item-index> <field> <value-choice-handle> <value>",
     }
+    assert payload["continuation"]["value_choice_policy"] == {
+        "choice_on_disclosure": {
+            "disclose_first": True,
+            "field_disclosure_source": "business_input",
+            "untyped_fact_forms_allowed": False,
+            "typed_fact_suffix": "-as",
+            "value_choice_handle": "copy_exactly_from_disclosure",
+        }
+    }
 
 
 def test_ambiguous_topic_scalar_uses_a_digest_bound_value_choice_handle(

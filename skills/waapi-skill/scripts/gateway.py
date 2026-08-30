@@ -8127,16 +8127,25 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                         "<value-choice-handle> <value>"
                     ),
                 },
-                    "event_row_field_disclosure": (
-                        "topic-schema <topic-uri> --row <collection> "
-                        "--row-field-group <group>"
-                    ),
-                    "exact_entry_field_disclosure": (
-                        "topic-schema <topic-uri> --entry <scope>"
-                    ),
-                    "event_match_field_disclosure": (
-                        "topic-schema <topic-uri> --match-group <group>"
-                    ),
+                "value_choice_policy": {
+                    "choice_on_disclosure": {
+                        "disclose_first": True,
+                        "field_disclosure_source": "business_input",
+                        "untyped_fact_forms_allowed": False,
+                        "typed_fact_suffix": "-as",
+                        "value_choice_handle": "copy_exactly_from_disclosure",
+                    }
+                },
+                "event_row_field_disclosure": (
+                    "topic-schema <topic-uri> --row <collection> "
+                    "--row-field-group <group>"
+                ),
+                "exact_entry_field_disclosure": (
+                    "topic-schema <topic-uri> --entry <scope>"
+                ),
+                "event_match_field_disclosure": (
+                    "topic-schema <topic-uri> --match-group <group>"
+                ),
                 "lifecycle": {
                     "wait-topic": "bounded; unsubscribe",
                     "stream-topic": (
@@ -8144,12 +8153,12 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     ),
                 },
             },
-                "business_input": business.as_gateway_dict(
-                    selected_row=args.row,
-                    selected_entry=args.entry,
-                    selected_match_group=args.match_group,
-                    selected_row_field_group=args.row_field_group,
-                ),
+            "business_input": business.as_gateway_dict(
+                selected_row=args.row,
+                selected_entry=args.entry,
+                selected_match_group=args.match_group,
+                selected_row_field_group=args.row_field_group,
+            ),
         }
         final_payload = attach_gateway_session_context(
             payload,

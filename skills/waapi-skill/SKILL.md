@@ -119,8 +119,10 @@ Select `stream-topic` only for explicit persistent intent such as “stream”,
 flushes matched events, requires an `--event-count <1..64>` ceiling, and accepts
 an optional gateway-global finite `--timeout`. Before every wait or stream, run
 `topic-schema`; copy its contract digest and any opaque `tvc1-*` choice handles
-exactly. Event size, count, cumulative bytes, and buffering are bounded; the
-terminal record includes the completion and unsubscribe result.
+exactly. For `choice_on_disclosure`, run `field_disclosure` first and use only
+typed `*-as`; never guess untyped. Event size, count, cumulative bytes, and
+buffering are bounded; the terminal record includes the completion and
+unsubscribe result.
 
 Exact reflection-call fast route: for `ak.wwise.waapi.getFunctions` or `ak.wwise.waapi.getTopics`, run `request-schema` and follow its sole typed continuation. Do not run `describe` or `capabilities` first. If that continuation is rejected or fails, stop and report the result.
 

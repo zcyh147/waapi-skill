@@ -2341,10 +2341,14 @@ def test_generated_topic_reference_closes_model_owned_request_fields() -> None:
     reference = " ".join(QUERY_REFERENCE.read_text(encoding="utf-8").split())
     assert "Run `topic-schema`" in reference
     assert "--topic-option include <id|name|type|path>" in reference
-    assert "--event-entry platform - name <platform-name>" in reference
+    assert "--entry platform" in reference
+    assert (
+        "--event-entry-as platform - name <literal-text-handle> "
+        "<platform-name>"
+    ) in reference
+    assert "--event-entry platform - name <platform-name>" not in reference
     assert "`id,name,type,path`" in reference
     assert "--event-match soundbank-name <name>" in reference
-    assert "--event-entry platform - name <platform-name>" in reference
     assert "Otherwise omit that predicate" in reference
     assert "never inject a GUID" in reference
 
