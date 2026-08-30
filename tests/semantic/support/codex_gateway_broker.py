@@ -9707,11 +9707,13 @@ class CodexGatewayBroker:
                 step,
                 actual,
             )
-        if step.subcommand in {
-            "draft-declare-cli-console-plan",
-            "draft-declare-host-plan",
-        }:
+        if step.subcommand == "draft-declare-cli-console-plan":
             return CodexGatewayBroker._normalize_cli_console_plan_fact_order(
+                step,
+                actual,
+            )
+        if step.subcommand == "draft-declare-host-plan":
+            return CodexGatewayBroker._normalize_host_plan_fact_order(
                 step,
                 actual,
             )
@@ -9862,6 +9864,72 @@ class CodexGatewayBroker:
                 for expected_key in expected_keys
                 for token in actual_by_key[expected_key]
             ),
+        )
+
+    @staticmethod
+    def _normalize_host_plan_fact_order(
+        step: ExpectedGatewayStep,
+        actual: Sequence[str],
+    ) -> tuple[str, ...]:
+        """Canonicalize group order and equivalent numeric spellings."""
+
+        reordered = CodexGatewayBroker._normalize_cli_console_plan_fact_order(
+            step,
+            actual,
+        )
+        fixed_count = 5
+        option_arity = {
+            "--value": 2,
+            "--item": 2,
+            "--mapping": 3,
+            "--toggle": 2,
+        }
+        numeric_fields = {
+            "frequency_hz",
+            "sample_rate_hz",
+            "attack_seconds",
+            "sustain_seconds",
+            "release_seconds",
+            "sustain_db",
+        }
+
+        def parse(values: Sequence[Any]) -> list[list[Any]] | None:
+            groups: list[list[Any]] = []
+            cursor = fixed_count
+            while cursor < len(values):
+                option = values[cursor]
+                arity = option_arity.get(option) if isinstance(option, str) else None
+                if arity is None or cursor + arity >= len(values):
+                    return None
+                groups.append(list(values[cursor : cursor + arity + 1]))
+                cursor += arity + 1
+            return groups
+
+        expected_groups = parse(step.arguments)
+        actual_groups = parse(reordered)
+        if expected_groups is None or actual_groups is None:
+            return reordered
+        if len(expected_groups) != len(actual_groups):
+            return reordered
+        for expected, observed in zip(expected_groups, actual_groups, strict=True):
+            if expected[:2] != observed[:2]:
+                return reordered
+            if expected[0] != "--value" or expected[1] not in numeric_fields:
+                continue
+            try:
+                expected_number = Decimal(str(expected[2]))
+                observed_number = Decimal(str(observed[2]))
+            except InvalidOperation:
+                continue
+            if (
+                expected_number.is_finite()
+                and observed_number.is_finite()
+                and expected_number == observed_number
+            ):
+                observed[2] = expected[2]
+        return (
+            *tuple(reordered[:fixed_count]),
+            *(token for group in actual_groups for token in group),
         )
 
     def _normalize_import_batch_fact_order(
