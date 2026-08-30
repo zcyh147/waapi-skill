@@ -8047,10 +8047,28 @@ def _validate_heavy_v3_pass_checks(
         )
     if item_type == "topic":
         publisher_count = _heavy_v3_topic_publisher_request_count(prompt_evidence)
+        topic_lifecycle_steps = tuple(
+            step
+            for step in prompt_evidence.provenance.protocol.steps
+            if step.subcommand in {"wait-topic", "stream-topic"}
+        )
+        expected_lifecycle = (
+            topic_lifecycle_steps[0].subcommand
+            if len(topic_lifecycle_steps) == 1
+            else None
+        )
+        expected_dispatch_calls = 0 if expected_lifecycle == "stream-topic" else 1
         if (
-            set(primary) != {"api", "gateway_dispatch_calls", "event_count"}
+            set(primary)
+            != {
+                "api",
+                "gateway_dispatch_calls",
+                "topic_lifecycle",
+                "event_count",
+            }
             or primary.get("api") != api
-            or primary.get("gateway_dispatch_calls") != 1
+            or primary.get("gateway_dispatch_calls") != expected_dispatch_calls
+            or primary.get("topic_lifecycle") != expected_lifecycle
             or primary.get("event_count") != audited_count
             or checks.get("topic_publisher_call_count") != publisher_count
             or type(checks.get("topic_publisher_direct_call_count")) is not int

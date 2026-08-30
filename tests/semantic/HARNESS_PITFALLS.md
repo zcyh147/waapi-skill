@@ -120,6 +120,14 @@ prevention checks that are expensive to rediscover.
   the oracle in addition to match scopes. Never parse the whole stream with one
   `json.loads`, and never repair these harness omissions by weakening the
   production Topic contract.
+- Follow-up: root `imac-topic-9759832-r3-typ24-stream` passed every Agent,
+  Broker, NDJSON, publisher, event, artifact, and final-response gate, then the
+  final dispatch audit failed because it still required one dispatcher `call`
+  row. That invariant belongs to `wait-topic`; `stream-topic` opens a
+  `SubscriptionManager` lifecycle and therefore proves zero dispatcher-call
+  rows plus the sealed ACK, ordered NDJSON events, successful terminal, and
+  explicit unsubscribe cleanup. Every archive validator must branch on the
+  sealed lifecycle instead of treating all Topic evidence as a wait result.
 
 ### Windows task registration guessed the desktop environment
 

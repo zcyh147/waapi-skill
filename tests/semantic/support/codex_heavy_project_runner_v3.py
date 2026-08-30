@@ -78,6 +78,9 @@ from tests.semantic.support.codex_gateway_broker import (
     TrustedSubscriptionAckSpec,
     project_required_metadata_tokens,
 )
+from tests.semantic.support.codex_gateway_contracts import (
+    TOPIC_STREAM_RECORD_CONTRACT,
+)
 from tests.semantic.support.codex_harness import (
     CodexHarnessError,
     CodexInfrastructureError,
@@ -6096,15 +6099,35 @@ def _audit_primary_dispatch(
             raise HeavyProjectRunnerError("topic dispatch has no payload evidence")
         events = topic_payload.get("events")
         observed_events = len(events) if isinstance(events, list) else int(topic_payload.get("event") is not None)
-        if observed_calls != 1 or observed_events != scenario.primary_dispatch.count:
+        lifecycle = topic_payload.get("command")
+        if lifecycle == "wait-topic":
+            lifecycle_valid = observed_calls == 1
+        elif lifecycle == "stream-topic":
+            lifecycle_valid = (
+                observed_calls == 0
+                and topic_payload.get("contract") == TOPIC_STREAM_RECORD_CONTRACT
+                and topic_payload.get("record_type") == "terminal"
+                and topic_payload.get("status") == "completed"
+                and topic_payload.get("completion_reason") == "duration_elapsed"
+                and topic_payload.get("event_count") == observed_events
+                and topic_payload.get("cleanup") == "unsubscribed"
+            )
+        else:
+            lifecycle_valid = False
+        if (
+            not lifecycle_valid
+            or observed_events != scenario.primary_dispatch.count
+        ):
             raise HeavyProjectRunnerError(
-                f"topic evidence differs: calls={observed_calls}, events={observed_events}, "
+                f"topic evidence differs: lifecycle={lifecycle!r}, calls={observed_calls}, "
+                f"events={observed_events}, "
                 f"expected_events={scenario.primary_dispatch.count}"
             )
         return MappingProxyType(
             {
                 "api": scenario.api,
                 "gateway_dispatch_calls": observed_calls,
+                "topic_lifecycle": lifecycle,
                 "event_count": observed_events,
             }
         )

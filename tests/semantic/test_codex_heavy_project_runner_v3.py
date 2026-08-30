@@ -634,6 +634,61 @@ def test_dispatch_audit_accepts_only_the_sealed_topic_ack_as_auxiliary_evidence(
     assert [row["api"] for row in rows] == [runner.SOUNDBANK_TOPIC]
 
 
+def test_primary_dispatch_audit_accepts_stream_lifecycle_without_wait_call(
+    tmp_path: Path,
+) -> None:
+    evidence = (tmp_path / "evidence").resolve()
+    evidence.mkdir()
+    ack_path = evidence / "subscription-ack-stream.json"
+    ack_payload = {
+        "contract": runner.SUBSCRIPTION_ACK_CONTRACT,
+        "step_name": "soundbank.generated.stream",
+        "topic": runner.SOUNDBANK_TOPIC,
+    }
+    ack_raw = runner._canonical_json_bytes(ack_payload) + b"\n"
+    ack_path.write_bytes(ack_raw)
+    proof = {
+        "ack_path": str(ack_path),
+        "ack_payload": ack_payload,
+        "ack_file_sha256": hashlib.sha256(ack_raw).hexdigest(),
+    }
+    task = SimpleNamespace(
+        broker_evidence=SimpleNamespace(evidence_directory=str(evidence))
+    )
+    events = [
+        {"soundbank": {"name": "Weapons_Core"}, "platform": {"name": "Mac"}},
+        {"soundbank": {"name": "Weapons_Core"}, "platform": {"name": "Windows"}},
+    ]
+
+    audit = runner._audit_primary_dispatch(
+        _scenario(
+            runner.SOUNDBANK_TOPIC,
+            scenario_id="O22-SB-GENERATED-03",
+            item_type="topic",
+            count=2,
+        ),
+        task=task,
+        topic_payload={
+            "contract": "waapi-skill.topic-stream/v1",
+            "command": "stream-topic",
+            "record_type": "terminal",
+            "status": "completed",
+            "completion_reason": "duration_elapsed",
+            "event_count": 2,
+            "events": events,
+            "cleanup": "unsubscribed",
+        },
+        topic_subscription_ack=proof,
+    )
+
+    assert audit == {
+        "api": runner.SOUNDBANK_TOPIC,
+        "gateway_dispatch_calls": 0,
+        "topic_lifecycle": "stream-topic",
+        "event_count": 2,
+    }
+
+
 @pytest.mark.parametrize("tamper", ("hash", "payload", "outside", "extra_ack"))
 def test_dispatch_audit_rejects_unsealed_or_ambiguous_topic_ack_evidence(
     tmp_path: Path,
@@ -2295,6 +2350,7 @@ def test_prepare_case_compiles_and_validates_typed_soundbank_sections_for_all_ap
         assert [step.name for step in prepared.protocol.steps] == [
             "soundbank.generated.schema",
             "soundbank.generated.schema.language.entry",
+            "soundbank.generated.schema.platform.entry",
             "soundbank.generated.wait",
         ]
         assert len(prepared.topic_publishers) == 3
