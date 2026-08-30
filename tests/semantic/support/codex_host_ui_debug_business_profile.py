@@ -125,6 +125,7 @@ def _parse_unit(value: Any) -> HostUiDebugBusinessUnit:
         or not prompt.strip()
         or prompt.count(OUTPUT_PLACEHOLDER) != 1
         or "440 Hz" not in prompt
+        or "16-bit PCM" not in prompt
         or "-6 dB" not in prompt
     ):
         raise HostUiDebugBusinessProfileError(
