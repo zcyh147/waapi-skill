@@ -202,6 +202,7 @@ from tests.semantic.support.codex_integration_workflows_v2 import (  # noqa: E40
 from tests.semantic.support.codex_object_heavy_v3 import (  # noqa: E402
     ObjectHeavyRecipeError,
     build_object_heavy_v3_recipe,
+    typed_input_business_query_recipe,
     typed_input_merge_recipe,
     typed_input_rename_recipe,
 )
@@ -6233,6 +6234,30 @@ def _submitted_typed_draft_actions(
         ) from exc
 
 
+def _prepare_heavy_v3_replay_step(
+    replay: CodexGatewayBroker,
+    *,
+    index: int,
+    expected_step: ExpectedGatewayStep,
+    actual_arguments: Sequence[str],
+    label: str,
+) -> ExpectedGatewayStep:
+    """Apply the same deterministic pre-validation binding as live Broker."""
+
+    replay._next_step = index  # noqa: SLF001
+    replay_step = replay._execution_steps[index]  # noqa: SLF001
+    if replay_step.name != expected_step.name:
+        raise CampaignEvidenceError(
+            f"{label} replay step order differs at {expected_step.name}"
+        )
+    replay_step = replay._bind_task_local_declaration_id(  # noqa: SLF001
+        replay_step,
+        actual_arguments,
+    )
+    replay._execution_steps[index] = replay_step  # noqa: SLF001
+    return replay_step
+
+
 def _validate_heavy_v3_broker_records(
     records: Sequence[Any],
     *,
@@ -6351,12 +6376,13 @@ def _validate_heavy_v3_broker_records(
                 invocation_skill_source=invocation_skill_source,
                 shim_directory=task_root / "broker" / "bin",
             )
-            replay._next_step = index - 1  # noqa: SLF001
-            replay_step = replay._execution_steps[index - 1]  # noqa: SLF001
-            if replay_step.name != step.name:
-                raise CampaignEvidenceError(
-                    f"{label} replay step order differs at {step.name}"
-                )
+            replay_step = _prepare_heavy_v3_replay_step(
+                replay,
+                index=index - 1,
+                expected_step=step,
+                actual_arguments=resolved.gateway_arguments,
+                label=label,
+            )
             try:
                 semantic_sha, execution_arguments = replay._validate_step(  # noqa: SLF001
                     replay_step,
@@ -7406,14 +7432,23 @@ def _validate_heavy_v3_typed_business_plan(
             _heavy_v3_base_scenario_id(expected_unit),
             version=str(getattr(expected_unit, "version", "")),
         )
-        if getattr(expected_unit, "unit_id", None) == (
+        unit_id = getattr(expected_unit, "unit_id", None)
+        if unit_id in {
+            "TYP21-QUERY-OBJECT-GET",
+            "TYP23-QUERY-OBJECT-GET",
+        }:
+            recipe = typed_input_business_query_recipe(
+                recipe,
+                unit_id=str(unit_id),
+            )
+        elif unit_id == (
             "TYP21-DEDICATED-OBJECT-CREATE"
         ):
             recipe = typed_input_merge_recipe(
                 recipe,
                 unit_id="TYP21-DEDICATED-OBJECT-CREATE",
             )
-        elif getattr(expected_unit, "unit_id", None) == (
+        elif unit_id == (
             TYPED_PROFILE_RENAME_UNIT_ID
         ):
             recipe = typed_input_rename_recipe(

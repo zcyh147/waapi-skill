@@ -871,6 +871,26 @@ prevention checks that are expensive to rediscover.
   root starts, keep every candidate-owned file immutable until all selected
   hosts seal, even when the discovered fix is obvious.
 
+### Live Broker normalization must be replayed by the archive validator
+
+- Evidence: #60 macOS root `imac-issue60-f282029-r3-priority3` produced three
+  scenario-level PASS outcomes on the frozen candidate, including a verified
+  real `object.create`. The outer archive validator nevertheless classified
+  the query and create units BLOCKED. It rebuilt the query from the historical
+  raw recipe instead of the typed-profile business recipe, and it compared the
+  Agent's valid task-local declaration id `alert` with the protocol placeholder
+  `root-01` without running the same Broker binding used during execution.
+- Cause: execution and archive replay shared `_validate_step` but not all
+  deterministic pre-validation normalization. The archive also omitted the
+  profile-specific recipe migration that constructed the sealed plan.
+- Prevention: rebuild typed-profile archives through the same reviewed recipe
+  selector used before Codex, and apply the Broker's bounded task-local
+  declaration-id binding before replay validation. This does not trust the
+  archived id: the binding still enforces syntax, uniqueness, position, and
+  exact downstream payload/hash checks. A scenario PASS reclassified BLOCKED
+  by the outer verifier remains diagnostic only; repair the verifier and use a
+  new root rather than editing or replaying the sealed root.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:

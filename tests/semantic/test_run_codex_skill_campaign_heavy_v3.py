@@ -2017,6 +2017,116 @@ def _synthetic_object_before(
     )
 
 
+def test_campaign_typed_business_query_archive_uses_the_migrated_recipe(
+    tmp_path: Path,
+) -> None:
+    from tests.semantic.support.codex_typed_input_profile import (
+        load_typed_input_profile,
+    )
+
+    profile = load_typed_input_profile(
+        Path(__file__).resolve().parent
+        / "data"
+        / "typed-input-v1"
+        / "profile.json"
+    )
+    unit = next(
+        row
+        for row in profile.units
+        if row.unit_id == "TYP21-QUERY-OBJECT-GET"
+    )
+    protocol = _synthetic_protocol(
+        unit,
+        scenario_root=tmp_path / "scenario",
+        visible_values={},
+    )
+    sections = _synthetic_typed_sections(
+        unit,
+        protocol=protocol,
+        scenario_root=tmp_path / "scenario",
+    )
+
+    parsed = campaign._validate_heavy_v3_typed_business_plan(
+        sections.writer_kwargs(),
+        expected_unit=unit,
+        provenance=SimpleNamespace(protocol=protocol),
+    )
+
+    assert parsed is not None
+    assert parsed.static_expectation["request"]["value"]["argv"][3:7] == [
+        "query-object",
+        "--path-segment",
+        "Actor-Mixer Hierarchy",
+        "--path-segment",
+    ]
+    assert protocol.optional_query_schema_step_names == (
+        "query-schema",
+        "query-schema.advanced",
+    )
+
+
+def test_campaign_replay_prevalidation_binds_task_local_declaration_id() -> None:
+    expected = ExpectedGatewayStep(
+        "tx01.declare-root-01",
+        "draft-declare-new",
+        (
+            "draft-id",
+            "--task-authority",
+            "authority",
+            "--expected-revision",
+            "1",
+            "--declaration-id",
+            "root-01",
+            "--parent-handle",
+            "parent",
+            "--name",
+            "Alert",
+            "--kind",
+            "random-container",
+        ),
+    )
+    replay = SimpleNamespace(
+        _next_step=-1,
+        _execution_steps=[expected],
+    )
+
+    def bind(step: ExpectedGatewayStep, actual: Sequence[str]):
+        assert actual[7] == "alert"
+        arguments = list(step.arguments)
+        arguments[6] = "alert"
+        return replace(step, arguments=tuple(arguments))
+
+    replay._bind_task_local_declaration_id = bind
+    actual = (
+        "draft-declare-new",
+        "draft-id",
+        "--task-authority",
+        "authority",
+        "--expected-revision",
+        "1",
+        "--declaration-id",
+        "alert",
+        "--parent-handle",
+        "parent",
+        "--name",
+        "Alert",
+        "--kind",
+        "random-container",
+    )
+
+    rebound = campaign._prepare_heavy_v3_replay_step(
+        replay,
+        index=0,
+        expected_step=expected,
+        actual_arguments=actual,
+        label="task-local declaration replay",
+    )
+
+    assert replay._next_step == 0
+    assert rebound.arguments[6] == "alert"
+    assert replay._execution_steps[0] == rebound
+
+
 def _synthetic_audio_components_and_profiles(scenario_id: str):
     presets = (
         ConversionPreset(
