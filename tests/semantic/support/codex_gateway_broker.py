@@ -1534,6 +1534,60 @@ def _topic_fact_groups(
     return tuple(groups)
 
 
+_TOPIC_SHORTHAND_TO_TYPED = {
+    "--topic-option": "--topic-option-as",
+    "--event-match": "--event-match-as",
+    "--event-row": "--event-row-as",
+    "--event-entry": "--event-entry-as",
+    "--event-entry-object": "--event-entry-object-as",
+    "--event-entry-row": "--event-entry-row-as",
+}
+
+
+def _normalize_topic_business_shorthand(
+    step: "ExpectedGatewayStep",
+    supplied: Sequence[str],
+) -> tuple[str, ...]:
+    """Bind untyped public Topic facts to their sealed canonical wire kinds."""
+
+    actual = tuple(supplied)
+    if step.subcommand not in {"wait-topic", "stream-topic"}:
+        return actual
+    fact_start = next(
+        (
+            index
+            for index, value in enumerate(step.arguments)
+            if isinstance(value, str) and value in _TOPIC_BUSINESS_GROUP_WIDTHS
+        ),
+        None,
+    )
+    if fact_start is None or actual[:fact_start] != step.arguments[:fact_start]:
+        return actual
+    expected_groups = _topic_fact_groups(step.arguments[fact_start:])
+    actual_groups = _topic_fact_groups(actual[fact_start:])
+    if expected_groups is None or actual_groups is None:
+        return actual
+
+    normalized: list[str] = list(actual[:fact_start])
+    for group in actual_groups:
+        typed_flag = _TOPIC_SHORTHAND_TO_TYPED.get(group[0])
+        if typed_flag is None:
+            normalized.extend(group)
+            continue
+        candidates = tuple(
+            expected
+            for expected in expected_groups
+            if expected[0] == typed_flag
+            and len(expected) == len(group) + 1
+            and expected[1:-2] == group[1:-1]
+            and expected[-1] == group[-1]
+        )
+        if len(candidates) != 1:
+            return actual
+        normalized.extend(candidates[0])
+    return tuple(normalized)
+
+
 def _commutative_topic_match_destination(
     group: Sequence[str],
 ) -> tuple[str, ...] | None:
@@ -1559,7 +1613,7 @@ def _normalize_commutative_wait_topic_facts(
     """
 
     actual = tuple(supplied)
-    if step.subcommand != "wait-topic" or actual == step.arguments:
+    if step.subcommand not in {"wait-topic", "stream-topic"} or actual == step.arguments:
         return actual
     fact_start = next(
         (
@@ -10438,6 +10492,10 @@ class CodexGatewayBroker:
                     "utf-8"
                 ),
             )
+        validation_arguments = _normalize_topic_business_shorthand(
+            step,
+            validation_arguments,
+        )
         validation_arguments = _normalize_commutative_wait_topic_facts(
             step,
             validation_arguments,
