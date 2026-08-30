@@ -201,6 +201,7 @@ from tests.semantic.support.codex_soundbank_business_plan_v3 import (
     TOPIC_ACK_REQUIREMENT_CONTRACT,
     SoundBankBusinessPlanSections,
     compile_soundbank_business_plan,
+    soundbank_topic_protocol_steps,
     validate_soundbank_business_plan,
 )
 from tests.semantic.support.codex_soundbank_runtime_v3 import (
@@ -5118,18 +5119,13 @@ def _prepare_case(
             raise HeavyProjectRunnerError("SoundBank topic scenario has no topic plan")
         step_name = "soundbank.generated.wait"
         protocol = build_direct_protocol(
-            [
-                topic_schema_step("soundbank.generated.schema", topic.topic),
-                wait_topic_step(
-                    step_name,
-                    topic.topic,
-                    version=runtime.version,
-                    event_count=topic.event_count,
-                    match=topic.match,
-                    options=topic.options,
-                    timeout_seconds=120.0,
-                )
-            ]
+            soundbank_topic_protocol_steps(
+                topic=topic.topic,
+                version=runtime.version,
+                event_count=topic.event_count,
+                match=topic.match,
+                options=topic.options,
+            )
         )
         typed_sections = compile_soundbank_business_plan(
             soundbank_materialized,

@@ -279,7 +279,7 @@ def _validate_inputs(materialized: MaterializedSoundBankCase, before: SoundBankS
             raise SoundBankBusinessPlanError("topic must have only a closed topic plan")
         topic = materialized.topic_plan
         expected = build_direct_protocol(
-            _topic_protocol_steps(
+            soundbank_topic_protocol_steps(
                 topic=topic.topic,
                 version=blueprint.version,
                 event_count=topic.event_count,
@@ -406,7 +406,7 @@ def _expected_protocol_archive(static: Mapping[str, Any], live: Mapping[str, Any
         topic = live["topic"]
         return _protocol(
             build_direct_protocol(
-                _topic_protocol_steps(
+                soundbank_topic_protocol_steps(
                     topic=topic["topic"],
                     version=str(static["version"]),
                     event_count=topic["event_count"],
@@ -418,7 +418,7 @@ def _expected_protocol_archive(static: Mapping[str, Any], live: Mapping[str, Any
     return _protocol(build_transaction_protocol(static["operation_requests"], refusal=None if static["zero_dispatch_error_code"] is None else _refusal(static["zero_dispatch_error_code"])))
 
 
-def _topic_protocol_steps(
+def soundbank_topic_protocol_steps(
     *,
     topic: str,
     version: str,
@@ -1314,4 +1314,4 @@ def _json(value: Any) -> Any:
 def _plain(value: Any) -> Any: return _json(value)
 
 
-__all__ = ["SoundBankBusinessPlanError", "SoundBankBusinessPlanSections", "TOPIC_ACK_CONTRACT", "TOPIC_ACK_PROOF_CONTRACT", "TOPIC_ACK_REQUIREMENT_CONTRACT", "compile_soundbank_business_plan", "validate_soundbank_business_plan", "soundbank_archive_identity", "parse_soundbank_business_plan_sections", "validate_soundbank_business_plan_archive", "validate_soundbank_archived_verification"]
+__all__ = ["SoundBankBusinessPlanError", "SoundBankBusinessPlanSections", "TOPIC_ACK_CONTRACT", "TOPIC_ACK_PROOF_CONTRACT", "TOPIC_ACK_REQUIREMENT_CONTRACT", "compile_soundbank_business_plan", "validate_soundbank_business_plan", "soundbank_archive_identity", "soundbank_topic_protocol_steps", "parse_soundbank_business_plan_sections", "validate_soundbank_business_plan_archive", "validate_soundbank_archived_verification"]
