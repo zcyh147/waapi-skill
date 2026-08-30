@@ -3412,6 +3412,10 @@ def test_soundbank_topic_protocol_selects_finite_stream_for_explicit_stream_case
     assert steps[-1].subcommand == "stream-topic"
     assert steps[-1].gateway_global_arguments == ("--timeout", "30")
     assert "--event-count" not in steps[-1].arguments
+    assert any(
+        step.arguments[-2:] == ("--entry", "platform")
+        for step in steps[:-1]
+    )
 
 
 def _synthetic_audio_transaction_request() -> dict[str, Any]:

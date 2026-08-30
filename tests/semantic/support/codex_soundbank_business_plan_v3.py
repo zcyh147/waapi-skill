@@ -483,7 +483,13 @@ def soundbank_topic_protocol_steps(
             separators=(",", ":"),
         )
     )
-    disclosure_scopes = tuple(sorted({*canonical_match, "language"}))
+    # Platform and language are event-result identities used by every reviewed
+    # SoundBank generated oracle even when they are intentionally not match
+    # predicates. Keep only these two sealed result disclosures beyond the
+    # scopes already present in the subscription match.
+    disclosure_scopes = tuple(
+        sorted({*canonical_match, "language", "platform"})
+    )
     for scope in disclosure_scopes:
         value = canonical_match.get(scope)
         if isinstance(value, Mapping) and any(
