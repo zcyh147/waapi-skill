@@ -3322,25 +3322,25 @@ def test_soundbank_topic_protocol_discloses_each_nested_match_scope() -> None:
 
     assert [step.name for step in steps] == [
         "soundbank.generated.schema",
+        "soundbank.generated.schema.platform.entry",
         "soundbank.generated.schema.soundbank.match-group",
         "soundbank.generated.schema.soundbank.entry",
-        "soundbank.generated.schema.platform.entry",
         "soundbank.generated.wait",
     ]
     assert steps[1].arguments == (
         "ak.wwise.core.soundbank.generated",
-        "--match-group",
-        "soundbank",
+        "--entry",
+        "platform",
     )
     assert steps[2].arguments == (
         "ak.wwise.core.soundbank.generated",
-        "--entry",
+        "--match-group",
         "soundbank",
     )
     assert steps[3].arguments == (
         "ak.wwise.core.soundbank.generated",
         "--entry",
-        "platform",
+        "soundbank",
     )
 
     protocol = build_optional_topic_schema_protocol(steps)
@@ -3348,11 +3348,23 @@ def test_soundbank_topic_protocol_discloses_each_nested_match_scope() -> None:
     assert protocol.terminal_prefix_counts == (2, 3, 4, 5)
     assert protocol.optional_topic_schema_step_groups == (
         (
+            "soundbank.generated.schema.platform.entry",
             "soundbank.generated.schema.soundbank.match-group",
             "soundbank.generated.schema.soundbank.entry",
-            "soundbank.generated.schema.platform.entry",
         ),
     )
+
+    reordered = soundbank_topic_protocol_steps(
+        topic="ak.wwise.core.soundbank.generated",
+        version="2022.1",
+        event_count=3,
+        match={
+            "platform": {"name": "Windows"},
+            "soundbank": {"name": "Dialogue_Chapter14"},
+        },
+        options={"return": ["id", "name", "type", "path"]},
+    )
+    assert reordered == steps
 
 
 def _synthetic_audio_transaction_request() -> dict[str, Any]:

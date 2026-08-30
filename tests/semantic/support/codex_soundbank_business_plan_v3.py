@@ -432,7 +432,25 @@ def soundbank_topic_protocol_steps(
 
     steps = [topic_schema_step("soundbank.generated.schema", topic)]
     contract = topic_business_contract(version, topic)
-    for scope, value in match.items():
+    canonical_match = json.loads(
+        json.dumps(
+            _json(match),
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    )
+    canonical_options = json.loads(
+        json.dumps(
+            _json(options),
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    )
+    for scope, value in canonical_match.items():
         if not isinstance(value, Mapping):
             continue
         if any(
@@ -461,8 +479,8 @@ def soundbank_topic_protocol_steps(
             topic,
             version=version,
             event_count=event_count,
-            match=match,
-            options=options,
+            match=canonical_match,
+            options=canonical_options,
         )
     )
     return steps
