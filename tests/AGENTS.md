@@ -241,8 +241,10 @@ moves the sandbox into the evidence quarantine and writes a `prepared` /
 `PENDING` row. Only after transaction materialization, host shutdown, lock
 release, source-integrity checks, and quarantine cleanup all succeed may it
 append a `final` / `PASS` row. A prepared row grants no credit. Any earlier
-failure writes a final non-PASS row and retains the quarantine; a late evidence
-or cleanup failure must never leave a final PASS.
+failure writes a final non-PASS row and derives `quarantined`, `retained`, or
+`quarantine_failed` from the observed filesystem state; it must never claim a
+quarantine without its exact path. A late evidence or cleanup failure must
+never leave a final PASS.
 
 ### SoundBank file-operation fixtures
 

@@ -140,6 +140,26 @@ def append_category_evidence(
                 or (phase == "prepared") != (invocation["outcome"] == "PENDING")
             ):
                 raise AssertionError("exact category evidence v3 invocation values are invalid")
+            sandbox_state = residual_state.get("sandbox")
+            quarantine_path = residual_state.get("quarantine_path")
+            if sandbox_state not in {
+                "quarantined_pending_release",
+                "quarantined",
+                "retained",
+                "quarantine_failed",
+                "deleted",
+            }:
+                raise AssertionError("exact category evidence v3 sandbox state is invalid")
+            if sandbox_state in {"quarantined_pending_release", "quarantined"} and (
+                not isinstance(quarantine_path, str) or not quarantine_path
+            ):
+                raise AssertionError(
+                    "exact category evidence cannot claim quarantine without its exact path"
+                )
+            if invocation["phase"] == "final" and invocation["outcome"] == "PASS" and (
+                sandbox_state != "deleted"
+            ):
+                raise AssertionError("exact category evidence final PASS requires deleted sandbox")
         required_transaction_fields = {
             "transaction_id",
             "state",

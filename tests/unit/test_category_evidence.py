@@ -211,7 +211,10 @@ def test_exact_evidence_v3_preserves_prepared_phase_without_pass_credit(
             }
         ],
         source={},
-        residual_state={"sandbox": "quarantined_pending_release"},
+        residual_state={
+            "sandbox": "quarantined_pending_release",
+            "quarantine_path": "/tmp/quarantine",
+        },
         invocation={
             "selected_test_nodeids": [nodeid],
             "node_outcomes": [{"nodeid": nodeid, "outcome": "PASS"}],
@@ -227,3 +230,37 @@ def test_exact_evidence_v3_preserves_prepared_phase_without_pass_credit(
     assert payload["contract"] == "waapi-skill.host-category-evidence/v3"
     assert payload["invocation"]["phase"] == "prepared"
     assert payload["invocation"]["outcome"] == "PENDING"
+
+
+def test_exact_evidence_v3_rejects_quarantine_without_exact_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(category_evidence, "current_evidence_platform", lambda: "macos")
+    nodeid = "tests/destructive/test_example.py::test_one"
+
+    with pytest.raises(AssertionError, match="cannot claim quarantine"):
+        category_evidence.append_category_evidence(
+            repo_root=tmp_path,
+            candidate="d" * 40,
+            version="2025.1",
+            host={"display_name": "WwiseConsole"},
+            categories=[
+                {
+                    "category": "object-topology",
+                    "status": "FAIL",
+                    "verifier_strength": "readback",
+                }
+            ],
+            source={},
+            residual_state={"sandbox": "quarantined", "quarantine_path": None},
+            invocation={
+                "selected_test_nodeids": [nodeid],
+                "node_outcomes": [{"nodeid": nodeid, "outcome": "FAIL"}],
+                "started_at_unix_ns": 1,
+                "finished_at_unix_ns": 2,
+                "phase": "final",
+                "outcome": "FAIL",
+            },
+            transactions=[],
+        )

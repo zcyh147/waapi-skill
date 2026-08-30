@@ -122,6 +122,59 @@ def test_prepared_evidence_failure_leaves_quarantine_and_no_false_pass(
     assert records[0]["invocation"]["outcome"] == "PENDING"
 
 
+def test_quarantine_failure_reports_retained_state_not_false_quarantine(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    module_file = tmp_path / "example.py"
+    module_file.write_text("", encoding="utf-8")
+    retained = tmp_path / "retained"
+    retained.mkdir()
+    lock = _Lock()
+    records: list[dict] = []
+    monkeypatch.setattr(exact_real_evidence, "exact_transaction_outcomes", lambda _path: [])
+    monkeypatch.setattr(
+        exact_real_evidence,
+        "cleanup_sandbox",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("move failed")),
+    )
+    monkeypatch.setattr(
+        exact_real_evidence,
+        "append_category_evidence",
+        lambda **payload: records.append(payload),
+    )
+
+    error = exact_real_evidence.finalize_exact_real_evidence(
+        repo_root=tmp_path,
+        candidate="a" * 40,
+        version="2025.1",
+        request=_request(module_file),
+        module_file=module_file,
+        started_at_unix_ns=1,
+        active_error=None,
+        deferred_error=None,
+        sandbox=_sandbox(retained),
+        lock=lock,
+        state_dir=tmp_path / "state",
+        host={"display_name": "WwiseConsole"},
+        categories=[
+            {
+                "category": "object-topology",
+                "status": "PASS",
+                "verifier_strength": "readback",
+            }
+        ],
+        source={},
+    )
+
+    assert isinstance(error, OSError)
+    assert retained.is_dir()
+    assert len(records) == 1
+    assert records[0]["invocation"]["outcome"] == "FAIL"
+    assert records[0]["residual_state"]["sandbox"] == "retained"
+    assert records[0]["residual_state"]["quarantine_path"] is None
+
+
 def test_node_outcomes_preserve_skip_and_blocked_states(tmp_path: Path) -> None:
     module_file = tmp_path / "example.py"
     module_file.write_text("", encoding="utf-8")

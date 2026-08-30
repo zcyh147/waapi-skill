@@ -74,6 +74,17 @@ def _overall_outcome(
     return "PASS" if statuses == {"PASS"} else "BLOCKED"
 
 
+def _observed_nonpass_sandbox_state(
+    sandbox: SandboxProject,
+    quarantine_path: Path | None,
+) -> str:
+    if quarantine_path is not None and quarantine_path.is_dir():
+        return "quarantined"
+    if sandbox.sandbox_path.exists():
+        return "retained"
+    return "quarantine_failed"
+
+
 def finalize_exact_real_evidence(
     *,
     repo_root: Path,
@@ -157,7 +168,14 @@ def finalize_exact_real_evidence(
 
     if outcome != "PASS":
         try:
-            append_record(phase="final", record_outcome=outcome, sandbox_state="quarantined")
+            append_record(
+                phase="final",
+                record_outcome=outcome,
+                sandbox_state=_observed_nonpass_sandbox_state(
+                    sandbox,
+                    quarantine_path,
+                ),
+            )
         except BaseException as exc:  # noqa: BLE001 - quarantine remains durable
             deferred_error = deferred_error or exc
         return deferred_error
@@ -177,7 +195,14 @@ def finalize_exact_real_evidence(
     except BaseException as exc:  # noqa: BLE001 - final record must report cleanup failure
         deferred_error = deferred_error or exc
         try:
-            append_record(phase="final", record_outcome="FAIL", sandbox_state="quarantined")
+            append_record(
+                phase="final",
+                record_outcome="FAIL",
+                sandbox_state=_observed_nonpass_sandbox_state(
+                    sandbox,
+                    quarantine_path,
+                ),
+            )
         except BaseException as evidence_exc:  # noqa: BLE001
             deferred_error = deferred_error or evidence_exc
         return deferred_error
