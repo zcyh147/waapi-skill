@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from pathlib import PureWindowsPath
 
@@ -184,6 +185,10 @@ def test_local_wine_console_project_dispatch_translates_the_audited_path(
         ("ak.wwise.ui.project.open", True),
         ("ak.wwise.ui.project.create", False),
     ),
+)
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="This test simulates local POSIX Wine drive translation",
 )
 def test_local_wine_authoring_project_transition_without_current_project_uses_target_anchor(
     tmp_path: Path,
