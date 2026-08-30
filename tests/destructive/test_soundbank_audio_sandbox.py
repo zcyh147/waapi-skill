@@ -941,8 +941,8 @@ def _unsubscribe(handler: Any) -> None:
     if handler is None:
         return
     unsubscribe = getattr(handler, "unsubscribe", None)
-    if callable(unsubscribe):
-        unsubscribe()
+    assert callable(unsubscribe), "WAAPI subscription handler cannot unsubscribe"
+    assert unsubscribe() is True, "WAAPI subscription cleanup returned false"
 
 
 def _hash_mutation_bearing_project_files(root: Path) -> tuple[str, int, int]:

@@ -103,6 +103,28 @@ def test_active_soundbank_and_transport_families_name_hard_event_proofs() -> Non
         )
 
 
+def test_soundbank_topic_proof_requires_successful_unsubscribe() -> None:
+    soundbank_test = (
+        REPO_ROOT / "tests" / "destructive" / "test_soundbank_audio_sandbox.py"
+    )
+    module = ast.parse(soundbank_test.read_text(encoding="utf-8"))
+    helper = next(
+        node
+        for node in module.body
+        if isinstance(node, ast.FunctionDef) and node.name == "_unsubscribe"
+    )
+    assert any(
+        isinstance(node, ast.Assert)
+        and isinstance(node.test, ast.Compare)
+        and len(node.test.ops) == 1
+        and isinstance(node.test.ops[0], ast.Is)
+        and len(node.test.comparators) == 1
+        and isinstance(node.test.comparators[0], ast.Constant)
+        and node.test.comparators[0].value is True
+        for node in ast.walk(helper)
+    )
+
+
 def _policy() -> Mapping[str, Any]:
     return json.loads(POLICY_PATH.read_text(encoding="utf-8"))
 
