@@ -12,6 +12,7 @@ from .business_declarations import business_repair
 from .canonical import canonical_json_bytes
 from .cli_console_business_contracts import (
     CLI_CONSOLE_BUSINESS_OPERATIONS,
+    CLI_CONSOLE_ENUM_CHOICES,
     cli_console_business_contract_data,
 )
 from .operation_registry import parse_operation_request
@@ -23,13 +24,8 @@ _IMPORT_MODES = {
     "replace": "replaceExisting",
 }
 _ENUMS = {
-    "verbosity": {"normal", "quiet", "verbose"},
-    "source_control": {"enabled", "disabled"},
-    "wwise_dat": {"write", "omit"},
-    "decoded_media": {"write", "omit"},
-    "tabular_import_mode": set(_IMPORT_MODES),
-    "content": {"names", "property_sets"},
-    "migration_policy": {"migrate", "fail"},
+    field: set(choices)
+    for field, choices in CLI_CONSOLE_ENUM_CHOICES.items()
 }
 _LIST_TYPES = {
     "platform_name_list",

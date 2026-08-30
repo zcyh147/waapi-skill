@@ -1561,7 +1561,13 @@ def execute_migrate_successfully(
     )
     assert exit_code == 0, payload
     assert payload["state"] == TransactionState.EXECUTED_UNVERIFIED.value
-    assert "next_command" not in payload
+    assert payload["agent_control"]["required_outcome_before_reply"] == (
+        "verified_or_structured_verification_failure"
+    )
+    assert payload["next_command"]["gateway_argv"][-2:] == [
+        "verify",
+        transaction["transaction_id"],
+    ]
     return transaction, request, preview_client, execute_client
 
 
@@ -7279,10 +7285,9 @@ def test_additional_reviewed_explicit_project_cli_calls_verify_without_project_p
         api,
     ]
 
-    # Conversion uses this verification path directly. Migration remains
-    # terminal after execute in the agent-facing protocol, but its lower-level
-    # durable contract must likewise never probe an Authoring project that the
-    # CLI process may already have unloaded.
+    # Both conversion and migration must follow the returned verify continuation.
+    # That context/runtime-only verification never probes an Authoring project
+    # that the CLI process may already have unloaded.
     verify_client = FakeClient({"ak.wwise.core.getInfo": [live_info()]})
     verify_exit, verify_payload = execute(
         ["verify", transaction["transaction_id"]],

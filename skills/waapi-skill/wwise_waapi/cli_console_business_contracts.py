@@ -11,6 +11,16 @@ ALL_VERSIONS = ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
 VERSIONS_2022_PLUS = ("2022.1", "2023.1", "2024.1", "2025.1")
 VERSIONS_2023_PLUS = ("2023.1", "2024.1", "2025.1")
 
+CLI_CONSOLE_ENUM_CHOICES: dict[str, tuple[str, ...]] = {
+    "verbosity": ("normal", "quiet", "verbose"),
+    "source_control": ("disabled", "enabled"),
+    "wwise_dat": ("omit", "write"),
+    "decoded_media": ("omit", "write"),
+    "tabular_import_mode": ("create", "replace", "reuse"),
+    "content": ("names", "property_sets"),
+    "migration_policy": ("fail", "migrate"),
+}
+
 
 _COMMON_TYPES: dict[str, str] = {
     "project_file": "exact_project_file",
@@ -689,12 +699,20 @@ def _input_form(field: str, field_type: str) -> dict[str, Any]:
             "arguments": [field, "enable|disable"],
             "repeatable": False,
         }
-    return {"flag": "--value", "arguments": [field, "<value>"], "repeatable": False}
+    result = {
+        "flag": "--value",
+        "arguments": [field, "<value>"],
+        "repeatable": False,
+    }
+    if field in CLI_CONSOLE_ENUM_CHOICES:
+        result["choices"] = list(CLI_CONSOLE_ENUM_CHOICES[field])
+    return result
 
 
 __all__ = [
     "CLI_CONSOLE_BUSINESS_CONTRACT",
     "CLI_CONSOLE_BUSINESS_OPERATIONS",
+    "CLI_CONSOLE_ENUM_CHOICES",
     "cli_console_business_catalog_rows",
     "cli_console_business_contract_data",
     "cli_console_business_versions",

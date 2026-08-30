@@ -159,6 +159,31 @@ def test_every_cli_console_lane_has_one_deep_business_entry(
         assert native_leak not in encoded
 
 
+def test_cli_console_schema_discloses_every_closed_scalar_choice() -> None:
+    expected = {
+        "verbosity": ["normal", "quiet", "verbose"],
+        "source_control": ["disabled", "enabled"],
+        "wwise_dat": ["omit", "write"],
+        "decoded_media": ["omit", "write"],
+        "tabular_import_mode": ["create", "replace", "reuse"],
+        "content": ["names", "property_sets"],
+        "migration_policy": ["fail", "migrate"],
+    }
+
+    disclosed: dict[str, list[str]] = {}
+    for operation, versions in LANES.items():
+        for version in versions:
+            forms = cli_console_business_contract_data(operation, version)[
+                "declaration"
+            ]["input_forms"]
+            for field, choices in expected.items():
+                if field in forms:
+                    assert forms[field]["choices"] == choices
+                    disclosed[field] = choices
+
+    assert disclosed == expected
+
+
 @pytest.mark.parametrize(
     ("operation", "version"),
     [
