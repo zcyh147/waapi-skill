@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Any, Mapping, Sequence
 
 from .capabilities import CapabilityCatalog, CapabilityNotFoundError
-from .schema_inventory import load_definition_graph
+from .canonical import canonical_sha256
+from .schema_inventory import DefinitionGraph, load_definition_graph
 from .typed_requests import (
     MaterializedTypedRequest,
     TypedRequestContract,
@@ -88,7 +90,7 @@ def topic_match_contract(version: str, topic: str) -> TypedRequestContract:
             "argsSchema": _optional_match_schema(publish),
             "optionsSchema": _empty_object_schema(),
         },
-        graph=load_definition_graph(version),
+        graph=_optional_match_definition_graph(version),
     )
 
 
@@ -148,6 +150,34 @@ def _optional_match_schema(value: Any) -> Any:
     if isinstance(value, list):
         return [_optional_match_schema(item) for item in value]
     return deepcopy(value)
+
+
+def _optional_match_definition_graph(version: str) -> DefinitionGraph:
+    """Remove nested publish requirements while retaining exact version data."""
+
+    graph = load_definition_graph(version)
+    projected_documents = {
+        name: _optional_match_schema(document)
+        for name, document in graph.documents.items()
+    }
+    documents = {
+        name: MappingProxyType(document)
+        for name, document in projected_documents.items()
+    }
+    return DefinitionGraph(
+        contract=graph.contract,
+        version=graph.version,
+        wwise_build=graph.wwise_build,
+        source_file_names=graph.source_file_names,
+        documents=MappingProxyType(documents),
+        inventory_sha256=canonical_sha256(
+            {
+                "source_inventory_sha256": graph.inventory_sha256,
+                "projection": "optional-topic-match/v1",
+                "documents": projected_documents,
+            }
+        ),
+    )
 
 
 __all__ = [

@@ -7,8 +7,6 @@ from pathlib import Path
 
 import pytest
 
-from tests.semantic.support.codex_eval_protocol_v3 import wait_topic_step
-from tests.semantic.support.codex_gateway_broker import ResponseBinding
 from wwise_waapi.capabilities import CapabilityCatalog
 from wwise_waapi.execution_contracts import AUTHORING_UI_EXECUTION_PROFILE
 from wwise_waapi.typed_topics import (
@@ -116,6 +114,11 @@ def _expand_compact_field_table(table: dict[str, object]) -> list[dict[str, obje
             field["map"] = map_payload
         expanded_fields.append(field)
     return expanded_fields
+
+
+def _business_field_names(table: dict[str, object]) -> set[str]:
+    field_column = list(table["columns"]).index("field")
+    return {str(row[field_column]) for row in table["rows"]}
 
 
 @pytest.mark.parametrize("version", ("2021.1", "2023.1", "2024.1"))
@@ -317,300 +320,9 @@ def test_name_changed_options_and_nested_match_materialize_exactly() -> None:
     }
 
 
-def test_topic_schema_discloses_one_typed_continuation_offline(tmp_path: Path) -> None:
-    topic = "ak.wwise.core.object.nameChanged"
-    called = False
-
-    def client_factory(url: str):
-        nonlocal called
-        called = True
-        raise AssertionError(url)
-
-    code, payload = gateway.execute_gateway(
-        ["topic-schema", topic],
-        env=_env(tmp_path, "2025.1"),
-        client_factory=client_factory,
-    )
-
-    assert code == 0
-    assert called is False
-    assert payload["contract"] == "waapi-skill.typed-topic-input/v1"
-    assert payload["topic"] == topic
-    assert payload["options"]["schema_digest"]
-    assert payload["event_match"]["schema_digest"]
-    assert "construction_order" not in payload["options"]
-    assert "top_level_fact_plan" not in payload["options"]
-    assert "construction_order" not in payload["event_match"]
-    assert "top_level_fact_plan" not in payload["event_match"]
-    assert payload["bounds"]["stdout_utf8_bytes"] == 32 * 1024
-    assert payload["continuation"]["subcommands"] == ["wait-topic", "stream-topic"]
-    assert payload["continuation"]["fact_selection"] == (
-        "row action; present only when empty; disclose-* rows only"
-    )
-    assert payload["continuation"]["fact_order"] == (
-        "options ordered; match facts commute"
-    )
-    prefix = payload["continuation"]["wait_argv_prefix"]
-    assert prefix[:6] == [
-        "--timeout",
-        "<positive-seconds>",
-        "wait-topic",
-        topic,
-        "--event-count",
-        "<exact-count:1..64>",
-    ]
-    assert prefix[6:] == [
-        "--options-schema-digest",
-        payload["options"]["schema_digest"],
-        "--match-schema-digest",
-        payload["event_match"]["schema_digest"],
-    ]
-    assert payload["event_match"]["continuation"]["dynamic_container_commands"] == {
-        "array_item": "request-array-item",
-    }
-    serialized = json.dumps(payload, sort_keys=True)
-    assert "options-json" not in serialized
-    assert "match-json" not in serialized
 
 
-def test_scalar_topic_array_does_not_advertise_container_disclosure(
-    tmp_path: Path,
-) -> None:
-    topic = "ak.wwise.core.soundbank.generated"
-    code, payload = gateway.execute_gateway(
-        ["topic-schema", topic],
-        env=_env(tmp_path, "2021.1"),
-        client_factory=lambda url: pytest.fail(f"topic-schema connected to {url}"),
-    )
-
-    assert code == 0
-    return_field = next(
-        field
-        for field in _expand_compact_field_table(payload["options"]["fields"])
-        if field["name"] == "return"
-    )
-    assert return_field["accepted_types"] == ["string"]
-    assert return_field["fact_construction"] == {
-        "nonempty_scalar_items": {
-            "phase": "before_dynamic_disclosure",
-            "fact_action": "append",
-            "repeat_for_each_item": True,
-        },
-        "empty_array_only": {
-            "phase": "before_dynamic_disclosure",
-            "fact_action": "present",
-            "must_not_accompany": ["append"],
-        },
-    }
-    assert "dynamic_container_commands" not in payload["options"]["continuation"]
-    platform = next(
-        field
-        for field in _expand_compact_field_table(payload["event_match"]["fields"])
-        if field["name"] == "platform" and field.get("parent_handle") is None
-    )
-    fact_tables = payload["continuation"]["fact_argv"]["top_level_fact_tables"]
-    assert fact_tables["options"] == {
-        "columns": [
-            "business_pointer", "nonempty_fact_argv", "empty_argv",
-            "object_identity_match_argv",
-        ],
-        "rows": [
-            [
-                "/options/bankData",
-                ["--option-set", "trh1-1a15d3daa1ee65ce7a4d8dc9", "boolean", "<business-value>"],
-                None,
-                None,
-            ],
-            [
-                "/options/infoFile",
-                ["--option-set", "trh1-a420199e36fa199a064d9b1a", "boolean", "<business-value>"],
-                None,
-                None,
-            ],
-            [
-                "/options/pluginInfo",
-                ["--option-set", "trh1-608f352938a2e4324477c1a4", "boolean", "<business-value>"],
-                None,
-                None,
-            ],
-            [
-                "/options/return",
-                ["--option-append", return_field["handle"], "string", "<business-value>"],
-                ["--option-present", return_field["handle"]],
-                None,
-            ],
-        ],
-    }
-    assert fact_tables["match"]["columns"] == [
-        "business_pointer", "nonempty_fact_argv", "empty_argv",
-        "object_identity_match_argv",
-    ]
-    platform_row = next(
-        row
-        for row in fact_tables["match"]["rows"]
-        if row[0] == "/args/platform"
-    )
-    assert platform_row == [
-        "/args/platform",
-        [
-            "--match-map-put", platform["handle"], "<business-map-member-key>",
-            "<type-of-business-map-member-value>",
-            "<business-map-member-value>",
-        ],
-        ["--match-present", platform["handle"]],
-        {
-            "id": [
-                "--match-map-put", platform["handle"], "id", "string",
-                "<exact-guid>",
-            ],
-            "name": [
-                "--match-map-put", platform["handle"], "name", "string",
-                "<exact-name>",
-            ],
-        },
-    ]
-    encoded = gateway.gateway_stdout_json_encoder(payload).encode(payload)
-    assert encoded.index(platform["handle"]) < 4096
-
-
-@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
-def test_wait_topic_digests_bind_to_the_real_topic_schema_envelope(
-    tmp_path: Path,
-    version: str,
-) -> None:
-    topic = "ak.wwise.core.soundbank.generated"
-    code, payload = gateway.execute_gateway(
-        ["topic-schema", topic],
-        env=_env(tmp_path, version),
-        client_factory=lambda url: pytest.fail(f"topic-schema connected to {url}"),
-    )
-    assert code == 0, payload
-    step = wait_topic_step(
-        "soundbank.generated.wait",
-        topic,
-        version=version,
-        event_count=1,
-        schema_step_name="soundbank.generated.schema",
-    )
-    options_binding = step.arguments[
-        step.arguments.index("--options-schema-digest") + 1
-    ]
-    match_binding = step.arguments[
-        step.arguments.index("--match-schema-digest") + 1
-    ]
-
-    assert options_binding == ResponseBinding(
-        "soundbank.generated.schema", "/options/schema_digest"
-    )
-    assert match_binding == ResponseBinding(
-        "soundbank.generated.schema", "/event_match/schema_digest"
-    )
-    assert payload["options"]["schema_digest"]
-    assert payload["event_match"]["schema_digest"]
-    assert payload["options"]["fields"]["section"] == "options"
-    assert payload["event_match"]["fields"]["section"] == "args"
-    assert payload["options"]["continuation"]["request_key"] == (
-        f"topic.options:{topic}"
-    )
-    assert payload["event_match"]["continuation"]["request_key"] == (
-        f"topic.match:{topic}"
-    )
-    for contract, public_key in (
-        (topic_options_contract(version, topic), "options"),
-        (topic_match_contract(version, topic), "event_match"),
-    ):
-        full_fields = contract.gateway_field_payloads()
-        compact_fields = _expand_compact_field_table(payload[public_key]["fields"])
-        assert len(compact_fields) == len(full_fields)
-        for full, compact in zip(full_fields, compact_fields, strict=True):
-            expected = dict(full)
-            expected.pop("path")
-            assert compact == expected
-    platform = next(
-        field
-        for field in _expand_compact_field_table(payload["event_match"]["fields"])
-        if field["name"] == "platform" and field.get("parent_handle") is None
-    )
-    assert platform["fact_construction"] == {
-        "nonempty_scalar_members": {
-            "phase": "before_dynamic_disclosure",
-            "fact_action": "map-put",
-            "repeat_for_each_member": True,
-        },
-        "empty_map_only": {
-            "phase": "before_dynamic_disclosure",
-            "fact_action": "present",
-            "must_not_accompany": ["map-put"],
-        },
-    }
-    assert payload["continuation"]["fact_selection"] == (
-        "row action; present only when empty; disclose-* rows only"
-    )
-    soundbank_map = next(
-        field
-        for field in _expand_compact_field_table(payload["event_match"]["fields"])
-        if field["name"] == "soundbank:map"
-    )
-    assert soundbank_map["map"]["fixed_key_route"] == "explicit_child_row"
-    assert any(
-        field["name"] == "name"
-        and field.get("parent_handle") == soundbank_map["parent_handle"]
-        for field in _expand_compact_field_table(payload["event_match"]["fields"])
-    )
-    duplicate_paths = {
-        int(row): path
-        for row, path in payload["event_match"]["fields"][
-            "duplicate_name_paths"
-        ]
-    }
-    assert payload["event_match"]["fields"]["path"] == (
-        "omitted; duplicate names use path row; no parent map"
-    )
-    compact_rows = payload["event_match"]["fields"]["rows"]
-    top_level_name_row = next(
-        index
-        for index, row in enumerate(compact_rows)
-        if row[2] == "name" and row[1] is not None
-        and compact_rows[row[1]][2] == "soundbank"
-    )
-    assert duplicate_paths[top_level_name_row] == "soundbank.name"
-    duplicate_routes = {
-        row[0]: row[1:]
-        for row in payload["event_match"]["fields"][
-            "duplicate_name_fact_routes"
-        ]["rows"]
-    }
-    if version == "2023.1":
-        assert duplicate_routes["soundbank.name"] == [
-            "--match-set",
-            compact_rows[top_level_name_row][0],
-            ["string"],
-        ]
-        assert payload["event_match"]["fields"][
-            "duplicate_name_fact_routes"
-        ]["selection"].endswith(
-            "never use an ancestor open-map row for a fixed child key"
-        )
-        assert payload["continuation"]["fact_argv"][
-            "qualified_duplicate_fact_routes"
-        ] == payload["event_match"]["fields"]["duplicate_name_fact_routes"]
-    nested_name_rows = [
-        index
-        for index, row in enumerate(compact_rows)
-        if row[2] == "name" and row[1] is not None
-        and compact_rows[row[1]][2] == "activeSource"
-    ]
-    if nested_name_rows:
-        assert duplicate_paths[nested_name_rows[0]] == (
-            "soundbank.activeSource.name"
-        )
-    encoded = gateway.gateway_stdout_json_encoder(payload).encode(payload)
-    assert len(encoded.encode("utf-8")) < 32 * 1024
-    assert "\n" not in encoded
-    assert encoded.index('"continuation"') < 4096
-
-
-def test_public_nested_topic_match_handle_is_lifecycle_neutral(tmp_path: Path) -> None:
+def test_public_nested_topic_handle_disclosure_is_removed(tmp_path: Path) -> None:
     version = "2025.1"
     topic = "ak.wwise.core.soundbank.generated"
     contract = topic_match_contract(version, topic)
@@ -636,16 +348,8 @@ def test_public_nested_topic_match_handle_is_lifecycle_neutral(tmp_path: Path) -
         client_factory=lambda url: (_ for _ in ()).throw(AssertionError(url)),
     )
 
-    assert code == 0
-    assert payload["continuation"]["subcommand"] == "topic-input-fact"
-    assert payload["continuation"]["valid_subscription_subcommands"] == [
-        "wait-topic",
-        "stream-topic",
-    ]
-    assert payload["continuation"]["deferred_fact"]["argv"][:2] == [
-        "--match-append",
-        bank_info.handle,
-    ]
+    assert code == 2
+    assert "business topic-schema" in payload["message"].lower()
 
 
 @pytest.mark.parametrize(
@@ -666,24 +370,14 @@ def test_generic_request_schema_rejects_topic_pseudo_operations(
     )
 
     assert code == 2
-    assert "single schema entry" in payload["message"]
-    assert "topic-schema" in payload["message"]
+    assert "handle-free business topic-schema" in payload["message"]
 
 
-def test_public_wait_topic_uses_typed_options_and_match_then_unsubscribes(
+def test_public_wait_topic_uses_business_options_and_match_then_unsubscribes(
     tmp_path: Path,
 ) -> None:
     version = "2025.1"
     topic = "ak.wwise.core.object.nameChanged"
-    options = topic_options_contract(version, topic)
-    match = topic_match_contract(version, topic)
-    platform = next(field for field in options.fields if field.name == "platform")
-    object_field = next(field for field in match.fields if field.name == "object")
-    object_id = next(
-        field
-        for field in match.fields
-        if field.parent_handle == object_field.handle and field.name == "id"
-    )
     wanted = "{22222222-2222-2222-2222-222222222222}"
     client = _TopicClient(
         topic,
@@ -696,10 +390,8 @@ def test_public_wait_topic_uses_typed_options_and_match_then_unsubscribes(
     code, payload = gateway.execute_gateway(
         [
             "--timeout", "0.5", "wait-topic", topic,
-            "--options-schema-digest", options.schema_digest,
-            "--match-schema-digest", match.schema_digest,
-            "--option-set", platform.handle, "string", "{11111111-1111-1111-1111-111111111111}",
-            "--match-set", object_id.handle, "string", wanted,
+            "--topic-option", "platform", "{11111111-1111-1111-1111-111111111111}",
+            "--event-match", "object-id", wanted,
         ],
         env=_env(tmp_path, version),
         client_factory=lambda url: client,
@@ -711,24 +403,172 @@ def test_public_wait_topic_uses_typed_options_and_match_then_unsubscribes(
     assert client.handler.unsubscribe_calls == 1
 
 
-def test_typed_topic_rejects_stale_digest_before_connecting(tmp_path: Path) -> None:
-    called = False
+def test_topic_schema_leads_with_handle_free_business_input(tmp_path: Path) -> None:
+    topic = "ak.wwise.core.object.created"
 
-    def client_factory(url: str):
-        nonlocal called
-        called = True
-        raise AssertionError(url)
+    code, payload = gateway.execute_gateway(
+        ["topic-schema", topic, "--match-group", "object"],
+        env=_env(tmp_path, "2025.1"),
+        client_factory=lambda url: pytest.fail(f"topic-schema connected to {url}"),
+    )
+
+    assert code == 0
+    business = payload["business_input"]
+    assert business["contract"] == "waapi-skill.topic-business/v1"
+    assert business["topic"] == topic
+    assert _business_field_names(business["options"]) >= {
+        "platform",
+        "include",
+    }
+    assert _business_field_names(business["event_match"]) >= {
+        "object-name",
+        "object-type",
+    }
+    serialized = json.dumps(business, sort_keys=True)
+    assert "trh1-" not in serialized
+    assert "schema_digest" not in serialized
+    assert "wire_type" not in serialized
+    assert payload["continuation"]["default_input"] == "business"
+    assert payload["continuation"]["business_fact_argv"] == {
+        "topic_option": "--topic-option <field> <value>",
+        "empty_topic_option": "--topic-option-empty <field>",
+        "typed_topic_option": "--topic-option-as <field> <text|integer|number|toggle|null> <value>",
+        "event_match": "--event-match <field> <value>",
+        "empty_event_field": "--event-empty <field>",
+        "typed_event_match": "--event-match-as <field> <text|integer|number|toggle|null> <value>",
+        "event_row": "--event-row <collection> <comma-separated-indices> <field> <value>",
+        "typed_event_row": "--event-row-as <collection> <comma-separated-indices> <field> <text|integer|number|toggle|null> <value>",
+        "empty_event_row": "--event-row-empty <collection> <comma-separated-parent-indices-or-dash>",
+        "exact_entry": "--event-entry <scope> <indices-or-dash> <exact-key> <value>",
+        "typed_exact_entry": "--event-entry-as <scope> <indices-or-dash> <exact-key> <text|integer|number|toggle|null> <value>",
+        "empty_exact_entry": "--event-entry-empty <scope> <indices-or-dash> <exact-key> <object|list>",
+        "exact_entry_object": "--event-entry-object <scope> <indices-or-dash> <exact-key> <field> <value>",
+        "typed_exact_entry_object": "--event-entry-object-as <scope> <indices-or-dash> <exact-key> <field> <text|integer|number|toggle|null> <value>",
+        "exact_entry_row": "--event-entry-row <scope> <indices-or-dash> <exact-key> <item-index> <field> <value>",
+        "typed_exact_entry_row": "--event-entry-row-as <scope> <indices-or-dash> <exact-key> <item-index> <field> <text|integer|number|toggle|null> <value>",
+    }
+
+
+def test_largest_progressive_topic_row_disclosure_stays_bounded(tmp_path: Path) -> None:
+    code, payload = gateway.execute_gateway(
+        [
+            "topic-schema",
+            "ak.wwise.core.object.structureChanged",
+            "--row",
+            "objects",
+            "--row-field-group",
+            "object-playback-duration",
+        ],
+        env=_env(tmp_path, "2025.1"),
+        client_factory=lambda url: pytest.fail(f"topic-schema connected to {url}"),
+    )
+
+    assert code == 0, payload
+    encoded = gateway.gateway_stdout_json_encoder(payload).encode(payload)
+    assert len(encoded.encode("utf-8")) <= 32 * 1024
+    assert "trh1-" not in encoded
+    selected = payload["business_input"]["event_rows"]["selected"]
+    assert selected["collection"] == "objects"
+    assert selected["fields"]["rows"]
+
+
+def test_public_wait_topic_compiles_business_event_rows(tmp_path: Path) -> None:
+    topic = "ak.wwise.core.audio.imported"
+    client = _TopicClient(
+        topic,
+        [
+            {
+                "files": ["/tmp/Footstep_Run.wav"],
+                "objects": [
+                    {"name": "Footstep_Run", "type": "Sound", "@Volume": -4}
+                ],
+                "operation": "CreateNewObject",
+            }
+        ],
+    )
 
     code, payload = gateway.execute_gateway(
         [
-            "wait-topic", "ak.wwise.core.object.nameChanged",
-            "--options-schema-digest", "stale",
-            "--match-schema-digest", "stale",
+            "--timeout",
+            "0.5",
+            "wait-topic",
+            topic,
+            "--event-row",
+            "objects",
+            "0",
+            "name",
+            "Footstep_Run",
+            "--event-row",
+            "objects",
+            "0",
+            "type",
+            "Sound",
+            "--event-entry",
+            "objects",
+            "0",
+            "@Volume",
+            "-4",
         ],
         env=_env(tmp_path, "2025.1"),
-        client_factory=client_factory,
+        client_factory=lambda url: client,
     )
 
-    assert code == 2
-    assert called is False
-    assert "digest" in payload["message"].lower()
+    assert code == 0, payload
+    assert payload["event"]["objects"][0]["name"] == "Footstep_Run"
+    assert client.handler.unsubscribe_calls == 1
+
+
+def test_public_wait_topic_defaults_to_business_input_without_schema_digests(
+    tmp_path: Path,
+) -> None:
+    topic = "ak.wwise.core.object.created"
+    wanted = "Footstep_Run"
+    client = _TopicClient(
+        topic,
+        [
+            {"object": {"name": "Skip", "type": "Sound"}},
+            {"object": {"name": wanted, "type": "Sound"}},
+        ],
+    )
+
+    code, payload = gateway.execute_gateway(
+        [
+            "--timeout",
+            "0.5",
+            "wait-topic",
+            topic,
+            "--topic-option",
+            "include",
+            "name",
+            "--event-match",
+            "object-name",
+            wanted,
+            "--event-match",
+            "object-type",
+            "Sound",
+        ],
+        env=_env(tmp_path, "2025.1"),
+        client_factory=lambda url: client,
+    )
+
+    assert code == 0, payload
+    assert payload["event"]["object"]["name"] == wanted
+    assert client.options == {"return": ["name"]}
+    assert client.handler.unsubscribe_calls == 1
+
+
+@pytest.mark.parametrize(
+    "removed_flag",
+    ["--options-schema-digest", "--match-set", "--legacy-typed"],
+)
+def test_model_authored_topic_handles_and_fragments_are_not_in_the_parser(
+    removed_flag: str,
+) -> None:
+    argv = ["wait-topic", "ak.wwise.core.object.nameChanged", removed_flag, "x"]
+    if removed_flag == "--legacy-typed":
+        argv = ["topic-schema", "ak.wwise.core.object.nameChanged", removed_flag]
+
+    with pytest.raises(SystemExit) as exc_info:
+        gateway.build_parser().parse_args(argv)
+
+    assert exc_info.value.code == 2

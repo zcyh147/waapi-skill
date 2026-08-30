@@ -494,13 +494,6 @@ def test_typed_zero_get_commands_is_discoverable_and_host_attested(
 def test_executed_topic_uses_authoring_overlay_and_unsubscribes(
     tmp_path: Path,
 ) -> None:
-    schema_code, schema = execute(
-        ["topic-schema", EXECUTED_TOPIC],
-        tmp_path=tmp_path,
-        version="2024.1",
-    )
-    assert schema_code == 0, schema
-    bind = schema["continuation"]["bind"]
     event = {"command": "SaveProject", "objects": [], "platforms": []}
     client = FakeClient(
         {GET_INFO_URI: [live_info()]},
@@ -509,8 +502,6 @@ def test_executed_topic_uses_authoring_overlay_and_unsubscribes(
     code, payload = execute(
         [
             "--timeout", "5", "wait-topic", EXECUTED_TOPIC,
-            "--options-schema-digest", bind["--options-schema-digest"],
-            "--match-schema-digest", bind["--match-schema-digest"],
         ],
         tmp_path=tmp_path,
         version="2024.1",
@@ -528,21 +519,12 @@ def test_executed_topic_uses_authoring_overlay_and_unsubscribes(
 def test_executed_topic_console_boundary_never_subscribes(
     tmp_path: Path,
 ) -> None:
-    schema_code, schema = execute(
-        ["topic-schema", EXECUTED_TOPIC],
-        tmp_path=tmp_path,
-        version="2024.1",
-    )
-    assert schema_code == 0, schema
-    bind = schema["continuation"]["bind"]
     client = FakeClient(
         {GET_INFO_URI: [live_info(command_line=True)]}
     )
     code, payload = execute(
         [
             "wait-topic", EXECUTED_TOPIC,
-            "--options-schema-digest", bind["--options-schema-digest"],
-            "--match-schema-digest", bind["--match-schema-digest"],
         ],
         tmp_path=tmp_path,
         version="2024.1",

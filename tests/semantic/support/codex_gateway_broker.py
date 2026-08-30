@@ -93,7 +93,6 @@ from tests.semantic.support.codex_gateway_contracts import (
     TYPED_CONTAINER_HANDLE_CONTRACT,
     TYPED_MAP_CONTAINER_CHOICES_CONTRACT,
     TYPED_REQUEST_SCHEMA_CONTRACT,
-    TYPED_TOPIC_INPUT_CONTRACT,
     gateway_payload_contracts,
     metadata_candidate_limit_for_query_count,
     task_local_runner_matches_normalized,
@@ -1495,19 +1494,24 @@ def _parse_typed_request_fact_argv(
     return tuple(result)
 
 
-_TOPIC_FACT_GROUP_WIDTHS = {
-    "set": 4,
-    "append": 4,
-    "present": 2,
-    "choose": 3,
-    "choose-dynamic": 4,
-    "map-put": 5,
-    "map-correct": 5,
-    "map-remove": 3,
+_TOPIC_BUSINESS_GROUP_WIDTHS = {
+    "--topic-option": 3,
+    "--topic-option-as": 4,
+    "--topic-option-empty": 2,
+    "--event-match": 3,
+    "--event-match-as": 4,
+    "--event-empty": 2,
+    "--event-row": 5,
+    "--event-row-as": 6,
+    "--event-row-empty": 3,
+    "--event-entry": 5,
+    "--event-entry-as": 6,
+    "--event-entry-empty": 5,
+    "--event-entry-object": 6,
+    "--event-entry-object-as": 7,
+    "--event-entry-row": 7,
+    "--event-entry-row-as": 8,
 }
-_COMMUTATIVE_TOPIC_MATCH_ACTIONS = frozenset(
-    {"set", "present", "choose", "choose-dynamic", "map-put"}
-)
 
 
 def _topic_fact_groups(
@@ -1519,18 +1523,7 @@ def _topic_fact_groups(
         flag = values[index]
         if not isinstance(flag, str):
             return None
-        prefix = next(
-            (
-                candidate
-                for candidate in ("option", "match")
-                if flag.startswith(f"--{candidate}-")
-            ),
-            None,
-        )
-        if prefix is None:
-            return None
-        action = flag.removeprefix(f"--{prefix}-")
-        width = _TOPIC_FACT_GROUP_WIDTHS.get(action)
+        width = _TOPIC_BUSINESS_GROUP_WIDTHS.get(flag)
         if width is None or index + width > len(values):
             return None
         group = tuple(values[index : index + width])
@@ -1544,12 +1537,15 @@ def _topic_fact_groups(
 def _commutative_topic_match_destination(
     group: Sequence[str],
 ) -> tuple[str, ...] | None:
-    action = group[0].removeprefix("--match-")
-    if action not in _COMMUTATIVE_TOPIC_MATCH_ACTIONS:
+    flag = group[0]
+    if flag.startswith("--topic-option"):
         return None
-    if action in {"choose-dynamic", "map-put"}:
-        return (group[1], group[2])
-    return (group[1],)
+    if flag in {"--event-empty", "--event-row-empty"}:
+        return tuple(group[1:])
+    if flag == "--event-entry-empty":
+        return tuple(group[1:-1])
+    value_tail = 2 if flag.endswith("-as") else 1
+    return tuple(group[1:-value_tail])
 
 
 def _normalize_commutative_wait_topic_facts(
@@ -1570,11 +1566,7 @@ def _normalize_commutative_wait_topic_facts(
             index
             for index, value in enumerate(step.arguments)
             if isinstance(value, str)
-            and any(
-                value == f"--{prefix}-{action}"
-                for prefix in ("option", "match")
-                for action in _TOPIC_FACT_GROUP_WIDTHS
-            )
+            and value in _TOPIC_BUSINESS_GROUP_WIDTHS
         ),
         None,
     )
@@ -1585,16 +1577,16 @@ def _normalize_commutative_wait_topic_facts(
     if expected_groups is None or actual_groups is None:
         return actual
     expected_options = tuple(
-        group for group in expected_groups if group[0].startswith("--option-")
+        group for group in expected_groups if group[0].startswith("--topic-option")
     )
     actual_options = tuple(
-        group for group in actual_groups if group[0].startswith("--option-")
+        group for group in actual_groups if group[0].startswith("--topic-option")
     )
     expected_matches = tuple(
-        group for group in expected_groups if group[0].startswith("--match-")
+        group for group in expected_groups if not group[0].startswith("--topic-option")
     )
     actual_matches = tuple(
-        group for group in actual_groups if group[0].startswith("--match-")
+        group for group in actual_groups if not group[0].startswith("--topic-option")
     )
     if (
         expected_groups != (*expected_options, *expected_matches)

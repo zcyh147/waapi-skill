@@ -66,6 +66,7 @@ from wwise_waapi.typed_operations import (
     inline_operation_cli_arguments,
 )
 from wwise_waapi.typed_topics import topic_match_contract, topic_options_contract
+from wwise_waapi.topic_business import topic_business_contract
 from wwise_waapi.typed_requests import (
     TypedRequestFact,
     TypedRequestError,
@@ -5160,41 +5161,17 @@ def wait_topic_step(
         {} if match is None else match,
         field="wait-topic match",
     )
-    try:
-        options_contract = topic_options_contract(version, topic)
-        match_contract = topic_match_contract(version, topic)
-        option_facts = typed_request_facts_for_values(
-            options_contract,
-            args={},
-            options=option_values,
-        )
-        match_facts = typed_request_facts_for_values(
-            match_contract,
-            args=match_values,
-            options={},
-        )
-    except (TypeError, ValueError) as exc:
-        raise V3ProtocolError(
-            f"Topic {topic!r} cannot use its typed protocol: {exc}"
-        ) from exc
+    del schema_step_name
     arguments: list[Any] = [
         topic,
         "--event-count",
         str(event_count),
-        "--options-schema-digest",
-        (
-            ResponseBinding(schema_step_name, "/options/schema_digest")
-            if schema_step_name is not None
-            else options_contract.schema_digest
-        ),
-        "--match-schema-digest",
-        (
-            ResponseBinding(schema_step_name, "/event_match/schema_digest")
-            if schema_step_name is not None
-            else match_contract.schema_digest
-        ),
-        *(_typed_fact_cli_arguments(option_facts, prefix="option")),
-        *(_typed_fact_cli_arguments(match_facts, prefix="match")),
+        *(_business_topic_arguments(
+            topic,
+            version=version,
+            options=option_values,
+            match=match_values,
+        )),
     ]
     return ExpectedGatewayStep(
         name=name,
@@ -5203,6 +5180,98 @@ def wait_topic_step(
         arguments=tuple(arguments),
         allow_omitted_default_event_count_one=event_count == 1,
     )
+
+
+def _business_topic_arguments(
+    topic: str,
+    *,
+    version: str,
+    options: Mapping[str, Any],
+    match: Mapping[str, Any],
+) -> tuple[str, ...]:
+    contract = topic_business_contract(version, topic)
+    arguments: list[str] = []
+    for values, fields, flag in (
+        (options, contract.option_fields, "--topic-option-as"),
+        (match, contract.match_fields, "--event-match-as"),
+    ):
+        for path, value in _topic_scalar_leaves(values):
+            field = next(
+                (
+                    item
+                    for item in fields
+                    if any(candidate.path == path for candidate in item._candidates)
+                ),
+                None,
+            )
+            if field is None:
+                entry = next(
+                    (
+                        item
+                        for item in contract.entry_fields
+                        if None not in item._path
+                        and tuple(item._path) == path[:-1]
+                    ),
+                    None,
+                )
+                if entry is None or flag != "--event-match-as":
+                    raise V3ProtocolError(
+                        f"Topic {topic!r} business protocol requires a complex "
+                        f"fixture compiler for {'.'.join(path)!r}"
+                    )
+                kind, encoded = _topic_business_value(value)
+                arguments.extend(
+                    (
+                        "--event-entry-as",
+                        entry.token,
+                        "-",
+                        path[-1],
+                        kind,
+                        encoded,
+                    )
+                )
+                continue
+            items = value if isinstance(value, list) else [value]
+            for item in items:
+                kind, encoded = _topic_business_value(item)
+                arguments.extend((flag, field.token, kind, encoded))
+    return tuple(arguments)
+
+
+def _topic_scalar_leaves(
+    value: Mapping[str, Any],
+    path: tuple[str, ...] = (),
+) -> tuple[tuple[tuple[str, ...], Any], ...]:
+    leaves: list[tuple[tuple[str, ...], Any]] = []
+    for key, item in value.items():
+        item_path = (*path, key)
+        if isinstance(item, Mapping):
+            leaves.extend(_topic_scalar_leaves(item, item_path))
+        elif isinstance(item, list) and any(
+            isinstance(child, (Mapping, list)) for child in item
+        ):
+            raise V3ProtocolError(
+                "Complex Topic fixtures must use the business row compiler"
+            )
+        else:
+            leaves.append((item_path, item))
+    return tuple(leaves)
+
+
+def _topic_business_value(value: Any) -> tuple[str, str]:
+    if value is None:
+        return "null", "null"
+    if isinstance(value, bool):
+        return "toggle", "true" if value else "false"
+    if isinstance(value, int):
+        return "integer", str(value)
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise V3ProtocolError("Topic business number must be finite")
+        return "number", str(value)
+    if isinstance(value, str):
+        return "text", value
+    raise V3ProtocolError("Topic business scalar has an unsupported value")
 
 
 def _validate_operation_request(request: Mapping[str, Any]) -> dict[str, Any]:

@@ -29,6 +29,7 @@ from wwise_waapi.builders.query import (  # pyright: ignore[reportMissingImports
 )
 from wwise_waapi.safety import EXPLICIT_UNSUPPORTED_TOPIC_URIS, IMMEDIATE_UNSUPPORTED_CALL_URIS
 from wwise_waapi.typed_topics import topic_match_contract, topic_options_contract
+from wwise_waapi.topic_business import topic_business_contract
 from wwise_waapi.typed_requests import typed_request_construction_for_values
 from wwise_waapi.versions import SUPPORTED_WWISE_VERSION_KEYS, version_key_from_get_info
 
@@ -67,12 +68,8 @@ EXPECTED_EXCLUDED_TOPIC_URIS = frozenset()
 
 
 def _typed_topic_bindings(topic: str, version: str = "2022.1") -> list[str]:
-    return [
-        "--options-schema-digest",
-        topic_options_contract(version, topic).schema_digest,
-        "--match-schema-digest",
-        topic_match_contract(version, topic).schema_digest,
-    ]
+    del topic, version
+    return []
 
 
 def _typed_topic_arguments(
@@ -82,47 +79,51 @@ def _typed_topic_arguments(
     options: Mapping[str, Any] | None = None,
     match: Mapping[str, Any] | None = None,
 ) -> list[str]:
-    option_contract = topic_options_contract(version, topic)
-    match_contract = topic_match_contract(version, topic)
-    option_construction = typed_request_construction_for_values(
-        option_contract,
-        args={},
-        options=dict(options or {}),
-    )
-    match_construction = typed_request_construction_for_values(
-        match_contract,
-        args=dict(match or {}),
-        options={},
-    )
-    arguments = [
-        "--options-schema-digest",
-        option_contract.schema_digest,
-        "--match-schema-digest",
-        match_contract.schema_digest,
-    ]
-    for fact in option_construction.facts:
-        if fact.action == "set":
-            arguments.extend(
-                    ["--option-set", fact.handle, fact.value_type, fact.value]
+    contract = topic_business_contract(version, topic)
+    arguments: list[str] = []
+    for values, fields, flag in (
+        (dict(options or {}), contract.option_fields, "--topic-option-as"),
+        (dict(match or {}), contract.match_fields, "--event-match-as"),
+    ):
+        for path, value in _scalar_business_leaves(values):
+            field = next(
+                item
+                for item in fields
+                if any(candidate.path == path for candidate in item._candidates)
             )
-        elif fact.action == "append":
-            arguments.extend(
-                    ["--option-append", fact.handle, fact.value_type, fact.value]
-            )
-        else:
-            raise AssertionError(f"Unsupported simple Topic option fact {fact.action!r}")
-    for fact in match_construction.facts:
-        if fact.action == "set":
-            arguments.extend(
-                    ["--match-set", fact.handle, fact.value_type, fact.value]
-            )
-        elif fact.action == "append":
-            arguments.extend(
-                    ["--match-append", fact.handle, fact.value_type, fact.value]
-            )
-        else:
-            raise AssertionError(f"Unsupported simple Topic match fact {fact.action!r}")
+            items = value if isinstance(value, list) else [value]
+            for item in items:
+                kind, encoded = _business_test_value(item)
+                arguments.extend([flag, field.token, kind, encoded])
     return arguments
+
+
+def _scalar_business_leaves(
+    value: Mapping[str, Any],
+    path: tuple[str, ...] = (),
+) -> list[tuple[tuple[str, ...], Any]]:
+    leaves: list[tuple[tuple[str, ...], Any]] = []
+    for key, item in value.items():
+        item_path = (*path, key)
+        if isinstance(item, Mapping):
+            leaves.extend(_scalar_business_leaves(item, item_path))
+        else:
+            leaves.append((item_path, item))
+    return leaves
+
+
+def _business_test_value(value: Any) -> tuple[str, str]:
+    if value is None:
+        return "null", "null"
+    if isinstance(value, bool):
+        return "toggle", "true" if value else "false"
+    if isinstance(value, int):
+        return "integer", str(value)
+    if isinstance(value, float):
+        return "number", str(value)
+    if isinstance(value, str):
+        return "text", value
+    raise AssertionError(f"Unsupported Topic business test value {value!r}")
 
 
 class FakeEventHandler:

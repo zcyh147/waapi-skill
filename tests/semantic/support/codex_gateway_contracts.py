@@ -17,7 +17,7 @@ BUSINESS_QUERY_SCHEMA_CONTRACT = "waapi-skill.object-query-business-schema/v1"
 ADVANCED_QUERY_SCHEMA_CONTRACT = (
     "waapi-skill.advanced-object-query-business-schema/v1"
 )
-TYPED_TOPIC_INPUT_CONTRACT = "waapi-skill.typed-topic-input/v1"
+TOPIC_BUSINESS_ENVELOPE_CONTRACT = "waapi-skill.topic-business-envelope/v1"
 TYPED_CONTAINER_HANDLE_CONTRACT = "waapi-skill.typed-container-handle/v1"
 TYPED_MAP_CONTAINER_CHOICES_CONTRACT = (
     "waapi-skill.typed-map-container-choices/v1"
@@ -66,7 +66,7 @@ def gateway_payload_contracts(subcommand: str) -> frozenset[str]:
             }
         )
     if subcommand == "topic-schema":
-        return frozenset({TYPED_TOPIC_INPUT_CONTRACT})
+        return frozenset({TOPIC_BUSINESS_ENVELOPE_CONTRACT})
     if subcommand == "request-map-container":
         return frozenset(
             {TYPED_CONTAINER_HANDLE_CONTRACT, TYPED_MAP_CONTAINER_CHOICES_CONTRACT}
@@ -90,7 +90,7 @@ __all__ = [
     "TYPED_CONTAINER_HANDLE_CONTRACT",
     "TYPED_MAP_CONTAINER_CHOICES_CONTRACT",
     "TYPED_REQUEST_SCHEMA_CONTRACT",
-    "TYPED_TOPIC_INPUT_CONTRACT",
+    "TOPIC_BUSINESS_ENVELOPE_CONTRACT",
     "gateway_payload_contracts",
     "metadata_candidate_limit_for_query_count",
     "task_local_runner_matches_normalized",

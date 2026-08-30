@@ -1334,7 +1334,14 @@ def dynamic_map_entry_handle(
                 )
             variant_index = selected[0]
         elif len(matching) == 1 and choice_handle is not None:
-            raise TypedRequestError("Typed map container choice is unknown or stale")
+            choices = _dynamic_map_container_choices(
+                contract,
+                field=field,
+                key=key,
+                shape=shape,
+            )
+            if choices[0][0] != choice_handle:
+                raise TypedRequestError("Typed map container choice is unknown or stale")
     return TYPED_DYNAMIC_HANDLE_PREFIX + canonical_sha256(
         {
             "schema_digest": contract.schema_digest,
@@ -3682,6 +3689,27 @@ def _append_dynamic_object_members(
             root_schema=contract.schema_roots[section],
             graph=contract.definition_graph,
         )
+        fixed_schema = fixed_properties.get(key)
+        if isinstance(fixed_schema, Mapping):
+            fixed_variants = _structural_variants(
+                fixed_schema,
+                root_schema=contract.schema_roots[section],
+                graph=contract.definition_graph,
+            )
+            fixed_indexes = {
+                index
+                for index, variant in enumerate(variants)
+                if any(
+                    canonical_json_bytes(variant)
+                    == canonical_json_bytes(fixed_variant)
+                    for fixed_variant in fixed_variants
+                )
+            }
+            fixed_matches = tuple(
+                index for index in selected_indexes if index in fixed_indexes
+            )
+            if fixed_matches:
+                selected_indexes = fixed_matches
         if not selected_indexes:
             raise TypedRequestError(f"Typed map key {key!r} has no matching value schema")
         choice_handle: str | None = None
@@ -3697,15 +3725,19 @@ def _append_dynamic_object_members(
                 key=key,
                 value_schema={"oneOf": list(variants)},
             )
-            preferred = _preferred_matching_variants(
-                tuple(variant for _choice, variant in choices),
-                item,
-                root_schema=contract.schema_roots[section],
-                graph=contract.definition_graph,
-            )
-            selected = [choices[index][0] for index in preferred]
+            selected = [choices[index][0] for index in selected_indexes]
             if len(selected) != 1:
-                raise TypedRequestError(f"Typed map key {key!r} has an ambiguous branch")
+                if selected and item in ({}, []):
+                    # The trusted inverse compiler may encounter an empty
+                    # fixed container whose schema also matches an open-map
+                    # container branch. Both branches materialize the same
+                    # canonical JSON value; preserve schema order to keep the
+                    # generated fact stream deterministic.
+                    selected = selected[:1]
+                else:
+                    raise TypedRequestError(
+                        f"Typed map key {key!r} has an ambiguous branch"
+                    )
             choice_handle = selected[0]
             facts.append(
                 TypedRequestFact(
@@ -3729,10 +3761,10 @@ def _append_dynamic_object_members(
                     ),
                     None,
                 )
-                if parent_choice_group_index is None:
-                    raise TypedRequestError(
-                        f"Typed map key {key!r} lacks its parent-published branch"
-                    )
+                # Arbitrary pattern-map keys cannot be pre-published in their
+                # parent's bounded disclosure.  Keep the index absent so the
+                # protocol emits the normal lineage-bound choice disclosure
+                # for this exact caller-owned key.
             child = dynamic_map_entry_handle(
                 contract,
                 map_handle=handle,

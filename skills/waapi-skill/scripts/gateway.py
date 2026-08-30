@@ -142,9 +142,18 @@ from wwise_waapi.typed_queries import (  # noqa: E402  # pyright: ignore[reportM
 from wwise_waapi.typed_topics import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     TOPIC_MATCH_OPERATION_PREFIX,
     TOPIC_OPTIONS_OPERATION_PREFIX,
-    materialize_typed_topic_inputs,
-    topic_match_contract,
-    topic_options_contract,
+)
+from wwise_waapi.topic_business import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    TopicBusinessFact,
+    TopicBusinessEmptyFact,
+    TopicBusinessEmptyRowFact,
+    TopicBusinessEntryEmptyFact,
+    TopicBusinessEntryFact,
+    TopicBusinessEntryObjectFact,
+    TopicBusinessEntryRowFact,
+    TopicBusinessRowFact,
+    materialize_topic_business_inputs,
+    topic_business_contract,
 )
 from wwise_waapi.builders.schema import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     validate_semantic_event,
@@ -1971,7 +1980,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Collect a bounded count of manifest topic events, with optional payload match and guaranteed cleanup",
     )
     wait_topic.add_argument("api")
-    add_typed_topic_input_arguments(wait_topic)
+    add_topic_business_input_arguments(wait_topic)
     wait_topic.add_argument(
         "--event-count",
         type=int,
@@ -2000,13 +2009,34 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     stream_topic.add_argument("api")
-    add_typed_topic_input_arguments(stream_topic)
+    add_topic_business_input_arguments(stream_topic)
 
     topic_schema = subparsers.add_parser(
         "topic-schema",
-        help="Describe exact-version typed subscription options and event matching offline",
+        help="Describe exact-version business subscription options and event matching offline",
     )
     topic_schema.add_argument("api")
+    topic_schema.add_argument(
+        "--row",
+        help=(
+            "Disclose the stable scalar fields for one business event-row "
+            "collection"
+        ),
+    )
+    topic_schema.add_argument(
+        "--row-field-group",
+        help="Disclose one field group within the selected event-row collection",
+    )
+    topic_schema.add_argument(
+        "--entry",
+        help=(
+            "Disclose object/list fields for one exact event-entry scope"
+        ),
+    )
+    topic_schema.add_argument(
+        "--match-group",
+        help="Disclose stable scalar fields for one event-match root",
+    )
 
     capabilities = subparsers.add_parser(
         "capabilities",
@@ -2996,53 +3026,128 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def add_typed_topic_input_arguments(parser: argparse.ArgumentParser) -> None:
-    """Add the one closed typed Topic input vocabulary to a subscription command."""
+def add_topic_business_input_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add the one closed business Topic vocabulary to a subscription command."""
 
-    parser.add_argument("--options-schema-digest")
-    parser.add_argument("--match-schema-digest")
-    for prefix in ("option", "match"):
-        parser.add_argument(
-            f"--{prefix}-set",
-            action="append",
-            nargs=3,
-            metavar=("FIELD_HANDLE", "TYPE", "VALUE"),
-            default=[],
-        )
-        parser.add_argument(
-            f"--{prefix}-append",
-            action="append",
-            nargs=3,
-            metavar=("FIELD_HANDLE", "TYPE", "VALUE"),
-            default=[],
-        )
-        parser.add_argument(
-            f"--{prefix}-present",
-            action="append",
-            metavar="CONTAINER_HANDLE",
-            default=[],
-        )
-        parser.add_argument(
-            f"--{prefix}-choose",
-            action="append",
-            nargs=2,
-            metavar=("BRANCH_HANDLE", "CHOICE_HANDLE"),
-            default=[],
-        )
-        parser.add_argument(
-            f"--{prefix}-choose-dynamic",
-            action="append",
-            nargs=3,
-            metavar=("OBJECT_HANDLE", "KEY", "CHOICE_HANDLE"),
-            default=[],
-        )
-        parser.add_argument(
-            f"--{prefix}-map-put",
-            action="append",
-            nargs=4,
-            metavar=("MAP_HANDLE", "KEY", "TYPE", "VALUE"),
-            default=[],
-        )
+    parser.add_argument(
+        "--topic-option",
+        action="append",
+        nargs=2,
+        metavar=("FIELD", "VALUE"),
+        default=[],
+    )
+    parser.add_argument(
+        "--topic-option-empty",
+        action="append",
+        metavar="FIELD",
+        default=[],
+    )
+    parser.add_argument(
+        "--topic-option-as",
+        action="append",
+        nargs=3,
+        metavar=("FIELD", "KIND", "VALUE"),
+        default=[],
+    )
+    parser.add_argument(
+        "--event-match",
+        action="append",
+        nargs=2,
+        metavar=("FIELD", "VALUE"),
+        default=[],
+    )
+    parser.add_argument(
+        "--event-empty",
+        action="append",
+        metavar="FIELD",
+        default=[],
+    )
+    parser.add_argument(
+        "--event-match-as",
+        action="append",
+        nargs=3,
+        metavar=("FIELD", "KIND", "VALUE"),
+        default=[],
+    )
+    parser.add_argument(
+        "--event-row",
+        action="append",
+        nargs=4,
+        metavar=("COLLECTION", "INDICES", "FIELD", "VALUE"),
+        default=[],
+    )
+    parser.add_argument(
+        "--event-row-as",
+        action="append",
+        nargs=5,
+        metavar=("COLLECTION", "INDICES", "FIELD", "KIND", "VALUE"),
+        default=[],
+    )
+    parser.add_argument(
+        "--event-row-empty",
+        action="append",
+        nargs=2,
+        metavar=("COLLECTION", "PARENT_INDICES"),
+        default=[],
+    )
+    parser.add_argument(
+        "--event-entry",
+        action="append",
+        nargs=4,
+        metavar=("SCOPE", "INDICES", "KEY", "VALUE"),
+        default=[],
+    )
+    parser.add_argument(
+        "--event-entry-as",
+        action="append",
+        nargs=5,
+        metavar=("SCOPE", "INDICES", "KEY", "KIND", "VALUE"),
+        default=[],
+    )
+    parser.add_argument(
+        "--event-entry-empty",
+        action="append",
+        nargs=4,
+        metavar=("SCOPE", "INDICES", "KEY", "OBJECT_OR_LIST"),
+        default=[],
+    )
+    parser.add_argument(
+        "--event-entry-object",
+        action="append",
+        nargs=5,
+        metavar=("SCOPE", "INDICES", "KEY", "FIELD", "VALUE"),
+        default=[],
+    )
+    parser.add_argument(
+        "--event-entry-object-as",
+        action="append",
+        nargs=6,
+        metavar=("SCOPE", "INDICES", "KEY", "FIELD", "KIND", "VALUE"),
+        default=[],
+    )
+    parser.add_argument(
+        "--event-entry-row",
+        action="append",
+        nargs=6,
+        metavar=("SCOPE", "INDICES", "KEY", "ITEM_INDEX", "FIELD", "VALUE"),
+        default=[],
+    )
+    parser.add_argument(
+        "--event-entry-row-as",
+        action="append",
+        nargs=7,
+        metavar=(
+            "SCOPE",
+            "INDICES",
+            "KEY",
+            "ITEM_INDEX",
+            "FIELD",
+            "KIND",
+            "VALUE",
+        ),
+        default=[],
+    )
+
 
 
 def execute_gateway(
@@ -5632,59 +5737,6 @@ def preflight_json_inputs(args: argparse.Namespace) -> None:
         return
 
 
-def topic_typed_input_requested(args: argparse.Namespace) -> bool:
-    """Return whether one subscription invocation selected its typed input surface."""
-
-    return any(
-        (
-            getattr(args, "options_schema_digest", None),
-            getattr(args, "match_schema_digest", None),
-            *(getattr(args, name, ()) for name in (
-                "option_set",
-                "option_append",
-                "option_present",
-                "option_choose",
-                "option_choose_dynamic",
-                "option_map_put",
-                "match_set",
-                "match_append",
-                "match_present",
-                "match_choose",
-                "match_choose_dynamic",
-                "match_map_put",
-            )),
-        )
-    )
-
-
-def _typed_topic_facts(args: argparse.Namespace, prefix: str) -> tuple[TypedRequestFact, ...]:
-    facts = [
-        TypedRequestFact("set", handle, value_type, value)
-        for handle, value_type, value in getattr(args, f"{prefix}_set")
-    ]
-    facts.extend(
-        TypedRequestFact("append", handle, value_type, value)
-        for handle, value_type, value in getattr(args, f"{prefix}_append")
-    )
-    facts.extend(
-        TypedRequestFact("present", handle, "null", "null")
-        for handle in getattr(args, f"{prefix}_present")
-    )
-    facts.extend(
-        TypedRequestFact("choose", handle, "branch", choice)
-        for handle, choice in getattr(args, f"{prefix}_choose")
-    )
-    facts.extend(
-        TypedRequestFact("choose-dynamic", handle, "choice", choice, key=key)
-        for handle, key, choice in getattr(args, f"{prefix}_choose_dynamic")
-    )
-    facts.extend(
-        TypedRequestFact("map-put", handle, value_type, value, key=key)
-        for handle, key, value_type, value in getattr(args, f"{prefix}_map_put")
-    )
-    return tuple(facts)
-
-
 def preflight_typed_topic_input(
     args: argparse.Namespace,
     *,
@@ -5692,21 +5744,190 @@ def preflight_typed_topic_input(
 ) -> None:
     """Materialize exact Topic options and subset match before connecting."""
 
-    if not isinstance(args.options_schema_digest, str) or not isinstance(
-        args.match_schema_digest, str
-    ):
-        raise GatewayInputError(
-            "Typed Topic input requires both schema digests from topic-schema"
-        )
     (version,) = resolve_catalog_versions(args, env=env)
-    args.typed_topic_input = materialize_typed_topic_inputs(
+    args.typed_topic_input = materialize_topic_business_inputs(
         version=version,
         topic=args.api,
-        options_schema_digest=args.options_schema_digest,
-        option_facts=_typed_topic_facts(args, "option"),
-        match_schema_digest=args.match_schema_digest,
-        match_facts=_typed_topic_facts(args, "match"),
+        option_facts=_topic_business_facts(args, "topic_option"),
+        match_facts=_topic_business_facts(args, "event_match"),
+        option_empty_facts=tuple(
+            TopicBusinessEmptyFact(field_name)
+            for field_name in args.topic_option_empty
+        ),
+        match_empty_facts=tuple(
+            TopicBusinessEmptyFact(field_name)
+            for field_name in args.event_empty
+        ),
+        row_facts=_topic_business_row_facts(args),
+        empty_row_facts=tuple(
+            TopicBusinessEmptyRowFact(
+                collection,
+                _parse_topic_row_indices(parent_indices),
+            )
+            for collection, parent_indices in args.event_row_empty
+        ),
+        entry_facts=_topic_business_entry_facts(args),
+        entry_empty_facts=tuple(
+            TopicBusinessEntryEmptyFact(
+                scope,
+                _parse_topic_row_indices(indices),
+                key,
+                shape,
+            )
+            for scope, indices, key, shape in args.event_entry_empty
+        ),
+        entry_object_facts=_topic_business_entry_object_facts(args),
+        entry_row_facts=_topic_business_entry_row_facts(args),
     )
+
+
+def _topic_business_facts(
+    args: argparse.Namespace,
+    prefix: str,
+) -> tuple[TopicBusinessFact, ...]:
+    facts = [
+        TopicBusinessFact(field_name, value)
+        for field_name, value in getattr(args, prefix)
+    ]
+    facts.extend(
+        TopicBusinessFact(field_name, value, kind=kind)
+        for field_name, kind, value in getattr(args, f"{prefix}_as")
+    )
+    return tuple(facts)
+
+
+def _topic_business_row_facts(
+    args: argparse.Namespace,
+) -> tuple[TopicBusinessRowFact, ...]:
+    facts = [
+        TopicBusinessRowFact(
+            collection,
+            _parse_topic_row_indices(indices),
+            field_name,
+            value,
+        )
+        for collection, indices, field_name, value in args.event_row
+    ]
+    facts.extend(
+        TopicBusinessRowFact(
+            collection,
+            _parse_topic_row_indices(indices),
+            field_name,
+            value,
+            kind=kind,
+        )
+        for collection, indices, field_name, kind, value in args.event_row_as
+    )
+    return tuple(facts)
+
+
+def _parse_topic_row_indices(value: str) -> tuple[int, ...]:
+    if value == "-":
+        return ()
+    try:
+        return tuple(int(part) for part in value.split(","))
+    except ValueError as exc:
+        raise GatewayInputError(
+            "Topic event row indices must be comma-separated integers"
+        ) from exc
+
+
+def _topic_business_entry_facts(
+    args: argparse.Namespace,
+) -> tuple[TopicBusinessEntryFact, ...]:
+    facts = [
+        TopicBusinessEntryFact(
+            scope,
+            _parse_topic_row_indices(indices),
+            key,
+            value,
+        )
+        for scope, indices, key, value in args.event_entry
+    ]
+    facts.extend(
+        TopicBusinessEntryFact(
+            scope,
+            _parse_topic_row_indices(indices),
+            key,
+            value,
+            kind=kind,
+        )
+        for scope, indices, key, kind, value in args.event_entry_as
+    )
+    return tuple(facts)
+
+
+def _topic_business_entry_object_facts(
+    args: argparse.Namespace,
+) -> tuple[TopicBusinessEntryObjectFact, ...]:
+    facts = [
+        TopicBusinessEntryObjectFact(
+            scope,
+            _parse_topic_row_indices(indices),
+            key,
+            field_name,
+            value,
+        )
+        for scope, indices, key, field_name, value in args.event_entry_object
+    ]
+    facts.extend(
+        TopicBusinessEntryObjectFact(
+            scope,
+            _parse_topic_row_indices(indices),
+            key,
+            field_name,
+            value,
+            kind=kind,
+        )
+        for scope, indices, key, field_name, kind, value in args.event_entry_object_as
+    )
+    return tuple(facts)
+
+
+def _topic_business_entry_row_facts(
+    args: argparse.Namespace,
+) -> tuple[TopicBusinessEntryRowFact, ...]:
+    facts = [
+        TopicBusinessEntryRowFact(
+            scope,
+            _parse_topic_row_indices(indices),
+            key,
+            _parse_topic_entry_item_index(item_index),
+            field_name,
+            value,
+        )
+        for scope, indices, key, item_index, field_name, value in args.event_entry_row
+    ]
+    facts.extend(
+        TopicBusinessEntryRowFact(
+            scope,
+            _parse_topic_row_indices(indices),
+            key,
+            _parse_topic_entry_item_index(item_index),
+            field_name,
+            value,
+            kind=kind,
+        )
+        for (
+            scope,
+            indices,
+            key,
+            item_index,
+            field_name,
+            kind,
+            value,
+        ) in args.event_entry_row_as
+    )
+    return tuple(facts)
+
+
+def _parse_topic_entry_item_index(value: str) -> int:
+    try:
+        return int(value)
+    except ValueError as exc:
+        raise GatewayInputError(
+            "Topic exact event entry row index must be an integer"
+        ) from exc
 
 
 _LEGACY_OPERATION_PROJECTION_FIELDS = frozenset(
@@ -6169,14 +6390,6 @@ def operation_draft_schema_digest(operation: str, version: str) -> str:
 def public_typed_contract(version: str, api: str) -> Any:
     """Resolve one function or query construction contract by exact public key."""
 
-    if api.startswith(TOPIC_OPTIONS_OPERATION_PREFIX):
-        return topic_options_contract(
-            version, api.removeprefix(TOPIC_OPTIONS_OPERATION_PREFIX)
-        )
-    if api.startswith(TOPIC_MATCH_OPERATION_PREFIX):
-        return topic_match_contract(
-            version, api.removeprefix(TOPIC_MATCH_OPERATION_PREFIX)
-        )
     if api in DRAFT_TYPED_OPERATIONS:
         return draft_operation_request_contract(api, version)
     return request_contract(version, api)
@@ -6299,113 +6512,6 @@ def core_business_route_available(api: str, version: str) -> bool:
     return False
 
 
-def typed_topic_contract_payload(contract: Any) -> dict[str, Any]:
-    """Project one shared Core contract with Topic-specific continuation names."""
-
-    payload = contract.as_gateway_payload()
-    # Topic discovery already owns one outer fact-selection continuation and
-    # exposes a compact, lossless field table for each of its two subcontracts.
-    # Repeating the request-wide Draft plan in both nested projections adds no
-    # construction authority and can push the final public document past its
-    # fixed visible ceiling.
-    payload.pop("construction_order", None)
-    payload.pop("top_level_fact_plan", None)
-    payload["fields"] = contract.gateway_field_table()
-    payload["input_shape"] = "typed-facts"
-    dynamic_commands: dict[str, str] = {}
-    for field in contract.fields:
-        fact_construction = field.as_dict().get("fact_construction", {})
-        if not isinstance(fact_construction, Mapping):
-            continue
-        if fact_construction.get("complex_member_disclosure") == (
-            "request-map-container"
-        ):
-            dynamic_commands["map_value"] = "request-map-container"
-        if fact_construction.get("complex_item_disclosure") == "request-array-item":
-            dynamic_commands["array_item"] = "request-array-item"
-    payload["continuation"] = {
-        **(
-            {"dynamic_container_commands": dynamic_commands}
-            if dynamic_commands
-            else {}
-        ),
-        "request_key": contract.uri,
-    }
-    return payload
-
-
-def _topic_top_level_fact_table(
-    contract: TypedRequestContract,
-    *,
-    prefix: str,
-) -> dict[str, Any]:
-    """Expose copy-ready top-level Topic facts before the large field tables."""
-
-    fields_by_handle = {
-        field.handle: field.as_dict()
-        for field in contract.fields
-    }
-    rows: list[list[Any]] = []
-    for handle, _name, phase, action, pointer in contract.top_level_fact_plan()[
-        "rows"
-    ]:
-        if phase != "fact" or not isinstance(handle, str):
-            continue
-        field = fields_by_handle.get(handle, {})
-        accepted_types = field.get("accepted_types", [])
-        value_type = (
-            accepted_types[0]
-            if isinstance(accepted_types, list) and len(accepted_types) == 1
-            else "<type>"
-        )
-        if action == "set":
-            nonempty = [
-                f"--{prefix}-set", handle, value_type, "<business-value>",
-            ]
-            empty = None
-        elif action == "append":
-            nonempty = [
-                f"--{prefix}-append", handle, value_type, "<business-value>",
-            ]
-            empty = [f"--{prefix}-present", handle]
-        elif action == "map-put":
-            nonempty = [
-                f"--{prefix}-map-put", handle, "<business-map-member-key>",
-                "<type-of-business-map-member-value>",
-                "<business-map-member-value>",
-            ]
-            empty = [f"--{prefix}-present", handle]
-        elif action == "choose":
-            nonempty = [f"--{prefix}-choose", handle, "<choice-handle>"]
-            empty = None
-        else:
-            continue
-        identity_facts = (
-            {
-                "id": [
-                    f"--{prefix}-map-put", handle, "id", "string",
-                    "<exact-guid>",
-                ],
-                "name": [
-                    f"--{prefix}-map-put", handle, "name", "string",
-                    "<exact-name>",
-                ],
-            }
-            if prefix == "match"
-            and action == "map-put"
-            and field.get("name") in {"language", "platform"}
-            else None
-        )
-        rows.append([pointer, nonempty, empty, identity_facts])
-    return {
-        "columns": [
-            "business_pointer",
-            "nonempty_fact_argv",
-            "empty_argv",
-            "object_identity_match_argv",
-        ],
-        "rows": rows,
-    }
 
 
 def _container_schema_binding_argv(
@@ -7792,18 +7898,9 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
 
     if args.command == "topic-schema":
         (version,) = resolve_catalog_versions(args, env=env)
-        options = topic_options_contract(version, args.api)
-        match = topic_match_contract(version, args.api)
-        options_payload = typed_topic_contract_payload(options)
-        match_payload = typed_topic_contract_payload(match)
-        match_fields = match_payload.get("fields")
-        duplicate_name_fact_routes = (
-            match_fields.get("duplicate_name_fact_routes")
-            if isinstance(match_fields, Mapping)
-            else None
-        )
+        business = topic_business_contract(version, args.api)
         payload = {
-            "contract": "waapi-skill.typed-topic-input/v1",
+            "contract": "waapi-skill.topic-business-envelope/v1",
             "ok": True,
             "status": "ok",
             "command": "topic-schema",
@@ -7815,9 +7912,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             },
             "continuation": {
                 "subcommands": ["wait-topic", "stream-topic"],
-                "fact_selection": (
-                    "row action; present only when empty; disclose-* rows only"
-                ),
+                "default_input": "business",
                 "wait_argv_prefix": [
                     "--timeout",
                     "<positive-seconds>",
@@ -7825,54 +7920,84 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     args.api,
                     "--event-count",
                     "<exact-count:1..64>",
-                    "--options-schema-digest",
-                    options.schema_digest,
-                    "--match-schema-digest",
-                    match.schema_digest,
                 ],
-                "fact_order": "options ordered; match facts commute",
-                "bind": {
-                    "--options-schema-digest": options.schema_digest,
-                    "--match-schema-digest": match.schema_digest,
-                },
-                "fact_argv": {
-                    "prefixes": ["option", "match"],
-                    **(
-                        {"qualified_duplicate_fact_routes": duplicate_name_fact_routes}
-                        if isinstance(duplicate_name_fact_routes, Mapping)
-                        and duplicate_name_fact_routes.get("rows")
-                        else {}
+                "business_fact_argv": {
+                    "topic_option": "--topic-option <field> <value>",
+                    "empty_topic_option": "--topic-option-empty <field>",
+                    "typed_topic_option": (
+                        "--topic-option-as <field> "
+                        "<text|integer|number|toggle|null> <value>"
                     ),
-                    "top_level_fact_tables": {
-                        "options": _topic_top_level_fact_table(
-                            options,
-                            prefix="option",
-                        ),
-                        "match": _topic_top_level_fact_table(
-                            match,
-                            prefix="match",
-                        ),
-                    },
-                    "templates": {
-                        "set": "--<prefix>-set <handle> <type> <value>",
-                        "append": "--<prefix>-append <handle> <type> <value>",
-                        "present": "--<prefix>-present <handle>",
-                        "choose": "--<prefix>-choose <handle> <choice_handle>",
-                        "choose_dynamic": (
-                            "--<prefix>-choose-dynamic <handle> <key> <choice_handle>"
-                        ),
-                        "map_put": (
-                            "--<prefix>-map-put <handle> <key> <type> <value>"
-                        ),
-                    },
+                    "event_match": "--event-match <field> <value>",
+                    "empty_event_field": "--event-empty <field>",
+                    "typed_event_match": (
+                        "--event-match-as <field> "
+                        "<text|integer|number|toggle|null> <value>"
+                    ),
+                    "event_row": (
+                        "--event-row <collection> <comma-separated-indices> "
+                        "<field> <value>"
+                    ),
+                    "typed_event_row": (
+                        "--event-row-as <collection> <comma-separated-indices> "
+                        "<field> <text|integer|number|toggle|null> <value>"
+                    ),
+                    "empty_event_row": (
+                        "--event-row-empty <collection> "
+                        "<comma-separated-parent-indices-or-dash>"
+                    ),
+                    "exact_entry": (
+                        "--event-entry <scope> <indices-or-dash> <exact-key> "
+                        "<value>"
+                    ),
+                    "typed_exact_entry": (
+                        "--event-entry-as <scope> <indices-or-dash> "
+                        "<exact-key> <text|integer|number|toggle|null> <value>"
+                    ),
+                    "empty_exact_entry": (
+                        "--event-entry-empty <scope> <indices-or-dash> "
+                        "<exact-key> <object|list>"
+                    ),
+                    "exact_entry_object": (
+                        "--event-entry-object <scope> <indices-or-dash> "
+                        "<exact-key> <field> <value>"
+                    ),
+                    "typed_exact_entry_object": (
+                        "--event-entry-object-as <scope> <indices-or-dash> "
+                        "<exact-key> <field> "
+                        "<text|integer|number|toggle|null> <value>"
+                    ),
+                    "exact_entry_row": (
+                        "--event-entry-row <scope> <indices-or-dash> "
+                        "<exact-key> <item-index> <field> <value>"
+                    ),
+                    "typed_exact_entry_row": (
+                        "--event-entry-row-as <scope> <indices-or-dash> "
+                        "<exact-key> <item-index> <field> "
+                        "<text|integer|number|toggle|null> <value>"
+                    ),
                 },
+                    "event_row_field_disclosure": (
+                        "topic-schema <topic-uri> --row <collection> "
+                        "--row-field-group <group>"
+                    ),
+                    "exact_entry_field_disclosure": (
+                        "topic-schema <topic-uri> --entry <scope>"
+                    ),
+                    "event_match_field_disclosure": (
+                        "topic-schema <topic-uri> --match-group <group>"
+                    ),
                 "lifecycle": {
                     "wait-topic": "bounded; unsubscribe",
                     "stream-topic": "cancel/timeout; unsubscribe",
                 },
             },
-            "options": options_payload,
-            "event_match": match_payload,
+                "business_input": business.as_gateway_dict(
+                    selected_row=args.row,
+                    selected_entry=args.entry,
+                    selected_match_group=args.match_group,
+                    selected_row_field_group=args.row_field_group,
+                ),
         }
         final_payload = attach_gateway_session_context(
             payload,
@@ -7884,56 +8009,9 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             stop_after_bytes=MAX_TOPIC_SCHEMA_GATEWAY_RESULT_BYTES,
         )
         if observed > MAX_TOPIC_SCHEMA_GATEWAY_RESULT_BYTES:
-            # Qualified duplicate-name paths are a readability aid over the
-            # already lossless parent_row lineage.  Near-ceiling Topics keep
-            # that canonical lineage and omit only this redundant aid.
-            for section_name in ("event_match", "options"):
-                section = payload.get(section_name)
-                fields = section.get("fields") if isinstance(section, Mapping) else None
-                if isinstance(fields, dict):
-                    fields.pop("duplicate_name_paths", None)
-                    fields.pop("duplicate_name_fact_routes", None)
-            continuation = payload.get("continuation")
-            fact_argv = (
-                continuation.get("fact_argv")
-                if isinstance(continuation, Mapping)
-                else None
-            )
-            if isinstance(fact_argv, dict):
-                fact_argv.pop("qualified_duplicate_fact_routes", None)
-            final_payload = attach_gateway_session_context(
-                payload,
-                args=args,
-                env=env,
-            )
-            observed = gateway_json_document_size(
-                final_payload,
-                stop_after_bytes=MAX_TOPIC_SCHEMA_GATEWAY_RESULT_BYTES,
-            )
-        if observed > MAX_TOPIC_SCHEMA_GATEWAY_RESULT_BYTES:
-            # Copy-ready top-level facts prevent opaque-handle transcription
-            # on schemas with room for the redundant table. Large Topics keep
-            # the same exact handles in their lossless field tables.
-            continuation = payload.get("continuation")
-            fact_argv = (
-                continuation.get("fact_argv")
-                if isinstance(continuation, Mapping)
-                else None
-            )
-            if isinstance(fact_argv, dict):
-                fact_argv.pop("top_level_fact_tables", None)
-            final_payload = attach_gateway_session_context(
-                payload,
-                args=args,
-                env=env,
-            )
-            observed = gateway_json_document_size(
-                final_payload,
-                stop_after_bytes=MAX_TOPIC_SCHEMA_GATEWAY_RESULT_BYTES,
-            )
-        if observed > MAX_TOPIC_SCHEMA_GATEWAY_RESULT_BYTES:
             raise ValueError(
-                "Typed Topic schema exceeds its fixed 32 KiB public output ceiling"
+                "Topic business schema exceeds its fixed 32 KiB public "
+                "output ceiling"
             )
         return payload
     if args.command in {"request-schema", "request-map-container", "request-array-item"}:
@@ -7948,11 +8026,12 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 "Object queries use query-schema and its business continuation; "
                 "archived typed query pseudo-operations are not public routes."
             )
-        if args.command == "request-schema" and args.api.startswith(
+        if args.api.startswith(
             (TOPIC_OPTIONS_OPERATION_PREFIX, TOPIC_MATCH_OPERATION_PREFIX)
         ):
             raise GatewayInputError(
-                "Typed Topics use topic-schema <topic-uri> as their single schema entry."
+                "Topic subscriptions use the handle-free business topic-schema "
+                "and do not expose typed request handles or fragments."
             )
         capability: CapabilityRecord | None = None
         if args.api.startswith("ak."):

@@ -423,7 +423,9 @@ timeout and add the subcommand flag `--no-timeout`. Do not combine the two flags
 One timeout covers setup and collection. A Topic contract timeout is its default
 or recommendation, not a maximum. With `--no-timeout`, collection still stops at
 1–64 matching events, and the command still returns one terminal JSON document. Recursive
-Typed match facts from `topic-schema` are applied per event; nonmatches do not consume count. The route
+business match facts from `topic-schema` are applied per event; the Gateway derives
+publish-schema paths, nested containers, wire types, and exact matching structure.
+Nonmatches do not consume count. The route
 unsubscribes after success, timeout, or user cancellation. Every payload is
 publish-schema validated, and the complete dispatcher collection still shares
 the topic execution contract's 256 KiB JSON result ceiling. Reaching N matches
@@ -441,11 +443,7 @@ silently dropping an event. Every exit always attempts to unsubscribe and emits
 one terminal NDJSON record. Relay events immediately; do not restart between
 events or wait for the terminal record.
 
-For `ak.wwise.core.soundbank.generated`, the gateway itself keeps the ordinary 10-second omitted-duration default. The Skill must explicitly pass gateway-global `--timeout 120` and tell the user that this subscription will use 120 seconds. This is an explicit Skill-selected timeout, not a different gateway default; a user-supplied positive finite duration or explicit no-time-limit bounded wait still takes precedence. Run `topic-schema`; use its exact typed option handles for `id,name,type,path`, set event count to Bank × platform × language cells, and match `soundbank.name`/`platform.name` only when one explicit name covers every cell. Otherwise omit matches; never inject a GUID. Use the leaf handle, not its parent map.
-Conversely, use `map-put` only where the schema exposes an open map without a
-leaf scalar. If every requested cell shares one platform, that platform is a
-common explicit name and its typed match fact is required even when the Bank
-names differ.
+For `ak.wwise.core.soundbank.generated`, the gateway itself keeps the ordinary 10-second omitted-duration default. The Skill must explicitly pass gateway-global `--timeout 120` and tell the user that this subscription will use 120 seconds. This is an explicit Skill-selected timeout, not a different gateway default; a user-supplied positive finite duration or explicit no-time-limit bounded wait still takes precedence. Run `topic-schema`; repeat `--topic-option include <id|name|type|path>`, set event count to Bank × platform × language cells, and use `--event-match soundbank-name <name>` only when one explicit Bank name covers every cell. When every requested cell shares one platform, add `--event-entry platform - name <platform-name>`. Otherwise omit that predicate; never inject a GUID.
 
 Use `ak.wwise.core.soundbank.generated` for per-Bank × platform × language
 result events. Use `ak.wwise.core.soundbank.generationDone` only for the overall

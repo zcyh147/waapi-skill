@@ -7547,32 +7547,23 @@ def test_wait_topic_commutes_only_independent_selected_match_facts(
         topic,
         "--event-count",
         "3",
-        "--options-schema-digest",
-        "1" * 64,
-        "--match-schema-digest",
-        "2" * 64,
     )
     options = (
-        "--option-append",
-        "trh1-111111111111111111111111",
-        "string",
+        "--topic-option",
+        "include",
         "id",
-        "--option-append",
-        "trh1-111111111111111111111111",
-        "string",
+        "--topic-option",
+        "include",
         "name",
     )
     platform = (
-        "--match-map-put",
-        "trh1-222222222222222222222222",
-        "name",
-        "string",
-        "Windows",
+        "--event-match",
+        "soundbank-type",
+        "SoundBank",
     )
     soundbank = (
-        "--match-set",
-        "trh1-333333333333333333333333",
-        "string",
+        "--event-match",
+        "soundbank-name",
         "Dialogue_Chapter14",
     )
     step = ExpectedGatewayStep(
@@ -7609,21 +7600,15 @@ def test_wait_topic_does_not_commute_ordered_option_appends(tmp_path: Path) -> N
         topic,
         "--event-count",
         "3",
-        "--options-schema-digest",
-        "1" * 64,
-        "--match-schema-digest",
-        "2" * 64,
     )
     first = (
-        "--option-append",
-        "trh1-111111111111111111111111",
-        "string",
+        "--topic-option",
+        "include",
         "id",
     )
     second = (
-        "--option-append",
-        "trh1-111111111111111111111111",
-        "string",
+        "--topic-option",
+        "include",
         "name",
     )
     step = ExpectedGatewayStep(

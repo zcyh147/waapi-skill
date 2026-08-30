@@ -3459,7 +3459,7 @@ def test_command_classifier_accepts_exact_topic_schema_envelope(
         status="completed",
         aggregated_output=json.dumps(
             {
-                "contract": "waapi-skill.typed-topic-input/v1",
+                "contract": "waapi-skill.topic-business-envelope/v1",
                 "ok": True,
                 "command": "topic-schema",
             }

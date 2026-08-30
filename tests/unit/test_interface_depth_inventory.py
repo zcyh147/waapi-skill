@@ -89,9 +89,14 @@ def test_every_public_gateway_parser_flag_is_sealed_authoritatively() -> None:
     assert {row["name"] for row in by_command["wait-topic"]} >= {
         "event-count",
         "no-timeout",
-        "option-set",
-        "match-set",
+        "topic-option",
+        "event-match",
+        "event-row",
+        "event-entry",
     }
+    assert {"option-set", "match-set", "options-schema-digest"}.isdisjoint(
+        {row["name"] for row in by_command["wait-topic"]}
+    )
     assert {row["name"] for row in by_command["typed-call"]} >= {
         "set",
         "append",

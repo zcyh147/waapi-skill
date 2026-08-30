@@ -2037,7 +2037,7 @@ def test_media_pool_read_draft_keeps_dynamic_choice_and_value_in_one_batch() -> 
             assert paired["key"] == action["key"]
 
 
-def test_wait_topic_and_operation_requests_use_typed_inputs() -> None:
+def test_wait_topic_uses_business_input_and_operations_keep_typed_internals() -> None:
     topic_step = wait_topic_step(
         "generated",
         "ak.wwise.core.soundbank.generated",
@@ -2048,8 +2048,9 @@ def test_wait_topic_and_operation_requests_use_typed_inputs() -> None:
     )
     assert "--options-json" not in topic_step.arguments
     assert "--match-json" not in topic_step.arguments
-    assert "--options-schema-digest" in topic_step.arguments
-    assert "--match-schema-digest" in topic_step.arguments
+    assert "--options-schema-digest" not in topic_step.arguments
+    assert "--match-schema-digest" not in topic_step.arguments
+    assert not any(str(value).startswith("trh1-") for value in topic_step.arguments)
 
     protocol = build_transaction_protocol((_request(),))
     assert all("--request-json" not in step.arguments for step in protocol.steps)

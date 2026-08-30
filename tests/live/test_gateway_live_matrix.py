@@ -183,7 +183,7 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
                     evidence_dir=evidence_dir,
                     timeout=0.5,
                 )
-                topic_schema = _require_offline_schema_success(
+                _require_offline_schema_success(
                     _invoke_gateway(
                         common,
                         ("topic-schema", "ak.wwise.core.object.created"),
@@ -198,10 +198,6 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
                         (
                             "wait-topic",
                             "ak.wwise.core.object.created",
-                            "--options-schema-digest",
-                            str(topic_schema["options"]["schema_digest"]),
-                            "--match-schema-digest",
-                            str(topic_schema["event_match"]["schema_digest"]),
                         ),
                         env=env,
                     )

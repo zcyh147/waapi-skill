@@ -206,10 +206,16 @@ def _continuation_error(
         if item_type == "topic":
             if commands != ["wait-topic", "stream-topic"]:
                 return "Topic lifecycle continuation is not the exact wait/stream pair"
-            options = gateway.topic_options_contract(version, uri)
-            match = gateway.topic_match_contract(version, uri)
-            if not options.schema_digest or not match.schema_digest:
-                return "Topic typed contracts do not bind both schema digests"
+            business = gateway.topic_business_contract(version, uri)
+            public = business.as_gateway_dict()
+            encoded = json.dumps(public, sort_keys=True)
+            if (
+                business.transitional_boundaries
+                or public.get("contract") != "waapi-skill.topic-business/v1"
+                or "trh1-" in encoded
+                or "schema_digest" in encoded
+            ):
+                return "Topic business contract leaks its retired typed surface"
         elif "operation-schema" in commands:
             operations = tuple(capability.transaction_operations)
             if not operations:
