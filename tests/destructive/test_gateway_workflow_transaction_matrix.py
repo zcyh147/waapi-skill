@@ -10,6 +10,7 @@ import struct
 import subprocess
 import sys
 import uuid
+import wave
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
