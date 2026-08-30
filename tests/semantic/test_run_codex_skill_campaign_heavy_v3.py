@@ -63,6 +63,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_transaction_protocol,
     query_object_step,
     topic_schema_step,
+    topic_schema_entry_or_match_group_step,
     wait_topic_step,
     _typed_fact_cli_arguments,
 )
@@ -71,6 +72,7 @@ from tests.semantic.support.codex_gateway_broker import (
     DRAFT_REVISION_SUBCOMMANDS,
     DraftTypedActionArgument,
     DraftTypedActionBatchArgument,
+    ExactArgumentAlternatives,
     ExpectedGatewayStep,
     InlineTypedOperationArgument,
     MetadataQueryArgument,
@@ -3307,15 +3309,15 @@ def test_synthetic_topic_schema_supplies_bound_wait_digests(tmp_path: Path) -> N
 
 
 def test_topic_schema_progressive_entry_step_is_exact() -> None:
-    step = topic_schema_step(
+    step = topic_schema_entry_or_match_group_step(
         "soundbank.generated.schema.soundbank",
         "ak.wwise.core.soundbank.generated",
-        entry="soundbank",
+        scope="soundbank",
     )
 
     assert step.arguments == (
         "ak.wwise.core.soundbank.generated",
-        "--entry",
+        ExactArgumentAlternatives(("--entry", "--match-group")),
         "soundbank",
     )
 

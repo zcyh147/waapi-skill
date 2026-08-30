@@ -23,6 +23,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_direct_protocol,
     build_transaction_protocol,
     wait_topic_step,
+    topic_schema_entry_or_match_group_step,
     topic_schema_step,
 )
 from tests.semantic.support.codex_filesystem_security import (
@@ -431,10 +432,10 @@ def soundbank_topic_protocol_steps(
     steps = [topic_schema_step("soundbank.generated.schema", topic)]
     if isinstance(match.get("soundbank"), Mapping):
         steps.append(
-            topic_schema_step(
+            topic_schema_entry_or_match_group_step(
                 "soundbank.generated.schema.soundbank",
                 topic,
-                entry="soundbank",
+                scope="soundbank",
             )
         )
     steps.append(

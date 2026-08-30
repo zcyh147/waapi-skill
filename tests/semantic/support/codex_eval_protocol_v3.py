@@ -5148,6 +5148,31 @@ def topic_schema_step(
     )
 
 
+def topic_schema_entry_or_match_group_step(
+    name: str,
+    topic: str,
+    *,
+    scope: str,
+) -> ExpectedGatewayStep:
+    """Accept either bounded disclosure that closes one nested match scope."""
+
+    if not isinstance(topic, str) or not topic.startswith("ak.wwise."):
+        raise V3ProtocolError("topic-schema requires one exact WAAPI topic")
+    if not isinstance(scope, str) or not re.fullmatch(
+        r"[a-z][a-z0-9-]{0,127}", scope
+    ):
+        raise V3ProtocolError("topic-schema scope must be one stable token")
+    return ExpectedGatewayStep(
+        name=name,
+        subcommand="topic-schema",
+        arguments=(
+            topic,
+            ExactArgumentAlternatives(("--entry", "--match-group")),
+            scope,
+        ),
+    )
+
+
 def wait_topic_step(
     name: str,
     topic: str,
