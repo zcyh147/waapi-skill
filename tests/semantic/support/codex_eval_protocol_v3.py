@@ -5128,13 +5128,23 @@ def request_schema_step(name: str, api: str) -> ExpectedGatewayStep:
     )
 
 
-def topic_schema_step(name: str, topic: str) -> ExpectedGatewayStep:
+def topic_schema_step(
+    name: str,
+    topic: str,
+    *,
+    entry: str | None = None,
+) -> ExpectedGatewayStep:
     if not isinstance(topic, str) or not topic.startswith("ak.wwise."):
         raise V3ProtocolError("topic-schema requires one exact WAAPI topic")
+    if entry is not None and (
+        not isinstance(entry, str)
+        or not re.fullmatch(r"[a-z][a-z0-9-]{0,127}", entry)
+    ):
+        raise V3ProtocolError("topic-schema entry must be one stable scope token")
     return ExpectedGatewayStep(
         name=name,
         subcommand="topic-schema",
-        arguments=(topic,),
+        arguments=(topic, *(("--entry", entry) if entry is not None else ())),
     )
 
 

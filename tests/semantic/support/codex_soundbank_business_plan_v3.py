@@ -29,6 +29,7 @@ from tests.semantic.support.codex_filesystem_security import (
     CodexFileSecurityError,
     read_bounded_exclusive_regular_file,
 )
+from tests.semantic.support.codex_gateway_broker import ExpectedGatewayStep
 from tests.semantic.support.codex_prompt_provenance_v3 import serialize_protocol
 from tests.semantic.support.codex_soundbank_runtime_v3 import (
     MAX_FILE_BYTES,
@@ -277,10 +278,15 @@ def _validate_inputs(materialized: MaterializedSoundBankCase, before: SoundBankS
         if materialized.topic_plan is None or materialized.operation_requests or materialized.topic_plan.event_count != blueprint.expected_primary_dispatch_count:
             raise SoundBankBusinessPlanError("topic must have only a closed topic plan")
         topic = materialized.topic_plan
-        expected = build_direct_protocol([
-            topic_schema_step("soundbank.generated.schema", topic.topic),
-            wait_topic_step("soundbank.generated.wait", topic.topic, version=blueprint.version, event_count=topic.event_count, match=topic.match, options=topic.options),
-        ])
+        expected = build_direct_protocol(
+            _topic_protocol_steps(
+                topic=topic.topic,
+                version=blueprint.version,
+                event_count=topic.event_count,
+                match=topic.match,
+                options=topic.options,
+            )
+        )
     elif materialized.topic_plan is not None or not materialized.operation_requests:
         raise SoundBankBusinessPlanError("function/refusal materialization has invalid request topology")
     else:
@@ -398,11 +404,50 @@ def _refusal_archive_delta(static: Mapping[str, Any], live: Mapping[str, Any]) -
 def _expected_protocol_archive(static: Mapping[str, Any], live: Mapping[str, Any], protocol: V3GatewayProtocol) -> dict[str, Any]:
     if static["api"] == SOUNDBANK_TOPIC:
         topic = live["topic"]
-        return _protocol(build_direct_protocol([
-            topic_schema_step("soundbank.generated.schema", topic["topic"]),
-            wait_topic_step("soundbank.generated.wait", topic["topic"], version=str(static["version"]), event_count=topic["event_count"], match=topic["match"], options=topic["options"]),
-        ]))
+        return _protocol(
+            build_direct_protocol(
+                _topic_protocol_steps(
+                    topic=topic["topic"],
+                    version=str(static["version"]),
+                    event_count=topic["event_count"],
+                    match=topic["match"],
+                    options=topic["options"],
+                )
+            )
+        )
     return _protocol(build_transaction_protocol(static["operation_requests"], refusal=None if static["zero_dispatch_error_code"] is None else _refusal(static["zero_dispatch_error_code"])))
+
+
+def _topic_protocol_steps(
+    *,
+    topic: str,
+    version: str,
+    event_count: int,
+    match: Mapping[str, Any],
+    options: Mapping[str, Any],
+) -> list[ExpectedGatewayStep]:
+    """Build the exact progressive Topic disclosure used by SoundBank waits."""
+
+    steps = [topic_schema_step("soundbank.generated.schema", topic)]
+    if isinstance(match.get("soundbank"), Mapping):
+        steps.append(
+            topic_schema_step(
+                "soundbank.generated.schema.soundbank",
+                topic,
+                entry="soundbank",
+            )
+        )
+    steps.append(
+        wait_topic_step(
+            "soundbank.generated.wait",
+            topic,
+            version=version,
+            event_count=event_count,
+            match=match,
+            options=options,
+        )
+    )
+    return steps
 
 
 def _refusal(code: str):

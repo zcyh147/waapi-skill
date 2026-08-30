@@ -3306,6 +3306,20 @@ def test_synthetic_topic_schema_supplies_bound_wait_digests(tmp_path: Path) -> N
     assert records[1]["accepted"] is True
 
 
+def test_topic_schema_progressive_entry_step_is_exact() -> None:
+    step = topic_schema_step(
+        "soundbank.generated.schema.soundbank",
+        "ak.wwise.core.soundbank.generated",
+        entry="soundbank",
+    )
+
+    assert step.arguments == (
+        "ak.wwise.core.soundbank.generated",
+        "--entry",
+        "soundbank",
+    )
+
+
 def _synthetic_audio_transaction_request() -> dict[str, Any]:
     return {
         "contract": "waapi-skill.operation-request/v1",
