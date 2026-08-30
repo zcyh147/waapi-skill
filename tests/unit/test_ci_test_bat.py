@@ -576,6 +576,13 @@ def test_python_driver_includes_shared_gateway_nodes_for_every_matrix_version() 
         )
 
 
+def test_python_driver_includes_task_91_topic_business_live_node() -> None:
+    assert (
+        "tests/live/test_2022_1_topic_business_sandbox.py::"
+        "test_2022_1_topic_business_inputs_against_sandbox"
+    ) in LIVE_TEST_NODES["2022.1"]
+
+
 def test_ci_test_bat_all_mode_defaults_to_all_and_runs_full_matrix(tmp_path: Path) -> None:
     env, log_path = _base_env(tmp_path)
 

@@ -67,6 +67,7 @@ LIVE_TEST_NODES = {
         "tests/live/test_2022_live_prerequisites.py::test_2022_live_environment_prerequisites_fail_fast",
         "tests/live/test_2022_reflection_inventory.py::test_2022_live_reflection_inventory_runs_against_sandbox",
         "tests/live/test_2022_waql_live_matrix.py::test_2022_live_waql_object_get_matrix_runs_read_only_against_sandbox",
+        "tests/live/test_2022_1_topic_business_sandbox.py::test_2022_1_topic_business_inputs_against_sandbox",
         "tests/live/test_gateway_live_matrix.py::test_gateway_read_only_matrix_runs_once_against_copied_sandbox",
     ),
     "2023.1": (
