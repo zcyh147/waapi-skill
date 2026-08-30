@@ -129,6 +129,12 @@ prevention checks that are expensive to rediscover.
   Create the workspace/log parent before the redirected native command and put
   wrapper-preflight errors in an already-existing directory.
 
+- Re-observed: the final #89 Windows root `iwin-cli-console-c216f68-r1`
+  exported `InteractiveToken` but omitted the default `RunLevel` element. The
+  registered Principal reported `Limited`; that two-source attestation allowed
+  the campaign to run in desktop session 1, pass 1/1 plus verify-only, and
+  remove the task with zero scoped residual processes.
+
 ### macOS foreground ownership and TCC
 
 - Symptom: a unified shell receives `SIGTERM`, a `nohup` child outlives its
@@ -619,9 +625,11 @@ prevention checks that are expensive to rediscover.
 - Prevention: a Fresh routing case for the CLI/Console family must say
   `WwiseConsole 命令行` (or an equivalent explicit channel) while still hiding
   URIs, Gateway commands, Draft mechanics, and native options. Final candidate
-  `d6d6709` passed 1/1 fresh plus identical verify-only on both hosts; the
+  `c216f68` passed 1/1 fresh plus identical verify-only on both hosts; the
   Windows run used an attested `InteractiveToken` / `Limited` task and removed
-  it after zero scoped residual processes.
+  it after zero scoped residual processes. Predecessor `d6d6709` also passed
+  this case, but later packaged changes prevent treating it as final-candidate
+  evidence.
 
 ### A dynamic Business request is replayed from its durable Draft
 
