@@ -2343,9 +2343,9 @@ def test_generated_topic_reference_closes_model_owned_request_fields() -> None:
     assert "--topic-option include <id|name|type|path>" in reference
     assert "--event-entry platform - name <platform-name>" in reference
     assert "`id,name,type,path`" in reference
-    assert "`soundbank.name`" in reference
-    assert "`platform.name`" in reference
-    assert "Otherwise omit matches" in reference
+    assert "--event-match soundbank-name <name>" in reference
+    assert "--event-entry platform - name <platform-name>" in reference
+    assert "Otherwise omit that predicate" in reference
     assert "never inject a GUID" in reference
 
 
