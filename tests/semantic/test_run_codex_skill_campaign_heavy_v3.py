@@ -3366,6 +3366,28 @@ def test_soundbank_topic_protocol_discloses_each_nested_match_scope() -> None:
     )
     assert reordered == steps
 
+    selected_names = [
+        "soundbank.generated.schema",
+        "soundbank.generated.schema.soundbank.match-group",
+        "soundbank.generated.schema.platform.entry",
+        "soundbank.generated.wait",
+    ]
+    selected = campaign._consumed_heavy_v3_protocol_steps(  # noqa: SLF001
+        protocol,
+        len(selected_names),
+        selected_step_names=selected_names,
+    )
+    assert [step.name for step in selected] == selected_names
+    assert campaign._consumed_heavy_v3_protocol_steps(  # noqa: SLF001
+        protocol,
+        3,
+        selected_step_names=[
+            "soundbank.generated.schema",
+            "soundbank.generated.schema.platform.entry",
+            "soundbank.generated.schema.soundbank.entry",
+        ],
+    ) == ()
+
 
 def _synthetic_audio_transaction_request() -> dict[str, Any]:
     return {

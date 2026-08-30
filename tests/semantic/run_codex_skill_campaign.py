@@ -5832,6 +5832,12 @@ def _validate_heavy_v3_task_result(
     gateway_records: list[Mapping[str, Any]] = []
     previous_prefix = 0
     expected_skill_reads = _heavy_v3_expected_skill_reads(expected_unit)
+    broker_value = value.get("broker")
+    selected_step_names = (
+        broker_value.get("expected_step_names")
+        if isinstance(broker_value, Mapping)
+        else None
+    )
     for index, grade in enumerate(turn_grades, start=1):
         turn_root = turns_root / f"turn-{index:02d}"
         expected_prefix = (
@@ -5852,6 +5858,7 @@ def _validate_heavy_v3_task_result(
         consumed_protocol_steps = _consumed_heavy_v3_protocol_steps(
             protocol,
             expected_prefix,
+            selected_step_names=selected_step_names,
         )
         turn_gateway_records = _validate_heavy_v3_turn_grade(
             grade,
@@ -6001,7 +6008,11 @@ def _validate_heavy_v3_broker_result(
         if expected_consumed_count is None
         else expected_consumed_count
     )
-    protocol_steps = _consumed_heavy_v3_protocol_steps(protocol, consumed_count)
+    protocol_steps = _consumed_heavy_v3_protocol_steps(
+        protocol,
+        consumed_count,
+        selected_step_names=value.get("expected_step_names"),
+    )
     expected_names = [step.name for step in protocol_steps]
     accepted_terminal = tuple(
         getattr(protocol, "accepted_terminal_prefixes", (len(expected_names),))
@@ -6087,10 +6098,37 @@ def _validate_heavy_v3_broker_result(
 def _consumed_heavy_v3_protocol_steps(
     protocol: Any,
     consumed_count: int,
+    *,
+    selected_step_names: Any = None,
 ) -> tuple[Any, ...]:
-    """Select the sealed command lane after one optional schema omission."""
+    """Select the sealed command lane after reviewed optional disclosures."""
 
     steps = tuple(protocol.steps)
+    optional_topic_groups = tuple(
+        getattr(protocol, "optional_topic_schema_step_groups", ())
+    )
+    if optional_topic_groups:
+        if (
+            not isinstance(selected_step_names, list)
+            or len(selected_step_names) != consumed_count
+            or len(selected_step_names) != len(set(selected_step_names))
+        ):
+            return ()
+        by_name = {step.name: step for step in steps}
+        optional_names = {
+            name for group in optional_topic_groups for name in group
+        }
+        if any(name not in by_name for name in selected_step_names):
+            return ()
+        mandatory_names = tuple(
+            step.name for step in steps if step.name not in optional_names
+        )
+        selected_mandatory = tuple(
+            name for name in selected_step_names if name not in optional_names
+        )
+        if selected_mandatory != mandatory_names:
+            return ()
+        return tuple(by_name[name] for name in selected_step_names)
     if (
         getattr(protocol, "optional_initial_query_schema", False)
         and consumed_count == len(steps) - 1
