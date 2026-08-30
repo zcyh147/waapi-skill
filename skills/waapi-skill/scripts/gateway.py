@@ -498,6 +498,7 @@ DEFAULT_HOST = "127.0.0.1"
 DEFAULT_TIMEOUT = 10.0
 DEFAULT_METADATA_DISCOVERY_TIMEOUT = 30.0
 DEFAULT_TRANSACTION_TIMEOUT = 150.0
+PROJECT_TRANSITION_SETTLE_POLL_SECONDS = 0.1
 TRANSPORT_CLEANUP_GRACE_SECONDS = 0.05
 UNBOUNDED_TOPIC_CLEANUP_TIMEOUT_SECONDS = 1.0
 TOPIC_CLEANUP_RESERVE_MAX_SECONDS = 0.25
@@ -3173,16 +3174,33 @@ def _execute_gateway_unconstrained(
         factory = client_factory or default_client_factory
         transport = GatewayTransport(connection.url, factory, deadline=connection.deadline)
         try:
-            version_detection_timeout = connection.deadline.require_remaining(
-                "version_detection.getInfo"
+            wait_for_project_transition = _verify_is_executed_project_transition(
+                args,
+                env=source_env,
             )
-            if math.isinf(version_detection_timeout):
-                version_detection_timeout = DEFAULT_TIMEOUT
-            live_info = transport.call_with_timeout(
-                GET_INFO_URI,
-                timeout=version_detection_timeout,
-                phase="version_detection.getInfo",
-            )
+            while True:
+                version_detection_timeout = connection.deadline.require_remaining(
+                    "version_detection.getInfo"
+                )
+                if math.isinf(version_detection_timeout):
+                    version_detection_timeout = DEFAULT_TIMEOUT
+                try:
+                    live_info = transport.call_with_timeout(
+                        GET_INFO_URI,
+                        timeout=version_detection_timeout,
+                        phase="version_detection.getInfo",
+                    )
+                    break
+                except Exception as exc:
+                    if not (
+                        wait_for_project_transition
+                        and _is_transient_project_transition_lock(exc)
+                    ):
+                        raise
+                    connection.deadline.require_remaining(
+                        "wait for Authoring project transition"
+                    )
+                    time.sleep(PROJECT_TRANSITION_SETTLE_POLL_SECONDS)
             detected_version = version_key_from_get_info(require_mapping(live_info, "getInfo response"))
             runtime_detected_version = detected_version
             if connection.version_hint and connection.version_hint != detected_version:
@@ -9477,6 +9495,51 @@ def require_transaction_preconnection_policy(
     return policy
 
 
+def _verify_is_executed_project_transition(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+) -> bool:
+    """Recognize the one verify lane allowed to wait for Authoring to settle."""
+
+    if args.command != "verify":
+        return False
+    try:
+        store = resolve_transaction_store(args, env=env)
+        if store.load(args.transaction_id).state is not TransactionState.EXECUTED_UNVERIFIED:
+            return False
+        artifact = store.load_preview(args.transaction_id).artifact
+        request = require_mapping(artifact.get("request"), "transaction request")
+        version = request.get("version")
+        if not isinstance(version, str):
+            return False
+        mode, _target = transaction_project_guard_spec(request, version=version)
+    except (GatewayInputError, TransactionNotFound, InvalidTransition, ValueError):
+        return False
+    return mode != PROJECT_GUARD_INVARIANT
+
+
+def _is_transient_project_transition_lock(exc: BaseException) -> bool:
+    """Accept only Wwise's explicit project transition lock reasons."""
+
+    normalized = normalize_gateway_exception(exc)
+    if normalized.get("waapi_error_uri") != "ak.wwise.locked":
+        return False
+    metadata = normalized.get("waapi_error_details")
+    details = metadata.get("details") if isinstance(metadata, Mapping) else None
+    reasons = details.get("reasons") if isinstance(details, Mapping) else None
+    allowed = {
+        "Closing project in progress",
+        "Opening project in progress",
+        "Loading project in progress",
+    }
+    return (
+        isinstance(reasons, list)
+        and bool(reasons)
+        and all(isinstance(reason, str) and reason in allowed for reason in reasons)
+    )
+
+
 def require_transaction_confirmation_policy(
     *,
     store: TransactionStore,
@@ -15351,6 +15414,10 @@ def dispatch_business_host_ui_debug_plan(
         detected_version=detected_version,
         live_info=live_info,
         dispatcher=dispatcher,
+        allow_no_project=pending.operation in {
+            "ak.wwise.ui.project.create",
+            "ak.wwise.ui.project.open",
+        },
     )
     adapter = business_adapter(binding.record.operation)
     if adapter.family != "host-ui-debug-business" or not adapter.accepts_update_command(
@@ -15779,6 +15846,37 @@ def _business_context_from_live(
     )
 
 
+def _business_context_without_project(
+    *,
+    task_authority: str,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+) -> BusinessContext:
+    """Bind a project-transition-only declaration while no project is open.
+
+    The host/UI project adapters do not expose object or field handles. Their
+    immutable transaction Preview captures the real ``state=none`` project
+    guard later, so this private sentinel cannot stand in for live project
+    identity in a mutation or verifier.
+    """
+
+    version = live_info.get("version")
+    display_name = version.get("displayName") if isinstance(version, Mapping) else None
+    if not isinstance(display_name, str) or not display_name:
+        raise GatewayResultShapeError(
+            "Live Wwise build identity is unavailable for business handle binding.",
+            details={"required_field": "version.displayName"},
+            error_code="INVALID_STATUS_RESULT",
+        )
+    return BusinessContext.create(
+        task_authority=task_authority,
+        project_id="waapi-skill:no-current-project",
+        project_path="waapi-skill:no-current-project",
+        wwise_version=detected_version,
+        wwise_build=display_name,
+    )
+
+
 def _runtime_transport_context_from_live(
     *,
     endpoint: Mapping[str, Any],
@@ -15892,6 +15990,7 @@ def _open_business_binding(
     detected_version: str,
     live_info: Mapping[str, Any],
     dispatcher: WwiseDispatcher,
+    allow_no_project: bool = False,
 ) -> _BusinessBinding:
     state_dir = resolve_transaction_state_directory(args, env=env)
     store = OperationDraftStore(state_dir)
@@ -15909,19 +16008,36 @@ def _open_business_binding(
         dispatcher,
         connection=connection,
         version=detected_version,
+        allow_none=allow_no_project,
     )
-    assert project is not None
-    context = _business_context_from_live(
-        task_authority=args.task_authority,
-        project=project,
-        detected_version=detected_version,
-        live_info=live_info,
-    )
+    if project is None:
+        if not allow_no_project:  # pragma: no cover - current_project is strict above
+            raise GatewayInputError("A live Wwise project is required")
+        context = _business_context_without_project(
+            task_authority=args.task_authority,
+            detected_version=detected_version,
+            live_info=live_info,
+        )
+        # Only project open/create business adapters can reach this sentinel,
+        # and neither consumes ``binding.project``. Keeping the dataclass shape
+        # closed avoids making project identity optional for every other adapter.
+        bound_project: Mapping[str, Any] = {
+            "id": context.project_id,
+            "path": context.project_path,
+        }
+    else:
+        context = _business_context_from_live(
+            task_authority=args.task_authority,
+            project=project,
+            detected_version=detected_version,
+            live_info=live_info,
+        )
+        bound_project = project
     return _BusinessBinding(
         state_dir=state_dir,
         store=store,
         record=record,
-        project=project,
+        project=bound_project,
         project_call=project_call,
         context=context,
         read_call=transaction_read_call(

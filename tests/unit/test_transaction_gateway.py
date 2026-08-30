@@ -7558,6 +7558,182 @@ def test_every_project_transition_row_runs_one_complete_program_chain(
     assert verify_payload["agent_result"]["verified"] is True
 
 
+def test_project_transition_verify_waits_through_transient_authoring_lock(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    version = "2022.1"
+    api = "ak.wwise.ui.project.close"
+    state_dir = tmp_path / "state"
+    current_path = (tmp_path / "current" / "CurrentProject.wproj").resolve()
+    request = {
+        "contract": OPERATION_REQUEST_CONTRACT,
+        "version": version,
+        "operation": "waapi.call",
+        "arguments": {"api": api, "args": {}, "options": {}},
+    }
+    before = [{**project(path=str(current_path)), "type": "Project"}]
+    transaction = preview(
+        request,
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=FakeClient(
+            {
+                "ak.wwise.core.getInfo": [live_info(is_command_line=False)],
+                "ak.wwise.core.object.get": [{"return": before}],
+            }
+        ),
+    )
+    confirm(
+        transaction["transaction_id"],
+        transaction["artifact_hash"],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+    )
+    execute_exit, execute_payload = execute(
+        ["execute", transaction["transaction_id"]],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=FakeClient(
+            {
+                "ak.wwise.core.getInfo": [live_info(is_command_line=False)],
+                "ak.wwise.core.object.get": [{"return": before}],
+                api: [{"hadProjectOpen": True}],
+            }
+        ),
+        version=version,
+    )
+    assert execute_exit == 0, execute_payload
+    monkeypatch.setattr(waapi_gateway.time, "sleep", lambda _seconds: None)
+    locked = WaapiRequestFailed(
+        "ak.wwise.locked",
+        {
+            "message": "Cannot execute call because Wwise has an exclusive lock.",
+            "details": {"reasons": ["Closing project in progress"]},
+        },
+    )
+    verify_client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": [live_info(is_command_line=False)],
+            "ak.wwise.core.object.get": [{"return": []}],
+        },
+        errors={"ak.wwise.core.getInfo": [locked]},
+    )
+
+    verify_exit, verified = execute(
+        ["verify", transaction["transaction_id"]],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=verify_client,
+        version=version,
+    )
+
+    assert verify_exit == 0, verified
+    assert verified["state"] == TransactionState.VERIFIED.value
+    assert verified["guard_validation"]["project_transition"]["matched"] is True
+    assert [call[0] for call in verify_client.calls].count(
+        "ak.wwise.core.getInfo"
+    ) == 2
+
+
+def test_authoring_project_open_draft_allows_no_current_project(
+    tmp_path: Path,
+) -> None:
+    version = "2022.1"
+    operation = "ak.wwise.ui.project.open"
+    state_dir = tmp_path / "state"
+    target = (tmp_path / "target" / "TargetProject.wproj").resolve()
+    target.parent.mkdir()
+    target.write_text("fixture", encoding="utf-8")
+    code, started = execute(
+        ["draft-start", operation],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        version=version,
+    )
+    assert code == 0, started
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+
+    def no_project_client() -> FakeClient:
+        return FakeClient(
+            {
+                "ak.wwise.core.getInfo": [live_info(is_command_line=False)],
+                "ak.wwise.core.object.get": [{"return": []}],
+            },
+            errors={
+                "ak.wwise.core.getProjectInfo": [
+                    WaapiRequestFailed(
+                        "ak.wwise.unavailable",
+                        {"message": "No project is loaded"},
+                    )
+                ]
+            },
+        )
+
+    code, declared = execute(
+        [
+            "draft-declare-host-plan",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            "1",
+            "--value",
+            "project_file",
+            str(target),
+            "--toggle",
+            "discard_unsaved_current_project",
+            "disable",
+            "--value",
+            "upgrade_policy",
+            "fail",
+        ],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=no_project_client(),
+        version=version,
+    )
+    assert code == 0, declared
+    code, checked = execute(
+        [
+            "draft-check",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            str(declared["draft"]["revision"]),
+        ],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=no_project_client(),
+        version=version,
+    )
+    assert code == 0, checked
+    code, previewed = execute(
+        [
+            "preview-from-draft",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            str(checked["draft"]["revision"]),
+        ],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=no_project_client(),
+        version=version,
+    )
+
+    assert code == 0, previewed
+    assert previewed["state"] == TransactionState.AWAITING_CONFIRMATION.value
+    guard = TransactionStore(state_dir).load_preview(
+        previewed["transaction_id"]
+    ).artifact["project_guard"]
+    assert guard["project_guard_mode"] == PROJECT_GUARD_TRANSITION_TO_PATH
+    assert guard["project"]["state"] == "none"
+
+
 def test_project_transition_mismatch_stays_executed_unverified_for_manual_verify(
     tmp_path: Path,
 ) -> None:

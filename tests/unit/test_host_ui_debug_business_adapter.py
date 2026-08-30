@@ -122,6 +122,18 @@ class _HostClient:
                 "name": "Sample Project",
                 "path": str(self.project_file),
             }
+        if uri == "ak.wwise.core.object.get":
+            return {
+                "return": [
+                    {
+                        "id": "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}",
+                        "name": "Sample Project",
+                        "type": "Project",
+                        "path": str(self.project_file),
+                        "filePath": str(self.project_file),
+                    }
+                ]
+            }
         if uri == "ak.wwise.waapi.getSchema":
             return {}
         raise AssertionError(f"unexpected call {uri} {args} {options}")
