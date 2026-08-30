@@ -3418,6 +3418,26 @@ def test_soundbank_topic_protocol_selects_finite_stream_for_explicit_stream_case
     )
 
 
+def test_soundbank_topic_protocol_seals_result_only_soundbank_disclosure() -> None:
+    steps = soundbank_topic_protocol_steps(
+        scenario_id="O22-SB-GENERATED-01",
+        topic="ak.wwise.core.soundbank.generated",
+        version="2021.1",
+        event_count=3,
+        match={"platform": {"name": "Windows"}},
+        options={"return": ["id", "name", "type", "path"]},
+    )
+    disclosure = next(
+        step
+        for step in steps
+        if step.name == "soundbank.generated.schema.soundbank.disclosure"
+    )
+
+    assert disclosure.subcommand == "topic-schema"
+    assert disclosure.arguments[0] == "ak.wwise.core.soundbank.generated"
+    assert disclosure.arguments[2] == "soundbank"
+
+
 def _synthetic_audio_transaction_request() -> dict[str, Any]:
     return {
         "contract": "waapi-skill.operation-request/v1",

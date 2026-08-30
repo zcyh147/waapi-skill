@@ -24,6 +24,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_transaction_protocol,
     stream_topic_step,
     wait_topic_step,
+    topic_schema_entry_or_match_group_step,
     topic_schema_match_group_step,
     topic_schema_step,
 )
@@ -488,15 +489,31 @@ def soundbank_topic_protocol_steps(
     # predicates. Keep only these two sealed result disclosures beyond the
     # scopes already present in the subscription match.
     disclosure_scopes = tuple(
-        sorted({*canonical_match, "language", "platform"})
+        sorted({*canonical_match, "language", "platform", "soundbank"})
     )
     for scope in disclosure_scopes:
         value = canonical_match.get(scope)
-        if isinstance(value, Mapping) and any(
+        has_match_group = any(
             candidate.path and candidate.path[0] == scope
             for field in contract.match_fields
             for candidate in field._candidates
-        ):
+        )
+        has_entry = any(entry.token == scope for entry in contract.entry_fields)
+        combined_result_disclosure = (
+            scope == "soundbank"
+            and scope not in canonical_match
+            and has_match_group
+            and has_entry
+        )
+        if combined_result_disclosure:
+            steps.append(
+                topic_schema_entry_or_match_group_step(
+                    f"soundbank.generated.schema.{scope}.disclosure",
+                    topic,
+                    scope=scope,
+                )
+            )
+        elif isinstance(value, Mapping) and has_match_group:
             steps.append(
                 topic_schema_match_group_step(
                     f"soundbank.generated.schema.{scope}.match-group",
@@ -504,7 +521,7 @@ def soundbank_topic_protocol_steps(
                     group=scope,
                 )
             )
-        if any(entry.token == scope for entry in contract.entry_fields):
+        if has_entry and not combined_result_disclosure:
             steps.append(
                 topic_schema_step(
                     f"soundbank.generated.schema.{scope}.entry",
