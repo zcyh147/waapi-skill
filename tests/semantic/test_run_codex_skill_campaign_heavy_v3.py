@@ -3322,6 +3322,7 @@ def test_soundbank_topic_protocol_discloses_each_nested_match_scope() -> None:
 
     assert [step.name for step in steps] == [
         "soundbank.generated.schema",
+        "soundbank.generated.schema.language.entry",
         "soundbank.generated.schema.platform.entry",
         "soundbank.generated.schema.soundbank.match-group",
         "soundbank.generated.schema.soundbank.entry",
@@ -3330,24 +3331,30 @@ def test_soundbank_topic_protocol_discloses_each_nested_match_scope() -> None:
     assert steps[1].arguments == (
         "ak.wwise.core.soundbank.generated",
         "--entry",
-        "platform",
+        "language",
     )
     assert steps[2].arguments == (
+        "ak.wwise.core.soundbank.generated",
+        "--entry",
+        "platform",
+    )
+    assert steps[3].arguments == (
         "ak.wwise.core.soundbank.generated",
         "--match-group",
         "soundbank",
     )
-    assert steps[3].arguments == (
+    assert steps[4].arguments == (
         "ak.wwise.core.soundbank.generated",
         "--entry",
         "soundbank",
     )
 
     protocol = build_optional_topic_schema_protocol(steps)
-    assert protocol.allowed_turn_prefix_counts == ((2, 3, 4, 5),)
-    assert protocol.terminal_prefix_counts == (2, 3, 4, 5)
+    assert protocol.allowed_turn_prefix_counts == ((2, 3, 4, 5, 6),)
+    assert protocol.terminal_prefix_counts == (2, 3, 4, 5, 6)
     assert protocol.optional_topic_schema_step_groups == (
         (
+            "soundbank.generated.schema.language.entry",
             "soundbank.generated.schema.platform.entry",
             "soundbank.generated.schema.soundbank.match-group",
             "soundbank.generated.schema.soundbank.entry",

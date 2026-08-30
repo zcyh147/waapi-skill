@@ -10,10 +10,8 @@ import pytest
 
 from tests.semantic.support.codex_eval_protocol_v3 import (
     StructuredRefusal,
-    build_direct_protocol,
+    build_optional_topic_schema_protocol,
     build_transaction_protocol,
-    topic_schema_step,
-    wait_topic_step,
 )
 from tests.semantic.support.codex_soundbank_business_plan_v3 import (
     TOPIC_ACK_CONTRACT,
@@ -28,6 +26,7 @@ from tests.semantic.support.codex_soundbank_business_plan_v3 import (
     compile_soundbank_business_plan,
     parse_soundbank_business_plan_sections,
     soundbank_archive_identity,
+    soundbank_topic_protocol_steps,
     validate_soundbank_archived_verification,
     validate_soundbank_business_plan,
     validate_soundbank_business_plan_archive,
@@ -160,18 +159,14 @@ def _case(api: str, scenario_id: str, root: Path, *, refusal: bool = False, topi
     materialized = MaterializedSoundBankCase(blue, MappingProxyType({}), MappingProxyType({}), requests, topic_plan, (proof,), (artifact,), dynamic_roots, MappingProxyType({"bank:Bank": "{00000000-0000-0000-0000-000000000010}", "event": "{00000000-0000-0000-0000-000000000040}"}), MappingProxyType({"bank:Bank": 1}), MappingProxyType({}), MappingProxyType({"Windows": "{00000000-0000-0000-0000-000000000020}"}), MappingProxyType({"SFX": "{00000000-0000-0000-0000-000000000030}"}))
     snapshot = SoundBankSnapshot(scenario_id, (ObjectState("event", "{00000000-0000-0000-0000-000000000040}", r"\Events\Default Work Unit\Hero", "Event"),), (BankState("Bank", "{00000000-0000-0000-0000-000000000010}", (("{00000000-0000-0000-0000-000000000040}", ()),)),), (), (proof,), (tree,))
     if topic:
-        protocol = build_direct_protocol(
-            [
-                topic_schema_step("soundbank.generated.schema", api),
-                wait_topic_step(
-                    "soundbank.generated.wait",
-                    api,
-                    version="2022.1",
-                    event_count=topic_count,
-                    match={},
-                    options={},
-                )
-            ]
+        protocol = build_optional_topic_schema_protocol(
+            soundbank_topic_protocol_steps(
+                topic=api,
+                version="2022.1",
+                event_count=topic_count,
+                match={},
+                options={},
+            )
         )
     else:
         protocol = build_transaction_protocol(

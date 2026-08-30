@@ -450,10 +450,10 @@ def soundbank_topic_protocol_steps(
             separators=(",", ":"),
         )
     )
-    for scope, value in canonical_match.items():
-        if not isinstance(value, Mapping):
-            continue
-        if any(
+    disclosure_scopes = tuple(sorted({*canonical_match, "language"}))
+    for scope in disclosure_scopes:
+        value = canonical_match.get(scope)
+        if isinstance(value, Mapping) and any(
             candidate.path and candidate.path[0] == scope
             for field in contract.match_fields
             for candidate in field._candidates
