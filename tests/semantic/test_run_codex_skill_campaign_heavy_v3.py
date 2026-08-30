@@ -111,7 +111,9 @@ from tests.semantic.support.codex_prompt_provenance_v3 import (
 )
 from tests.semantic.support.codex_object_business_plan_v3 import (
     ObjectBusinessPlanError,
+    TYPED_PROFILE_OBJECT_METADATA_UNITS,
     TYPED_PROFILE_QUERY_REPAIR_UNIT_ID,
+    TYPED_PROFILE_RENAME_UNIT_ID,
     compile_object_business_plan,
     validate_object_archived_verification,
 )
@@ -122,6 +124,7 @@ from tests.semantic.support.codex_object_heavy_v3 import (
     OperationRequestSpec,
     QueryObjectRequestSpec,
     build_object_heavy_v3_recipe,
+    typed_input_business_query_recipe,
     typed_input_merge_recipe,
     typed_input_rename_recipe,
 )
@@ -1790,6 +1793,18 @@ def _synthetic_typed_sections(
             getattr(unit, "base_scenario_id", unit.unit_id),
             version=unit.version,
         )
+        if unit.unit_id in {
+            "TYP21-QUERY-OBJECT-GET",
+            "TYP23-QUERY-OBJECT-GET",
+        }:
+            recipe = typed_input_business_query_recipe(
+                recipe,
+                unit_id=unit.unit_id,
+            )
+        elif unit.unit_id == "TYP21-DEDICATED-OBJECT-CREATE":
+            recipe = typed_input_merge_recipe(recipe, unit_id=unit.unit_id)
+        elif unit.unit_id == "TYP23-DEDICATED-OBJECT-CREATE":
+            recipe = typed_input_rename_recipe(recipe, unit_id=unit.unit_id)
         before = _synthetic_object_before(recipe)
         audio_root = scenario_root / "owned" / "assets" / "object-query-audio"
         manifest: list[dict[str, Any]] = []
@@ -1815,8 +1830,13 @@ def _synthetic_typed_sections(
             before,
             manifest,
             profile_unit_id=(
-                TYPED_PROFILE_QUERY_REPAIR_UNIT_ID
-                if unit.unit_id == TYPED_PROFILE_QUERY_REPAIR_UNIT_ID
+                unit.unit_id
+                if unit.unit_id
+                in {
+                    TYPED_PROFILE_QUERY_REPAIR_UNIT_ID,
+                    TYPED_PROFILE_RENAME_UNIT_ID,
+                    *TYPED_PROFILE_OBJECT_METADATA_UNITS,
+                }
                 else None
             ),
         )
@@ -2274,6 +2294,18 @@ def _synthetic_protocol(
             getattr(unit, "base_scenario_id", unit.unit_id),
             version=unit.version,
         )
+        if unit.unit_id in {
+            "TYP21-QUERY-OBJECT-GET",
+            "TYP23-QUERY-OBJECT-GET",
+        }:
+            recipe = typed_input_business_query_recipe(
+                recipe,
+                unit_id=unit.unit_id,
+            )
+        elif unit.unit_id == "TYP21-DEDICATED-OBJECT-CREATE":
+            recipe = typed_input_merge_recipe(recipe, unit_id=unit.unit_id)
+        elif unit.unit_id == "TYP23-DEDICATED-OBJECT-CREATE":
+            recipe = typed_input_rename_recipe(recipe, unit_id=unit.unit_id)
         if isinstance(recipe.request, OperationRequestSpec):
             return build_transaction_protocol((recipe.request.as_dict(),))
         if isinstance(recipe.request, QueryObjectRequestSpec):
@@ -7515,7 +7547,7 @@ def test_heavy_cli_pass_checks_reject_migration_disconnect_before_dispatch() -> 
         )
 
 
-def test_get_info_pass_checks_bind_status_preflight_separately(
+def test_get_info_pass_checks_bind_status_as_the_single_public_route(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     unit = SimpleNamespace(
@@ -7535,7 +7567,7 @@ def test_get_info_pass_checks_bind_status_preflight_separately(
         "primary_dispatch": {
             "api": "ak.wwise.core.getInfo",
             "dispatch_count": 1,
-            "status_preflight_dispatch_count": 1,
+            "status_preflight_dispatch_count": 0,
         },
         "business_verification": {"passed": True},
     }
@@ -9208,18 +9240,8 @@ def test_campaign_typed_profile_set03_plan_binds_exact_unit_metadata_lane(
         unit.base_scenario_id,
         version=unit.version,
     )
-    protocol = build_metadata_transaction_protocol(
-        (recipe.request.as_dict(version=recipe.version),),
-        object_type="ActorMixer",
-        metadata_queries=("volume", "pitch", "notes", "output bus"),
-        required_tokens=("Volume", "Pitch", "OutputBus"),
-        expected_required_token_projection=(
-            MetadataTokenProjection("Volume", "property", "Real32"),
-            MetadataTokenProjection("Pitch", "property", "Real32"),
-            MetadataTokenProjection("OutputBus", "reference", "Object"),
-        ),
-        equivalence="object_set_v1",
-        schema_first=True,
+    protocol = build_transaction_protocol(
+        (recipe.request.as_dict(version=recipe.version),)
     )
     sections = compile_object_business_plan(
         unit.scenario,
@@ -9240,7 +9262,7 @@ def test_campaign_typed_profile_set03_plan_binds_exact_unit_metadata_lane(
     assert parsed.static_expectation["profile_unit_id"] == unit.unit_id
     with pytest.raises(
         ObjectBusinessPlanError,
-        match="exact reviewed request",
+        match="static expectation differs",
     ):
         campaign._validate_heavy_v3_typed_business_plan(
             sections.writer_kwargs(),

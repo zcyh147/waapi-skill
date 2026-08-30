@@ -1624,11 +1624,17 @@ def _compound_metadata_protocol(
             raise ObjectBusinessPlanError(
                 "object metadata profile unit is outside its reviewed lane"
             )
-        metadata_queries = reviewed[3]
-        required_tokens = reviewed[4]
+        return None
     else:
         metadata_queries = ()
         required_tokens = ()
+    if (
+        profile_unit_id is None
+        and isinstance(recipe.request, OperationRequestSpec)
+        and recipe.request.operation in {"object.create", "object.set"}
+        and all(step.subcommand != "metadata" for step in protocol.steps)
+    ):
+        return None
 
     fixture = getattr(scenario, "fixture", {})
     asset_spec = fixture.get("asset_spec") if isinstance(fixture, Mapping) else None

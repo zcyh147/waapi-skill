@@ -1224,7 +1224,309 @@ SOUNDBANK_BUSINESS_OPERATIONS = frozenset(
     }
 )
 
-OBJECT_GRAPH_BUSINESS_OPERATIONS = frozenset({"object.create"})
+OBJECT_GRAPH_BUSINESS_OPERATIONS = frozenset({"object.create", "object.set"})
+
+
+def _build_object_set_business_transaction_steps(
+    normalized: Mapping[str, Any],
+    *,
+    label: str,
+) -> tuple[ExpectedGatewayStep, ...]:
+    """Translate one closed bulk object edit into Business Draft declarations."""
+
+    try:
+        parsed = parse_operation_request(normalized)
+    except OperationContractError as exc:
+        raise V3ProtocolError(
+            f"object set business request is invalid: {exc}"
+        ) from exc
+    arguments = parsed.arguments
+    if set(arguments) - {"objects", "on_name_conflict"}:
+        raise V3ProtocolError("object set business request fields are not closed")
+    objects = arguments.get("objects")
+    if not isinstance(objects, list) or not objects:
+        raise V3ProtocolError("object set business request requires target rows")
+
+    draft = _BusinessDraftSteps.start(operation="object.set", label=label)
+    steps = draft.steps
+    object_handles: dict[str, ResponseBinding] = {}
+    field_handles: dict[tuple[str, str], ResponseBinding] = {}
+
+    def selector_key(selector: Mapping[str, Any]) -> str:
+        try:
+            return json.dumps(
+                selector,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        except (TypeError, ValueError) as exc:
+            raise V3ProtocolError("object set identity is not strict JSON") from exc
+
+    def bind(selector: Any, *, role: str) -> ResponseBinding:
+        if not isinstance(selector, Mapping):
+            raise V3ProtocolError("object set identity must be an object")
+        key = selector_key(selector)
+        existing = object_handles.get(key)
+        if existing is not None:
+            return existing
+        step_name = f"{label}.bind-{role}-{len(object_handles) + 1:02d}"
+        handle = draft.bind_object(
+            selector,
+            step_name=step_name,
+            error_subject="object set business",
+        )
+        object_handles[key] = handle
+        return handle
+
+    prepared: list[dict[str, Any]] = []
+    for index, row in enumerate(objects, start=1):
+        if not isinstance(row, Mapping) or set(row) - {
+            "object",
+            "notes",
+            "properties",
+            "references",
+            "children",
+        }:
+            raise V3ProtocolError("object set target row is not closed")
+        target = bind(row.get("object"), role=f"target-{index:02d}")
+        references = row.get("references", [])
+        if not isinstance(references, list):
+            raise V3ProtocolError("object set references must be an array")
+        reference_rows: list[tuple[str, ResponseBinding | None]] = []
+        for reference in references:
+            if (
+                not isinstance(reference, Mapping)
+                or set(reference) != {"name", "target"}
+                or not isinstance(reference.get("name"), str)
+            ):
+                raise V3ProtocolError("object set reference is not closed")
+            target_selector = reference.get("target")
+            target_handle = (
+                None
+                if target_selector is None
+                else bind(target_selector, role=f"reference-{index:02d}")
+            )
+            reference_rows.append((str(reference["name"]), target_handle))
+        prepared.append(
+            {
+                "index": index,
+                "row": row,
+                "target": target,
+                "references": tuple(reference_rows),
+            }
+        )
+
+    for item in prepared:
+        row = item["row"]
+        properties = row.get("properties", [])
+        if not isinstance(properties, list):
+            raise V3ProtocolError("object set properties must be an array")
+        for prop in properties:
+            if (
+                not isinstance(prop, Mapping)
+                or set(prop) != {"name", "value"}
+                or not isinstance(prop.get("name"), str)
+            ):
+                raise V3ProtocolError("object set property is not closed")
+            name = str(prop["name"])
+            if name == "Volume":
+                continue
+            key = (selector_key(row["object"]), name)
+            if key in field_handles:
+                continue
+            step_name = f"{label}.discover-field-{len(field_handles) + 1:02d}"
+            steps.append(
+                ExpectedGatewayStep(
+                    name=step_name,
+                    subcommand="draft-discover-fields",
+                    arguments=(
+                        *draft.prefix(),
+                        "--object-handle",
+                        item["target"],
+                        "--meaning",
+                        name.casefold(),
+                    ),
+                )
+            )
+            draft.advance(step_name)
+            field_handles[key] = ResponseBinding(
+                step_name,
+                "/field_candidates/0/handle",
+            )
+
+    def scalar(value: Any) -> Any:
+        if isinstance(value, bool):
+            return "true" if value else "false"
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            if isinstance(value, float) and not math.isfinite(value):
+                raise V3ProtocolError("object set numeric value must be finite")
+            encoded = json.dumps(value, ensure_ascii=False, allow_nan=False)
+            if isinstance(value, float) and value.is_integer():
+                return ExactArgumentAlternatives((str(int(value)), encoded))
+            return encoded
+        if isinstance(value, str):
+            return value
+        raise V3ProtocolError("object set field value is unsupported")
+
+    declaration_index = 0
+    native_kind = {
+        "ActorMixer": "actor-mixer",
+        "RandomSequenceContainer": "random-container",
+        "Sound": "sound-sfx",
+    }
+
+    def declare_child(
+        child: Mapping[str, Any],
+        *,
+        parent_handle: Any,
+        declaration_id: str,
+        step_suffix: str,
+    ) -> None:
+        nonlocal declaration_index
+        if not isinstance(child, Mapping) or set(child) - {
+            "type",
+            "name",
+            "children",
+            "properties",
+            "notes",
+        }:
+            raise V3ProtocolError("object set child declaration is not closed")
+        object_type = child.get("type")
+        name = child.get("name")
+        if object_type not in native_kind or not isinstance(name, str) or not name:
+            raise V3ProtocolError("object set child type or name is unsupported")
+        arguments_out: list[Any] = [
+            *draft.prefix(),
+            "--declaration-id",
+            declaration_id,
+            "--parent-handle",
+            parent_handle,
+            "--name",
+            name,
+            "--kind",
+            native_kind[str(object_type)],
+        ]
+        notes = child.get("notes")
+        if notes is not None:
+            arguments_out.extend(("--field", "notes", scalar(notes)))
+        properties = child.get("properties", [])
+        if not isinstance(properties, list):
+            raise V3ProtocolError("object set child properties must be an array")
+        for prop in properties:
+            if (
+                not isinstance(prop, Mapping)
+                or set(prop) != {"name", "value"}
+                or prop.get("name") != "Volume"
+            ):
+                raise V3ProtocolError(
+                    "object set child property requires a reviewed stable field"
+                )
+            arguments_out.extend(
+                ("--field", "volume_db", scalar(prop.get("value")))
+            )
+        step_name = f"{label}.declare-{step_suffix}"
+        steps.append(
+            ExpectedGatewayStep(
+                name=step_name,
+                subcommand="draft-declare-new",
+                arguments=tuple(arguments_out),
+            )
+        )
+        current_index = declaration_index
+        declaration_index += 1
+        draft.advance(step_name)
+        child_parent = ResponseBinding(
+            step_name,
+            f"/draft/declarations/{current_index}/result_handle",
+        )
+        nested = child.get("children", [])
+        if not isinstance(nested, list):
+            raise V3ProtocolError("object set nested children must be an array")
+        for nested_index, nested_child in enumerate(nested, start=1):
+            declare_child(
+                nested_child,
+                parent_handle=child_parent,
+                declaration_id=f"{declaration_id}-{nested_index:02d}",
+                step_suffix=f"{step_suffix}-{nested_index:02d}",
+            )
+
+    for item in prepared:
+        row = item["row"]
+        declaration_id = f"target-{item['index']:02d}"
+        arguments_out: list[Any] = [
+            *draft.prefix(),
+            "--declaration-id",
+            declaration_id,
+            "--object-handle",
+            item["target"],
+        ]
+        if "notes" in row:
+            arguments_out.extend(("--field", "notes", scalar(row["notes"])))
+        for prop in row.get("properties", []):
+            name = str(prop["name"])
+            if name == "Volume":
+                arguments_out.extend(
+                    ("--field", "volume_db", scalar(prop.get("value")))
+                )
+            else:
+                arguments_out.extend(
+                    (
+                        "--field-value",
+                        field_handles[(selector_key(row["object"]), name)],
+                        scalar(prop.get("value")),
+                    )
+                )
+        for name, target_handle in item["references"]:
+            if name != "OutputBus" or target_handle is None:
+                raise V3ProtocolError(
+                    "object set reference requires one bound output bus"
+                )
+            arguments_out.extend(("--field", "output_bus", target_handle))
+        step_name = f"{label}.declare-existing-{item['index']:02d}"
+        steps.append(
+            ExpectedGatewayStep(
+                name=step_name,
+                subcommand="draft-declare-existing",
+                arguments=tuple(arguments_out),
+            )
+        )
+        existing_index = declaration_index
+        declaration_index += 1
+        draft.advance(step_name)
+        parent_handle = ResponseBinding(
+            step_name,
+            f"/draft/declarations/{existing_index}/result_handle",
+        )
+        children = row.get("children", [])
+        if not isinstance(children, list):
+            raise V3ProtocolError("object set children must be an array")
+        for child_index, child in enumerate(children, start=1):
+            declare_child(
+                child,
+                parent_handle=parent_handle,
+                declaration_id=f"{declaration_id}-child-{child_index:02d}",
+                step_suffix=f"child-{item['index']:02d}-{child_index:02d}",
+            )
+
+    check_name = f"{label}.check"
+    steps.append(
+        ExpectedGatewayStep(
+            name=check_name,
+            subcommand="draft-check",
+            arguments=draft.prefix(),
+        )
+    )
+    draft.advance(check_name)
+    steps.append(
+        ExpectedGatewayStep(
+            name=f"{label}.preview",
+            subcommand="preview-from-draft",
+            arguments=draft.prefix(),
+            expected_operation_request=normalized,
+        )
+    )
+    return tuple(steps)
 
 
 def build_object_graph_business_transaction_steps(
@@ -1233,7 +1535,7 @@ def build_object_graph_business_transaction_steps(
     label: str,
     parent_selector: Mapping[str, Any] | None = None,
 ) -> tuple[ExpectedGatewayStep, ...]:
-    """Translate one named Weather-style graph into Business Draft steps."""
+    """Translate one closed recursive object tree into Business Draft steps."""
 
     normalized = _validate_operation_request(request)
     if normalized["operation"] not in OBJECT_GRAPH_BUSINESS_OPERATIONS:
@@ -1242,6 +1544,11 @@ def build_object_graph_business_transaction_steps(
         )
     if not isinstance(label, str) or not re.fullmatch(r"tx[0-9]{2}", label):
         raise V3ProtocolError("business transaction label must be txNN")
+    if normalized["operation"] == "object.set":
+        return _build_object_set_business_transaction_steps(
+            normalized,
+            label=label,
+        )
     try:
         parsed = parse_operation_request(normalized)
     except OperationContractError as exc:
@@ -1249,19 +1556,178 @@ def build_object_graph_business_transaction_steps(
             f"object graph business request is invalid: {exc}"
         ) from exc
     arguments = parsed.arguments
+    allowed_root_fields = {
+        "parent",
+        "type",
+        "name",
+        "children",
+        "properties",
+        "references",
+        "notes",
+        "on_name_conflict",
+        "platform",
+        "auto_add_to_source_control",
+        "replace_owned_root",
+    }
     if (
-        arguments.get("type") != "ActorMixer"
+        set(arguments) - allowed_root_fields
+        or not isinstance(arguments.get("type"), str)
         or not isinstance(arguments.get("name"), str)
-        or set(arguments) != {"parent", "type", "name", "children"}
+        or not arguments["name"]
     ):
-        raise V3ProtocolError(
-            "object graph business profile requires one named ActorMixer root"
-        )
-    children = arguments.get("children")
-    if not isinstance(children, list) or not children:
-        raise V3ProtocolError(
-            "object graph business profile requires named Sound children"
-        )
+        raise V3ProtocolError("object graph business root is not closed")
+
+    kind_by_native_type = {
+        "ActorMixer": "actor-mixer",
+        "BlendContainer": "blend-container",
+        "MusicRanSeqCntr": "music-playlist-container",
+        "MusicSegment": "music-segment",
+        "MusicSwitchContainer": "music-switch-container",
+        "MusicTrack": "music-track",
+        "RandomSequenceContainer": "random-container",
+        "Sound": "sound-sfx",
+        "SwitchContainer": "switch-container",
+        "Folder": "virtual-folder",
+    }
+    reference_handles: dict[str, ResponseBinding] = {}
+
+    def reference_key(selector: Mapping[str, Any]) -> str:
+        try:
+            return json.dumps(
+                selector,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        except (TypeError, ValueError) as exc:
+            raise V3ProtocolError(
+                "object graph reference identity is not strict JSON"
+            ) from exc
+
+    def semantic_kind(node: Mapping[str, Any]) -> str:
+        native_type = node.get("type")
+        try:
+            kind = kind_by_native_type[str(native_type)]
+        except KeyError as exc:
+            raise V3ProtocolError(
+                f"object graph native type {native_type!r} has no reviewed business kind"
+            ) from exc
+        language = node.get("language")
+        if native_type == "Sound" and isinstance(language, str) and language != "SFX":
+            return "sound-voice"
+        return kind
+
+    def scalar_text(value: Any) -> Any:
+        if isinstance(value, bool):
+            return "true" if value else "false"
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            if isinstance(value, float) and not math.isfinite(value):
+                raise V3ProtocolError("object graph numeric field must be finite")
+            encoded = json.dumps(value, ensure_ascii=False, allow_nan=False)
+            if isinstance(value, float) and value.is_integer():
+                return ExactArgumentAlternatives((str(int(value)), encoded))
+            return encoded
+        if isinstance(value, str):
+            return value
+        raise V3ProtocolError("object graph business field value is unsupported")
+
+    def stable_fields(node: Mapping[str, Any]) -> tuple[tuple[str, Any], ...]:
+        fields: list[tuple[str, Any]] = []
+        notes = node.get("notes")
+        if notes is not None:
+            if not isinstance(notes, str):
+                raise V3ProtocolError("object graph notes must be text")
+            fields.append(("notes", notes))
+        language = node.get("language")
+        if language is not None:
+            if not isinstance(language, str) or not language:
+                raise V3ProtocolError("object graph language must be text")
+            fields.append(("language", language))
+        properties = node.get("properties", [])
+        if not isinstance(properties, list):
+            raise V3ProtocolError("object graph properties must be an array")
+        property_map: dict[str, Any] = {}
+        for row in properties:
+            if (
+                not isinstance(row, Mapping)
+                or set(row) != {"name", "value"}
+                or not isinstance(row.get("name"), str)
+                or row["name"] in property_map
+            ):
+                raise V3ProtocolError("object graph properties are not closed")
+            property_map[str(row["name"])] = row.get("value")
+        looping = property_map.pop("IsLoopingEnabled", None)
+        infinite = property_map.pop("IsLoopingInfinite", None)
+        if looping is not None or infinite is not None:
+            if looping is True and infinite is True:
+                fields.append(("loop", "infinite"))
+            elif looping is False and infinite in {None, False}:
+                fields.append(("loop", "off"))
+            else:
+                raise V3ProtocolError(
+                    "object graph loop fields do not form one closed business value"
+                )
+        field_names = {
+            "Volume": "volume_db",
+            "MaxNumInstances": "max_instances",
+            "OverrideParentMaxNumInstances": "override_parent_instance_limit",
+        }
+        for native_name, value in property_map.items():
+            try:
+                field_name = field_names[native_name]
+            except KeyError as exc:
+                raise V3ProtocolError(
+                    f"object graph property {native_name!r} requires a bound field handle"
+                ) from exc
+            fields.append((field_name, scalar_text(value)))
+        references = node.get("references", [])
+        if not isinstance(references, list):
+            raise V3ProtocolError("object graph references must be an array")
+        for reference in references:
+            if (
+                not isinstance(reference, Mapping)
+                or set(reference) != {"name", "target"}
+                or reference.get("name") != "OutputBus"
+                or not isinstance(reference.get("target"), Mapping)
+            ):
+                raise V3ProtocolError(
+                    "object graph reference requires one output bus target"
+                )
+            try:
+                handle = reference_handles[reference_key(reference["target"])]
+            except KeyError as exc:
+                raise V3ProtocolError(
+                    "object graph reference target was not pre-bound"
+                ) from exc
+            fields.append(("output_bus", handle))
+        return tuple(fields)
+
+    def children(node: Mapping[str, Any]) -> tuple[Mapping[str, Any], ...]:
+        raw = node.get("children", [])
+        if not isinstance(raw, list):
+            raise V3ProtocolError("object graph children must be an array")
+        values: list[Mapping[str, Any]] = []
+        for child in raw:
+            if not isinstance(child, Mapping):
+                raise V3ProtocolError("object graph child must be an object")
+            allowed = {
+                "type",
+                "name",
+                "children",
+                "properties",
+                "references",
+                "notes",
+                "language",
+            }
+            if (
+                set(child) - allowed
+                or not isinstance(child.get("type"), str)
+                or not isinstance(child.get("name"), str)
+                or not child["name"]
+            ):
+                raise V3ProtocolError("object graph child shape is not closed")
+            values.append(child)
+        return tuple(values)
 
     draft = _BusinessDraftSteps.start(operation="object.create", label=label)
     steps = draft.steps
@@ -1271,96 +1737,123 @@ def build_object_graph_business_transaction_steps(
         step_name=f"{label}.bind-parent",
         error_subject="object graph business parent",
     )
-    root_name = f"{label}.declare-root"
-    steps.append(
-        ExpectedGatewayStep(
-            name=root_name,
-            subcommand="draft-declare-new",
-            arguments=(
-                *draft.prefix(),
-                "--declaration-id",
-                "weather",
-                "--parent-handle",
-                parent_handle,
-                "--name",
-                str(arguments["name"]),
-                "--kind",
-                "actor-mixer",
-            ),
-        )
-    )
-    draft.advance(root_name)
-    root_handle = ResponseBinding(root_name, "/draft/declarations/0/result_handle")
 
-    for index, child in enumerate(children, start=1):
-        if not isinstance(child, Mapping) or set(child) != {
-            "type",
-            "name",
-            "properties",
-        }:
-            raise V3ProtocolError(
-                "object graph business child shape is not closed"
+    def bind_references(node: Mapping[str, Any]) -> None:
+        references = node.get("references", [])
+        if not isinstance(references, list):
+            raise V3ProtocolError("object graph references must be an array")
+        for reference in references:
+            if (
+                not isinstance(reference, Mapping)
+                or set(reference) != {"name", "target"}
+                or reference.get("name") != "OutputBus"
+                or not isinstance(reference.get("target"), Mapping)
+            ):
+                raise V3ProtocolError(
+                    "object graph reference requires one output bus target"
+                )
+            selector = reference["target"]
+            key = reference_key(selector)
+            if key not in reference_handles:
+                step_name = (
+                    f"{label}.bind-reference-{len(reference_handles) + 1:02d}"
+                )
+                reference_handles[key] = draft.bind_object(
+                    selector,
+                    step_name=step_name,
+                    error_subject="object graph reference target",
+                )
+        for child in children(node):
+            bind_references(child)
+
+    bind_references(arguments)
+    conflict = arguments.get("on_name_conflict")
+    configure_arguments: list[Any] = [*draft.prefix()]
+    if conflict is not None:
+        if conflict not in {"fail", "rename", "merge", "replace"}:
+            raise V3ProtocolError("object graph name conflict policy is invalid")
+        configure_arguments.extend(("--name-conflict", str(conflict)))
+    if "platform" in arguments:
+        configure_arguments.extend(("--platform", str(arguments["platform"])))
+    if "auto_add_to_source_control" in arguments:
+        configure_arguments.append(
+            "--add-to-source-control"
+            if arguments["auto_add_to_source_control"] is True
+            else "--no-add-to-source-control"
+        )
+    replace_owner = arguments.get("replace_owned_root")
+    if replace_owner is not None:
+        configure_suffix = configure_arguments[len(draft.prefix()) :]
+        owner_handle = draft.bind_object(
+            replace_owner,
+            step_name=f"{label}.bind-replace-owner",
+            error_subject="object graph replacement owner",
+        )
+        configure_arguments = [*draft.prefix(), *configure_suffix]
+        configure_arguments.extend(("--replace-owner-handle", owner_handle))
+    if len(configure_arguments) > len(draft.prefix()):
+        configure_name = f"{label}.configure"
+        steps.append(
+            ExpectedGatewayStep(
+                name=configure_name,
+                subcommand="draft-business-configure",
+                arguments=tuple(configure_arguments),
             )
-        properties = child.get("properties")
-        if child.get("type") != "Sound" or not isinstance(properties, list):
-            raise V3ProtocolError(
-                "object graph business profile requires Sound SFX children"
-            )
-        property_map = {
-            row.get("name"): row.get("value")
-            for row in properties
-            if isinstance(row, Mapping) and set(row) == {"name", "value"}
-        }
-        if (
-            len(property_map) != len(properties)
-            or property_map.get("IsLoopingEnabled") is not True
-            or property_map.get("IsLoopingInfinite") is not True
-            or isinstance(property_map.get("Volume"), bool)
-            or not isinstance(property_map.get("Volume"), (int, float))
-            or set(property_map)
-            != {"IsLoopingEnabled", "IsLoopingInfinite", "Volume"}
-        ):
-            raise V3ProtocolError(
-                "object graph business Sound requires Infinite loop and volume_db"
-            )
-        step_name = f"{label}.declare-sound-{index:02d}"
+        )
+        draft.advance(configure_name)
+
+    declaration_index = 0
+
+    def declare(
+        node: Mapping[str, Any],
+        *,
+        parent: Any,
+        declaration_id: str,
+        step_suffix: str,
+    ) -> None:
+        nonlocal declaration_index
+        step_name = f"{label}.declare-{step_suffix}"
+        declaration_arguments: list[Any] = [
+            *draft.prefix(),
+            "--declaration-id",
+            declaration_id,
+            "--parent-handle",
+            parent,
+            "--name",
+            str(node["name"]),
+            "--kind",
+            semantic_kind(node),
+        ]
+        for field_name, value in stable_fields(node):
+            declaration_arguments.extend(("--field", field_name, value))
         steps.append(
             ExpectedGatewayStep(
                 name=step_name,
                 subcommand="draft-declare-new",
-                arguments=(
-                    *draft.prefix(),
-                    "--declaration-id",
-                    f"sound-{index:02d}",
-                    "--parent-handle",
-                    root_handle,
-                    "--name",
-                    str(child["name"]),
-                    "--kind",
-                    "sound-sfx",
-                    "--field",
-                    "loop",
-                    "infinite",
-                    "--field",
-                    "volume_db",
-                    (
-                        ExactArgumentAlternatives(
-                            (
-                                str(int(property_map["Volume"])),
-                                json.dumps(
-                                    property_map["Volume"],
-                                    allow_nan=False,
-                                ),
-                            )
-                        )
-                        if isinstance(property_map["Volume"], float)
-                        and property_map["Volume"].is_integer()
-                        else json.dumps(property_map["Volume"], allow_nan=False)
-                    ),
-                ),
+                arguments=tuple(declaration_arguments),
             )
         )
+        current_index = declaration_index
+        declaration_index += 1
         draft.advance(step_name)
+        child_parent = ResponseBinding(
+            step_name,
+            f"/draft/declarations/{current_index}/result_handle",
+        )
+        for child_index, child in enumerate(children(node), start=1):
+            declare(
+                child,
+                parent=child_parent,
+                declaration_id=f"{declaration_id}-{child_index:02d}",
+                step_suffix=f"{step_suffix}-{child_index:02d}",
+            )
+
+    declare(
+        arguments,
+        parent=parent_handle,
+        declaration_id="root",
+        step_suffix="root",
+    )
 
     check_name = f"{label}.check"
     steps.append(
@@ -4419,7 +4912,15 @@ def build_transaction_protocol(
             COMPOSER_INPUT_MODE,
             BUSINESS_DECLARATION_INPUT_MODE,
         }:
-            if operation == "object.set":
+            if (
+                input_mode == BUSINESS_DECLARATION_INPUT_MODE
+                and operation in OBJECT_GRAPH_BUSINESS_OPERATIONS
+            ):
+                operation_steps = build_object_graph_business_transaction_steps(
+                    request,
+                    label=label,
+                )
+            elif operation == "object.set":
                 operation_steps = build_object_set_composer_transaction_steps(
                     request,
                     label=label,
@@ -4727,6 +5228,15 @@ def build_metadata_transaction_protocol(
     ):
         raise V3ProtocolError(
             "expected required-token projection must match required_tokens in order"
+        )
+    object_set_requests = all(
+        request.get("operation") == "object.set" for request in requests
+    )
+    if object_set_requests:
+        if equivalence == "object_set_v1":
+            return build_transaction_protocol(requests)
+        raise V3ProtocolError(
+            "object.set Business Draft owns live field discovery"
         )
 
     metadata_step_name = "metadata.discover"

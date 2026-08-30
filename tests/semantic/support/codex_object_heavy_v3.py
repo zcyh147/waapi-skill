@@ -2503,6 +2503,65 @@ def build_object_heavy_v3_recipe(
         ) from exc
 
 
+def typed_input_business_query_recipe(
+    recipe: ObjectHeavyRecipe,
+    *,
+    unit_id: str,
+) -> ObjectHeavyRecipe:
+    """Migrate the two historical superset reads at the typed-input boundary.
+
+    The underlying heavy-V3 recipes remain frozen for historical replay.  The
+    current typed-input profile instead exposes only the public business query
+    vocabulary that replaced raw paths, native predicates, and return fields.
+    """
+
+    reviewed = {
+        "TYP21-QUERY-OBJECT-GET": (
+            "OBJ22-F-GET-01",
+            "2021.1",
+            SEMANTIC_LAB + r"\Combat",
+            (("kind-is", "all-sounds"),),
+            ("volume-db", "notes", "output-bus"),
+        ),
+        "TYP23-QUERY-OBJECT-GET": (
+            "OBJ22-F-GET-02",
+            "2023.1",
+            SEMANTIC_LAB,
+            (),
+            ("parent", "source-language", "volume-db", "notes"),
+        ),
+    }.get(unit_id)
+    if (
+        reviewed is None
+        or not isinstance(recipe.request, QueryObjectRequestSpec)
+        or recipe.api != OBJECT_GET_URI
+        or (recipe.scenario_id, recipe.version) != reviewed[:2]
+    ):
+        raise ObjectHeavyRecipeError(
+            "typed-input business query is outside its reviewed unit/version lane"
+        )
+    request = recipe.request
+    migrated = _business_query(
+        path=reviewed[2],
+        relationships=("descendants",),
+        predicates=reviewed[3],
+        take=request.take,
+        includes=reviewed[4],
+        return_fields=request.return_fields,
+        strategy=request.result_strategy,
+        exact_keys=request.exact_expected_keys,
+        superset_keys=request.bounded_superset_keys,
+        final_filter=request.final_filter,
+    )
+    migrated = replace(
+        migrated,
+        primary_row_policy=request.primary_row_policy,
+        derived_row_policy=request.derived_row_policy,
+        final_answer_policy=request.final_answer_policy,
+    )
+    return replace(recipe, request=migrated)
+
+
 def typed_input_merge_recipe(
     recipe: ObjectHeavyRecipe,
     *,
@@ -2687,6 +2746,7 @@ __all__ = [
     "QueryObjectRequestSpec",
     "all_object_heavy_v3_recipes",
     "build_object_heavy_v3_recipe",
+    "typed_input_business_query_recipe",
     "typed_input_merge_recipe",
     "typed_input_rename_recipe",
 ]

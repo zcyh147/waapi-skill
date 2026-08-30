@@ -229,16 +229,6 @@ def test_campaign_reader_independently_accepts_exact_direct_plan() -> None:
                 "host.status",
                 "status",
             ),
-            ExpectedGatewayStep(
-                "host.get-info.schema",
-                "request-schema",
-                ("ak.wwise.core.getInfo",),
-            ),
-            ExpectedGatewayStep(
-                "host.get-info",
-                "typed-zero-call",
-                ("ak.wwise.core.getInfo",),
-            ),
         )
     )
     bindings = {
@@ -345,8 +335,6 @@ def test_full_archive_dispatcher_terminates_after_direct_typed_validation(
     steps = (
         (
             {"name": "host.status", "subcommand": "status"},
-            {"name": "host.get-info.schema", "subcommand": "request-schema"},
-            {"name": "host.get-info", "subcommand": "typed-zero-call"},
         )
         if api.endswith("getInfo")
         else ({"name": "direct.execute", "subcommand": "typed-zero-call"},)

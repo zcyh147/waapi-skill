@@ -168,6 +168,7 @@ from tests.semantic.support.codex_object_heavy_v3 import (
     ObjectHeavyRecipe,
     OperationRequestSpec,
     build_object_heavy_v3_recipe,
+    typed_input_business_query_recipe,
     typed_input_merge_recipe,
     typed_input_rename_recipe,
 )
@@ -3702,7 +3703,7 @@ def _build_compound_object_metadata_protocol(
     version: str,
     profile_unit_id: str | None = None,
 ) -> V3GatewayProtocol | None:
-    """Seal one object mutation behind an agent-visible live metadata read."""
+    """Build the remaining historical metadata protocol when still required."""
 
     binding = _compound_object_metadata_binding(
         scenario,
@@ -3714,6 +3715,10 @@ def _build_compound_object_metadata_protocol(
     if not isinstance(recipe.request, OperationRequestSpec):
         raise HeavyProjectRunnerError(
             "compound object metadata binding requires one operation request"
+        )
+    if recipe.request.operation in {"object.create", "object.set"}:
+        return build_transaction_protocol(
+            (recipe.request.as_dict(version=version),)
         )
     object_type, queries, tokens = binding
     trusted_result = discover_metadata(
@@ -4367,12 +4372,6 @@ def _prepare_case(
                     "host.status",
                     "status",
                 ),
-                ExpectedGatewayStep(
-                    "host.get-info.schema",
-                    "request-schema",
-                    (GET_INFO_URI,),
-                ),
-                call_step("host.get-info", GET_INFO_URI, version=runtime.version),
             ]
         )
         project_digest = _project_document_digest(runtime.sandbox.sandbox_path)
@@ -4469,10 +4468,11 @@ def _prepare_case(
             if payload is None:
                 failures.append("getInfo gateway payload is missing")
             else:
-                try:
-                    actual = _agent_result_mapping(payload, context="host.get-info")
-                except HeavyProjectRunnerError as exc:
-                    failures.append(str(exc))
+                value = payload.get("wwise")
+                if isinstance(value, Mapping):
+                    actual = value
+                else:
+                    failures.append("Gateway status lacks the live Wwise identity")
             if actual is not None and dict(actual) != baseline_result:
                 failures.append("model getInfo result differs from the sealed host identity")
             if snapshot_get_info() != project_digest:
@@ -4745,7 +4745,12 @@ def _prepare_case(
             scenario.id,
             version=runtime.version,
         )
-        if unit_id == "TYP21-DEDICATED-OBJECT-CREATE":
+        if unit_id in {
+            "TYP21-QUERY-OBJECT-GET",
+            "TYP23-QUERY-OBJECT-GET",
+        }:
+            recipe = typed_input_business_query_recipe(recipe, unit_id=unit_id)
+        elif unit_id == "TYP21-DEDICATED-OBJECT-CREATE":
             recipe = typed_input_merge_recipe(recipe, unit_id=unit_id)
         elif unit_id == TYPED_PROFILE_RENAME_UNIT_ID:
             recipe = typed_input_rename_recipe(recipe, unit_id=unit_id)
@@ -4772,6 +4777,8 @@ def _prepare_case(
                 base_protocol=protocol,
                 profile_unit_id=unit_id,
             )
+        elif metadata_profile_unit_id is not None:
+            protocol = object_runtime.gateway_protocol()
         else:
             protocol = _build_compound_object_metadata_protocol(
                 scenario,
@@ -6177,27 +6184,17 @@ def _audit_get_info_dispatch_partition(
     primary_count: int,
     status_project_api: str,
 ) -> Mapping[str, Any]:
-    """Separate the required status preflight from the named API result."""
+    """Bind the sole public status route to getInfo plus its project read."""
 
     records = tuple(task.broker_evidence.records)
-    if tuple(record.step_name for record in records) != (
-        "host.status",
-        "host.get-info.schema",
-        "host.get-info",
-    ):
+    if tuple(record.step_name for record in records) != ("host.status",):
         raise HeavyProjectRunnerError(
             "getInfo dispatch audit differs from its exact public protocol"
         )
     status_payload = records[0].payload
-    result_payload = records[2].payload
     status_calls = (
         status_payload.get("calls")
         if isinstance(status_payload, Mapping)
-        else None
-    )
-    result_call = (
-        result_payload.get("call")
-        if isinstance(result_payload, Mapping)
         else None
     )
     if (
@@ -6207,11 +6204,9 @@ def _audit_get_info_dispatch_partition(
         or not all(isinstance(row, Mapping) for row in status_calls)
         or {row.get("api") for row in status_calls}
         != {GET_INFO_URI, status_project_api}
-        or not isinstance(result_call, Mapping)
-        or result_call.get("api") != GET_INFO_URI
     ):
         raise HeavyProjectRunnerError(
-            "getInfo status/result dispatch partition is invalid"
+            "getInfo status dispatch partition is invalid"
         )
     status_get_info = next(
         row for row in status_calls if row.get("api") == GET_INFO_URI
@@ -6224,7 +6219,6 @@ def _audit_get_info_dispatch_partition(
     expected_bindings = (
         (GET_INFO_URI, status_get_info.get("evidence_path")),
         (status_project_api, status_project.get("evidence_path")),
-        (GET_INFO_URI, result_call.get("evidence_path")),
     )
     expected_paths = tuple(path for _api, path in expected_bindings)
     if not all(isinstance(path, str) and path for path in expected_paths):
@@ -6235,17 +6229,17 @@ def _audit_get_info_dispatch_partition(
         (row.get("api"), row.get("evidence_path")) for row in rows
     )
     if (
-        len(set(expected_paths)) != 3
+        len(set(expected_paths)) != 2
         or observed_bindings != expected_bindings
     ):
         raise HeavyProjectRunnerError(
-            "getInfo dispatcher evidence is not bound to its ordered status and named result"
+            "getInfo dispatcher evidence is not bound to its ordered status result"
         )
     return MappingProxyType(
         {
             "api": GET_INFO_URI,
             "dispatch_count": 1,
-            "status_preflight_dispatch_count": 1,
+            "status_preflight_dispatch_count": 0,
         }
     )
 

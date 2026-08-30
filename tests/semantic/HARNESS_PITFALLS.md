@@ -817,6 +817,33 @@ prevention checks that are expensive to rediscover.
   convert it to a semantic FAIL or retry the root; a later changed candidate
   may use one new campaign root after the exact runner and desktop preflight.
 
+### A production interface migration must migrate the Fresh oracle too
+
+- Evidence: #60 macOS root `imac-issue60-f361093-r1` used the frozen deep
+  Skill candidate but retained the older `typed_input_cross_version_25`
+  protocol. The Agent correctly used the sole `status` route while the Broker
+  expected `status -> request-schema -> typed-zero-call`; it correctly read
+  `query-schema` while the Broker expected a retired raw `query-object`; the
+  third unit then blocked before Codex because the oracle requested a removed
+  generic typed-Draft adapter for `object.create`. The root stopped at 0 PASS /
+  2 FAIL / 1 BLOCKED / 22 pending with unchanged source hash and mtime and was
+  frozen without replay. The simultaneous Windows root
+  `iwin-issue60-f361093-r1` independently froze as infrastructure BLOCKED on
+  one incomplete Codex command lifecycle and grants no semantic evidence.
+- Cause: Program, Non-live, and real-Wwise gates proved the production deep
+  interface, but the representative Fresh profile still materialized its
+  expected commands from pre-migration helper recipes. An exact Broker then
+  treated correct current commands as unexpected, and a removed Adapter became
+  a setup blocker rather than an Agent result.
+- Prevention: when a public Gateway seam is removed or deepened, include its
+  executable Fresh protocol/oracle in the same deterministic migration gate.
+  Build expected steps only from the current business declaration, keep frozen
+  historical recipes solely for archive replay, and run a no-Codex
+  constructibility regression over every selected profile unit before opening
+  a formal root. Never restore the retired production interface to make an old
+  oracle pass, and never relabel a protocol-construction BLOCKED result as an
+  Agent failure.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:

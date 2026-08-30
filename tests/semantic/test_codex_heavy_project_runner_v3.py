@@ -996,18 +996,14 @@ def test_prepare_get_info_case_binds_exact_live_process_and_result(
     )
 
     assert calls == [(runner.GET_INFO_URI, {}, {})]
-    assert [step.subcommand for step in prepared.protocol.steps] == [
-        "status",
-        "request-schema",
-        "typed-zero-call",
-    ]
+    assert [step.subcommand for step in prepared.protocol.steps] == ["status"]
     assert prepared.required_reference is None
     assert prepared.turn_reference_schedule is None
     assert prepared.typed_sections.static_expectation["verification_boundary"] == (
         "exact_host_identity"
     )
     omitted_status = prepared.verify_final(
-        {"agent_result": baseline},
+        {"wwise": baseline},
         SimpleNamespace(final_response="Wwise 2021.1.14.8108，进程 4242。"),
     )
     assert omitted_status.passed is False
@@ -1029,31 +1025,31 @@ def test_prepare_get_info_case_binds_exact_live_process_and_result(
         },
     )
     verification = prepared.verify_final(
-        {"agent_result": baseline},
+        {"wwise": baseline},
         SimpleNamespace(final_response="Wwise 2021.1.14.8108，进程 4242。"),
     )
     assert verification.passed is True
     split_build = prepared.verify_final(
-        {"agent_result": baseline},
+        {"wwise": baseline},
         SimpleNamespace(
             final_response="Wwise v2021.1.14，build 8108，进程 4242。"
         ),
     )
     assert split_build.passed is True
     incomplete = prepared.verify_final(
-        {"agent_result": baseline},
+        {"wwise": baseline},
         SimpleNamespace(final_response="Wwise 2021.1，进程 4242。"),
     )
     assert incomplete.passed is False
     wrong_split_build = prepared.verify_final(
-        {"agent_result": baseline},
+        {"wwise": baseline},
         SimpleNamespace(
             final_response="Wwise v2021.1.14，build 8109，进程 4242。"
         ),
     )
     assert wrong_split_build.passed is False
     negated_split_build = prepared.verify_final(
-        {"agent_result": baseline},
+        {"wwise": baseline},
         SimpleNamespace(
             final_response="Wwise 不是 v2021.1.14，build 8108，进程 4242。"
         ),
@@ -1068,7 +1064,7 @@ def test_prepare_get_info_case_binds_exact_live_process_and_result(
         ("2025.1", "ak.wwise.core.getProjectInfo"),
     ),
 )
-def test_get_info_dispatch_audit_separates_status_preflight_from_named_result(
+def test_get_info_dispatch_audit_binds_the_single_status_route(
     tmp_path: Path,
     version: str,
     status_project_api: str,
@@ -1086,7 +1082,6 @@ def test_get_info_dispatch_audit_separates_status_preflight_from_named_result(
 
     status_get_info = write_evidence("01-get-info.json", runner.GET_INFO_URI)
     status_project = write_evidence("02-project.json", status_project_api)
-    named_get_info = write_evidence("03-get-info.json", runner.GET_INFO_URI)
     task = SimpleNamespace(
         broker_evidence=SimpleNamespace(
             evidence_directory=str(evidence_root),
@@ -1104,19 +1099,6 @@ def test_get_info_dispatch_audit_separates_status_preflight_from_named_result(
                                 "evidence_path": str(status_project),
                             },
                         ]
-                    },
-                ),
-                SimpleNamespace(
-                    step_name="host.get-info.schema",
-                    payload={"command": "request-schema"},
-                ),
-                SimpleNamespace(
-                    step_name="host.get-info",
-                    payload={
-                        "call": {
-                            "api": runner.GET_INFO_URI,
-                            "evidence_path": str(named_get_info),
-                        }
                     },
                 ),
             ),
@@ -1137,7 +1119,7 @@ def test_get_info_dispatch_audit_separates_status_preflight_from_named_result(
     assert audit == {
         "api": runner.GET_INFO_URI,
         "dispatch_count": 1,
-        "status_preflight_dispatch_count": 1,
+        "status_preflight_dispatch_count": 0,
     }
 
     task.broker_evidence.records[0].payload["calls"][1]["api"] = (
@@ -1147,7 +1129,7 @@ def test_get_info_dispatch_audit_separates_status_preflight_from_named_result(
     )
     with pytest.raises(
         runner.HeavyProjectRunnerError,
-        match="status/result dispatch partition is invalid",
+        match="status dispatch partition is invalid",
     ):
         runner._audit_primary_dispatch(
             _scenario(
@@ -1202,14 +1184,14 @@ def test_get_info_dispatch_audit_separates_status_preflight_from_named_result(
         status_project
     )
     task.broker_evidence.records[0].payload["calls"][0]["evidence_path"] = str(
-        named_get_info
+        status_project
     )
-    task.broker_evidence.records[2].payload["call"]["evidence_path"] = str(
+    task.broker_evidence.records[0].payload["calls"][1]["evidence_path"] = str(
         status_get_info
     )
     with pytest.raises(
         runner.HeavyProjectRunnerError,
-        match="not bound to its ordered status and named result",
+        match="not bound to its ordered status result",
     ):
         runner._audit_primary_dispatch(
             _scenario(
@@ -1358,7 +1340,7 @@ def test_other_typed_profile_object_metadata_lanes_are_exact(
     )
 
 
-def test_typed_profile_set03_builds_schema_first_metadata_protocol(
+def test_typed_profile_set03_uses_business_draft_field_discovery(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     scenario = _scenario(
@@ -1367,35 +1349,10 @@ def test_typed_profile_set03_builds_schema_first_metadata_protocol(
         version="2022.1",
     )
     recipe = build_object_heavy_v3_recipe("OBJ22-F-SET-03", "2022.1")
-    candidates = [
-        {"name": name, "kind": kind, "metadata": {"type": value_type}}
-        for name, kind, value_type in (
-            ("Volume", "property", "Real32"),
-            ("Pitch", "property", "Real32"),
-            ("OutputBus", "reference", "Object"),
-        )
-    ]
     monkeypatch.setattr(
         runner,
         "discover_metadata",
-        lambda **_kwargs: SimpleNamespace(
-            as_dict=lambda: {
-                "contract": "waapi-skill.metadata-discovery/v2",
-                "authority": "live-waapi",
-                "result_detail": "compact",
-                "selection_required": True,
-                "exact_live_name_required_for_mutation": True,
-                "dependency_closure_complete": True,
-                "unresolved_dependencies": [],
-                "scope": {
-                    "kind": "object_type",
-                    "requested": "ActorMixer",
-                    "resolved": {"name": "ActorMixer"},
-                },
-                "candidates": candidates,
-                "dependency_candidates": [],
-            }
-        ),
+        lambda **_kwargs: pytest.fail("retired outer metadata discovery ran"),
     )
 
     protocol = runner._build_compound_object_metadata_protocol(
@@ -1409,24 +1366,15 @@ def test_typed_profile_set03_builds_schema_first_metadata_protocol(
     assert protocol is not None
     assert [step.subcommand for step in protocol.steps[:2]] == [
         "operation-schema",
-        "metadata",
+        "draft-start",
     ]
-    binding = next(
-        candidate
-        for step in protocol.steps
-        for argument in (None, *step.arguments)
-        for candidate in (
-            (step.metadata_binding,)
-            if argument is None
-            else (
-                tuple(action.metadata_binding for action in argument.actions)
-                if isinstance(argument, DraftTypedActionBatchArgument)
-                else (getattr(argument, "metadata_binding", None),)
-            )
-        )
-        if candidate is not None
+    assert any(
+        step.subcommand == "draft-discover-fields" for step in protocol.steps
     )
-    assert binding.required_tokens == ("Volume", "Pitch", "OutputBus")
+    assert any(
+        step.subcommand == "draft-declare-existing" for step in protocol.steps
+    )
+    assert all(step.subcommand != "metadata" for step in protocol.steps)
 
 
 def test_prepare_get_info_rejects_process_drift_from_readiness_proof(

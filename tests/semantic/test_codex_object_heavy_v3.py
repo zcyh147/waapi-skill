@@ -24,6 +24,7 @@ from tests.semantic.support.codex_object_heavy_v3 import (
     QueryObjectRequestSpec,
     all_object_heavy_v3_recipes,
     build_object_heavy_v3_recipe,
+    typed_input_business_query_recipe,
     typed_input_merge_recipe,
 )
 from wwise_waapi.operation_registry import parse_operation_request
@@ -332,6 +333,45 @@ def test_query_recipes_keep_historical_and_business_declarations_explicit() -> N
         "--include",
         "output-bus",
     )
+
+
+@pytest.mark.parametrize(
+    ("scenario_id", "version", "unit_id", "required_tokens"),
+    (
+        (
+            "OBJ22-F-GET-01",
+            "2021.1",
+            "TYP21-QUERY-OBJECT-GET",
+            {"--path-segment", "--relationship", "--predicate", "--max-results", "--include"},
+        ),
+        (
+            "OBJ22-F-GET-02",
+            "2023.1",
+            "TYP23-QUERY-OBJECT-GET",
+            {"--path-segment", "--relationship", "--max-results", "--include"},
+        ),
+    ),
+)
+def test_typed_input_query_recipes_use_only_the_business_declaration(
+    scenario_id: str,
+    version: str,
+    unit_id: str,
+    required_tokens: set[str],
+) -> None:
+    historical = build_object_heavy_v3_recipe(scenario_id, version)
+    migrated = typed_input_business_query_recipe(historical, unit_id=unit_id)
+
+    assert isinstance(migrated.request, QueryObjectRequestSpec)
+    assert required_tokens.issubset(set(migrated.request.argv))
+    assert not {
+        "--path",
+        "--select",
+        "--where",
+        "--take",
+        "--return-field",
+    } & set(migrated.request.argv)
+    assert migrated.oracle == historical.oracle
+    assert migrated.fixture == historical.fixture
 @pytest.mark.parametrize(
     "case_id",
     (

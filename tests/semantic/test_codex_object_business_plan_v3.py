@@ -254,18 +254,8 @@ def test_typed_profile_set03_metadata_protocol_binds_exact_unit_in_archive(
         "OBJ22-F-SET-03",
         tmp_path,
     )
-    protocol = build_metadata_transaction_protocol(
-        (recipe.request.as_dict(version=recipe.version),),
-        object_type="ActorMixer",
-        metadata_queries=("volume", "pitch", "notes", "output bus"),
-        required_tokens=("Volume", "Pitch", "OutputBus"),
-        expected_required_token_projection=(
-            MetadataTokenProjection("Volume", "property", "Real32"),
-            MetadataTokenProjection("Pitch", "property", "Real32"),
-            MetadataTokenProjection("OutputBus", "reference", "Object"),
-        ),
-        equivalence="object_set_v1",
-        schema_first=True,
+    protocol = build_transaction_protocol(
+        (recipe.request.as_dict(version=recipe.version),)
     )
     unit_id = "TYP22-METADATA-OBJECT-SET"
 
@@ -297,7 +287,7 @@ def test_typed_profile_set03_metadata_protocol_binds_exact_unit_in_archive(
     )
 
     assert archived.static_expectation["profile_unit_id"] == unit_id
-    with pytest.raises(ObjectBusinessPlanError, match="exact reviewed request"):
+    with pytest.raises(ObjectBusinessPlanError, match="static expectation differs"):
         validate_archived_object_business_plan(
             sections.writer_kwargs(),
             scenario=scenario,
@@ -542,7 +532,7 @@ def _archive_test_compound_object_metadata_protocol_is_archived_and_revalidated(
     )
 
 
-def test_compound_object_metadata_protocol_requires_trusted_projection(
+def test_compound_object_set_uses_its_business_draft_field_contract(
     tmp_path: Path,
 ) -> None:
     profile_path = (
@@ -561,25 +551,22 @@ def test_compound_object_metadata_protocol_requires_trusted_projection(
         tmp_path,
         unit.version,
     )
-    protocol = build_metadata_transaction_protocol(
-        (recipe.request.as_dict(version=unit.version),),
-        object_type="ActorMixer",
-        metadata_queries=("volume",),
-        required_tokens=("Volume",),
-        schema_first=True,
+    protocol = build_transaction_protocol(
+        (recipe.request.as_dict(version=unit.version),)
     )
 
-    with pytest.raises(
-        ObjectBusinessPlanError,
-        match="trusted live metadata projection",
-    ):
-        compile_object_business_plan(
-            unit.scenario,
-            recipe,
-            protocol,
-            before,
-            manifest,
-        )
+    sections = compile_object_business_plan(
+        unit.scenario,
+        recipe,
+        protocol,
+        before,
+        manifest,
+    )
+    assert sections.static_expectation["api"] == "ak.wwise.core.object.set"
+    assert any(
+        step.subcommand == "draft-declare-existing" for step in protocol.steps
+    )
+    assert all(step.subcommand != "metadata" for step in protocol.steps)
 
 
 @pytest.mark.parametrize("version", ("2022.1", "2025.1"))

@@ -8118,7 +8118,7 @@ def _validate_heavy_v3_pass_checks(
             or primary.get("dispatch_count") != audited_count
             or (
                 api == "ak.wwise.core.getInfo"
-                and primary.get("status_preflight_dispatch_count") != 1
+                and primary.get("status_preflight_dispatch_count") != 0
             )
         ):
             raise CampaignEvidenceError(

@@ -16,6 +16,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_exact_artifact_business_transaction_steps,
     build_metadata_transaction_protocol,
     build_object_lifecycle_business_transaction_steps,
+    build_object_graph_business_transaction_steps,
     build_object_metadata_business_transaction_steps,
     build_switch_assignment_business_transaction_steps,
     build_object_set_composer_transaction_steps,
@@ -1036,6 +1037,94 @@ def test_audio_import_transaction_request_uses_business_declaration_steps() -> N
     assert all("--request-json" not in step.arguments for step in protocol.steps)
 
 
+def test_recursive_object_create_uses_business_graph_declarations() -> None:
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2021.1",
+        "operation": "object.create",
+        "arguments": {
+            "parent": {
+                "kind": "path",
+                "value": r"\Actor-Mixer Hierarchy\Default Work Unit\SemanticLab\NPC",
+            },
+            "type": "ActorMixer",
+            "name": "Robot_VO",
+            "children": [
+                {
+                    "type": "RandomSequenceContainer",
+                    "name": "Alert",
+                    "children": [
+                        {"type": "Sound", "name": "Alert_A"},
+                        {"type": "Sound", "name": "Alert_B"},
+                    ],
+                }
+            ],
+            "on_name_conflict": "merge",
+        },
+    }
+
+    steps = build_object_graph_business_transaction_steps(request, label="tx01")
+
+    assert [step.subcommand for step in steps] == [
+        "operation-schema",
+        "draft-start",
+        "draft-bind-object",
+        "draft-business-configure",
+        "draft-declare-new",
+        "draft-declare-new",
+        "draft-declare-new",
+        "draft-declare-new",
+        "draft-check",
+        "preview-from-draft",
+    ]
+    declarations = [
+        step for step in steps if step.subcommand == "draft-declare-new"
+    ]
+    encoded = repr([step.arguments for step in declarations])
+    assert "actor-mixer" in encoded
+    assert "random-container" in encoded
+    assert encoded.count("sound-sfx") == 2
+    assert "ActorMixer" not in encoded
+    assert "RandomSequenceContainer" not in encoded
+    assert all(step.subcommand != "draft-apply" for step in steps)
+    assert steps[-1].expected_operation_request == request
+
+
+def test_bulk_object_set_uses_existing_and_child_business_declarations() -> None:
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2025.1",
+        "operation": "object.set",
+        "arguments": {
+            "objects": [
+                {
+                    "object": {
+                        "kind": "path",
+                        "value": r"\Containers\Default Work Unit\SemanticLab\UI\Error",
+                    },
+                    "notes": "错误操作反馈",
+                    "properties": [{"name": "Volume", "value": -4.0}],
+                    "children": [{"type": "Sound", "name": "Error_Layer"}],
+                }
+            ],
+            "on_name_conflict": "fail",
+        },
+    }
+
+    protocol = build_transaction_protocol((request,))
+
+    assert any(
+        step.subcommand == "draft-declare-existing" for step in protocol.steps
+    )
+    assert any(step.subcommand == "draft-declare-new" for step in protocol.steps)
+    assert all(step.subcommand != "draft-apply" for step in protocol.steps)
+    assert all("--request-json" not in step.arguments for step in protocol.steps)
+    preview = next(
+        step for step in protocol.steps if step.subcommand == "preview-from-draft"
+    )
+    assert preview.expected_operation_request == request
+
+
 @pytest.mark.parametrize(
     ("operation", "arguments", "expected_flags"),
     [
@@ -1400,52 +1489,23 @@ def test_set_inclusions_business_plan_binds_ids_without_typed_disclosure() -> No
     assert all(step.subcommand != "draft-apply" for step in protocol.steps)
 
 
-def test_metadata_transaction_protocol_is_generic_and_binds_every_preview() -> None:
+def test_object_set_rejects_the_retired_outer_metadata_protocol() -> None:
     first = _object_set_request()
     second = _object_set_request()
     second["arguments"]["objects"][0]["object"]["value"] = r"\Root\Two"  # type: ignore[index]
 
-    protocol = build_metadata_transaction_protocol(
-        (first, second),
-        object_type="ActorMixer",
-        metadata_queries=("output volume", "voice gain"),
-        required_tokens=("Volume",),
-        expected_required_token_projection=(
-            MetadataTokenProjection("Volume", "property", "Real32"),
-        ),
-    )
-
-    assert protocol.turn_prefix_counts == (6, 15, 19)
-    assert protocol.steps[0].name == "metadata.discover"
-    assert protocol.steps[0].subcommand == "metadata"
-    assert protocol.steps[0].arguments[:3] == (
-        "discover",
-        "--object-type",
-        "ActorMixer",
-    )
-    query_arguments = tuple(
-        item
-        for item in protocol.steps[0].arguments
-        if isinstance(item, MetadataQueryArgument)
-    )
-    assert tuple(item.label for item in query_arguments) == (
-        "output volume",
-        "voice gain",
-    )
-    actions = tuple(
-        step.arguments[-1]
-        for step in protocol.steps
-        if step.subcommand == "draft-apply"
-    )
-    assert len(actions) == 2
-    for argument in actions:
-        assert isinstance(argument, DraftTypedActionArgument)
-        assert argument.metadata_binding is not None
-        assert argument.metadata_binding.step == "metadata.discover"
-        assert argument.metadata_binding.object_type == "ActorMixer"
-        assert argument.metadata_binding.required_tokens == ("Volume",)
-        assert argument.metadata_binding.expected_projection == (
-            MetadataTokenProjection("Volume", "property", "Real32"),
+    with pytest.raises(
+        V3ProtocolError,
+        match="Business Draft owns live field discovery",
+    ):
+        build_metadata_transaction_protocol(
+            (first, second),
+            object_type="ActorMixer",
+            metadata_queries=("output volume", "voice gain"),
+            required_tokens=("Volume",),
+            expected_required_token_projection=(
+                MetadataTokenProjection("Volume", "property", "Real32"),
+            ),
         )
 
 
@@ -1453,24 +1513,13 @@ def test_metadata_transaction_protocol_is_generic_and_binds_every_preview() -> N
     ("query_count", "expected_limit"),
     ((1, 8), (2, 8), (3, 3), (4, 3), (5, 2), (8, 2)),
 )
-def test_metadata_transaction_protocol_uses_the_skill_query_count_budget(
+def test_metadata_candidate_limit_uses_the_skill_query_count_budget(
     query_count: int,
     expected_limit: int,
 ) -> None:
     queries = tuple(f"setting {index}" for index in range(query_count))
 
-    protocol = build_metadata_transaction_protocol(
-        (_object_set_request(),),
-        object_type="Sound",
-        metadata_queries=queries,
-        required_tokens=("Volume",),
-    )
-
     assert metadata_candidate_limit(queries) == expected_limit
-    assert protocol.steps[0].arguments[-2:] == (
-        "--limit",
-        str(expected_limit),
-    )
 
 
 @pytest.mark.parametrize("queries", ((), tuple("q" for _ in range(9)), "volume"))
@@ -1481,38 +1530,21 @@ def test_metadata_candidate_budget_rejects_non_protocol_query_counts(
         metadata_candidate_limit(queries)  # type: ignore[arg-type]
 
 
-def test_schema_first_metadata_protocol_exposes_version_before_exact_scope() -> None:
-    protocol = build_metadata_transaction_protocol(
-        (_object_set_request(),),
-        object_type="PropertyContainer",
-        metadata_queries=("output volume",),
-        required_tokens=("Volume",),
-        expected_required_token_projection=(
-            MetadataTokenProjection("Volume", "property", "Real32"),
-        ),
-        schema_first=True,
-    )
-
-    assert protocol.turn_prefix_counts == (6, 10)
-    assert tuple(step.subcommand for step in protocol.steps[:3]) == (
-        "operation-schema",
-        "metadata",
-        "draft-start",
-    )
-    assert protocol.steps[1].arguments[:3] == (
-        "discover",
-        "--object-type",
-        "PropertyContainer",
-    )
-    argument = next(
-        step.arguments[-1]
-        for step in protocol.steps
-        if step.subcommand == "draft-apply"
-    )
-    assert isinstance(argument, DraftTypedActionArgument)
-    assert argument.metadata_binding is not None
-    assert argument.metadata_binding.step == "metadata.discover"
-    assert argument.metadata_binding.object_type == "PropertyContainer"
+def test_schema_first_object_set_metadata_protocol_is_retired() -> None:
+    with pytest.raises(
+        V3ProtocolError,
+        match="Business Draft owns live field discovery",
+    ):
+        build_metadata_transaction_protocol(
+            (_object_set_request(),),
+            object_type="PropertyContainer",
+            metadata_queries=("output volume",),
+            required_tokens=("Volume",),
+            expected_required_token_projection=(
+                MetadataTokenProjection("Volume", "property", "Real32"),
+            ),
+            schema_first=True,
+        )
 
 
 def test_schema_query_protocol_requires_one_exact_auditable_preflight_lookup() -> None:
@@ -1685,15 +1717,16 @@ def test_metadata_transaction_protocol_selects_closed_object_set_equivalence() -
         required_tokens=("Volume",),
         equivalence="object_set_v1",
     )
-    argument = next(
-        step.arguments[-1]
+    declaration = next(
+        step
         for step in protocol.steps
-        if step.subcommand == "draft-apply"
+        if step.subcommand == "draft-declare-existing"
     )
-    assert isinstance(argument, DraftTypedActionArgument)
-    assert argument.metadata_binding is not None
-    assert argument.metadata_binding.step == "metadata.discover"
-    assert argument.metadata_binding.required_tokens == ("Volume",)
+    assert ("--field", "volume_db") == (
+        declaration.arguments[-3],
+        declaration.arguments[-2],
+    )
+    assert all(step.subcommand != "draft-apply" for step in protocol.steps)
 
 
 @pytest.mark.parametrize(
