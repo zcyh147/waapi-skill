@@ -198,10 +198,11 @@
     },
     {
       "id": "generic-host-ui-debug-waapi",
-      "disposition": "migration_required",
-      "owner_issue": 57,
+      "disposition": "already_deep",
+      "owner_issue": null,
       "match": {"uri_prefixes": ["ak.wwise.debug.", "ak.wwise.ui.", "ak.wwise.waapi."]},
-      "leaked_mechanics": ["native_object_path", "wire_type", "request_fragment"]
+      "leaked_mechanics": [],
+      "audit_evidence": "The public host-ui-debug-business/v1 Adapter and bounded waapi-schema read cover all 15 exact host, Authoring project, Tone WAV, and WAAPI schema lanes. Callers provide stable waveform, duration, level, channel, project-policy, include-examples, and exact target artifact intent; the Gateway owns versioned native field names, waveform masks, marker shape, project open/create flags, host requirements, isolated I/O roots, POSIX-to-Wine path translation, immutable Preview, execute-once, project-transition settling, and verification. Normal typed-call, typed containers, raw native args/options, and shallow Draft construction are blocked. #90 retains five-version deterministic and hostile-value coverage, dual-host real schema/Tone and Authoring close/open evidence, and final Terra Fresh Agent host-plan PASS plus identical verify-only on both hosts."
     },
     {
       "id": "generic-core-project-object",
@@ -229,15 +230,6 @@
     }
   ],
   "ticket_blueprints": {
-    "generic-host-ui-debug-waapi": {
-      "title": "Deepen remaining host UI, debug validation, tone, project, and WAAPI schema routes",
-      "parent_issue": 57,
-      "blocked_by_family": "generic-cli-console",
-      "public_behavior": "Expose bounded host/project/tone/validation/schema intent while keeping exact validation targets and dangerous boundaries inside Gateway-owned envelopes.",
-      "deterministic_tests": "All exact rows and host/version deltas, Authoring requirements, bounded validateCall input, hostile paths/scalars, continuation completeness, project guards, and no arbitrary escape hatch.",
-      "removal_boundary": "Remove raw typed construction, including debug.validateCall's fixed-command typed escape, after reviewed business envelopes exist.",
-      "proportional_evidence": "Representative real Authoring/project operations and tone output on matching hosts; Fresh Agent only for changed host/routing decisions."
-    },
     "generic-topics": {
       "title": "Deepen every Topic subscription, match, wait, and stream continuation",
       "parent_issue": 57,
@@ -278,10 +270,14 @@
       "github_issue": 89,
       "row_count": 65,
       "rows_sha256": "3f5b7464510f32b6f06dc4c6c3e0a7da700159ad07b8aff69b4b759bed41b9e1"
+    },
+    "generic-host-ui-debug-waapi": {
+      "github_issue": 90,
+      "row_count": 15,
+      "rows_sha256": "8d701d66442416c74f627e468842139fa8971b441b9b813be95cd9e7d3712ee0"
     }
   },
   "ticket_issue_numbers": {
-    "generic-host-ui-debug-waapi": 90,
     "generic-topics": 91
   },
   "field_ownership_rules": {

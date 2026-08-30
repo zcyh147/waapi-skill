@@ -343,7 +343,7 @@ def test_every_migration_row_has_exactly_one_rollup_and_ticket_family() -> None:
     assert set(tickets) == expected
     assert {family["github_issue"] for family in inventory["ticket_families"]} == {
         *range(77, 94),
-    } - {77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 92, 93}
+    } - {77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 92, 93}
     assert all(
         row["owner_issue"] in {56, 57}
         for row in (*inventory["native_lanes"], *inventory["operation_lanes"])

@@ -3683,6 +3683,29 @@
       "rows_sha256": "b66b1f4d66d8d77b456b98041c7e14fa2d383e02bae02b4a17fabfb85261d593"
     },
     {
+      "github_issue": 90,
+      "id": "generic-host-ui-debug-waapi",
+      "row_count": 15,
+      "rows": [
+        "2021.1|function|ak.wwise.ui.project.close",
+        "2021.1|function|ak.wwise.ui.project.open",
+        "2021.1|function|ak.wwise.waapi.getSchema",
+        "2022.1|function|ak.wwise.ui.project.close",
+        "2022.1|function|ak.wwise.ui.project.open",
+        "2022.1|function|ak.wwise.waapi.getSchema",
+        "2023.1|function|ak.wwise.debug.generateToneWAV",
+        "2023.1|function|ak.wwise.ui.project.close",
+        "2023.1|function|ak.wwise.ui.project.create",
+        "2023.1|function|ak.wwise.ui.project.open",
+        "2023.1|function|ak.wwise.waapi.getSchema",
+        "2024.1|function|ak.wwise.debug.generateToneWAV",
+        "2024.1|function|ak.wwise.waapi.getSchema",
+        "2025.1|function|ak.wwise.debug.generateToneWAV",
+        "2025.1|function|ak.wwise.waapi.getSchema"
+      ],
+      "rows_sha256": "8d701d66442416c74f627e468842139fa8971b441b9b813be95cd9e7d3712ee0"
+    },
+    {
       "github_issue": 88,
       "id": "generic-soundengine-runtime",
       "row_count": 124,
@@ -153726,7 +153749,7 @@
     "contract": "waapi-skill.typed-request-surface/v1",
     "total_lanes": 824
   },
-  "inventory_sha256": "86e5000d5699844e836d6cefbfb8fbefd289e0a49cff73fcfb1d42e94fa51a79",
+  "inventory_sha256": "0253d5766ffcccd93ccb81f080132565bcd80a1cf712efa8deda6fccf0f6d232",
   "mechanic_owners": {
     "ambiguous_continuation_selection": "gateway_derivation",
     "batch_layout": "gateway_derivation",
@@ -156668,70 +156691,62 @@
       "version": "2021.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public host-ui-debug-business/v1 Adapter and bounded waapi-schema read cover all 15 exact host, Authoring project, Tone WAV, and WAAPI schema lanes. Callers provide stable waveform, duration, level, channel, project-policy, include-examples, and exact target artifact intent; the Gateway owns versioned native field names, waveform masks, marker shape, project open/create flags, host requirements, isolated I/O roots, POSIX-to-Wine path translation, immutable Preview, execute-once, project-transition settling, and verification. Normal typed-call, typed containers, raw native args/options, and shallow Draft construction are blocked. #90 retains five-version deterministic and hostile-value coverage, dual-host real schema/Tone and Authoring close/open evidence, and final Terra Fresh Agent host-plan PASS plus identical verify-only on both hosts.",
       "classification": "generic-host-ui-debug-waapi",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "233b1a731e50cf571ac29765d03da5e34fdd5c9cf5c3846df726e0d6ed1b5a1d",
       "field_contract_sha256": "715bac80000ee4e1da9cf4d1d12d8b34a1bb4b7de4b03f5aa4b6713a08661a88",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "managed_transaction",
       "schema_sha256": "a902ddec6433528feabf79fd51aaa5ace8145dab06c6a65d4ef001217b8ac937",
       "uri": "ak.wwise.ui.project.close",
       "version": "2021.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public host-ui-debug-business/v1 Adapter and bounded waapi-schema read cover all 15 exact host, Authoring project, Tone WAV, and WAAPI schema lanes. Callers provide stable waveform, duration, level, channel, project-policy, include-examples, and exact target artifact intent; the Gateway owns versioned native field names, waveform masks, marker shape, project open/create flags, host requirements, isolated I/O roots, POSIX-to-Wine path translation, immutable Preview, execute-once, project-transition settling, and verification. Normal typed-call, typed containers, raw native args/options, and shallow Draft construction are blocked. #90 retains five-version deterministic and hostile-value coverage, dual-host real schema/Tone and Authoring close/open evidence, and final Terra Fresh Agent host-plan PASS plus identical verify-only on both hosts.",
       "classification": "generic-host-ui-debug-waapi",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "87323634483248d5fec437e8d609790dc36762d7fd6209d999aaf67109066a06",
       "field_contract_sha256": "ce58d140ed01095ac16b7ee972766ae1d7bf2b1542e667e55a3299250be71090",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "isolated_transaction",
       "schema_sha256": "5f680cf09d4f2ca8b6dd011b9ae0e84ec99428cea3359cb3c5d0793293ba4d3a",
       "uri": "ak.wwise.ui.project.open",
@@ -156769,36 +156784,32 @@
       "version": "2021.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public host-ui-debug-business/v1 Adapter and bounded waapi-schema read cover all 15 exact host, Authoring project, Tone WAV, and WAAPI schema lanes. Callers provide stable waveform, duration, level, channel, project-policy, include-examples, and exact target artifact intent; the Gateway owns versioned native field names, waveform masks, marker shape, project open/create flags, host requirements, isolated I/O roots, POSIX-to-Wine path translation, immutable Preview, execute-once, project-transition settling, and verification. Normal typed-call, typed containers, raw native args/options, and shallow Draft construction are blocked. #90 retains five-version deterministic and hostile-value coverage, dual-host real schema/Tone and Authoring close/open evidence, and final Terra Fresh Agent host-plan PASS plus identical verify-only on both hosts.",
       "classification": "generic-host-ui-debug-waapi",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema",
         "waapi-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "306d62dfd2c8e2ce84f6d43dcde2f86218d4d0ec6de013143261292ad7cec3fa",
       "field_contract_sha256": "362c2dc22033b50502f511a1900028743a46e050634770164af5b14136ee3335",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "bounded_call",
       "schema_sha256": "012097bfc4a4bdeeac987e7d4ab2c7a797c3aaaf8c3f39e7fb4122d632790915",
       "uri": "ak.wwise.waapi.getSchema",
@@ -161167,70 +161178,62 @@
       "version": "2022.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public host-ui-debug-business/v1 Adapter and bounded waapi-schema read cover all 15 exact host, Authoring project, Tone WAV, and WAAPI schema lanes. Callers provide stable waveform, duration, level, channel, project-policy, include-examples, and exact target artifact intent; the Gateway owns versioned native field names, waveform masks, marker shape, project open/create flags, host requirements, isolated I/O roots, POSIX-to-Wine path translation, immutable Preview, execute-once, project-transition settling, and verification. Normal typed-call, typed containers, raw native args/options, and shallow Draft construction are blocked. #90 retains five-version deterministic and hostile-value coverage, dual-host real schema/Tone and Authoring close/open evidence, and final Terra Fresh Agent host-plan PASS plus identical verify-only on both hosts.",
       "classification": "generic-host-ui-debug-waapi",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "b96a6c12b439e716538a187f404c9a423c6c899ad737c9f56e4eb8a3e57260ad",
       "field_contract_sha256": "715bac80000ee4e1da9cf4d1d12d8b34a1bb4b7de4b03f5aa4b6713a08661a88",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "managed_transaction",
       "schema_sha256": "a902ddec6433528feabf79fd51aaa5ace8145dab06c6a65d4ef001217b8ac937",
       "uri": "ak.wwise.ui.project.close",
       "version": "2022.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public host-ui-debug-business/v1 Adapter and bounded waapi-schema read cover all 15 exact host, Authoring project, Tone WAV, and WAAPI schema lanes. Callers provide stable waveform, duration, level, channel, project-policy, include-examples, and exact target artifact intent; the Gateway owns versioned native field names, waveform masks, marker shape, project open/create flags, host requirements, isolated I/O roots, POSIX-to-Wine path translation, immutable Preview, execute-once, project-transition settling, and verification. Normal typed-call, typed containers, raw native args/options, and shallow Draft construction are blocked. #90 retains five-version deterministic and hostile-value coverage, dual-host real schema/Tone and Authoring close/open evidence, and final Terra Fresh Agent host-plan PASS plus identical verify-only on both hosts.",
       "classification": "generic-host-ui-debug-waapi",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "eb13f7daadc779d12b88451e59d31e2297a1ee2a51e142c0383d5dd9426733d7",
       "field_contract_sha256": "ce58d140ed01095ac16b7ee972766ae1d7bf2b1542e667e55a3299250be71090",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "isolated_transaction",
       "schema_sha256": "5f680cf09d4f2ca8b6dd011b9ae0e84ec99428cea3359cb3c5d0793293ba4d3a",
       "uri": "ak.wwise.ui.project.open",
@@ -161268,36 +161271,32 @@
       "version": "2022.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public host-ui-debug-business/v1 Adapter and bounded waapi-schema read cover all 15 exact host, Authoring project, Tone WAV, and WAAPI schema lanes. Callers provide stable waveform, duration, level, channel, project-policy, include-examples, and exact target artifact intent; the Gateway owns versioned native field names, waveform masks, marker shape, project open/create flags, host requirements, isolated I/O roots, POSIX-to-Wine path translation, immutable Preview, execute-once, project-transition settling, and verification. Normal typed-call, typed containers, raw native args/options, and shallow Draft construction are blocked. #90 retains five-version deterministic and hostile-value coverage, dual-host real schema/Tone and Authoring close/open evidence, and final Terra Fresh Agent host-plan PASS plus identical verify-only on both hosts.",
       "classification": "generic-host-ui-debug-waapi",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema",
         "waapi-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "81c9d6ece86d131c77a006eb7a4809572c1f39614321db56b6607fefe1fad156",
       "field_contract_sha256": "362c2dc22033b50502f511a1900028743a46e050634770164af5b14136ee3335",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "bounded_call",
       "schema_sha256": "012097bfc4a4bdeeac987e7d4ab2c7a797c3aaaf8c3f39e7fb4122d632790915",
       "uri": "ak.wwise.waapi.getSchema",
@@ -166600,35 +166599,31 @@
       "version": "2023.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public host-ui-debug-business/v1 Adapter and bounded waapi-schema read cover all 15 exact host, Authoring project, Tone WAV, and WAAPI schema lanes. Callers provide stable waveform, duration, level, channel, project-policy, include-examples, and exact target artifact intent; the Gateway owns versioned native field names, waveform masks, marker shape, project open/create flags, host requirements, isolated I/O roots, POSIX-to-Wine path translation, immutable Preview, execute-once, project-transition settling, and verification. Normal typed-call, typed containers, raw native args/options, and shallow Draft construction are blocked. #90 retains five-version deterministic and hostile-value coverage, dual-host real schema/Tone and Authoring close/open evidence, and final Terra Fresh Agent host-plan PASS plus identical verify-only on both hosts.",
       "classification": "generic-host-ui-debug-waapi",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "1e17696bc8bf6586403b20d71f478a9861d67a5928f42beffac2c8fdc88c0456",
       "field_contract_sha256": "863bef7666022768a93c30da449b5c1bfcddadd68242728f61debc88eb6a1d30",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "isolated_transaction",
       "schema_sha256": "3c413179442aa6b92218e1f4f390db6601eb4738610fd2be079f744596d29138",
       "uri": "ak.wwise.debug.generateToneWAV",
@@ -166976,105 +166971,93 @@
       "version": "2023.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public host-ui-debug-business/v1 Adapter and bounded waapi-schema read cover all 15 exact host, Authoring project, Tone WAV, and WAAPI schema lanes. Callers provide stable waveform, duration, level, channel, project-policy, include-examples, and exact target artifact intent; the Gateway owns versioned native field names, waveform masks, marker shape, project open/create flags, host requirements, isolated I/O roots, POSIX-to-Wine path translation, immutable Preview, execute-once, project-transition settling, and verification. Normal typed-call, typed containers, raw native args/options, and shallow Draft construction are blocked. #90 retains five-version deterministic and hostile-value coverage, dual-host real schema/Tone and Authoring close/open evidence, and final Terra Fresh Agent host-plan PASS plus identical verify-only on both hosts.",
       "classification": "generic-host-ui-debug-waapi",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "e57527434474902892e7f475f556b1143bf1b099dceef4b346780dc91f6c6a8f",
       "field_contract_sha256": "715bac80000ee4e1da9cf4d1d12d8b34a1bb4b7de4b03f5aa4b6713a08661a88",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "managed_transaction",
       "schema_sha256": "44efd47bdba4b3411c807b741e31735a95d650137629d097eb590500b385a12f",
       "uri": "ak.wwise.ui.project.close",
       "version": "2023.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public host-ui-debug-business/v1 Adapter and bounded waapi-schema read cover all 15 exact host, Authoring project, Tone WAV, and WAAPI schema lanes. Callers provide stable waveform, duration, level, channel, project-policy, include-examples, and exact target artifact intent; the Gateway owns versioned native field names, waveform masks, marker shape, project open/create flags, host requirements, isolated I/O roots, POSIX-to-Wine path translation, immutable Preview, execute-once, project-transition settling, and verification. Normal typed-call, typed containers, raw native args/options, and shallow Draft construction are blocked. #90 retains five-version deterministic and hostile-value coverage, dual-host real schema/Tone and Authoring close/open evidence, and final Terra Fresh Agent host-plan PASS plus identical verify-only on both hosts.",
       "classification": "generic-host-ui-debug-waapi",
       "construction_shape": "draft",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "41f2bf72d9ff608a4a6c59897fd16fb0cc1046e6b87a385e783b2b481b661253",
       "field_contract_sha256": "96a9ea9882ffaa12681916dc729df1cc2bfdc408404941d90a1de3cbde7fc069",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "isolated_transaction",
       "schema_sha256": "ce03b2d6c7d8045ce886e240ee028e3ebed9a2be3486954d1e1b6b295fc6bb96",
       "uri": "ak.wwise.ui.project.create",
       "version": "2023.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public host-ui-debug-business/v1 Adapter and bounded waapi-schema read cover all 15 exact host, Authoring project, Tone WAV, and WAAPI schema lanes. Callers provide stable waveform, duration, level, channel, project-policy, include-examples, and exact target artifact intent; the Gateway owns versioned native field names, waveform masks, marker shape, project open/create flags, host requirements, isolated I/O roots, POSIX-to-Wine path translation, immutable Preview, execute-once, project-transition settling, and verification. Normal typed-call, typed containers, raw native args/options, and shallow Draft construction are blocked. #90 retains five-version deterministic and hostile-value coverage, dual-host real schema/Tone and Authoring close/open evidence, and final Terra Fresh Agent host-plan PASS plus identical verify-only on both hosts.",
       "classification": "generic-host-ui-debug-waapi",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "c7e386056f5cdd66487c774d44600b503a6d6898ca32e6ee12d23b01ed8d5503",
       "field_contract_sha256": "1c255ef8c5bcdd438f0f0091c9ee6876165abb2f59696af483bacb1af62d9d25",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "isolated_transaction",
       "schema_sha256": "b0f25b45dd3f8e0263fa966f97e8f56048daa16985fa1c15ef0230f8e35bea2f",
       "uri": "ak.wwise.ui.project.open",
@@ -167112,36 +167095,32 @@
       "version": "2023.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public host-ui-debug-business/v1 Adapter and bounded waapi-schema read cover all 15 exact host, Authoring project, Tone WAV, and WAAPI schema lanes. Callers provide stable waveform, duration, level, channel, project-policy, include-examples, and exact target artifact intent; the Gateway owns versioned native field names, waveform masks, marker shape, project open/create flags, host requirements, isolated I/O roots, POSIX-to-Wine path translation, immutable Preview, execute-once, project-transition settling, and verification. Normal typed-call, typed containers, raw native args/options, and shallow Draft construction are blocked. #90 retains five-version deterministic and hostile-value coverage, dual-host real schema/Tone and Authoring close/open evidence, and final Terra Fresh Agent host-plan PASS plus identical verify-only on both hosts.",
       "classification": "generic-host-ui-debug-waapi",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema",
         "waapi-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "b24651d3af616bb0163bf0a0310893449031eeacce6edd1068a7b09c098607fb",
       "field_contract_sha256": "362c2dc22033b50502f511a1900028743a46e050634770164af5b14136ee3335",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "bounded_call",
       "schema_sha256": "012097bfc4a4bdeeac987e7d4ab2c7a797c3aaaf8c3f39e7fb4122d632790915",
       "uri": "ak.wwise.waapi.getSchema",
@@ -172663,35 +172642,31 @@
       "version": "2024.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public host-ui-debug-business/v1 Adapter and bounded waapi-schema read cover all 15 exact host, Authoring project, Tone WAV, and WAAPI schema lanes. Callers provide stable waveform, duration, level, channel, project-policy, include-examples, and exact target artifact intent; the Gateway owns versioned native field names, waveform masks, marker shape, project open/create flags, host requirements, isolated I/O roots, POSIX-to-Wine path translation, immutable Preview, execute-once, project-transition settling, and verification. Normal typed-call, typed containers, raw native args/options, and shallow Draft construction are blocked. #90 retains five-version deterministic and hostile-value coverage, dual-host real schema/Tone and Authoring close/open evidence, and final Terra Fresh Agent host-plan PASS plus identical verify-only on both hosts.",
       "classification": "generic-host-ui-debug-waapi",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "f4b027c3dd4a26165699352a17ebf6e59f408f1454713b7b7e59551ac05eb6d6",
       "field_contract_sha256": "17f1935ede9b7db4d41b9078a3f33d04b5c63e4673305eb550a03010bd428bd9",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "isolated_transaction",
       "schema_sha256": "dcf2e7cc7f0331899c502a059db37d46a4cafe420f745c1f650b3a646bbbc411",
       "uri": "ak.wwise.debug.generateToneWAV",
@@ -173039,36 +173014,32 @@
       "version": "2024.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public host-ui-debug-business/v1 Adapter and bounded waapi-schema read cover all 15 exact host, Authoring project, Tone WAV, and WAAPI schema lanes. Callers provide stable waveform, duration, level, channel, project-policy, include-examples, and exact target artifact intent; the Gateway owns versioned native field names, waveform masks, marker shape, project open/create flags, host requirements, isolated I/O roots, POSIX-to-Wine path translation, immutable Preview, execute-once, project-transition settling, and verification. Normal typed-call, typed containers, raw native args/options, and shallow Draft construction are blocked. #90 retains five-version deterministic and hostile-value coverage, dual-host real schema/Tone and Authoring close/open evidence, and final Terra Fresh Agent host-plan PASS plus identical verify-only on both hosts.",
       "classification": "generic-host-ui-debug-waapi",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema",
         "waapi-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "fd2af87693fc8b2bd89a053f4d67a0624d9e0af565124ef2e26774978251994d",
       "field_contract_sha256": "3967b15136bcdde45b838893fb68b7882b87fd6c4bc0defc8c53384bd0675610",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "bounded_call",
       "schema_sha256": "c31e27a8313ce42fddf68c0f556a72bde4fb62398231029d393e5b5c70e8fcc2",
       "uri": "ak.wwise.waapi.getSchema",
@@ -178740,35 +178711,31 @@
       "version": "2025.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public host-ui-debug-business/v1 Adapter and bounded waapi-schema read cover all 15 exact host, Authoring project, Tone WAV, and WAAPI schema lanes. Callers provide stable waveform, duration, level, channel, project-policy, include-examples, and exact target artifact intent; the Gateway owns versioned native field names, waveform masks, marker shape, project open/create flags, host requirements, isolated I/O roots, POSIX-to-Wine path translation, immutable Preview, execute-once, project-transition settling, and verification. Normal typed-call, typed containers, raw native args/options, and shallow Draft construction are blocked. #90 retains five-version deterministic and hostile-value coverage, dual-host real schema/Tone and Authoring close/open evidence, and final Terra Fresh Agent host-plan PASS plus identical verify-only on both hosts.",
       "classification": "generic-host-ui-debug-waapi",
       "construction_shape": "draft",
       "continuation_commands": [
         "request-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "2eac235c93b30f5819dfa1dcd619fcbf633d39bf3d9e34fc9b6236dba3d7b110",
       "field_contract_sha256": "dec87acc81cc4498b083af9c7f9e501477aa032af30ee526efb7def6c54d779b",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "isolated_transaction",
       "schema_sha256": "ad0c920e1ac9ad1f3278aa2056b0fdb8ab114b7dc88992160e96ad0bc91faa9c",
       "uri": "ak.wwise.debug.generateToneWAV",
@@ -179116,36 +179083,32 @@
       "version": "2025.1"
     },
     {
-      "audit_evidence": null,
+      "audit_evidence": "The public host-ui-debug-business/v1 Adapter and bounded waapi-schema read cover all 15 exact host, Authoring project, Tone WAV, and WAAPI schema lanes. Callers provide stable waveform, duration, level, channel, project-policy, include-examples, and exact target artifact intent; the Gateway owns versioned native field names, waveform masks, marker shape, project open/create flags, host requirements, isolated I/O roots, POSIX-to-Wine path translation, immutable Preview, execute-once, project-transition settling, and verification. Normal typed-call, typed containers, raw native args/options, and shallow Draft construction are blocked. #90 retains five-version deterministic and hostile-value coverage, dual-host real schema/Tone and Authoring close/open evidence, and final Terra Fresh Agent host-plan PASS plus identical verify-only on both hosts.",
       "classification": "generic-host-ui-debug-waapi",
       "construction_shape": "inline",
       "continuation_commands": [
         "request-schema",
         "waapi-schema"
       ],
-      "disposition": "migration_required",
+      "disposition": "already_deep",
       "execution_policy_sha256": "94850558f513fcd588f552859adf73260a00b644e1b27986a2b5fe4fcd070bfd",
       "field_contract_sha256": "3967b15136bcdde45b838893fb68b7882b87fd6c4bc0defc8c53384bd0675610",
       "host": "wwise-console",
       "item_type": "function",
-      "leaked_mechanics": [
-        "native_object_path",
-        "wire_type",
-        "request_fragment"
-      ],
+      "leaked_mechanics": [],
       "mechanic_states": {
         "ambiguous_continuation_selection": "gateway_owned",
         "batch_layout": "gateway_owned",
         "dependency_order": "gateway_owned",
         "metadata_scope": "gateway_owned",
-        "native_object_path": "model_owned_leak",
+        "native_object_path": "gateway_owned",
         "property_or_reference_token": "gateway_owned",
-        "request_fragment": "model_owned_leak",
+        "request_fragment": "gateway_owned",
         "revision_arithmetic": "gateway_owned",
         "shell_quoting": "gateway_owned",
-        "wire_type": "model_owned_leak"
+        "wire_type": "gateway_owned"
       },
-      "owner_issue": 57,
+      "owner_issue": null,
       "route": "bounded_call",
       "schema_sha256": "bc8b88aec22ac39bbb3238037e7ed622d3f56f2c6d192c6d5eef55938d777286",
       "uri": "ak.wwise.waapi.getSchema",
@@ -184210,10 +184173,10 @@
     "typed_request_surface_sha256": "7cbe0a9ba6d9756c94ecea58bb1b2ac56da242059f17c5cdfdaf768271d133a8"
   },
   "summary": {
-    "migration_ticket_families": 2,
+    "migration_ticket_families": 1,
     "native_dispositions": {
-      "already_deep": 516,
-      "migration_required": 169,
+      "already_deep": 531,
+      "migration_required": 154,
       "prohibited_boundary": 139
     },
     "native_lanes": 824,
@@ -184225,36 +184188,6 @@
     "unowned_migration_rows": 0
   },
   "ticket_families": [
-    {
-      "blocked_by_family": "generic-cli-console",
-      "deterministic_tests": "All exact rows and host/version deltas, Authoring requirements, bounded validateCall input, hostile paths/scalars, continuation completeness, project guards, and no arbitrary escape hatch.",
-      "github_issue": 90,
-      "id": "generic-host-ui-debug-waapi",
-      "parent_issue": 57,
-      "proportional_evidence": "Representative real Authoring/project operations and tone output on matching hosts; Fresh Agent only for changed host/routing decisions.",
-      "public_behavior": "Expose bounded host/project/tone/validation/schema intent while keeping exact validation targets and dangerous boundaries inside Gateway-owned envelopes.",
-      "removal_boundary": "Remove raw typed construction, including debug.validateCall's fixed-command typed escape, after reviewed business envelopes exist.",
-      "row_count": 15,
-      "rows": [
-        "2021.1|function|ak.wwise.ui.project.close",
-        "2021.1|function|ak.wwise.ui.project.open",
-        "2021.1|function|ak.wwise.waapi.getSchema",
-        "2022.1|function|ak.wwise.ui.project.close",
-        "2022.1|function|ak.wwise.ui.project.open",
-        "2022.1|function|ak.wwise.waapi.getSchema",
-        "2023.1|function|ak.wwise.debug.generateToneWAV",
-        "2023.1|function|ak.wwise.ui.project.close",
-        "2023.1|function|ak.wwise.ui.project.create",
-        "2023.1|function|ak.wwise.ui.project.open",
-        "2023.1|function|ak.wwise.waapi.getSchema",
-        "2024.1|function|ak.wwise.debug.generateToneWAV",
-        "2024.1|function|ak.wwise.waapi.getSchema",
-        "2025.1|function|ak.wwise.debug.generateToneWAV",
-        "2025.1|function|ak.wwise.waapi.getSchema"
-      ],
-      "rows_sha256": "8d701d66442416c74f627e468842139fa8971b441b9b813be95cd9e7d3712ee0",
-      "title": "Deepen remaining host UI, debug validation, tone, project, and WAAPI schema routes"
-    },
     {
       "blocked_by_family": "generic-host-ui-debug-waapi",
       "deterministic_tests": "All 154 exact Topic lanes, version-delta event schemas, empty/nonempty match values, hostile scalars, timeout/no-timeout/event-count rules, size bounds, cancellation cleanup, and continuation uniqueness.",

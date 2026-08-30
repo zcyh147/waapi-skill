@@ -6,7 +6,7 @@ This report is generated from the exact five-version public surface and the revi
 
 - Native function/Topic lanes: **824**
 - Named-operation lanes: **153**
-- Migration families: **2**
+- Migration families: **1**
 - Unowned migration rows: **0**
 
 Every exact row, version, schema digest, continuation command, field ownership, disposition, and owner is recorded in `interface-depth-inventory.json`.
@@ -29,7 +29,6 @@ Business scalar values remain visible. Native paths, metadata scope, property/re
 
 | Family | Roll-up | Exact rows | Versions | Unique API/operation names | Row digest |
 | --- | ---: | ---: | --- | ---: | --- |
-| [`generic-host-ui-debug-waapi`](https://github.com/zcyh147/waapi-skill/issues/90) | #57 | 15 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 5 | `8d701d66442416c74f627e468842139fa8971b441b9b813be95cd9e7d3712ee0` |
 | [`generic-topics`](https://github.com/zcyh147/waapi-skill/issues/91) | #57 | 154 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 33 | `48f62fffb957f2ed581bee75cb11ddd6624411b77fc307813d1984b5ce015982` |
 
 ## Completed migration family seals
@@ -41,6 +40,7 @@ Business scalar values remain visible. Native paths, metadata scope, property/re
 | `generic-core-project-object` | #84 | 55 | `caf467378cbabccb637cd93d18cc4e87e5356d409ce110da1f040825af4245ed` |
 | `generic-core-remaining` | #86 | 43 | `a7541ae6dad3c8c033b13089c13c1faad9a2688aee985c72e5c414fdb812fa8a` |
 | `generic-core-runtime-inspection` | #87 | 94 | `b66b1f4d66d8d77b456b98041c7e14fa2d383e02bae02b4a17fabfb85261d593` |
+| `generic-host-ui-debug-waapi` | #90 | 15 | `8d701d66442416c74f627e468842139fa8971b441b9b813be95cd9e7d3712ee0` |
 | `generic-soundengine-runtime` | #88 | 124 | `5075fdcc32810059d6a3fee10499ff6823eea0be4c300dfb717bede6697c6ced` |
 
 ## Already-deep and boundary evidence
@@ -55,6 +55,7 @@ Business scalar values remain visible. Native paths, metadata scope, property/re
 | `generic-dedicated-route-boundary` | `prohibited_boundary` | 139 | request-schema rejects these exact URI lanes before construction and directs callers to the Registry-selected dedicated operation, preventing a weaker generic bypass. |
 | `generic-fixed-command-audited-deep` | `already_deep` | 12 | The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior. |
 | `generic-fixed-query-metadata` | `already_deep` | 44 | The fixed query, metadata, selection, profiler, and Debug routes accept business sources, predicates, outputs, meanings, identities, capture intent, and bounded exact artifacts. The Gateway owns native paths, types, accessors, projections, metadata tokens, pipeline IDs, Debug envelopes, result bounds, and every continuation; request-schema and typed-call cannot bypass those routes. |
+| `generic-host-ui-debug-waapi` | `already_deep` | 15 | The public host-ui-debug-business/v1 Adapter and bounded waapi-schema read cover all 15 exact host, Authoring project, Tone WAV, and WAAPI schema lanes. Callers provide stable waveform, duration, level, channel, project-policy, include-examples, and exact target artifact intent; the Gateway owns versioned native field names, waveform masks, marker shape, project open/create flags, host requirements, isolated I/O roots, POSIX-to-Wine path translation, immutable Preview, execute-once, project-transition settling, and verification. Normal typed-call, typed containers, raw native args/options, and shallow Draft construction are blocked. #90 retains five-version deterministic and hostile-value coverage, dual-host real schema/Tone and Authoring close/open evidence, and final Terra Fresh Agent host-plan PASS plus identical verify-only on both hosts. |
 | `generic-soundengine-runtime` | `already_deep` | 124 | The public soundengine-control-business/v1 Adapter covers all 26 operations and 124 supported version/API rows. Mutations accept bound Wwise object roles, opaque runtime game-object and playing handles, stable action/mode/layout names, finite business values, percentages, decibels, and bounded position or routing rows; the Gateway derives native IDs, reserved sentinels, enums, overload branches, nested arrays, channel configuration, gain conversion, lifecycle retirement, execution-time handle revalidation, exact identity drift checks, immutable Preview, and result projection. getState and getSwitch use direct bounded reads with exact group identity validation. Normal typed-call, typed container, and shallow Composer ingress is removed. Final #88 dual-host real and Fresh evidence remains a release gate rather than an interface-depth claim. |
 | `generic-zero-input-audited-deep` | `already_deep` | 63 | The reflected request accepts no model-authored values; the Gateway owns the complete zero-input envelope, authorization/effect policy, dispatch, result bound, and any project guard. |
 | `named-audio-import-audited-deep` | `already_deep` | 5 | The public audio-import-business/v1 contract exposes semantic kinds and stable declaration values, binds objects and fields live, derives native paths/types/order/batches/continuation, preserves media artifacts exactly, and has complete #54 five-version Program plus macOS/Windows Fresh and real-host evidence. |
