@@ -43,6 +43,7 @@ from tests.destructive.support.sandbox_fixture import (  # pyright: ignore[repor
     launch_sandboxed_wwise,
     prepare_sample_project_sandbox,
     shutdown_sandboxed_wwise,
+    wait_for_port_release,
 )
 from tests.destructive.support.workflow_evidence import (  # pyright: ignore[reportMissingImports]  # noqa: E402
     validate_audio_import_business_evidence,
@@ -520,6 +521,7 @@ def _restart_workflow_host_after_transport_loss(
 
     port = runtime.port
     shutdown_sandboxed_wwise(runtime.lifecycle, runtime.sandbox)
+    wait_for_port_release(runtime.lifecycle.host, port)
     replacement = launch_sandboxed_wwise(
         runtime.sandbox,
         runtime.env,

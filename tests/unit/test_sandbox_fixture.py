@@ -35,6 +35,50 @@ ORG_FIXTURE_ROOT = REPO_ROOT / "tests" / "_org" / "2022.1"
 ORG_FIXTURE_2023_ROOT = REPO_ROOT / "tests" / "_org" / "2023.1"
 
 
+def test_wait_for_port_release_retries_until_the_exact_port_is_bindable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    attempts: list[tuple[str, int]] = []
+
+    def probe(host: str, port: int) -> None:
+        attempts.append((host, port))
+        if len(attempts) < 3:
+            raise sandbox_fixture.PortUnavailable("still occupied")
+
+    monkeypatch.setattr(sandbox_fixture, "assert_port_free", probe)
+
+    sandbox_fixture.wait_for_port_release(
+        "127.0.0.1",
+        30485,
+        timeout_seconds=1,
+        poll_interval_seconds=0,
+    )
+
+    assert attempts == [("127.0.0.1", 30485)] * 3
+
+
+def test_wait_for_port_release_fails_closed_after_its_bound(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monotonic_values = iter((10.0, 11.0))
+    monkeypatch.setattr(sandbox_fixture.time, "monotonic", lambda: next(monotonic_values))
+    monkeypatch.setattr(
+        sandbox_fixture,
+        "assert_port_free",
+        lambda _host, _port: (_ for _ in ()).throw(
+            sandbox_fixture.PortUnavailable("still occupied")
+        ),
+    )
+
+    with pytest.raises(SandboxFixtureError, match="remained occupied"):
+        sandbox_fixture.wait_for_port_release(
+            "127.0.0.1",
+            30485,
+            timeout_seconds=1,
+            poll_interval_seconds=0,
+        )
+
+
 def _hold_live_sandbox_lock(root: str, acquired: Any, release: Any, results: Any) -> None:
     try:
         with LiveSandboxLock(Path(root)):

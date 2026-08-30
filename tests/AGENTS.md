@@ -210,6 +210,13 @@ solely to restore infrastructure for later, different tests. Teardown must own
 the replacement lifecycle; otherwise later cases inherit a dead endpoint or
 the replacement process escapes cleanup. A later PASS is evidence only for its
 own operation, never retroactive credit for the blocked CLI Lua call.
+Before that replacement launch, seal the stopped lifecycle's audit and call the
+shared bounded `wait_for_port_release` guard for the exact host/port. On macOS,
+the Console process can be gone while the CrossOver socket remains temporarily
+unavailable; relaunching immediately can raise `PortUnavailable` and overwrite
+the valid first-launch metadata with an unstarted replacement. Never add an
+unbounded sleep or select a new port to hide this state: the original port must
+become bindable inside the fixed release window or the fixture fails closed.
 
 ### SoundBank file-operation fixtures
 

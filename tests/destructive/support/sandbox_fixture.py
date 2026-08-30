@@ -15,7 +15,12 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Mapping
 
-from wwise_waapi.headless import HeadlessLifecycle, LifecycleTimeouts  # pyright: ignore[reportMissingImports]
+from wwise_waapi.headless import (  # pyright: ignore[reportMissingImports]
+    HeadlessLifecycle,
+    LifecycleTimeouts,
+    PortUnavailable,
+    assert_port_free,
+)
 from .live_environment import (  # pyright: ignore[reportMissingImports]
     ENV_WWISE_FIXTURE_PROJECT,
     ENV_WWISE_SANDBOX_ROOT,
@@ -51,10 +56,37 @@ REAL_LAUNCH_AUDIT_PATH = Path(".waapi-skill-state") / "evidence" / "waapi-test-r
 _LOCK_REGION_BYTES = 1
 _WINDOWS_LOCK_RETRY_SECONDS = 0.05
 _WINDOWS_LOCK_VIOLATION = 33
+_PORT_RELEASE_TIMEOUT_SECONDS = 15.0
+_PORT_RELEASE_POLL_SECONDS = 0.1
 
 
 class SandboxFixtureError(RuntimeError):
     """Raised when a sandbox copy would be unsafe or incomplete."""
+
+
+def wait_for_port_release(
+    host: str,
+    port: int,
+    *,
+    timeout_seconds: float = _PORT_RELEASE_TIMEOUT_SECONDS,
+    poll_interval_seconds: float = _PORT_RELEASE_POLL_SECONDS,
+) -> None:
+    """Wait until a stopped Wwise host has released its exact server port."""
+
+    if timeout_seconds <= 0 or poll_interval_seconds < 0:
+        raise SandboxFixtureError("port-release timing bounds are invalid")
+    deadline = time.monotonic() + timeout_seconds
+    while True:
+        try:
+            assert_port_free(host, port)
+            return
+        except PortUnavailable as exc:
+            if time.monotonic() >= deadline:
+                raise SandboxFixtureError(
+                    f"Wwise WAAPI port 0.0.0.0:{port} remained occupied after "
+                    f"the {timeout_seconds:g}-second release wait"
+                ) from exc
+            time.sleep(poll_interval_seconds)
 
 
 class _PosixLiveSandboxLockBackend:
