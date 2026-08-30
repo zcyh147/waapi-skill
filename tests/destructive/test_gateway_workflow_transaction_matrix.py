@@ -2994,6 +2994,28 @@ def _save_sandbox_project(runtime: _WorkflowSandboxRuntime) -> None:
 
     api = "ak.wwise.core.project.save"
     schema = runtime.gateway(["request-schema", api], live=False)
+    if schema.get("input_shape") == "business_declaration":
+        continuation = schema.get("continuation")
+        assert continuation == {
+            "subcommand": "draft-start",
+            "gateway_argv": ["draft-start", api],
+            "copy_exactly": True,
+            "append_arguments": "forbidden",
+        }, continuation
+        draft = _start_business_draft(runtime, api)
+        _update_business_draft(
+            runtime,
+            draft,
+            "draft-declare-core-plan",
+            ["--value", "auto_check_out", "false"],
+            live=True,
+        )
+        saved = _complete_core_result_schema_draft(runtime, draft)
+        assert saved["verify"]["state"] == (
+            TransactionState.RESULT_SCHEMA_CHECKED.value
+        ), saved
+        return
+
     continuation = schema.get("continuation")
     assert isinstance(continuation, Mapping), schema
     argv = continuation.get("gateway_argv")
