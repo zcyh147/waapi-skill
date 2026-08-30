@@ -3803,6 +3803,44 @@ _BUSINESS_QUERY_SOURCE_OPTIONS = frozenset(
     }
 )
 _BUSINESS_QUERY_KIND_ALIASES = {"sound": "all-sounds"}
+_BUSINESS_KIND_DISPLAY_ALIASES = {
+    "Actor-Mixer": "actor-mixer",
+    "Blend Container": "blend-container",
+    "Music Playlist Container": "music-playlist-container",
+    "Music Segment": "music-segment",
+    "Music Switch Container": "music-switch-container",
+    "Music Track": "music-track",
+    "Random Container": "random-container",
+    "Sequence Container": "sequence-container",
+    "Sound SFX": "sound-sfx",
+    "Sound Voice": "sound-voice",
+    "Switch Container": "switch-container",
+    "Virtual Folder": "virtual-folder",
+}
+
+
+def _closed_business_literal_equivalent(
+    step: ExpectedGatewayStep,
+    index: int,
+    supplied: str,
+    expected: str,
+) -> bool:
+    """Accept only reviewed display/root spellings for one canonical literal."""
+
+    if index <= 0:
+        return False
+    prior = step.arguments[index - 1]
+    if prior == "--kind":
+        return _BUSINESS_KIND_DISPLAY_ALIASES.get(supplied) == expected
+    if prior not in {"--path-segment", "--object-path-segment"}:
+        return False
+    if sum(value == prior for value in step.arguments[:index]) != 1:
+        return False
+    return (
+        not expected.startswith("\\")
+        and supplied == f"\\{expected}"
+        and not supplied.startswith("\\\\")
+    )
 
 
 def _normalize_business_query_arguments(
@@ -3877,6 +3915,14 @@ def _normalize_business_query_arguments(
             else (option, arguments)
             for option, arguments in parsed["sources"]
         ]
+        if parsed["sources"]:
+            option, arguments = parsed["sources"][0]
+            if (
+                option in {"--path-segment", "--query-path-segment"}
+                and arguments[0].startswith("\\")
+                and not arguments[0].startswith("\\\\")
+            ):
+                parsed["sources"][0] = (option, (arguments[0][1:],))
         parsed["predicates"] = [
             (
                 arguments[0],
@@ -10686,6 +10732,12 @@ class CodexGatewayBroker:
                     if (
                         index not in unordered_return_field_indexes
                         and supplied != expected
+                        and not _closed_business_literal_equivalent(
+                            step,
+                            index,
+                            supplied,
+                            expected,
+                        )
                     ):
                         raise GatewayInvocationError(
                             f"step {step.name!r} argument {index} must be exactly {expected!r}"
@@ -12041,7 +12093,7 @@ class CodexGatewayBroker:
         *,
         preview_step: ExpectedGatewayStep,
     ) -> Any:
-        """Normalize only exact pre-Draft Bus GUIDs to their reviewed paths."""
+        """Normalize only exact live-bound GUIDs to their reviewed paths."""
 
         preview_index = self._execution_steps.index(preview_step)
         identities: dict[str, str] = {}
@@ -12083,6 +12135,47 @@ class CodexGatewayBroker:
                         )
                     identities[identity["id"]] = identity["path"]
 
+        expected_request = preview_step.expected_operation_request
+        expected_arguments = (
+            expected_request.get("arguments")
+            if isinstance(expected_request, Mapping)
+            else None
+        )
+        audio_convert = (
+            isinstance(expected_arguments, Mapping)
+            and expected_request.get("operation") == "waapi.call"
+            and expected_arguments.get("api") == "ak.wwise.core.audio.convert"
+        )
+        if audio_convert:
+            for bind_step in self._execution_steps[:preview_index]:
+                if (
+                    bind_step.subcommand != "draft-bind-object"
+                    or "--role" not in bind_step.arguments
+                    or "audio_object" not in bind_step.arguments
+                ):
+                    continue
+                source = self._payloads_by_step.get(bind_step.name)
+                bound = source.get("bound_object") if isinstance(source, Mapping) else None
+                object_id = bound.get("id") if isinstance(bound, Mapping) else None
+                object_path = bound.get("path") if isinstance(bound, Mapping) else None
+                segments = tuple(
+                    str(bind_step.arguments[index + 1])
+                    for index, item in enumerate(bind_step.arguments[:-1])
+                    if item == "--object-path-segment"
+                )
+                expected_path = "\\" + "\\".join(segments)
+                if (
+                    not isinstance(object_id, str)
+                    or not isinstance(object_path, str)
+                    or not segments
+                    or object_path != expected_path
+                ):
+                    raise GatewayInvocationError(
+                        "audio.convert Draft identity normalization differs from "
+                        "the reviewed bound path"
+                    )
+                identities[object_id] = object_path
+
         def normalize(item: Any) -> Any:
             if isinstance(item, Mapping):
                 if (
@@ -12097,6 +12190,8 @@ class CodexGatewayBroker:
                 return {str(key): normalize(nested) for key, nested in item.items()}
             if isinstance(item, list):
                 return [normalize(nested) for nested in item]
+            if audio_convert and isinstance(item, str) and item in identities:
+                return identities[item]
             return item
 
         return normalize(value)

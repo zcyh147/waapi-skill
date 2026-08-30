@@ -2272,6 +2272,107 @@ def build_core_business_transaction_steps(
     )
 
 
+def build_audio_convert_business_transaction_steps(
+    request: Mapping[str, Any],
+    *,
+    label: str,
+) -> tuple[ExpectedGatewayStep, ...]:
+    """Translate one audio.convert native witness into its public Core Draft."""
+
+    normalized = _validate_operation_request(request)
+    arguments = normalized.get("arguments")
+    if (
+        normalized.get("operation") != "waapi.call"
+        or not isinstance(arguments, Mapping)
+        or arguments.get("api") != "ak.wwise.core.audio.convert"
+        or set(arguments) != {"api", "args", "options", "io_root"}
+        or arguments.get("options") != {}
+    ):
+        raise V3ProtocolError(
+            "audio.convert business request must be one closed waapi.call witness"
+        )
+    raw_args = arguments.get("args")
+    io_root = arguments.get("io_root")
+    if (
+        not isinstance(raw_args, Mapping)
+        or set(raw_args) != {"objects", "platforms", "languages"}
+        or not isinstance(io_root, str)
+        or not io_root
+    ):
+        raise V3ProtocolError("audio.convert business request fields are incomplete")
+
+    def strings(field: str) -> tuple[str, ...]:
+        value = raw_args.get(field)
+        if (
+            not isinstance(value, list)
+            or not value
+            or any(not isinstance(item, str) or not item for item in value)
+        ):
+            raise V3ProtocolError(
+                f"audio.convert {field} must be a nonempty string array"
+            )
+        return tuple(value)
+
+    objects = strings("objects")
+    platforms = strings("platforms")
+    languages = strings("languages")
+    draft = _BusinessDraftSteps.start(
+        operation="ak.wwise.core.audio.convert",
+        label=label,
+    )
+    # This exact-URI business route is discovered through request-schema.
+    draft.steps[0] = replace(
+        draft.steps[0],
+        name=f"{label}.request-schema",
+        subcommand="request-schema",
+        arguments=("ak.wwise.core.audio.convert",),
+    )
+    handles = tuple(
+        draft.bind_object(
+            {"kind": "path", "value": path},
+            step_name=f"{label}.bind-audio-object-{index:02d}",
+            error_subject="audio.convert object",
+            role="audio_object",
+        )
+        for index, path in enumerate(objects, start=1)
+    )
+    declaration_name = f"{label}.declare-core-plan"
+    declaration: list[Any] = [*draft.prefix()]
+    for handle in handles:
+        declaration.extend(("--role", "audio_object_handles", handle))
+    for platform in platforms:
+        declaration.extend(("--item", "platform_names", platform))
+    for language in languages:
+        declaration.extend(("--item", "languages", language))
+    declaration.extend(("--value", "io_root", io_root))
+    draft.steps.append(
+        ExpectedGatewayStep(
+            name=declaration_name,
+            subcommand="draft-declare-core-plan",
+            arguments=tuple(declaration),
+        )
+    )
+    draft.advance(declaration_name)
+    check_name = f"{label}.check"
+    draft.steps.append(
+        ExpectedGatewayStep(
+            name=check_name,
+            subcommand="draft-check",
+            arguments=draft.prefix(),
+        )
+    )
+    draft.advance(check_name)
+    draft.steps.append(
+        ExpectedGatewayStep(
+            name=f"{label}.preview",
+            subcommand="preview-from-draft",
+            arguments=draft.prefix(),
+            expected_operation_request=normalized,
+        )
+    )
+    return tuple(draft.steps)
+
+
 def build_cli_console_business_transaction_steps(
     *,
     api: str,
@@ -3843,10 +3944,14 @@ def materialize_typed_transaction_protocol_requests(
             request = _validate_operation_request(
                 protocol.steps[terminal_index].expected_operation_request
             )
-            if (
-                request["operation"] != operation
-                or request["version"] != version
-            ):
+            request_arguments = request.get("arguments")
+            request_operation = request.get("operation")
+            operation_matches = request_operation == operation or (
+                request_operation == "waapi.call"
+                and isinstance(request_arguments, Mapping)
+                and request_arguments.get("api") == operation
+            )
+            if not operation_matches or request["version"] != version:
                 raise V3ProtocolError(
                     "business request witness differs from its Draft binding"
                 )
@@ -4805,6 +4910,64 @@ def build_transaction_protocol(
                 or not isinstance(raw_options, Mapping)
             ):
                 raise V3ProtocolError("typed waapi.call request is incomplete")
+            if api == "ak.wwise.core.audio.convert":
+                if refusal is not None:
+                    raise V3ProtocolError(
+                        "audio.convert Core business Draft has no reviewed refusal lane"
+                    )
+                operation_steps = build_audio_convert_business_transaction_steps(
+                    request,
+                    label=label,
+                )
+                steps.extend(operation_steps)
+                preview_name = f"{label}.preview"
+                prefixes.append(len(steps))
+                show_name = f"{label}.transaction-show"
+                confirm_name = f"{label}.confirm"
+                execute_name = f"{label}.execute"
+                steps.extend(
+                    (
+                        ExpectedGatewayStep(
+                            name=show_name,
+                            subcommand="transaction-show",
+                            arguments=(
+                                ResponseBinding(preview_name, "/transaction_id"),
+                                "--summary-only",
+                            ),
+                        ),
+                        ExpectedGatewayStep(
+                            name=confirm_name,
+                            subcommand="confirm",
+                            arguments=(
+                                ResponseBinding(show_name, "/transaction_id"),
+                                "--confirmation-token",
+                                ResponseBinding(show_name, "/confirmation/token"),
+                            ),
+                        ),
+                        ExpectedGatewayStep(
+                            name=execute_name,
+                            subcommand="execute",
+                            arguments=(
+                                ResponseBinding(confirm_name, "/transaction_id"),
+                            ),
+                            allowed_exit_codes=(0, 2),
+                            terminal_execute=terminal_execute,
+                        ),
+                    )
+                )
+                if not terminal_execute:
+                    steps.append(
+                        ExpectedGatewayStep(
+                            name=f"{label}.verify",
+                            subcommand="verify",
+                            arguments=(
+                                ResponseBinding(execute_name, "/transaction_id"),
+                            ),
+                        )
+                    )
+                if index == len(normalized):
+                    prefixes.append(len(steps))
+                continue
             try:
                 contract = request_contract(str(request["version"]), api)
                 construction = typed_request_construction_for_values(
@@ -5474,6 +5637,55 @@ def build_direct_protocol(
     return V3GatewayProtocol(values, (len(values),))
 
 
+def build_operations_discovery_protocol(
+    base: V3GatewayProtocol,
+) -> V3GatewayProtocol:
+    """Require the compact named-operation inventory before one business schema.
+
+    Natural-language mutation intent does not itself disclose an exact named
+    operation.  This wrapper seals the public discovery step that makes that
+    identifier visible, then preserves the independently built transaction
+    protocol byte-for-byte after it.
+    """
+
+    if not isinstance(base, V3GatewayProtocol) or not base.steps:
+        raise V3ProtocolError("operations discovery requires one protocol")
+    first = base.steps[0]
+    if (
+        first.subcommand != "operation-schema"
+        or len(first.arguments) != 1
+        or not isinstance(first.arguments[0], str)
+        or not first.arguments[0]
+    ):
+        raise V3ProtocolError(
+            "operations discovery must precede one exact named operation schema"
+        )
+    label = first.name.rsplit(".", 1)[0]
+    discovery = ExpectedGatewayStep(
+        name=f"{label}.operations",
+        subcommand="operations",
+    )
+    if any(step.name == discovery.name for step in base.steps):
+        raise V3ProtocolError("operations discovery step name collides")
+
+    allowed = tuple(
+        tuple(value + 1 for value in values)
+        for values in base.allowed_turn_prefix_counts
+    )
+    terminal = tuple(value + 1 for value in base.terminal_prefix_counts)
+    return V3GatewayProtocol(
+        steps=(discovery, *base.steps),
+        turn_prefix_counts=tuple(value + 1 for value in base.turn_prefix_counts),
+        allowed_turn_prefix_counts=allowed,
+        terminal_prefix_counts=terminal,
+        commutative_read_only_step_groups=base.commutative_read_only_step_groups,
+        commutative_composer_setup_step_groups=(
+            base.commutative_composer_setup_step_groups
+        ),
+        optional_topic_schema_step_groups=base.optional_topic_schema_step_groups,
+    )
+
+
 def build_optional_topic_schema_protocol(
     steps: Sequence[ExpectedGatewayStep],
 ) -> V3GatewayProtocol:
@@ -5585,12 +5797,12 @@ def build_modification_policy_protocol(
         raise V3ProtocolError(
             "modification-policy evaluation requires one typed transaction"
         )
-    operation_schema = base.steps[0]
+    schema = base.steps[0]
     transaction_show, confirm, execute, verify = base.steps[-4:]
     construction = base.steps[:-4]
     preview = construction[-1]
     if (
-        operation_schema.subcommand != "operation-schema"
+        schema.subcommand not in {"operation-schema", "request-schema"}
         or preview.subcommand not in {"typed-operation", "preview-from-draft"}
         or transaction_show.subcommand != "transaction-show"
         or confirm.subcommand != "confirm"
@@ -5603,7 +5815,7 @@ def build_modification_policy_protocol(
         )
     if policy == "read_only":
         return V3GatewayProtocol(
-            steps=(operation_schema,),
+            steps=(schema,),
             turn_prefix_counts=(1, 1),
             allowed_turn_prefix_counts=((1,), (1,)),
             terminal_prefix_counts=(1,),

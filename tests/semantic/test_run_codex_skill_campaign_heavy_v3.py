@@ -19,6 +19,7 @@ import pytest
 
 from tests.semantic import run_codex_skill_campaign as campaign
 from tests.semantic import run_codex_skill_matrix as matrix
+from tests.semantic.support import codex_heavy_project_runner_v3 as project_runner
 from tests.semantic.support.codex_business_oracle_plan_v3 import (
     BusinessOraclePlanEvidence,
     business_family_for_api,
@@ -159,7 +160,10 @@ from wwise_waapi.business_declarations import (
 )
 from wwise_waapi.transaction_cleanup import transaction_cleanup_payload
 from wwise_waapi.typed_operations import inline_operation_cli_arguments
-from wwise_waapi.typed_requests import typed_request_construction_for_values
+from wwise_waapi.typed_requests import (
+    request_contract,
+    typed_request_construction_for_values,
+)
 from wwise_waapi.typed_topics import topic_match_contract, topic_options_contract
 from tests.semantic.support.codex_object_runtime_v3 import ObjectRuntimeSnapshot
 from tests.semantic.support.codex_soundbank_business_plan_v3 import (
@@ -222,6 +226,94 @@ EXPECTED_DRAFT_REVISION_SUBCOMMANDS = frozenset(
         "preview-from-draft",
     }
 )
+
+
+def test_typed_input_named_mutation_requires_operations_discovery() -> None:
+    from tests.semantic.support.codex_typed_input_profile import (
+        load_typed_input_profile,
+    )
+
+    profile = load_typed_input_profile(
+        Path(__file__).resolve().parent
+        / "data"
+        / "typed-input-v1"
+        / "profile.json"
+    )
+    mutation = next(
+        unit
+        for unit in profile.units
+        if unit.unit_id == "TYP22-METADATA-OBJECT-SET"
+    )
+    recipe = build_object_heavy_v3_recipe(
+        mutation.base_scenario_id,
+        version=mutation.version,
+    )
+    base = build_transaction_protocol(
+        (recipe.request.as_dict(version=recipe.version),)
+    )
+
+    protocol = project_runner.typed_input_operations_protocol(mutation, base)
+
+    assert tuple(step.subcommand for step in protocol.steps[:2]) == (
+        "operations",
+        "operation-schema",
+    )
+
+    query = next(
+        unit
+        for unit in profile.units
+        if unit.unit_id == "TYP21-QUERY-OBJECT-GET"
+    )
+    query_protocol = build_direct_protocol(
+        (ExpectedGatewayStep("query-object", "query-object"),)
+    )
+    assert (
+        project_runner.typed_input_operations_protocol(query, query_protocol)
+        is query_protocol
+    )
+
+
+def test_typed_input_business_plan_accepts_sealed_operations_discovery() -> None:
+    from tests.semantic.support.codex_typed_input_profile import (
+        load_typed_input_profile,
+    )
+
+    profile = load_typed_input_profile(
+        Path(__file__).resolve().parent
+        / "data"
+        / "typed-input-v1"
+        / "profile.json"
+    )
+    unit = next(
+        row
+        for row in profile.units
+        if row.unit_id == "TYP22-METADATA-OBJECT-SET"
+    )
+    recipe = build_object_heavy_v3_recipe(
+        unit.base_scenario_id,
+        version=unit.version,
+    )
+    base = build_transaction_protocol(
+        (recipe.request.as_dict(version=recipe.version),)
+    )
+    protocol = project_runner.typed_input_operations_protocol(unit, base)
+    sections = compile_object_business_plan(
+        unit.scenario,
+        recipe,
+        protocol,
+        _synthetic_object_before(recipe),
+        (),
+        profile_unit_id=unit.unit_id,
+    )
+
+    parsed = campaign._validate_heavy_v3_typed_business_plan(
+        sections.writer_kwargs(),
+        expected_unit=unit,
+        provenance=SimpleNamespace(protocol=protocol),
+    )
+
+    assert parsed is not None
+    assert parsed.static_expectation["profile_unit_id"] == unit.unit_id
 
 
 @pytest.mark.parametrize(
@@ -2548,6 +2640,9 @@ def _synthetic_gateway_records(
         "soundbank.processDefinitionFiles",
         "soundbank.setInclusions",
     }
+    synthetic_plan_only_operations = {
+        *soundbank_business_operations,
+    }
     exact_artifact_business_operations = {
         "audio.importTabDelimited",
         "lua.executeCliFile",
@@ -2702,7 +2797,11 @@ def _synthetic_gateway_records(
             )
         elif step.subcommand == "draft-start":
             operation = str(step.arguments[0])
-            schema_digest = operation_request_schema_digest(operation, version)
+            schema_digest = (
+                request_contract(version, operation).schema_digest
+                if operation.startswith("ak.")
+                else operation_request_schema_digest(operation, version)
+            )
             composer_digest = operation_composer_digest(operation, version)
             started = draft_store.start(
                 operation=operation,
@@ -2717,6 +2816,14 @@ def _synthetic_gateway_records(
                 started.record.revision,
             )
             if operation in exact_artifact_business_operations:
+                business_contexts[operation] = BusinessContext.create(
+                    task_authority=started.task_authority,
+                    project_id="{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}",
+                    project_path=str(task_root / "SampleProject.wproj"),
+                    wwise_version=version,
+                    wwise_build=f"{version}.synthetic",
+                )
+            elif operation == "ak.wwise.core.audio.convert":
                 business_contexts[operation] = BusinessContext.create(
                     task_authority=started.task_authority,
                     project_id="{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}",
@@ -2861,7 +2968,48 @@ def _synthetic_gateway_records(
                 revision = updated.revision
                 handle = created["handle"]
                 bound_artifact_handles[operation] = handle
-            elif operation in soundbank_business_operations:
+            elif operation == "ak.wwise.core.audio.convert":
+                context = business_contexts[operation]
+                path_segments = tuple(
+                    str(arguments[position + 1])
+                    for position, value in enumerate(arguments[:-1])
+                    if value == "--object-path-segment"
+                )
+                object_path = "\\" + "\\".join(path_segments)
+                object_id = (
+                    "{00000000-0000-0000-0000-" + f"{index:012X}" + "}"
+                )
+                created: dict[str, str] = {}
+
+                def bind_core_object(
+                    current: BusinessDeclarationSession,
+                ) -> BusinessDeclarationSession:
+                    handles = BusinessHandleRegistry.from_dict(
+                        current.handles.as_dict()
+                    )
+                    bound = handles.bind_object(
+                        object_id=object_id,
+                        name=path_segments[-1],
+                        object_type="Sound",
+                        path=object_path,
+                        role="audio_object",
+                    )
+                    created["handle"] = bound.handle
+                    return current.with_handle_registry(handles)
+
+                updated = draft_store.apply_business_update(
+                    draft_id,
+                    task_authority=authority,
+                    expected_revision=revision,
+                    schema_digest=schema_digest,
+                    composer_digest=operation_composer_digest(operation, version),
+                    context=context,
+                    update=bind_core_object,
+                    event_type="handles.bound",
+                )
+                revision = updated.revision
+                handle = created["handle"]
+            elif operation in synthetic_plan_only_operations:
                 revision += 1
                 handle = "boh1-" + f"{index:032x}"
             else:
@@ -2887,7 +3035,20 @@ def _synthetic_gateway_records(
                             "schema_digest": schema_digest,
                         },
                     },
-                    "bound_object": {"handle": handle},
+                    "bound_object": {
+                        "handle": handle,
+                        **(
+                            {
+                                "id": object_id,
+                                "name": path_segments[-1],
+                                "type": "Sound",
+                                "path": object_path,
+                                "role": "audio_object",
+                            }
+                            if operation == "ak.wwise.core.audio.convert"
+                            else {}
+                        ),
+                    },
                 }
             )
         elif step.subcommand == "draft-declare-soundbank-plan":
@@ -2906,6 +3067,69 @@ def _synthetic_gateway_records(
                 "contract": "waapi-skill.operation-draft/v1",
                 "draft_id": draft_id,
                 "revision": revision,
+                "lifecycle_state": "editable",
+                "binding": {
+                    "operation": operation,
+                    "version": version,
+                    "schema_digest": schema_digest,
+                },
+            }
+        elif step.subcommand == "draft-declare-core-plan":
+            operation = next(reversed(draft_started))
+            draft_id, authority, schema_digest, revision = draft_started[operation]
+            if operation != "ak.wwise.core.audio.convert":
+                raise AssertionError("synthetic Core plan operation is invalid")
+            plan: dict[str, Any] = {
+                "audio_object_handles": [],
+                "platform_names": [],
+                "languages": [],
+            }
+            position = 0
+            while position < len(arguments):
+                value = arguments[position]
+                if value == "--role":
+                    name, item = arguments[position + 1 : position + 3]
+                    plan[str(name)].append(item)
+                    position += 3
+                elif value == "--item":
+                    name, item = arguments[position + 1 : position + 3]
+                    plan[str(name)].append(item)
+                    position += 3
+                elif value == "--value":
+                    name, item = arguments[position + 1 : position + 3]
+                    plan[str(name)] = item
+                    position += 3
+                else:
+                    position += 1
+            context = business_contexts[operation]
+
+            def declare_core(
+                current: BusinessDeclarationSession,
+            ) -> BusinessDeclarationSession:
+                candidate = current.with_settings({"core_plan": plan})
+                business_adapter(operation).materialize(candidate)
+                return candidate
+
+            updated = draft_store.apply_business_update(
+                draft_id,
+                task_authority=authority,
+                expected_revision=revision,
+                schema_digest=schema_digest,
+                composer_digest=operation_composer_digest(operation, version),
+                context=context,
+                update=declare_core,
+                event_type="settings.revised",
+            )
+            draft_started[operation] = (
+                draft_id,
+                authority,
+                schema_digest,
+                updated.revision,
+            )
+            payload["draft"] = {
+                "contract": "waapi-skill.operation-draft/v1",
+                "draft_id": draft_id,
+                "revision": updated.revision,
                 "lifecycle_state": "editable",
                 "binding": {
                     "operation": operation,
@@ -3067,7 +3291,7 @@ def _synthetic_gateway_records(
         elif step.subcommand == "draft-check":
             operation = next(reversed(draft_started))
             draft_id, authority, schema_digest, revision = draft_started[operation]
-            if operation in soundbank_business_operations:
+            if operation in synthetic_plan_only_operations:
                 revision += 1
                 draft_started[operation] = (
                     draft_id,
@@ -3150,10 +3374,10 @@ def _synthetic_gateway_records(
         elif step.subcommand == "preview-from-draft":
             operation = next(reversed(draft_started))
             draft_id, authority, schema_digest, revision = draft_started[operation]
-            if operation in soundbank_business_operations:
+            if operation in synthetic_plan_only_operations:
                 if step.expected_operation_request is None:
                     raise AssertionError(
-                        "synthetic SoundBank preview requires its canonical request"
+                        "synthetic plan preview requires its canonical request"
                     )
                 canonical_request = dict(step.expected_operation_request)
                 reservation = None
@@ -3725,9 +3949,10 @@ def test_campaign_transaction_validator_accepts_only_the_show_token_response_cha
         expected_operation_request=request,
     )
 
+    indexes = {step.name: index for index, step in enumerate(protocol.steps)}
     invalid_arguments = (
         (
-            3,
+            indexes["tx01.confirm"],
             (
                 ResponseBinding("tx01.preview", "/transaction_id"),
                 "--confirmation-token",
@@ -3738,7 +3963,7 @@ def test_campaign_transaction_validator_accepts_only_the_show_token_response_cha
             ),
         ),
         (
-            3,
+            indexes["tx01.confirm"],
             (
                 ResponseBinding(
                     "tx01.transaction-show",
@@ -3752,11 +3977,11 @@ def test_campaign_transaction_validator_accepts_only_the_show_token_response_cha
             ),
         ),
         (
-            4,
+            indexes["tx01.execute"],
             (ResponseBinding("tx01.transaction-show", "/transaction_id"),),
         ),
         (
-            5,
+            indexes["tx01.verify"],
             (ResponseBinding("tx01.confirm", "/transaction_id"),),
         ),
     )
@@ -3780,7 +4005,13 @@ def test_campaign_transaction_validator_accepts_only_the_show_token_response_cha
 
 
 def test_campaign_rejects_transaction_show_with_incomplete_or_misbound_confirmation() -> None:
-    step = build_transaction_protocol((_synthetic_audio_transaction_request(),)).steps[2]
+    step = next(
+        candidate
+        for candidate in build_transaction_protocol(
+            (_synthetic_audio_transaction_request(),)
+        ).steps
+        if candidate.subcommand == "transaction-show"
+    )
     event_sequence = 2
     last_event_hash = "b" * 64
     token = confirmation_token_for(

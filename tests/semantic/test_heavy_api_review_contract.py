@@ -13,6 +13,7 @@ SUITE_V3 = REPO_ROOT / "skills" / "waapi-skill" / "evals" / "suite-v3.json"
 OPERATE_REFERENCE = (
     REPO_ROOT / "skills" / "waapi-skill" / "references" / "waapi-operate.md"
 )
+SKILL_ENTRY = REPO_ROOT / "skills" / "waapi-skill" / "SKILL.md"
 
 FILE_BACKED_HEAVY_APIS = frozenset(
     {
@@ -153,3 +154,17 @@ def test_operate_reference_routes_playback_limits_through_stable_business_fields
     assert "parent instance-limit override" in reference
     assert "use stable business fields" in reference
     assert "bind only user-requested custom properties/references" in reference
+
+
+def test_entry_skill_forbids_model_appended_apply_on_draft_preview() -> None:
+    skill = SKILL_ENTRY.read_text(encoding="utf-8")
+
+    assert "Never append `--apply` to `preview-from-draft`" in skill
+    assert "copy the returned `preview-from-draft` continuation exactly" in skill
+
+
+def test_entry_skill_does_not_force_complex_core_reads_back_to_core_call() -> None:
+    skill = SKILL_ENTRY.read_text(encoding="utf-8")
+
+    assert "`core-business/v1` reads use `core-call`" not in skill
+    assert "the exact returned continuation owns the read shape" in skill

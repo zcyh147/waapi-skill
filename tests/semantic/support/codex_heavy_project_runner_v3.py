@@ -64,6 +64,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_optional_query_repair_protocol,
     build_optional_query_schema_protocol,
     build_optional_topic_schema_protocol,
+    build_operations_discovery_protocol,
     build_transaction_protocol,
     call_step,
     query_object_step,
@@ -815,6 +816,100 @@ class _PreparedCase:
     verify_turn: Callable[[int, CodexRunResult], Any] | None = None
     expected_dispatches: tuple[tuple[str, int], ...] = ()
     post_shutdown: Callable[[ScenarioRuntime], None] | None = None
+
+
+def typed_input_operations_protocol(
+    unit: Any,
+    protocol: V3GatewayProtocol,
+) -> V3GatewayProtocol:
+    """Expose named-operation discovery for natural-language typed-input units."""
+
+    unit_id = getattr(unit, "unit_id", None)
+    base_scenario_id = getattr(unit, "base_scenario_id", None)
+    if (
+        not isinstance(unit_id, str)
+        or not unit_id.startswith("TYP")
+        or not isinstance(base_scenario_id, str)
+        or not protocol.steps
+        or protocol.steps[0].subcommand != "operation-schema"
+    ):
+        return protocol
+    return build_operations_discovery_protocol(protocol)
+
+
+def final_response_reports_weak_verifier_boundary(value: str) -> bool:
+    """Accept equivalent clear wording without requiring one fixed sentence."""
+
+    if not isinstance(value, str):
+        return False
+    folded = value.casefold()
+    explicit_schema_limit = (
+        "验证仅限返回结果结构" in folded
+        or "verification is limited to the returned result schema" in folded
+        or "verification is limited to the result schema" in folded
+    )
+    equivalent_schema_limit = (
+        (
+            "验证仅确认返回结果符合预期结构" in folded
+            or "only confirms that the returned result matches the expected structure"
+            in folded
+            or (
+                ("仅确认" in folded or "仅已验证" in folded)
+                and "返回结果" in folded
+                and "结构" in folded
+            )
+            or (
+                "验证仅限" in folded
+                and "返回" in folded
+                and "结构" in folded
+            )
+            or (
+                ("仅验证" in folded or "只验证" in folded)
+                and "返回结果" in folded
+                and "结构" in folded
+            )
+        )
+        and (
+            "未验证" in folded
+            or "不能声称已验证" in folded
+            or "不声称已验证" in folded
+            or "不代表已验证" in folded
+            or (
+                "不能" in folded
+                and "声称" in folded
+                and "已验证" in folded
+            )
+            or "not verified" in folded
+            or "does not verify" in folded
+        )
+        and (
+            "业务副作用" in folded
+            or "业务状态" in folded
+            or "business side effects" in folded
+            or "business state" in folded
+        )
+    )
+    overclaim_markers = (
+        "不仅限于结果结构",
+        "不限于结果结构",
+        "已验证全部业务副作用",
+        "验证了全部业务副作用",
+        "all business side effects were verified",
+        "verified all business side effects",
+        "business state verified",
+        "所有业务状态正确",
+        "全部业务状态正确",
+        "确认所有业务状态",
+        "all business state is correct",
+        "all business states are correct",
+        "confirmed all business state",
+    )
+    return bool(
+        "typed_input" in folded
+        and "3" in folded
+        and (explicit_schema_limit or equivalent_schema_limit)
+        and not any(marker in folded for marker in overclaim_markers)
+    )
 
 
 def run_heavy_project_unit(
@@ -4553,7 +4648,10 @@ def _prepare_case(
             expected_version=runtime.version,
         )
         prepared_lua = prepare_operation(parsed, read_call=direct).as_dict()
-        protocol = build_transaction_protocol([request_payload])
+        protocol = typed_input_operations_protocol(
+            unit,
+            build_transaction_protocol([request_payload]),
+        )
         project_digest = _project_document_digest(runtime.sandbox.sandbox_path)
         script_sha256 = hashlib.sha256(script_bytes).hexdigest()
         live_bindings = {
@@ -4650,73 +4748,8 @@ def _prepare_case(
             if turn_index != 2:
                 return None
             failures: list[str] = []
-            folded = result.final_response.casefold()
-            explicit_schema_limit = (
-                "验证仅限返回结果结构" in folded
-                or "verification is limited to the returned result schema" in folded
-                or "verification is limited to the result schema" in folded
-            )
-            equivalent_schema_limit = (
-                (
-                    "验证仅确认返回结果符合预期结构" in folded
-                    or "only confirms that the returned result matches the expected structure"
-                    in folded
-                    or (
-                        "仅确认" in folded
-                        and "返回结果" in folded
-                        and "结构" in folded
-                    )
-                    or (
-                        "验证仅限" in folded
-                        and "返回" in folded
-                        and "结构" in folded
-                    )
-                    or (
-                        ("仅验证" in folded or "只验证" in folded)
-                        and "返回结果" in folded
-                        and "结构" in folded
-                    )
-                )
-                and (
-                    "未验证" in folded
-                    or "不能声称已验证" in folded
-                    or "不代表已验证" in folded
-                    or (
-                        "不能" in folded
-                        and "声称" in folded
-                        and "已验证" in folded
-                    )
-                    or "not verified" in folded
-                    or "does not verify" in folded
-                )
-                and (
-                    "业务副作用" in folded
-                    or "业务状态" in folded
-                    or "business side effects" in folded
-                    or "business state" in folded
-                )
-            )
-            bounded_boundary = explicit_schema_limit or equivalent_schema_limit
-            overclaim_markers = (
-                "不仅限于结果结构",
-                "不限于结果结构",
-                "已验证全部业务副作用",
-                "验证了全部业务副作用",
-                "all business side effects were verified",
-                "verified all business side effects",
-                "business state verified",
-                "所有业务状态正确",
-                "全部业务状态正确",
-                "确认所有业务状态",
-                "all business state is correct",
-                "all business states are correct",
-                "confirmed all business state",
-            )
-            if (
-                "typed_input" not in folded
-                or "3" not in folded
-                or not bounded_boundary
-                or any(marker in folded for marker in overclaim_markers)
+            if not final_response_reports_weak_verifier_boundary(
+                result.final_response
             ):
                 failures.append("final response omits the weak-verifier boundary")
             return _DirectSemanticVerification(
@@ -4848,6 +4881,7 @@ def _prepare_case(
                 protocol,
                 policy=project_modification_policy,
             )
+        protocol = typed_input_operations_protocol(unit, protocol)
         object_input_files = {
             item.key: (
                 runtime.asset_root / "object-query-audio" / f"{item.key}.wav"
@@ -4997,6 +5031,7 @@ def _prepare_case(
                     ),
                 )
             )
+        protocol = typed_input_operations_protocol(unit, protocol)
         before = import_runtime.hidden_before
         if before is None:
             raise HeavyProjectRunnerError(
@@ -5215,6 +5250,7 @@ def _prepare_case(
         soundbank_runtime.operation_requests,
         refusal=StructuredRefusal(refusal_code) if refusal_code else None,
     )
+    protocol = typed_input_operations_protocol(unit, protocol)
     typed_sections = compile_soundbank_business_plan(
         soundbank_materialized,
         before,

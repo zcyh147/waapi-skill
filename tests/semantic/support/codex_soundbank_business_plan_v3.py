@@ -21,6 +21,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     StructuredRefusal,
     V3GatewayProtocol,
     build_optional_topic_schema_protocol,
+    build_operations_discovery_protocol,
     build_transaction_protocol,
     stream_topic_step,
     wait_topic_step,
@@ -327,6 +328,8 @@ def _validate_inputs(materialized: MaterializedSoundBankCase, before: SoundBankS
                 else None
             ),
         )
+    if protocol.steps[0].subcommand == "operations":
+        expected = build_operations_discovery_protocol(expected)
     if blueprint.expected_primary_dispatch_count == 0:
         if blueprint.zero_dispatch_error_code != PROCESS_REFUSAL_ERROR_CODE:
             raise SoundBankBusinessPlanError("zero-dispatch refusal lacks exact unknown-identity code")
@@ -449,7 +452,17 @@ def _expected_protocol_archive(static: Mapping[str, Any], live: Mapping[str, Any
                 )
             )
         )
-    return _protocol(build_transaction_protocol(static["operation_requests"], refusal=None if static["zero_dispatch_error_code"] is None else _refusal(static["zero_dispatch_error_code"])))
+    expected = build_transaction_protocol(
+        static["operation_requests"],
+        refusal=(
+            None
+            if static["zero_dispatch_error_code"] is None
+            else _refusal(static["zero_dispatch_error_code"])
+        ),
+    )
+    if protocol.steps[0].subcommand == "operations":
+        expected = build_operations_discovery_protocol(expected)
+    return _protocol(expected)
 
 
 def soundbank_topic_protocol_steps(

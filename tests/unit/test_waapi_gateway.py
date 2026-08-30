@@ -3387,6 +3387,59 @@ def test_query_object_broad_results_remain_gateway_bounded(tmp_path: Path) -> No
     assert client.calls[-1][1] == {"waql": "from type Sound take 2"}
 
 
+def test_query_object_projects_not_applicable_mixed_type_fields_as_null(
+    tmp_path: Path,
+) -> None:
+    rows = [
+        {
+            "id": "{container}",
+            "name": "Weather",
+            "type": "RandomSequenceContainer",
+            "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Weather",
+        },
+        {
+            "id": "{source}",
+            "name": "rain_source",
+            "type": "AudioFileSource",
+            "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Weather\Rain\rain_source",
+            "audioSource:language": {"id": "{language}", "name": "SFX"},
+        },
+    ]
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": live_info(year=2023),
+            "ak.wwise.core.object.get": {"return": rows},
+        }
+    )
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "--version",
+            "2023.1",
+            "query-object",
+            "--path-segment",
+            "Actor-Mixer Hierarchy",
+            "--path-segment",
+            "Default Work Unit",
+            "--relationship",
+            "descendants",
+            "--include",
+            "source-language",
+            "--max-results",
+            "2",
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 0, payload
+    assert payload["objects"][0]["source_language"] is None
+    assert payload["objects"][1]["source_language"] == {
+        "id": "{language}",
+        "name": "SFX",
+    }
+
+
 def test_query_object_exact_path_uses_from_object_without_doubled_separators(
     tmp_path: Path,
 ) -> None:
@@ -3439,6 +3492,41 @@ def test_query_object_builds_exact_wwise_path_from_business_segments(
             "query-object",
             "--path-segment",
             "Actor-Mixer Hierarchy",
+            "--path-segment",
+            "Default Work Unit",
+            "--path-segment",
+            "Leaf",
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 0, payload
+    assert payload["objects"] == [row]
+    assert client.calls[-1] == (
+        "ak.wwise.core.object.get",
+        {"waql": r'from object "\Actor-Mixer Hierarchy\Default Work Unit\Leaf"'},
+        {"return": ["id", "name", "type", "path"]},
+    )
+
+
+def test_query_object_normalizes_one_root_marker_on_first_business_segment(
+    tmp_path: Path,
+) -> None:
+    path = r"\Actor-Mixer Hierarchy\Default Work Unit\Leaf"
+    row = {"id": "{leaf}", "name": "Leaf", "type": "ActorMixer", "path": path}
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": live_info(),
+            "ak.wwise.core.object.get": {"return": [row]},
+        }
+    )
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "query-object",
+            "--path-segment",
+            r"\Actor-Mixer Hierarchy",
             "--path-segment",
             "Default Work Unit",
             "--path-segment",

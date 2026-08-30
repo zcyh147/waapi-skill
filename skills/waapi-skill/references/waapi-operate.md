@@ -48,7 +48,7 @@ For business operations, the business Adapter owns object paths, native types, m
 
 Follow the schema's sole `input_mode`. No schema-to-preview shortcut; never infer a token. For `composer`, run only its returned start and action argv. For `business_declaration`, run `draft-start` when returned; a bounded Core read instead runs `core-call`. Copy handles into the same named role; submit only disclosed high-level fields. `binding.role_fields` maps repeated roles into collections. Bind exact owners, parents, and references through returned roles. Supply stable facts such as `volume_db=-4`. The Gateway derives Wwise paths, types, metadata scopes, tokens/enums, arrays, curve points, Blend edges, order, batching, and Preview change intent. For audio import, use replace only when explicit; configure a default only when the user requested it for every target kind. Corrections reuse the draft. Continue to Preview/refusal in the same turn. Exact reflected URIs use `request-schema`.
 
-Copy argv, preserving `--expected-revision` and `--apply`. Only when the returned input mode is `composer`, fill six-fact batches then a last partial batch and add required branch facts after `choose`. Business declarations instead submit one complete returned high-level command at a time.
+Copy returned argv exactly, preserving `--expected-revision` and `--apply` when present; never add absent flags. Only for `composer`, fill six-fact batches, then the last partial batch and required branch facts after `choose`. Business declarations submit one complete returned high-level command at a time.
 
 For a Composer lane, `construction_state.complete:false` and compact action receipts are complete JSON. Follow `next_command_decision`; only an exact `business_value_pointer` authorizes it. A business Draft instead follows its returned required phase and completion candidate. Both lanes finish through the returned check/Preview continuation, never `draft-apply --action check`.
 
@@ -177,7 +177,7 @@ For exact `ak.wwise.core.audio.convert` in `2024.1`/`2025.1`, run `request-schem
 
 ## Closed input, preview, and policy
 
-Unknown fields fail. Use only the returned continuation; there is no caller-authored request document. Never ask for confirmation while typed composition or Preview creation is still incomplete. Under `ask_before_changes`, `--apply` previews without execution; design work omits it. The Gateway owns the external runtime state root: omit `--state-dir` unless a trusted caller supplied an absolute override.
+Unknown fields fail; there is no caller-authored request document. Use only its continuation. Never ask for confirmation while typed composition or Preview creation is still incomplete. Under `ask_before_changes`, use its executable Preview. Business Drafts return `preview-from-draft` without `--apply`; never append it. Design uses the non-executable form. Unless a trusted caller supplied an absolute override, omit `--state-dir`; the Gateway owns the external runtime state root.
 
 A rejected or incomplete preview is a hard same-turn boundary. Do not repair JSON, change an operation, or retry preview in that turn. A changed target/value requires a new preview.
 

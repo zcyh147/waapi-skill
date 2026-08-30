@@ -1668,28 +1668,30 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "all dynamic tokens pre-draft" in instructions
     assert "single existing=>--object GUID" in instructions
     assert "--object-type only new/imported/plural" in instructions
-    assert "reread selected pre-schema" in instructions
+    assert "reread pre-schema" in instructions
     assert "path=>by_path_segments one arg/segment" in instructions
     assert "SoundBank=>role_route" in instructions
     assert "exact bank=>soundbank.by_exact_name" in instructions
     assert "name=>query>ID=>by_id" in instructions
     assert "GUID=>by_id" in instructions
-    assert "Else exact path=>path" in instructions
+    assert "Else path=>path" in instructions
     assert "one query/hop; no merge" in instructions
     assert "enum/const exact" in instructions
     assert "typed_operation: copy gateway_argv_prefix" in instructions
     assert "incl --apply" in instructions
     assert "selector kind/value separate" in instructions
     assert "opaque IDs/handles/tokens/digests" in instructions
-    assert "Import object_type=Sound SFX" in instructions
+    assert "Import type=Sound SFX" in instructions
     assert "query type=Sound" in instructions
-    assert "Events initial" in instructions
+    assert "Events:" in instructions
     assert "parents first" in instructions
-    assert "POSIX paths single-quoted" in instructions
+    assert "New path=>parent" in instructions
+    assert "name=>declaration only" in instructions
+    assert "POSIX path: single-quote" in instructions
     assert "keep backslashes" in instructions
-    assert "add one/child" in instructions
-    assert "Files absolute; no relative/traversal" in instructions
-    assert "terminal scalars first" in instructions
+    assert "one arg/child" in instructions
+    assert "Files absolute; no traversal" in instructions
+    assert "scalars first" in instructions
     assert "every prompt field/item/map/bool" in instructions
     assert "Top facts first; exhaust tree" in instructions
     assert "More=>ancestor_next_item_source" in instructions

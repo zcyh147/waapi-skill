@@ -107,19 +107,28 @@ def test_all_five_cases_build_closed_waapi_call_protocols(tmp_path: Path) -> Non
             backend=object(),
         )
         protocol = runtime.gateway_protocol()
-        assert protocol.turn_prefix_counts == (2, 6)
+        assert protocol.turn_prefix_counts == (
+            len(plan.objects) + 5,
+            len(plan.objects) + 9,
+        )
         assert [step.subcommand for step in protocol.steps] == [
             "request-schema",
-            "typed-call",
+            "draft-start",
+            *(["draft-bind-object"] * len(plan.objects)),
+            "draft-declare-core-plan",
+            "draft-check",
+            "preview-from-draft",
             "transaction-show",
             "confirm",
             "execute",
             "verify",
         ]
-        typed_request = protocol.steps[1].arguments[-1]
-        assert typed_request.expected_args == plan.operation_request["arguments"]["args"]
-        assert typed_request.expected_options == {}
-        assert typed_request.io_root == str(io.resolve())
+        preview = next(
+            step
+            for step in protocol.steps
+            if step.subcommand == "preview-from-draft"
+        )
+        assert preview.expected_operation_request == plan.operation_request
         assert runtime.render_prompt() == _scenario(plan.scenario_id).render_prompt(
             {"io_root": str(io.resolve())}
         )

@@ -11,6 +11,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     V3GatewayProtocol,
     V3ProtocolError,
     build_audio_import_composer_transaction_steps,
+    build_audio_convert_business_transaction_steps,
     build_compound_undo_business_transaction_steps,
     build_direct_protocol,
     build_exact_artifact_business_transaction_steps,
@@ -20,6 +21,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_object_metadata_business_transaction_steps,
     build_switch_assignment_business_transaction_steps,
     build_object_set_composer_transaction_steps,
+    build_operations_discovery_protocol,
     build_schema_query_transaction_protocol,
     build_transaction_protocol,
     call_step,
@@ -37,6 +39,7 @@ from tests.semantic.support.codex_gateway_broker import (
     DraftTypedActionBatchArgument,
     DraftActionMetadataBinding,
     ExpectedGatewayStep,
+    ExactArgumentAlternatives,
     MetadataQueryArgument,
     MetadataTokenProjection,
     ResponseBinding,
@@ -71,6 +74,26 @@ def _request(index: int = 1) -> dict[str, object]:
             "source_authority": LUA_SOURCE_AUTHORITY,
         },
     }
+
+
+def test_query_object_step_keeps_canonical_first_path_segment() -> None:
+    step = query_object_step(
+        "query",
+        (
+            "query-object",
+            "--path-segment",
+            "Actor-Mixer Hierarchy",
+            "--path-segment",
+            "Default Work Unit",
+        ),
+    )
+
+    assert step.arguments == (
+        "--path-segment",
+        "Actor-Mixer Hierarchy",
+        "--path-segment",
+        "Default Work Unit",
+    )
 
 
 def test_stream_topic_step_owns_finite_duration_and_typed_business_facts() -> None:
@@ -870,6 +893,66 @@ def test_single_transaction_spans_two_turn_prefixes_with_response_bindings() -> 
         ResponseBinding("tx01.execute", "/transaction_id"),
     )
     assert all("--request-json" not in step.arguments for step in protocol.steps)
+
+
+def test_operations_discovery_wraps_one_natural_language_business_transaction() -> None:
+    base = build_transaction_protocol([_request()])
+
+    protocol = build_operations_discovery_protocol(base)
+
+    assert tuple(step.subcommand for step in protocol.steps[:2]) == (
+        "operations",
+        "operation-schema",
+    )
+    assert protocol.steps[0].name == "tx01.operations"
+    assert protocol.turn_prefix_counts == tuple(
+        count + 1 for count in base.turn_prefix_counts
+    )
+    assert protocol.steps[1:] == base.steps
+
+
+def test_audio_convert_uses_core_business_draft_instead_of_typed_call() -> None:
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2024.1",
+        "operation": "waapi.call",
+        "arguments": {
+            "api": "ak.wwise.core.audio.convert",
+            "args": {
+                "objects": [
+                    r"\Actor-Mixer Hierarchy\Default Work Unit\Weather\Rain",
+                    r"\Actor-Mixer Hierarchy\Default Work Unit\Weather\Wind",
+                ],
+                "platforms": ["Windows", "Mac"],
+                "languages": ["SFX"],
+            },
+            "options": {},
+            "io_root": native_absolute_test_path("audio-convert-business"),
+        },
+    }
+
+    steps = build_audio_convert_business_transaction_steps(
+        request,
+        label="tx01",
+    )
+
+    assert tuple(step.subcommand for step in steps) == (
+        "request-schema",
+        "draft-start",
+        "draft-bind-object",
+        "draft-bind-object",
+        "draft-declare-core-plan",
+        "draft-check",
+        "preview-from-draft",
+    )
+    assert all(step.subcommand != "typed-call" for step in steps)
+    assert steps[-1].expected_operation_request == request
+
+    protocol = build_transaction_protocol((request,))
+    assert tuple(step.subcommand for step in protocol.steps[:7]) == tuple(
+        step.subcommand for step in steps
+    )
+    assert all(step.subcommand != "typed-call" for step in protocol.steps)
 
 
 def test_commutative_read_only_groups_are_adjacent_and_cannot_cross_turns() -> None:

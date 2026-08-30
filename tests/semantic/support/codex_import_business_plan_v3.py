@@ -32,6 +32,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     V3GatewayProtocol,
     build_audio_import_composer_protocol,
     build_metadata_transaction_protocol,
+    build_operations_discovery_protocol,
     build_transaction_protocol,
 )
 from tests.semantic.support.codex_filesystem_security import (
@@ -333,6 +334,8 @@ def _validate_expected_protocol(
                 refusal=StructuredRefusal(refusal) if refusal else None,
             )
         )
+    if protocol.steps[0].subcommand == "operations":
+        expected = build_operations_discovery_protocol(expected)
     if _plain(serialize_protocol(protocol)) != _plain(serialize_protocol(expected)):
         raise ImportBusinessPlanError("import protocol does not exactly bind sealed requests and transaction order")
 
@@ -718,6 +721,8 @@ def _validate_static_archive(static: Mapping[str, Any], live: Mapping[str, Any],
                 ),
             )
         )
+    if protocol.steps[0].subcommand == "operations":
+        expected = build_operations_discovery_protocol(expected)
     if _plain(serialize_protocol(protocol)) != _plain(serialize_protocol(expected)) or static["protocol_sha256"] != _hash(serialize_protocol(protocol)):
         raise ImportBusinessPlanError("archived import protocol/request order drifted")
     if not isinstance(static["row_contracts"], list) or not static["row_contracts"] or len({row.get("row_key") for row in static["row_contracts"] if isinstance(row, Mapping)}) != len(static["row_contracts"]):

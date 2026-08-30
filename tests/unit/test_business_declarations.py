@@ -86,6 +86,24 @@ def test_semantic_kind_repair_discloses_only_closed_choices() -> None:
     assert unsupported.value.repair["choices"] == list(SUPPORTED_WWISE_VERSIONS)
 
 
+@pytest.mark.parametrize(
+    ("display_name", "stable_name"),
+    (
+        ("Sound SFX", "sound-sfx"),
+        ("Sound Voice", "sound-voice"),
+        ("Random Container", "random-container"),
+        ("Sequence Container", "sequence-container"),
+    ),
+)
+def test_semantic_kind_normalizes_unambiguous_wwise_display_names(
+    display_name: str,
+    stable_name: str,
+) -> None:
+    resolved = resolve_semantic_kind(display_name, version="2025.1")
+
+    assert resolved.name == stable_name
+
+
 def test_new_descendant_uses_parent_handle_name_and_kind_only() -> None:
     registry = BusinessHandleRegistry(_context(), token_bytes=lambda size: b"p" * size)
     parent = registry.bind_object(

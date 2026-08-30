@@ -28,6 +28,22 @@ prevention checks that are expensive to rediscover.
   `Limited`; the same numeric console session owns `explorer.exe`. Ordinary
   pytest and `ci/test.bat` remain direct SSH commands.
 
+### Attest the exact current standalone Codex release
+
+- Evidence: Windows Fresh roots using standalone Codex 0.146 could enter the
+  correct `InteractiveToken` / `Limited` task and then stall for about 203
+  seconds on the first exact PowerShell `Get-Content` Skill read. The same
+  query lane passed fresh plus verify-only after switching to the official
+  user-owned 0.151 executable.
+- Installer pitfall: an installer started through SSH may inherit Git's `tar`
+  and fail while unpacking an otherwise valid release. Run the ARM64 installer
+  through PowerShell with a sanitized System32/PowerShell `PATH`, then attest
+  the exact release path, executable SHA-256, and direct `--version` result.
+  A visible shortcut, package directory, or PATH hit is not executable proof.
+- Prevention: freeze a pre-command stall as infrastructure evidence; do not
+  increase timeouts or retry its root. Upgrade or repair the standalone CLI,
+  create a new root, and keep the Scheduled Task desktop contract unchanged.
+
 ### Windows SSH verify-only still needs the sealed standalone Codex path
 
 - Evidence: after native-Windows root `iwin-runtime-114e948-r4` passed fresh in
@@ -173,6 +189,11 @@ prevention checks that are expensive to rediscover.
 - Prevention: put the exact Skill-local Python and campaign argv directly in a
   `RunAtLoad=true`, `KeepAlive=false` LaunchAgent. Prove one run, sealed output,
   and zero scoped processes, then boot it out.
+- Addendum: a LaunchAgent that executes a wrapper script stored under
+  `Documents` can fail with macOS `Operation not permitted` before campaign-root
+  creation. Put the Skill-local Python plus exact campaign arguments directly
+  in `ProgramArguments`; do not move the wrapper elsewhere and treat that as a
+  semantic retry.
 
 ### A macOS verify-only replay can discover a different Codex binary
 
@@ -367,6 +388,45 @@ prevention checks that are expensive to rediscover.
 - Prevention: accept exactly those two openings. Bind the optional branch to
   the exact `waapi.undoGroup` schema. Repeated, late, or differently bound
   discovery remains terminal.
+
+### Natural operation selection may begin with `operations`
+
+- Evidence: one #60 full root correctly used the compact `operations` catalog
+  before several named `operation-schema` calls, but the formal Broker required
+  the named schema as command one and rejected every such task before Gateway
+  dispatch.
+- Cause: the test protocol treated its runner-owned exact operation identity as
+  if it were already known to the fresh Agent. The Skill allows direct schema
+  lookup only when the exact name is visible; natural-language business intent
+  may first require one catalog read.
+- Prevention: typed-profile protocols whose first public step is a named
+  `operation-schema` accept exactly one initial `operations` step. Preserve the
+  rest of the ordered protocol, terminal counts, and immutable operation name;
+  repeated or late discovery remains rejected.
+
+### Mixed-type query rows may omit inapplicable optional accessors
+
+- Evidence: a #60 descendants query requested source language across a result
+  containing both containers and `AudioFileSource` objects. Wwise omitted the
+  source-language accessor on containers, and Gateway incorrectly returned
+  `INVALID_QUERY_RESULT` even though identity fields and applicable source rows
+  were valid.
+- Cause: business projection treated every requested optional property or
+  reference as mandatory on every heterogeneous row.
+- Prevention: keep `id`, `name`, `type`, and `path` strict, but project a
+  requested property/reference/derived business field as JSON `null` when it
+  is not applicable to that row. Missing required identity still fails closed;
+  this is not permission to accept malformed result rows.
+
+### Do not kill unrelated Wwise, Console, REAPER, or Codex work
+
+- Evidence: the Windows desktop may concurrently run the user's separate
+  ReWwire/Wwise Console development workflow. Its processes can share product
+  names and WAAPI-related components without belonging to the Fresh campaign.
+- Prevention: ownership requires the campaign token, sealed sandbox/project
+  path, task identity, or recorded descendant relationship. If an unowned
+  process occupies a required port or host prerequisite, postpone that lane or
+  report it blocked. Never terminate it from a name-only process match.
 
 ### The archive validator inferred optional protocol from task policy
 

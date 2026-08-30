@@ -57,6 +57,19 @@ class _Verification:
     failures: tuple[str, ...] = ()
 
 
+def test_weak_verifier_oracle_accepts_clear_chinese_boundary() -> None:
+    response = (
+        "profile：`typed_input`\ncount：`3`\n\n"
+        "弱验证：仅已验证脚本返回结果符合结构；未验证、也不声称已验证"
+        "脚本的全部业务副作用。"
+    )
+
+    assert runner.final_response_reports_weak_verifier_boundary(response)
+    assert not runner.final_response_reports_weak_verifier_boundary(
+        "profile: typed_input; count: 3; 已验证全部业务副作用"
+    )
+
+
 def _successful_spawn_topic_publisher(
     _host,
     _port,

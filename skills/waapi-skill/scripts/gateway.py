@@ -16233,7 +16233,15 @@ def _business_object_path_from_segments(values: Any) -> str:
             f"{MAX_BUSINESS_OBJECT_PATH_SEGMENTS} ordered path segments."
         )
     segments: list[str] = []
-    for value in values:
+    for index, raw_value in enumerate(values):
+        value = raw_value
+        if (
+            index == 0
+            and isinstance(value, str)
+            and value.startswith("\\")
+            and not value.startswith("\\\\")
+        ):
+            value = value[1:]
         if (
             not isinstance(value, str)
             or not value
@@ -20627,26 +20635,18 @@ def _project_query_business_rows(
 
     bindings = tuple(getattr(args, "query_output_bindings", ()) or ())
     projected: list[dict[str, Any]] = []
-    for index, row in enumerate(rows):
+    for row in rows:
         item = {field: row[field] for field in SELECTED_REQUIRED_RETURN_FIELDS}
         properties: dict[str, Any] = {}
         references: dict[str, Any] = {}
         for kind, native, output in bindings:
-            if native not in row:
-                raise GatewayResultShapeError(
-                    "Object query omitted a requested business result field.",
-                    details={
-                        "row_index": index,
-                        "business_field": output,
-                    },
-                    error_code="INVALID_QUERY_RESULT",
-                )
+            value = row.get(native)
             if kind == "property":
-                properties[output] = row[native]
+                properties[output] = value
             elif kind == "reference":
-                references[output] = row[native]
+                references[output] = value
             else:
-                item[output] = row[native]
+                item[output] = value
         if properties:
             item["properties"] = properties
         if references:
@@ -22295,6 +22295,11 @@ def _business_next_action_binding(
             "copy_each_nonempty_user_path_segment_root_to_leaf; gateway_inserts_"
             "every_wwise_separator"
         ),
+        "new_target_parent_rule": (
+            "when_the_user_supplies_a_complete_new_object_path_bind_every_segment_"
+            "except_the_final_new_object_name; pass_that_final_segment_once_as_the_"
+            "later_declaration_name"
+        ),
         "name_rule": "unscoped_name_is_not_a_mutation_identity",
         "result": "copy_the_returned_bound_object.handle",
         "result_validation_rule": (
@@ -22310,6 +22315,8 @@ def _business_next_action_binding(
         ],
     }
     role_declaration = adapter.role_declaration
+    if role_declaration is not None:
+        object_binding.pop("new_target_parent_rule", None)
 
     def role_object_binding(next_role: str) -> dict[str, Any]:
         role_bind_prefix = [*object_bind_prefix, "--role", next_role]
@@ -23775,6 +23782,13 @@ def _business_next_action_binding(
                         "object",
                     ],
                     "use_when": "new_kind_is_not_one_disclosed_stable_semantic_kind",
+                },
+                "stable_semantic_kinds": list(SUPPORTED_BUSINESS_KINDS),
+                "stable_kind_display_aliases": {
+                    "Sound SFX": "sound-sfx",
+                    "Sound Voice": "sound-voice",
+                    "Random Container": "random-container",
+                    "Sequence Container": "sequence-container",
                 },
                 "declare_existing": {
                     **operation_draft_prefix_copy_binding(declare_existing_prefix),

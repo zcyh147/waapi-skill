@@ -339,9 +339,13 @@ _BASE_KIND_ROWS: Mapping[str, tuple[str, str, str, tuple[str, ...]]] = {
     ),
 }
 
+_DISPLAY_KIND_ALIASES = {
+    row[0]: stable_name for stable_name, row in _BASE_KIND_ROWS.items()
+}
+
 
 def resolve_semantic_kind(name: str, *, version: str) -> SemanticKind:
-    """Resolve one exact stable kind into its versioned Wwise representations."""
+    """Resolve one stable kind or its unambiguous Wwise display spelling."""
 
     if version not in SUPPORTED_WWISE_VERSIONS:
         raise _error(
@@ -350,20 +354,25 @@ def resolve_semantic_kind(name: str, *, version: str) -> SemanticKind:
             choices=SUPPORTED_WWISE_VERSIONS,
             action="choose one supported Wwise version",
         )
-    if not isinstance(name, str) or name not in _BASE_KIND_ROWS:
+    canonical_name = (
+        _DISPLAY_KIND_ALIASES.get(name, name) if isinstance(name, str) else name
+    )
+    if not isinstance(canonical_name, str) or canonical_name not in _BASE_KIND_ROWS:
         raise _error(
             "BUSINESS_KIND_UNAVAILABLE",
             field="kind",
             choices=SUPPORTED_BUSINESS_KINDS,
             action="choose one disclosed semantic kind",
         )
-    path_type, native_type, metadata_type, verifier_types = _BASE_KIND_ROWS[name]
-    if name == "actor-mixer" and version == "2025.1":
+    path_type, native_type, metadata_type, verifier_types = _BASE_KIND_ROWS[
+        canonical_name
+    ]
+    if canonical_name == "actor-mixer" and version == "2025.1":
         metadata_type = "PropertyContainer"
         verifier_types = ("ActorMixer", "PropertyContainer")
     material = {
         "contract": BUSINESS_KIND_CONTRACT,
-        "name": name,
+        "name": canonical_name,
         "version": version,
         "path_segment_type": path_type,
         "native_object_type": native_type,
@@ -371,7 +380,7 @@ def resolve_semantic_kind(name: str, *, version: str) -> SemanticKind:
         "verifier_object_types": list(verifier_types),
     }
     return SemanticKind(
-        name=name,
+        name=canonical_name,
         version=version,
         path_segment_type=path_type,
         native_object_type=native_type,

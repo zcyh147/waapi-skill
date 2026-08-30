@@ -91,6 +91,49 @@ from wwise_waapi.operation_composer import (
     operation_draft_public_projection,
     typed_action_cli_arguments,
 )
+
+
+@pytest.mark.parametrize(
+    ("subcommand", "arguments", "index", "supplied", "expected"),
+    (
+        (
+            "query-object",
+            ("--path-segment", "Actor-Mixer Hierarchy"),
+            1,
+            r"\Actor-Mixer Hierarchy",
+            "Actor-Mixer Hierarchy",
+        ),
+        (
+            "draft-bind-object",
+            ("--object-path-segment", "Actor-Mixer Hierarchy"),
+            1,
+            r"\Actor-Mixer Hierarchy",
+            "Actor-Mixer Hierarchy",
+        ),
+        (
+            "draft-declare-new",
+            ("--kind", "sound-sfx"),
+            1,
+            "Sound SFX",
+            "sound-sfx",
+        ),
+    ),
+)
+def test_closed_business_literal_equivalence_is_broker_owned(
+    subcommand: str,
+    arguments: tuple[str, ...],
+    index: int,
+    supplied: str,
+    expected: str,
+) -> None:
+    step = ExpectedGatewayStep("step", subcommand, arguments)
+
+    assert broker_module._closed_business_literal_equivalent(
+        step,
+        index,
+        supplied,
+        expected,
+    ) is True
 from wwise_waapi.canonical import canonical_sha256
 from wwise_waapi.builders.debug_lua import LUA_SOURCE_AUTHORITY
 from wwise_waapi.operation_drafts import OperationDraftStore

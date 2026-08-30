@@ -31,6 +31,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_modification_policy_protocol,
     build_optional_query_repair_protocol,
     build_optional_query_schema_protocol,
+    build_operations_discovery_protocol,
     build_schema_query_transaction_protocol,
     build_transaction_protocol,
     query_object_step,
@@ -1896,6 +1897,16 @@ def _validate_protocol(
         )
     else:  # pragma: no cover - recipe union is closed
         raise ObjectBusinessPlanError("object recipe request type is unsupported")
+    if profile_unit_id is not None:
+        expected_protocols = tuple(
+            variant
+            for expected in expected_protocols
+            for variant in (
+                (expected, build_operations_discovery_protocol(expected))
+                if expected.steps[0].subcommand == "operation-schema"
+                else (expected,)
+            )
+        )
     if serialize_protocol(protocol) not in tuple(
         serialize_protocol(expected) for expected in expected_protocols
     ):

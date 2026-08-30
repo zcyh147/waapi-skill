@@ -254,6 +254,11 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
     assert "gateway_inserts_every_wwise_separator" in (
         start_next["object_binding"]["path_rule"]
     )
+    assert start_next["object_binding"]["new_target_parent_rule"] == (
+        "when_the_user_supplies_a_complete_new_object_path_bind_every_segment_"
+        "except_the_final_new_object_name; pass_that_final_segment_once_as_the_"
+        "later_declaration_name"
+    )
     assert "returned_name_type_path" in (
         start_next["object_binding"]["result_validation_rule"]
     )
