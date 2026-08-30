@@ -5284,6 +5284,45 @@ def wait_topic_step(
     )
 
 
+def stream_topic_step(
+    name: str,
+    topic: str,
+    *,
+    version: str,
+    match: Mapping[str, Any] | None = None,
+    options: Mapping[str, Any] | None = None,
+    timeout_seconds: float,
+) -> ExpectedGatewayStep:
+    """Build one finite persistent Topic stream from closed business facts."""
+
+    if timeout_seconds <= 0:
+        raise V3ProtocolError("stream-topic timeout must be positive")
+    option_values = _normalize_json_object(
+        {} if options is None else options,
+        field="stream-topic options",
+    )
+    match_values = _normalize_json_object(
+        {} if match is None else match,
+        field="stream-topic match",
+    )
+    return ExpectedGatewayStep(
+        name=name,
+        subcommand="stream-topic",
+        gateway_global_arguments=("--timeout", _format_timeout(timeout_seconds)),
+        arguments=(
+            topic,
+            "--topic-contract-digest",
+            topic_business_contract(version, topic).contract_digest,
+            *_business_topic_arguments(
+                topic,
+                version=version,
+                options=option_values,
+                match=match_values,
+            ),
+        ),
+    )
+
+
 def _business_topic_arguments(
     topic: str,
     *,
@@ -5523,5 +5562,6 @@ __all__ = [
     "request_schema_step",
     "topic_schema_step",
     "topic_schema_match_group_step",
+    "stream_topic_step",
     "wait_topic_step",
 ]

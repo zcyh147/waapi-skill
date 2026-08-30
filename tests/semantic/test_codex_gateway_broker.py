@@ -2000,6 +2000,61 @@ if mode == "report-python-bytecode-policy":
     payload["python_dont_write_bytecode"] = os.environ.get(
         "PYTHONDONTWRITEBYTECODE"
     )
+if mode.startswith("topic-stream") and command == "stream-topic":
+    topic = command_arguments[0]
+    records = [
+        {
+            "contract": "waapi-skill.topic-stream/v1",
+            "command": "stream-topic",
+            "record_type": "started",
+            "ok": True,
+            "status": "streaming",
+            "topic": topic,
+            "topic_contract_digest": "a" * 64,
+            "match": None,
+            "subscription_timeout": {
+                "mode": "finite",
+                "seconds": 30.0,
+                "source": "explicit",
+            },
+            "buffer_limit_events": 64,
+            "event_result_limit_bytes": 65536,
+        },
+        {
+            "contract": "waapi-skill.topic-stream/v1",
+            "record_type": "event",
+            "sequence": 1,
+            "topic": topic,
+            "event": {"soundbank": {"name": "Weapons_Core"}},
+            "event_validation": {"valid": True},
+        },
+        {
+            "contract": "waapi-skill.topic-stream/v1",
+            "command": "stream-topic",
+            "record_type": "terminal",
+            "ok": True,
+            "status": "completed",
+            "completion_reason": "duration_elapsed",
+            "topic": topic,
+            "topic_contract_digest": "a" * 64,
+            "match": None,
+            "subscription_timeout": {
+                "mode": "finite",
+                "seconds": 30.0,
+                "source": "explicit",
+            },
+            "event_count": 1,
+            "elapsed_seconds": 30.0,
+            "cleanup": "unsubscribed",
+        },
+    ]
+    if mode == "topic-stream-bad-sequence":
+        records[1]["sequence"] = 2
+    elif mode == "topic-stream-bad-cleanup":
+        records[-1]["cleanup"] = "failed"
+    for record in records:
+        print(json.dumps(record, ensure_ascii=False, separators=(",", ":")))
+    raise SystemExit(0)
 transaction_id = os.environ.get("FAKE_GATEWAY_TRANSACTION_ID", "tx-dynamic-123")
 artifact_hash = "a" * 64
 event_sequence = 2
@@ -8239,6 +8294,83 @@ def test_subscription_ack_is_secret_fresh_step_bound_and_broker_validated(
             <= validated["validated_at_unix_ns"]
             <= evidence.records[0].finished_at_unix_ns
         )
+
+
+def test_stream_topic_ndjson_is_validated_and_observer_receives_events(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    topic = "ak.wwise.core.soundbank.generated"
+    step = ExpectedGatewayStep(
+        "soundbank.generated.stream",
+        "stream-topic",
+        (topic,),
+        gateway_global_arguments=("--timeout", "30"),
+    )
+    observed: list[Mapping[str, object]] = []
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(step,),
+        trusted_subscription_ack=TrustedSubscriptionAckSpec(step.name, topic),
+        trusted_subscription_ack_observer=lambda _expectation: None,
+        trusted_step_observer=lambda _step, payload, _state, _evidence: observed.append(payload),
+        runner_environment={**os.environ, "FAKE_GATEWAY_MODE": "topic-stream"},
+        transport="tcp",
+    ) as broker:
+        result = run_model_command(
+            broker,
+            ["--timeout", "30", "stream-topic", topic],
+        )
+        evidence = broker.evidence()
+
+    assert result.returncode == 0, result.stderr
+    assert [json.loads(line)["record_type"] for line in result.stdout.splitlines()] == [
+        "started",
+        "event",
+        "terminal",
+    ]
+    assert evidence.passed is True
+    assert evidence.records[0].payload["record_type"] == "terminal"
+    assert evidence.records[0].payload["cleanup"] == "unsubscribed"
+    assert observed[0]["events"] == [
+        {"soundbank": {"name": "Weapons_Core"}}
+    ]
+
+
+@pytest.mark.parametrize(
+    "mode",
+    ("topic-stream-bad-sequence", "topic-stream-bad-cleanup"),
+)
+def test_stream_topic_rejects_malformed_or_unclean_terminal_evidence(
+    tmp_path: Path,
+    mode: str,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    topic = "ak.wwise.core.soundbank.generated"
+    step = ExpectedGatewayStep(
+        "soundbank.generated.stream",
+        "stream-topic",
+        (topic,),
+        gateway_global_arguments=("--timeout", "30"),
+    )
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(step,),
+        trusted_subscription_ack=TrustedSubscriptionAckSpec(step.name, topic),
+        runner_environment={**os.environ, "FAKE_GATEWAY_MODE": mode},
+        transport="tcp",
+    ) as broker:
+        result = run_model_command(
+            broker,
+            ["--timeout", "30", "stream-topic", topic],
+        )
+        evidence = broker.evidence()
+
+    assert result.returncode == 125
+    assert evidence.passed is False
+    assert evidence.records[0].payload_error
 
 
 def test_windows_subscription_ack_accepts_only_the_trusted_redirector_chain(

@@ -161,6 +161,7 @@ def _case(api: str, scenario_id: str, root: Path, *, refusal: bool = False, topi
     if topic:
         protocol = build_optional_topic_schema_protocol(
             soundbank_topic_protocol_steps(
+                scenario_id=scenario_id,
                 topic=api,
                 version="2022.1",
                 event_count=topic_count,

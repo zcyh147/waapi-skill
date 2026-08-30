@@ -2294,6 +2294,7 @@ def test_prepare_case_compiles_and_validates_typed_soundbank_sections_for_all_ap
     if topic:
         assert [step.name for step in prepared.protocol.steps] == [
             "soundbank.generated.schema",
+            "soundbank.generated.schema.language.entry",
             "soundbank.generated.wait",
         ]
         assert len(prepared.topic_publishers) == 3

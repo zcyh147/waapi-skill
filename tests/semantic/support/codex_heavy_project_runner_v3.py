@@ -203,6 +203,7 @@ from tests.semantic.support.codex_soundbank_business_plan_v3 import (
     SoundBankBusinessPlanSections,
     compile_soundbank_business_plan,
     soundbank_topic_protocol_steps,
+    soundbank_topic_lifecycle,
     validate_soundbank_business_plan,
 )
 from tests.semantic.support.codex_soundbank_runtime_v3 import (
@@ -5118,9 +5119,10 @@ def _prepare_case(
         topic = soundbank_runtime.topic_plan
         if topic is None:
             raise HeavyProjectRunnerError("SoundBank topic scenario has no topic plan")
-        step_name = "soundbank.generated.wait"
+        step_name, _lifecycle_command = soundbank_topic_lifecycle(scenario.id)
         protocol = build_optional_topic_schema_protocol(
             soundbank_topic_protocol_steps(
+                scenario_id=scenario.id,
                 topic=topic.topic,
                 version=runtime.version,
                 event_count=topic.event_count,

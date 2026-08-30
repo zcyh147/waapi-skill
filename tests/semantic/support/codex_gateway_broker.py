@@ -1922,7 +1922,7 @@ TrustedStepPreObserver = Callable[
 
 @dataclass(frozen=True, slots=True)
 class TrustedSubscriptionAckSpec:
-    """One broker-owned wait-topic step that requires a post-subscribe ACK."""
+    """One broker-owned Topic lifecycle step requiring a post-subscribe ACK."""
 
     step_name: str
     topic: str
@@ -1953,7 +1953,7 @@ class TrustedSubscriptionAckExpectation:
 
 @dataclass(frozen=True, slots=True)
 class _TrustedSubscriptionAckCredential:
-    """Broker-private raw credential for one exact wait-topic step."""
+    """Broker-private raw credential for one exact Topic lifecycle step."""
 
     expectation: TrustedSubscriptionAckExpectation
     nonce: str
@@ -7133,6 +7133,71 @@ def _extract_payload(stdout: str, *, required_contract: str | None = None) -> Ma
     return payload
 
 
+def _extract_topic_stream_records(stdout: str) -> tuple[Mapping[str, Any], ...]:
+    """Validate the public stream-topic NDJSON lifecycle and return its records."""
+
+    lines = stdout.splitlines()
+    if not lines or any(not line.strip() for line in lines):
+        raise GatewayInvocationError(
+            "stream-topic output must be contiguous non-empty NDJSON records"
+        )
+    records: list[Mapping[str, Any]] = []
+    for line in lines:
+        value = _decode_json_argument(line, reject_duplicate_keys=True)
+        if not isinstance(value, Mapping):
+            raise GatewayInvocationError(
+                "stream-topic NDJSON record must be one JSON object"
+            )
+        if value.get("contract") != "waapi-skill.topic-stream/v1":
+            raise GatewayInvocationError(
+                "stream-topic NDJSON record has the wrong contract"
+            )
+        records.append(dict(value))
+    if len(records) < 2:
+        raise GatewayInvocationError(
+            "stream-topic output must contain started and terminal records"
+        )
+    started = records[0]
+    terminal = records[-1]
+    if (
+        started.get("record_type") != "started"
+        or started.get("command") != "stream-topic"
+        or started.get("ok") is not True
+        or started.get("status") != "streaming"
+        or terminal.get("record_type") != "terminal"
+        or terminal.get("command") != "stream-topic"
+        or terminal.get("ok") is not True
+        or terminal.get("status") != "completed"
+        or terminal.get("completion_reason") != "duration_elapsed"
+        or terminal.get("cleanup") != "unsubscribed"
+        or terminal.get("topic") != started.get("topic")
+        or terminal.get("topic_contract_digest")
+        != started.get("topic_contract_digest")
+        or terminal.get("subscription_timeout")
+        != started.get("subscription_timeout")
+    ):
+        raise GatewayInvocationError(
+            "stream-topic started/terminal lifecycle is not the exact successful finite stream"
+        )
+    events = records[1:-1]
+    for sequence, event in enumerate(events, start=1):
+        if (
+            event.get("record_type") != "event"
+            or event.get("sequence") != sequence
+            or event.get("topic") != started.get("topic")
+            or not isinstance(event.get("event"), Mapping)
+            or not isinstance(event.get("event_validation"), Mapping)
+        ):
+            raise GatewayInvocationError(
+                "stream-topic event records are malformed or out of sequence"
+            )
+    if terminal.get("event_count") != len(events):
+        raise GatewayInvocationError(
+            "stream-topic terminal event count differs from emitted records"
+        )
+    return tuple(records)
+
+
 def _gateway_payload_contracts(step: ExpectedGatewayStep) -> frozenset[str]:
     """Return the exact public response envelopes allowed for one command."""
 
@@ -8221,12 +8286,12 @@ class CodexGatewayBroker:
                 )
             ack_step = matching_steps[0]
             if (
-                ack_step.subcommand != "wait-topic"
+                ack_step.subcommand not in {"wait-topic", "stream-topic"}
                 or not ack_step.arguments
                 or ack_step.arguments[0] != self.trusted_subscription_ack.topic
             ):
                 raise ValueError(
-                    "trusted subscription ACK must bind the exact literal wait-topic URI"
+                    "trusted subscription ACK must bind the exact literal wait/stream URI"
                 )
 
         self._temporary_directory: tempfile.TemporaryDirectory[str] | None = None
@@ -11388,6 +11453,8 @@ class CodexGatewayBroker:
             failures.append(f"packaged gateway runner failed: {type(exc).__name__}: {exc}")
 
         payload: Mapping[str, Any] | None = None
+        stream_records: tuple[Mapping[str, Any], ...] | None = None
+        observer_payload: Mapping[str, Any] | None = None
         payload_start = 0
         payload_end = 0
         if exit_code not in step.allowed_exit_codes:
@@ -11402,10 +11469,14 @@ class CodexGatewayBroker:
                 if self.required_contract in allowed_payload_contracts
                 else None
             )
-            payload, payload_start, payload_end = _extract_payload_span(
-                stdout,
-                required_contract=preferred_contract,
-            )
+            if step.subcommand == "stream-topic":
+                stream_records = _extract_topic_stream_records(stdout)
+                payload = stream_records[-1]
+            else:
+                payload, payload_start, payload_end = _extract_payload_span(
+                    stdout,
+                    required_contract=preferred_contract,
+                )
             if payload.get("contract") not in allowed_payload_contracts:
                 raise GatewayInvocationError(
                     "gateway payload contract must be one of the exact command contracts "
@@ -11471,7 +11542,29 @@ class CodexGatewayBroker:
                     invocation_runner=self.invocation_runner_path,
                     platform_name=self.platform_name,
                 )
-                if projected_payload != payload:
+                if stream_records is not None:
+                    projected_records = tuple(
+                        _project_model_visible_runner(
+                            record,
+                            candidate_runner=self.runner_path,
+                            invocation_runner=self.invocation_runner_path,
+                            platform_name=self.platform_name,
+                        )
+                        for record in stream_records
+                    )
+                    stdout = "".join(
+                        json.dumps(
+                            record,
+                            ensure_ascii=False,
+                            allow_nan=False,
+                            separators=(",", ":"),
+                        )
+                        + "\n"
+                        for record in projected_records
+                    )
+                    stream_records = projected_records
+                    payload = projected_records[-1]
+                elif projected_payload != payload:
                     projected_json = json.dumps(
                         projected_payload,
                         ensure_ascii=False,
@@ -11498,11 +11591,21 @@ class CodexGatewayBroker:
                 payload_hash = _sha256_bytes(_canonical_json_bytes(payload))
             except GatewayInvocationError as exc:
                 failures.append(str(exc))
-        if not failures and payload is not None and self.trusted_step_observer is not None:
+        if payload is not None:
+            observer_payload = payload
+            if stream_records is not None:
+                observer_payload = {
+                    **payload,
+                    "events": [
+                        record["event"]
+                        for record in stream_records[1:-1]
+                    ],
+                }
+        if not failures and observer_payload is not None and self.trusted_step_observer is not None:
             try:
                 self.trusted_step_observer(
                     step,
-                    MappingProxyType(dict(payload)),
+                    MappingProxyType(dict(observer_payload)),
                     self.state_directory,
                     self.evidence_directory,
                 )

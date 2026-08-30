@@ -3310,6 +3310,7 @@ def test_synthetic_topic_schema_supplies_bound_wait_digests(tmp_path: Path) -> N
 
 def test_soundbank_topic_protocol_discloses_each_nested_match_scope() -> None:
     steps = soundbank_topic_protocol_steps(
+        scenario_id="O22-SB-GENERATED-02",
         topic="ak.wwise.core.soundbank.generated",
         version="2022.1",
         event_count=3,
@@ -3362,6 +3363,7 @@ def test_soundbank_topic_protocol_discloses_each_nested_match_scope() -> None:
     )
 
     reordered = soundbank_topic_protocol_steps(
+        scenario_id="O22-SB-GENERATED-02",
         topic="ak.wwise.core.soundbank.generated",
         version="2022.1",
         event_count=3,
@@ -3394,6 +3396,22 @@ def test_soundbank_topic_protocol_discloses_each_nested_match_scope() -> None:
             "soundbank.generated.schema.soundbank.entry",
         ],
     ) == ()
+
+
+def test_soundbank_topic_protocol_selects_finite_stream_for_explicit_stream_case() -> None:
+    steps = soundbank_topic_protocol_steps(
+        scenario_id="O22-SB-GENERATED-03",
+        topic="ak.wwise.core.soundbank.generated",
+        version="2024.1",
+        event_count=2,
+        match={"soundbank": {"name": "Weapons_Core"}},
+        options={"return": ["id", "name", "type", "path"]},
+    )
+
+    assert steps[-1].name == "soundbank.generated.stream"
+    assert steps[-1].subcommand == "stream-topic"
+    assert steps[-1].gateway_global_arguments == ("--timeout", "30")
+    assert "--event-count" not in steps[-1].arguments
 
 
 def _synthetic_audio_transaction_request() -> dict[str, Any]:

@@ -22,6 +22,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     V3GatewayProtocol,
     build_optional_topic_schema_protocol,
     build_transaction_protocol,
+    stream_topic_step,
     wait_topic_step,
     topic_schema_match_group_step,
     topic_schema_step,
@@ -76,6 +77,16 @@ _DEFINITION_FILTER_TO_INCLUSION = MappingProxyType(
         "Media": "media",
     }
 )
+_STREAM_TOPIC_SCENARIO_IDS = frozenset({"O22-SB-GENERATED-03"})
+_STREAM_TOPIC_TIMEOUT_SECONDS = 30.0
+
+
+def soundbank_topic_lifecycle(scenario_id: str) -> tuple[str, str]:
+    """Return the sealed model-facing lifecycle for one reviewed Topic case."""
+
+    if scenario_id in _STREAM_TOPIC_SCENARIO_IDS:
+        return "soundbank.generated.stream", "stream-topic"
+    return "soundbank.generated.wait", "wait-topic"
 
 
 @dataclass(frozen=True, slots=True)
@@ -109,8 +120,11 @@ def compile_soundbank_business_plan(
     if blueprint.api == SOUNDBANK_TOPIC:
         topic = materialized.topic_plan
         assert topic is not None
+        lifecycle_name, _lifecycle_command = soundbank_topic_lifecycle(
+            blueprint.scenario_id
+        )
         return _sections(
-            "soundbank_topic_materialized_v1", ("soundbank.generated.wait",), (), _TOPIC_ASSERTIONS,
+            "soundbank_topic_materialized_v1", (lifecycle_name,), (), _TOPIC_ASSERTIONS,
             static, live, (_topic_delta(topic, before),),
         )
     if blueprint.expected_primary_dispatch_count == 0:
@@ -199,12 +213,17 @@ def validate_soundbank_business_plan_archive(
     if api == SOUNDBANK_TOPIC:
         if kind != "soundbank_topic_materialized_v1" or sections.assertion_ids != _TOPIC_ASSERTIONS:
             raise SoundBankBusinessPlanError("archived topic kind/assertions drifted")
-        expected_primary, expected_verification = ["soundbank.generated.wait"], []
+        lifecycle_name, _lifecycle_command = soundbank_topic_lifecycle(
+            str(static["scenario_id"])
+        )
+        expected_primary, expected_verification = [lifecycle_name], []
         expected_delta = _topic_archive_delta(static, live)
         if live["topic"]["event_count"] != len(live["topic"]["expected_events"]):
             raise SoundBankBusinessPlanError("topic event count is not closed")
-        if any(name == "soundbank.generated.wait" for name in live["topic"]["publisher_steps"]):
-            raise SoundBankBusinessPlanError("runner publisher was recorded as a model wait step")
+        if any(name == lifecycle_name for name in live["topic"]["publisher_steps"]):
+            raise SoundBankBusinessPlanError(
+                "runner publisher was recorded as a model Topic lifecycle step"
+            )
     elif static["zero_dispatch_error_code"] is not None:
         if kind != "soundbank_refusal_materialized_v1" or sections.assertion_ids != _REFUSAL_ASSERTIONS:
             raise SoundBankBusinessPlanError("archived refusal kind/assertions drifted")
@@ -282,6 +301,7 @@ def _validate_inputs(materialized: MaterializedSoundBankCase, before: SoundBankS
         topic = materialized.topic_plan
         expected = build_optional_topic_schema_protocol(
             soundbank_topic_protocol_steps(
+                scenario_id=blueprint.scenario_id,
                 topic=topic.topic,
                 version=blueprint.version,
                 event_count=topic.event_count,
@@ -343,7 +363,10 @@ def _live(case: MaterializedSoundBankCase, before: SoundBankSnapshot) -> dict[st
             "expected_events": topic.expected_events, "publisher_requests": [item.operation_request for item in topic.publishers],
             "publisher_steps": [f"publisher.{index:02d}" for index, _item in enumerate(topic.publishers, 1)],
             "reject_n_plus_one": topic.reject_n_plus_one,
-            "subscription_ack_requirement": _topic_ack_requirement(topic),
+            "subscription_ack_requirement": _topic_ack_requirement(
+                topic,
+                scenario_id=case.blueprint.scenario_id,
+            ),
         },
     })
 
@@ -361,7 +384,10 @@ def _topic_delta(topic: TopicPlan, before: SoundBankSnapshot) -> dict[str, Any]:
     return _json({"enum": "soundbank.topic_delta_v1", "event_count": topic.event_count,
                   "expected_event_keys": [item.key for item in topic.expected_events],
                   "publisher_request_sha256": [_sha(item.operation_request) for item in topic.publishers],
-                  "subscription_ack_requirement": _topic_ack_requirement(topic),
+                  "subscription_ack_requirement": _topic_ack_requirement(
+                      topic,
+                      scenario_id=before.scenario_id,
+                  ),
                   "before_output_files_sha256": _sha(before.output_files), "before_project_files_sha256": _sha(before.project_files)})
 
 
@@ -388,11 +414,16 @@ def _topic_archive_delta(static: Mapping[str, Any], live: Mapping[str, Any]) -> 
             "before_output_files_sha256": _sha(before["output_files"]), "before_project_files_sha256": _sha(before["project_files"])}
 
 
-def _topic_ack_requirement(topic: TopicPlan) -> dict[str, Any]:
+def _topic_ack_requirement(
+    topic: TopicPlan,
+    *,
+    scenario_id: str,
+) -> dict[str, Any]:
+    step_name, _command = soundbank_topic_lifecycle(scenario_id)
     return {
         "contract": TOPIC_ACK_REQUIREMENT_CONTRACT,
         "ack_contract": TOPIC_ACK_CONTRACT,
-        "step_name": "soundbank.generated.wait",
+        "step_name": step_name,
         "topic": topic.topic,
         "fresh_exclusive_path_required": True,
         "publisher_requires_valid_ack": True,
@@ -409,6 +440,7 @@ def _expected_protocol_archive(static: Mapping[str, Any], live: Mapping[str, Any
         return _protocol(
             build_optional_topic_schema_protocol(
                 soundbank_topic_protocol_steps(
+                    scenario_id=str(static["scenario_id"]),
                     topic=topic["topic"],
                     version=str(static["version"]),
                     event_count=topic["event_count"],
@@ -422,6 +454,7 @@ def _expected_protocol_archive(static: Mapping[str, Any], live: Mapping[str, Any
 
 def soundbank_topic_protocol_steps(
     *,
+    scenario_id: str,
     topic: str,
     version: str,
     event_count: int,
@@ -473,16 +506,29 @@ def soundbank_topic_protocol_steps(
                     entry=scope,
                 )
             )
-    steps.append(
-        wait_topic_step(
-            "soundbank.generated.wait",
-            topic,
-            version=version,
-            event_count=event_count,
-            match=canonical_match,
-            options=canonical_options,
+    lifecycle_name, lifecycle_command = soundbank_topic_lifecycle(scenario_id)
+    if lifecycle_command == "stream-topic":
+        steps.append(
+            stream_topic_step(
+                lifecycle_name,
+                topic,
+                version=version,
+                match=canonical_match,
+                options=canonical_options,
+                timeout_seconds=_STREAM_TOPIC_TIMEOUT_SECONDS,
+            )
         )
-    )
+    else:
+        steps.append(
+            wait_topic_step(
+                lifecycle_name,
+                topic,
+                version=version,
+                event_count=event_count,
+                match=canonical_match,
+                options=canonical_options,
+            )
+        )
     return steps
 
 
@@ -566,10 +612,13 @@ def _validate_archive_inputs(static: Mapping[str, Any], live: Mapping[str, Any])
         ):
             raise SoundBankBusinessPlanError("archived SoundBank topic dispatch shape is invalid")
         ack_requirement = topic.get("subscription_ack_requirement")
+        lifecycle_name, _lifecycle_command = soundbank_topic_lifecycle(
+            str(static["scenario_id"])
+        )
         if ack_requirement != {
             "contract": TOPIC_ACK_REQUIREMENT_CONTRACT,
             "ack_contract": TOPIC_ACK_CONTRACT,
-            "step_name": "soundbank.generated.wait",
+            "step_name": lifecycle_name,
             "topic": SOUNDBANK_TOPIC,
             "fresh_exclusive_path_required": True,
             "publisher_requires_valid_ack": True,

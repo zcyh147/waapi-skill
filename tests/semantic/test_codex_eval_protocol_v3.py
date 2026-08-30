@@ -24,6 +24,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     call_step,
     metadata_candidate_limit,
     query_object_step,
+    stream_topic_step,
     typed_read_draft_steps,
     wait_topic_step,
 )
@@ -68,6 +69,28 @@ def _request(index: int = 1) -> dict[str, object]:
             "source_authority": LUA_SOURCE_AUTHORITY,
         },
     }
+
+
+def test_stream_topic_step_owns_finite_duration_and_typed_business_facts() -> None:
+    step = stream_topic_step(
+        "soundbank.generated.stream",
+        "ak.wwise.core.soundbank.generated",
+        version="2024.1",
+        match={"soundbank": {"name": "Weapons_Core"}},
+        options={"return": ["id", "name", "type", "path"]},
+        timeout_seconds=30.0,
+    )
+
+    assert step.subcommand == "stream-topic"
+    assert step.gateway_global_arguments == ("--timeout", "30")
+    assert step.arguments[:3] == (
+        "ak.wwise.core.soundbank.generated",
+        "--topic-contract-digest",
+        step.arguments[2],
+    )
+    assert "--event-count" not in step.arguments
+    assert "--topic-option-as" in step.arguments
+    assert "--event-match-as" in step.arguments
 
 
 def test_authoring_ui_business_suffixes_match_only_closed_public_flags() -> None:

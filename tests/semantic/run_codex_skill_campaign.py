@@ -289,6 +289,7 @@ from tests.semantic.support.codex_gateway_broker import (  # noqa: E402
     ResponseBinding,
     SemanticJsonArgument,
     VALIDATED_SUBSCRIPTION_ACK_CONTRACT,
+    _extract_topic_stream_records,
     resolve_gateway_invocation,
     gateway_step_sequence_matches,
     validate_transaction_show_confirmation_payload,
@@ -6427,8 +6428,7 @@ def _validate_heavy_v3_broker_records(
                 f"{label} broker hashes, exits, or timing are inconsistent"
             )
         expected_topic_ack = (
-            step.name == "soundbank.generated.wait"
-            and step.subcommand == "wait-topic"
+            step.subcommand in {"wait-topic", "stream-topic"}
             and bool(step.arguments)
             and step.arguments[0] == SOUNDBANK_TOPIC
         )
@@ -6438,6 +6438,7 @@ def _validate_heavy_v3_broker_records(
                 record=record,
                 task_root=task_root,
                 label=f"{label} broker subscription ACK",
+                expected_step_name=step.name,
             )
         elif record.get("subscription_ack") is not None:
             raise CampaignEvidenceError(
@@ -6481,10 +6482,15 @@ def _validate_heavy_v3_broker_records(
                 f"{label} broker record is not uniquely aligned to Codex facts"
             )
         try:
-            observed_payload = json.loads(
-                str(command_record.get("aggregated_output", "")).strip()
-            )
-        except json.JSONDecodeError as exc:
+            if step.subcommand == "stream-topic":
+                observed_payload = _extract_topic_stream_records(
+                    str(command_record.get("aggregated_output", ""))
+                )[-1]
+            else:
+                observed_payload = json.loads(
+                    str(command_record.get("aggregated_output", "")).strip()
+                )
+        except (json.JSONDecodeError, GatewayInvocationError) as exc:
             raise CampaignEvidenceError(
                 f"{label} Codex command output is not the broker JSON payload"
             ) from exc
@@ -6524,6 +6530,7 @@ def _validate_heavy_v3_broker_subscription_ack_record(
     record: Mapping[str, Any],
     task_root: Path,
     label: str,
+    expected_step_name: str,
 ) -> Mapping[str, Any]:
     """Validate the broker-owned ACK facts independently of runner checks."""
 
@@ -6557,7 +6564,7 @@ def _validate_heavy_v3_broker_subscription_ack_record(
     if (
         value.get("contract") != VALIDATED_SUBSCRIPTION_ACK_CONTRACT
         or value.get("ack_contract") != TOPIC_ACK_CONTRACT
-        or value.get("step_name") != "soundbank.generated.wait"
+        or value.get("step_name") != expected_step_name
         or value.get("topic") != SOUNDBANK_TOPIC
         or not isinstance(ack_path, str)
         or Path(ack_path).parent != expected_directory
@@ -7516,7 +7523,10 @@ def _validate_heavy_v3_typed_business_plan(
     if isinstance(sections, SoundBankBusinessPlanSections) and api == SOUNDBANK_TOPIC:
         dispatch_invalid = (
             expected_count < 1
-            or primary_steps != ["soundbank.generated.wait"]
+            or not isinstance(primary_steps, list)
+            or len(primary_steps) != 1
+            or primary_steps[0]
+            not in {"soundbank.generated.wait", "soundbank.generated.stream"}
         )
     else:
         dispatch_invalid = (
@@ -13419,10 +13429,16 @@ def _validate_heavy_v3_topic_publisher_process(
     diagnostic_ack_payload = {
         key: nested for key, nested in ack_payload.items() if key != "nonce"
     }
+    proof_requirement = proof.get("requirement")
+    expected_step_name = (
+        proof_requirement.get("step_name")
+        if isinstance(proof_requirement, Mapping)
+        else None
+    )
     if (
         api != SOUNDBANK_TOPIC
         or ack.get("contract") != TOPIC_ACK_CONTRACT
-        or ack.get("step_name") != "soundbank.generated.wait"
+        or ack.get("step_name") != expected_step_name
         or ack.get("topic") != api
         or ack.get("path") != proof.get("ack_path")
         or ack.get("file_sha256") != proof.get("ack_file_sha256")
@@ -13562,10 +13578,15 @@ def _validate_heavy_v3_topic_subscription_ack(
         if isinstance(topic_binding, Mapping)
         else None
     )
+    expected_step_name = (
+        planned_requirement.get("step_name")
+        if isinstance(planned_requirement, Mapping)
+        else None
+    )
     expected_requirement = {
         "contract": TOPIC_ACK_REQUIREMENT_CONTRACT,
         "ack_contract": TOPIC_ACK_CONTRACT,
-        "step_name": "soundbank.generated.wait",
+        "step_name": expected_step_name,
         "topic": api,
         "fresh_exclusive_path_required": True,
         "publisher_requires_valid_ack": True,
@@ -13596,7 +13617,7 @@ def _validate_heavy_v3_topic_subscription_ack(
             record
             for record in records
             if isinstance(record, Mapping)
-            and record.get("step_name") == "soundbank.generated.wait"
+            and record.get("step_name") == expected_step_name
         ]
         if isinstance(records, list)
         else []
@@ -13617,6 +13638,7 @@ def _validate_heavy_v3_topic_subscription_ack(
         record=broker_record,
         task_root=task_root,
         label="topic subscription ACK broker record",
+        expected_step_name=str(expected_step_name),
     )
 
     ack_path_value = proof.get("ack_path")
