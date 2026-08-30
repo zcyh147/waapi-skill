@@ -345,6 +345,9 @@ def run_v3_codex_task(
         commutative_composer_setup_step_groups=(
             protocol.commutative_composer_setup_step_groups
         ),
+        optional_topic_schema_step_groups=(
+            protocol.optional_topic_schema_step_groups
+        ),
         expected_wwise_version=version,
         project_modification_policy=project_modification_policy,
         runner_environment=runner_environment,
@@ -652,6 +655,39 @@ def _broker_terminal_protocol_passed(
         protocol_names = tuple(step.name for step in protocol.steps)
         selected_names = evidence.expected_step_names
         if selected_names not in {protocol_names, protocol_names[1:]}:
+            return False
+        return bool(
+            evidence.consumed_step_names == selected_names
+            and len(evidence.records) == len(selected_names)
+            and tuple(record.step_name for record in evidence.records)
+            == selected_names
+            and not evidence.rejected_records
+            and all(record.succeeded for record in evidence.records)
+            and evidence.complete
+            and evidence.passed
+            and evidence.terminal_state == "COMPLETE"
+        )
+    if protocol.optional_topic_schema_step_groups:
+        protocol_names = tuple(step.name for step in protocol.steps)
+        optional_names = {
+            name
+            for group in protocol.optional_topic_schema_step_groups
+            for name in group
+        }
+        selected_names = evidence.expected_step_names
+        selected_optional = tuple(
+            name for name in selected_names if name in optional_names
+        )
+        mandatory_names = tuple(
+            name for name in protocol_names if name not in optional_names
+        )
+        if (
+            tuple(name for name in selected_names if name not in optional_names)
+            != mandatory_names
+            or len(selected_names) != len(set(selected_names))
+            or any(name not in protocol_names for name in selected_names)
+            or any(name not in optional_names for name in selected_optional)
+        ):
             return False
         return bool(
             evidence.consumed_step_names == selected_names

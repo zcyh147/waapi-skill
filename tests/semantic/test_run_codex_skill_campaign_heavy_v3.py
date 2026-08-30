@@ -60,10 +60,10 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_object_set_composer_transaction_steps,
     build_optional_query_repair_protocol,
     build_optional_query_schema_protocol,
+    build_optional_topic_schema_protocol,
     build_transaction_protocol,
     query_object_step,
     topic_schema_step,
-    topic_schema_entry_or_match_group_step,
     wait_topic_step,
     _typed_fact_cli_arguments,
 )
@@ -72,7 +72,6 @@ from tests.semantic.support.codex_gateway_broker import (
     DRAFT_REVISION_SUBCOMMANDS,
     DraftTypedActionArgument,
     DraftTypedActionBatchArgument,
-    ExactArgumentAlternatives,
     ExpectedGatewayStep,
     InlineTypedOperationArgument,
     MetadataQueryArgument,
@@ -3309,20 +3308,6 @@ def test_synthetic_topic_schema_supplies_bound_wait_digests(tmp_path: Path) -> N
     assert records[1]["accepted"] is True
 
 
-def test_topic_schema_progressive_entry_step_is_exact() -> None:
-    step = topic_schema_entry_or_match_group_step(
-        "soundbank.generated.schema.soundbank",
-        "ak.wwise.core.soundbank.generated",
-        scope="soundbank",
-    )
-
-    assert step.arguments == (
-        "ak.wwise.core.soundbank.generated",
-        ExactArgumentAlternatives(("--entry", "--match-group")),
-        "soundbank",
-    )
-
-
 def test_soundbank_topic_protocol_discloses_each_nested_match_scope() -> None:
     steps = soundbank_topic_protocol_steps(
         topic="ak.wwise.core.soundbank.generated",
@@ -3337,19 +3322,36 @@ def test_soundbank_topic_protocol_discloses_each_nested_match_scope() -> None:
 
     assert [step.name for step in steps] == [
         "soundbank.generated.schema",
-        "soundbank.generated.schema.soundbank",
-        "soundbank.generated.schema.platform",
+        "soundbank.generated.schema.soundbank.match-group",
+        "soundbank.generated.schema.soundbank.entry",
+        "soundbank.generated.schema.platform.entry",
         "soundbank.generated.wait",
     ]
     assert steps[1].arguments == (
         "ak.wwise.core.soundbank.generated",
-        ExactArgumentAlternatives(("--entry", "--match-group")),
+        "--match-group",
         "soundbank",
     )
     assert steps[2].arguments == (
         "ak.wwise.core.soundbank.generated",
-        ExactArgumentAlternatives(("--entry", "--match-group")),
+        "--entry",
+        "soundbank",
+    )
+    assert steps[3].arguments == (
+        "ak.wwise.core.soundbank.generated",
+        "--entry",
         "platform",
+    )
+
+    protocol = build_optional_topic_schema_protocol(steps)
+    assert protocol.allowed_turn_prefix_counts == ((2, 3, 4, 5),)
+    assert protocol.terminal_prefix_counts == (2, 3, 4, 5)
+    assert protocol.optional_topic_schema_step_groups == (
+        (
+            "soundbank.generated.schema.soundbank.match-group",
+            "soundbank.generated.schema.soundbank.entry",
+            "soundbank.generated.schema.platform.entry",
+        ),
     )
 
 

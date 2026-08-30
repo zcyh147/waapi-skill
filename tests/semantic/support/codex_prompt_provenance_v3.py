@@ -530,6 +530,11 @@ def serialize_protocol(protocol: V3GatewayProtocol) -> dict[str, Any]:
             list(group)
             for group in protocol.commutative_composer_setup_step_groups
         ]
+    if protocol.optional_topic_schema_step_groups:
+        value["optional_topic_schema_step_groups"] = [
+            list(group)
+            for group in protocol.optional_topic_schema_step_groups
+        ]
     return value
 
 
@@ -651,6 +656,7 @@ def deserialize_protocol(value: Mapping[str, Any]) -> V3GatewayProtocol:
         *optional_prefix_keys,
         "commutative_read_only_step_groups",
         "commutative_composer_setup_step_groups",
+        "optional_topic_schema_step_groups",
     }
     if (
         not required_keys.issubset(keys)
@@ -671,6 +677,7 @@ def deserialize_protocol(value: Mapping[str, Any]) -> V3GatewayProtocol:
     terminal: tuple[int, ...] = ()
     commutative_groups: tuple[tuple[str, ...], ...] = ()
     composer_setup_groups: tuple[tuple[str, ...], ...] = ()
+    optional_topic_groups: tuple[tuple[str, ...], ...] = ()
     if "allowed_turn_prefix_counts" in value:
         raw_allowed = value.get("allowed_turn_prefix_counts")
         raw_terminal = value.get("terminal_prefix_counts")
@@ -719,14 +726,30 @@ def deserialize_protocol(value: Mapping[str, Any]) -> V3GatewayProtocol:
                 "commutative Composer setup protocol groups are invalid"
             )
         composer_setup_groups = tuple(tuple(group) for group in raw_groups)
+    if "optional_topic_schema_step_groups" in value:
+        raw_groups = value.get("optional_topic_schema_step_groups")
+        if (
+            not isinstance(raw_groups, list)
+            or any(
+                not isinstance(group, list)
+                or not group
+                or any(not isinstance(item, str) for item in group)
+                for group in raw_groups
+            )
+        ):
+            raise PromptProvenanceError(
+                "optional Topic schema protocol groups are invalid"
+            )
+        optional_topic_groups = tuple(tuple(group) for group in raw_groups)
     try:
         return V3GatewayProtocol(
-            tuple(_deserialize_step(item) for item in steps),
-            tuple(prefixes),
-            allowed,
-            terminal,
-            commutative_groups,
-            composer_setup_groups,
+            steps=tuple(_deserialize_step(item) for item in steps),
+            turn_prefix_counts=tuple(prefixes),
+            allowed_turn_prefix_counts=allowed,
+            terminal_prefix_counts=terminal,
+            commutative_read_only_step_groups=commutative_groups,
+            commutative_composer_setup_step_groups=composer_setup_groups,
+            optional_topic_schema_step_groups=optional_topic_groups,
         )
     except (TypeError, ValueError) as exc:
         if "commutative read-only groups" in str(exc):

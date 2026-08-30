@@ -62,6 +62,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_metadata_transaction_protocol,
     build_modification_policy_protocol,
     build_optional_query_repair_protocol,
+    build_optional_topic_schema_protocol,
     build_transaction_protocol,
     call_step,
     query_object_step,
@@ -5118,7 +5119,7 @@ def _prepare_case(
         if topic is None:
             raise HeavyProjectRunnerError("SoundBank topic scenario has no topic plan")
         step_name = "soundbank.generated.wait"
-        protocol = build_direct_protocol(
+        protocol = build_optional_topic_schema_protocol(
             soundbank_topic_protocol_steps(
                 topic=topic.topic,
                 version=runtime.version,

@@ -2415,6 +2415,8 @@ elif mode == "bad-contract":
     payload["contract"] = "forged/v1"
 elif mode == "typed-schema":
     payload["contract"] = "waapi-skill.typed-request-schema/v1"
+elif mode == "topic-business" and command == "topic-schema":
+    payload["contract"] = "waapi-skill.topic-business-envelope/v1"
 elif mode in {"expected-error", "expected-error-exact-output"}:
     payload["ok"] = os.environ.get("FAKE_GATEWAY_ERROR_OK", "false") == "true"
     payload["error_code"] = os.environ.get(
@@ -2605,6 +2607,116 @@ def test_broker_optional_initial_operations_discovery_binds_one_exact_operation(
             optional_initial_operations_discovery_operation="waapi.undoGroup",
             transport="tcp",
         )
+
+
+@pytest.mark.parametrize(
+    "disclosures",
+    (
+        (),
+        (("topic-schema", "ak.test.topic", "--match-group", "soundbank"),),
+        (
+            ("topic-schema", "ak.test.topic", "--match-group", "soundbank"),
+            ("topic-schema", "ak.test.topic", "--entry", "soundbank"),
+            ("topic-schema", "ak.test.topic", "--entry", "platform"),
+        ),
+    ),
+    ids=("none", "one", "all"),
+)
+def test_broker_accepts_only_selected_optional_topic_disclosures(
+    tmp_path: Path,
+    disclosures: tuple[tuple[str, ...], ...],
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    topic = "ak.test.topic"
+    steps = (
+        ExpectedGatewayStep("schema", "topic-schema", (topic,)),
+        ExpectedGatewayStep(
+            "soundbank-match",
+            "topic-schema",
+            (topic, "--match-group", "soundbank"),
+        ),
+        ExpectedGatewayStep(
+            "soundbank-entry",
+            "topic-schema",
+            (topic, "--entry", "soundbank"),
+        ),
+        ExpectedGatewayStep(
+            "platform-entry",
+            "topic-schema",
+            (topic, "--entry", "platform"),
+        ),
+        ExpectedGatewayStep("wait", "wait-topic", (topic,)),
+    )
+    commands = (
+        ("topic-schema", topic),
+        *disclosures,
+        ("wait-topic", topic),
+    )
+    observed: list[list[str]] = []
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=steps,
+        optional_topic_schema_step_groups=(
+            ("soundbank-match", "soundbank-entry", "platform-entry"),
+        ),
+        runner_environment={**os.environ, "FAKE_GATEWAY_MODE": "topic-business"},
+        transport="tcp",
+    ) as broker:
+        for command in commands:
+            result = run_model_command(broker, list(command))
+            assert result.returncode == 0, result.stderr
+            observed.append(
+                [
+                    "python",
+                    str(broker.invocation_runner_path),
+                    "gateway.py",
+                    *command,
+                ]
+            )
+        evidence = broker.evidence()
+        reconciliation = broker.reconcile(observed)
+
+    selected = {
+        ("--match-group", "soundbank"): "soundbank-match",
+        ("--entry", "soundbank"): "soundbank-entry",
+        ("--entry", "platform"): "platform-entry",
+    }
+    assert evidence.expected_step_names == (
+        "schema",
+        *(selected[command[-2:]] for command in disclosures),
+        "wait",
+    )
+    assert evidence.passed is True
+    assert reconciliation.passed is True
+
+
+def test_broker_rejects_unsealed_optional_topic_disclosure(tmp_path: Path) -> None:
+    skill = make_fake_skill(tmp_path)
+    topic = "ak.test.topic"
+    steps = (
+        ExpectedGatewayStep("schema", "topic-schema", (topic,)),
+        ExpectedGatewayStep(
+            "platform-entry",
+            "topic-schema",
+            (topic, "--entry", "platform"),
+        ),
+        ExpectedGatewayStep("wait", "wait-topic", (topic,)),
+    )
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=steps,
+        optional_topic_schema_step_groups=(("platform-entry",),),
+        runner_environment={**os.environ, "FAKE_GATEWAY_MODE": "topic-business"},
+        transport="tcp",
+    ) as broker:
+        assert run_model_command(broker, ["topic-schema", topic]).returncode == 0
+        result = run_model_command(
+            broker,
+            ["topic-schema", topic, "--entry", "language"],
+        )
+
+    assert result.returncode == 126
+    assert broker.evidence().terminal_state == "FAILED"
 
 
 def test_compound_parent_revision_binding_ignores_later_child_draft_receipts(

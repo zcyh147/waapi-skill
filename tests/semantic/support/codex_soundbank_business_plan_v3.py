@@ -20,10 +20,10 @@ from tests.semantic.support.codex_archive_paths import (
 from tests.semantic.support.codex_eval_protocol_v3 import (
     StructuredRefusal,
     V3GatewayProtocol,
-    build_direct_protocol,
+    build_optional_topic_schema_protocol,
     build_transaction_protocol,
     wait_topic_step,
-    topic_schema_entry_or_match_group_step,
+    topic_schema_match_group_step,
     topic_schema_step,
 )
 from tests.semantic.support.codex_filesystem_security import (
@@ -32,6 +32,7 @@ from tests.semantic.support.codex_filesystem_security import (
 )
 from tests.semantic.support.codex_gateway_broker import ExpectedGatewayStep
 from tests.semantic.support.codex_prompt_provenance_v3 import serialize_protocol
+from wwise_waapi.topic_business import topic_business_contract
 from tests.semantic.support.codex_soundbank_runtime_v3 import (
     MAX_FILE_BYTES,
     OPERATION_REQUEST_CONTRACT,
@@ -279,7 +280,7 @@ def _validate_inputs(materialized: MaterializedSoundBankCase, before: SoundBankS
         if materialized.topic_plan is None or materialized.operation_requests or materialized.topic_plan.event_count != blueprint.expected_primary_dispatch_count:
             raise SoundBankBusinessPlanError("topic must have only a closed topic plan")
         topic = materialized.topic_plan
-        expected = build_direct_protocol(
+        expected = build_optional_topic_schema_protocol(
             soundbank_topic_protocol_steps(
                 topic=topic.topic,
                 version=blueprint.version,
@@ -406,7 +407,7 @@ def _expected_protocol_archive(static: Mapping[str, Any], live: Mapping[str, Any
     if static["api"] == SOUNDBANK_TOPIC:
         topic = live["topic"]
         return _protocol(
-            build_direct_protocol(
+            build_optional_topic_schema_protocol(
                 soundbank_topic_protocol_steps(
                     topic=topic["topic"],
                     version=str(static["version"]),
@@ -430,16 +431,30 @@ def soundbank_topic_protocol_steps(
     """Build the exact progressive Topic disclosure used by SoundBank waits."""
 
     steps = [topic_schema_step("soundbank.generated.schema", topic)]
+    contract = topic_business_contract(version, topic)
     for scope, value in match.items():
         if not isinstance(value, Mapping):
             continue
-        steps.append(
-            topic_schema_entry_or_match_group_step(
-                f"soundbank.generated.schema.{scope}",
-                topic,
-                scope=scope,
+        if any(
+            candidate.path and candidate.path[0] == scope
+            for field in contract.match_fields
+            for candidate in field._candidates
+        ):
+            steps.append(
+                topic_schema_match_group_step(
+                    f"soundbank.generated.schema.{scope}.match-group",
+                    topic,
+                    group=scope,
+                )
             )
-        )
+        if any(entry.token == scope for entry in contract.entry_fields):
+            steps.append(
+                topic_schema_step(
+                    f"soundbank.generated.schema.{scope}.entry",
+                    topic,
+                    entry=scope,
+                )
+            )
     steps.append(
         wait_topic_step(
             "soundbank.generated.wait",

@@ -1973,7 +1973,69 @@ class GatewayBrokerRecord:
 
 CommutativeReadOnlyStepGroups = tuple[tuple[str, ...], ...]
 CommutativeComposerSetupStepGroups = tuple[tuple[str, ...], ...]
+OptionalTopicSchemaStepGroups = tuple[tuple[str, ...], ...]
 _MAX_COMMUTATIVE_READ_ONLY_GROUP_SIZE = 4
+_MAX_OPTIONAL_TOPIC_SCHEMA_GROUP_SIZE = 8
+
+
+def validate_optional_topic_schema_step_groups(
+    expected_steps: Sequence[ExpectedGatewayStep],
+    groups: Sequence[Sequence[str]],
+) -> OptionalTopicSchemaStepGroups:
+    """Validate bounded optional Topic disclosures between schema and lifecycle."""
+
+    steps = tuple(expected_steps)
+    names = tuple(step.name for step in steps)
+    indexes = {name: index for index, name in enumerate(names)}
+    normalized: list[tuple[str, ...]] = []
+    claimed: set[str] = set()
+    for raw_group in groups:
+        group = tuple(raw_group)
+        if (
+            not 1 <= len(group) <= _MAX_OPTIONAL_TOPIC_SCHEMA_GROUP_SIZE
+            or any(not isinstance(name, str) or not name for name in group)
+            or len(set(group)) != len(group)
+            or any(name not in indexes or name in claimed for name in group)
+        ):
+            raise ValueError(
+                "optional Topic schema groups must name between 1 and 8 "
+                "disjoint expected steps"
+            )
+        group_indexes = tuple(indexes[name] for name in group)
+        if group_indexes != tuple(
+            range(group_indexes[0], group_indexes[0] + len(group))
+        ):
+            raise ValueError(
+                "optional Topic schema groups must be contiguous in canonical order"
+            )
+        if group_indexes[0] == 0 or group_indexes[-1] + 1 >= len(steps):
+            raise ValueError(
+                "optional Topic schema groups require enclosing schema and lifecycle steps"
+            )
+        before = steps[group_indexes[0] - 1]
+        after = steps[group_indexes[-1] + 1]
+        grouped = tuple(steps[index] for index in group_indexes)
+        if (
+            before.subcommand != "topic-schema"
+            or before.arguments[1:]
+            or after.subcommand not in {"wait-topic", "stream-topic"}
+            or not before.arguments
+            or not after.arguments
+            or any(step.subcommand != "topic-schema" for step in grouped)
+            or any(
+                not step.arguments
+                or step.arguments[0] != before.arguments[0]
+                for step in grouped
+            )
+            or after.arguments[0] != before.arguments[0]
+        ):
+            raise ValueError(
+                "optional Topic schema groups must stay between one exact base "
+                "topic-schema and its wait/stream step"
+            )
+        claimed.update(group)
+        normalized.append(group)
+    return tuple(normalized)
 
 
 def _is_closed_exact_identity_query_step(
@@ -7876,6 +7938,7 @@ class CodexGatewayBroker:
         expected_steps: Sequence[ExpectedGatewayStep],
         commutative_read_only_step_groups: Sequence[Sequence[str]] = (),
         commutative_composer_setup_step_groups: Sequence[Sequence[str]] = (),
+        optional_topic_schema_step_groups: Sequence[Sequence[str]] = (),
         gateway_global_arguments: Sequence[str] = (),
         expected_wwise_version: str = "",
         project_modification_policy: str = "ask_before_changes",
@@ -7919,6 +7982,12 @@ class CodexGatewayBroker:
                 commutative_composer_setup_step_groups,
             )
         )
+        self.optional_topic_schema_step_groups = (
+            validate_optional_topic_schema_step_groups(
+                self.expected_steps,
+                optional_topic_schema_step_groups,
+            )
+        )
         self._execution_steps = list(self.expected_steps)
         self._selected_expected_steps = list(self.expected_steps)
         if optional_initial_operations_discovery_operation is not None and (
@@ -7948,6 +8017,9 @@ class CodexGatewayBroker:
             if first != second
         } | _commutative_composer_setup_pairs(
             self.commutative_composer_setup_step_groups
+        )
+        self._optional_topic_schema_step_sets = tuple(
+            frozenset(group) for group in self.optional_topic_schema_step_groups
         )
         self.gateway_global_arguments = tuple(str(value) for value in gateway_global_arguments)
         self.expected_wwise_version = str(expected_wwise_version)
@@ -9112,6 +9184,14 @@ class CodexGatewayBroker:
                         business_setup_reordered
                     )
                 elif (
+                    optional_topic_step := (
+                        self._match_or_skip_optional_topic_schema_step(
+                            resolved.gateway_arguments,
+                        )
+                    )
+                ) is not None:
+                    step, semantic_hash, execution_arguments = optional_topic_step
+                elif (
                     read_only_reordered := self._match_commutative_read_only_step(
                         resolved.gateway_arguments,
                     )
@@ -9685,6 +9765,88 @@ class CodexGatewayBroker:
             self._execution_steps.pop(index),
         )
         return candidate, semantic_hash, execution_arguments
+
+    def _match_or_skip_optional_topic_schema_step(
+        self,
+        actual: Sequence[str],
+    ) -> tuple[ExpectedGatewayStep, str, tuple[str, ...]] | None:
+        """Accept one sealed Topic disclosure or skip the unused remainder."""
+
+        current = self._execution_steps[self._next_step]
+        group = next(
+            (
+                candidate
+                for candidate in self._optional_topic_schema_step_sets
+                if current.name in candidate
+            ),
+            None,
+        )
+        if group is None:
+            return None
+
+        group_end = self._next_step
+        while (
+            group_end < len(self._execution_steps)
+            and self._execution_steps[group_end].name in group
+        ):
+            group_end += 1
+
+        matches: list[
+            tuple[int, ExpectedGatewayStep, str, tuple[str, ...]]
+        ] = []
+        for index in range(self._next_step, group_end):
+            candidate = self._execution_steps[index]
+            try:
+                semantic_hash, execution_arguments = self._validate_step(
+                    candidate,
+                    actual,
+                )
+            except GatewayInvocationError:
+                continue
+            matches.append(
+                (index, candidate, semantic_hash, execution_arguments)
+            )
+        if len(matches) > 1:
+            raise GatewayInvocationError(
+                "command matches multiple optional Topic schema disclosures"
+            )
+        if matches:
+            index, candidate, semantic_hash, execution_arguments = matches[0]
+            self._execution_steps.insert(
+                self._next_step,
+                self._execution_steps.pop(index),
+            )
+            selected_index = next(
+                index
+                for index in range(self._next_step, len(self._selected_expected_steps))
+                if self._selected_expected_steps[index].name == candidate.name
+            )
+            self._selected_expected_steps.insert(
+                self._next_step,
+                self._selected_expected_steps.pop(selected_index),
+            )
+            return candidate, semantic_hash, execution_arguments
+
+        lifecycle = self._execution_steps[group_end]
+        try:
+            semantic_hash, execution_arguments = self._validate_step(
+                lifecycle,
+                actual,
+            )
+        except GatewayInvocationError:
+            return None
+
+        skipped_names = {
+            step.name
+            for step in self._execution_steps[self._next_step:group_end]
+        }
+        del self._execution_steps[self._next_step:group_end]
+        self._selected_expected_steps[:] = [
+            step
+            for step in self._selected_expected_steps
+            if step.name not in skipped_names
+        ]
+        return lifecycle, semantic_hash, execution_arguments
 
     def _normalize_business_declaration_fact_order(
         self,

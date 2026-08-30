@@ -32,6 +32,7 @@ from tests.semantic.support.codex_gateway_broker import (
     TypedRequestFactsArgument,
     validate_commutative_composer_setup_step_groups,
     validate_commutative_read_only_step_groups,
+    validate_optional_topic_schema_step_groups,
     validate_operation_draft_protocol_steps,
 )
 from tests.semantic.support.codex_gateway_contracts import (
@@ -4032,6 +4033,7 @@ class V3GatewayProtocol:
     terminal_prefix_counts: tuple[int, ...] = ()
     commutative_read_only_step_groups: tuple[tuple[str, str], ...] = ()
     commutative_composer_setup_step_groups: tuple[tuple[str, ...], ...] = ()
+    optional_topic_schema_step_groups: tuple[tuple[str, ...], ...] = ()
 
     def __post_init__(self) -> None:
         if not self.steps:
@@ -4110,6 +4112,18 @@ class V3GatewayProtocol:
             raise ValueError(
                 "commutative Composer setup step groups must use canonical tuples"
             )
+        optional_topic_groups = validate_optional_topic_schema_step_groups(
+            self.steps,
+            self.optional_topic_schema_step_groups,
+        )
+        if optional_topic_groups != self.optional_topic_schema_step_groups:
+            raise ValueError(
+                "optional Topic schema step groups must use canonical tuples"
+            )
+        if optional_topic_groups and not self.allowed_turn_prefix_counts:
+            raise ValueError(
+                "optional Topic schema steps require explicit allowed prefixes"
+            )
         checkpoint_counts = set(self.turn_prefix_counts)
         for allowed in self.allowed_turn_prefix_counts:
             checkpoint_counts.update(allowed)
@@ -4129,6 +4143,15 @@ class V3GatewayProtocol:
             ):
                 raise ValueError(
                     "a commutative Composer setup group cannot cross a turn prefix"
+                )
+        for group in optional_topic_groups:
+            start = indexes[group[0]]
+            if any(
+                start < count < start + len(group)
+                for count in self.turn_prefix_counts
+            ):
+                raise ValueError(
+                    "an optional Topic schema group cannot cross a turn prefix"
                 )
 
     def allowed_prefixes_for_turn(self, index: int) -> tuple[int, ...]:
@@ -4912,6 +4935,31 @@ def build_direct_protocol(
     return V3GatewayProtocol(values, (len(values),))
 
 
+def build_optional_topic_schema_protocol(
+    steps: Sequence[ExpectedGatewayStep],
+) -> V3GatewayProtocol:
+    """Allow only sealed, bounded Topic disclosures before one lifecycle call."""
+
+    values = tuple(steps)
+    if len(values) < 2:
+        raise V3ProtocolError(
+            "Topic schema protocol requires base schema and lifecycle"
+        )
+    if len(values) == 2:
+        return build_direct_protocol(values)
+    optional_names = tuple(step.name for step in values[1:-1])
+    minimum = 2
+    maximum = len(values)
+    allowed = tuple(range(minimum, maximum + 1))
+    return V3GatewayProtocol(
+        steps=values,
+        turn_prefix_counts=(maximum,),
+        allowed_turn_prefix_counts=(allowed,),
+        terminal_prefix_counts=allowed,
+        optional_topic_schema_step_groups=(optional_names,),
+    )
+
+
 def build_optional_query_schema_protocol(
     query_step: ExpectedGatewayStep,
 ) -> V3GatewayProtocol:
@@ -5173,6 +5221,25 @@ def topic_schema_entry_or_match_group_step(
     )
 
 
+def topic_schema_match_group_step(
+    name: str,
+    topic: str,
+    *,
+    group: str,
+) -> ExpectedGatewayStep:
+    if not isinstance(topic, str) or not topic.startswith("ak.wwise."):
+        raise V3ProtocolError("topic-schema requires one exact WAAPI topic")
+    if not isinstance(group, str) or not re.fullmatch(
+        r"[a-z][a-z0-9-]{0,127}", group
+    ):
+        raise V3ProtocolError("topic-schema group must be one stable token")
+    return ExpectedGatewayStep(
+        name=name,
+        subcommand="topic-schema",
+        arguments=(topic, "--match-group", group),
+    )
+
+
 def wait_topic_step(
     name: str,
     topic: str,
@@ -5425,6 +5492,7 @@ __all__ = [
     "build_direct_protocol",
     "build_optional_query_repair_protocol",
     "build_optional_query_schema_protocol",
+    "build_optional_topic_schema_protocol",
     "build_audio_import_composer_protocol",
     "build_audio_import_composer_transaction_steps",
     "build_authoring_ui_business_transaction_steps",
@@ -5454,5 +5522,6 @@ __all__ = [
     "query_schema_step",
     "request_schema_step",
     "topic_schema_step",
+    "topic_schema_match_group_step",
     "wait_topic_step",
 ]
