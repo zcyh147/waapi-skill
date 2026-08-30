@@ -225,7 +225,7 @@ class TopicBusinessEntryContract:
 
 @dataclass(frozen=True, slots=True)
 class TopicBusinessContract:
-    """The deep, handle-free Topic interface for one versioned event lane."""
+    """The deep, native-handle-free Topic interface for one event lane."""
 
     version: str
     topic: str
@@ -259,7 +259,7 @@ class TopicBusinessContract:
         selected_match_group: str | None = None,
         selected_row_field_group: str | None = None,
     ) -> dict[str, Any]:
-        """Return the bounded handle-free field tables used by the Gateway."""
+        """Return bounded native-handle-free field tables for the Gateway."""
 
         if selected_row is not None and not any(
             row.token == selected_row for row in self.row_fields
@@ -404,6 +404,7 @@ def topic_business_value_choices(
     """Return finite opaque choices only where reflected scalar meaning is ambiguous."""
 
     owner_tuple = tuple(owner)
+    choice_owner = owner_tuple
     accepted: tuple[str, ...]
     if channel in {"topic-option", "event-match"}:
         fields = (
@@ -467,10 +468,19 @@ def topic_business_value_choices(
                 None,
             )
             if selected is None:
-                raise TopicBusinessError(
-                    f"Unknown {channel} field {'/'.join(owner_tuple)!r}"
+                open_members = (
+                    entry._open_object_fields
+                    if channel == "event-entry-object"
+                    else entry._open_row_fields
                 )
-            accepted = selected.accepted_value_kinds
+                if not open_members:
+                    raise TopicBusinessError(
+                        f"Unknown {channel} field {'/'.join(owner_tuple)!r}"
+                    )
+                accepted = entry.accepted_value_kinds
+                choice_owner = (entry.token, "*")
+            else:
+                accepted = selected.accepted_value_kinds
     else:
         raise TopicBusinessError(f"Unknown Topic value-choice channel {channel!r}")
 
@@ -484,13 +494,13 @@ def topic_business_value_choices(
                     {
                         "contract_digest": contract.contract_digest,
                         "channel": channel,
-                        "owner": owner_tuple,
+                        "owner": choice_owner,
                         "kind": kind,
                     }
                 )[:32]
             ),
             channel=channel,
-            owner=owner_tuple,
+            owner=choice_owner,
             meaning=_VALUE_CHOICE_MEANINGS[kind],
             _kind=kind,
         )
@@ -1881,7 +1891,21 @@ def _gateway_entry_member_table(
         )
         for item in fields
     }
-    return {
+    open_members = (
+        entry._open_object_fields
+        if channel == "event-entry-object"
+        else entry._open_row_fields
+    )
+    open_choices = (
+        topic_business_value_choices(
+            contract,
+            channel=channel,
+            owner=(entry.token, "*"),
+        )
+        if open_members
+        else ()
+    )
+    payload: dict[str, Any] = {
         "columns": ["field", "value_mode", "value_choice_handles"],
         "rows": [
             [
@@ -1897,6 +1921,16 @@ def _gateway_entry_member_table(
             for choice in item_choices
         ),
     }
+    if open_members:
+        payload["open_member"] = {
+            "field_ownership": "exact_user_key",
+            "value_mode": (
+                "choice_required" if open_choices else "gateway_derived"
+            ),
+            "value_choice_handles": [choice.handle for choice in open_choices],
+            "value_choices": _gateway_value_choice_table(open_choices),
+        }
+    return payload
 
 
 __all__ = [

@@ -3736,6 +3736,21 @@ def _append_dynamic_object_members(
             root_schema=contract.schema_roots[section],
             graph=contract.definition_graph,
         )
+        if (
+            not selected_indexes
+            and item_type in {"object", "array"}
+            and dynamic.open_map
+        ):
+            variants = (
+                *variants,
+                _map_container_variant(dynamic, key, item_type),
+            )
+            selected_indexes = _preferred_matching_variants(
+                variants,
+                item,
+                root_schema=contract.schema_roots[section],
+                graph=contract.definition_graph,
+            )
         fixed_schema = fixed_properties.get(key)
         if isinstance(fixed_schema, Mapping):
             fixed_variants = _structural_variants(

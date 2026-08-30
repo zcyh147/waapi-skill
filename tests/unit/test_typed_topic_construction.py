@@ -17,6 +17,9 @@ from wwise_waapi.typed_topics import (
 from wwise_waapi.typed_requests import TypedRequestFact
 from wwise_waapi.typed_requests import dynamic_array_item_choices
 from wwise_waapi.topic_business import (
+    TopicBusinessEntryObjectFact,
+    materialize_topic_business_inputs,
+    resolve_topic_business_value_choice,
     topic_business_contract,
     topic_business_value_choices,
 )
@@ -547,6 +550,64 @@ def test_ambiguous_topic_scalar_uses_a_digest_bound_value_choice_handle(
     assert code == 0, payload.get("message", payload)
     assert payload["event"]["platform"]["name"] == "Windows"
     assert client.handler.unsubscribe_calls == 1
+
+
+def test_open_exact_entry_member_uses_one_scope_bound_value_choice(
+    tmp_path: Path,
+) -> None:
+    version = "2021.1"
+    topic = "ak.wwise.core.audio.imported"
+    scope = "objects-audio-source-language"
+    schema_code, schema = gateway.execute_gateway(
+        ["--version", version, "topic-schema", topic, "--entry", scope],
+        env=_env(tmp_path, version),
+        client_factory=lambda url: pytest.fail(f"topic-schema connected to {url}"),
+    )
+
+    assert schema_code == 0
+    open_member = schema["business_input"]["exact_entries"]["selected"][
+        "object_fields"
+    ]["open_member"]
+    assert open_member["field_ownership"] == "exact_user_key"
+    choices = {
+        meaning: handle
+        for handle, meaning in open_member["value_choices"]["rows"]
+    }
+    assert set(choices) == {
+        "literal_text",
+        "whole_number",
+        "decimal_number",
+        "on_or_off",
+        "explicit_empty",
+    }
+
+    contract = topic_business_contract(version, topic)
+    kind = resolve_topic_business_value_choice(
+        contract,
+        channel="event-entry-object",
+        owner=(scope, "customLanguageTag"),
+        handle=choices["literal_text"],
+    )
+    compiled = materialize_topic_business_inputs(
+        version=version,
+        topic=topic,
+        option_facts=(),
+        match_facts=(),
+        entry_object_facts=(
+            TopicBusinessEntryObjectFact(
+                scope=scope,
+                indices=(0,),
+                key="metadata",
+                field="customLanguageTag",
+                value="Gameplay",
+                kind=kind,
+            ),
+        ),
+    )
+
+    assert compiled.match["objects"][0]["audioSourceLanguage"] == {
+        "metadata": {"customLanguageTag": "Gameplay"}
+    }
 
 
 def test_raw_topic_scalar_kind_is_rejected_before_connecting(

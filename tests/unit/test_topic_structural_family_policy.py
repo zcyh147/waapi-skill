@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import json
 from collections import defaultdict
 from pathlib import Path
@@ -69,6 +70,37 @@ def test_topic_structural_family_policy_never_promotes_a_boundary_to_real_pass()
                 assert evidence["review_trigger"]
                 assert evidence["counts_as_real_pass"] is False
                 assert "publisher" not in evidence
+
+
+def test_active_soundbank_and_transport_families_name_hard_event_proofs() -> None:
+    families = {row["family"]: row for row in _policy()["families"]}
+    for family in ("soundbank-generated", "soundbank-generation-done"):
+        for evidence in families[family]["evidence_by_version"].values():
+            assert evidence["evidence_test"] == (
+                "tests/destructive/test_soundbank_audio_sandbox.py"
+            )
+
+    soundbank_test = (
+        REPO_ROOT / "tests" / "destructive" / "test_soundbank_audio_sandbox.py"
+    )
+    module = ast.parse(soundbank_test.read_text(encoding="utf-8"))
+    generate_test = next(
+        node
+        for node in module.body
+        if isinstance(node, ast.FunctionDef)
+        and node.name == "test_soundbank_generate_write_to_disk_or_records_blocker"
+    )
+    assert any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "_require_soundbank_topic_events"
+        for node in ast.walk(generate_test)
+    )
+
+    for evidence in families["transport-state"]["evidence_by_version"].values():
+        assert evidence["evidence_test"] == (
+            "tests/live/test_topic_transport_state_sandbox.py"
+        )
 
 
 def _policy() -> Mapping[str, Any]:
