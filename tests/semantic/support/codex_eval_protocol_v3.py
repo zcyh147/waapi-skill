@@ -4665,6 +4665,31 @@ class V3GatewayProtocol:
         return (len(self.steps),)
 
     @property
+    def optional_query_schema_step_names(self) -> tuple[str, ...]:
+        """Return the bounded leading query disclosures that may be omitted.
+
+        A closed business query may be issued directly, after the ordinary
+        business schema, or after both the ordinary and advanced read-only
+        schemas.  The selected disclosure reads remain broker-authenticated;
+        only their presence is optional and the final business query is still
+        exact.
+        """
+
+        maximum = len(self.steps)
+        optional = self.steps[:-1]
+        allowed = tuple(range(1, maximum + 1))
+        return (
+            tuple(step.name for step in optional)
+            if maximum >= 2
+            and self.steps[-1].subcommand == "query-object"
+            and all(step.subcommand == "query-schema" for step in optional)
+            and self.turn_prefix_counts == (maximum,)
+            and self.allowed_turn_prefix_counts == (allowed,)
+            and self.terminal_prefix_counts == allowed
+            else ()
+        )
+
+    @property
     def optional_initial_query_schema(self) -> bool:
         """Whether this seal permits omitting one initial query-schema read."""
 
@@ -5476,16 +5501,31 @@ def build_optional_topic_schema_protocol(
 
 def build_optional_query_schema_protocol(
     query_step: ExpectedGatewayStep,
+    *,
+    allow_advanced: bool = False,
 ) -> V3GatewayProtocol:
-    """Allow either a direct closed query or one exact schema read before it."""
+    """Allow a direct closed query after zero or more exact schema reads."""
 
     if query_step.subcommand != "query-object":
         raise V3ProtocolError("optional query schema must precede query-object")
+    if type(allow_advanced) is not bool:
+        raise V3ProtocolError("allow_advanced must be a boolean")
+    schema_steps = (query_schema_step(),)
+    if allow_advanced:
+        schema_steps += (
+            ExpectedGatewayStep(
+                name="query-schema.advanced",
+                subcommand="query-schema",
+                arguments=("--advanced",),
+            ),
+        )
+    steps = (*schema_steps, query_step)
+    allowed = tuple(range(1, len(steps) + 1))
     return V3GatewayProtocol(
-        steps=(query_schema_step(), query_step),
-        turn_prefix_counts=(2,),
-        allowed_turn_prefix_counts=((1, 2),),
-        terminal_prefix_counts=(1, 2),
+        steps=steps,
+        turn_prefix_counts=(len(steps),),
+        allowed_turn_prefix_counts=(allowed,),
+        terminal_prefix_counts=allowed,
     )
 
 

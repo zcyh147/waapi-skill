@@ -48,6 +48,7 @@ from tests.semantic.support.codex_object_heavy_v3 import (
     ObjectHeavyRecipe,
     OperationRequestSpec,
     QueryObjectRequestSpec,
+    business_query_path_arguments,
 )
 from tests.semantic.support.codex_object_runtime_v3 import ObjectRuntimeSnapshot
 from tests.semantic.support.codex_prompt_provenance_v3 import serialize_protocol
@@ -1755,16 +1756,7 @@ def build_object_merge_query_protocol(
             "object.collision-root",
             (
                 "query-object",
-                "--path",
-                root.path,
-                "--return-field",
-                "id",
-                "--return-field",
-                "name",
-                "--return-field",
-                "type",
-                "--return-field",
-                "path",
+                *business_query_path_arguments(root.path),
             ),
         )
         return V3GatewayProtocol(
@@ -1832,16 +1824,7 @@ def build_object_merge_query_protocol(
             "object.merge-root",
             (
                 "query-object",
-                "--path",
-                root.path,
-                "--return-field",
-                "id",
-                "--return-field",
-                "name",
-                "--return-field",
-                "type",
-                "--return-field",
-                "path",
+                *business_query_path_arguments(root.path),
             ),
         ),
     )
@@ -1906,9 +1889,10 @@ def _validate_protocol(
             else build_direct_protocol((query,))
         )
         expected_protocols = (
-            build_optional_query_repair_protocol(query)
-            if profile_unit_id == TYPED_PROFILE_QUERY_REPAIR_UNIT_ID
-            else base,
+            build_optional_query_repair_protocol(query),
+        ) if profile_unit_id == TYPED_PROFILE_QUERY_REPAIR_UNIT_ID else (
+            base,
+            build_optional_query_schema_protocol(query, allow_advanced=True),
         )
     else:  # pragma: no cover - recipe union is closed
         raise ObjectBusinessPlanError("object recipe request type is unsupported")

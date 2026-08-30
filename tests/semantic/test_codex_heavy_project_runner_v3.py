@@ -47,6 +47,7 @@ from tests.semantic.support.codex_gateway_broker import (
     MetadataTokenProjection,
 )
 from tests.semantic.support.codex_object_heavy_v3 import (
+    business_query_path_arguments,
     build_object_heavy_v3_recipe,
 )
 
@@ -957,6 +958,18 @@ def test_prepare_get_info_case_binds_exact_live_process_and_result(
             "displayName": "v2021.1.14",
         },
     }
+    status_wwise = {
+        key: baseline[key]
+        for key in (
+            "apiVersion",
+            "displayName",
+            "isCommandLine",
+            "processId",
+            "processPath",
+            "sessionId",
+            "version",
+        )
+    }
     calls: list[tuple[str, dict, dict]] = []
 
     def direct(api, args, options):
@@ -1003,7 +1016,7 @@ def test_prepare_get_info_case_binds_exact_live_process_and_result(
         "exact_host_identity"
     )
     omitted_status = prepared.verify_final(
-        {"wwise": baseline},
+        {"wwise": status_wwise},
         SimpleNamespace(final_response="Wwise 2021.1.14.8108，进程 4242。"),
     )
     assert omitted_status.passed is False
@@ -1011,7 +1024,7 @@ def test_prepare_get_info_case_binds_exact_live_process_and_result(
     prepared.observe_payload(
         prepared.protocol.steps[0],
         {
-            "wwise": baseline,
+            "wwise": status_wwise,
             "project": {
                 "id": "{16164796-C6E6-491A-8799-C42A33110A84}",
                 "name": "SampleProject",
@@ -1025,31 +1038,31 @@ def test_prepare_get_info_case_binds_exact_live_process_and_result(
         },
     )
     verification = prepared.verify_final(
-        {"wwise": baseline},
+        {"wwise": status_wwise},
         SimpleNamespace(final_response="Wwise 2021.1.14.8108，进程 4242。"),
     )
     assert verification.passed is True
     split_build = prepared.verify_final(
-        {"wwise": baseline},
+        {"wwise": status_wwise},
         SimpleNamespace(
             final_response="Wwise v2021.1.14，build 8108，进程 4242。"
         ),
     )
     assert split_build.passed is True
     incomplete = prepared.verify_final(
-        {"wwise": baseline},
+        {"wwise": status_wwise},
         SimpleNamespace(final_response="Wwise 2021.1，进程 4242。"),
     )
     assert incomplete.passed is False
     wrong_split_build = prepared.verify_final(
-        {"wwise": baseline},
+        {"wwise": status_wwise},
         SimpleNamespace(
             final_response="Wwise v2021.1.14，build 8109，进程 4242。"
         ),
     )
     assert wrong_split_build.passed is False
     negated_split_build = prepared.verify_final(
-        {"wwise": baseline},
+        {"wwise": status_wwise},
         SimpleNamespace(
             final_response="Wwise 不是 v2021.1.14，build 8108，进程 4242。"
         ),
@@ -1858,17 +1871,8 @@ def _archive_test_compound_merge_requires_exact_existing_root_type_query(
         "query-object",
         "operation-schema",
     )
-    assert protocol.steps[0].arguments == (
-        "--path",
-        expected_path,
-        "--return-field",
-        "id",
-        "--return-field",
-        "name",
-        "--return-field",
-        "type",
-        "--return-field",
-        "path",
+    assert protocol.steps[0].arguments == business_query_path_arguments(
+        expected_path
     )
 
 

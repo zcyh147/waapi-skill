@@ -137,6 +137,46 @@ def test_optional_query_schema_terminal_accepts_only_complete_selected_protocol(
     assert not task_runner._broker_terminal_protocol_passed(protocol, evidence)
 
 
+@pytest.mark.parametrize(
+    "selected_names",
+    (
+        ("query",),
+        ("query-schema", "query"),
+        ("query-schema.advanced", "query"),
+        ("query-schema", "query-schema.advanced", "query"),
+    ),
+)
+def test_optional_query_disclosures_accept_only_the_selected_complete_lane(
+    selected_names: tuple[str, ...],
+) -> None:
+    protocol = build_optional_query_schema_protocol(
+        query_object_step(
+            "query",
+            ("query-object", "--kind", "all-sounds", "--max-results", "12"),
+        ),
+        allow_advanced=True,
+    )
+    evidence = SimpleNamespace(
+        expected_step_names=selected_names,
+        consumed_step_names=selected_names,
+        records=tuple(
+            SimpleNamespace(step_name=name, succeeded=True)
+            for name in selected_names
+        ),
+        rejected_records=(),
+        complete=True,
+        passed=True,
+        terminal_state="COMPLETE",
+    )
+
+    assert protocol.optional_query_schema_step_names == (
+        "query-schema",
+        "query-schema.advanced",
+    )
+    assert protocol.accepted_terminal_prefixes == (1, 2, 3)
+    assert task_runner._broker_terminal_protocol_passed(protocol, evidence)
+
+
 @pytest.mark.parametrize("include_schema", (False, True))
 def test_optional_query_repair_protocol_accepts_one_sealed_repair_chain(
     include_schema: bool,

@@ -833,12 +833,8 @@ def _business_query(
     superset_keys: Sequence[str],
     final_filter: FinalAnswerFilter,
 ) -> QueryObjectRequestSpec:
-    segments = tuple(segment for segment in path.split("\\") if segment)
-    if not segments:
-        raise ObjectHeavyRecipeError("business query path has no visible segments")
     argv = ["gateway.py", "--version", VERSION, "query-object"]
-    for segment in segments:
-        argv.extend(("--path-segment", segment))
+    argv.extend(business_query_path_arguments(path))
     for relationship in relationships:
         argv.extend(("--relationship", relationship))
     for condition, value in predicates:
@@ -854,6 +850,28 @@ def _business_query(
         exact_expected_keys=tuple(exact_keys),
         bounded_superset_keys=tuple(superset_keys),
         final_filter=final_filter,
+    )
+
+
+def business_query_path_arguments(path: str) -> tuple[str, ...]:
+    """Compile one canonical Wwise hierarchy path to closed business flags."""
+
+    if (
+        not isinstance(path, str)
+        or not path.startswith("\\")
+        or path.endswith("\\")
+        or "\\\\" in path
+    ):
+        raise ObjectHeavyRecipeError(
+            f"business query path is not canonical: {path!r}"
+        )
+    segments = tuple(path[1:].split("\\"))
+    if not segments or any(not segment for segment in segments):
+        raise ObjectHeavyRecipeError("business query path has no visible segments")
+    return tuple(
+        argument
+        for segment in segments
+        for argument in ("--path-segment", segment)
     )
 
 
@@ -2746,6 +2764,7 @@ __all__ = [
     "QueryObjectRequestSpec",
     "all_object_heavy_v3_recipes",
     "build_object_heavy_v3_recipe",
+    "business_query_path_arguments",
     "typed_input_business_query_recipe",
     "typed_input_merge_recipe",
     "typed_input_rename_recipe",

@@ -62,6 +62,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_metadata_transaction_protocol,
     build_modification_policy_protocol,
     build_optional_query_repair_protocol,
+    build_optional_query_schema_protocol,
     build_optional_topic_schema_protocol,
     build_transaction_protocol,
     call_step,
@@ -4366,6 +4367,18 @@ def _prepare_case(
             "process_id": process_id,
             "project": status_project,
         }
+        expected_status_wwise = {
+            key: baseline_result.get(key)
+            for key in (
+                "apiVersion",
+                "displayName",
+                "isCommandLine",
+                "processId",
+                "processPath",
+                "sessionId",
+                "version",
+            )
+        }
         protocol = build_direct_protocol(
             [
                 ExpectedGatewayStep(
@@ -4388,7 +4401,7 @@ def _prepare_case(
                 "process_id": process_id,
                 "launch_process_id": launch_process_id,
                 "session_id": baseline_result.get("sessionId"),
-                "result_sha256": _json_sha256(baseline_result),
+                "result_sha256": _json_sha256(expected_status_wwise),
                 "project_digest": project_digest,
                 "status": status_binding,
             },
@@ -4408,7 +4421,7 @@ def _prepare_case(
                 "process_id": process_id,
                 "launch_process_id": launch_process_id,
                 "session_id": baseline_result.get("sessionId"),
-                "result_sha256": _json_sha256(baseline_result),
+                "result_sha256": _json_sha256(expected_status_wwise),
                 "project_digest": project_digest,
                 "status": status_binding,
             },
@@ -4473,7 +4486,7 @@ def _prepare_case(
                     actual = value
                 else:
                     failures.append("Gateway status lacks the live Wwise identity")
-            if actual is not None and dict(actual) != baseline_result:
+            if actual is not None and dict(actual) != expected_status_wwise:
                 failures.append("model getInfo result differs from the sealed host identity")
             if snapshot_get_info() != project_digest:
                 failures.append("read-only getInfo task changed project documents")
@@ -4494,7 +4507,9 @@ def _prepare_case(
                     {
                         "expected_build": expected_build,
                         "expected_process_id": process_id,
-                        "expected_result_sha256": _json_sha256(baseline_result),
+                        "expected_result_sha256": _json_sha256(
+                            expected_status_wwise
+                        ),
                         "actual_result_sha256": (
                             _json_sha256(actual) if actual is not None else None
                         ),
@@ -4804,6 +4819,22 @@ def _prepare_case(
                     "query repair unit requires one optional-schema business query"
                 )
             protocol = build_optional_query_repair_protocol(protocol.steps[1])
+        elif unit_id in {
+            "TYP21-QUERY-OBJECT-GET",
+            "TYP23-QUERY-OBJECT-GET",
+        }:
+            if (
+                len(protocol.steps) != 2
+                or protocol.steps[0].subcommand != "query-schema"
+                or protocol.steps[1].subcommand != "query-object"
+            ):
+                raise HeavyProjectRunnerError(
+                    "typed business query requires one optional-schema query"
+                )
+            protocol = build_optional_query_schema_protocol(
+                protocol.steps[1],
+                allow_advanced=True,
+            )
         if project_modification_policy is not None:
             if _compound_object_metadata_binding(
                 scenario,

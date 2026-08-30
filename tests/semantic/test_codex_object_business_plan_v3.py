@@ -419,16 +419,16 @@ def _archive_test_typed_profile_collision_protocol_queries_before_schema(
         "draft-start",
     ]
     assert protocol.steps[0].arguments == (
-        "--path",
-        r"\Actor-Mixer Hierarchy\Default Work Unit\SemanticLab\Weapons\Impact_Library",
-        "--return-field",
-        "id",
-        "--return-field",
-        "name",
-        "--return-field",
-        "type",
-        "--return-field",
-        "path",
+        "--path-segment",
+        "Actor-Mixer Hierarchy",
+        "--path-segment",
+        "Default Work Unit",
+        "--path-segment",
+        "SemanticLab",
+        "--path-segment",
+        "Weapons",
+        "--path-segment",
+        "Impact_Library",
     )
 
 
@@ -692,16 +692,16 @@ def _archive_test_typed_profile_merge_reads_the_exact_root_before_schema_continu
         "draft-start",
     )
     assert protocol.steps[0].arguments == (
-        "--path",
-        r"\Actor-Mixer Hierarchy\Default Work Unit\SemanticLab\NPC\Robot_VO",
-        "--return-field",
-        "id",
-        "--return-field",
-        "name",
-        "--return-field",
-        "type",
-        "--return-field",
-        "path",
+        "--path-segment",
+        "Actor-Mixer Hierarchy",
+        "--path-segment",
+        "Default Work Unit",
+        "--path-segment",
+        "SemanticLab",
+        "--path-segment",
+        "NPC",
+        "--path-segment",
+        "Robot_VO",
     )
     assert (
         "先核对现有 `\\Actor-Mixer Hierarchy\\Default Work Unit"

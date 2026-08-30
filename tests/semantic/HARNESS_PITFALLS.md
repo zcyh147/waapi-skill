@@ -844,6 +844,33 @@ prevention checks that are expensive to rediscover.
   oracle pass, and never relabel a protocol-construction BLOCKED result as an
   Agent failure.
 
+### A current Fresh oracle must allow bounded read-only disclosure choices
+
+- Evidence: #60 macOS diagnostic root
+  `imac-issue60-9683ec1-r2-priority3` reached all three priority units. The
+  `status` unit returned the correct normalized `status.wwise` projection but
+  the oracle compared it with the larger raw `getInfo` object. The query unit
+  read both `query-schema` and `query-schema --advanced` before issuing the
+  exact closed business `query-object`; the Broker rejected the second harmless
+  disclosure. The create unit used repeated `--path-segment` flags and default
+  identity fields while its collision oracle still expected removed `--path`
+  and `--return-field` flags. The root was also invalidated by a harness edit
+  during execution and grants no PASS credit. The simultaneous Windows
+  diagnostic ended 0 PASS / 1 FAIL / 1 BLOCKED / 1 pending and likewise grants
+  no credit.
+- Cause: the oracle mixed three native representations with current public
+  contracts: raw `getInfo` versus normalized `status`, one exact reasoning
+  trace versus several equivalent bounded schema reads, and retired query
+  flags versus the business path-segment grammar.
+- Prevention: compare each public result with its own documented projection,
+  not the native payload behind it. For a closed business query, allow direct
+  execution, the ordinary schema read, the advanced read-only schema, or both
+  schema reads; authenticate every selected disclosure and still require the
+  same final business query. Compile trusted Wwise paths through the shared
+  canonical segment helper and rely on default identity fields. Once a Fresh
+  root starts, keep every candidate-owned file immutable until all selected
+  hosts seal, even when the discovered fix is obvious.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:

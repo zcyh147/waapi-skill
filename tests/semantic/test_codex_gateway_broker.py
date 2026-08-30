@@ -10843,6 +10843,61 @@ def test_broker_optional_query_schema_rejects_the_advanced_contract(
     assert broker.evidence().passed is False
 
 
+@pytest.mark.parametrize(
+    "schema_arguments",
+    (
+        (),
+        (("query-schema",),),
+        (("query-schema", "--advanced"),),
+        (("query-schema",), ("query-schema", "--advanced")),
+    ),
+)
+def test_broker_accepts_bounded_optional_query_schema_disclosures(
+    tmp_path: Path,
+    schema_arguments: tuple[tuple[str, ...], ...],
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    query_arguments = ("--kind", "all-sounds", "--max-results", "12")
+    steps = (
+        ExpectedGatewayStep("query-schema", "query-schema"),
+        ExpectedGatewayStep(
+            "query-schema.advanced",
+            "query-schema",
+            ("--advanced",),
+        ),
+        ExpectedGatewayStep("query", "query-object", query_arguments),
+    )
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=steps,
+        optional_query_schema_step_names=(
+            "query-schema",
+            "query-schema.advanced",
+        ),
+        transport="tcp",
+    ) as broker:
+        results = [
+            run_model_command(broker, arguments)
+            for arguments in schema_arguments
+        ]
+        results.append(
+            run_model_command(broker, ["query-object", *query_arguments])
+        )
+
+    assert all(result.returncode == 0 for result in results)
+    evidence = broker.evidence()
+    assert evidence.passed
+    assert evidence.expected_step_names == (
+        tuple(
+            "query-schema.advanced"
+            if arguments == ("query-schema", "--advanced")
+            else "query-schema"
+            for arguments in schema_arguments
+        )
+        + ("query",)
+    )
+
+
 def test_broker_rejects_a_different_business_query_predicate(
     tmp_path: Path,
 ) -> None:

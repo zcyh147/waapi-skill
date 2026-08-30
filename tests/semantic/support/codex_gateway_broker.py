@@ -8024,6 +8024,7 @@ class CodexGatewayBroker:
         ) = None,
         optional_initial_operations_discovery_operation: str | None = None,
         optional_initial_query_schema: bool = False,
+        optional_query_schema_step_names: Sequence[str] = (),
     ) -> None:
         self.skill_source = _absolute_lexical(skill_source)
         self.runner_path = self.skill_source / "scripts" / "run.py"
@@ -8070,6 +8071,9 @@ class CodexGatewayBroker:
         if type(optional_initial_query_schema) is not bool:
             raise TypeError("optional_initial_query_schema must be a boolean")
         self.optional_initial_query_schema = optional_initial_query_schema
+        self.optional_query_schema_step_names = tuple(
+            optional_query_schema_step_names
+        )
         self._commutative_read_only_step_sets = tuple(
             frozenset(group)
             for group in self.commutative_read_only_step_groups
@@ -8207,6 +8211,22 @@ class CodexGatewayBroker:
             ):
                 raise ValueError(
                     "optional query schema must be the exact first step before query-object"
+                )
+        if self.optional_query_schema_step_names:
+            optional_names = self.optional_query_schema_step_names
+            optional_steps = self.expected_steps[: len(optional_names)]
+            if (
+                len(optional_names) >= len(self.expected_steps)
+                or len(optional_names) != len(set(optional_names))
+                or tuple(step.name for step in optional_steps) != optional_names
+                or any(step.subcommand != "query-schema" for step in optional_steps)
+                or self.expected_steps[len(optional_names)].subcommand
+                != "query-object"
+                or len(self.expected_steps) != len(optional_names) + 1
+            ):
+                raise ValueError(
+                    "optional query disclosures must be the exact leading "
+                    "query-schema steps before one query-object"
                 )
         validate_operation_draft_protocol_steps(self.expected_steps)
         terminal_execute_steps = tuple(
@@ -9249,6 +9269,14 @@ class CodexGatewayBroker:
                         business_setup_reordered
                     )
                 elif (
+                    optional_query_step := (
+                        self._match_or_skip_optional_query_schema_step(
+                            resolved.gateway_arguments,
+                        )
+                    )
+                ) is not None:
+                    step, semantic_hash, execution_arguments = optional_query_step
+                elif (
                     optional_topic_step := (
                         self._match_or_skip_optional_topic_schema_step(
                             resolved.gateway_arguments,
@@ -9912,6 +9940,87 @@ class CodexGatewayBroker:
             if step.name not in skipped_names
         ]
         return lifecycle, semantic_hash, execution_arguments
+
+    def _match_or_skip_optional_query_schema_step(
+        self,
+        actual: Sequence[str],
+    ) -> tuple[ExpectedGatewayStep, str, tuple[str, ...]] | None:
+        """Accept a sealed query disclosure or skip unused disclosures."""
+
+        optional_names = frozenset(self.optional_query_schema_step_names)
+        if not optional_names:
+            return None
+        current = self._execution_steps[self._next_step]
+        if current.name not in optional_names:
+            return None
+
+        group_end = self._next_step
+        while (
+            group_end < len(self._execution_steps)
+            and self._execution_steps[group_end].name in optional_names
+        ):
+            group_end += 1
+
+        matches: list[
+            tuple[int, ExpectedGatewayStep, str, tuple[str, ...]]
+        ] = []
+        for index in range(self._next_step, group_end):
+            candidate = self._execution_steps[index]
+            try:
+                semantic_hash, execution_arguments = self._validate_step(
+                    candidate,
+                    actual,
+                )
+            except GatewayInvocationError:
+                continue
+            matches.append(
+                (index, candidate, semantic_hash, execution_arguments)
+            )
+        if len(matches) > 1:
+            raise GatewayInvocationError(
+                "command matches multiple optional query schema disclosures"
+            )
+        if matches:
+            index, candidate, semantic_hash, execution_arguments = matches[0]
+            self._execution_steps.insert(
+                self._next_step,
+                self._execution_steps.pop(index),
+            )
+            selected_index = next(
+                selected_index
+                for selected_index in range(
+                    self._next_step,
+                    len(self._selected_expected_steps),
+                )
+                if self._selected_expected_steps[selected_index].name
+                == candidate.name
+            )
+            self._selected_expected_steps.insert(
+                self._next_step,
+                self._selected_expected_steps.pop(selected_index),
+            )
+            return candidate, semantic_hash, execution_arguments
+
+        query_step = self._execution_steps[group_end]
+        try:
+            semantic_hash, execution_arguments = self._validate_step(
+                query_step,
+                actual,
+            )
+        except GatewayInvocationError:
+            return None
+
+        skipped_names = {
+            step.name
+            for step in self._execution_steps[self._next_step:group_end]
+        }
+        del self._execution_steps[self._next_step:group_end]
+        self._selected_expected_steps[:] = [
+            step
+            for step in self._selected_expected_steps
+            if step.name not in skipped_names
+        ]
+        return query_step, semantic_hash, execution_arguments
 
     def _normalize_business_declaration_fact_order(
         self,

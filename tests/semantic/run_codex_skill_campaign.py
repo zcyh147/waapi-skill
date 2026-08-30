@@ -6130,6 +6130,27 @@ def _consumed_heavy_v3_protocol_steps(
         if selected_mandatory != mandatory_names:
             return ()
         return tuple(by_name[name] for name in selected_step_names)
+    optional_query_names = tuple(
+        getattr(protocol, "optional_query_schema_step_names", ())
+    )
+    if optional_query_names:
+        if (
+            not isinstance(selected_step_names, list)
+            or len(selected_step_names) != consumed_count
+            or len(selected_step_names) != len(set(selected_step_names))
+        ):
+            return ()
+        by_name = {step.name: step for step in steps}
+        if (
+            not selected_step_names
+            or selected_step_names[-1] != steps[-1].name
+            or any(
+                name not in optional_query_names
+                for name in selected_step_names[:-1]
+            )
+        ):
+            return ()
+        return tuple(by_name[name] for name in selected_step_names)
     if (
         getattr(protocol, "optional_initial_query_schema", False)
         and consumed_count == len(steps) - 1

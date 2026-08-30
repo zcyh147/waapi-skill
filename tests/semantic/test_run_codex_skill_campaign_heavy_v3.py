@@ -2313,7 +2313,14 @@ def _synthetic_protocol(
             if unit.unit_id == TYPED_PROFILE_QUERY_REPAIR_UNIT_ID:
                 return build_optional_query_repair_protocol(query)
             return (
-                build_optional_query_schema_protocol(query)
+                build_optional_query_schema_protocol(
+                    query,
+                    allow_advanced=unit.unit_id
+                    in {
+                        "TYP21-QUERY-OBJECT-GET",
+                        "TYP23-QUERY-OBJECT-GET",
+                    },
+                )
                 if "--max-results" in recipe.request.argv
                 else build_direct_protocol((query,))
             )
