@@ -67,7 +67,10 @@ from wwise_waapi.typed_operations import (
     inline_operation_cli_arguments,
 )
 from wwise_waapi.typed_topics import topic_match_contract, topic_options_contract
-from wwise_waapi.topic_business import topic_business_contract
+from wwise_waapi.topic_business import (
+    topic_business_contract,
+    topic_business_value_choices,
+)
 from wwise_waapi.typed_requests import (
     TypedRequestFact,
     TypedRequestError,
@@ -5289,6 +5292,7 @@ def stream_topic_step(
     topic: str,
     *,
     version: str,
+    event_count: int,
     match: Mapping[str, Any] | None = None,
     options: Mapping[str, Any] | None = None,
     timeout_seconds: float,
@@ -5297,6 +5301,14 @@ def stream_topic_step(
 
     if timeout_seconds <= 0:
         raise V3ProtocolError("stream-topic timeout must be positive")
+    if (
+        not isinstance(event_count, int)
+        or isinstance(event_count, bool)
+        or not 1 <= event_count <= 64
+    ):
+        raise V3ProtocolError(
+            "stream-topic event_count must be an integer from 1 through 64"
+        )
     option_values = _normalize_json_object(
         {} if options is None else options,
         field="stream-topic options",
@@ -5311,6 +5323,8 @@ def stream_topic_step(
         gateway_global_arguments=("--timeout", _format_timeout(timeout_seconds)),
         arguments=(
             topic,
+            "--event-count",
+            str(event_count),
             "--topic-contract-digest",
             topic_business_contract(version, topic).contract_digest,
             *_business_topic_arguments(
@@ -5361,13 +5375,19 @@ def _business_topic_arguments(
                         f"fixture compiler for {'.'.join(path)!r}"
                     )
                 kind, encoded = _topic_business_value(value)
+                choice = _topic_value_choice_handle(
+                    contract,
+                    channel="event-entry",
+                    owner=(entry.token,),
+                    kind=kind,
+                )
                 arguments.extend(
                     (
                         "--event-entry-as",
                         entry.token,
                         "-",
                         path[-1],
-                        kind,
+                        choice,
                         encoded,
                     )
                 )
@@ -5375,8 +5395,47 @@ def _business_topic_arguments(
             items = value if isinstance(value, list) else [value]
             for item in items:
                 kind, encoded = _topic_business_value(item)
-                arguments.extend((flag, field.token, kind, encoded))
+                if len(field.accepted_value_kinds) == 1:
+                    arguments.extend((flag.removesuffix("-as"), field.token, encoded))
+                else:
+                    choice = _topic_value_choice_handle(
+                        contract,
+                        channel=(
+                            "topic-option"
+                            if flag == "--topic-option-as"
+                            else "event-match"
+                        ),
+                        owner=(field.token,),
+                        kind=kind,
+                    )
+                    arguments.extend((flag, field.token, choice, encoded))
     return tuple(arguments)
+
+
+def _topic_value_choice_handle(
+    contract: Any,
+    *,
+    channel: str,
+    owner: tuple[str, ...],
+    kind: str,
+) -> str:
+    meaning = {
+        "text": "literal_text",
+        "integer": "whole_number",
+        "number": "decimal_number",
+        "toggle": "on_or_off",
+        "null": "explicit_empty",
+    }[kind]
+    for choice in topic_business_value_choices(
+        contract,
+        channel=channel,
+        owner=owner,
+    ):
+        if choice.meaning == meaning:
+            return choice.handle
+    raise V3ProtocolError(
+        f"Topic business value {channel} {'/'.join(owner)!r} does not accept {meaning}"
+    )
 
 
 def _topic_scalar_leaves(

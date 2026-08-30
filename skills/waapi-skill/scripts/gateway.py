@@ -153,6 +153,7 @@ from wwise_waapi.topic_business import (  # noqa: E402  # pyright: ignore[report
     TopicBusinessEntryRowFact,
     TopicBusinessRowFact,
     materialize_topic_business_inputs,
+    resolve_topic_business_value_choice,
     topic_business_contract,
 )
 from wwise_waapi.builders.schema import (  # noqa: E402  # pyright: ignore[reportMissingImports]
@@ -582,6 +583,10 @@ EXPANDING_QUERY_SELECTS = frozenset({"descendants", "ancestors", "referencesTo",
 MAX_GATEWAY_RESULT_JSON_BYTES = 1024 * 1024
 MAX_METADATA_DISCOVERY_GATEWAY_RESULT_BYTES = 32 * 1024
 MAX_TOPIC_SCHEMA_GATEWAY_RESULT_BYTES = 32 * 1024
+TOPIC_STREAM_EVENT_OUTPUT_LIMIT_BYTES = MAX_GATEWAY_RESULT_JSON_BYTES
+TOPIC_STREAM_TOTAL_OUTPUT_LIMIT_BYTES = (
+    TOPIC_STREAM_EVENT_OUTPUT_LIMIT_BYTES + MAX_GATEWAY_RESULT_JSON_BYTES
+)
 TOPIC_STREAM_POLL_SECONDS = 0.05
 TOPIC_STREAM_HEALTH_INTERVAL_SECONDS = 5.0
 MAX_GATEWAY_JSON_INPUT_BYTES = 256 * 1024
@@ -593,6 +598,26 @@ MAX_GATEWAY_JSON_STRING_BYTES = 64 * 1024
 # 180 KiB decoded WAV (roughly 240 KiB of canonical Base64).
 MAX_PREVIEW_JSON_INPUT_BYTES = 384 * 1024
 MAX_PREVIEW_JSON_STRING_BYTES = 256 * 1024
+
+
+class TopicStreamCancelled(KeyboardInterrupt):
+    """Cancellation carrying the already-attempted subscription cleanup."""
+
+    def __init__(
+        self,
+        *,
+        event_count: int,
+        elapsed_seconds: float,
+        cleanup: str,
+        cleanup_failure: Mapping[str, Any] | None,
+    ) -> None:
+        super().__init__("topic stream cancelled")
+        self.event_count = event_count
+        self.elapsed_seconds = elapsed_seconds
+        self.cleanup = cleanup
+        self.cleanup_failure = (
+            dict(cleanup_failure) if cleanup_failure is not None else None
+        )
 # ``transaction-show --summary-only`` must carry the exact immutable request,
 # but every other review field has a closed projection.  This ceiling bounds
 # that summary fragment independently of request complexity; the small outer
@@ -2010,6 +2035,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     stream_topic.add_argument("api")
     add_topic_business_input_arguments(stream_topic)
+    stream_topic.add_argument(
+        "--event-count",
+        type=int,
+        default=None,
+        metavar=f"1..{MAX_WAIT_EVENT_COUNT}",
+        help=(
+            "Explicit maximum matching-event count before unsubscribe; required "
+            f"for finite and no-time-limit streams and capped at {MAX_WAIT_EVENT_COUNT}"
+        ),
+    )
 
     topic_schema = subparsers.add_parser(
         "topic-schema",
@@ -3053,7 +3088,7 @@ def add_topic_business_input_arguments(parser: argparse.ArgumentParser) -> None:
         "--topic-option-as",
         action="append",
         nargs=3,
-        metavar=("FIELD", "KIND", "VALUE"),
+        metavar=("FIELD", "VALUE_CHOICE", "VALUE"),
         default=[],
     )
     parser.add_argument(
@@ -3073,7 +3108,7 @@ def add_topic_business_input_arguments(parser: argparse.ArgumentParser) -> None:
         "--event-match-as",
         action="append",
         nargs=3,
-        metavar=("FIELD", "KIND", "VALUE"),
+        metavar=("FIELD", "VALUE_CHOICE", "VALUE"),
         default=[],
     )
     parser.add_argument(
@@ -3087,7 +3122,7 @@ def add_topic_business_input_arguments(parser: argparse.ArgumentParser) -> None:
         "--event-row-as",
         action="append",
         nargs=5,
-        metavar=("COLLECTION", "INDICES", "FIELD", "KIND", "VALUE"),
+        metavar=("COLLECTION", "INDICES", "FIELD", "VALUE_CHOICE", "VALUE"),
         default=[],
     )
     parser.add_argument(
@@ -3108,7 +3143,7 @@ def add_topic_business_input_arguments(parser: argparse.ArgumentParser) -> None:
         "--event-entry-as",
         action="append",
         nargs=5,
-        metavar=("SCOPE", "INDICES", "KEY", "KIND", "VALUE"),
+        metavar=("SCOPE", "INDICES", "KEY", "VALUE_CHOICE", "VALUE"),
         default=[],
     )
     parser.add_argument(
@@ -3129,7 +3164,14 @@ def add_topic_business_input_arguments(parser: argparse.ArgumentParser) -> None:
         "--event-entry-object-as",
         action="append",
         nargs=6,
-        metavar=("SCOPE", "INDICES", "KEY", "FIELD", "KIND", "VALUE"),
+        metavar=(
+            "SCOPE",
+            "INDICES",
+            "KEY",
+            "FIELD",
+            "VALUE_CHOICE",
+            "VALUE",
+        ),
         default=[],
     )
     parser.add_argument(
@@ -3149,7 +3191,7 @@ def add_topic_business_input_arguments(parser: argparse.ArgumentParser) -> None:
             "KEY",
             "ITEM_INDEX",
             "FIELD",
-            "KIND",
+            "VALUE_CHOICE",
             "VALUE",
         ),
         default=[],
@@ -3335,7 +3377,7 @@ def _execute_gateway_unconstrained(
             )
             if payload.get("ok"):
                 connection.deadline.require_remaining(f"finalize {args.command}")
-        except KeyboardInterrupt:
+        except KeyboardInterrupt as cancellation:
             cancellation_cleanup: dict[str, Any]
             try:
                 transport.close()
@@ -3382,6 +3424,23 @@ def _execute_gateway_unconstrained(
                         },
                     }
                 )
+            if isinstance(cancellation, TopicStreamCancelled):
+                cancelled_payload.update(
+                    {
+                        "contract": TOPIC_STREAM_RECORD_CONTRACT,
+                        "record_type": "terminal",
+                        "topic_contract_digest": args.topic_contract_digest,
+                        "match": dict(args.typed_topic_input.match) or None,
+                        "event_count": cancellation.event_count,
+                        "elapsed_seconds": cancellation.elapsed_seconds,
+                        "cleanup": cancellation.cleanup,
+                        "transport_cleanup": cancellation_cleanup,
+                    }
+                )
+                if cancellation.cleanup_failure is not None:
+                    cancelled_payload["details"] = {
+                        "cleanup_failure": cancellation.cleanup_failure,
+                    }
             return finish(130, cancelled_payload)
         except Exception as primary_exc:
             try:
@@ -5730,12 +5789,15 @@ def preflight_json_inputs(args: argparse.Namespace) -> None:
             raise GatewayInputError(
                 "wait-topic --no-timeout cannot be combined with global --timeout"
             )
-        if (
-            args.command == "wait-topic"
-            and not 1 <= args.event_count <= MAX_WAIT_EVENT_COUNT
-        ):
+        if args.event_count is None:
             raise GatewayInputError(
-                f"wait-topic --event-count must be between 1 and {MAX_WAIT_EVENT_COUNT}"
+                f"{args.command} --event-count must be explicitly set between "
+                f"1 and {MAX_WAIT_EVENT_COUNT}"
+            )
+        if not 1 <= args.event_count <= MAX_WAIT_EVENT_COUNT:
+            raise GatewayInputError(
+                f"{args.command} --event-count must be between 1 and "
+                f"{MAX_WAIT_EVENT_COUNT}"
             )
     elif args.command == "draft-apply":
         # The authorized Draft binding decides the operation-local typed
@@ -5768,8 +5830,18 @@ def preflight_typed_topic_input(
     args.typed_topic_input = materialize_topic_business_inputs(
         version=version,
         topic=args.api,
-        option_facts=_topic_business_facts(args, "topic_option"),
-        match_facts=_topic_business_facts(args, "event_match"),
+        option_facts=_topic_business_facts(
+            args,
+            business,
+            "topic_option",
+            channel="topic-option",
+        ),
+        match_facts=_topic_business_facts(
+            args,
+            business,
+            "event_match",
+            channel="event-match",
+        ),
         option_empty_facts=tuple(
             TopicBusinessEmptyFact(field_name)
             for field_name in args.topic_option_empty
@@ -5778,7 +5850,7 @@ def preflight_typed_topic_input(
             TopicBusinessEmptyFact(field_name)
             for field_name in args.event_empty
         ),
-        row_facts=_topic_business_row_facts(args),
+        row_facts=_topic_business_row_facts(args, business),
         empty_row_facts=tuple(
             TopicBusinessEmptyRowFact(
                 collection,
@@ -5786,7 +5858,7 @@ def preflight_typed_topic_input(
             )
             for collection, parent_indices in args.event_row_empty
         ),
-        entry_facts=_topic_business_entry_facts(args),
+        entry_facts=_topic_business_entry_facts(args, business),
         entry_empty_facts=tuple(
             TopicBusinessEntryEmptyFact(
                 scope,
@@ -5796,28 +5868,41 @@ def preflight_typed_topic_input(
             )
             for scope, indices, key, shape in args.event_entry_empty
         ),
-        entry_object_facts=_topic_business_entry_object_facts(args),
-        entry_row_facts=_topic_business_entry_row_facts(args),
+        entry_object_facts=_topic_business_entry_object_facts(args, business),
+        entry_row_facts=_topic_business_entry_row_facts(args, business),
     )
 
 
 def _topic_business_facts(
     args: argparse.Namespace,
+    business: Any,
     prefix: str,
+    *,
+    channel: str,
 ) -> tuple[TopicBusinessFact, ...]:
     facts = [
         TopicBusinessFact(field_name, value)
         for field_name, value in getattr(args, prefix)
     ]
     facts.extend(
-        TopicBusinessFact(field_name, value, kind=kind)
-        for field_name, kind, value in getattr(args, f"{prefix}_as")
+        TopicBusinessFact(
+            field_name,
+            value,
+            kind=resolve_topic_business_value_choice(
+                business,
+                channel=channel,
+                owner=(field_name,),
+                handle=value_choice,
+            ),
+        )
+        for field_name, value_choice, value in getattr(args, f"{prefix}_as")
     )
     return tuple(facts)
 
 
 def _topic_business_row_facts(
     args: argparse.Namespace,
+    business: Any,
 ) -> tuple[TopicBusinessRowFact, ...]:
     facts = [
         TopicBusinessRowFact(
@@ -5834,9 +5919,14 @@ def _topic_business_row_facts(
             _parse_topic_row_indices(indices),
             field_name,
             value,
-            kind=kind,
+            kind=resolve_topic_business_value_choice(
+                business,
+                channel="event-row",
+                owner=(collection, field_name),
+                handle=value_choice,
+            ),
         )
-        for collection, indices, field_name, kind, value in args.event_row_as
+        for collection, indices, field_name, value_choice, value in args.event_row_as
     )
     return tuple(facts)
 
@@ -5854,6 +5944,7 @@ def _parse_topic_row_indices(value: str) -> tuple[int, ...]:
 
 def _topic_business_entry_facts(
     args: argparse.Namespace,
+    business: Any,
 ) -> tuple[TopicBusinessEntryFact, ...]:
     facts = [
         TopicBusinessEntryFact(
@@ -5870,15 +5961,21 @@ def _topic_business_entry_facts(
             _parse_topic_row_indices(indices),
             key,
             value,
-            kind=kind,
+            kind=resolve_topic_business_value_choice(
+                business,
+                channel="event-entry",
+                owner=(scope,),
+                handle=value_choice,
+            ),
         )
-        for scope, indices, key, kind, value in args.event_entry_as
+        for scope, indices, key, value_choice, value in args.event_entry_as
     )
     return tuple(facts)
 
 
 def _topic_business_entry_object_facts(
     args: argparse.Namespace,
+    business: Any,
 ) -> tuple[TopicBusinessEntryObjectFact, ...]:
     facts = [
         TopicBusinessEntryObjectFact(
@@ -5897,15 +5994,28 @@ def _topic_business_entry_object_facts(
             key,
             field_name,
             value,
-            kind=kind,
+            kind=resolve_topic_business_value_choice(
+                business,
+                channel="event-entry-object",
+                owner=(scope, field_name),
+                handle=value_choice,
+            ),
         )
-        for scope, indices, key, field_name, kind, value in args.event_entry_object_as
+        for (
+            scope,
+            indices,
+            key,
+            field_name,
+            value_choice,
+            value,
+        ) in args.event_entry_object_as
     )
     return tuple(facts)
 
 
 def _topic_business_entry_row_facts(
     args: argparse.Namespace,
+    business: Any,
 ) -> tuple[TopicBusinessEntryRowFact, ...]:
     facts = [
         TopicBusinessEntryRowFact(
@@ -5926,7 +6036,12 @@ def _topic_business_entry_row_facts(
             _parse_topic_entry_item_index(item_index),
             field_name,
             value,
-            kind=kind,
+            kind=resolve_topic_business_value_choice(
+                business,
+                channel="event-entry-row",
+                owner=(scope, field_name),
+                handle=value_choice,
+            ),
         )
         for (
             scope,
@@ -5934,7 +6049,7 @@ def _topic_business_entry_row_facts(
             key,
             item_index,
             field_name,
-            kind,
+            value_choice,
             value,
         ) in args.event_entry_row_as
     )
@@ -7951,6 +8066,8 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 "stream_argv_prefix": [
                     "stream-topic",
                     args.api,
+                    "--event-count",
+                    "<maximum-events:1..64>",
                     "--topic-contract-digest",
                     business.contract_digest,
                 ],
@@ -7959,13 +8076,13 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     "empty_topic_option": "--topic-option-empty <field>",
                     "typed_topic_option": (
                         "--topic-option-as <field> "
-                        "<text|integer|number|toggle|null> <value>"
+                        "<value-choice-handle> <value>"
                     ),
                     "event_match": "--event-match <field> <value>",
                     "empty_event_field": "--event-empty <field>",
                     "typed_event_match": (
                         "--event-match-as <field> "
-                        "<text|integer|number|toggle|null> <value>"
+                        "<value-choice-handle> <value>"
                     ),
                     "event_row": (
                         "--event-row <collection> <comma-separated-indices> "
@@ -7973,7 +8090,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     ),
                     "typed_event_row": (
                         "--event-row-as <collection> <comma-separated-indices> "
-                        "<field> <text|integer|number|toggle|null> <value>"
+                        "<field> <value-choice-handle> <value>"
                     ),
                     "empty_event_row": (
                         "--event-row-empty <collection> "
@@ -7985,7 +8102,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     ),
                     "typed_exact_entry": (
                         "--event-entry-as <scope> <indices-or-dash> "
-                        "<exact-key> <text|integer|number|toggle|null> <value>"
+                        "<exact-key> <value-choice-handle> <value>"
                     ),
                     "empty_exact_entry": (
                         "--event-entry-empty <scope> <indices-or-dash> "
@@ -7998,7 +8115,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     "typed_exact_entry_object": (
                         "--event-entry-object-as <scope> <indices-or-dash> "
                         "<exact-key> <field> "
-                        "<text|integer|number|toggle|null> <value>"
+                        "<value-choice-handle> <value>"
                     ),
                     "exact_entry_row": (
                         "--event-entry-row <scope> <indices-or-dash> "
@@ -8007,7 +8124,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     "typed_exact_entry_row": (
                         "--event-entry-row-as <scope> <indices-or-dash> "
                         "<exact-key> <item-index> <field> "
-                        "<text|integer|number|toggle|null> <value>"
+                        "<value-choice-handle> <value>"
                     ),
                 },
                     "event_row_field_disclosure": (
@@ -8022,7 +8139,9 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     ),
                 "lifecycle": {
                     "wait-topic": "bounded; unsubscribe",
-                    "stream-topic": "cancel/timeout; unsubscribe",
+                    "stream-topic": (
+                        "explicit event-count bound plus optional timeout; unsubscribe"
+                    ),
                 },
             },
                 "business_input": business.as_gateway_dict(
@@ -13684,7 +13803,12 @@ def dispatch_topic_stream(
             "ok": True,
             "status": "streaming",
             "buffer_limit_events": DEFAULT_LISTENER_QUEUE_SIZE,
+            "event_count_limit": args.event_count,
             "event_result_limit_bytes": result_limit_bytes,
+            "event_records_output_limit_bytes": (
+                TOPIC_STREAM_EVENT_OUTPUT_LIMIT_BYTES
+            ),
+            "total_output_limit_bytes": TOPIC_STREAM_TOTAL_OUTPUT_LIMIT_BYTES,
         },
         args=args,
         env=env,
@@ -13694,11 +13818,14 @@ def dispatch_topic_stream(
     primary_error: Exception | None = None
     cleanup_status = "unknown"
     cleanup_failure: dict[str, Any] | None = None
+    streamed_output_bytes = 0
     try:
-        emit_topic_stream_record(
+        streamed_output_bytes += emit_topic_stream_record(
             started_record,
             sink=stream_sink,
             limit_bytes=MAX_GATEWAY_RESULT_JSON_BYTES,
+            cumulative_bytes=streamed_output_bytes,
+            cumulative_limit_bytes=TOPIC_STREAM_EVENT_OUTPUT_LIMIT_BYTES,
         )
         collection_timeout = (
             math.inf
@@ -13763,7 +13890,7 @@ def dispatch_topic_stream(
                 authoring_ui_profile=live_info.get("isCommandLine") is False,
             )
             sequence = event_count + 1
-            emit_topic_stream_record(
+            streamed_output_bytes += emit_topic_stream_record(
                 {
                     "contract": TOPIC_STREAM_RECORD_CONTRACT,
                     "record_type": "event",
@@ -13774,14 +13901,36 @@ def dispatch_topic_stream(
                 },
                 sink=stream_sink,
                 limit_bytes=result_limit_bytes,
+                cumulative_bytes=streamed_output_bytes,
+                cumulative_limit_bytes=TOPIC_STREAM_EVENT_OUTPUT_LIMIT_BYTES,
             )
             event_count = sequence
-    except KeyboardInterrupt:
+            if event_count >= args.event_count:
+                break
+    except KeyboardInterrupt as cancellation:
         try:
-            event_stream.close()
-        except BaseException:
-            pass
-        raise
+            cleanup_succeeded = event_stream.close()
+        except BaseException as cleanup_exc:  # noqa: BLE001 - cancellation preserves cleanup truth
+            cleanup_status = SUBSCRIPTION_CLEANUP_FAILED
+            cleanup_failure = cleanup_failure_evidence(cleanup_exc)
+        else:
+            cleanup_status = (
+                SUBSCRIPTION_CLEANUP_UNSUBSCRIBED
+                if cleanup_succeeded
+                else SUBSCRIPTION_CLEANUP_FAILED
+            )
+            if not cleanup_succeeded:
+                cleanup_failure = {
+                    "error_code": "SUBSCRIPTION_CLEANUP_FAILED",
+                    "message": "Subscription cleanup returned false and remains active",
+                    "details": {"reason": "unsubscribe_returned_false"},
+                }
+        raise TopicStreamCancelled(
+            event_count=event_count,
+            elapsed_seconds=max(0.0, time.monotonic() - stream_started_at),
+            cleanup=cleanup_status,
+            cleanup_failure=cleanup_failure,
+        ) from cancellation
     except Exception as exc:  # noqa: BLE001 - terminal record preserves the structured error
         primary_error = exc
 
@@ -13845,7 +13994,11 @@ def dispatch_topic_stream(
         {
             "ok": True,
             "status": "completed",
-            "completion_reason": "duration_elapsed",
+            "completion_reason": (
+                "event_count_reached"
+                if event_count >= args.event_count
+                else "duration_elapsed"
+            ),
         }
     )
     return terminal
@@ -13895,7 +14048,9 @@ def emit_topic_stream_record(
     *,
     sink: Callable[[Mapping[str, Any]], None] | None,
     limit_bytes: int,
-) -> None:
+    cumulative_bytes: int = 0,
+    cumulative_limit_bytes: int | None = None,
+) -> int:
     """Validate one compact stream record's size before exposing it."""
 
     encoder = topic_stream_stdout_json_encoder()
@@ -13912,6 +14067,18 @@ def emit_topic_stream_record(
                     },
                     error_code="RESULT_TOO_LARGE",
                 )
+            if (
+                cumulative_limit_bytes is not None
+                and cumulative_bytes + observed > cumulative_limit_bytes
+            ):
+                raise GatewayResultShapeError(
+                    "stream-topic cumulative event output exceeded its JSON boundary.",
+                    details={
+                        "limit_bytes": cumulative_limit_bytes,
+                        "observed_at_least_bytes": cumulative_limit_bytes + 1,
+                    },
+                    error_code="RESULT_TOO_LARGE",
+                )
     except GatewayResultShapeError:
         raise
     except (RecursionError, TypeError, UnicodeEncodeError, ValueError) as exc:
@@ -13922,6 +14089,7 @@ def emit_topic_stream_record(
         ) from exc
     if sink is not None:
         sink(record)
+    return observed
 
 
 def _validated_tab_import_wire_path_input_audit(

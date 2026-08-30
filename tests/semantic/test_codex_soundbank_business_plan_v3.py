@@ -82,6 +82,21 @@ def _request(api: str, arguments: MappingProxyType | dict[str, object]) -> Mappi
     )
 
 
+def test_fixed_duration_topic_stream_uses_a_ceiling_not_expected_event_total() -> None:
+    steps = soundbank_topic_protocol_steps(
+        scenario_id="O22-SB-GENERATED-03",
+        topic=SOUNDBANK_TOPIC,
+        version="2024.1",
+        event_count=2,
+        match={"soundbank": {"name": "Weapons_Core"}},
+        options={"return": ["id", "name", "type", "path"]},
+    )
+
+    stream = steps[-1]
+    index = stream.arguments.index("--event-count")
+    assert stream.arguments[index + 1] == "64"
+
+
 def _case(api: str, scenario_id: str, root: Path, *, refusal: bool = False, topic: bool = False):
     root.mkdir(parents=True, exist_ok=True)
     source = root / "input.tsv"; source.write_text("Bank\tEvent\tHero\n", encoding="utf-8")

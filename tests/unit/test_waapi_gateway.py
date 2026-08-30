@@ -29,7 +29,10 @@ from wwise_waapi.builders.query import (  # pyright: ignore[reportMissingImports
 )
 from wwise_waapi.safety import EXPLICIT_UNSUPPORTED_TOPIC_URIS, IMMEDIATE_UNSUPPORTED_CALL_URIS
 from wwise_waapi.typed_topics import topic_match_contract, topic_options_contract
-from wwise_waapi.topic_business import topic_business_contract
+from wwise_waapi.topic_business import (
+    topic_business_contract,
+    topic_business_value_choices,
+)
 from wwise_waapi.typed_requests import typed_request_construction_for_values
 from wwise_waapi.versions import SUPPORTED_WWISE_VERSION_KEYS, version_key_from_get_info
 
@@ -99,7 +102,30 @@ def _typed_topic_arguments(
             items = value if isinstance(value, list) else [value]
             for item in items:
                 kind, encoded = _business_test_value(item)
-                arguments.extend([flag, field.token, kind, encoded])
+                if len(field.accepted_value_kinds) == 1:
+                    arguments.extend([flag.removesuffix("-as"), field.token, encoded])
+                    continue
+                meaning = {
+                    "text": "literal_text",
+                    "integer": "whole_number",
+                    "number": "decimal_number",
+                    "toggle": "on_or_off",
+                    "null": "explicit_empty",
+                }[kind]
+                choice = next(
+                    choice
+                    for choice in topic_business_value_choices(
+                        contract,
+                        channel=(
+                            "topic-option"
+                            if flag == "--topic-option-as"
+                            else "event-match"
+                        ),
+                        owner=(field.token,),
+                    )
+                    if choice.meaning == meaning
+                )
+                arguments.extend([flag, field.token, choice.handle, encoded])
     return arguments
 
 
@@ -4602,6 +4628,8 @@ def test_stream_topic_emits_matching_events_immediately_from_one_subscription(
             "0.5",
             "stream-topic",
             topic,
+            "--event-count",
+            "64",
             *_typed_topic_arguments(topic, match={"object": {"id": wanted}}),
         ],
         env=gateway_env(tmp_path),
@@ -4632,6 +4660,141 @@ def test_stream_topic_emits_matching_events_immediately_from_one_subscription(
     assert client.disconnected is True
 
 
+def test_stream_topic_stops_at_its_explicit_event_count_bound(
+    tmp_path: Path,
+) -> None:
+    topic = "ak.wwise.core.object.created"
+    client = FakeClient(
+        {"ak.wwise.core.getInfo": live_info()},
+        subscription_events={
+            topic: [
+                {"object": {"id": "one", "name": "UI_1"}},
+                {"object": {"id": "two", "name": "UI_2"}},
+                {"object": {"id": "three", "name": "UI_3"}},
+            ]
+        },
+    )
+    records: list[Mapping[str, Any]] = []
+
+    exit_code, terminal = waapi_gateway.execute_gateway(
+        [
+            "stream-topic",
+            topic,
+            "--event-count",
+            "2",
+            *_typed_topic_bindings(topic),
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+        stream_sink=records.append,
+    )
+
+    assert exit_code == 0
+    assert [record["record_type"] for record in records] == [
+        "started",
+        "event",
+        "event",
+    ]
+    assert terminal["completion_reason"] == "event_count_reached"
+    assert terminal["event_count"] == 2
+    assert terminal["cleanup"] == "unsubscribed"
+    assert client.handlers[0].unsubscribe_calls == 1
+
+
+def test_stream_topic_bounds_cumulative_event_record_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    topic = "ak.wwise.core.object.created"
+    client = FakeClient(
+        {"ak.wwise.core.getInfo": live_info()},
+        subscription_events={
+            topic: [
+                {"object": {"id": str(index), "name": "x" * 512}}
+                for index in range(8)
+            ]
+        },
+    )
+    records: list[Mapping[str, Any]] = []
+    monkeypatch.setattr(
+        waapi_gateway,
+        "TOPIC_STREAM_EVENT_OUTPUT_LIMIT_BYTES",
+        2048,
+    )
+
+    exit_code, terminal = waapi_gateway.execute_gateway(
+        [
+            "--timeout",
+            "0.5",
+            "stream-topic",
+            topic,
+            "--event-count",
+            "64",
+            *_typed_topic_bindings(topic),
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+        stream_sink=records.append,
+    )
+
+    assert exit_code == 2
+    assert terminal["error_code"] == "RESULT_TOO_LARGE"
+    assert terminal["cleanup"] == "unsubscribed"
+    assert terminal["details"]["limit_bytes"] == 2048
+    assert len(records) < 9
+    assert client.handlers[0].unsubscribe_calls == 1
+
+
+def test_stream_topic_cancellation_reports_subscription_cleanup(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    topic = "ak.wwise.core.object.created"
+
+    class InterruptingStream:
+        close_calls = 0
+
+        def poll(self, timeout: float) -> None:
+            del timeout
+            raise KeyboardInterrupt
+
+        def close(self) -> bool:
+            self.close_calls += 1
+            return True
+
+    event_stream = InterruptingStream()
+    monkeypatch.setattr(
+        waapi_gateway.SubscriptionManager,
+        "open_stream",
+        lambda *args, **kwargs: event_stream,
+    )
+    client = FakeClient({"ak.wwise.core.getInfo": live_info()})
+    records: list[Mapping[str, Any]] = []
+
+    exit_code, terminal = waapi_gateway.execute_gateway(
+        [
+            "stream-topic",
+            topic,
+            "--event-count",
+            "64",
+            *_typed_topic_bindings(topic),
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+        stream_sink=records.append,
+    )
+
+    assert exit_code == 130
+    assert terminal["contract"] == waapi_gateway.TOPIC_STREAM_RECORD_CONTRACT
+    assert terminal["record_type"] == "terminal"
+    assert terminal["status"] == "cancelled"
+    assert terminal["error_code"] == "CANCELLED"
+    assert terminal["cleanup"] == "unsubscribed"
+    assert terminal["transport_cleanup"] == {"status": "transport_closed"}
+    assert event_stream.close_calls == 1
+    assert client.disconnected is True
+
+
 def test_short_topic_wait_reserves_half_deadline_for_cleanup() -> None:
     started_at = time.monotonic()
     connection = waapi_gateway.GatewayConnection(
@@ -4652,19 +4815,28 @@ def test_short_topic_wait_reserves_half_deadline_for_cleanup() -> None:
     assert 0.20 <= reserved <= 0.25
 
 
-def test_stream_topic_defaults_to_continuous_until_cancelled(
+def test_stream_topic_requires_an_explicit_event_count_bound(
     tmp_path: Path,
 ) -> None:
-    args = waapi_gateway.build_parser().parse_args(
-        ["stream-topic", "ak.wwise.core.object.created"]
-    )
+    topic = "ak.wwise.core.object.created"
+    connected = False
 
-    connection = waapi_gateway.resolve_connection(
-        args,
+    def client_factory(url: str) -> FakeClient:
+        nonlocal connected
+        connected = True
+        raise AssertionError(url)
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["--timeout", "0.01", "stream-topic", topic, *_typed_topic_bindings(topic)],
         env=gateway_env(tmp_path),
+        client_factory=client_factory,
+        stream_sink=lambda record: None,
     )
 
-    assert connection.timeout == math.inf
+    assert exit_code == 2
+    assert payload["error_code"] == "GatewayInputError"
+    assert "event-count" in payload["message"]
+    assert connected is False
 
 
 def test_stream_topic_without_record_sink_fails_before_connecting(

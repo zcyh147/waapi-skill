@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field
-from typing import Any, Mapping, Sequence
+from typing import Any, Iterable, Mapping, Sequence
 
 from .canonical import canonical_sha256
 from .typed_requests import (
@@ -25,8 +25,16 @@ from .typed_topics import topic_match_contract, topic_options_contract
 
 
 TOPIC_BUSINESS_CONTRACT = "waapi-skill.topic-business/v1"
+TOPIC_VALUE_CHOICE_HANDLE_PREFIX = "tvc1-"
 _SCALAR_TYPES = frozenset({"string", "integer", "number", "boolean", "null"})
 _CAMEL_BOUNDARY = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
+_VALUE_CHOICE_MEANINGS = {
+    "text": "literal_text",
+    "integer": "whole_number",
+    "number": "decimal_number",
+    "toggle": "on_or_off",
+    "null": "explicit_empty",
+}
 
 
 class TopicBusinessError(ValueError):
@@ -283,7 +291,11 @@ class TopicBusinessContract:
             "version": self.version,
             "topic": self.topic,
             "contract_digest": self.contract_digest,
-            "options": _gateway_field_table(self.option_fields),
+            "options": _gateway_field_table(
+                self,
+                self.option_fields,
+                channel="topic-option",
+            ),
             "event_match_groups": {
                 "columns": ["group", "field_count", "field_digest"],
                 "rows": [
@@ -299,16 +311,20 @@ class TopicBusinessContract:
                 ),
             },
             "event_match": _gateway_field_table(
-                match_groups.get(selected_match_group, ())
+                self,
+                match_groups.get(selected_match_group, ()),
+                channel="event-match",
             ),
             "option_empty": [item.as_dict() for item in self.option_empty_fields],
             "event_empty": [item.as_dict() for item in self.match_empty_fields],
             "event_rows": _gateway_row_table(
+                self,
                 self.row_fields,
                 selected_row=selected_row,
                 selected_field_group=selected_row_field_group,
             ),
             "exact_entries": _gateway_entry_table(
+                self,
                 self.entry_fields,
                 selected_entry=selected_entry,
             ),
@@ -325,6 +341,20 @@ class MaterializedTopicBusinessInputs:
     match: Mapping[str, Any]
     option_request: MaterializedTypedRequest
     match_request: MaterializedTypedRequest
+
+
+@dataclass(frozen=True, slots=True)
+class TopicBusinessValueChoice:
+    """Opaque contract-bound choice for one union-ambiguous scalar."""
+
+    handle: str
+    channel: str
+    owner: tuple[str, ...]
+    meaning: str
+    _kind: str = field(repr=False, compare=False)
+
+    def as_gateway_row(self) -> list[str]:
+        return [self.handle, self.meaning]
 
 
 def topic_business_contract(version: str, topic: str) -> TopicBusinessContract:
@@ -362,6 +392,131 @@ def topic_business_contract(version: str, topic: str) -> TopicBusinessContract:
         row_fields=row_fields,
         entry_fields=entry_fields,
         contract_digest=canonical_sha256(public_body),
+    )
+
+
+def topic_business_value_choices(
+    contract: TopicBusinessContract,
+    *,
+    channel: str,
+    owner: Sequence[str],
+) -> tuple[TopicBusinessValueChoice, ...]:
+    """Return finite opaque choices only where reflected scalar meaning is ambiguous."""
+
+    owner_tuple = tuple(owner)
+    accepted: tuple[str, ...]
+    if channel in {"topic-option", "event-match"}:
+        fields = (
+            contract.option_fields
+            if channel == "topic-option"
+            else contract.match_fields
+        )
+        if len(owner_tuple) != 1:
+            raise TopicBusinessError(f"{channel} value choice requires one field")
+        selected = next(
+            (item for item in fields if item.token == owner_tuple[0]),
+            None,
+        )
+        if selected is None:
+            raise TopicBusinessError(
+                f"Unknown {channel} field {owner_tuple[0]!r}"
+            )
+        accepted = selected.accepted_value_kinds
+    elif channel == "event-row":
+        if len(owner_tuple) != 2:
+            raise TopicBusinessError(
+                "event-row value choice requires collection and field"
+            )
+        row = next(
+            (item for item in contract.row_fields if item.token == owner_tuple[0]),
+            None,
+        )
+        selected = next(
+            (item for item in row.fields if item.token == owner_tuple[1]),
+            None,
+        ) if row is not None else None
+        if selected is None:
+            raise TopicBusinessError(
+                f"Unknown event-row field {'/'.join(owner_tuple)!r}"
+            )
+        accepted = selected.accepted_value_kinds
+    elif channel in {"event-entry", "event-entry-object", "event-entry-row"}:
+        expected_owner_count = 1 if channel == "event-entry" else 2
+        if len(owner_tuple) != expected_owner_count:
+            raise TopicBusinessError(
+                f"{channel} value choice has an invalid owner"
+            )
+        entry = next(
+            (item for item in contract.entry_fields if item.token == owner_tuple[0]),
+            None,
+        )
+        if entry is None:
+            raise TopicBusinessError(
+                f"Unknown event-entry scope {owner_tuple[0]!r}"
+            )
+        if channel == "event-entry":
+            accepted = entry.accepted_value_kinds
+        else:
+            fields = (
+                entry.object_fields
+                if channel == "event-entry-object"
+                else entry.row_fields
+            )
+            selected = next(
+                (item for item in fields if item.token == owner_tuple[1]),
+                None,
+            )
+            if selected is None:
+                raise TopicBusinessError(
+                    f"Unknown {channel} field {'/'.join(owner_tuple)!r}"
+                )
+            accepted = selected.accepted_value_kinds
+    else:
+        raise TopicBusinessError(f"Unknown Topic value-choice channel {channel!r}")
+
+    if len(accepted) <= 1:
+        return ()
+    return tuple(
+        TopicBusinessValueChoice(
+            handle=(
+                TOPIC_VALUE_CHOICE_HANDLE_PREFIX
+                + canonical_sha256(
+                    {
+                        "contract_digest": contract.contract_digest,
+                        "channel": channel,
+                        "owner": owner_tuple,
+                        "kind": kind,
+                    }
+                )[:32]
+            ),
+            channel=channel,
+            owner=owner_tuple,
+            meaning=_VALUE_CHOICE_MEANINGS[kind],
+            _kind=kind,
+        )
+        for kind in accepted
+    )
+
+
+def resolve_topic_business_value_choice(
+    contract: TopicBusinessContract,
+    *,
+    channel: str,
+    owner: Sequence[str],
+    handle: str,
+) -> str:
+    """Resolve one copied opaque choice without exposing its reflected wire type."""
+
+    for choice in topic_business_value_choices(
+        contract,
+        channel=channel,
+        owner=owner,
+    ):
+        if choice.handle == handle:
+            return choice._kind
+    raise TopicBusinessError(
+        "Unknown or stale Topic value-choice handle for "
+        f"{channel} {'/'.join(owner)!r}; rerun topic-schema and copy the exact handle"
     )
 
 
@@ -964,6 +1119,11 @@ def _select_candidate(
     field: TopicBusinessField,
     fact: TopicBusinessFact,
 ) -> tuple[TypedFieldContract, str]:
+    _require_value_choice_for_ambiguous_scalar(
+        field.accepted_value_kinds,
+        fact.kind,
+        label=field.token,
+    )
     supported = {
         str(variant["type"])
         for candidate in field._candidates
@@ -1102,6 +1262,11 @@ def _parse_row_value(
     field: TopicBusinessRowField,
     fact: TopicBusinessRowFact,
 ) -> Any:
+    _require_value_choice_for_ambiguous_scalar(
+        field.accepted_value_kinds,
+        fact.kind,
+        label=field.token,
+    )
     supported = {
         str(variant["type"])
         for variant in field._variants
@@ -1290,6 +1455,11 @@ def _parse_entry_scalar(
     value: str,
     kind: str | None,
 ) -> Any:
+    _require_value_choice_for_ambiguous_scalar(
+        entry.accepted_value_kinds,
+        kind,
+        label=entry.token,
+    )
     supported = {
         str(variant["type"])
         for variant in entry._scalar_variants
@@ -1328,6 +1498,19 @@ def _parse_entry_row_value(
         field,
         TopicBusinessRowFact("entry", (), field.token, value, kind=kind),
     )
+
+
+def _require_value_choice_for_ambiguous_scalar(
+    accepted_value_kinds: Sequence[str],
+    selected_kind: str | None,
+    *,
+    label: str,
+) -> None:
+    if len(accepted_value_kinds) > 1 and selected_kind is None:
+        raise TopicBusinessError(
+            f"{label!r} accepts multiple scalar meanings; rerun topic-schema "
+            "and copy one exact value-choice handle"
+        )
 
 
 def _ensure_row_target(
@@ -1433,24 +1616,53 @@ def _business_kind(value_type: str) -> str:
 
 
 def _gateway_field_table(
+    contract: TopicBusinessContract,
     fields: Sequence[TopicBusinessField],
+    *,
+    channel: str,
 ) -> dict[str, Any]:
-    kind_sets: list[tuple[str, ...]] = []
-    for item in fields:
-        if item.accepted_value_kinds not in kind_sets:
-            kind_sets.append(item.accepted_value_kinds)
+    choices = {
+        item.token: topic_business_value_choices(
+            contract,
+            channel=channel,
+            owner=(item.token,),
+        )
+        for item in fields
+    }
     return {
-        "columns": ["field", "cardinality", "value_kind_set", "required"],
-        "value_kind_sets": [list(item) for item in kind_sets],
+        "columns": [
+            "field",
+            "cardinality",
+            "value_mode",
+            "required",
+            "value_choice_handles",
+        ],
         "rows": [
             [
                 item.token,
                 item.cardinality,
-                kind_sets.index(item.accepted_value_kinds),
+                "choice_required" if choices[item.token] else "gateway_derived",
                 item.required,
+                [choice.handle for choice in choices[item.token]],
             ]
             for item in fields
         ],
+        "value_choices": _gateway_value_choice_table(
+            choice
+            for item_choices in choices.values()
+            for choice in item_choices
+        ),
+    }
+
+
+def _gateway_value_choice_table(
+    choices: Iterable[TopicBusinessValueChoice],
+) -> dict[str, Any]:
+    rows = [choice.as_gateway_row() for choice in choices]
+    return {
+        "columns": ["handle", "meaning"],
+        "rows": rows,
+        "copy_exactly": True,
     }
 
 
@@ -1469,6 +1681,7 @@ def _business_match_groups(
 
 
 def _gateway_row_table(
+    contract: TopicBusinessContract,
     rows: Sequence[TopicBusinessRowContract],
     *,
     selected_row: str | None,
@@ -1523,11 +1736,39 @@ def _gateway_row_table(
                 ),
             },
             "fields": {
-                "columns": ["field", "accepted_value_kinds"],
+                "columns": ["field", "value_mode", "value_choice_handles"],
                 "rows": [
-                    [item.token, list(item.accepted_value_kinds)]
+                    [
+                        item.token,
+                        (
+                            "choice_required"
+                            if topic_business_value_choices(
+                                contract,
+                                channel="event-row",
+                                owner=(row.token, item.token),
+                            )
+                            else "gateway_derived"
+                        ),
+                        [
+                            choice.handle
+                            for choice in topic_business_value_choices(
+                                contract,
+                                channel="event-row",
+                                owner=(row.token, item.token),
+                            )
+                        ],
+                    ]
                     for item in field_groups.get(selected_field_group, ())
                 ],
+                "value_choices": _gateway_value_choice_table(
+                    choice
+                    for item in field_groups.get(selected_field_group, ())
+                    for choice in topic_business_value_choices(
+                        contract,
+                        channel="event-row",
+                        owner=(row.token, item.token),
+                    )
+                ),
             },
         }
     return payload
@@ -1548,6 +1789,7 @@ def _row_field_groups(
 
 
 def _gateway_entry_table(
+    contract: TopicBusinessContract,
     entries: Sequence[TopicBusinessEntryContract],
     *,
     selected_entry: str | None,
@@ -1556,7 +1798,7 @@ def _gateway_entry_table(
         "columns": [
             "scope",
             "index_depth",
-            "accepted_value_kinds",
+            "scalar_value_mode",
             "object_field_count",
             "row_field_count",
             "object_field_mode",
@@ -1566,7 +1808,11 @@ def _gateway_entry_table(
             [
                 entry.token,
                 entry.index_depth,
-                list(entry.accepted_value_kinds),
+                (
+                    "choice_on_disclosure"
+                    if len(entry.accepted_value_kinds) > 1
+                    else "gateway_derived"
+                ),
                 len(entry.object_fields),
                 len(entry.row_fields),
                 "exact-key" if entry._open_object_fields else "closed",
@@ -1581,8 +1827,76 @@ def _gateway_entry_table(
         entry = next(
             item for item in entries if item.token == selected_entry
         )
-        payload["selected"] = entry.as_dict()
+        scalar_choices = topic_business_value_choices(
+            contract,
+            channel="event-entry",
+            owner=(entry.token,),
+        )
+        payload["selected"] = {
+            "scope": entry.token,
+            "index_depth": entry.index_depth,
+            "scalar_value_mode": (
+                "choice_required" if scalar_choices else "gateway_derived"
+            ),
+            "scalar_value_choice_handles": [
+                choice.handle for choice in scalar_choices
+            ],
+            "value_choices": _gateway_value_choice_table(scalar_choices),
+            "object_fields": _gateway_entry_member_table(
+                contract,
+                entry,
+                channel="event-entry-object",
+            ),
+            "row_fields": _gateway_entry_member_table(
+                contract,
+                entry,
+                channel="event-entry-row",
+            ),
+            "object_field_mode": (
+                "exact-key" if entry._open_object_fields else "closed"
+            ),
+            "row_field_mode": (
+                "exact-key" if entry._open_row_fields else "closed"
+            ),
+        }
     return payload
+
+
+def _gateway_entry_member_table(
+    contract: TopicBusinessContract,
+    entry: TopicBusinessEntryContract,
+    *,
+    channel: str,
+) -> dict[str, Any]:
+    fields = (
+        entry.object_fields
+        if channel == "event-entry-object"
+        else entry.row_fields
+    )
+    choices = {
+        item.token: topic_business_value_choices(
+            contract,
+            channel=channel,
+            owner=(entry.token, item.token),
+        )
+        for item in fields
+    }
+    return {
+        "columns": ["field", "value_mode", "value_choice_handles"],
+        "rows": [
+            [
+                item.token,
+                "choice_required" if choices[item.token] else "gateway_derived",
+                [choice.handle for choice in choices[item.token]],
+            ]
+            for item in fields
+        ],
+        "value_choices": _gateway_value_choice_table(
+            choice
+            for item_choices in choices.values()
+            for choice in item_choices
+        ),
+    }
 
 
 __all__ = [
@@ -1602,6 +1916,9 @@ __all__ = [
     "TopicBusinessRowContract",
     "TopicBusinessRowFact",
     "TopicBusinessRowField",
+    "TopicBusinessValueChoice",
     "materialize_topic_business_inputs",
+    "resolve_topic_business_value_choice",
     "topic_business_contract",
+    "topic_business_value_choices",
 ]

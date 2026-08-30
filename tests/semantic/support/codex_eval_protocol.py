@@ -26,7 +26,6 @@ from .codex_gateway_broker import (
     ResponseBinding,
     SemanticJsonArgument,
 )
-from wwise_waapi.topic_business import topic_business_contract
 
 
 _CONFIRM_RUNTIME_FIELDS = frozenset({"transaction_id", "preview_hash"})
@@ -297,7 +296,7 @@ _CASE_ROUTES: Mapping[str, _CaseRoute] = {
         protocol="object_created_topic_read_only",
         operation=None,
         variables=("wwise_version", "topic_probe_name", "topic_probe_event_type"),
-        phases={"single": ("topic-schema", "wait-topic")},
+        phases={"single": ("wait-topic",)},
     ),
     "R6": _CaseRoute(
         adapter="reflection_functions_read",
@@ -433,37 +432,17 @@ def build_expected_gateway_steps(
             ),
         )
     elif session.case.id == "R5":
-        topic = "ak.wwise.core.object.created"
-        digest = topic_business_contract(session.version, topic).contract_digest
         steps = (
-            ExpectedGatewayStep(
-                name="topic-schema",
-                subcommand="topic-schema",
-                arguments=(topic,),
-            ),
             ExpectedGatewayStep(
                 name="wait-topic",
                 subcommand="wait-topic",
                 gateway_global_arguments=("--timeout", "10"),
                 arguments=(
-                    topic,
-                    "--topic-contract-digest",
-                    digest,
-                    "--topic-option",
-                    "include",
-                    "id",
-                    "--topic-option",
-                    "include",
-                    "name",
-                    "--topic-option",
-                    "include",
-                    "type",
-                    "--topic-option",
-                    "include",
-                    "path",
-                    "--event-match",
-                    "object-type",
-                    values["topic_probe_event_type"],
+                    "ak.wwise.core.object.created",
+                    "--options-json",
+                    SemanticJsonArgument({"return": ["id", "name", "type", "path"]}),
+                    "--match-json",
+                    SemanticJsonArgument({"object": {"type": values["topic_probe_event_type"]}}),
                 ),
             ),
         )

@@ -431,6 +431,9 @@ or recommendation, not a maximum. With `--no-timeout`, collection still stops at
 1–64 matching events, and the command still returns one terminal JSON document. Recursive
 business match facts from `topic-schema` are applied per event; the Gateway derives
 publish-schema paths, nested containers, wire types, and exact matching structure.
+For a union-ambiguous scalar, copy the exact opaque `tvc1-*` value-choice
+handle disclosed by `topic-schema`; raw `text`, `integer`, `number`, `toggle`,
+or `null` type words are rejected before connection.
 Nonmatches do not consume count. The route
 unsubscribes after success, timeout, or user cancellation. Every payload is
 publish-schema validated, and the complete dispatcher collection still shares
@@ -442,12 +445,14 @@ Route ordinary vague requests to subscribe, listen, monitor through
 stream, continuous, persistent, event-by-event, “实时逐条”, “流式”, “持续”,
 “一直监听”, or “不要收到后退出” intent. It uses one persistent subscription and
 emits one compact flushed NDJSON record per match,
-and by default continues until the user cancels it or a bounded low-frequency
-health check detects host loss/replacement. A finite global timeout ends it
-normally. Every streamed event is validated; overflow fails closed instead of
-silently dropping an event. Every exit always attempts to unsubscribe and emits
-one terminal NDJSON record. Relay events immediately; do not restart between
-events or wait for the terminal record.
+and requires an explicit maximum `--event-count <1..64>`. Without a global
+timeout it continues until that count, user cancellation, or a bounded
+low-frequency health check detects host loss/replacement. A finite global
+timeout ends it normally. Every streamed event and the cumulative NDJSON bytes
+are bounded and validated; overflow fails closed instead of silently dropping
+an event. Every exit always attempts to unsubscribe and emits one terminal
+NDJSON record. Relay events immediately; do not restart between events or wait
+for the terminal record.
 
 For `ak.wwise.core.soundbank.generated`, the gateway itself keeps the ordinary 10-second omitted-duration default. The Skill must explicitly pass gateway-global `--timeout 120` and tell the user that this subscription will use 120 seconds. This is an explicit Skill-selected timeout, not a different gateway default; a user-supplied positive finite duration or explicit no-time-limit bounded wait still takes precedence. Run `topic-schema`; repeat `--topic-option include <id|name|type|path>`, set event count to Bank × platform × language cells, and use `--event-match soundbank-name <name>` only when one explicit Bank name covers every cell. When every requested cell shares one platform, add `--event-entry platform - name <platform-name>`. Otherwise omit that predicate; never inject a GUID.
 

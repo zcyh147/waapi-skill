@@ -57,8 +57,9 @@ inherited from the canonical Console manifest.
   timeout, and a result-size ceiling.
 - `bounded_topic_wait`: a configurable finite or explicitly no-timeout wait
   that remains event-count/result bounded and always unsubscribes. Explicit
-  continuous requests use `stream-topic`, whose persistent subscription emits
-  bounded records and also unsubscribes on termination.
+  continuous requests use `stream-topic`, whose persistent subscription has an
+  explicit event-count and cumulative-output bound, emits bounded records, and
+  also unsubscribes on termination.
 - `transaction`, `managed_transaction`, or `isolated_transaction`: a named
   `operation-schema` or exact-URI `request-schema` typed route through immutable
   Preview -> accepted authorization -> execute once -> result verification.

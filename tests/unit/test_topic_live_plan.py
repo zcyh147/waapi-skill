@@ -29,6 +29,7 @@ SAFE_TASK_8_TOPIC_URIS = {
     "ak.wwise.core.object.postDeleted",
     "ak.wwise.core.object.preDeleted",
     "ak.wwise.core.object.propertyChanged",
+    "ak.wwise.core.object.structureChanged",
     "ak.wwise.core.log.itemAdded",
 }
 FORBIDDEN_TASK_8_TOPIC_URIS = {
@@ -36,7 +37,6 @@ FORBIDDEN_TASK_8_TOPIC_URIS = {
     "ak.wwise.core.object.attenuationCurveLinkChanged",
     "ak.wwise.core.object.curveChanged",
     "ak.wwise.core.object.referenceChanged",
-    "ak.wwise.core.object.structureChanged",
     "ak.wwise.core.profiler.captureLog.itemAdded",
     "ak.wwise.core.project.saved",
     "ak.wwise.ui.selectionChanged",
@@ -228,12 +228,18 @@ def test_task_91_plan_compiles_public_business_options_and_match() -> None:
     assert business.match_request.schema_digest
 
 
-def test_task_91_plan_is_bounded_to_two_representative_event_families() -> None:
+def test_task_91_plan_covers_every_safe_2022_object_event_family() -> None:
     plan = _task8_plan(TASK_91_PLAN_PATH)
 
     assert plan["metadata"]["version"] == "2022.1"
     assert {case["uri"] for case in plan["topic_cases"]} == {
+        "ak.wwise.core.object.childAdded",
+        "ak.wwise.core.object.childRemoved",
         "ak.wwise.core.object.created",
+        "ak.wwise.core.object.nameChanged",
+        "ak.wwise.core.object.notesChanged",
+        "ak.wwise.core.object.postDeleted",
+        "ak.wwise.core.object.preDeleted",
         "ak.wwise.core.object.propertyChanged",
     }
     for case in plan["topic_cases"]:

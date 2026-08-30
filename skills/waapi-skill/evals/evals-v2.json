@@ -225,7 +225,7 @@
       "id": "object_created_topic_read_only",
       "phases": [{
         "id": "single",
-        "gateway_steps": ["topic-schema", "wait-topic"],
+        "gateway_steps": ["wait-topic"],
         "hard_gates": [
           "fresh_ephemeral_no_memory", "one_thread_one_turn", "no_collaboration",
           "exact_target_skill_only", "skill_md_read", "gateway_only_no_ad_hoc_code",
@@ -595,7 +595,7 @@
       "adapter": "object_created_topic_read",
       "protocol": "object_created_topic_read_only",
       "variables": ["wwise_version", "topic_probe_name", "topic_probe_event_type"],
-      "prompts": {"single": "请用 waapi-skill 在 Wwise {wwise_version} 中等待一次 ak.wwise.core.object.created。先运行 topic-schema，随后原样复制它返回的 --topic-contract-digest；必须在 wait-topic 子命令前显式使用 gateway-global --timeout 10，用业务 options 请求 id、name、type、path，并用业务 event match 精确匹配 object type={topic_probe_event_type}。测试 runner 会在订阅后创建名为 {topic_probe_name} 的对象，并在评分时用隐藏的 runner-owned GUID 校验事件归属；不要自己创建对象、不要写代码。最终回答必须且只能是一行 WAAPI_RESULT_JSON=<json>；JSON 顶层键必须严格为 topic、event_object_id、cleanup；topic 和 cleanup 必须逐字来自 gateway，event_object_id 必须逐字来自 gateway event.object.id。不要 Markdown、解释或任何其他文字。"},
+      "prompts": {"single": "请用 waapi-skill 的固定 wait-topic 命令，在 Wwise {wwise_version} 中等待一次 ak.wwise.core.object.created；必须在 wait-topic 子命令前显式使用 gateway-global --timeout 10，options-json 必须显式请求 return=[id,name,type,path]，并用 match-json 精确匹配 object.type={topic_probe_event_type}。测试 runner 会在订阅后创建名为 {topic_probe_name} 的对象，并在评分时用隐藏的 runner-owned GUID 校验事件归属；不要自己创建对象、不要写代码。最终回答必须且只能是一行 WAAPI_RESULT_JSON=<json>；JSON 顶层键必须严格为 topic、event_object_id、cleanup；topic 和 cleanup 必须逐字来自 gateway，event_object_id 必须逐字来自 gateway event.object.id。不要 Markdown、解释或任何其他文字。"},
       "operation": null,
       "mutation_uri": null,
       "request_template": null

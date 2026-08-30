@@ -91,7 +91,7 @@ def test_property_changed_business_value_selects_branch_from_value() -> None:
             TopicBusinessFact("property", "Volume"),
         ),
         match_facts=(
-            TopicBusinessFact("new", "-4"),
+            TopicBusinessFact("new", "-4", kind="number"),
             TopicBusinessFact("object-name", "Weather_Rain"),
         ),
     )
@@ -185,7 +185,13 @@ def test_exact_accessor_entries_compile_scalar_object_and_object_list_values() -
         option_facts=(),
         match_facts=(),
         entry_facts=(
-            TopicBusinessEntryFact("objects", (0,), "@Volume", "-4"),
+            TopicBusinessEntryFact(
+                "objects",
+                (0,),
+                "@Volume",
+                "-4",
+                kind="number",
+            ),
         ),
         entry_object_facts=(
             TopicBusinessEntryObjectFact(

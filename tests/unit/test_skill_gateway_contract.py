@@ -188,10 +188,9 @@ def test_topic_wait_policy_is_consistent_across_skill_reference_and_readmes() ->
     assert "only when the user explicitly asks for a stream" in query_flat
     assert "one persistent subscription" in query_flat
     assert "one compact flushed NDJSON record" in query_flat
-    assert (
-        "by default continues until the user cancels it or a bounded "
-        "low-frequency health check detects"
-    ) in query_flat
+    assert "requires an explicit maximum `--event-count <1..64>`" in query_flat
+    assert "user cancellation, or a bounded low-frequency health check" in query_flat
+    assert "cumulative NDJSON bytes are bounded" in query_flat
     assert "overflow fails closed instead of silently dropping an event" in query_flat
     assert "always attempts to unsubscribe" in query_flat
     assert "one terminal NDJSON record" in query_flat

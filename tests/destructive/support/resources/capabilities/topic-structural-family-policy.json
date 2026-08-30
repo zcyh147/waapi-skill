@@ -1,0 +1,219 @@
+{
+  "contract": "waapi-skill.topic-structural-family-policy/v1",
+  "versions": ["2022.1", "2025.1"],
+  "family_count": 24,
+  "policy": {
+    "purpose": "Partition the proportional real-Wwise evidence obligation by exact public Topic business-contract shape. A reflected or program-tested schema is not real behavioral evidence.",
+    "active_live_rule": "Credit requires a fresh matching event payload from the named test on the exact frozen candidate and host. Accepted publisher calls, timeouts, polls, or old evidence do not count.",
+    "boundary_rule": "A prerequisite or prohibited boundary receives no real PASS credit and is revisited only at its exact review trigger."
+  },
+  "families": [
+    {
+      "family": "audio-import-collection",
+      "topics_by_version": {
+        "2022.1": ["ak.wwise.core.audio.imported"],
+        "2025.1": ["ak.wwise.core.audio.imported"]
+      },
+      "evidence_by_version": {
+        "2022.1": {"disposition": "active_live", "publisher": "ak.wwise.core.audio.import", "evidence_test": "tests/destructive/test_soundbank_audio_sandbox.py", "result_requirement": "matching_event_payload", "counts_as_real_pass_only_after_execution": true},
+        "2025.1": {"disposition": "active_live", "publisher": "ak.wwise.core.audio.import", "evidence_test": "tests/destructive/test_soundbank_audio_sandbox.py", "result_requirement": "matching_event_payload", "counts_as_real_pass_only_after_execution": true}
+      }
+    },
+    {
+      "family": "log-item",
+      "topics_by_version": {
+        "2022.1": ["ak.wwise.core.log.itemAdded"],
+        "2025.1": ["ak.wwise.core.log.itemAdded"]
+      },
+      "evidence_by_version": {
+        "2022.1": {"disposition": "prerequisite_boundary", "blocker": "Wwise 2022.1 has no reflected ak.wwise.core.log.addItem publisher and no deterministic unique log-item publisher is packaged.", "review_trigger": "Add a bounded publisher only when a version-proven operation can emit a uniquely matchable log payload.", "counts_as_real_pass": false},
+        "2025.1": {"disposition": "active_live", "publisher": "ak.wwise.core.log.addItem", "evidence_test": "tests/live/test_2025_1_object_topics_sandbox.py", "result_requirement": "matching_event_payload", "counts_as_real_pass_only_after_execution": true}
+      }
+    },
+    {
+      "family": "object-attenuation-pair",
+      "topics_by_version": {
+        "2022.1": ["ak.wwise.core.object.attenuationCurveChanged", "ak.wwise.core.object.attenuationCurveLinkChanged"],
+        "2025.1": ["ak.wwise.core.object.attenuationCurveChanged", "ak.wwise.core.object.attenuationCurveLinkChanged"]
+      },
+      "evidence_by_version": {
+        "2022.1": {"disposition": "prerequisite_boundary", "blocker": "No closed deterministic attenuation-curve mutation publisher with restore proof is packaged for the sandbox.", "review_trigger": "Revisit when a closed attenuation operation owns curve identity, immutable preview, execution, readback, and restore cleanup.", "counts_as_real_pass": false},
+        "2025.1": {"disposition": "prerequisite_boundary", "blocker": "No closed deterministic attenuation-curve mutation publisher with restore proof is packaged for the sandbox.", "review_trigger": "Revisit when a closed attenuation operation owns curve identity, immutable preview, execution, readback, and restore cleanup.", "counts_as_real_pass": false}
+      }
+    },
+    {
+      "family": "object-child-add-remove",
+      "topics_by_version": {
+        "2022.1": ["ak.wwise.core.object.childAdded", "ak.wwise.core.object.childRemoved"],
+        "2025.1": ["ak.wwise.core.object.childAdded", "ak.wwise.core.object.childRemoved"]
+      },
+      "evidence_by_version": {
+        "2022.1": {"disposition": "active_live", "publisher": "disposable object.create/object.delete", "evidence_test": "tests/live/test_2022_1_topic_business_sandbox.py", "result_requirement": "matching_event_payload", "counts_as_real_pass_only_after_execution": true},
+        "2025.1": {"disposition": "active_live", "publisher": "disposable object.create/object.delete", "evidence_test": "tests/live/test_2025_1_object_topics_sandbox.py", "result_requirement": "matching_event_payload", "counts_as_real_pass_only_after_execution": true}
+      }
+    },
+    {
+      "family": "object-identity-create-delete",
+      "topics_by_version": {
+        "2022.1": ["ak.wwise.core.object.created", "ak.wwise.core.object.postDeleted", "ak.wwise.core.object.preDeleted"],
+        "2025.1": ["ak.wwise.core.object.created", "ak.wwise.core.object.postDeleted", "ak.wwise.core.object.preDeleted"]
+      },
+      "evidence_by_version": {
+        "2022.1": {"disposition": "active_live", "publisher": "disposable object.create/object.delete", "evidence_test": "tests/live/test_2022_1_topic_business_sandbox.py", "result_requirement": "matching_event_payload", "counts_as_real_pass_only_after_execution": true},
+        "2025.1": {"disposition": "active_live", "publisher": "disposable object.create/object.delete", "evidence_test": "tests/live/test_2025_1_object_topics_sandbox.py", "result_requirement": "matching_event_payload", "counts_as_real_pass_only_after_execution": true}
+      }
+    },
+    {
+      "family": "object-curve",
+      "topics_by_version": {
+        "2022.1": ["ak.wwise.core.object.curveChanged"],
+        "2025.1": ["ak.wwise.core.object.curveChanged"]
+      },
+      "evidence_by_version": {
+        "2022.1": {"disposition": "prerequisite_boundary", "blocker": "No closed deterministic RTPC-curve mutation publisher with exact curve readback and restore cleanup is packaged.", "review_trigger": "Revisit when a closed curve operation and disposable authored fixture are available.", "counts_as_real_pass": false},
+        "2025.1": {"disposition": "prerequisite_boundary", "blocker": "No closed deterministic RTPC-curve mutation publisher with exact curve readback and restore cleanup is packaged.", "review_trigger": "Revisit when a closed curve operation and disposable authored fixture are available.", "counts_as_real_pass": false}
+      }
+    },
+    {
+      "family": "object-name",
+      "topics_by_version": {"2022.1": ["ak.wwise.core.object.nameChanged"], "2025.1": ["ak.wwise.core.object.nameChanged"]},
+      "evidence_by_version": {
+        "2022.1": {"disposition": "active_live", "publisher": "disposable object.setName", "evidence_test": "tests/live/test_2022_1_topic_business_sandbox.py", "result_requirement": "matching_event_payload", "counts_as_real_pass_only_after_execution": true},
+        "2025.1": {"disposition": "active_live", "publisher": "disposable object.setName", "evidence_test": "tests/live/test_2025_1_object_topics_sandbox.py", "result_requirement": "matching_event_payload", "counts_as_real_pass_only_after_execution": true}
+      }
+    },
+    {
+      "family": "object-notes",
+      "topics_by_version": {"2022.1": ["ak.wwise.core.object.notesChanged"], "2025.1": ["ak.wwise.core.object.notesChanged"]},
+      "evidence_by_version": {
+        "2022.1": {"disposition": "active_live", "publisher": "disposable object.setNotes", "evidence_test": "tests/live/test_2022_1_topic_business_sandbox.py", "result_requirement": "matching_event_payload", "counts_as_real_pass_only_after_execution": true},
+        "2025.1": {"disposition": "active_live", "publisher": "disposable object.setNotes", "evidence_test": "tests/live/test_2025_1_object_topics_sandbox.py", "result_requirement": "matching_event_payload", "counts_as_real_pass_only_after_execution": true}
+      }
+    },
+    {
+      "family": "object-property",
+      "topics_by_version": {"2022.1": ["ak.wwise.core.object.propertyChanged"], "2025.1": ["ak.wwise.core.object.propertyChanged"]},
+      "evidence_by_version": {
+        "2022.1": {"disposition": "active_live", "publisher": "disposable object.setProperty", "evidence_test": "tests/live/test_2022_1_topic_business_sandbox.py", "result_requirement": "matching_event_payload", "counts_as_real_pass_only_after_execution": true},
+        "2025.1": {"disposition": "active_live", "publisher": "disposable object.setProperty", "evidence_test": "tests/live/test_2025_1_object_topics_sandbox.py", "result_requirement": "matching_event_payload", "counts_as_real_pass_only_after_execution": true}
+      }
+    },
+    {
+      "family": "object-reference",
+      "topics_by_version": {"2022.1": ["ak.wwise.core.object.referenceChanged"], "2025.1": ["ak.wwise.core.object.referenceChanged"]},
+      "evidence_by_version": {
+        "2022.1": {"disposition": "prerequisite_boundary", "blocker": "No disposable fixture currently proves one version-valid reference field, target identity, event payload, readback, and restoration as one bounded case.", "review_trigger": "Revisit when the closed object-reference operation supplies a fixture-owned reference selector and restore verifier.", "counts_as_real_pass": false},
+        "2025.1": {"disposition": "prerequisite_boundary", "blocker": "No disposable fixture currently proves one version-valid reference field, target identity, event payload, readback, and restoration as one bounded case.", "review_trigger": "Revisit when the closed object-reference operation supplies a fixture-owned reference selector and restore verifier.", "counts_as_real_pass": false}
+      }
+    },
+    {
+      "family": "object-structure",
+      "topics_by_version": {"2025.1": ["ak.wwise.core.object.structureChanged"]},
+      "evidence_by_version": {
+        "2025.1": {"disposition": "active_live", "publisher": "disposable object.create/object.delete under exact parent", "evidence_test": "tests/live/test_2025_1_object_topics_sandbox.py", "result_requirement": "matching_event_payload", "counts_as_real_pass_only_after_execution": true}
+      }
+    },
+    {
+      "family": "profiler-capture-log-item",
+      "topics_by_version": {"2022.1": ["ak.wwise.core.profiler.captureLog.itemAdded"], "2025.1": ["ak.wwise.core.profiler.captureLog.itemAdded"]},
+      "evidence_by_version": {
+        "2022.1": {"disposition": "prerequisite_boundary", "blocker": "A capture session plus postMsgMonitor was accepted historically but no uniquely matching captureLog event was proven on the headless fixture.", "review_trigger": "Retry only with a working capture-enabled SoundEngine fixture and require the exact monitor message in the event payload.", "counts_as_real_pass": false},
+        "2025.1": {"disposition": "prerequisite_boundary", "blocker": "A capture-enabled SoundEngine publisher fixture is not packaged for this version lane.", "review_trigger": "Retry only with a working capture-enabled SoundEngine fixture and require the exact monitor message in the event payload.", "counts_as_real_pass": false}
+      }
+    },
+    {
+      "family": "profiler-game-object-registration",
+      "topics_by_version": {"2022.1": ["ak.wwise.core.profiler.gameObjectRegistered", "ak.wwise.core.profiler.gameObjectUnregistered"], "2025.1": ["ak.wwise.core.profiler.gameObjectRegistered", "ak.wwise.core.profiler.gameObjectUnregistered"]},
+      "evidence_by_version": {
+        "2022.1": {"disposition": "prerequisite_boundary", "blocker": "The headless fixture accepted registerGameObj but did not prove matching profiler registration events.", "review_trigger": "Retry only when profiler game-object data is enabled and both register and unregister payloads are observable.", "counts_as_real_pass": false},
+        "2025.1": {"disposition": "prerequisite_boundary", "blocker": "No capture-enabled SoundEngine game-object publisher fixture is packaged for this version lane.", "review_trigger": "Retry only when profiler game-object data is enabled and both register and unregister payloads are observable.", "counts_as_real_pass": false}
+      }
+    },
+    {
+      "family": "empty-lifecycle-event",
+      "topics_by_version": {"2022.1": ["ak.wwise.core.profiler.gameObjectReset", "ak.wwise.core.project.loaded", "ak.wwise.core.project.postClosed", "ak.wwise.core.project.preClosed"], "2025.1": ["ak.wwise.core.profiler.gameObjectReset", "ak.wwise.core.project.loaded", "ak.wwise.core.project.postClosed", "ak.wwise.core.project.preClosed"]},
+      "evidence_by_version": {
+        "2022.1": {"disposition": "prerequisite_boundary", "blocker": "Project load/close events require an isolated Authoring transition and gameObjectReset requires a capture-enabled runtime reset; neither may be triggered inside the ordinary Console sandbox.", "review_trigger": "Run only in a case-owned Authoring transition fixture or capture-enabled runtime reset fixture with reconnect and cleanup proof.", "counts_as_real_pass": false},
+        "2025.1": {"disposition": "prerequisite_boundary", "blocker": "Project load/close events require an isolated Authoring transition and gameObjectReset requires a capture-enabled runtime reset; neither may be triggered inside the ordinary Console sandbox.", "review_trigger": "Run only in a case-owned Authoring transition fixture or capture-enabled runtime reset fixture with reconnect and cleanup proof.", "counts_as_real_pass": false}
+      }
+    },
+    {
+      "family": "profiler-state",
+      "topics_by_version": {"2022.1": ["ak.wwise.core.profiler.stateChanged"], "2025.1": ["ak.wwise.core.profiler.stateChanged"]},
+      "evidence_by_version": {
+        "2022.1": {"disposition": "prerequisite_boundary", "blocker": "No deterministic authored State plus capture-enabled runtime publisher exists in the copied SampleProject.", "review_trigger": "Retry with an identity-pinned State fixture and require its exact game object, group, and state payload.", "counts_as_real_pass": false},
+        "2025.1": {"disposition": "prerequisite_boundary", "blocker": "No deterministic authored State plus capture-enabled runtime publisher exists in the copied SampleProject.", "review_trigger": "Retry with an identity-pinned State fixture and require its exact game object, group, and state payload.", "counts_as_real_pass": false}
+      }
+    },
+    {
+      "family": "profiler-switch",
+      "topics_by_version": {"2022.1": ["ak.wwise.core.profiler.switchChanged"], "2025.1": ["ak.wwise.core.profiler.switchChanged"]},
+      "evidence_by_version": {
+        "2022.1": {"disposition": "prerequisite_boundary", "blocker": "No deterministic authored Switch plus capture-enabled runtime publisher exists in the copied SampleProject.", "review_trigger": "Retry with an identity-pinned Switch fixture and require its exact game object, group, and switch payload.", "counts_as_real_pass": false},
+        "2025.1": {"disposition": "prerequisite_boundary", "blocker": "No deterministic authored Switch plus capture-enabled runtime publisher exists in the copied SampleProject.", "review_trigger": "Retry with an identity-pinned Switch fixture and require its exact game object, group, and switch payload.", "counts_as_real_pass": false}
+      }
+    },
+    {
+      "family": "project-saved",
+      "topics_by_version": {"2022.1": ["ak.wwise.core.project.saved"], "2025.1": ["ak.wwise.core.project.saved"]},
+      "evidence_by_version": {
+        "2022.1": {"disposition": "prerequisite_boundary", "blocker": "WwiseConsole rejects this subscription as unavailable for the host type.", "review_trigger": "Run only against an exact sandbox project in Wwise Authoring, subscribing before project.save and proving modifiedPaths.", "counts_as_real_pass": false},
+        "2025.1": {"disposition": "prerequisite_boundary", "blocker": "WwiseConsole rejects this subscription as unavailable for the host type.", "review_trigger": "Run only against an exact sandbox project in Wwise Authoring, subscribing before project.save and proving modifiedPaths.", "counts_as_real_pass": false}
+      }
+    },
+    {
+      "family": "soundbank-generated",
+      "topics_by_version": {"2022.1": ["ak.wwise.core.soundbank.generated"], "2025.1": ["ak.wwise.core.soundbank.generated"]},
+      "evidence_by_version": {
+        "2022.1": {"disposition": "active_live", "publisher": "sandbox soundbank.generate", "evidence_test": "tests/destructive/test_soundbank_audio_sandbox.py", "result_requirement": "matching_event_payload", "counts_as_real_pass_only_after_execution": true},
+        "2025.1": {"disposition": "active_live", "publisher": "sandbox soundbank.generate", "evidence_test": "tests/destructive/test_soundbank_audio_sandbox.py", "result_requirement": "matching_event_payload", "counts_as_real_pass_only_after_execution": true}
+      }
+    },
+    {
+      "family": "soundbank-generation-done",
+      "topics_by_version": {"2022.1": ["ak.wwise.core.soundbank.generationDone"], "2025.1": ["ak.wwise.core.soundbank.generationDone"]},
+      "evidence_by_version": {
+        "2022.1": {"disposition": "active_live", "publisher": "sandbox soundbank.generate", "evidence_test": "tests/destructive/test_soundbank_audio_sandbox.py", "result_requirement": "matching_event_payload", "counts_as_real_pass_only_after_execution": true},
+        "2025.1": {"disposition": "active_live", "publisher": "sandbox soundbank.generate", "evidence_test": "tests/destructive/test_soundbank_audio_sandbox.py", "result_requirement": "matching_event_payload", "counts_as_real_pass_only_after_execution": true}
+      }
+    },
+    {
+      "family": "switch-assignment-pair",
+      "topics_by_version": {"2022.1": ["ak.wwise.core.switchContainer.assignmentAdded", "ak.wwise.core.switchContainer.assignmentRemoved"], "2025.1": ["ak.wwise.core.switchContainer.assignmentAdded", "ak.wwise.core.switchContainer.assignmentRemoved"]},
+      "evidence_by_version": {
+        "2022.1": {"disposition": "active_live", "publisher": "sandbox switchContainer.addAssignment/removeAssignment", "evidence_test": "tests/destructive/test_switchcontainer_assignment_sandbox.py", "result_requirement": "matching_event_payload", "counts_as_real_pass_only_after_execution": true},
+        "2025.1": {"disposition": "active_live", "publisher": "sandbox switchContainer.addAssignment/removeAssignment", "evidence_test": "tests/destructive/test_switchcontainer_assignment_sandbox.py", "result_requirement": "matching_event_payload", "counts_as_real_pass_only_after_execution": true}
+      }
+    },
+    {
+      "family": "transport-state",
+      "topics_by_version": {"2022.1": ["ak.wwise.core.transport.stateChanged"], "2025.1": ["ak.wwise.core.transport.stateChanged"]},
+      "evidence_by_version": {
+        "2022.1": {"disposition": "active_live", "publisher": "sandbox transport.executeAction", "evidence_test": "tests/live/test_profiler_transport_soundengine.py", "result_requirement": "matching_event_payload", "counts_as_real_pass_only_after_execution": true},
+        "2025.1": {"disposition": "active_live", "publisher": "sandbox transport.executeAction", "evidence_test": "tests/live/test_profiler_transport_soundengine.py", "result_requirement": "matching_event_payload", "counts_as_real_pass_only_after_execution": true}
+      }
+    },
+    {
+      "family": "debug-assert",
+      "topics_by_version": {"2022.1": ["ak.wwise.debug.assertFailed"], "2025.1": ["ak.wwise.debug.assertFailed"]},
+      "evidence_by_version": {
+        "2022.1": {"disposition": "prohibited_boundary", "blocker": "A validation fixture must not intentionally crash or assert the Wwise process to publish this event.", "review_trigger": "None during ordinary validation; review only with an Audiokinetic-provided non-crashing assertion simulator in an isolated host.", "counts_as_real_pass": false},
+        "2025.1": {"disposition": "prohibited_boundary", "blocker": "A validation fixture must not intentionally crash or assert the Wwise process to publish this event.", "review_trigger": "None during ordinary validation; review only with an Audiokinetic-provided non-crashing assertion simulator in an isolated host.", "counts_as_real_pass": false}
+      }
+    },
+    {
+      "family": "ui-command-executed",
+      "topics_by_version": {"2022.1": ["ak.wwise.ui.commands.executed"]},
+      "evidence_by_version": {
+        "2022.1": {"disposition": "prerequisite_boundary", "blocker": "The topic is Authoring-only and command registration is environment-dependent; Console evidence is invalid.", "review_trigger": "Run only in an exact-project Authoring fixture using one freshly enumerated, audited non-mutating command.", "counts_as_real_pass": false}
+      }
+    },
+    {
+      "family": "ui-selection",
+      "topics_by_version": {"2022.1": ["ak.wwise.ui.selectionChanged"]},
+      "evidence_by_version": {
+        "2022.1": {"disposition": "prerequisite_boundary", "blocker": "The topic is Authoring-only and requires a deterministic disposable selection target and UI state restoration.", "review_trigger": "Run only in an exact-project Authoring fixture with selection set/readback and restoration proof.", "counts_as_real_pass": false}
+      }
+    }
+  ]
+}

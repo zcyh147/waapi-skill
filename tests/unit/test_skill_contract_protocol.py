@@ -627,22 +627,23 @@ def test_explicit_persistent_topic_intent_uses_one_streaming_subscription() -> N
 
     for phrase in (
         "Route ordinary vague “subscribe”, “listen”, or “monitor” wording to `wait-topic`",
-        "Select `stream-topic` only for explicit streaming or persistent intent",
-        "one persistent subscription",
-        "compact flushed JSON record",
-        "by default runs until cancellation",
-        "bounded buffer fails closed on overflow",
-        "cleanup always attempts unsubscribe",
-        "a terminal record reports why the stream ended",
+        "Select `stream-topic` only for explicit persistent intent",
+        "It keeps one subscription",
+        "flushes matched events",
+        "requires an `--event-count <1..64>` ceiling",
+        "Event size, count, cumulative bytes, and buffering are bounded",
+        "terminal record includes the completion and unsubscribe result",
     ):
         assert phrase in skill_flat
     for phrase in (
         "one compact flushed NDJSON record",
-        "by default continues until the user cancels it or a bounded low-frequency health check detects",
+        "requires an explicit maximum `--event-count <1..64>`",
+        "user cancellation, or a bounded low-frequency health check detects",
+        "cumulative NDJSON bytes are bounded",
         "overflow fails closed instead of silently dropping an event",
         "always attempts to unsubscribe",
         "one terminal NDJSON record",
-        "Every streamed event is validated",
+        "Every streamed event and the cumulative NDJSON bytes are bounded and validated",
     ):
         assert phrase in query_flat
     for intent in (

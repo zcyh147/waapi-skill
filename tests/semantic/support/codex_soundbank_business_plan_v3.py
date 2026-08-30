@@ -80,6 +80,7 @@ _DEFINITION_FILTER_TO_INCLUSION = MappingProxyType(
 )
 _STREAM_TOPIC_SCENARIO_IDS = frozenset({"O22-SB-GENERATED-03"})
 _STREAM_TOPIC_TIMEOUT_SECONDS = 30.0
+_STREAM_TOPIC_EVENT_COUNT_LIMIT = 64
 
 
 def soundbank_topic_lifecycle(scenario_id: str) -> tuple[str, str]:
@@ -536,6 +537,7 @@ def soundbank_topic_protocol_steps(
                 lifecycle_name,
                 topic,
                 version=version,
+                event_count=_STREAM_TOPIC_EVENT_COUNT_LIMIT,
                 match=canonical_match,
                 options=canonical_options,
                 timeout_seconds=_STREAM_TOPIC_TIMEOUT_SECONDS,

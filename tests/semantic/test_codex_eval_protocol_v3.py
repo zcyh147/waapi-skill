@@ -76,6 +76,7 @@ def test_stream_topic_step_owns_finite_duration_and_typed_business_facts() -> No
         "soundbank.generated.stream",
         "ak.wwise.core.soundbank.generated",
         version="2024.1",
+        event_count=2,
         match={"soundbank": {"name": "Weapons_Core"}},
         options={"return": ["id", "name", "type", "path"]},
         timeout_seconds=30.0,
@@ -83,14 +84,15 @@ def test_stream_topic_step_owns_finite_duration_and_typed_business_facts() -> No
 
     assert step.subcommand == "stream-topic"
     assert step.gateway_global_arguments == ("--timeout", "30")
-    assert step.arguments[:3] == (
+    assert step.arguments[:5] == (
         "ak.wwise.core.soundbank.generated",
+        "--event-count",
+        "2",
         "--topic-contract-digest",
-        step.arguments[2],
+        step.arguments[4],
     )
-    assert "--event-count" not in step.arguments
-    assert "--topic-option-as" in step.arguments
-    assert "--event-match-as" in step.arguments
+    assert "--topic-option" in step.arguments
+    assert "--event-match" in step.arguments
 
 
 def test_authoring_ui_business_suffixes_match_only_closed_public_flags() -> None:

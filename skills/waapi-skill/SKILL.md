@@ -64,8 +64,8 @@ python scripts/run.py gateway.py topic-schema <topic-uri>
 python scripts/run.py gateway.py wait-topic <topic-uri> <binding-and-facts-from-topic-schema>
 python scripts/run.py gateway.py --timeout <positive-finite-seconds> wait-topic <topic-uri> --event-count <1..64> <binding-and-facts-from-topic-schema>
 python scripts/run.py gateway.py wait-topic <topic-uri> --no-timeout <binding-from-topic-schema>
-python scripts/run.py gateway.py stream-topic <topic-uri> <binding-and-facts-from-topic-schema>
-python scripts/run.py gateway.py --timeout <positive-finite-seconds> stream-topic <topic-uri> <binding-and-facts-from-topic-schema>
+python scripts/run.py gateway.py stream-topic <topic-uri> --event-count <1..64> <binding-and-facts-from-topic-schema>
+python scripts/run.py gateway.py --timeout <positive-finite-seconds> stream-topic <topic-uri> --event-count <1..64> <binding-and-facts-from-topic-schema>
 python scripts/run.py gateway.py operations
 python scripts/run.py gateway.py operation-schema object.create
 python scripts/run.py gateway.py operation-schema object.set
@@ -94,7 +94,7 @@ Use the listed route for the corresponding intent:
 | packaged object-type discovery without Wwise | `object-types` |
 | live object type/property/reference metadata | `metadata` |
 | wait for one or a fixed bounded count of topic events | `wait-topic` |
-| explicitly stream topic events continuously | `stream-topic` |
+| explicitly stream topic events continuously, with a maximum event count | `stream-topic` |
 | inspect project-changing operation support | `operations` / `operation-schema` |
 
 `status` is the sole Gateway-owned `getInfo` route and completes a connection/version/project request. Do not use `request-schema` or `typed-zero-call` as another `getInfo` path. This complete route needs only this `SKILL.md`; do not read the setup or query reference for it.
@@ -114,15 +114,13 @@ flag `--no-timeout`; it waits until 1–64 requested matches or cancellation but
 is not an unlimited output stream. Never combine those flags.
 By default say “这次使用默认的 10 秒等待时间”.
 
-Select `stream-topic` only for explicit streaming or persistent intent such as
-“stream”, “continuous”, “persistent”, “实时逐条”, “流式”, “持续”, “一直监听”,
-or “不要收到后退出”. It creates one persistent subscription, emits each matched
-event immediately as a compact flushed JSON record, and by default runs until
-cancellation; a gateway-global `--timeout <positive-finite-seconds>` gives it a
-finite duration. Before every wait or stream, run `topic-schema` and copy its
-exact `--topic-contract-digest`, even without options or matching. Each event is publish-schema and size validated; a bounded buffer
-fails closed on overflow, cleanup always attempts unsubscribe, and a terminal
-record reports why the stream ended.
+Select `stream-topic` only for explicit persistent intent such as “stream”,
+“continuous”, “实时逐条”, “流式”, “持续”, “一直监听”, or “不要收到后退出”. It keeps one subscription,
+flushes matched events, requires an `--event-count <1..64>` ceiling, and accepts
+an optional gateway-global finite `--timeout`. Before every wait or stream, run
+`topic-schema`; copy its contract digest and any opaque `tvc1-*` choice handles
+exactly. Event size, count, cumulative bytes, and buffering are bounded; the
+terminal record includes the completion and unsubscribe result.
 
 Exact reflection-call fast route: for `ak.wwise.waapi.getFunctions` or `ak.wwise.waapi.getTopics`, run `request-schema` and follow its sole typed continuation. Do not run `describe` or `capabilities` first. If that continuation is rejected or fails, stop and report the result.
 

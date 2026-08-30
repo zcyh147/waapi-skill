@@ -7705,64 +7705,43 @@ def test_wait_topic_event_count_greater_than_one_cannot_be_omitted(
         assert not (broker.state_directory / "fake-runner-calls.jsonl").exists()
 
 
-def test_wait_topic_business_shorthand_binds_to_sealed_typed_facts(
+def test_wait_topic_shorthand_cannot_invent_an_opaque_value_choice(
     tmp_path: Path,
 ) -> None:
     skill = make_fake_skill(tmp_path)
     topic = "ak.wwise.core.soundbank.generated"
-    canonical = (
+    expected = (
         topic,
         "--event-count",
-        "3",
-        "--topic-option-as",
-        "include",
-        "text",
-        "id",
-        "--event-match-as",
-        "soundbank-name",
-        "text",
-        "Dialogue_Chapter14",
+        "1",
         "--event-entry-as",
         "platform",
         "-",
         "name",
-        "text",
+        "tvc1-0123456789abcdef0123456789abcdef",
         "Windows",
     )
-    shorthand = (
+    supplied = (
         topic,
         "--event-count",
-        "3",
-        "--topic-option",
-        "include",
-        "id",
-        "--event-match",
-        "soundbank-name",
-        "Dialogue_Chapter14",
+        "1",
         "--event-entry",
         "platform",
         "-",
         "name",
         "Windows",
     )
-    step = ExpectedGatewayStep("wait", "wait-topic", canonical)
+    step = ExpectedGatewayStep("wait", "wait-topic", expected)
     with CodexGatewayBroker(
         skill_source=skill,
         expected_steps=(step,),
         transport="tcp",
     ) as broker:
-        result = run_model_command(broker, ["wait-topic", *shorthand])
-        evidence = broker.evidence()
-        executed = json.loads(
-            (broker.state_directory / "fake-runner-calls.jsonl").read_text(
-                encoding="utf-8"
-            )
-        )
+        result = run_model_command(broker, ["wait-topic", *supplied])
 
-    assert result.returncode == 0, result.stderr
-    assert evidence.passed is True
-    assert evidence.records[0].gateway_arguments == ("wait-topic", *shorthand)
-    assert executed == ["gateway.py", "wait-topic", *shorthand]
+        assert result.returncode == 126
+        assert broker.evidence().terminal_state == "FAILED"
+        assert not (broker.state_directory / "fake-runner-calls.jsonl").exists()
 
 
 def test_wait_topic_commutes_only_independent_selected_match_facts(

@@ -16,7 +16,10 @@ from wwise_waapi.typed_topics import (
 )
 from wwise_waapi.typed_requests import TypedRequestFact
 from wwise_waapi.typed_requests import dynamic_array_item_choices
-from wwise_waapi.topic_business import topic_business_contract
+from wwise_waapi.topic_business import (
+    topic_business_contract,
+    topic_business_value_choices,
+)
 from wwise_waapi.versions import SUPPORTED_WWISE_VERSION_KEYS
 
 
@@ -437,6 +440,8 @@ def test_topic_schema_leads_with_handle_free_business_input(tmp_path: Path) -> N
     assert "trh1-" not in serialized
     assert "schema_digest" not in serialized
     assert "wire_type" not in serialized
+    assert "accepted_value_kinds" not in serialized
+    assert "value_kind_sets" not in serialized
     assert payload["continuation"]["default_input"] == "business"
     digest = business["contract_digest"]
     assert payload["continuation"]["contract_binding"] == {
@@ -451,21 +456,122 @@ def test_topic_schema_leads_with_handle_free_business_input(tmp_path: Path) -> N
     assert payload["continuation"]["business_fact_argv"] == {
         "topic_option": "--topic-option <field> <value>",
         "empty_topic_option": "--topic-option-empty <field>",
-        "typed_topic_option": "--topic-option-as <field> <text|integer|number|toggle|null> <value>",
+        "typed_topic_option": "--topic-option-as <field> <value-choice-handle> <value>",
         "event_match": "--event-match <field> <value>",
         "empty_event_field": "--event-empty <field>",
-        "typed_event_match": "--event-match-as <field> <text|integer|number|toggle|null> <value>",
+        "typed_event_match": "--event-match-as <field> <value-choice-handle> <value>",
         "event_row": "--event-row <collection> <comma-separated-indices> <field> <value>",
-        "typed_event_row": "--event-row-as <collection> <comma-separated-indices> <field> <text|integer|number|toggle|null> <value>",
+        "typed_event_row": "--event-row-as <collection> <comma-separated-indices> <field> <value-choice-handle> <value>",
         "empty_event_row": "--event-row-empty <collection> <comma-separated-parent-indices-or-dash>",
         "exact_entry": "--event-entry <scope> <indices-or-dash> <exact-key> <value>",
-        "typed_exact_entry": "--event-entry-as <scope> <indices-or-dash> <exact-key> <text|integer|number|toggle|null> <value>",
+        "typed_exact_entry": "--event-entry-as <scope> <indices-or-dash> <exact-key> <value-choice-handle> <value>",
         "empty_exact_entry": "--event-entry-empty <scope> <indices-or-dash> <exact-key> <object|list>",
         "exact_entry_object": "--event-entry-object <scope> <indices-or-dash> <exact-key> <field> <value>",
-        "typed_exact_entry_object": "--event-entry-object-as <scope> <indices-or-dash> <exact-key> <field> <text|integer|number|toggle|null> <value>",
+        "typed_exact_entry_object": "--event-entry-object-as <scope> <indices-or-dash> <exact-key> <field> <value-choice-handle> <value>",
         "exact_entry_row": "--event-entry-row <scope> <indices-or-dash> <exact-key> <item-index> <field> <value>",
-        "typed_exact_entry_row": "--event-entry-row-as <scope> <indices-or-dash> <exact-key> <item-index> <field> <text|integer|number|toggle|null> <value>",
+        "typed_exact_entry_row": "--event-entry-row-as <scope> <indices-or-dash> <exact-key> <item-index> <field> <value-choice-handle> <value>",
     }
+
+
+def test_ambiguous_topic_scalar_uses_a_digest_bound_value_choice_handle(
+    tmp_path: Path,
+) -> None:
+    topic = "ak.wwise.core.soundbank.generated"
+    schema_code, schema = gateway.execute_gateway(
+        ["topic-schema", topic, "--entry", "platform"],
+        env=_env(tmp_path, "2025.1"),
+        client_factory=lambda url: pytest.fail(f"topic-schema connected to {url}"),
+    )
+
+    assert schema_code == 0
+    selected = schema["business_input"]["exact_entries"]["selected"]
+    assert selected["scope"] == "platform"
+    assert selected["scalar_value_mode"] == "choice_required"
+    choices = {
+        meaning: handle
+        for handle, meaning in selected["value_choices"]["rows"]
+    }
+    assert set(choices) == {
+        "literal_text",
+        "whole_number",
+        "decimal_number",
+        "on_or_off",
+        "explicit_empty",
+    }
+    assert all(handle.startswith("tvc1-") for handle in choices.values())
+    client = _TopicClient(
+        topic,
+        [
+            {
+                "soundbank": {
+                    "id": "{22222222-2222-2222-2222-222222222222}",
+                    "name": "Main",
+                    "type": "SoundBank",
+                    "path": r"\SoundBanks\Main",
+                },
+                "platform": {"name": "Windows"},
+            }
+        ],
+    )
+
+    code, payload = gateway.execute_gateway(
+        [
+            "--timeout",
+            "0.5",
+            "wait-topic",
+            topic,
+            "--event-count",
+            "1",
+            "--topic-contract-digest",
+            schema["business_input"]["contract_digest"],
+            "--event-entry-as",
+            "platform",
+            "-",
+            "name",
+            choices["literal_text"],
+            "Windows",
+        ],
+        env=_env(tmp_path, "2025.1"),
+        client_factory=lambda url: client,
+    )
+
+    assert code == 0, payload.get("message", payload)
+    assert payload["event"]["platform"]["name"] == "Windows"
+    assert client.handler.unsubscribe_calls == 1
+
+
+def test_raw_topic_scalar_kind_is_rejected_before_connecting(
+    tmp_path: Path,
+) -> None:
+    topic = "ak.wwise.core.soundbank.generated"
+    connected = False
+
+    def client_factory(url: str) -> _TopicClient:
+        nonlocal connected
+        connected = True
+        raise AssertionError(url)
+
+    code, payload = gateway.execute_gateway(
+        [
+            "wait-topic",
+            topic,
+            "--event-count",
+            "1",
+            *_contract_binding(topic),
+            "--event-entry-as",
+            "platform",
+            "-",
+            "name",
+            "text",
+            "Windows",
+        ],
+        env=_env(tmp_path, "2025.1"),
+        client_factory=client_factory,
+    )
+
+    assert code == 2
+    assert "value-choice" in payload["message"]
+    assert connected is False
 
 
 def test_wait_topic_requires_contract_digest_before_connection(tmp_path: Path) -> None:
@@ -523,6 +629,16 @@ def test_largest_progressive_topic_row_disclosure_stays_bounded(tmp_path: Path) 
 
 def test_public_wait_topic_compiles_business_event_rows(tmp_path: Path) -> None:
     topic = "ak.wwise.core.audio.imported"
+    contract = topic_business_contract("2025.1", topic)
+    volume_choice = next(
+        choice.handle
+        for choice in topic_business_value_choices(
+            contract,
+            channel="event-entry",
+            owner=("objects",),
+        )
+        if choice.meaning == "decimal_number"
+    )
     client = _TopicClient(
         topic,
         [
@@ -553,10 +669,11 @@ def test_public_wait_topic_compiles_business_event_rows(tmp_path: Path) -> None:
             "0",
             "type",
             "Sound",
-            "--event-entry",
+            "--event-entry-as",
             "objects",
             "0",
             "@Volume",
+            volume_choice,
             "-4",
         ],
         env=_env(tmp_path, "2025.1"),
