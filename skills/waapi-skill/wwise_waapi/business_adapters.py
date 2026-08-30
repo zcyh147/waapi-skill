@@ -24,6 +24,10 @@ from .cli_console_business_contracts import (
     CLI_CONSOLE_BUSINESS_OPERATIONS,
     cli_console_business_contract_data,
 )
+from .host_ui_debug_business_contracts import (
+    HOST_UI_DEBUG_DRAFT_OPERATIONS,
+    host_ui_debug_business_contract_data,
+)
 from .object_lifecycle_business_contracts import (
     object_lifecycle_business_contract_data,
 )
@@ -135,6 +139,10 @@ def _core_business_contract(operation: str, version: str) -> dict[str, Any]:
 
 def _cli_console_contract(operation: str, version: str) -> dict[str, Any]:
     return cli_console_business_contract_data(operation, version)
+
+
+def _host_ui_debug_contract(operation: str, version: str) -> dict[str, Any]:
+    return host_ui_debug_business_contract_data(operation, version)
 
 
 def _object_lifecycle_contract(operation: str, version: str) -> dict[str, Any]:
@@ -372,6 +380,15 @@ def _materialize_cli_console(
     from .cli_console_business import materialize_cli_console_business_request
 
     return materialize_cli_console_business_request(operation, session)
+
+
+def _materialize_host_ui_debug(
+    operation: str,
+    session: BusinessDeclarationSession,
+) -> Mapping[str, Any]:
+    from .host_ui_debug_business import materialize_host_ui_debug_business_request
+
+    return materialize_host_ui_debug_business_request(operation, session)
 
 
 def _authoring_ui_is_complete(
@@ -940,6 +957,26 @@ _CLI_CONSOLE_DEFINITION = {
     "settings_are_complete_declaration": True,
 }
 
+_HOST_UI_DEBUG_DEFINITION = {
+    "family": "host-ui-debug-business",
+    "contract_builder": _host_ui_debug_contract,
+    "materializer": _materialize_host_ui_debug,
+    "update_commands": frozenset({"draft-declare-host-plan"}),
+    "initial_projection_actions": (
+        "declare-host-plan",
+        "inspect",
+        "cancel",
+    ),
+    "active_projection_actions": (
+        "declare-host-plan",
+        "check",
+        "inspect",
+        "cancel",
+    ),
+    "auto_apply_preview": True,
+    "settings_are_complete_declaration": True,
+}
+
 
 def _bind_adapter(operation: str, definition: Mapping[str, Any]) -> BusinessAdapter:
     values = dict(definition)
@@ -955,6 +992,10 @@ def _bind_adapter(operation: str, definition: Mapping[str, Any]) -> BusinessAdap
 
 
 _BUSINESS_ADAPTERS = {
+    **{
+        operation: _bind_adapter(operation, _HOST_UI_DEBUG_DEFINITION)
+        for operation in HOST_UI_DEBUG_DRAFT_OPERATIONS
+    },
     **{
         operation: _bind_adapter(operation, _CLI_CONSOLE_DEFINITION)
         for operation in CLI_CONSOLE_BUSINESS_OPERATIONS

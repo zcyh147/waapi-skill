@@ -208,6 +208,14 @@ DEFAULT_CLI_CONSOLE_BUSINESS_SUITE = (
     / "cli-console-business"
     / "profile.json"
 )
+DEFAULT_HOST_UI_DEBUG_BUSINESS_SUITE = (
+    REPO_ROOT
+    / "tests"
+    / "semantic"
+    / "data"
+    / "host-ui-debug-business"
+    / "profile.json"
+)
 DEFAULT_COMPOUND_UNDO_BUSINESS_SUITE = (
     REPO_ROOT
     / "tests"
@@ -294,6 +302,9 @@ DEFAULT_SOUNDENGINE_BUSINESS_ITERATION_ROOT = (
 DEFAULT_CLI_CONSOLE_BUSINESS_ITERATION_ROOT = (
     SKILL_ROOT.parent / "waapi-skill-workspace" / "cli-console-business-1"
 )
+DEFAULT_HOST_UI_DEBUG_BUSINESS_ITERATION_ROOT = (
+    SKILL_ROOT.parent / "waapi-skill-workspace" / "host-ui-debug-business-1"
+)
 DEFAULT_COMPOUND_UNDO_BUSINESS_ITERATION_ROOT = (
     SKILL_ROOT.parent / "waapi-skill-workspace" / "compound-undo-business-1"
 )
@@ -357,6 +368,7 @@ PROJECT_SETTING_BUSINESS_PROFILE_ID = "project_setting_business_1"
 RUNTIME_CONTROL_BUSINESS_PROFILE_ID = "runtime_control_business_1"
 SOUNDENGINE_BUSINESS_PROFILE_ID = "soundengine_business_4"
 CLI_CONSOLE_BUSINESS_PROFILE_ID = "cli_console_business_1"
+HOST_UI_DEBUG_BUSINESS_PROFILE_ID = "host_ui_debug_business_1"
 COMPOUND_UNDO_BUSINESS_PROFILE_ID = "compound_undo_business_1"
 AUTHORING_UI_BUSINESS_PROFILE_ID = "authoring_ui_business_2"
 INTEGRATION_WORKFLOWS_V1_PROFILE_ID = "integration_workflows_cross_version_6"
@@ -520,6 +532,21 @@ OFFLINE_BUSINESS_AGENT_PROFILES = {
         options_name="CliConsoleBusinessAgentOptions",
         run_name="run_cli_console_business_agent_unit",
     ),
+    HOST_UI_DEBUG_BUSINESS_PROFILE_ID: OfflineBusinessAgentProfileDescriptor(
+        suite_path=DEFAULT_HOST_UI_DEBUG_BUSINESS_SUITE,
+        iteration_root=DEFAULT_HOST_UI_DEBUG_BUSINESS_ITERATION_ROOT,
+        supported_versions=frozenset({"2025.1"}),
+        preflight_contract="waapi-skill.host-ui-debug-business-preflight/v1",
+        profile_module=(
+            "tests.semantic.support.codex_host_ui_debug_business_profile"
+        ),
+        loader_name="load_host_ui_debug_business_profile",
+        runner_module=(
+            "tests.semantic.support.codex_host_ui_debug_business_agent_runner"
+        ),
+        options_name="HostUiDebugBusinessAgentOptions",
+        run_name="run_host_ui_debug_business_agent_unit",
+    ),
     COMPOUND_UNDO_BUSINESS_PROFILE_ID: OfflineBusinessAgentProfileDescriptor(
         suite_path=DEFAULT_COMPOUND_UNDO_BUSINESS_SUITE,
         iteration_root=DEFAULT_COMPOUND_UNDO_BUSINESS_ITERATION_ROOT,
@@ -574,6 +601,7 @@ EXECUTABLE_V3_PROFILE_IDS = frozenset(
         RUNTIME_CONTROL_BUSINESS_PROFILE_ID,
         SOUNDENGINE_BUSINESS_PROFILE_ID,
         CLI_CONSOLE_BUSINESS_PROFILE_ID,
+        HOST_UI_DEBUG_BUSINESS_PROFILE_ID,
         COMPOUND_UNDO_BUSINESS_PROFILE_ID,
         AUTHORING_UI_BUSINESS_PROFILE_ID,
         INTEGRATION_WORKFLOWS_V1_PROFILE_ID,

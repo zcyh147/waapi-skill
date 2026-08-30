@@ -412,6 +412,9 @@ BUSINESS_AGENT_OUTCOME_CONTRACTS = {
     matrix.CLI_CONSOLE_BUSINESS_PROFILE_ID: (
         "waapi-skill.cli-console-business-agent-outcome/v1"
     ),
+    matrix.HOST_UI_DEBUG_BUSINESS_PROFILE_ID: (
+        "waapi-skill.host-ui-debug-business-agent-outcome/v1"
+    ),
     matrix.COMPOUND_UNDO_BUSINESS_PROFILE_ID: (
         "waapi-skill.compound-undo-business-agent-outcome/v1"
     ),
@@ -3535,6 +3538,29 @@ def _validate_bound_business_agent_protocol(
             output_directory=OUTPUT_DIRECTORY,
         )
         preview_request = steps[-1].expected_operation_request
+    elif profile == matrix.HOST_UI_DEBUG_BUSINESS_PROFILE_ID:
+        from tests.semantic.support.codex_eval_protocol_v3 import (
+            build_host_ui_debug_business_transaction_steps,
+        )
+
+        if scenario_root is None:
+            raise CampaignEvidenceError(
+                "host/UI/Debug Business Agent audit lacks its scenario root"
+            )
+        output_file = (
+            scenario_root
+            / "evidence"
+            / "codex-task"
+            / "runtime"
+            / "output"
+            / "FreshAgentTone.wav"
+        ).resolve(strict=False)
+        steps = build_host_ui_debug_business_transaction_steps(
+            version=expected_unit.version,
+            label="tx01",
+            output_file=str(output_file),
+        )
+        preview_request = steps[-1].expected_operation_request
     elif profile == matrix.COMPOUND_UNDO_BUSINESS_PROFILE_ID:
         from tests.semantic.support.codex_compound_undo_business_agent_runner import (
             compound_undo_business_child_expectations,
@@ -3577,6 +3603,7 @@ def _validate_bound_business_agent_protocol(
         matrix.RUNTIME_CONTROL_BUSINESS_PROFILE_ID: "tx01",
         matrix.SOUNDENGINE_BUSINESS_PROFILE_ID: "tx01",
         matrix.CLI_CONSOLE_BUSINESS_PROFILE_ID: "tx01",
+        matrix.HOST_UI_DEBUG_BUSINESS_PROFILE_ID: "tx01",
     }
     if profile in optional_discovery_labels:
         label = optional_discovery_labels[profile]

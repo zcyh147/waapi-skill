@@ -4638,6 +4638,70 @@ def test_cli_console_plan_group_order_is_transport_not_business_meaning() -> Non
     ) != step.arguments
 
 
+def test_host_plan_group_order_is_transport_not_business_meaning() -> None:
+    fixed = (
+        "od1-" + "1" * 32,
+        "--task-authority",
+        "da1-" + "2" * 40,
+        "--expected-revision",
+        "1",
+    )
+    step = ExpectedGatewayStep(
+        name="tx01.declare-host-plan",
+        subcommand="draft-declare-host-plan",
+        arguments=(
+            *fixed,
+            "--value",
+            "output_file",
+            "/tmp/FreshAgentTone.wav",
+            "--value",
+            "waveform",
+            "sine",
+            "--value",
+            "frequency_hz",
+            "440",
+            "--item",
+            "waveform_channels",
+            "0",
+            "--toggle",
+            "anonymous_channels",
+            "enable",
+        ),
+    )
+    reordered = (
+        *fixed,
+        "--value",
+        "output_file",
+        "/tmp/FreshAgentTone.wav",
+        "--toggle",
+        "anonymous_channels",
+        "enable",
+        "--item",
+        "waveform_channels",
+        "0",
+        "--value",
+        "frequency_hz",
+        "440",
+        "--value",
+        "waveform",
+        "sine",
+    )
+    broker = SimpleNamespace(_payloads_by_step={})
+
+    assert CodexGatewayBroker._normalize_business_declaration_fact_order(
+        broker,
+        step,
+        reordered,
+    ) == step.arguments
+    changed = list(reordered)
+    changed[changed.index("440")] = "880"
+    assert CodexGatewayBroker._normalize_business_declaration_fact_order(
+        broker,
+        step,
+        tuple(changed),
+    ) != step.arguments
+
+
 def test_business_request_normalizes_only_exact_live_bound_reference_paths() -> None:
     bound_path = r"\Master-Mixer Hierarchy\Default Work Unit\Weather_Bus"
     unknown_path = r"\Master-Mixer Hierarchy\Default Work Unit\Unknown"

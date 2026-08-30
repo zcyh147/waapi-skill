@@ -88,55 +88,8 @@ def _live_info(version: str) -> dict[str, Any]:
     }
 
 
-def _request_contract(tmp_path: Path, version: str = "2025.1") -> dict[str, Any]:
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["--version", version, "request-schema", INLINE_READ_URI],
-        env=_env(tmp_path, version),
-        client_factory=lambda _url: pytest.fail("discovery must remain offline"),
-    )
-    assert exit_code == 0, payload
-    return payload
-
-
-def _field_handles(payload: Mapping[str, Any]) -> dict[str, str]:
-    return {
-        str(field["name"]): str(field["handle"])
-        for field in payload["fields"]
-        if "parent_handle" not in field
-    }
-
-
-def _typed_scalar_args(
-    payload: Mapping[str, Any],
-    field_name: str,
-    value_type: str,
-    value: str,
-) -> list[str]:
-    top = next(
-        field
-        for field in payload["fields"]
-        if field["name"] == field_name and "parent_handle" not in field
-    )
-    if top["shape"] != "branch":
-        return ["--set", top["handle"], value_type, value]
-    choice = next(
-        field
-        for field in payload["fields"]
-        if field.get("parent_handle") == top["handle"] and field["name"] == value_type
-    )
-    return [
-        "--choose",
-        top["handle"],
-        choice["handle"],
-        "--set",
-        choice["handle"],
-        value_type,
-        value,
-    ]
-
-
 @pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS[1:])
-def test_request_schema_returns_one_typed_continuation_for_tracer(
+def test_request_schema_returns_one_business_continuation_for_schema_read(
     tmp_path: Path,
     version: str,
 ) -> None:
@@ -147,25 +100,21 @@ def test_request_schema_returns_one_typed_continuation_for_tracer(
     )
 
     assert exit_code == 0, payload
-    assert payload["input_shape"] == "inline"
+    assert payload["input_shape"] == "business_declaration"
     assert payload["version"] == version
     assert payload["uri"] == INLINE_READ_URI
-    assert payload["continuation"]["subcommand"] == "typed-call"
-    assert payload["continuation"]["schema_digest"] == payload["schema_digest"]
+    assert payload["continuation"]["subcommand"] == "waapi-schema"
+    assert payload["business_adapter"]["input_mode"] == "bounded_business_read"
     assert "args-json" not in json.dumps(payload)
     assert "options-json" not in json.dumps(payload)
-    assert "uri" in {
-        field["name"] for field in payload["fields"] if "parent_handle" not in field
-    }
-    assert all(str(field["handle"]).startswith("trh1-") for field in payload["fields"])
+    assert "fields" not in payload
 
 
 @pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS[1:])
-def test_typed_call_materializes_and_dispatches_without_preview(
+def test_waapi_schema_dispatches_without_preview(
     tmp_path: Path,
     version: str,
 ) -> None:
-    contract = _request_contract(tmp_path, version)
     client = FakeClient(
         {
             "ak.wwise.core.getInfo": _live_info(version),
@@ -174,16 +123,8 @@ def test_typed_call_materializes_and_dispatches_without_preview(
     )
     exit_code, payload = waapi_gateway.execute_gateway(
         [
-            "typed-call",
-            INLINE_READ_URI,
-            "--schema-digest",
-            contract["schema_digest"],
-            *_typed_scalar_args(
-                contract,
-                "uri",
-                "string",
-                "ak.wwise.core.getInfo",
-            ),
+            "waapi-schema",
+            "ak.wwise.core.getInfo",
         ],
         env=_env(tmp_path, version),
         client_factory=lambda _url: client,
@@ -205,33 +146,17 @@ def test_typed_call_materializes_and_dispatches_without_preview(
     assert "transaction_state" not in payload
 
 
-@pytest.mark.parametrize("case", ("missing", "unknown", "wrong_type", "stale_digest"))
-def test_invalid_typed_facts_fail_before_connection(
+@pytest.mark.parametrize("digest", ("stale", "0" * 64))
+def test_retired_schema_typed_facts_fail_before_connection(
     tmp_path: Path,
-    case: str,
+    digest: str,
 ) -> None:
-    contract = _request_contract(tmp_path)
-    facts: list[str] = []
-    if case != "missing":
-        facts.extend(
-            _typed_scalar_args(
-                contract,
-                "uri",
-                "string",
-                "ak.wwise.core.getInfo",
-            )
-        )
-        if case == "unknown":
-            facts[-3] = "trh1-not-a-packaged-handle"
-        elif case == "wrong_type":
-            facts[-2:] = ["integer", "17"]
     exit_code, payload = waapi_gateway.execute_gateway(
         [
             "typed-call",
             INLINE_READ_URI,
             "--schema-digest",
-            "0" * 64 if case == "stale_digest" else contract["schema_digest"],
-            *facts,
+            digest,
         ],
         env=_env(tmp_path, "2025.1"),
         client_factory=lambda _url: pytest.fail("invalid facts must not connect"),
@@ -239,23 +164,15 @@ def test_invalid_typed_facts_fail_before_connection(
 
     assert exit_code == 2
     assert payload["ok"] is False
+    assert "business" in payload["message"].casefold()
 
 
-def test_typed_call_rejects_configured_live_version_drift(tmp_path: Path) -> None:
-    contract = _request_contract(tmp_path)
+def test_waapi_schema_rejects_configured_live_version_drift(tmp_path: Path) -> None:
     client = FakeClient({"ak.wwise.core.getInfo": _live_info("2024.1")})
     exit_code, payload = waapi_gateway.execute_gateway(
         [
-            "typed-call",
-            INLINE_READ_URI,
-            "--schema-digest",
-            contract["schema_digest"],
-            *_typed_scalar_args(
-                contract,
-                "uri",
-                "string",
-                "ak.wwise.core.getInfo",
-            ),
+            "waapi-schema",
+            "ak.wwise.core.getInfo",
         ],
         env=_env(tmp_path, "2025.1"),
         client_factory=lambda _url: client,

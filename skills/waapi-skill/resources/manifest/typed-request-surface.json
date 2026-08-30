@@ -1,7 +1,7 @@
 {
   "contract": "waapi-skill.typed-request-surface/v1",
   "intentionally_blocked_field_occurrences": 79,
-  "inventory_sha256": "5922cf1e60a867f1d0131ff9db476eaaa4f7af3d39aaecdbe2ba3ba87030baa5",
+  "inventory_sha256": "7cbe0a9ba6d9756c94ecea58bb1b2ac56da242059f17c5cdfdaf768271d133a8",
   "lanes": [
     {
       "construction_shape": "inline",
@@ -4514,7 +4514,8 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "request-schema"
+          "request-schema",
+          "waapi-schema"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -4529,7 +4530,7 @@
         "verification_strategy": "result_schema",
         "version": "2021.1"
       },
-      "execution_policy_sha256": "7e26c9a858900d813a6fc70e658d112b5d1b647d7faf6dfb6a34fb51b4c9a007",
+      "execution_policy_sha256": "306d62dfd2c8e2ce84f6d43dcde2f86218d4d0ec6de013143261292ad7cec3fa",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 0,
@@ -10896,7 +10897,8 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "request-schema"
+          "request-schema",
+          "waapi-schema"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -10911,7 +10913,7 @@
         "verification_strategy": "result_schema",
         "version": "2022.1"
       },
-      "execution_policy_sha256": "d3ab7204deafa0a87fa8317f11d537e2837b386980fbcf136e3f804c5c21522e",
+      "execution_policy_sha256": "81c9d6ece86d131c77a006eb7a4809572c1f39614321db56b6607fefe1fad156",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 0,
@@ -19221,7 +19223,8 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "request-schema"
+          "request-schema",
+          "waapi-schema"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -19236,7 +19239,7 @@
         "verification_strategy": "result_schema",
         "version": "2023.1"
       },
-      "execution_policy_sha256": "f8083b5a00475fc54195b2b24dd645ffbeeb8d34a8f3bd6f80aa985cd47af556",
+      "execution_policy_sha256": "b24651d3af616bb0163bf0a0310893449031eeacce6edd1068a7b09c098607fb",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 0,
@@ -27709,7 +27712,8 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "request-schema"
+          "request-schema",
+          "waapi-schema"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -27724,7 +27728,7 @@
         "verification_strategy": "result_schema",
         "version": "2024.1"
       },
-      "execution_policy_sha256": "a1376d6ff466710cefa44b6dc7622cb7f97b3d121bf72db0e8307a64a247cc71",
+      "execution_policy_sha256": "fd2af87693fc8b2bd89a053f4d67a0624d9e0af565124ef2e26774978251994d",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 0,
@@ -36437,7 +36441,8 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "request-schema"
+          "request-schema",
+          "waapi-schema"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -36452,7 +36457,7 @@
         "verification_strategy": "result_schema",
         "version": "2025.1"
       },
-      "execution_policy_sha256": "c63594950e5b8a4134aab119785104cb22663c8e1e9a42c4dc6dbbdd92d5ba8f",
+      "execution_policy_sha256": "94850558f513fcd588f552859adf73260a00b644e1b27986a2b5fe4fcd070bfd",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 0,

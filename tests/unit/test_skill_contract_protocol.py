@@ -1018,6 +1018,25 @@ def test_operate_cli_and_console_routes_use_only_the_deep_business_plan() -> Non
     assert "user's exact absolute `io_root`" in compact
 
 
+def test_operate_host_schema_tone_and_project_routes_hide_native_mechanics() -> None:
+    compact = " ".join(OPERATE.split())
+
+    for phrase in (
+        "`ak.wwise.waapi.getSchema`",
+        "`ak.wwise.debug.generateToneWAV`",
+        "`ak.wwise.ui.project.*`",
+        "continues directly through `waapi-schema`",
+        "one complete `draft-declare-host-plan`",
+        "zero-based `waveform_channels`",
+        "derives waveform spelling and the native channel bitmask",
+        "Every `ak.wwise.ui.project.*` phase requires Wwise Authoring",
+    ):
+        assert phrase in compact
+    assert "waveformChannelMask" not in OPERATE
+    assert "autoCheckOutToSourceControl" not in OPERATE
+    assert "onMigrationRequired" not in OPERATE
+
+
 def test_operate_policy_and_gateway_owned_continuation_are_closed() -> None:
     compact = " ".join(OPERATE.split())
     skill_compact = " ".join(SKILL.split())

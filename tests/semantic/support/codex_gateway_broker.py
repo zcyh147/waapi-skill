@@ -9707,7 +9707,10 @@ class CodexGatewayBroker:
                 step,
                 actual,
             )
-        if step.subcommand == "draft-declare-cli-console-plan":
+        if step.subcommand in {
+            "draft-declare-cli-console-plan",
+            "draft-declare-host-plan",
+        }:
             return CodexGatewayBroker._normalize_cli_console_plan_fact_order(
                 step,
                 actual,

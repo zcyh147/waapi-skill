@@ -408,7 +408,11 @@ def test_public_manifest_dispatch_is_exactly_the_immutable_reviewed_call_allowli
     assert frozenset(FIXED_COMMANDS_BY_URI) == REVIEWED_FIXED_FUNCTION_URIS
     assert all(
         entry.gateway_commands
-        in {("request-schema",), ("request-schema", "core-call")}
+        in {
+            ("request-schema",),
+            ("request-schema", "core-call"),
+            ("request-schema", "waapi-schema"),
+        }
         for entry in entries
         if entry.preferred_route == "manifest_dispatch"
     )

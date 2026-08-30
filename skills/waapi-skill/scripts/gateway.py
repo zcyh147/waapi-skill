@@ -250,6 +250,20 @@ from wwise_waapi.cli_console_business_cli import (  # noqa: E402  # pyright: ign
     add_cli_console_plan_arguments,
     cli_console_plan_from_namespace,
 )
+from wwise_waapi.host_ui_debug_business_contracts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    HOST_UI_DEBUG_BUSINESS_OPERATIONS,
+    host_ui_debug_business_catalog_rows,
+    host_ui_debug_business_contract_data,
+    host_ui_debug_business_versions,
+)
+from wwise_waapi.host_ui_debug_business_cli import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    HostUiDebugBusinessCliError,
+    add_host_ui_debug_plan_arguments,
+    host_ui_debug_plan_from_namespace,
+)
+from wwise_waapi.host_ui_debug_business import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    materialize_waapi_schema_read_args,
+)
 from wwise_waapi.core_business_contracts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     core_business_catalog_rows,
     core_business_contract_data,
@@ -1476,6 +1490,24 @@ def build_parser() -> argparse.ArgumentParser:
     )
     request_schema.add_argument("api")
 
+    waapi_schema = subparsers.add_parser(
+        "waapi-schema",
+        help="Read one exact WAAPI schema through a bounded business route",
+    )
+    waapi_schema.add_argument("target_uri")
+    waapi_schema_examples = waapi_schema.add_mutually_exclusive_group()
+    waapi_schema_examples.add_argument(
+        "--include-examples",
+        dest="include_examples",
+        action="store_true",
+    )
+    waapi_schema_examples.add_argument(
+        "--exclude-examples",
+        dest="include_examples",
+        action="store_false",
+    )
+    waapi_schema.set_defaults(include_examples=None)
+
     core_call = subparsers.add_parser(
         "core-call",
         help="Run one reviewed generic Core read from closed business identities",
@@ -2399,6 +2431,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_business_draft_binding_arguments(draft_declare_cli_console_plan)
     add_cli_console_plan_arguments(draft_declare_cli_console_plan)
+    draft_declare_host_plan = subparsers.add_parser(
+        "draft-declare-host-plan",
+        help=(
+            "Declare one complete test-tone or Authoring-project outcome while "
+            "the Gateway owns native host request construction"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_declare_host_plan)
+    add_host_ui_debug_plan_arguments(draft_declare_host_plan)
 
     draft_declare_ui_plan = subparsers.add_parser(
         "draft-declare-ui-plan",
@@ -4289,6 +4330,26 @@ def live_authoring_transaction_boundary(
     common: Mapping[str, Any],
 ) -> dict[str, Any] | None:
     operation = request_payload.get("operation")
+    arguments = request_payload.get("arguments")
+    native_api = (
+        arguments.get("api")
+        if operation == "waapi.call" and isinstance(arguments, Mapping)
+        else None
+    )
+    if native_api in {
+        "ak.wwise.ui.project.close",
+        "ak.wwise.ui.project.create",
+        "ak.wwise.ui.project.open",
+    }:
+        if live_info.get("isCommandLine") is not False:
+            return authoring_host_required_payload(
+                api=str(native_api),
+                command=command,
+                live_info=live_info,
+                common=common,
+                operation=str(native_api),
+            )
+        return None
     if operation == "lua.executeCliFile" and live_info.get("isCommandLine") is not True:
         return command_line_host_required_payload(
             command=command,
@@ -4306,7 +4367,6 @@ def live_authoring_transaction_boundary(
             common=common,
             operation=str(operation),
         )
-    arguments = request_payload.get("arguments")
     owned_unregister = (
         operation == "ui.commands.unregister"
         and isinstance(arguments, Mapping)
@@ -6153,7 +6213,9 @@ def core_business_route_payload(version: str, api: str) -> dict[str, Any]:
     """Expose one reviewed Core declaration without reflected typed fields."""
 
     contract = (
-        cli_console_business_contract_data(api, version)
+        host_ui_debug_business_contract_data(api, version)
+        if api in HOST_UI_DEBUG_BUSINESS_OPERATIONS
+        else cli_console_business_contract_data(api, version)
         if api in CLI_CONSOLE_BUSINESS_OPERATIONS
         else media_build_business_contract_data(api, version)
         if api in media_build_business_operations()
@@ -6200,6 +6262,8 @@ def core_business_route_payload(version: str, api: str) -> dict[str, Any]:
 
 
 def core_business_route_available(api: str, version: str) -> bool:
+    if api in HOST_UI_DEBUG_BUSINESS_OPERATIONS:
+        return version in host_ui_debug_business_versions(api)
     if api in CLI_CONSOLE_BUSINESS_OPERATIONS:
         return version in cli_console_business_versions(api)
     if api in media_build_business_operations():
@@ -8890,6 +8954,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
         request_schema_routes = list(
             (
                 *cli_console_business_catalog_rows(),
+                *host_ui_debug_business_catalog_rows(),
                 *core_business_catalog_rows(),
                 *media_build_business_catalog_rows(),
                 *runtime_inspection_business_catalog_rows(),
@@ -11990,6 +12055,16 @@ def dispatch_command(
             dispatcher=dispatcher,
             common=common,
         )
+    if args.command == "draft-declare-host-plan":
+        return dispatch_business_host_ui_debug_plan(
+            args,
+            env=env,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+        )
     if args.command in {"draft-declare-ui-plan", "draft-add-ui-command"}:
         return dispatch_business_authoring_ui_update(
             args,
@@ -12060,6 +12135,99 @@ def dispatch_command(
             dispatcher=dispatcher,
             common=common,
         )
+    if args.command == "waapi-schema":
+        api = "ak.wwise.waapi.getSchema"
+        try:
+            capability = live_capability(
+                detected_version,
+                api,
+                live_info=live_info,
+            )
+        except CapabilityNotFoundError:
+            return unreflected_interface_payload(
+                api,
+                detected_version,
+                command=args.command,
+                common=common,
+            )
+        if (
+            capability.execution_contract.get("route") != "bounded_call"
+            or args.command not in capability.gateway_commands
+        ):
+            raise GatewayInputError(
+                f"{api} is not bound to the packaged {args.command} route in "
+                f"Wwise {detected_version}"
+            )
+        try:
+            schema_args = materialize_waapi_schema_read_args(
+                detected_version,
+                target_uri=args.target_uri,
+                include_examples=args.include_examples,
+            )
+        except ValueError as exc:
+            raise GatewayInputError(str(exc)) from exc
+        request_validation = validate_semantic_payload(
+            api,
+            schema_args,
+            {},
+            version=detected_version,
+        )
+        result = dispatch(
+            dispatcher,
+            api,
+            connection=connection,
+            version=detected_version,
+            args=schema_args,
+            options={},
+        )
+        if not result.get("ok"):
+            return {
+                "ok": False,
+                "status": "error",
+                **common,
+                "api_attempted": api,
+                "schema_target": args.target_uri,
+                "call": dispatch_call_summary(result),
+                "schema_validation": {
+                    "request": request_validation.as_dict(),
+                    "result": None,
+                },
+            }
+        raw_result = strict_call_result_mapping(
+            result,
+            command="waapi-schema",
+            error_code="INVALID_SCHEMA_RESULT",
+        )
+        result_validation = validate_semantic_result(
+            api,
+            raw_result,
+            version=detected_version,
+        )
+        return {
+            "ok": True,
+            "status": "ok",
+            **common,
+            "api_attempted": api,
+            "schema_target": args.target_uri,
+            "semantic_preview": {
+                "uri": api,
+                "business_request": {
+                    "target_uri": args.target_uri,
+                    **(
+                        {"include_examples": args.include_examples}
+                        if args.include_examples is not None
+                        else {}
+                    ),
+                },
+                "native_request_fields": "gateway_owned",
+            },
+            "call": dispatch_call_summary(result),
+            "schema_validation": {
+                "request": request_validation.as_dict(),
+                "result": result_validation.as_dict(),
+            },
+            "agent_result": raw_result,
+        }
     if args.command == "status":
         info = dispatch(
             dispatcher,
@@ -15113,6 +15281,113 @@ def dispatch_business_cli_console_plan(
     ) -> BusinessDeclarationSession:
         candidate = current.with_settings({"cli_console_plan": plan})
         adapter.materialize(candidate)
+        return candidate
+
+    record = binding.store.apply_business_update(
+        args.draft_id,
+        task_authority=args.task_authority,
+        expected_revision=args.expected_revision,
+        schema_digest=operation_draft_schema_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        composer_digest=operation_composer_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        context=binding.context,
+        update=update,
+        event_type="settings.revised",
+    )
+    payload = operation_draft_payload(
+        args.command,
+        record,
+        offline=False,
+        state_dir=args.state_dir,
+        task_authority=args.task_authority,
+    )
+    payload.update(
+        {
+            "endpoint": dict(common["endpoint"]),
+            "detected_version": detected_version,
+            "project_call": dispatch_call_summary(binding.project_call),
+        }
+    )
+    return payload
+
+
+def dispatch_business_host_ui_debug_plan(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Bind one complete test-tone or Authoring-project business plan."""
+
+    state_dir = resolve_transaction_state_directory(args, env=env)
+    pending = OperationDraftStore(state_dir).inspect(
+        args.draft_id,
+        task_authority=args.task_authority,
+    )
+    if (
+        pending.operation.startswith("ak.wwise.ui.project.")
+        and live_info.get("isCommandLine") is not False
+    ):
+        return authoring_host_required_payload(
+            api=None,
+            command=args.command,
+            live_info=live_info,
+            common=common,
+            operation=pending.operation,
+        )
+    binding = _open_business_binding(
+        args,
+        env=env,
+        connection=connection,
+        detected_version=detected_version,
+        live_info=live_info,
+        dispatcher=dispatcher,
+    )
+    adapter = business_adapter(binding.record.operation)
+    if adapter.family != "host-ui-debug-business" or not adapter.accepts_update_command(
+        args.command
+    ):
+        raise GatewayInputError(
+            f"{binding.record.operation} does not expose {args.command}"
+        )
+    raw_session = (
+        binding.record.composition.get("business_session")
+        if binding.record.composition is not None
+        else None
+    )
+    session = (
+        BusinessDeclarationSession.create(binding.context)
+        if raw_session is None
+        else BusinessDeclarationSession.from_dict(raw_session)
+    )
+    if session.context != binding.context:
+        raise OperationDraftBindingDrift(
+            "Live project or Wwise build differs from the host/UI/Debug plan binding."
+        )
+    try:
+        plan = host_ui_debug_plan_from_namespace(
+            args,
+            operation=binding.record.operation,
+            version=detected_version,
+        )
+    except HostUiDebugBusinessCliError as exc:
+        raise GatewayInputError(str(exc)) from exc
+
+    def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
+        candidate = current.with_settings({"host_ui_debug_plan": plan})
+        parse_operation_request(
+            adapter.materialize(candidate),
+            expected_version=detected_version,
+        )
         return candidate
 
     record = binding.store.apply_business_update(
@@ -21548,6 +21823,11 @@ def _business_next_action_binding(
         "draft-declare-cli-console-plan",
         *binding,
     ]
+    declare_host_plan_prefix = [
+        *base,
+        "draft-declare-host-plan",
+        *binding,
+    ]
     declare_ui_plan_prefix = [*base, "draft-declare-ui-plan", *binding]
     add_ui_command_prefix = [*base, "draft-add-ui-command", *binding]
     declare_debug_intent_prefix = [
@@ -22661,6 +22941,51 @@ def _business_next_action_binding(
                     declare_cli_console_plan_prefix,
                     append_action=(
                         "copy_verbatim_then_append_one_complete_cli_console_plan"
+                    ),
+                ),
+                "required_fields": list(declaration["required_fields"]),
+                "optional_fields": list(declaration["optional_fields"]),
+                "input_forms": dict(declaration["input_forms"]),
+                "submit_once": True,
+                "native_request_input": "forbidden",
+            },
+        }
+    if adapter.family == "host-ui-debug-business":
+        declaration = business_contract["declaration"]
+        shared = {
+            "contract": "waapi-skill.business-draft-next-action/v1",
+            "responsibility_split": business_contract["responsibility_split"],
+            "business_contract": business_contract,
+            "forbidden_inputs": [
+                *forbidden_inputs,
+                "native_request",
+                "waapi_args",
+                "waapi_options",
+                "waveform_channel_mask",
+                "native_project_policy_field",
+                "request_fragment",
+            ],
+            "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+            "then_read_next_response": True,
+            "precompute_or_increment_revision": False,
+        }
+        if session is not None and adapter.is_complete(session):
+            return {
+                **shared,
+                "required_next_phase": "check_complete_host_plan",
+                "check": {
+                    **operation_draft_prefix_copy_binding(check),
+                    "append": [],
+                },
+            }
+        return {
+            **shared,
+            "required_next_phase": "declare_complete_host_plan",
+            "declaration": {
+                **operation_draft_prefix_copy_binding(
+                    declare_host_plan_prefix,
+                    append_action=(
+                        "copy_verbatim_then_append_one_complete_host_plan"
                     ),
                 ),
                 "required_fields": list(declaration["required_fields"]),

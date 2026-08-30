@@ -163,6 +163,14 @@ Closed scalar choices appear in each current version's returned input form only 
 
 The Gateway also owns the Wwise 2022 external-source partial-success boundary, all per-version field deltas, collection ceilings, and isolated-I/O checks. On rejection, report the returned repair action instead of reconstructing a native request. After every successful CLI execute, including `ak.wwise.cli.migrate`, copy the returned `verify` continuation exactly. Migration verification may end at the explicit weaker result-schema boundary: disconnect or continued reachability never authorizes replay, and result-schema-only evidence is not a reopened-project business oracle.
 
+### WAAPI schema, test tone, and Authoring project routes
+
+Use `request-schema <exact-uri>` for `ak.wwise.waapi.getSchema`, `ak.wwise.debug.generateToneWAV`, and the disclosed `ak.wwise.ui.project.*` rows. The schema read continues directly through `waapi-schema`; provide the exact target URI and the examples outcome only when the returned version supports it. Do not enter a transaction for this read or return to typed field handles.
+
+Test-tone and Authoring project operations continue through `draft-start` and one complete `draft-declare-host-plan`. Supply only the returned business fields and input forms. For a tone, use Hz, seconds, dB, the returned Wwise channel-layout name, and zero-based `waveform_channels`; the Gateway derives waveform spelling and the native channel bitmask. For project create/open/close, provide the exact project artifact plus only requested save-discard, upgrade, migration, checkout, language, and platform outcomes. The Gateway owns the versioned native field names, platform objects, I/O root, project-transition guard, Preview, and verification.
+
+Every `ak.wwise.ui.project.*` phase requires Wwise Authoring. An Authoring-host boundary ends the attempt; never substitute WwiseConsole, a CLI project operation, or a GUI command. Exact WwiseConsole intent still selects the separate CLI/Console business routes above.
+
 ### Authoring audio conversion
 
 For exact `ak.wwise.core.audio.convert` in `2024.1`/`2025.1`, run `request-schema ak.wwise.core.audio.convert` and follow its `core-business/v1` Draft. Its public business inputs are object identities, platforms, languages, and the user's exact absolute `io_root`. Bind each `audio_object` role and copy the returned handles into `audio_object_handles`. Explicit SFX targets use `SFX`; explicit localized languages replace it. Never return to `typed-call` or typed facts. Ask when a required input remains ambiguous.

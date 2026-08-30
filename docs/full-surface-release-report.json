@@ -40,7 +40,7 @@
   "intentionally_blocked_field_occurrences": 79,
   "source_inventory": {
     "contract": "waapi-skill.typed-request-surface/v1",
-    "inventory_sha256": "5922cf1e60a867f1d0131ff9db476eaaa4f7af3d39aaecdbe2ba3ba87030baa5",
+    "inventory_sha256": "7cbe0a9ba6d9756c94ecea58bb1b2ac56da242059f17c5cdfdaf768271d133a8",
     "versions": [
       "2021.1",
       "2022.1",

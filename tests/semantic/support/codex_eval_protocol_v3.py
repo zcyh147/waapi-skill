@@ -1883,6 +1883,123 @@ def build_cli_console_business_transaction_steps(
     )
 
 
+def build_host_ui_debug_business_transaction_steps(
+    *,
+    version: str,
+    label: str,
+    output_file: str,
+) -> tuple[ExpectedGatewayStep, ...]:
+    """Build one closed test-tone Preview through business units only."""
+
+    api = "ak.wwise.debug.generateToneWAV"
+    draft_start = f"{label}.draft-start"
+    declaration = f"{label}.declare-host-plan"
+    check = f"{label}.check"
+
+    def prefix(revision_step: str) -> tuple[Any, ...]:
+        return (
+            ResponseBinding(draft_start, "/draft/draft_id"),
+            "--task-authority",
+            ResponseBinding(draft_start, "/task_authority"),
+            "--expected-revision",
+            ResponseBinding(revision_step, "/draft/revision"),
+        )
+
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": version,
+        "operation": "waapi.call",
+        "arguments": {
+            "api": api,
+            "args": {
+                "path": output_file,
+                "waveform": "sine",
+                "frequency": 440,
+                "channelConfig": "2.0",
+                "bitDepth": "pcm24",
+                "sampleRate": 48000,
+                "attackTime": 0.05,
+                "sustainTime": 1.0,
+                "releaseTime": 0.1,
+                "sustainLevel": -6,
+                "setAnonymous": True,
+                "waveformChannelMask": 3,
+            },
+            "options": {},
+            "io_root": str(Path(output_file).parent),
+        },
+    }
+    return (
+        ExpectedGatewayStep(
+            name=f"{label}.request-schema",
+            subcommand="request-schema",
+            arguments=(api,),
+        ),
+        ExpectedGatewayStep(
+            name=draft_start,
+            subcommand="draft-start",
+            arguments=(api,),
+        ),
+        ExpectedGatewayStep(
+            name=declaration,
+            subcommand="draft-declare-host-plan",
+            arguments=(
+                *prefix(draft_start),
+                "--value",
+                "output_file",
+                output_file,
+                "--value",
+                "waveform",
+                "sine",
+                "--value",
+                "frequency_hz",
+                "440",
+                "--value",
+                "channel_layout",
+                "2.0",
+                "--value",
+                "bit_depth",
+                "pcm24",
+                "--value",
+                "sample_rate_hz",
+                "48000",
+                "--value",
+                "attack_seconds",
+                "0.05",
+                "--value",
+                "sustain_seconds",
+                "1.0",
+                "--value",
+                "release_seconds",
+                "0.1",
+                "--value",
+                "sustain_db",
+                "-6",
+                "--toggle",
+                "anonymous_channels",
+                "enable",
+                "--item",
+                "waveform_channels",
+                "0",
+                "--item",
+                "waveform_channels",
+                "1",
+            ),
+        ),
+        ExpectedGatewayStep(
+            name=check,
+            subcommand="draft-check",
+            arguments=prefix(declaration),
+        ),
+        ExpectedGatewayStep(
+            name=f"{label}.preview",
+            subcommand="preview-from-draft",
+            arguments=prefix(check),
+            expected_operation_request=request,
+        ),
+    )
+
+
 def build_project_setting_business_transaction_steps(
     *,
     version: str,
@@ -5208,6 +5325,7 @@ __all__ = [
     "build_audio_import_composer_transaction_steps",
     "build_authoring_ui_business_transaction_steps",
     "build_cli_console_business_transaction_steps",
+    "build_host_ui_debug_business_transaction_steps",
     "build_core_business_transaction_steps",
     "build_project_setting_business_transaction_steps",
     "build_soundengine_business_transaction_steps",

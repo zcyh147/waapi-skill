@@ -268,10 +268,15 @@ class WaapiRequestFailed(Exception):
         self.kwargs = kwargs
 
 
-def live_info(*, year: int = 2022, major: int = 1) -> dict[str, Any]:
+def live_info(
+    *,
+    year: int = 2022,
+    major: int = 1,
+    is_command_line: bool = True,
+) -> dict[str, Any]:
     return {
         "displayName": "Wwise",
-        "isCommandLine": True,
+        "isCommandLine": is_command_line,
         "sessionId": "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}",
         "processId": 4242,
         "processPath": "/Applications/Audiokinetic/Wwise.app/Contents/MacOS/Wwise",
@@ -1610,7 +1615,7 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
         "<api>",
     ]
     assert all("next_command" not in row for row in request_schema_routes.values())
-    assert catalog["request_schema_route_count"] == 100
+    assert catalog["request_schema_route_count"] == 105
     assert catalog["request_schema_route_count"] == len(request_schema_routes)
     assert "ak.wwise.cli.generateSoundbank" in request_schema_routes
     assert "ak.wwise.console.project.open" in request_schema_routes
@@ -7448,6 +7453,7 @@ def test_every_project_transition_row_runs_one_complete_program_chain(
     guard_mode: str,
 ) -> None:
     year = int(version.split(".", 1)[0])
+    is_command_line = not api.startswith("ak.wwise.ui.")
     state_dir = tmp_path / "state"
     io_root = (tmp_path / "io-root").resolve()
     target_path = io_root / "TargetProject.wproj"
@@ -7477,7 +7483,9 @@ def test_every_project_transition_row_runs_one_complete_program_chain(
     )
     preview_client = FakeClient(
         {
-            "ak.wwise.core.getInfo": [live_info(year=year)],
+            "ak.wwise.core.getInfo": [
+                live_info(year=year, is_command_line=is_command_line)
+            ],
             "ak.wwise.core.object.get": [{"return": before_rows}],
         }
     )
@@ -7497,7 +7505,9 @@ def test_every_project_transition_row_runs_one_complete_program_chain(
     result = {"hadProjectOpen": True} if api.endswith(".close") else {}
     execute_client = FakeClient(
         {
-            "ak.wwise.core.getInfo": [live_info(year=year)],
+            "ak.wwise.core.getInfo": [
+                live_info(year=year, is_command_line=is_command_line)
+            ],
             "ak.wwise.core.object.get": [{"return": before_rows}],
             api: [result],
         }
@@ -7525,7 +7535,9 @@ def test_every_project_transition_row_runs_one_complete_program_chain(
     )
     verify_client = FakeClient(
         {
-            "ak.wwise.core.getInfo": [live_info(year=year)],
+            "ak.wwise.core.getInfo": [
+                live_info(year=year, is_command_line=is_command_line)
+            ],
             "ak.wwise.core.object.get": [{"return": after_rows}],
         }
     )
@@ -7571,7 +7583,7 @@ def test_project_transition_mismatch_stays_executed_unverified_for_manual_verify
         state_dir=state_dir,
         client=FakeClient(
             {
-                "ak.wwise.core.getInfo": [live_info()],
+                "ak.wwise.core.getInfo": [live_info(is_command_line=False)],
                 "ak.wwise.core.object.get": [{"return": []}],
             }
         ),
@@ -7588,7 +7600,7 @@ def test_project_transition_mismatch_stays_executed_unverified_for_manual_verify
         state_dir=state_dir,
         client=FakeClient(
             {
-                "ak.wwise.core.getInfo": [live_info()],
+                "ak.wwise.core.getInfo": [live_info(is_command_line=False)],
                 "ak.wwise.core.object.get": [{"return": []}],
                 api: [{}],
             }
@@ -7604,7 +7616,7 @@ def test_project_transition_mismatch_stays_executed_unverified_for_manual_verify
         state_dir=state_dir,
         client=FakeClient(
             {
-                "ak.wwise.core.getInfo": [live_info()],
+                "ak.wwise.core.getInfo": [live_info(is_command_line=False)],
                 "ak.wwise.core.object.get": [
                     {
                         "return": [

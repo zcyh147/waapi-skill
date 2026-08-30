@@ -677,22 +677,23 @@ class ExecutionContractRegistry:
                 program_case="fixed-command-dispatch",
             )
         if uri in BOUNDED_DIRECT_CALL_URIS:
+            if uri == "ak.wwise.waapi.getSchema":
+                gateway_commands = ("request-schema", "waapi-schema")
+            elif uri in (
+                core_business_operations()
+                | media_build_business_operations()
+                | runtime_inspection_business_operations()
+            ):
+                gateway_commands = ("request-schema", "core-call")
+            else:
+                gateway_commands = ("request-schema",)
             return ExecutionContract(
                 version=version,
                 uri=uri,
                 item_type=item_type,
                 route="bounded_call",
                 effect="read",
-                gateway_commands=(
-                    ("request-schema", "core-call")
-                    if uri
-                    in (
-                        core_business_operations()
-                        | media_build_business_operations()
-                        | runtime_inspection_business_operations()
-                    )
-                    else ("request-schema",)
-                ),
+                gateway_commands=gateway_commands,
                 timeout_seconds=10.0,
                 result_limit_bytes=256 * 1024,
                 verification_strategy="result_schema",
