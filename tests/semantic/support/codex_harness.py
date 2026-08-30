@@ -260,6 +260,7 @@ GATEWAY_SUBCOMMANDS = frozenset(
         "metadata",
         "topic-schema",
         "wait-topic",
+        "stream-topic",
         "capabilities",
         "describe",
         "operations",
@@ -4351,7 +4352,22 @@ def successful_gateway_payload(
     if not record.succeeded:
         return None
     try:
-        payload = json.loads(record.aggregated_output.strip())
+        if subcommand == "stream-topic":
+            stream_records = tuple(
+                json.loads(line)
+                for line in record.aggregated_output.splitlines()
+                if line.strip()
+            )
+            if (
+                len(stream_records) < 2
+                or not all(isinstance(item, Mapping) for item in stream_records)
+                or stream_records[0].get("record_type") != "started"
+                or stream_records[-1].get("record_type") != "terminal"
+            ):
+                return None
+            payload = stream_records[-1]
+        else:
+            payload = json.loads(record.aggregated_output.strip())
     except json.JSONDecodeError:
         return None
     if not isinstance(payload, Mapping):

@@ -3482,6 +3482,77 @@ def test_command_classifier_accepts_exact_topic_schema_envelope(
     assert facts.unexpected_commands == ()
 
 
+def test_command_classifier_accepts_successful_stream_topic_ndjson(
+    tmp_path: Path,
+) -> None:
+    skill = tmp_path / "skill"
+    runner = skill / "scripts" / "run.py"
+    runner.parent.mkdir(parents=True)
+    runner.write_text("# packaged runner\n", encoding="utf-8")
+    topic = "ak.wwise.core.soundbank.generated"
+    argv = (
+        "python",
+        str(runner),
+        "gateway.py",
+        "--timeout",
+        "30",
+        "stream-topic",
+        topic,
+    )
+    records = (
+        {
+            "contract": "waapi-skill.topic-stream/v1",
+            "command": "stream-topic",
+            "record_type": "started",
+            "ok": True,
+            "status": "streaming",
+            "topic": topic,
+        },
+        {
+            "contract": "waapi-skill.topic-stream/v1",
+            "record_type": "event",
+            "sequence": 1,
+            "topic": topic,
+            "event": {"soundbank": {"name": "Weapons_Core"}},
+        },
+        {
+            "contract": "waapi-skill.topic-stream/v1",
+            "command": "stream-topic",
+            "record_type": "terminal",
+            "ok": True,
+            "status": "completed",
+            "completion_reason": "duration_elapsed",
+            "topic": topic,
+            "event_count": 1,
+            "cleanup": "unsubscribed",
+        },
+    )
+    record = CodexCommandRecord(
+        command=shlex.join(argv),
+        exit_code=0,
+        status="completed",
+        aggregated_output="".join(
+            json.dumps(item, separators=(",", ":")) + "\n"
+            for item in records
+        ),
+        argv=argv,
+        has_shell_operators=False,
+        parse_error="",
+        parser_kind="posix-native",
+    )
+
+    facts = classify_commands(
+        (record,),
+        skill_source=skill,
+        expected_gateway_subcommands=("stream-topic",),
+    )
+
+    assert facts.gateway_commands == (record.command,)
+    assert facts.gateway_attempt_commands == (record.command,)
+    assert facts.gateway_subcommands == ("stream-topic",)
+    assert facts.unexpected_commands == ()
+
+
 def test_command_classifier_accepts_packaged_query_schema_result() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     skill = repo_root / "skills" / "waapi-skill"

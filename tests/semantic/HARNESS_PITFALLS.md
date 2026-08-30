@@ -100,6 +100,27 @@ prevention checks that are expensive to rediscover.
   omits the campaign token. Require zero matching descendants plus the sealed
   summary and attempt manifest before unregistering the task.
 
+### Topic stream output is NDJSON, not one Gateway JSON document
+
+- Evidence: #91 macOS root `imac-topic-3b26237-r2-typ24-stream` completed one
+  30-second `stream-topic` lifecycle, received the exact Mac and Windows
+  SoundBank events, emitted a successful `duration_elapsed` terminal record,
+  and unsubscribed cleanly. The Broker and real publisher path passed, but the
+  shared command classifier omitted `stream-topic` and treated the successful
+  command as non-Gateway/unexpected.
+- Cause: the classifier knew the single-document `wait-topic` route but neither
+  the `stream-topic` subcommand nor its started/event/terminal NDJSON framing.
+  A separate earlier frozen root also showed that result-only `platform` and
+  `language` Topic disclosures must be sealed even when they are deliberately
+  absent from the subscription match.
+- Prevention: keep `stream-topic` in the one shared Gateway subcommand registry;
+  classify success from its final terminal NDJSON record, while the Broker
+  independently validates the complete ordered record lifecycle, event count,
+  and unsubscribe result. Seal only the exact event-result scopes required by
+  the oracle in addition to match scopes. Never parse the whole stream with one
+  `json.loads`, and never repair these harness omissions by weakening the
+  production Topic contract.
+
 ### Windows task registration guessed the desktop environment
 
 - Evidence: #96 query `r6` launcher probes stopped before campaign-root
