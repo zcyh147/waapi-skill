@@ -60,12 +60,12 @@ python scripts/run.py gateway.py --version <supported-version> query-schema [--a
 python scripts/run.py gateway.py --version <supported-version> query-object --advanced-waql '<bounded-single-line-waql>' --include <business-field> --max-results <1..1000>
 python scripts/run.py gateway.py --version <supported-version> object-types --query '<type keywords>' --limit 20
 python scripts/run.py gateway.py metadata types
-python scripts/run.py gateway.py wait-topic <topic-uri>
 python scripts/run.py gateway.py topic-schema <topic-uri>
-python scripts/run.py gateway.py --timeout <positive-finite-seconds> wait-topic <topic-uri> --event-count <1..64> <business-topic-facts-from-topic-schema>
-python scripts/run.py gateway.py wait-topic <topic-uri> --no-timeout
-python scripts/run.py gateway.py stream-topic <topic-uri> <business-topic-facts-from-topic-schema>
-python scripts/run.py gateway.py --timeout <positive-finite-seconds> stream-topic <topic-uri> <business-topic-facts-from-topic-schema>
+python scripts/run.py gateway.py wait-topic <topic-uri> <binding-and-facts-from-topic-schema>
+python scripts/run.py gateway.py --timeout <positive-finite-seconds> wait-topic <topic-uri> --event-count <1..64> <binding-and-facts-from-topic-schema>
+python scripts/run.py gateway.py wait-topic <topic-uri> --no-timeout <binding-from-topic-schema>
+python scripts/run.py gateway.py stream-topic <topic-uri> <binding-and-facts-from-topic-schema>
+python scripts/run.py gateway.py --timeout <positive-finite-seconds> stream-topic <topic-uri> <binding-and-facts-from-topic-schema>
 python scripts/run.py gateway.py operations
 python scripts/run.py gateway.py operation-schema object.create
 python scripts/run.py gateway.py operation-schema object.set
@@ -119,8 +119,8 @@ Select `stream-topic` only for explicit streaming or persistent intent such as
 or “不要收到后退出”. It creates one persistent subscription, emits each matched
 event immediately as a compact flushed JSON record, and by default runs until
 cancellation; a gateway-global `--timeout <positive-finite-seconds>` gives it a
-finite duration. When options or matching are needed, run `topic-schema` once
-and use its business continuation for that wait or stream. Disclose `--row` only for a needed complex collection. Each event is publish-schema and size validated; a bounded buffer
+finite duration. Before every wait or stream, run `topic-schema` and copy its
+exact `--topic-contract-digest`, even without options or matching. Each event is publish-schema and size validated; a bounded buffer
 fails closed on overflow, cleanup always attempts unsubscribe, and a terminal
 record reports why the stream ended.
 

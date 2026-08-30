@@ -16,6 +16,7 @@ from wwise_waapi.typed_topics import (
 )
 from wwise_waapi.typed_requests import TypedRequestFact
 from wwise_waapi.typed_requests import dynamic_array_item_choices
+from wwise_waapi.topic_business import topic_business_contract
 from wwise_waapi.versions import SUPPORTED_WWISE_VERSION_KEYS
 
 
@@ -47,6 +48,13 @@ def _env(tmp_path: Path, version: str) -> dict[str, str]:
         encoding="utf-8",
     )
     return {"WAAPI_SKILL_CONFIG_PATH": str(config)}
+
+
+def _contract_binding(topic: str, version: str = "2025.1") -> list[str]:
+    return [
+        "--topic-contract-digest",
+        topic_business_contract(version, topic).contract_digest,
+    ]
 
 
 class _Handler:
@@ -390,6 +398,7 @@ def test_public_wait_topic_uses_business_options_and_match_then_unsubscribes(
     code, payload = gateway.execute_gateway(
         [
             "--timeout", "0.5", "wait-topic", topic,
+            *_contract_binding(topic, version),
             "--topic-option", "platform", "{11111111-1111-1111-1111-111111111111}",
             "--event-match", "object-id", wanted,
         ],
@@ -429,6 +438,16 @@ def test_topic_schema_leads_with_handle_free_business_input(tmp_path: Path) -> N
     assert "schema_digest" not in serialized
     assert "wire_type" not in serialized
     assert payload["continuation"]["default_input"] == "business"
+    digest = business["contract_digest"]
+    assert payload["continuation"]["contract_binding"] == {
+        "flag": "--topic-contract-digest",
+        "value": digest,
+        "copy_exactly": True,
+    }
+    assert payload["continuation"]["wait_argv_prefix"][-2:] == [
+        "--topic-contract-digest",
+        digest,
+    ]
     assert payload["continuation"]["business_fact_argv"] == {
         "topic_option": "--topic-option <field> <value>",
         "empty_topic_option": "--topic-option-empty <field>",
@@ -447,6 +466,36 @@ def test_topic_schema_leads_with_handle_free_business_input(tmp_path: Path) -> N
         "exact_entry_row": "--event-entry-row <scope> <indices-or-dash> <exact-key> <item-index> <field> <value>",
         "typed_exact_entry_row": "--event-entry-row-as <scope> <indices-or-dash> <exact-key> <item-index> <field> <text|integer|number|toggle|null> <value>",
     }
+
+
+def test_wait_topic_requires_contract_digest_before_connection(tmp_path: Path) -> None:
+    topic = "ak.wwise.core.object.created"
+
+    code, payload = gateway.execute_gateway(
+        ["wait-topic", topic],
+        env=_env(tmp_path, "2025.1"),
+        client_factory=lambda url: pytest.fail(f"wait-topic connected to {url}"),
+    )
+
+    assert code == 2
+    assert payload["error_code"] == "GatewayInputError"
+    assert "topic-schema" in payload["message"]
+
+
+def test_wait_topic_rejects_stale_contract_digest_before_connection(
+    tmp_path: Path,
+) -> None:
+    topic = "ak.wwise.core.object.created"
+
+    code, payload = gateway.execute_gateway(
+        ["wait-topic", topic, "--topic-contract-digest", "0" * 64],
+        env=_env(tmp_path, "2025.1"),
+        client_factory=lambda url: pytest.fail(f"wait-topic connected to {url}"),
+    )
+
+    assert code == 2
+    assert payload["error_code"] == "GatewayInputError"
+    assert "stale" in payload["message"].lower()
 
 
 def test_largest_progressive_topic_row_disclosure_stays_bounded(tmp_path: Path) -> None:
@@ -493,6 +542,7 @@ def test_public_wait_topic_compiles_business_event_rows(tmp_path: Path) -> None:
             "0.5",
             "wait-topic",
             topic,
+            *_contract_binding(topic),
             "--event-row",
             "objects",
             "0",
@@ -537,6 +587,7 @@ def test_public_wait_topic_defaults_to_business_input_without_schema_digests(
             "0.5",
             "wait-topic",
             topic,
+            *_contract_binding(topic),
             "--topic-option",
             "include",
             "name",

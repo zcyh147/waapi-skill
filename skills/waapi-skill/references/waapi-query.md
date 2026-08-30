@@ -420,6 +420,12 @@ seconds without rounding and put global `--timeout` before `wait-topic`. Do not
 silently clamp it. For an explicit no-limit but fixed-count wait, omit global
 timeout and add the subcommand flag `--no-timeout`. Do not combine the two flags.
 
+Before every `wait-topic` or `stream-topic`, run `topic-schema` for that exact
+URI and version, then copy its complete `--topic-contract-digest` binding into
+the lifecycle command. This binding is mandatory even with no options or
+matching; a missing or stale digest stops before connecting to Authoring. Never
+retype, shorten, remember across a Skill update, or derive the digest.
+
 One timeout covers setup and collection. A Topic contract timeout is its default
 or recommendation, not a maximum. With `--no-timeout`, collection still stops at
 1–64 matching events, and the command still returns one terminal JSON document. Recursive

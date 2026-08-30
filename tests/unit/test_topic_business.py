@@ -52,7 +52,6 @@ def test_all_154_topic_lanes_compile_one_handle_free_business_contract() -> None
             assert "schema_digest" not in encoded
             assert "wire_type" not in encoded
             assert "json_path" not in encoded
-            assert contract.transitional_boundaries == ()
             assert all(row.fields for row in contract.row_fields)
             lane_count += 1
 
@@ -146,7 +145,6 @@ def test_complex_event_collections_have_no_legacy_boundary_after_business_parity
 
     assert contract.match_fields == ()
     assert {row.token for row in contract.row_fields} >= {"objects"}
-    assert contract.transitional_boundaries == ()
 
 
 def test_audio_imported_business_rows_compile_exact_object_array_match() -> None:

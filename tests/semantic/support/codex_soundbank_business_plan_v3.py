@@ -279,7 +279,7 @@ def _validate_inputs(materialized: MaterializedSoundBankCase, before: SoundBankS
         topic = materialized.topic_plan
         expected = build_direct_protocol([
             topic_schema_step("soundbank.generated.schema", topic.topic),
-            wait_topic_step("soundbank.generated.wait", topic.topic, version=blueprint.version, event_count=topic.event_count, match=topic.match, options=topic.options, schema_step_name="soundbank.generated.schema"),
+            wait_topic_step("soundbank.generated.wait", topic.topic, version=blueprint.version, event_count=topic.event_count, match=topic.match, options=topic.options),
         ])
     elif materialized.topic_plan is not None or not materialized.operation_requests:
         raise SoundBankBusinessPlanError("function/refusal materialization has invalid request topology")
@@ -400,7 +400,7 @@ def _expected_protocol_archive(static: Mapping[str, Any], live: Mapping[str, Any
         topic = live["topic"]
         return _protocol(build_direct_protocol([
             topic_schema_step("soundbank.generated.schema", topic["topic"]),
-            wait_topic_step("soundbank.generated.wait", topic["topic"], version=str(static["version"]), event_count=topic["event_count"], match=topic["match"], options=topic["options"], schema_step_name="soundbank.generated.schema"),
+            wait_topic_step("soundbank.generated.wait", topic["topic"], version=str(static["version"]), event_count=topic["event_count"], match=topic["match"], options=topic["options"]),
         ]))
     return _protocol(build_transaction_protocol(static["operation_requests"], refusal=None if static["zero_dispatch_error_code"] is None else _refusal(static["zero_dispatch_error_code"])))
 

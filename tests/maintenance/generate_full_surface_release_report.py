@@ -210,8 +210,7 @@ def _continuation_error(
             public = business.as_gateway_dict()
             encoded = json.dumps(public, sort_keys=True)
             if (
-                business.transitional_boundaries
-                or public.get("contract") != "waapi-skill.topic-business/v1"
+                public.get("contract") != "waapi-skill.topic-business/v1"
                 or "trh1-" in encoded
                 or "schema_digest" in encoded
             ):

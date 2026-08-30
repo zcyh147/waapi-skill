@@ -170,7 +170,6 @@ def _case(api: str, scenario_id: str, root: Path, *, refusal: bool = False, topi
                     event_count=topic_count,
                     match={},
                     options={},
-                    schema_step_name="soundbank.generated.schema",
                 )
             ]
         )

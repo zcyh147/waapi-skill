@@ -15,10 +15,10 @@ from .typed_requests import (
     TypedFieldContract,
     TypedRequestFact,
     TypedRequestContract,
-    _expanded_schema,
-    _parse_typed_scalar,
-    _structural_variants,
     materialize_typed_request,
+    parse_typed_scalar_value,
+    typed_contract_expanded_schema,
+    typed_contract_structural_variants,
     typed_request_construction_for_values,
 )
 from .typed_topics import topic_match_contract, topic_options_contract
@@ -227,7 +227,6 @@ class TopicBusinessContract:
     match_empty_fields: tuple[TopicBusinessEmptyField, ...]
     row_fields: tuple[TopicBusinessRowContract, ...]
     entry_fields: tuple[TopicBusinessEntryContract, ...]
-    transitional_boundaries: tuple[Mapping[str, str], ...]
     contract_digest: str
 
     def as_dict(self) -> dict[str, Any]:
@@ -242,9 +241,6 @@ class TopicBusinessContract:
             "event_empty": [item.as_dict() for item in self.match_empty_fields],
             "event_rows": [item.as_dict() for item in self.row_fields],
             "exact_entries": [item.as_dict() for item in self.entry_fields],
-            "transitional_boundaries": [
-                dict(item) for item in self.transitional_boundaries
-            ],
         }
 
     def as_gateway_dict(
@@ -316,9 +312,6 @@ class TopicBusinessContract:
                 self.entry_fields,
                 selected_entry=selected_entry,
             ),
-            "transitional_boundaries": [
-                dict(item) for item in self.transitional_boundaries
-            ],
         }
 
 
@@ -348,7 +341,6 @@ def topic_business_contract(version: str, topic: str) -> TopicBusinessContract:
     match_empty_fields = _business_empty_fields(match.fields, section="match")
     row_fields = _business_row_fields(match)
     entry_fields = _business_entry_fields(match)
-    boundaries: tuple[Mapping[str, str], ...] = ()
     public_body = {
         "contract": TOPIC_BUSINESS_CONTRACT,
         "version": version,
@@ -359,7 +351,6 @@ def topic_business_contract(version: str, topic: str) -> TopicBusinessContract:
         "event_empty": [item.as_dict() for item in match_empty_fields],
         "event_rows": [item.as_dict() for item in row_fields],
         "exact_entries": [item.as_dict() for item in entry_fields],
-        "transitional_boundaries": [dict(item) for item in boundaries],
     }
     return TopicBusinessContract(
         version=version,
@@ -370,7 +361,6 @@ def topic_business_contract(version: str, topic: str) -> TopicBusinessContract:
         match_empty_fields=match_empty_fields,
         row_fields=row_fields,
         entry_fields=entry_fields,
-        transitional_boundaries=boundaries,
         contract_digest=canonical_sha256(public_body),
     )
 
@@ -584,19 +574,15 @@ def _business_row_fields(
     ) -> None:
         if depth > MAX_TYPED_SCHEMA_DEPTH:
             return
-        expanded = _expanded_schema(
-            node,
-            root_schema=root,
-            graph=contract.definition_graph,
+        expanded = typed_contract_expanded_schema(
+            contract, node, section="args"
         )
         marker = canonical_sha256(expanded)
         if marker in active:
             return
         next_active = active | {marker}
-        variants = _structural_variants(
-            expanded,
-            root_schema=root,
-            graph=contract.definition_graph,
+        variants = typed_contract_structural_variants(
+            contract, expanded, section="args"
         )
         if len(variants) > 1:
             for variant in variants:
@@ -612,18 +598,14 @@ def _business_row_fields(
             items = expanded.get("items")
             if not isinstance(items, Mapping):
                 return
-            item_variants = _structural_variants(
-                items,
-                root_schema=root,
-                graph=contract.definition_graph,
+            item_variants = typed_contract_structural_variants(
+                contract, items, section="args"
             )
             object_variants = tuple(
                 variant
                 for variant in item_variants
-                if _expanded_schema(
-                    variant,
-                    root_schema=root,
-                    graph=contract.definition_graph,
+                if typed_contract_expanded_schema(
+                    contract, variant, section="args"
                 ).get("type")
                 == "object"
             )
@@ -632,7 +614,6 @@ def _business_row_fields(
                 token = _business_token(logical, section="match")
                 fields = _row_scalar_fields(
                     object_variants,
-                    root=root,
                     contract=contract,
                 )
                 existing = rows.get(token)
@@ -663,10 +644,8 @@ def _business_row_fields(
         for name, child in properties.items():
             if not isinstance(name, str) or not isinstance(child, Mapping):
                 continue
-            child_expanded = _expanded_schema(
-                child,
-                root_schema=root,
-                graph=contract.definition_graph,
+            child_expanded = typed_contract_expanded_schema(
+                contract, child, section="args"
             )
             child_path = (*path, name)
             if child_expanded.get("type") == "array":
@@ -685,7 +664,6 @@ def _business_row_fields(
 def _row_scalar_fields(
     variants: Sequence[Mapping[str, Any]],
     *,
-    root: Mapping[str, Any],
     contract: TypedRequestContract,
 ) -> tuple[TopicBusinessRowField, ...]:
     grouped: dict[tuple[str, ...], list[Mapping[str, Any]]] = {}
@@ -699,19 +677,15 @@ def _row_scalar_fields(
     ) -> None:
         if depth > MAX_TYPED_SCHEMA_DEPTH:
             return
-        expanded = _expanded_schema(
-            node,
-            root_schema=root,
-            graph=contract.definition_graph,
+        expanded = typed_contract_expanded_schema(
+            contract, node, section="args"
         )
         marker = canonical_sha256(expanded)
         if marker in active:
             return
         next_active = active | {marker}
-        structural = _structural_variants(
-            expanded,
-            root_schema=root,
-            graph=contract.definition_graph,
+        structural = typed_contract_structural_variants(
+            contract, expanded, section="args"
         )
         if len(structural) > 1:
             for variant in structural:
@@ -787,19 +761,15 @@ def _business_entry_fields(
     ) -> None:
         if depth > MAX_TYPED_SCHEMA_DEPTH:
             return
-        expanded = _expanded_schema(
-            node,
-            root_schema=root,
-            graph=contract.definition_graph,
+        expanded = typed_contract_expanded_schema(
+            contract, node, section="args"
         )
         marker = canonical_sha256(expanded)
         if marker in active:
             return
         next_active = active | {marker}
-        structural = _structural_variants(
-            expanded,
-            root_schema=root,
-            graph=contract.definition_graph,
+        structural = typed_contract_structural_variants(
+            contract, expanded, section="args"
         )
         if len(structural) > 1:
             for variant in structural:
@@ -866,15 +836,11 @@ def _business_entry_fields(
                 bucket["open_object"].append({"type": "boolean"})
                 bucket["open_row"].append({"type": "boolean"})
             for schema in dynamic_schemas:
-                for variant in _structural_variants(
-                    schema,
-                    root_schema=root,
-                    graph=contract.definition_graph,
+                for variant in typed_contract_structural_variants(
+                    contract, schema, section="args"
                 ):
-                    variant_expanded = _expanded_schema(
-                        variant,
-                        root_schema=root,
-                        graph=contract.definition_graph,
+                    variant_expanded = typed_contract_expanded_schema(
+                        contract, variant, section="args"
                     )
                     variant_type = variant_expanded.get("type")
                     if variant_type in _SCALAR_TYPES:
@@ -884,10 +850,8 @@ def _business_entry_fields(
                     elif variant_type == "array":
                         items = variant_expanded.get("items")
                         if isinstance(items, Mapping):
-                            item_expanded = _expanded_schema(
-                                items,
-                                root_schema=root,
-                                graph=contract.definition_graph,
+                            item_expanded = typed_contract_expanded_schema(
+                                contract, items, section="args"
                             )
                             if item_expanded.get("type") == "object":
                                 bucket["array"].append(item_expanded)
@@ -897,10 +861,8 @@ def _business_entry_fields(
         for name, child in properties.items():
             if not isinstance(name, str) or not isinstance(child, Mapping):
                 continue
-            child_expanded = _expanded_schema(
-                child,
-                root_schema=root,
-                graph=contract.definition_graph,
+            child_expanded = typed_contract_expanded_schema(
+                contract, child, section="args"
             )
             child_path = (*path, name)
             if child_expanded.get("type") == "array":
@@ -938,12 +900,10 @@ def _business_entry_fields(
                 ),
                 object_fields=_row_scalar_fields(
                     variants["object"],
-                    root=root,
                     contract=contract,
                 ),
                 row_fields=_row_scalar_fields(
                     variants["array"],
-                    root=root,
                     contract=contract,
                 ),
                 _path=path,
@@ -953,33 +913,6 @@ def _business_entry_fields(
             )
         )
     return tuple(result)
-
-
-def _transitional_boundaries(
-    fields: Sequence[TypedFieldContract],
-) -> tuple[Mapping[str, str], ...]:
-    rows: dict[str, str] = {}
-    for item in fields:
-        if item.shape == "array" and any(
-            variant.get("type") in {"object", "array"}
-            for variant in item.variants
-        ):
-            rows[_business_token(item.path, section="match")] = (
-                "complex_collection_requires_business_row_compiler"
-            )
-        elif (
-            item.shape == "map"
-            and item.open_map
-            and (item.map_patterns or item.additional_variants)
-        ):
-            rows.setdefault(
-                _business_token(item.path, section="match"),
-                "dynamic_map_requires_business_entry_compiler",
-            )
-    return tuple(
-        {"business_field": token, "reason": reason}
-        for token, reason in sorted(rows.items())
-    )
 
 
 def _compile_business_facts(
@@ -1048,7 +981,7 @@ def _select_candidate(
             ):
                 continue
             try:
-                _parse_typed_scalar(
+                parse_typed_scalar_value(
                     value_type,
                     fact.value,
                     variants=candidate.variants,
@@ -1183,7 +1116,7 @@ def _parse_row_value(
             if variant.get("type") == value_type
         )
         try:
-            return _parse_typed_scalar(
+            return parse_typed_scalar_value(
                 value_type,
                 fact.value,
                 variants=variants,
@@ -1371,7 +1304,7 @@ def _parse_entry_scalar(
             if variant.get("type") == value_type
         )
         try:
-            return _parse_typed_scalar(
+            return parse_typed_scalar_value(
                 value_type,
                 value,
                 variants=variants,

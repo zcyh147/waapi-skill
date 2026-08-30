@@ -5147,7 +5147,6 @@ def wait_topic_step(
     match: Mapping[str, Any] | None = None,
     options: Mapping[str, Any] | None = None,
     timeout_seconds: float = 120.0,
-    schema_step_name: str | None = None,
 ) -> ExpectedGatewayStep:
     if not isinstance(event_count, int) or isinstance(event_count, bool) or not 1 <= event_count <= 64:
         raise V3ProtocolError("wait-topic event_count must be an integer from 1 through 64")
@@ -5161,11 +5160,12 @@ def wait_topic_step(
         {} if match is None else match,
         field="wait-topic match",
     )
-    del schema_step_name
     arguments: list[Any] = [
         topic,
         "--event-count",
         str(event_count),
+        "--topic-contract-digest",
+        topic_business_contract(version, topic).contract_digest,
         *(_business_topic_arguments(
             topic,
             version=version,

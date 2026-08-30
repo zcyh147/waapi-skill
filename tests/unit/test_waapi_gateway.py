@@ -68,8 +68,10 @@ EXPECTED_EXCLUDED_TOPIC_URIS = frozenset()
 
 
 def _typed_topic_bindings(topic: str, version: str = "2022.1") -> list[str]:
-    del topic, version
-    return []
+    return [
+        "--topic-contract-digest",
+        topic_business_contract(version, topic).contract_digest,
+    ]
 
 
 def _typed_topic_arguments(
@@ -80,7 +82,10 @@ def _typed_topic_arguments(
     match: Mapping[str, Any] | None = None,
 ) -> list[str]:
     contract = topic_business_contract(version, topic)
-    arguments: list[str] = []
+    arguments: list[str] = [
+        "--topic-contract-digest",
+        contract.contract_digest,
+    ]
     for values, fields, flag in (
         (dict(options or {}), contract.option_fields, "--topic-option-as"),
         (dict(match or {}), contract.match_fields, "--event-match-as"),

@@ -17,6 +17,7 @@ from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImp
 from wwise_waapi.transactions import (  # pyright: ignore[reportMissingImports]
     TransactionState,
 )
+from wwise_waapi.topic_business import topic_business_contract
 
 
 SCRIPT_PATH = (
@@ -502,6 +503,8 @@ def test_executed_topic_uses_authoring_overlay_and_unsubscribes(
     code, payload = execute(
         [
             "--timeout", "5", "wait-topic", EXECUTED_TOPIC,
+            "--topic-contract-digest",
+            topic_business_contract("2024.1", EXECUTED_TOPIC).contract_digest,
         ],
         tmp_path=tmp_path,
         version="2024.1",
@@ -525,6 +528,8 @@ def test_executed_topic_console_boundary_never_subscribes(
     code, payload = execute(
         [
             "wait-topic", EXECUTED_TOPIC,
+            "--topic-contract-digest",
+            topic_business_contract("2024.1", EXECUTED_TOPIC).contract_digest,
         ],
         tmp_path=tmp_path,
         version="2024.1",

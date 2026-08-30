@@ -3287,7 +3287,6 @@ def test_synthetic_topic_schema_supplies_bound_wait_digests(tmp_path: Path) -> N
                 topic,
                 version="2022.1",
                 event_count=1,
-                schema_step_name="soundbank.generated.schema",
             ),
         ]
     )

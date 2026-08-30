@@ -2859,6 +2859,53 @@ def typed_request_facts_for_values(
     ).facts
 
 
+def typed_contract_expanded_schema(
+    contract: TypedRequestContract,
+    node: Mapping[str, Any],
+    *,
+    section: str,
+) -> Mapping[str, Any]:
+    """Expand one schema node through a contract's sealed definition graph."""
+
+    return _expanded_schema(
+        node,
+        root_schema=contract.schema_roots[section],
+        graph=contract.definition_graph,
+    )
+
+
+def typed_contract_structural_variants(
+    contract: TypedRequestContract,
+    node: Mapping[str, Any],
+    *,
+    section: str,
+) -> tuple[Mapping[str, Any], ...]:
+    """Return concrete structural variants from one contract-owned node."""
+
+    return _structural_variants(
+        node,
+        root_schema=contract.schema_roots[section],
+        graph=contract.definition_graph,
+    )
+
+
+def parse_typed_scalar_value(
+    value_type: str,
+    value: str,
+    *,
+    variants: Sequence[Mapping[str, Any]],
+    field_name: str,
+) -> Any:
+    """Validate and parse one scalar against reflected field variants."""
+
+    return _parse_typed_scalar(
+        value_type,
+        value,
+        variants=variants,
+        field_name=field_name,
+    )
+
+
 def typed_request_construction_for_values(
     contract: TypedRequestContract,
     *,

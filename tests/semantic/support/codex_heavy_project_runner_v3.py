@@ -5128,7 +5128,6 @@ def _prepare_case(
                     match=topic.match,
                     options=topic.options,
                     timeout_seconds=120.0,
-                    schema_step_name="soundbank.generated.schema",
                 )
             ]
         )

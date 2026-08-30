@@ -33,11 +33,17 @@ from tests.support.runtime_evidence_paths import (  # pyright: ignore[reportMiss
     localize_runtime_evidence_path,
 )
 from wwise_waapi.subscriptions import SubscriptionEvent, SubscriptionManager, SubscriptionTimeout  # pyright: ignore[reportMissingImports]
+from wwise_waapi.subscriptions import payload_matches  # pyright: ignore[reportMissingImports]
+from wwise_waapi.topic_business import (  # pyright: ignore[reportMissingImports]
+    MaterializedTopicBusinessInputs,
+    TopicBusinessFact,
+    materialize_topic_business_inputs,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 EVIDENCE_ROOT = REPO_ROOT / ".waapi-skill-state" / "evidence" / "waapi-test-remediation" / "topic-behavior"
-SUPPORTED_VERSIONS = {"2021.1", "2024.1", "2025.1"}
+SUPPORTED_VERSIONS = {"2021.1", "2022.1", "2024.1", "2025.1"}
 ACTOR_PARENT = r"\Actor-Mixer Hierarchy\Default Work Unit"
 READBACK_FIELDS = ["id", "name", "type", "path", "notes", "Volume"]
 TOPIC_RETURN_FIELDS = ["id", "name", "type", "path", "notes", "Volume"]
@@ -171,12 +177,67 @@ def _run_topic_case(client: Any, version: str, case: Mapping[str, Any]) -> None:
             raise AssertionError(f"unsupported topic case {uri}")
 
         subscription_options = _subscription_options(case, dynamic_subscription_values)
-        event, expected = _subscribe_then_mutate(client, case, mutate, subscription_options=subscription_options)
+        business = _business_subscription_inputs(
+            version,
+            case,
+            subscription_options,
+        )
+        event, expected = _subscribe_then_mutate(
+            client,
+            case,
+            mutate,
+            subscription_options=business.options,
+            match=business.match,
+        )
         if uri == "ak.wwise.core.log.itemAdded":
             _assert_log_payload(case, event.payload, expected)
         else:
             _assert_topic_payload_identity(case, event.payload, expected)
-        _write_topic_evidence(version, case, payload=event.payload, expected=expected)
+        _write_topic_evidence(
+            version,
+            case,
+            payload=event.payload,
+            expected=expected,
+            business=business,
+        )
+
+
+def _business_subscription_inputs(
+    version: str,
+    case: Mapping[str, Any],
+    subscription_options: Mapping[str, Any],
+) -> MaterializedTopicBusinessInputs:
+    option_facts: list[TopicBusinessFact] = []
+    for field_name, value in subscription_options.items():
+        token = "include" if field_name == "return" else field_name
+        values = value if isinstance(value, list) else [value]
+        option_facts.extend(
+            TopicBusinessFact(token, _business_scalar_text(item))
+            for item in values
+        )
+    match_facts = (
+        (TopicBusinessFact("new", "-3", kind="number"),)
+        if case["uri"] == "ak.wwise.core.object.propertyChanged"
+        else ()
+    )
+    return materialize_topic_business_inputs(
+        version=version,
+        topic=str(case["uri"]),
+        option_facts=tuple(option_facts),
+        match_facts=match_facts,
+    )
+
+
+def _business_scalar_text(value: Any) -> str:
+    if value is True:
+        return "true"
+    if value is False:
+        return "false"
+    if value is None:
+        return "null"
+    if isinstance(value, (str, int, float)):
+        return str(value)
+    raise AssertionError(f"Topic business option must be scalar: {value!r}")
 
 
 def _subscription_options(case: Mapping[str, Any], dynamic_values: Mapping[str, Any] | None = None) -> dict[str, Any]:
@@ -196,6 +257,7 @@ def _subscribe_then_mutate(
     mutate: Callable[[], Mapping[str, Any]],
     *,
     subscription_options: Mapping[str, Any],
+    match: Mapping[str, Any],
 ) -> tuple[Any, Mapping[str, Any]]:
     manager = SubscriptionManager(client)
     event_queue: queue.Queue[SubscriptionEvent] = queue.Queue(maxsize=1)
@@ -203,9 +265,16 @@ def _subscribe_then_mutate(
     publisher_errors: list[BaseException] = []
 
     def callback(*args: Any, **kwargs: Any) -> None:
+        candidate = SubscriptionEvent(
+            topic=str(case["uri"]),
+            args=args,
+            kwargs=dict(kwargs),
+        )
+        if match and not payload_matches(candidate.payload, match):
+            return
         if event_queue.full():
             event_queue.get_nowait()
-        event_queue.put_nowait(SubscriptionEvent(topic=str(case["uri"]), args=args, kwargs=dict(kwargs)))
+        event_queue.put_nowait(candidate)
 
     def publish() -> None:
         try:
@@ -350,7 +419,14 @@ def _safe_evidence_path(version: str, path: str) -> Path:
     return localize_runtime_evidence_path(_version_evidence_root(version), path)
 
 
-def _write_topic_evidence(version: str, case: Mapping[str, Any], *, payload: Any, expected: Mapping[str, Any]) -> None:
+def _write_topic_evidence(
+    version: str,
+    case: Mapping[str, Any],
+    *,
+    payload: Any,
+    expected: Mapping[str, Any],
+    business: MaterializedTopicBusinessInputs,
+) -> None:
     path = _safe_evidence_path(version, str(case["evidence_path"]))
     path.parent.mkdir(parents=True, exist_ok=True)
     body = {
@@ -363,6 +439,8 @@ def _write_topic_evidence(version: str, case: Mapping[str, Any], *, payload: Any
         "bounded_wait_seconds": case["bounded_wait_seconds"],
         "payload": _json_safe(payload),
         "expected": _json_safe(expected),
+        "business_options": _json_safe(business.options),
+        "business_match": _json_safe(business.match),
         "unsubscribe_proof": True,
         "cleanup": case["cleanup"],
         "recorded_at_unix": int(time.time()),

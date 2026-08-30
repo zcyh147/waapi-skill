@@ -1,0 +1,48 @@
+{
+  "metadata": {
+    "version": "2022.1",
+    "task": "91. Validate Gateway-owned Topic business inputs",
+    "source_manifest": "resources/manifest/2022.1/topics.json",
+    "live_command": "WWISE_VERSION=2022.1 WWISE_LIVE=1 python -m pytest tests/live/test_2022_1_topic_business_sandbox.py -q"
+  },
+  "coverage_policy": {
+    "counts_as_behavioral": false,
+    "counts_as_live_behavioral": false,
+    "promotion_rule": "Promote only from a completed real sandbox run with business options/match, payload identity, bounded wait, unsubscribe, cleanup, and source immutability evidence."
+  },
+  "topic_cases": [
+    {
+      "id": "topic_business_object_created",
+      "uri": "ak.wwise.core.object.created",
+      "status": "planned-active-live-smoke",
+      "publisher": {"uri": "ak.wwise.core.object.create", "deterministic": true, "description": "create disposable ActorMixer", "options": {}},
+      "bounded_wait_seconds": 5.0,
+      "subscription_options": {"return": ["id", "name", "type", "path", "notes", "Volume"]},
+      "payload_identity_requirements": {"match_object_id_or_path": true, "old_new_required_when_applicable": false, "required_return_fields": ["id", "name", "type", "path"], "topic_specific_fields": ["id", "name", "path", "type"]},
+      "readback": "object.get confirms created disposable ActorMixer before cleanup",
+      "cleanup": ["delete disposable object if still present", "object.get by tracked id proves cleanup", "sandbox copy deleted on success"],
+      "subscribe_before_mutation": true,
+      "unsubscribe_assertion": "subscription handle is unsubscribed and active topic set is empty after event or blocker",
+      "counts_as_behavioral": false,
+      "counts_as_live_behavioral": false,
+      "evidence_path": ".waapi-skill-state/evidence/waapi-test-remediation/topic-business/2022.1/object-created.json"
+    },
+    {
+      "id": "topic_business_property_changed",
+      "uri": "ak.wwise.core.object.propertyChanged",
+      "status": "planned-active-live-smoke",
+      "publisher": {"uri": "ak.wwise.core.object.setProperty", "deterministic": true, "description": "set Volume on disposable ActorMixer", "options": {}},
+      "bounded_wait_seconds": 5.0,
+      "subscription_options": {"return": ["id", "name", "type", "path", "notes", "Volume"]},
+      "dynamic_subscription_options": {"object": "$disposable_object_id", "property": "Volume"},
+      "payload_identity_requirements": {"match_object_id_or_path": true, "old_new_required_when_applicable": true, "required_return_fields": ["id", "name", "type", "path", "Volume"], "topic_specific_fields": ["id", "path", "property", "old", "new"]},
+      "readback": "object.get confirms Volume value on disposable ActorMixer",
+      "cleanup": ["delete disposable object if still present", "object.get by tracked id proves cleanup", "sandbox copy deleted on success"],
+      "subscribe_before_mutation": true,
+      "unsubscribe_assertion": "subscription handle is unsubscribed and active topic set is empty after event or blocker",
+      "counts_as_behavioral": false,
+      "counts_as_live_behavioral": false,
+      "evidence_path": ".waapi-skill-state/evidence/waapi-test-remediation/topic-business/2022.1/object-property-changed.json"
+    }
+  ]
+}

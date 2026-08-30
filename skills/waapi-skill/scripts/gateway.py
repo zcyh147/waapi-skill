@@ -3030,6 +3030,13 @@ def add_topic_business_input_arguments(parser: argparse.ArgumentParser) -> None:
     """Add the one closed business Topic vocabulary to a subscription command."""
 
     parser.add_argument(
+        "--topic-contract-digest",
+        help=(
+            "Exact contract digest copied from topic-schema; execution rejects "
+            "a missing or stale business vocabulary before connecting"
+        ),
+    )
+    parser.add_argument(
         "--topic-option",
         action="append",
         nargs=2,
@@ -5745,6 +5752,19 @@ def preflight_typed_topic_input(
     """Materialize exact Topic options and subset match before connecting."""
 
     (version,) = resolve_catalog_versions(args, env=env)
+    business = topic_business_contract(version, args.api)
+    supplied_digest = args.topic_contract_digest
+    if supplied_digest is None:
+        raise GatewayInputError(
+            "Topic execution requires --topic-contract-digest copied exactly "
+            "from topic-schema. Run topic-schema for this topic and version first."
+        )
+    if supplied_digest != business.contract_digest:
+        raise GatewayInputError(
+            "The supplied Topic business contract is stale or belongs to a "
+            "different topic/version. Run topic-schema again and copy its exact "
+            "--topic-contract-digest value."
+        )
     args.typed_topic_input = materialize_topic_business_inputs(
         version=version,
         topic=args.api,
@@ -7913,6 +7933,11 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             "continuation": {
                 "subcommands": ["wait-topic", "stream-topic"],
                 "default_input": "business",
+                "contract_binding": {
+                    "flag": "--topic-contract-digest",
+                    "value": business.contract_digest,
+                    "copy_exactly": True,
+                },
                 "wait_argv_prefix": [
                     "--timeout",
                     "<positive-seconds>",
@@ -7920,6 +7945,14 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     args.api,
                     "--event-count",
                     "<exact-count:1..64>",
+                    "--topic-contract-digest",
+                    business.contract_digest,
+                ],
+                "stream_argv_prefix": [
+                    "stream-topic",
+                    args.api,
+                    "--topic-contract-digest",
+                    business.contract_digest,
                 ],
                 "business_fact_argv": {
                     "topic_option": "--topic-option <field> <value>",
@@ -13493,6 +13526,7 @@ def dispatch_command(
             "status": "ok" if result.get("ok") else "error",
             **common,
             "topic": args.api,
+            "topic_contract_digest": args.topic_contract_digest,
             "match": match or None,
             "subscription_timeout": {
                 "mode": "unbounded" if unbounded_timeout else "finite",
@@ -13639,6 +13673,7 @@ def dispatch_topic_stream(
         "contract": TOPIC_STREAM_RECORD_CONTRACT,
         "command": "stream-topic",
         "topic": args.api,
+        "topic_contract_digest": args.topic_contract_digest,
         "match": match or None,
         "subscription_timeout": timeout_policy,
     }
