@@ -31,6 +31,14 @@ WINE_WIRE_PATH_WAAPI_URIS = frozenset(
         "ak.wwise.core.audio.importTabDelimited",
         "ak.wwise.core.soundbank.convertExternalSources",
         "ak.wwise.core.soundbank.processDefinitionFiles",
+        "ak.wwise.ui.project.create",
+        "ak.wwise.ui.project.open",
+    }
+)
+_AUTHORING_PROJECT_TRANSITION_URIS = frozenset(
+    {
+        "ak.wwise.ui.project.create",
+        "ak.wwise.ui.project.open",
     }
 )
 _WINDOWS_ABSOLUTE_PATH = re.compile(r"^[A-Za-z]:[\\/]")
@@ -192,23 +200,87 @@ def adapt_cli_dispatch_paths(
             "Host paths cannot be mapped into a remote Windows Wwise filesystem.",
             details={"endpoint_host": endpoint_host},
         )
-    if not isinstance(project_wire_path, str):
-        raise WwiseWirePathError(
-            "WIRE_PATH_CONTEXT_UNAVAILABLE",
-            "The local Wine project guard has no absolute project path anchor.",
-        )
-
     home = _account_home(account_home)
-    drive, _, anchor_host = _prove_wire_mapping(
-        project_wire_path,
-        account_home=home,
-    )
-    if not anchor_host.is_file() or anchor_host.is_symlink() or anchor_host.suffix.casefold() != ".wproj":
-        raise WwiseWirePathError(
-            "WIRE_PATH_ANCHOR_INVALID",
-            "The sealed Wine project path does not round-trip to one regular local .wproj file.",
-            details={"localized_project_path": str(anchor_host)},
+    if isinstance(project_wire_path, str):
+        drive, _, anchor_host = _prove_wire_mapping(
+            project_wire_path,
+            account_home=home,
         )
+        anchor_wire_path = _normalize_wire_path(project_wire_path)
+        anchor_source = "current_project"
+        if (
+            not anchor_host.is_file()
+            or anchor_host.is_symlink()
+            or anchor_host.suffix.casefold() != ".wproj"
+        ):
+            raise WwiseWirePathError(
+                "WIRE_PATH_ANCHOR_INVALID",
+                "The sealed Wine project path does not round-trip to one regular local .wproj file.",
+                details={"localized_project_path": str(anchor_host)},
+            )
+    else:
+        postcondition = live_project_guard.get("postcondition")
+        target_path = (
+            postcondition.get("canonical_path")
+            if isinstance(postcondition, Mapping)
+            else None
+        )
+        if (
+            uri not in _AUTHORING_PROJECT_TRANSITION_URIS
+            or project.get("state") != "none"
+            or live_project_guard.get("project_guard_mode") != "transition_to_path"
+            or not isinstance(target_path, str)
+        ):
+            raise WwiseWirePathError(
+                "WIRE_PATH_CONTEXT_UNAVAILABLE",
+                "The local Wine project guard has no absolute project path anchor.",
+            )
+        if not target_path.startswith("posix:/"):
+            raise WwiseWirePathError(
+                "WIRE_PATH_CONTEXT_UNAVAILABLE",
+                "The Authoring project transition target is not a canonical local POSIX path.",
+                details={"canonical_target_project_path": target_path},
+            )
+        anchor_host = Path(target_path.removeprefix("posix:")).resolve(strict=False)
+        if (
+            not anchor_host.is_absolute()
+            or anchor_host.is_symlink()
+            or anchor_host.suffix.casefold() != ".wproj"
+            or (
+                uri == "ak.wwise.ui.project.open"
+                and not anchor_host.is_file()
+            )
+            or (
+                uri == "ak.wwise.ui.project.create"
+                and not anchor_host.parent.is_dir()
+            )
+        ):
+            raise WwiseWirePathError(
+                "WIRE_PATH_ANCHOR_INVALID",
+                "The Authoring project transition target is not a valid local .wproj anchor.",
+                details={"target_project_path": str(anchor_host)},
+            )
+        drive, mapping_root = _mapping_for_host_path(
+            anchor_host,
+            account_home=home,
+        )
+        anchor_wire_path = _host_to_wire_path(
+            anchor_host,
+            drive=drive,
+            mapping_root=mapping_root,
+        )
+        if (
+            _wire_to_host_path(anchor_wire_path, account_home=home).resolve(
+                strict=False
+            )
+            != anchor_host
+        ):
+            raise WwiseWirePathError(
+                "WIRE_PATH_ROUND_TRIP_FAILED",
+                "The Authoring project transition target did not round-trip through its Wine mapping.",
+                details={"drive": drive},
+            )
+        anchor_source = "transition_target"
 
     indexed_audit: dict[tuple[str, str], Mapping[str, Any]] = {}
     for index, row in enumerate(audit_paths):
@@ -339,10 +411,11 @@ def adapt_cli_dispatch_paths(
         "current_project_guard_fingerprint": current_fingerprint,
         "mapping": {
             "anchor_drive": drive,
+            "anchor_source": anchor_source,
             "supported_drives": ["Y", "Z"],
             "anchor_host_path_sha256": hashlib.sha256(str(anchor_host).encode("utf-8")).hexdigest(),
             "anchor_wire_path_sha256": hashlib.sha256(
-                _normalize_wire_path(project_wire_path).encode("utf-8")
+                anchor_wire_path.encode("utf-8")
             ).hexdigest(),
             "round_trip_verified": True,
         },

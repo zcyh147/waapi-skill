@@ -178,6 +178,66 @@ def test_local_wine_console_project_dispatch_translates_the_audited_path(
     assert adapted.proof["translated_path_count"] == 1
 
 
+@pytest.mark.parametrize(
+    ("uri", "target_exists"),
+    (
+        ("ak.wwise.ui.project.open", True),
+        ("ak.wwise.ui.project.create", False),
+    ),
+)
+def test_local_wine_authoring_project_transition_without_current_project_uses_target_anchor(
+    tmp_path: Path,
+    uri: str,
+    target_exists: bool,
+) -> None:
+    home = tmp_path / "home"
+    target_project = home / "case" / "target" / "TargetProject.wproj"
+    target_project.parent.mkdir(parents=True)
+    if target_exists:
+        target_project.write_text("<Project/>", encoding="utf-8")
+    guard = {
+        "fingerprint": "no-project-transition-sha256",
+        "endpoint": {"host": "127.0.0.1", "port": 8080},
+        "wwise": {
+            "platform": "x64",
+            "processPath": r"c:\Program Files\Audiokinetic\Wwise\Wwise.exe",
+        },
+        "project_guard_mode": "transition_to_path",
+        "project": {"state": "none"},
+        "postcondition": {
+            "state": "open",
+            "canonical_path": f"posix:{target_project.resolve()}",
+        },
+    }
+
+    adapted = adapt_cli_dispatch_paths(
+        uri=uri,
+        args={"path": str(target_project)},
+        options={},
+        io_audit=_io_audit(
+            uri,
+            [
+                (
+                    "args",
+                    "$.args.path",
+                    str(target_project),
+                    str(target_project.resolve()),
+                )
+            ],
+        ),
+        project_guard=guard,
+        current_project_guard=guard,
+        host_os_name="posix",
+        account_home=home,
+    )
+
+    assert requires_wwise_wire_path_adaptation(uri) is True
+    assert adapted.args == {"path": r"Y:\case\target\TargetProject.wproj"}
+    assert adapted.proof["mode"] == "local_posix_wine"
+    assert adapted.proof["mapping"]["anchor_source"] == "transition_target"
+    assert adapted.proof["translated_path_count"] == 1
+
+
 def test_nested_platform_pairs_flow_from_io_audit_to_transient_wine_dispatch(
     tmp_path: Path,
 ) -> None:

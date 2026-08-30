@@ -6832,6 +6832,80 @@ def test_console_project_open_selects_the_sealed_isolated_io_audit() -> None:
     os.name == "nt",
     reason="Wine host path translation is POSIX-only",
 )
+def test_local_wine_authoring_project_open_translates_target_after_close(
+    tmp_path: Path,
+) -> None:
+    version = "2022.1"
+    api = "ak.wwise.ui.project.open"
+    state_dir = tmp_path / "wine-authoring-project-state"
+    target = (tmp_path / "target" / "TargetProject.wproj").resolve()
+    target.parent.mkdir()
+    target.write_text("<Project/>", encoding="utf-8")
+    request = {
+        "contract": OPERATION_REQUEST_CONTRACT,
+        "version": version,
+        "operation": "waapi.call",
+        "arguments": {
+            "api": api,
+            "args": {"path": str(target)},
+            "options": {},
+            "io_root": str(target.parent),
+        },
+    }
+    authoring_info = wine_live_info()
+    authoring_info["isCommandLine"] = False
+    authoring_info["processPath"] = (
+        r"c:\Program Files\Audiokinetic\Wwise\Wwise.exe"
+    )
+    no_project = {"ak.wwise.core.object.get": [{"return": []}]}
+    transaction = preview(
+        request,
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=FakeClient(
+            {
+                "ak.wwise.core.getInfo": [authoring_info],
+                **no_project,
+            }
+        ),
+    )
+    confirm(
+        transaction["transaction_id"],
+        transaction["artifact_hash"],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+    )
+    execute_client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": [authoring_info],
+            "ak.wwise.core.object.get": [{"return": []}],
+            api: [{}],
+        }
+    )
+
+    exit_code, payload = execute(
+        ["execute", transaction["transaction_id"]],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=execute_client,
+        version=version,
+    )
+
+    assert exit_code == 0, json.dumps(payload, indent=2)
+    assert next(call for call in execute_client.calls if call[0] == api) == (
+        api,
+        {"path": z_wire_path(target)},
+        {},
+    )
+    assert payload["wire_path_adaptation"]["mapping"]["anchor_source"] == (
+        "transition_target"
+    )
+
+
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="Wine host path translation is POSIX-only",
+)
 def test_local_wine_soundbank_execute_translates_sealed_host_paths_transiently(
     tmp_path: Path,
 ) -> None:
