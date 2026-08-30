@@ -218,6 +218,14 @@ the valid first-launch metadata with an unstarted replacement. Never add an
 unbounded sleep or select a new port to hide this state: the original port must
 become bindable inside the fixed release window or the fixture fails closed.
 
+CLI/Console operations that verify, open, or otherwise own a project can also
+end or invalidate the active module host even when their one-shot result is a
+truthful non-retry boundary. Run each such real node in its own pytest process
+and Wwise lifecycle. Do not use one full-module destructive invocation as a
+category campaign: after the first terminal CLI boundary, later failures are
+only dead-host contamination and must not be interpreted as independent API
+failures or retried inside that root.
+
 Real fixtures must follow the current closed query interface too. Exact GUID
 readback uses `query-object --exact-id`; exact hierarchy lookup repeats one
 `--path-segment` per already-closed business name. Identity fields are returned
