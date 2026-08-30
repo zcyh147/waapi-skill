@@ -68,6 +68,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     _typed_fact_cli_arguments,
 )
 from tests.semantic.support.codex_gateway_broker import (
+    BoundedIntegerArgument,
     CodexGatewayBroker,
     DRAFT_REVISION_SUBCOMMANDS,
     DraftTypedActionArgument,
@@ -3411,15 +3412,18 @@ def test_soundbank_topic_protocol_selects_finite_stream_for_explicit_stream_case
     assert steps[-1].name == "soundbank.generated.stream"
     assert steps[-1].subcommand == "stream-topic"
     assert steps[-1].gateway_global_arguments == ("--timeout", "30")
-    assert steps[-1].arguments[:3] == (
+    assert [step.name for step in steps] == [
+        "soundbank.generated.schema",
+        "soundbank.generated.schema.soundbank.match-group",
+        "soundbank.generated.stream",
+    ]
+    assert steps[-1].arguments[:2] == (
         "ak.wwise.core.soundbank.generated",
         "--event-count",
-        "64",
     )
-    assert any(
-        step.arguments[-2:] == ("--entry", "platform")
-        for step in steps[:-1]
-    )
+    ceiling = steps[-1].arguments[2]
+    assert isinstance(ceiling, BoundedIntegerArgument)
+    assert (ceiling.minimum, ceiling.maximum) == (3, 64)
 
 
 def test_soundbank_topic_protocol_seals_result_only_soundbank_disclosure() -> None:

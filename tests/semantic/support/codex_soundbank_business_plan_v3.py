@@ -80,7 +80,6 @@ _DEFINITION_FILTER_TO_INCLUSION = MappingProxyType(
 )
 _STREAM_TOPIC_SCENARIO_IDS = frozenset({"O22-SB-GENERATED-03"})
 _STREAM_TOPIC_TIMEOUT_SECONDS = 30.0
-_STREAM_TOPIC_EVENT_COUNT_LIMIT = 64
 
 
 def soundbank_topic_lifecycle(scenario_id: str) -> tuple[str, str]:
@@ -485,12 +484,15 @@ def soundbank_topic_protocol_steps(
             separators=(",", ":"),
         )
     )
-    # Platform and language are event-result identities used by every reviewed
-    # SoundBank generated oracle even when they are intentionally not match
-    # predicates. Keep only these two sealed result disclosures beyond the
-    # scopes already present in the subscription match.
-    disclosure_scopes = tuple(
-        sorted({*canonical_match, "language", "platform", "soundbank"})
+    lifecycle_name, lifecycle_command = soundbank_topic_lifecycle(scenario_id)
+    # A finite stream needs only disclosures that construct its subscription.
+    # Result-only platform/language identities are runner-validated payload
+    # fields, not Agent-authored match parameters. Historical fixed-count waits
+    # retain their sealed result disclosures.
+    disclosure_scopes = (
+        tuple(sorted(canonical_match))
+        if lifecycle_command == "stream-topic"
+        else tuple(sorted({*canonical_match, "language", "platform", "soundbank"}))
     )
     for scope in disclosure_scopes:
         value = canonical_match.get(scope)
@@ -522,7 +524,11 @@ def soundbank_topic_protocol_steps(
                     group=scope,
                 )
             )
-        if has_entry and not combined_result_disclosure:
+        if (
+            has_entry
+            and not combined_result_disclosure
+            and lifecycle_command != "stream-topic"
+        ):
             steps.append(
                 topic_schema_step(
                     f"soundbank.generated.schema.{scope}.entry",
@@ -530,14 +536,13 @@ def soundbank_topic_protocol_steps(
                     entry=scope,
                 )
             )
-    lifecycle_name, lifecycle_command = soundbank_topic_lifecycle(scenario_id)
     if lifecycle_command == "stream-topic":
         steps.append(
             stream_topic_step(
                 lifecycle_name,
                 topic,
                 version=version,
-                event_count=_STREAM_TOPIC_EVENT_COUNT_LIMIT,
+                event_count=event_count,
                 match=canonical_match,
                 options=canonical_options,
                 timeout_seconds=_STREAM_TOPIC_TIMEOUT_SECONDS,

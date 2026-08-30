@@ -10643,10 +10643,18 @@ class CodexGatewayBroker:
                         "metadata query slot escaped its closed discover validator"
                     )
                 elif isinstance(expected, BoundedIntegerArgument):
-                    raise GatewayInvocationError(
-                        "bounded integer slot escaped its closed metadata "
-                        "discover validator"
-                    )
+                    if not re.fullmatch(r"0|[1-9][0-9]*", supplied):
+                        raise GatewayInvocationError(
+                            f"step {step.name!r} argument {index} is not one "
+                            "canonical non-negative integer"
+                        )
+                    value = int(supplied)
+                    if not expected.minimum <= value <= expected.maximum:
+                        raise GatewayInvocationError(
+                            f"step {step.name!r} argument {index} is outside "
+                            f"the closed range {expected.minimum}..{expected.maximum}"
+                        )
+                    semantic_values.append(value)
                 elif isinstance(expected, MetadataBoundJsonArgument):
                     actual_json = _decode_json_argument(
                         supplied,

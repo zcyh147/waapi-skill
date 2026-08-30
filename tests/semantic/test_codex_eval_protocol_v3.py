@@ -29,6 +29,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     wait_topic_step,
 )
 from tests.semantic.support.codex_gateway_broker import (
+    BoundedIntegerArgument,
     DraftActionQueryIdentityBinding,
     DraftActionResponseBinding,
     DraftTypedActionArgument,
@@ -84,10 +85,14 @@ def test_stream_topic_step_owns_finite_duration_and_typed_business_facts() -> No
 
     assert step.subcommand == "stream-topic"
     assert step.gateway_global_arguments == ("--timeout", "30")
-    assert step.arguments[:5] == (
+    assert step.arguments[:2] == (
         "ak.wwise.core.soundbank.generated",
         "--event-count",
-        "2",
+    )
+    ceiling = step.arguments[2]
+    assert isinstance(ceiling, BoundedIntegerArgument)
+    assert (ceiling.minimum, ceiling.maximum) == (3, 64)
+    assert step.arguments[3:5] == (
         "--topic-contract-digest",
         step.arguments[4],
     )

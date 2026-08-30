@@ -760,6 +760,49 @@ prevention checks that are expensive to rediscover.
   code and logs, remove the task and temporary scripts, preserve the campaign
   evidence, and never retry a failed semantic root.
 
+### A copied Windows live config can still name the old worktree
+
+- Evidence: #91 candidate `8d5499e` passed both native-Windows Topic live
+  tests, then all three selected 2022.1 destructive tests stopped before Wwise
+  launch because the ignored copied `live-environment.json` still named
+  `C:\Git_Repos\waapi-skills\tests\_org\...` instead of the frozen candidate
+  worktree. The strict destructive fixture correctly rejected that mismatch.
+- Cause: the local config is machine-specific and ignored, but its
+  `sample_project` and `sandbox_root` values may be absolute. Copying the file
+  into a detached candidate does not rebase those paths.
+- Prevention: after creating a Windows candidate worktree, localize each
+  selected version's ignored `sample_project` and `sandbox_root` to that exact
+  worktree before any strict real test. Attest the printed Test Context. A
+  pre-launch path mismatch is zero real attempts; correct only the ignored
+  config and continue the unexecuted lane.
+
+### A Scheduled Task log redirection needs its parent, not its campaign root
+
+- Evidence: the first #91 `8d5499e` Windows TYP21 task had the correct
+  `InteractiveToken` / `Limited` principal but ended before campaign creation:
+  `Out-File` opened the task log below the absent ignored
+  `skills\waapi-skill-workspace` directory before the runner could create its
+  campaign root.
+- Cause: PowerShell opens pipeline redirection before invoking the campaign.
+  The campaign root must remain absent for a fresh run, but the separate log's
+  parent must already exist.
+- Prevention: create only `skills\waapi-skill-workspace` before the task
+  action. Keep the exact campaign root absent, place task logs beside it, and
+  credit no attempt when neither the root nor Codex/Wwise process was created.
+
+### An incomplete initial Skill read freezes the Windows Fresh root
+
+- Evidence: #91 Windows root `iwin-topic-8d5499e-typ21-r1` ended BLOCKED with
+  one `started_without_completed` item for the profile-free PowerShell Core
+  `Get-Content -Raw -Encoding UTF8 ...SKILL.md` command. No Gateway or Wwise
+  dispatch occurred, cleanup completed, and the root was not replayed.
+- Cause: the formal runner cannot prove a completed Codex command lifecycle
+  when the standalone task ends while its first Skill read is still marked in
+  progress; inferring success from a readable file would corrupt evidence.
+- Prevention: preserve the lifecycle failure and freeze the root. Do not
+  convert it to a semantic FAIL or retry the root; a later changed candidate
+  may use one new campaign root after the exact runner and desktop preflight.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:

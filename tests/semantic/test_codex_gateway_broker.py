@@ -7683,6 +7683,49 @@ def test_wait_topic_default_event_count_omission_executes_canonical_one_and_pres
     assert len(set(semantic_hashes)) == 1
 
 
+def test_topic_event_count_ceiling_accepts_only_one_canonical_bounded_integer(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    topic = "ak.wwise.core.soundbank.generated"
+    step = ExpectedGatewayStep(
+        "soundbank.generated.stream",
+        "stream-topic",
+        (topic, "--event-count", BoundedIntegerArgument(3, 64)),
+        gateway_global_arguments=("--timeout", "30"),
+    )
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(step,),
+        working_root=tmp_path / "accepted",
+        trusted_subscription_ack=TrustedSubscriptionAckSpec(step.name, topic),
+        trusted_subscription_ack_observer=lambda _expectation: None,
+        runner_environment={**os.environ, "FAKE_GATEWAY_MODE": "topic-stream"},
+        transport="tcp",
+    ) as broker:
+        accepted = run_model_command(
+            broker,
+            ["--timeout", "30", "stream-topic", topic, "--event-count", "6"],
+        )
+        assert accepted.returncode == 0, accepted.stderr
+        assert broker.evidence().passed is True
+
+    for value in ("2", "65", "03", "six"):
+        with CodexGatewayBroker(
+            skill_source=skill,
+            expected_steps=(step,),
+            working_root=tmp_path / f"rejected-{value}",
+            transport="tcp",
+        ) as broker:
+            rejected = run_model_command(
+                broker,
+                ["--timeout", "30", "stream-topic", topic, "--event-count", value],
+            )
+            assert rejected.returncode == 126
+            assert broker.evidence().terminal_state == "FAILED"
+
+
 def test_wait_topic_event_count_greater_than_one_cannot_be_omitted(
     tmp_path: Path,
 ) -> None:

@@ -13,6 +13,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_optional_topic_schema_protocol,
     build_transaction_protocol,
 )
+from tests.semantic.support.codex_gateway_broker import BoundedIntegerArgument
 from tests.semantic.support.codex_soundbank_business_plan_v3 import (
     TOPIC_ACK_CONTRACT,
     TOPIC_ACK_REQUIREMENT_CONTRACT,
@@ -94,7 +95,9 @@ def test_fixed_duration_topic_stream_uses_a_ceiling_not_expected_event_total() -
 
     stream = steps[-1]
     index = stream.arguments.index("--event-count")
-    assert stream.arguments[index + 1] == "64"
+    ceiling = stream.arguments[index + 1]
+    assert isinstance(ceiling, BoundedIntegerArgument)
+    assert (ceiling.minimum, ceiling.maximum) == (3, 64)
 
 
 def _case(api: str, scenario_id: str, root: Path, *, refusal: bool = False, topic: bool = False):

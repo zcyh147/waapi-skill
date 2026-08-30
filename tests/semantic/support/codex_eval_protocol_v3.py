@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from tests.semantic.support.codex_gateway_broker import (
+    BoundedIntegerArgument,
     DraftTypedActionArgument,
     DraftTypedActionBatchArgument,
     DraftActionMetadataBinding,
@@ -5307,7 +5308,7 @@ def stream_topic_step(
         or not 1 <= event_count <= 64
     ):
         raise V3ProtocolError(
-            "stream-topic event_count must be an integer from 1 through 64"
+            "stream-topic expected event count must be an integer from 1 through 64"
         )
     option_values = _normalize_json_object(
         {} if options is None else options,
@@ -5324,7 +5325,7 @@ def stream_topic_step(
         arguments=(
             topic,
             "--event-count",
-            str(event_count),
+            BoundedIntegerArgument(min(event_count + 1, 64), 64),
             "--topic-contract-digest",
             topic_business_contract(version, topic).contract_digest,
             *_business_topic_arguments(
