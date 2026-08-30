@@ -337,10 +337,10 @@ def test_topic_prompts_separate_subscription_scope_from_returned_event_checks() 
     assert "三个 SoundBank 名称在通知返回后核对" in prompts[
         "TYP21-TOPIC-SOUNDBANK-GENERATED"
     ]
-    assert "contract digest 已过期" in prompts[
+    assert "订阅契约校验值已经过期" in prompts[
         "TYP21-TOPIC-SOUNDBANK-GENERATED"
     ]
-    assert "不要重放旧命令或旧 digest" in prompts[
+    assert "不要重放旧命令或旧校验值" in prompts[
         "TYP21-TOPIC-SOUNDBANK-GENERATED"
     ]
     assert "SoundBank 对象本身的名称 `Dialogue_Chapter14`" in prompts[
