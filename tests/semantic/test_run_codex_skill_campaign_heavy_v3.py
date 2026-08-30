@@ -3415,6 +3415,7 @@ def test_soundbank_topic_protocol_selects_finite_stream_for_explicit_stream_case
     assert [step.name for step in steps] == [
         "soundbank.generated.schema",
         "soundbank.generated.schema.soundbank.match-group",
+        "soundbank.generated.schema.soundbank.entry",
         "soundbank.generated.stream",
     ]
     assert steps[-1].arguments[:2] == (
@@ -3424,6 +3425,20 @@ def test_soundbank_topic_protocol_selects_finite_stream_for_explicit_stream_case
     ceiling = steps[-1].arguments[2]
     assert isinstance(ceiling, BoundedIntegerArgument)
     assert (ceiling.minimum, ceiling.maximum) == (3, 64)
+
+    protocol = build_optional_topic_schema_protocol(steps)
+    selected_names = [
+        "soundbank.generated.schema",
+        "soundbank.generated.schema.soundbank.entry",
+        "soundbank.generated.schema.soundbank.match-group",
+        "soundbank.generated.stream",
+    ]
+    selected = campaign._consumed_heavy_v3_protocol_steps(  # noqa: SLF001
+        protocol,
+        len(selected_names),
+        selected_step_names=selected_names,
+    )
+    assert [step.name for step in selected] == selected_names
 
 
 def test_soundbank_topic_protocol_seals_result_only_soundbank_disclosure() -> None:

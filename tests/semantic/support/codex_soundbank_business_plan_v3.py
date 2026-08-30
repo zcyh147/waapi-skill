@@ -524,11 +524,7 @@ def soundbank_topic_protocol_steps(
                     group=scope,
                 )
             )
-        if (
-            has_entry
-            and not combined_result_disclosure
-            and lifecycle_command != "stream-topic"
-        ):
+        if has_entry and not combined_result_disclosure:
             steps.append(
                 topic_schema_step(
                     f"soundbank.generated.schema.{scope}.entry",
