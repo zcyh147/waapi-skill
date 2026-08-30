@@ -7,7 +7,7 @@ import json
 import os
 import re
 from dataclasses import dataclass
-from pathlib import Path, PurePath, PureWindowsPath
+from pathlib import Path, PurePath, PurePosixPath, PureWindowsPath
 from typing import Any, Iterable, Mapping
 
 from .endpoint_scope import is_loopback_waapi_host
@@ -160,7 +160,7 @@ def adapt_cli_dispatch_paths(
     if not windows_runtime:
         native_posix_process = (
             isinstance(process_path, str)
-            and Path(process_path).is_absolute()
+            and PurePosixPath(process_path).is_absolute()
         )
         local_endpoint = (
             isinstance(endpoint_host, str)
