@@ -430,12 +430,14 @@ def soundbank_topic_protocol_steps(
     """Build the exact progressive Topic disclosure used by SoundBank waits."""
 
     steps = [topic_schema_step("soundbank.generated.schema", topic)]
-    if isinstance(match.get("soundbank"), Mapping):
+    for scope, value in match.items():
+        if not isinstance(value, Mapping):
+            continue
         steps.append(
             topic_schema_entry_or_match_group_step(
-                "soundbank.generated.schema.soundbank",
+                f"soundbank.generated.schema.{scope}",
                 topic,
-                scope="soundbank",
+                scope=scope,
             )
         )
     steps.append(

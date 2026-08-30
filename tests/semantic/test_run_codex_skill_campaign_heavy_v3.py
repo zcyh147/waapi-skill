@@ -161,6 +161,7 @@ from wwise_waapi.typed_topics import topic_match_contract, topic_options_contrac
 from tests.semantic.support.codex_object_runtime_v3 import ObjectRuntimeSnapshot
 from tests.semantic.support.codex_soundbank_business_plan_v3 import (
     compile_soundbank_business_plan,
+    soundbank_topic_protocol_steps,
 )
 from tests.semantic.support.codex_soundbank_runtime_v3 import (
     PROCESS_REFUSAL_ERROR_CODE,
@@ -3319,6 +3320,36 @@ def test_topic_schema_progressive_entry_step_is_exact() -> None:
         "ak.wwise.core.soundbank.generated",
         ExactArgumentAlternatives(("--entry", "--match-group")),
         "soundbank",
+    )
+
+
+def test_soundbank_topic_protocol_discloses_each_nested_match_scope() -> None:
+    steps = soundbank_topic_protocol_steps(
+        topic="ak.wwise.core.soundbank.generated",
+        version="2022.1",
+        event_count=3,
+        match={
+            "soundbank": {"name": "Dialogue_Chapter14"},
+            "platform": {"name": "Windows"},
+        },
+        options={"return": ["id", "name", "type", "path"]},
+    )
+
+    assert [step.name for step in steps] == [
+        "soundbank.generated.schema",
+        "soundbank.generated.schema.soundbank",
+        "soundbank.generated.schema.platform",
+        "soundbank.generated.wait",
+    ]
+    assert steps[1].arguments == (
+        "ak.wwise.core.soundbank.generated",
+        ExactArgumentAlternatives(("--entry", "--match-group")),
+        "soundbank",
+    )
+    assert steps[2].arguments == (
+        "ak.wwise.core.soundbank.generated",
+        ExactArgumentAlternatives(("--entry", "--match-group")),
+        "platform",
     )
 
 
