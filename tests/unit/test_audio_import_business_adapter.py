@@ -344,7 +344,7 @@ def test_structure_only_existing_sound_preserves_live_subtype_without_language(
 
 
 @pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
-def test_invalid_mixed_modes_and_native_fields_repair_without_guessing(
+def test_use_existing_mode_accepts_mixed_existing_and_missing_targets(
     version: str,
     tmp_path: Path,
 ) -> None:
@@ -367,12 +367,13 @@ def test_invalid_mixed_modes_and_native_fields_repair_without_guessing(
         fields={"media_file": str(media), "language": "SFX"},
     )
 
-    before = mixed.as_dict()
-    with pytest.raises(BusinessDeclarationError) as conflict:
-        compile_audio_import_business(mixed, build_continuation=_continuation)
-    assert conflict.value.repair["error_code"] == "AUDIO_IMPORT_MODE_AMBIGUOUS"
-    assert conflict.value.repair["draft_revision"] == mixed.revision
-    assert mixed.as_dict() == before
+    compiled_mixed = compile_audio_import_business(
+        mixed,
+        build_continuation=_continuation,
+    )
+    assert compiled_mixed.request["arguments"]["import_operation"] == (
+        "useExisting"
+    )
 
     with pytest.raises(BusinessDeclarationError) as native:
         session.with_new_declaration(
@@ -387,13 +388,12 @@ def test_invalid_mixed_modes_and_native_fields_repair_without_guessing(
         target=NewDescendantTarget(parent, "New_Reimport", "sound-sfx"),
         fields={"media_file": str(media), "language": "SFX"},
     )
-    with pytest.raises(BusinessDeclarationError) as wrong_form:
-        compile_audio_import_business(
-            explicit_reimport,
-            build_continuation=_continuation,
-        )
-    assert wrong_form.value.repair["error_code"] == (
-        "AUDIO_IMPORT_MODE_TARGET_MISMATCH"
+    compiled_reimport = compile_audio_import_business(
+        explicit_reimport,
+        build_continuation=_continuation,
+    )
+    assert compiled_reimport.request["arguments"]["import_operation"] == (
+        "useExisting"
     )
 
 

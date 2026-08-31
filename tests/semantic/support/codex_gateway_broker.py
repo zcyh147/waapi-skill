@@ -3909,6 +3909,8 @@ def _closed_business_literal_equivalent(
     if index <= 0:
         return False
     prior = step.arguments[index - 1]
+    if prior == "--meaning":
+        return supplied.casefold() == expected.casefold()
     if prior == "--kind":
         return _BUSINESS_KIND_DISPLAY_ALIASES.get(supplied) == expected
     if prior not in {"--path-segment", "--object-path-segment"}:
@@ -12511,11 +12513,21 @@ class CodexGatewayBroker:
                     path_to_id=path_to_id,
                     type_name_to_id=type_name_to_id,
                 )
-                if _normalize_audio_import_request_named_fields(
+                normalized_replayed = _normalize_audio_import_request_named_fields(
                     replayed
-                ) != _normalize_audio_import_request_named_fields(
+                )
+                normalized_witness = _normalize_audio_import_request_named_fields(
                     bound_witness
-                ):
+                )
+                request_matches = (
+                    _object_operation_json_equal(
+                        normalized_replayed,
+                        normalized_witness,
+                    )
+                    if draft_operation in {"object.create", "object.set"}
+                    else normalized_replayed == normalized_witness
+                )
+                if not request_matches:
                     raise GatewayInvocationError(
                         "Durable business declarations differ from the sealed request "
                         "witness"

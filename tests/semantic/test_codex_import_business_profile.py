@@ -384,6 +384,63 @@ def test_existing_target_derives_reimport_while_replace_remains_explicit() -> No
     assert replace.arguments[-2:] == ("--mode", "replace")
 
 
+def test_use_existing_protocol_binds_live_rows_and_declares_missing_rows() -> None:
+    parent = (
+        r"\Actor-Mixer Hierarchy\Default Work Unit"
+        r"\<Virtual Folder>Weapons\<Random Container>Rifle"
+    )
+    existing = parent + r"\<Sound SFX>Rifle_Close"
+    missing = parent + r"\<Sound SFX>Rifle_Tail"
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2021.1",
+        "operation": "audio.import",
+        "arguments": {
+            "import_operation": "useExisting",
+            "imports": [
+                {
+                    "audio_file": "/tmp/rifle-close.wav",
+                    "object_path": existing,
+                    "object_type": "Sound SFX",
+                    "import_language": "SFX",
+                },
+                {
+                    "audio_file": "/tmp/rifle-tail.wav",
+                    "object_path": missing,
+                    "object_type": "Sound SFX",
+                    "import_language": "SFX",
+                },
+            ],
+        },
+    }
+
+    steps = build_audio_import_composer_transaction_steps(
+        request,
+        label="tx01",
+        existing_target_paths=frozenset({existing}),
+    )
+    bindings = [
+        step for step in steps if step.subcommand == "draft-bind-object"
+    ]
+    declaration = next(
+        step
+        for step in steps
+        if step.subcommand == "draft-declare-import-batch"
+    )
+
+    assert len(bindings) == 2
+    assert bindings[0].arguments[-2:] == (
+        "--object-path-segment",
+        "<Sound SFX>Rifle_Close",
+    )
+    assert bindings[1].arguments[-2:] == (
+        "--object-path-segment",
+        "<Random Container>Rifle",
+    )
+    assert "--existing-row" in declaration.arguments
+    assert "--new-row" in declaration.arguments
+
+
 def test_profile_filters_preserve_independent_unit_identity() -> None:
     selected = load_import_business_profile(
         PROFILE,

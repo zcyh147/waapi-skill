@@ -325,18 +325,37 @@ def _validate_expected_protocol(
                 else "audio_import_tab_v1"
             ),
         )
+        expected_variants = (expected,)
     else:
-        expected = (
-            build_audio_import_composer_protocol(plan.operation_requests[0])
-            if plan.api == "ak.wwise.core.audio.import"
-            else build_transaction_protocol(
-                plan.operation_requests,
-                refusal=StructuredRefusal(refusal) if refusal else None,
+        if plan.api == "ak.wwise.core.audio.import":
+            expected_variants = (
+                build_audio_import_composer_protocol(
+                    plan.operation_requests[0],
+                    existing_target_paths=frozenset(
+                        row.target_path
+                        for row in plan.rows
+                        if row.pre_state_existence == "existing"
+                    ),
+                ),
+                build_audio_import_composer_protocol(
+                    plan.operation_requests[0]
+                ),
             )
-        )
+        else:
+            expected_variants = (
+                build_transaction_protocol(
+                    plan.operation_requests,
+                    refusal=StructuredRefusal(refusal) if refusal else None,
+                ),
+            )
     if protocol.steps[0].subcommand == "operations":
-        expected = build_operations_discovery_protocol(expected)
-    if _plain(serialize_protocol(protocol)) != _plain(serialize_protocol(expected)):
+        expected_variants = tuple(
+            build_operations_discovery_protocol(expected)
+            for expected in expected_variants
+        )
+    if _plain(serialize_protocol(protocol)) not in tuple(
+        _plain(serialize_protocol(expected)) for expected in expected_variants
+    ):
         raise ImportBusinessPlanError("import protocol does not exactly bind sealed requests and transaction order")
 
 
@@ -708,22 +727,39 @@ def _validate_static_archive(static: Mapping[str, Any], live: Mapping[str, Any],
                 else "audio_import_tab_v1"
             ),
         )
+        expected_variants = (expected,)
     else:
-        expected = (
-            build_audio_import_composer_protocol(requests[0])
-            if static["api"] == "ak.wwise.core.audio.import"
-            else build_transaction_protocol(
-                requests,
-                refusal=(
-                    StructuredRefusal(static["refusal_error_code"])
-                    if count == 0
-                    else None
+        if static["api"] == "ak.wwise.core.audio.import":
+            expected_variants = (
+                build_audio_import_composer_protocol(
+                    requests[0],
+                    existing_target_paths=frozenset(
+                        str(row["target_path"])
+                        for row in static["row_contracts"]
+                        if row.get("pre_state_existence") == "existing"
+                    ),
+                ),
+                build_audio_import_composer_protocol(requests[0]),
+            )
+        else:
+            expected_variants = (
+                build_transaction_protocol(
+                    requests,
+                    refusal=(
+                        StructuredRefusal(static["refusal_error_code"])
+                        if count == 0
+                        else None
+                    ),
                 ),
             )
-        )
     if protocol.steps[0].subcommand == "operations":
-        expected = build_operations_discovery_protocol(expected)
-    if _plain(serialize_protocol(protocol)) != _plain(serialize_protocol(expected)) or static["protocol_sha256"] != _hash(serialize_protocol(protocol)):
+        expected_variants = tuple(
+            build_operations_discovery_protocol(expected)
+            for expected in expected_variants
+        )
+    if _plain(serialize_protocol(protocol)) not in tuple(
+        _plain(serialize_protocol(expected)) for expected in expected_variants
+    ) or static["protocol_sha256"] != _hash(serialize_protocol(protocol)):
         raise ImportBusinessPlanError("archived import protocol/request order drifted")
     if not isinstance(static["row_contracts"], list) or not static["row_contracts"] or len({row.get("row_key") for row in static["row_contracts"] if isinstance(row, Mapping)}) != len(static["row_contracts"]):
         raise ImportBusinessPlanError("archived import row contracts are invalid")

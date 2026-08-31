@@ -621,6 +621,14 @@ def test_core_mutation_check_rejects_bound_object_drift_before_dispatch(
         client_factory=lambda _url: bind_client,
     )
     assert bind_code == 0, bound
+    assert bound["draft"]["response_integrity"] == {
+        "complete": True,
+        "truncated": False,
+        "projection": "bound_object_and_copy_ready_continuation",
+        "compact_projection_is_not_truncation": True,
+    }
+    assert "created_at" not in bound["draft"]
+    assert '"fixed_argv_prefix":' not in json.dumps(bound["draft"])
     object_handle = bound["bound_object"]["handle"]
     declare_client = FakeClient(
         {
@@ -705,6 +713,16 @@ def test_audio_convert_core_plan_accepts_bound_objects_names_and_exact_io_root(
     assert start_code == 0, started
     draft_id = started["draft"]["draft_id"]
     authority = started["task_authority"]
+    binding = started["draft"]["next_action_binding"]["object_binding"]
+    assert binding["next_role"] == "audio_object"
+    assert binding["by_id"]["fixed_argv_prefix"][-2:] == [
+        "--role",
+        "audio_object",
+    ]
+    assert binding["by_path_segments"]["fixed_argv_prefix"][-2:] == [
+        "--role",
+        "audio_object",
+    ]
     object_path = r"\Actor-Mixer Hierarchy\Default Work Unit\Alarm"
     bind_client = FakeClient(
         {

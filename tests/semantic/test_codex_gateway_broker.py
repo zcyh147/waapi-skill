@@ -131,6 +131,13 @@ from wwise_waapi.operation_composer import (
             "<Virtual Folder>Weapons",
             "Weapons",
         ),
+        (
+            "draft-discover-fields",
+            ("--meaning", "pitch"),
+            1,
+            "Pitch",
+            "pitch",
+        ),
     ),
 )
 def test_closed_business_literal_equivalence_is_broker_owned(
@@ -6010,6 +6017,91 @@ def test_raw_core_durable_replay_selects_the_exact_api_adapter(
         preview
     ) == expected
     assert selected == ["ak.wwise.core.project.save"]
+
+
+def test_object_set_durable_replay_accepts_bound_ids_and_omitted_fail_default(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request = _two_target_object_set_request()
+    steps = build_object_graph_business_transaction_steps(
+        request,
+        label="tx01",
+    )
+    start = next(step for step in steps if step.subcommand == "draft-start")
+    preview = next(
+        step for step in steps if step.subcommand == "preview-from-draft"
+    )
+    paths = tuple(
+        row["object"]["value"] for row in request["arguments"]["objects"]
+    )
+    ids = (
+        "{11111111-1111-1111-1111-111111111111}",
+        "{22222222-2222-2222-2222-222222222222}",
+    )
+    replayed = json.loads(json.dumps(request))
+    replayed["arguments"].pop("on_name_conflict")
+    for row, object_id in zip(
+        replayed["arguments"]["objects"],
+        ids,
+        strict=True,
+    ):
+        row["object"] = {"kind": "id", "value": object_id}
+    session = SimpleNamespace(
+        handles=SimpleNamespace(
+            as_dict=lambda: {
+                "objects": [
+                    {
+                        "path": path,
+                        "object_id": object_id,
+                        "object_type": "ActorMixer",
+                        "name": path.rsplit("\\", 1)[-1],
+                    }
+                    for path, object_id in zip(paths, ids, strict=True)
+                ]
+            }
+        )
+    )
+    skill = make_fake_skill(tmp_path)
+    (skill / "wwise_waapi").mkdir()
+    state = tmp_path / "state"
+    state.mkdir()
+    monkeypatch.setattr(
+        broker_module,
+        "OperationDraftStore",
+        lambda _state: SimpleNamespace(
+            inspect=lambda *_args, **_kwargs: SimpleNamespace(
+                composition={"business_session": {}}
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        broker_module.BusinessDeclarationSession,
+        "from_dict",
+        lambda _value: session,
+    )
+    monkeypatch.setattr(
+        broker_module,
+        "business_adapter",
+        lambda _operation: SimpleNamespace(
+            supports_cleaned_file_evidence=False,
+            materialize=lambda *_args, **_kwargs: replayed,
+        ),
+    )
+    broker = CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=steps,
+        expected_wwise_version="2022.1",
+    )
+    broker._state_directory = state  # noqa: SLF001
+    broker._payloads_by_step[start.name] = {  # noqa: SLF001
+        "task_authority": "da1-" + "2" * 40,
+        "draft": {"draft_id": "od1-" + "1" * 32},
+    }
+
+    assert broker._replay_expected_operation_draft_request(  # noqa: SLF001
+        preview
+    ) == replayed
 
 
 def test_dynamic_soundengine_request_replays_its_durable_business_adapter(

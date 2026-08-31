@@ -713,6 +713,7 @@ def test_media_pool_contains_value_is_disclosed_as_literal_text() -> None:
 def test_operate_reference_is_a_bounded_single_read_control_plane() -> None:
     marker = "<!-- WAAPI_OPERATE_REFERENCE_END -->"
     assert len(OPERATE.encode("utf-8")) <= 32_768
+    assert len(OPERATE) + OPERATE.count("\n") <= 28_550
     assert len(OPERATE.splitlines()) <= 240
     assert OPERATE.count("WAAPI_OPERATE_REFERENCE_END") == 1
     assert OPERATE.rstrip().endswith(marker)

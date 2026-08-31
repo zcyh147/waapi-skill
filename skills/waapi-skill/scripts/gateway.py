@@ -22106,6 +22106,23 @@ def operation_draft_prefix_copy_binding(
     }
 
 
+def _compact_business_binding_continuation(value: Any) -> Any:
+    """Remove repeated argv arrays while preserving every copy-ready route."""
+
+    if isinstance(value, Mapping):
+        return {
+            str(key): _compact_business_binding_continuation(nested)
+            for key, nested in value.items()
+            if key != "fixed_argv_prefix"
+        }
+    if isinstance(value, list):
+        return [
+            _compact_business_binding_continuation(nested)
+            for nested in value
+        ]
+    return value
+
+
 def transaction_state_payload(
     command: str,
     record: Any,
@@ -22919,6 +22936,29 @@ def _business_next_action_binding(
         }
     if adapter.family == "core-project-object":
         roles = business_contract["binding"]["roles"]
+
+        def core_role_binding() -> dict[str, Any]:
+            if len(roles) == 1:
+                return {
+                    **role_object_binding(roles[0]),
+                    "repeat_until": (
+                        "every_object_for_this_business_role_is_bound"
+                    ),
+                }
+            return {
+                "role_routes": {
+                    role: role_object_binding(role) for role in roles
+                },
+                "selection_rule": (
+                    "choose_the_business_role_then_copy_only_its_"
+                    "Gateway_owned_binding_route"
+                ),
+                "result": (
+                    "copy_each_returned_handle_into_the_same_named_"
+                    "declaration_field"
+                ),
+            }
+
         core_field_types = business_contract["declaration"]["field_types"]
         needs_field_discovery = any(
             value_type in {"bound_field_handle", "bound_field_handle_list"}
@@ -22978,11 +23018,7 @@ def _business_next_action_binding(
             return {
                 **shared,
                 "required_next_phase": "bind_remaining_core_roles",
-                "object_binding": {
-                    **object_binding,
-                    "use_only_for": roles,
-                    "repeat_until": "every_role_named_by_the_business_contract_is_bound",
-                },
+                "object_binding": core_role_binding(),
                 "declaration": declaration,
                 **(
                     {"field_discovery": field_discovery}
@@ -22995,10 +23031,7 @@ def _business_next_action_binding(
             "required_next_phase": "declare_complete_core_plan",
             **(
                 {
-                    "object_binding": {
-                        **object_binding,
-                        "use_only_for": roles,
-                    }
+                    "object_binding": core_role_binding()
                 }
                 if roles
                 else {}
@@ -25239,26 +25272,20 @@ def operation_draft_payload(
             record,
             task_authority=task_authority,
         )
-        adapter = business_adapter(record.operation)
-        if (
-            command == "draft-bind-object"
-            and adapter.role_declaration is not None
-            and record.check is None
-        ):
+        if command == "draft-bind-object" and record.check is None:
             next_action_binding = {
-                key: next_action_binding[key]
-                for key in (
-                    "contract",
-                    "required_next_phase",
-                    "object_binding",
-                    "declaration",
-                    "check",
-                    "shell_tool_timeout_ms",
-                    "then_read_next_response",
-                    "precompute_or_increment_revision",
-                )
-                if key in next_action_binding
+                key: value
+                for key, value in next_action_binding.items()
+                if key
+                not in {
+                    "business_contract",
+                    "responsibility_split",
+                    "forbidden_inputs",
+                }
             }
+            next_action_binding = _compact_business_binding_continuation(
+                next_action_binding
+            )
             draft = {
                 key: draft[key]
                 for key in (
@@ -25274,7 +25301,7 @@ def operation_draft_payload(
             draft["response_integrity"] = {
                 "complete": True,
                 "truncated": False,
-                "projection": "bound_role_and_singular_continuation",
+                "projection": "bound_object_and_copy_ready_continuation",
                 "compact_projection_is_not_truncation": True,
             }
         if (

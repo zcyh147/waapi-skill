@@ -82,6 +82,44 @@ def test_media_pool_project_originals_scope_accepts_business_display_forms(
     assert prepared["args"]["databases"] == [r"\Databases\Project Originals"]
 
 
+def test_media_pool_deduplicates_the_same_filename_candidate_filter() -> None:
+    prepared = materialize_media_build_business_request(
+        MEDIA_POOL_GET_URI,
+        "2025.1",
+        {
+            "max_results": 200,
+            "text_filters": [["filename", "contains", "footstep"]],
+            "exact_name_contains": "footstep",
+            "final_limit": 20,
+        },
+        available_media_fields=("Filename", "Path", "Duration"),
+    )
+
+    assert prepared["args"]["filters"].count(
+        {
+            "type": "field",
+            "field": "Filename",
+            "operator": "contains",
+            "value": "footstep",
+        }
+    ) == 1
+
+
+def test_media_pool_rejects_conflicting_filename_candidate_filters() -> None:
+    with pytest.raises(MediaBuildBusinessError, match="conflicts"):
+        materialize_media_build_business_request(
+            MEDIA_POOL_GET_URI,
+            "2025.1",
+            {
+                "max_results": 200,
+                "text_filters": [["filename", "contains", "footstep"]],
+                "exact_name_contains": "weapon",
+                "final_limit": 20,
+            },
+            available_media_fields=("Filename", "Path", "Duration"),
+        )
+
+
 def test_peak_region_business_read_compiles_and_decodes_known_pcm_pairs() -> None:
     prepared = materialize_media_build_business_request(
         PEAKS_REGION_URI,

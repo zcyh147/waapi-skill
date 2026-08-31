@@ -10933,7 +10933,9 @@ def _validate_object_query_gateway_payload(
             raise CampaignEvidenceError(
                 f"{label} object.get broker has an unknown derived identity"
             )
-        language = _campaign_language_name(row.get("audioSource:language"))
+        language = _campaign_language_name(
+            row.get("source_language", row.get("audioSource:language"))
+        )
         parent = row.get("parent")
         parent_id = (
             str(parent.get("id"))

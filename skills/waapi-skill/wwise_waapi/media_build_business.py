@@ -507,23 +507,29 @@ def _materialize_media_pool(
                 "exact_name_contains exceeds 1024 characters"
             )
         filename = bind("filename")
-        if any(
-            row.get("type") == "field"
+        filename_contains = [
+            row
+            for row in filters
+            if row.get("type") == "field"
             and row.get("field") == filename
             and row.get("operator") == "contains"
-            for row in filters
+        ]
+        if len(filename_contains) > 1 or (
+            filename_contains
+            and filename_contains[0].get("value") != exact_name
         ):
             raise MediaBuildBusinessError(
-                "exact_name_contains already owns the server Filename candidate filter"
+                "exact_name_contains conflicts with the server Filename candidate filter"
             )
-        filters.append(
-            {
-                "type": "field",
-                "field": filename,
-                "operator": "contains",
-                "value": exact_name,
-            }
-        )
+        if not filename_contains:
+            filters.append(
+                {
+                    "type": "field",
+                    "field": filename,
+                    "operator": "contains",
+                    "value": exact_name,
+                }
+            )
         if (
             isinstance(final_limit, bool)
             or not isinstance(final_limit, int)

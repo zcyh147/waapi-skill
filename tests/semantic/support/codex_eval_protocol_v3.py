@@ -577,6 +577,7 @@ def build_audio_import_composer_transaction_steps(
     *,
     label: str,
     metadata_binding: DraftActionMetadataBinding | None = None,
+    existing_target_paths: frozenset[str] | None = None,
 ) -> tuple[ExpectedGatewayStep, ...]:
     """Translate one canonical audio.import request into deep business Draft steps."""
 
@@ -810,7 +811,12 @@ def build_audio_import_composer_transaction_steps(
             language=language,
         )
         existing_target_handle: ResponseBinding | None = None
-        if existing_target_form:
+        row_uses_existing_target = existing_target_form and not (
+            native_mode == "useExisting"
+            and existing_target_paths is not None
+            and target_path not in existing_target_paths
+        )
+        if row_uses_existing_target:
             existing_target_handle = bind_object({"kind": "path", "value": target_path})
             row_form = "existing"
             row_target: Any = existing_target_handle
@@ -4056,6 +4062,7 @@ def build_audio_import_composer_protocol(
     metadata_binding: DraftActionMetadataBinding | None = None,
     metadata_step: ExpectedGatewayStep | None = None,
     schema_first: bool = False,
+    existing_target_paths: frozenset[str] | None = None,
 ) -> V3GatewayProtocol:
     """Build one complete normal-input audio.import transaction."""
 
@@ -4068,6 +4075,7 @@ def build_audio_import_composer_protocol(
             request,
             label="tx01",
             metadata_binding=metadata_binding,
+            existing_target_paths=existing_target_paths,
         )
     )
     # Deep audio.import binds custom fields inside the Draft. Retained

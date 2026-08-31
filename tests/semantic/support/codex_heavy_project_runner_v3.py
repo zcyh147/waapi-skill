@@ -892,6 +892,15 @@ def final_response_reports_weak_verifier_boundary(value: str) -> bool:
             or "business state" in folded
         )
     )
+    explicit_negative_boundary = (
+        "反射结果结构" in folded
+        and (
+            "未验证" in folded
+            or "不能声称已验证" in folded
+            or "不声称已验证" in folded
+        )
+        and "业务副作用" in folded
+    )
     overclaim_markers = (
         "不仅限于结果结构",
         "不限于结果结构",
@@ -910,7 +919,11 @@ def final_response_reports_weak_verifier_boundary(value: str) -> bool:
     return bool(
         "typed_input" in folded
         and "3" in folded
-        and (explicit_schema_limit or equivalent_schema_limit)
+        and (
+            explicit_schema_limit
+            or equivalent_schema_limit
+            or explicit_negative_boundary
+        )
         and not any(marker in folded for marker in overclaim_markers)
     )
 
@@ -4999,6 +5012,11 @@ def _prepare_case(
             backend=import_backend,
             reference_fixtures=reference_fixtures,
         )
+        before = import_runtime.hidden_before
+        if before is None:
+            raise HeavyProjectRunnerError(
+                "import runtime did not retain its sealed before snapshot"
+            )
         refusal_code = _REFUSAL_CODES.get(scenario.id)
         if metadata_discovery is not None:
             if refusal_code is not None:
@@ -5026,7 +5044,12 @@ def _prepare_case(
         else:
             protocol = (
                 build_audio_import_composer_protocol(
-                    materialized.operation_requests[0]
+                    materialized.operation_requests[0],
+                    existing_target_paths=frozenset(
+                        row.target_path
+                        for row in import_runtime.plan.rows
+                        if row.pre_state_existence == "existing"
+                    ),
                 )
                 if scenario.api == "ak.wwise.core.audio.import"
                 else build_transaction_protocol(
@@ -5037,11 +5060,6 @@ def _prepare_case(
                 )
             )
         protocol = typed_input_operations_protocol(unit, protocol)
-        before = import_runtime.hidden_before
-        if before is None:
-            raise HeavyProjectRunnerError(
-                "import runtime did not retain its sealed before snapshot"
-            )
         typed_sections = compile_import_business_plan(
             scenario,
             materialized,
@@ -5119,7 +5137,10 @@ def _prepare_case(
             raise HeavyProjectRunnerError(
                 "audio conversion runtime did not retain its sealed before snapshot"
             )
-        protocol = audio_runtime.gateway_protocol()
+        protocol = typed_input_operations_protocol(
+            unit,
+            audio_runtime.gateway_protocol(),
+        )
         typed_sections = compile_audio_conversion_business_plan(
             plan,
             before,

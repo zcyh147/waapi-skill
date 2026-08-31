@@ -248,7 +248,7 @@ def _resolve_mode(
     if explicit_mode is None:
         if forms == {"new"}:
             return "create"
-        if forms == {"existing"}:
+        if forms in ({"existing"}, {"new", "existing"}):
             return "reimport"
         raise _repair(
             session,
@@ -260,7 +260,7 @@ def _resolve_mode(
     assert isinstance(explicit_mode, str)
     if explicit_mode == "create" and forms != {"new"}:
         raise _mode_target_mismatch(session, explicit_mode, forms)
-    if explicit_mode in {"reimport", "replace"} and forms != {"existing"}:
+    if explicit_mode == "replace" and forms != {"existing"}:
         raise _mode_target_mismatch(session, explicit_mode, forms)
     return explicit_mode
 

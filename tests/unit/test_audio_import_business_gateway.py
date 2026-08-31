@@ -364,9 +364,10 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
         )
         assert scope["fixed_argv_prefix_copy"]
     batch_action = bound_next["declare_import_batch"]
-    assert batch_action["fixed_argv_prefix"][3] == (
-        "draft-declare-import-batch"
-    )
+    assert "fixed_argv_prefix" not in batch_action
+    assert "gateway.py draft-declare-import-batch" in batch_action[
+        "fixed_argv_prefix_copy"
+    ]
     assert batch_action["fixed_argv_prefix_copy_instruction"]["source_field"] == (
         "fixed_argv_prefix_copy"
     )

@@ -38,6 +38,7 @@ from tests.semantic.support.codex_audio_media_business_plan_v3 import (
 )
 from tests.semantic.support.codex_eval_protocol_v3 import (
     build_direct_protocol,
+    build_operations_discovery_protocol,
     build_transaction_protocol,
 )
 from tests.semantic.support.codex_eval_bundle_v3 import load_eval_bundle_v3
@@ -224,6 +225,41 @@ def test_audio_all_five_cases_compile_and_recompute(index: int, tmp_path: Path) 
             "components_by_platform": [["Windows", plan.presets[0].key]],
         }
     ]
+
+
+def test_audio_plan_accepts_optional_named_operation_discovery(
+    tmp_path: Path,
+) -> None:
+    plan, before = _audio_case(3, tmp_path)
+    protocol = build_operations_discovery_protocol(
+        build_transaction_protocol([plan.operation_request])
+    )
+    reviewed_fixture = _audio_reviewed_fixture(plan)
+
+    sections = compile_audio_conversion_business_plan(
+        plan,
+        before,
+        protocol,
+        reviewed_scenario_fixture=reviewed_fixture,
+    )
+    validate_audio_conversion_business_plan(
+        sections,
+        plan,
+        before,
+        protocol,
+        reviewed_scenario_fixture=reviewed_fixture,
+        verify_files=True,
+    )
+    validate_audio_media_business_plan_archive(
+        sections,
+        protocol,
+        **_archive_identity(
+            plan.scenario_id,
+            AUDIO_CONVERT_URI,
+            "2024.1",
+            reviewed_fixture,
+        ),
+    )
 
 
 @pytest.mark.parametrize("index", range(1, 6))

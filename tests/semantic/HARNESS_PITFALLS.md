@@ -951,6 +951,23 @@ prevention checks that are expensive to rediscover.
   by the outer verifier remains diagnostic only; repair the verifier and use a
   new root rather than editing or replaying the sealed root.
 
+### A complete lane-reference read must fit the Codex shell-output envelope
+
+- Evidence: #60 native-Windows root `iwin-issue60-616fe68-r10-fail9` reached
+  the correct Lua Preview with five authenticated Gateway commands, but the
+  task gate classified the required `waapi-operate.md` read as unexpected.
+  PowerShell returned the beginning and terminal sentinel while the Codex
+  shell transcript silently omitted an interior slice: 28,617 visible
+  characters versus 30,689 source characters. The root remains frozen FAIL.
+- Cause: a terminal sentinel alone cannot prove a whole-file read when the
+  host transcript may preserve both ends while clipping the middle. The lane
+  reference had grown beyond the observed output envelope.
+- Prevention: keep Windows-rendered `waapi-operate.md` at or below 28,550
+  characters (source characters plus LF count), with a
+  deterministic size regression and one terminal sentinel. Remove repeated
+  prose in favor of Gateway schemas/continuations; never weaken byte-for-byte
+  read validation or grant PASS merely because the sentinel survived.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:

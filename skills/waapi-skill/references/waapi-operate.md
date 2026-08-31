@@ -17,7 +17,7 @@ An existing transaction continuation always outranks operation selection.
 
 ### Existing transaction
 
-Use the transaction id from conversation or a prior Gateway result; an artifact hash is not a lookup key. If absent, report unavailable preview context and offer a fresh preview; do not ask for an internal id, inspect state, or reread visible Skill files. The visible Preview's `next_command` is authoritative: execute its selected field verbatim. The template below never authorizes reconstruction with another runner path.
+Use the transaction id from conversation or a prior Gateway result; an artifact hash is not a lookup key. If absent, offer a fresh preview without inspecting state. The visible Preview's `next_command` is authoritative: execute its selected field verbatim. Its template never authorizes reconstruction.
 
 The first Gateway command is:
 
@@ -29,7 +29,7 @@ This is a mandatory safety gate. Do not call `operations`, `operation-schema`, o
 
 ### New transaction
 
-When this change uses a subset that the user selected from a previous multi-result business-declaration or advanced object query, finish the query lane's selected-subset identity gate first: exact-ID read back every selected GUID and require its unaliased name, type, and path to match the candidate that the user chose. A failed, missing, changed, or ambiguous row stops the change. These bounded read-only checks precede the transaction contract; they do not replace its schema or metadata steps.
+For a subset chosen from prior query results, finish the selected-subset identity gate first: exact-ID read back every selected GUID and match name, type, and path. Any mismatch stops. These bounded read-only checks precede the transaction contract; they never replace its schema or metadata.
 
 After a selected-subset gate, choose one first transaction-contract branch:
 
@@ -44,34 +44,35 @@ A natural-language outcome is not an exact operation name or URI. Unless the use
 | A named operation using only closed schema fields and side effects | its named `operation-schema` directly |
 | A known native URI without a named route | `request-schema <uri>` and follow its sole typed or business continuation |
 
-For business operations, the business Adapter owns object paths, native types, metadata scopes, object-list rows, Event/Switch construction, order and batching. Complete paths use `by_path_segments`; GUIDs use `by_id`; follow only the binding variants disclosed for the selected operation. Choose each business role from its structured route, copy its disclosed identity continuation, and use only the returned handle in that role's declaration field. Returned Field Handles are copied exactly; `draft-check` revalidates them. Returned Object Handles are copied exactly and revalidated too; never infer or type a property/reference token. Table imports start `operation-schema audio.importTabDelimited`; dynamic columns stay metadata-first.
+Follow the schema's sole `input_mode`. No schema-to-preview shortcut. The business Adapter owns object paths, native types, metadata scopes, tokens/enums, order, batching, and Preview intent. Bind through returned path/GUID/role routes and submit only disclosed high-level fields; never type a native request fragment.
 
-Follow the schema's sole `input_mode`. No schema-to-preview shortcut; never infer a token. For `composer`, run only its returned start and action argv. For `business_declaration`, run `draft-start` when returned; a bounded Core read instead runs `core-call`. Copy handles into the same named role; submit only disclosed high-level fields. `binding.role_fields` maps repeated roles into collections. Bind exact owners, parents, and references through returned roles. Supply stable facts such as `volume_db=-4`. The Gateway derives Wwise paths, types, metadata scopes, tokens/enums, arrays, curve points, Blend edges, order, batching, and Preview change intent. For audio import, use replace only when explicit; configure a default only when the user requested it for every target kind. Corrections reuse the draft. Continue to Preview/refusal in the same turn. Exact reflected URIs use `request-schema`.
+Complete paths use `by_path_segments`; GUIDs use `by_id`.
 
-Copy returned argv exactly, preserving `--expected-revision` and `--apply` when present; never add absent flags. Only for `composer`, fill six-fact batches, then the last partial batch and required branch facts after `choose`. Business declarations submit one complete returned high-level command at a time.
+For `composer`, run only its returned start and action argv. For `business_declaration`, run `draft-start` when returned. Bind exact owners, parents, and references. Supply stable facts such as `volume_db=-4`. The Gateway derives Wwise paths, types, metadata scopes, and Preview change intent; configure a default only when the user requested it. Exact reflected URIs use `request-schema`. For a complete caller path, keep it as one `path` selector.
 
-For a Composer lane, `construction_state.complete:false` and compact action receipts are complete JSON. Follow `next_command_decision`; only an exact `business_value_pointer` authorizes it. A business Draft instead follows its returned required phase and completion candidate. Both lanes finish through the returned check/Preview continuation, never `draft-apply --action check`.
+Table imports start `operation-schema audio.importTabDelimited`; dynamic columns stay metadata-first.
 
-Public mutation identities are closed to `id`, `path`, `exact-type-name`, `direct-child`, and `scoped-name` outside `business_declaration`. Use a schema-fitting selector directly in preview; do not query only to translate it or use raw WAQL. After exact relationship/path read returns canonical `id`/`name`/`type`/`path`, reuse its GUID as an `id` selector for later object/target; never switch to path/name or retype its Wwise path. Gateway revalidates it. When the user already supplied a complete Wwise path, keep it as one `path` selector; do not decompose it into `scoped-name` plus a parent path.
+Continue preserving `--expected-revision` and `--apply` to Preview or refusal in the same turn; bounded Core reads use `core-call`.
 
-For an exact SoundBank name that is intended to be globally unique by type, use
-`{"kind":"exact-type-name","type":"SoundBank","name":"<exact name>"}`. For an
-exact existing Event path whose requested target is its one direct Action, use
-`{"kind":"direct-child","parent":{"kind":"path","value":"<absolute Event path>"},"type":"Action"}`.
-The Gateway owns quoting, the two-row ambiguity ceiling, exact type validation,
-and the applicable parent or name checks.
+`construction_state.complete:false` and compact action receipts are complete JSON. Returned Field Handles are copied exactly; never infer or type a property/reference token. `draft-check` revalidates them.
 
-If the target needs a complex filter, follow the closed business declaration
-from offline `query-schema`; use bounded advanced query only for an unexpressible
-server-side read semantic. Mutate only when that read returns one verified GUID, then use
-`{"kind":"id","value":"<returned GUID>"}`. Zero, multiple, truncated, or
-otherwise incomplete query results do not identify a mutation target.
+Follow `next_command_decision`; only an exact `business_value_pointer` authorizes it. A business Draft instead follows its returned required phase and completion candidate. Copy handles into the same named role. Corrections reuse the draft. Finish through the returned check/Preview continuation, never `draft-apply --action check`.
+
+Outside business declarations, use only the schema's closed `id`, `path`, `exact-type-name`, `direct-child`, or `scoped-name` selector. Keep a caller-supplied complete path intact. A prior exact read may supply a verified GUID for `id`; zero, multiple, truncated, or incomplete results do not identify a mutation target. Raw WAQL never becomes a mutation identity.
+
+Public mutation identities are closed. After an exact relationship/path read returns canonical `id`/`name`/`type`/`path`, reuse its GUID as an `id` selector for a later object/target; never switch to path/name or retype its Wwise path. Gateway revalidates it.
 
 ## Choose by business outcome
 
 Select the operation whose postcondition and verifier match the user's complete authorized outcome. A native API overlap or large batch does not override this rule. `operation.selection_guidance` and `interface.selection_guidance` govern. **Media gate:** a request that names Sound/SFX nodes but supplies no media artifact or import intent is a pure object hierarchy and selects `object.create`. When media import is primary, use one `audio.import` for requests that replace media on existing Sounds or create a Sound in the same batch; `object.set` is never a preliminary schema for that outcome. From 2023.1, `object.set` may carry media only when import is subordinate to a broader atomic mutation of existing targets. New target-container hierarchy and same-row Event/Switch outcomes stay in the selected business transaction; never probe `object.create` or a separate assignment first.
 
 Existing-root status alone does not select `object.set`. One object's single rename, notes, scalar-property, or reference edit uses `object.setName`, `object.setNotes`, `object.setProperty`, or `object.setReference`. Broad `object.set` is only for one larger atomic outcome: several fields/properties/references on one root, an ordinary closed object-list change, multiple roots, a root edit plus a new subtree, or insertion into a named existing descendant. Plug-in, RTPC, and platform-link changes keep their dedicated operations. After any required selected-subset identity gate, that batch starts with `operation-schema object.set`.
+
+An insertion target is not the request root; give each one an `objects[]` row containing only genuinely new direct descendants. Single-edit, plug-in, RTPC, and platform-link operations take precedence. `object.set` owns several fields/properties/references on one root or an ordinary closed object-list change. `object.create` owns a new root, or descendants below one unchanged root only when those `object.set` conditions are absent.
+
+If root type is unproven, first exact-query the unchanged root. Then open `operation-schema object.create` and follow its sole continuation directly into the Draft; do not query the parent already determined by that verified path. For the default container Work Unit, use that preflight query for an `object.create`; `object.set` instead binds the exact target and uses returned field/type discovery plus business-Draft validation. Do not insert `project-default-work-units`.
+
+If not a valid direct writable parent, do not silently retarget the mutation; ask the user to confirm the intended writable child container.
 
 | User outcome | Select | Do not substitute |
 |---|---|---|
@@ -91,8 +92,6 @@ Existing-root status alone does not select `object.set`. One object's single ren
 
 When the user gives one Bank's complete desired final inclusion set, use one `soundbank.setInclusions` `replace` transaction: omitted existing rows such as Debug rows are removed without being named individually, and every other Bank remains outside that transaction. Do not split that final-state request into `add` and `remove` transactions.
 
-When saved inclusions precede generation, the verified Bank is the input; generation repeats only Bank/artifact expectation and preserves platforms/languages. Its `io_root` is the supplied trusted absolute ancestor of project, cache, and every platform Bank/media destination—not merely an output folder. Reuse it unchanged or ask for one.
-
 Batch size never establishes file-workflow intent. If a table workflow is explicit but no caller-owned TSV exists, ask for it instead of creating one. Keep an import's requested Event or Switch side effect inside that same `audio.import` transaction. If saved inclusions and artifact generation are both requested, use two ordered transactions under the current policy.
 
 Keep execution domains distinct:
@@ -103,15 +102,6 @@ Keep execution domains distinct:
 - an explicitly requested menu/GUI action uses `ui.commands.execute`.
 
 For example, `object.setRTPC` authors a curve while `ak.soundengine.setRTPCValue` changes a runtime value. Do not cross domains because names are similar.
-
-### `object.create` versus `object.set`
-
-- `object.set` covers several fields/properties/references on one root, an ordinary closed object-list change, multiple roots, a root plus descendants, or insertion into a named descendant. Single-edit, plug-in, RTPC, and platform-link operations take precedence. An insertion target is not the request root; give each one an `objects[]` row containing only genuinely new direct descendants.
-- `object.create` owns a wholly new recursive root, or—only when those `object.set` conditions are absent—descendants below one unchanged same-name root. Repeat that root's exact type/name, use its parent, and set `on_name_conflict:"merge"`.
-- If exact type is unproven, first exact-query the unchanged root and require one type/name/path match. Then open `operation-schema object.create` and follow its sole continuation directly into the Draft; do not query the parent already determined by that verified path.
-- For the current-version default container Work Unit, use that preflight query for an `object.create` same-name-root merge; `object.set` instead binds the exact target and uses returned field/type discovery plus business-Draft validation. Do not insert `project-default-work-units`.
-- Existing `objects[]` never implies child-name merge; obey returned `fail`, `merge`, or guarded-replace guidance.
-- If not a valid direct writable parent, do not silently retarget the mutation; ask the user to confirm the intended writable child container.
 
 ## Resolve properties and references from live metadata
 

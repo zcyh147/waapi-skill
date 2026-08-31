@@ -27,6 +27,7 @@ from tests.semantic.support.codex_audio_conversion_runtime_v3 import (
 from tests.semantic.support.codex_eval_protocol_v3 import (
     V3GatewayProtocol,
     build_direct_protocol,
+    build_operations_discovery_protocol,
     build_transaction_protocol,
     call_step,
     media_pool_business_call_step,
@@ -272,6 +273,10 @@ def validate_audio_media_business_plan_archive(
         if sections.fixture_spec.get("kind") != "audio_conversion_materialized_v1" or sections.assertion_ids != _AUDIO_ASSERTIONS:
             raise AudioMediaBusinessPlanError("archived audio fixture kind or assertions drifted")
         expected_protocol = build_transaction_protocol([static["operation_request"]])
+        expected_protocols = (
+            expected_protocol,
+            build_operations_discovery_protocol(expected_protocol),
+        )
         expected_primary = ["tx01.execute"]
         expected_verification = ["tx01.operation-schema", "tx01.preview", "tx01.transaction-show", "tx01.confirm", "tx01.verify"]
         if live["before_snapshot_sha256"] != _archived_audio_snapshot_digest(
@@ -317,7 +322,39 @@ def validate_audio_media_business_plan_archive(
                 )
             )
             expected_verification.append("media.audio-sources")
-        expected_protocol = build_direct_protocol(steps)
+        legacy_protocol = build_direct_protocol(steps)
+        direct_steps = [
+            request_schema_step(
+                "media.get-fields.schema",
+                MEDIA_POOL_GET_FIELDS_URI,
+            ),
+            call_step(
+                "media.get-fields",
+                MEDIA_POOL_GET_FIELDS_URI,
+                version=MEDIA_VERSION,
+            ),
+            request_schema_step("media.operation-schema", MEDIA_POOL_GET_URI),
+            media_pool_business_call_step(
+                "media.get",
+                scenario_id=scenario_id,
+                args=request["args"],
+                options=request["options"],
+                post_filter=request["post_filter"],
+            ),
+        ]
+        if static["association_expectations"] is not None:
+            direct_steps.append(
+                query_object_step(
+                    "media.audio-sources",
+                    build_reference_match_gateway_argv(
+                        _archived_reference_match_paths(live)
+                    ),
+                )
+            )
+        expected_protocols = (
+            legacy_protocol,
+            build_direct_protocol(direct_steps),
+        )
         expected_primary = ["media.get"]
         if live["request_sha256"] != _sha256(
             {
@@ -335,7 +372,9 @@ def validate_audio_media_business_plan_archive(
         expected_delta = _media_archive_delta(live)
     else:  # _validate_archive_shape already rejects this, retained for type narrowing.
         raise AudioMediaBusinessPlanError("archived family schema is unknown")
-    if _protocol_value(protocol) != _protocol_value(expected_protocol):
+    if _protocol_value(protocol) not in tuple(
+        _protocol_value(expected) for expected in expected_protocols
+    ):
         raise AudioMediaBusinessPlanError("archived typed plan protocol drifted")
     if sections.payload_bindings != {"primary_steps": expected_primary, "verification_steps": expected_verification}:
         raise AudioMediaBusinessPlanError("archived primary/verification partition drifted")
@@ -1765,7 +1804,13 @@ def _validate_audio_inputs(
     if before.digest != _audio_snapshot_digest(before):
         raise AudioMediaBusinessPlanError("audio before snapshot digest cannot be independently recomputed")
     expected_protocol = build_transaction_protocol([plan.operation_request])
-    if _protocol_value(protocol) != _protocol_value(expected_protocol):
+    expected_protocols = (
+        expected_protocol,
+        build_operations_discovery_protocol(expected_protocol),
+    )
+    if _protocol_value(protocol) not in tuple(
+        _protocol_value(expected) for expected in expected_protocols
+    ):
         raise AudioMediaBusinessPlanError("audio protocol does not exactly bind the sealed operation request")
     slots = {(item.object_path, item.platform, item.language) for item in before.artifacts}
     expected_slots = set(_audio_target_slots(plan))
