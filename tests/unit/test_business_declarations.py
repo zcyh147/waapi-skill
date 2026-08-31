@@ -420,6 +420,72 @@ def test_live_sound_revalidation_seals_the_exact_is_voice_subtype(
     assert stale.value.repair["error_code"] == "OBJECT_HANDLE_STALE"
 
 
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
+@pytest.mark.parametrize(
+    ("semantic_kind", "random_or_sequence"),
+    (("random-container", 0), ("sequence-container", 1)),
+)
+def test_live_random_sequence_revalidation_seals_the_exact_discriminator(
+    version: str,
+    semantic_kind: str,
+    random_or_sequence: int,
+) -> None:
+    registry = BusinessHandleRegistry(
+        _context(wwise_version=version, wwise_build=f"{version}.fixture"),
+        token_bytes=lambda size: b"r" * size,
+    )
+    bound = registry.bind_object(
+        object_id=OBJECT_ID,
+        name="Rifle",
+        object_type="RandomSequenceContainer",
+        path=r"\Actor-Mixer Hierarchy\Default Work Unit\Weapons\Rifle",
+        semantic_kind=semantic_kind,
+    )
+
+    def read(
+        _uri: str,
+        _args: dict[str, object],
+        options: dict[str, object],
+    ) -> dict[str, object]:
+        assert options["return"] == [
+            "id",
+            "name",
+            "type",
+            "path",
+            "@RandomOrSequence",
+        ]
+        return {
+            "return": [
+                {
+                    "id": OBJECT_ID,
+                    "name": "Rifle",
+                    "type": "RandomSequenceContainer",
+                    "path": (
+                        r"\Actor-Mixer Hierarchy\Default Work Unit\Weapons\Rifle"
+                    ),
+                    "@RandomOrSequence": random_or_sequence,
+                }
+            ]
+        }
+
+    assert revalidate_live_object(registry, bound, read_call=read) == bound
+
+    with pytest.raises(BusinessDeclarationError) as stale:
+        revalidate_live_object(
+            registry,
+            bound,
+            read_call=lambda uri, args, options: {
+                "return": [
+                    {
+                        **read(uri, args, options)["return"][0],
+                        "@RandomOrSequence": 1 - random_or_sequence,
+                    }
+                ]
+            },
+        )
+    assert stale.value.repair["error_code"] == "OBJECT_HANDLE_STALE"
+
+
 @pytest.mark.parametrize(
     ("changed", "error_code"),
     (

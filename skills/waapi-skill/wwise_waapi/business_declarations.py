@@ -524,10 +524,17 @@ class BusinessHandleRegistry:
         if not normalized_path.startswith("\\"):
             raise ValueError("path must be an absolute Wwise path")
         if semantic_kind is not None:
-            if semantic_kind not in {"sound-sfx", "sound-voice"}:
-                raise ValueError("semantic_kind must be a closed Sound kind")
-            if _type_token(normalized_type) != "sound":
-                raise ValueError("semantic_kind is valid only for live Sound objects")
+            resolved_kind = resolve_semantic_kind(
+                semantic_kind,
+                version=self.context.wwise_version,
+            )
+            if _type_token(normalized_type) not in {
+                _type_token(candidate)
+                for candidate in resolved_kind.verifier_object_types
+            }:
+                raise ValueError(
+                    "semantic_kind is incompatible with the live object type"
+                )
         normalized_role = (
             None
             if role is None
@@ -1406,8 +1413,16 @@ def revalidate_live_objects(
         )
     try:
         return_fields = ["id", "name", "type", "path"]
-        if any(bound.semantic_kind is not None for bound in bounds):
+        if any(
+            bound.semantic_kind in {"sound-sfx", "sound-voice"}
+            for bound in bounds
+        ):
             return_fields.append("@IsVoice")
+        if any(
+            bound.semantic_kind in {"random-container", "sequence-container"}
+            for bound in bounds
+        ):
+            return_fields.append("@RandomOrSequence")
         payload = read_call(
             "ak.wwise.core.object.get",
             {"from": {"id": unique_ids}},
@@ -1460,7 +1475,7 @@ def revalidate_live_objects(
             "type": row.get("type"),
             "path": row.get("path"),
         }
-        if bound.semantic_kind is not None:
+        if bound.semantic_kind in {"sound-sfx", "sound-voice"}:
             is_voice = row.get("@IsVoice")
             if type(is_voice) is not bool:
                 raise _error(
@@ -1470,6 +1485,28 @@ def revalidate_live_objects(
                     action="resolve the exact live object again before Preview",
                 )
             live["semantic_kind"] = "sound-voice" if is_voice else "sound-sfx"
+        elif bound.semantic_kind in {"random-container", "sequence-container"}:
+            random_or_sequence = row.get("@RandomOrSequence")
+            if (
+                type(random_or_sequence) is not int
+                or random_or_sequence not in {0, 1}
+            ):
+                raise _error(
+                    "OBJECT_READBACK_INVALID",
+                    field="object_handle",
+                    rejected_handle=bound.handle,
+                    action="resolve the exact live object again before Preview",
+                )
+            live["semantic_kind"] = (
+                "random-container"
+                if random_or_sequence == 0
+                else "sequence-container"
+            )
+        elif bound.semantic_kind is not None:
+            live["semantic_kind"] = semantic_kind_for_live_type(
+                str(row.get("type", "")),
+                version=registry.context.wwise_version,
+            )
         expected = {
             "id": bound.object_id,
             "name": bound.name,
@@ -1721,10 +1758,17 @@ def _bound_object_from_dict(
     )
     semantic_kind = payload.get("semantic_kind")
     if semantic_kind is not None:
-        if semantic_kind not in {"sound-sfx", "sound-voice"}:
-            raise ValueError("bound object semantic kind is invalid")
-        if _type_token(object_type) != "sound":
-            raise ValueError("bound object semantic kind requires a Sound")
+        resolved_kind = resolve_semantic_kind(
+            semantic_kind,
+            version=context.wwise_version,
+        )
+        if _type_token(object_type) not in {
+            _type_token(candidate)
+            for candidate in resolved_kind.verifier_object_types
+        }:
+            raise ValueError(
+                "bound object semantic kind is incompatible with its type"
+            )
     role = payload.get("role")
     if role is not None:
         role = _bounded_required_text(

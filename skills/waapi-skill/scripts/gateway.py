@@ -16373,6 +16373,35 @@ def _business_object_path_from_segments(values: Any) -> str:
     return path
 
 
+def _business_kind_from_final_typed_path_segment(
+    values: Any,
+    *,
+    version: str,
+) -> str | None:
+    """Return the stable kind explicitly carried by the final path segment."""
+
+    if not isinstance(values, list) or not values:
+        return None
+    final_segment = values[-1]
+    typed_segment = (
+        re.fullmatch(r"<([^<>]+)>(.+)", final_segment)
+        if isinstance(final_segment, str)
+        else None
+    )
+    if (
+        typed_segment is None
+        or typed_segment.group(1) not in _BUSINESS_TYPED_OBJECT_PATH_PREFIXES
+    ):
+        return None
+    try:
+        return resolve_semantic_kind(
+            typed_segment.group(1),
+            version=version,
+        ).name
+    except BusinessDeclarationError:
+        return None
+
+
 @dataclass(frozen=True, slots=True)
 class _BusinessBinding:
     state_dir: Path
@@ -16529,8 +16558,13 @@ def dispatch_business_object_binding(
                 f"The next business object binding requires --role {expected_role}"
             )
     object_path = args.object_path
+    expected_business_kind: str | None = None
     if args.object_path_segment is not None:
         object_path = _business_object_path_from_segments(args.object_path_segment)
+        expected_business_kind = _business_kind_from_final_typed_path_segment(
+            args.object_path_segment,
+            version=detected_version,
+        )
     exact_type_name: tuple[str, str] | None = None
     if args.exact_type_name is not None:
         try:
@@ -16605,7 +16639,12 @@ def dispatch_business_object_binding(
             details={"required_fields": ["id", "name", "type", "path"]},
             error_code="BUSINESS_OBJECT_BINDING_MISMATCH",
         )
+    compatible_business_kinds = semantic_kinds_for_live_type(
+        str(row["type"]),
+        version=detected_version,
+    )
     semantic_kind: str | None = None
+    business_kind_source: str | None = None
     if adapter.requires_sound_subtype and str(row["type"]).casefold() == "sound":
         subtype_raw = binding.read_call(
             OBJECT_GET_URI,
@@ -16629,19 +16668,58 @@ def dispatch_business_object_binding(
         semantic_kind = (
             "sound-voice" if subtype_rows[0]["@IsVoice"] else "sound-sfx"
         )
-    business_kind_candidates = (
-        (semantic_kind,)
-        if semantic_kind is not None
-        else semantic_kinds_for_live_type(
-            str(row["type"]),
-            version=detected_version,
+        business_kind_source = "live_sound_voice_discriminator"
+    elif set(compatible_business_kinds) == {
+        "random-container",
+        "sequence-container",
+    }:
+        subtype_raw = binding.read_call(
+            OBJECT_GET_URI,
+            {"from": {"id": [str(row["id"])]}},
+            {"return": ["id", "@RandomOrSequence"]},
+        )
+        subtype_rows = subtype_raw.get("return")
+        if (
+            not isinstance(subtype_rows, list)
+            or len(subtype_rows) != 1
+            or not isinstance(subtype_rows[0], Mapping)
+            or str(subtype_rows[0].get("id", "")).upper()
+            != str(row["id"]).upper()
+            or type(subtype_rows[0].get("@RandomOrSequence")) is not int
+            or subtype_rows[0]["@RandomOrSequence"] not in {0, 1}
+        ):
+            raise GatewayResultShapeError(
+                "Live Random/Sequence binding requires one exact discriminator readback.",
+                details={"required_fields": ["id", "@RandomOrSequence"]},
+                error_code="BUSINESS_OBJECT_KIND_UNRESOLVED",
+            )
+        semantic_kind = (
+            "random-container"
+            if subtype_rows[0]["@RandomOrSequence"] == 0
+            else "sequence-container"
+        )
+        business_kind_source = "live_random_or_sequence_discriminator"
+    business_kind_candidates = compatible_business_kinds
+    business_kind = (
+        semantic_kind
+        or (
+            business_kind_candidates[0]
+            if len(business_kind_candidates) == 1
+            else None
         )
     )
-    business_kind = (
-        business_kind_candidates[0]
-        if len(business_kind_candidates) == 1
-        else None
-    )
+    if (
+        expected_business_kind is not None
+        and business_kind != expected_business_kind
+    ):
+        raise GatewayResultShapeError(
+            "Live business object kind differs from the typed path segment.",
+            details={
+                "expected_business_kind": expected_business_kind,
+                "actual_business_kind": business_kind,
+            },
+            error_code="BUSINESS_OBJECT_KIND_MISMATCH",
+        )
     captured: list[Any] = []
 
     def bind(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
@@ -16699,6 +16777,11 @@ def dispatch_business_object_binding(
                     ),
                     "candidates": list(business_kind_candidates),
                     "reflected_type": str(row["type"]),
+                    **(
+                        {}
+                        if business_kind_source is None
+                        else {"source": business_kind_source}
+                    ),
                 },
                 "semantic_kind": bound.semantic_kind,
                 **({} if bound.role is None else {"role": bound.role}),

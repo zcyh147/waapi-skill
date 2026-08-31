@@ -1261,6 +1261,24 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   native-Windows r28 exposed the otherwise contradictory audit in both Lua and
   object-set before any rejected follow-up reached Gateway or Wwise.
 
+### Editing the candidate worktree invalidates an active Fresh root
+
+- Evidence: #60 macOS root `imac-m60-12caf94-r30-rem22` started from exact
+  candidate `12caf94`, then the candidate's packaged Skill source changed while
+  later units were still running. A metadata unit consequently reported
+  `no_files_changed` even though the Agent had not edited the Skill, and every
+  result after the tree drift lost candidate identity. The root was stopped,
+  frozen without PASS credit, and its exact campaign, Wwise, and Codex
+  descendants were removed.
+- Prevention: a Fresh campaign owns an immutable candidate worktree for its
+  complete lifetime. Do not patch production, tests, references, generated
+  inventories, or other candidate-owned files until every selected host has
+  sealed and all token-owned processes have exited. Develop the next repair in
+  a separate worktree, or wait; if any candidate file changes during a run,
+  freeze that root as candidate-drift evidence and start a new root from a clean
+  commit. Never interpret downstream semantic or file-integrity failures from
+  that root as independent product defects.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:

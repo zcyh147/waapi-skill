@@ -7,6 +7,8 @@ from collections import deque
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+import pytest
+
 from wwise_waapi.operation_composer import operation_composer_digest
 from wwise_waapi.operation_drafts import OperationDraftStore
 from wwise_waapi.canonical import canonical_sha256
@@ -175,6 +177,178 @@ def test_object_binding_returns_version_stable_business_kind(
     assert "business_kind" in payload["draft"]["next_action_binding"][
         "object_binding"
     ]["result_validation_rule"]
+
+
+def test_typed_random_container_path_resolves_ambiguous_live_kind(
+    tmp_path: Path,
+) -> None:
+    start_code, started = _offline(tmp_path, "draft-start", "object.set")
+    assert start_code == 0, started
+    target_path = r"\Actor-Mixer Hierarchy\Default Work Unit\Weapons\Rifle"
+    client = _live_client(
+        tmp_path,
+        {
+            "ak.wwise.core.object.get": [
+                {
+                    "return": [
+                        {
+                            "id": PARENT_ID,
+                            "name": "Rifle",
+                            "type": "RandomSequenceContainer",
+                            "path": target_path,
+                        }
+                    ]
+                },
+                {"return": [{"id": PARENT_ID, "@RandomOrSequence": 0}]},
+            ]
+        },
+    )
+
+    code, payload = gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(tmp_path / "state"),
+            "draft-bind-object",
+            started["draft"]["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            "1",
+            "--object-path-segment",
+            "Actor-Mixer Hierarchy",
+            "--object-path-segment",
+            "Default Work Unit",
+            "--object-path-segment",
+            "<Virtual Folder>Weapons",
+            "--object-path-segment",
+            "<Random Container>Rifle",
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+
+    assert code == 0, json.dumps(payload, ensure_ascii=False, indent=2)
+    assert payload["bound_object"]["business_kind"] == "random-container"
+    assert payload["bound_object"]["business_kind_resolution"] == {
+        "status": "resolved",
+        "candidates": ["random-container", "sequence-container"],
+        "reflected_type": "RandomSequenceContainer",
+        "source": "live_random_or_sequence_discriminator",
+    }
+
+
+def test_typed_random_container_path_rejects_live_sequence_discriminator(
+    tmp_path: Path,
+) -> None:
+    start_code, started = _offline(tmp_path, "draft-start", "object.set")
+    assert start_code == 0, started
+    target_path = r"\Actor-Mixer Hierarchy\Default Work Unit\Weapons\Rifle"
+    client = _live_client(
+        tmp_path,
+        {
+            "ak.wwise.core.object.get": [
+                {
+                    "return": [
+                        {
+                            "id": PARENT_ID,
+                            "name": "Rifle",
+                            "type": "RandomSequenceContainer",
+                            "path": target_path,
+                        }
+                    ]
+                },
+                {"return": [{"id": PARENT_ID, "@RandomOrSequence": 1}]},
+            ]
+        },
+    )
+
+    code, payload = gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(tmp_path / "state"),
+            "draft-bind-object",
+            started["draft"]["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            "1",
+            "--object-path-segment",
+            "Actor-Mixer Hierarchy",
+            "--object-path-segment",
+            "Default Work Unit",
+            "--object-path-segment",
+            "<Virtual Folder>Weapons",
+            "--object-path-segment",
+            "<Random Container>Rifle",
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+
+    assert code == 2
+    assert payload["error_code"] == "BUSINESS_OBJECT_KIND_MISMATCH"
+    assert payload["details"] == {
+        "expected_business_kind": "random-container",
+        "actual_business_kind": "sequence-container",
+    }
+
+
+@pytest.mark.parametrize("discriminator", (None, True, 2, "0"))
+def test_random_sequence_binding_rejects_invalid_live_discriminator(
+    tmp_path: Path,
+    discriminator: object,
+) -> None:
+    start_code, started = _offline(tmp_path, "draft-start", "object.set")
+    assert start_code == 0, started
+    target_path = r"\Actor-Mixer Hierarchy\Default Work Unit\Weapons\Rifle"
+    client = _live_client(
+        tmp_path,
+        {
+            "ak.wwise.core.object.get": [
+                {
+                    "return": [
+                        {
+                            "id": PARENT_ID,
+                            "name": "Rifle",
+                            "type": "RandomSequenceContainer",
+                            "path": target_path,
+                        }
+                    ]
+                },
+                {
+                    "return": [
+                        {
+                            "id": PARENT_ID,
+                            "@RandomOrSequence": discriminator,
+                        }
+                    ]
+                },
+            ]
+        },
+    )
+
+    code, payload = gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(tmp_path / "state"),
+            "draft-bind-object",
+            started["draft"]["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            "1",
+            "--object-id",
+            PARENT_ID,
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+
+    assert code == 2
+    assert payload["error_code"] == "BUSINESS_OBJECT_KIND_UNRESOLVED"
+    assert payload["details"] == {
+        "required_fields": ["id", "@RandomOrSequence"]
+    }
 
 
 def test_gateway_discovers_long_tail_type_then_compiles_only_its_handle(
