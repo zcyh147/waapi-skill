@@ -364,6 +364,21 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
         )
         assert scope["fixed_argv_prefix_copy"]
     batch_action = bound_next["declare_import_batch"]
+    assert "configure" not in bound_next
+    assert bound_next["target_form_mode"] == {
+        "all_new_rows": "Gateway derives create",
+        "one_or_more_existing_rows": "Gateway derives reimport",
+        "explicit_replace_request": "use explicit_batch_overrides --mode replace",
+        "use_existing_is_not_a_batch_override": True,
+    }
+    overrides = bound_next["explicit_batch_overrides"]
+    assert overrides["use_only_when"] == (
+        "the_user_explicitly_requests_replace_existing_media_source_control_"
+        "behavior_or_one_global_default"
+    )
+    assert overrides["append"][0] == (
+        "[--mode replace] only_for_explicit_replace_existing"
+    )
     assert "fixed_argv_prefix" not in batch_action
     assert "gateway.py" in batch_action["fixed_argv_prefix_copy"]
     assert "draft-declare-import-batch" in batch_action[

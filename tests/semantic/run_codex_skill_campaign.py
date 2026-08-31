@@ -7168,6 +7168,13 @@ def _validate_heavy_v3_codex_facts(
             if archived_common_gates.get(key) != expected_common_gates.get(key)
             or expected_common_gates.get(key) is not True
         }
+        if expected_common_gates.get("no_unexpected_commands") is not True:
+            mismatched["no_unexpected_commands"]["unexpected_commands"] = list(
+                classified.unexpected_commands
+            )
+            mismatched["no_unexpected_commands"][
+                "non_gateway_unexpected_commands"
+            ] = list(classified.non_gateway_unexpected_commands)
         raise CampaignEvidenceError(
             "passing heavy turn common gates cannot be recomputed from raw evidence: "
             f"{mismatched}"

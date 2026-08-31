@@ -5476,6 +5476,58 @@ def test_task_classifier_accepts_exact_task_local_gateway_runner(
     assert facts.unexpected_commands == ()
 
 
+def test_archive_classifier_keeps_windows_lua_arguments_json_gateway_owned(
+    tmp_path: Path,
+) -> None:
+    candidate = tmp_path / "candidate" / "waapi-skill"
+    runner = candidate / "scripts" / "run.py"
+    runner.parent.mkdir(parents=True)
+    runner.write_text("# runner\n", encoding="utf-8")
+    arguments_json = '{"count":3}'
+    argv = (
+        "python",
+        str(runner),
+        "gateway.py",
+        "draft-declare-artifact-plan",
+        "od1-" + "1" * 32,
+        "--task-authority",
+        "da1-" + "2" * 40,
+        "--expected-revision",
+        "1",
+        "--script-file",
+        str(tmp_path / "user-script.lua"),
+        "--arguments-json",
+        arguments_json,
+    )
+    command = windows_powershell_recording(encode_windows_model_argv(argv))
+    record = CodexCommandRecord(
+        command=command,
+        exit_code=0,
+        status="completed",
+        aggregated_output=json.dumps(
+            {
+                "contract": "waapi-skill.gateway-result/v1",
+                "command": "draft-declare-artifact-plan",
+                "ok": True,
+                "status": "editable",
+            }
+        ),
+        argv=argv,
+        has_shell_operators=False,
+        parser_kind="windows-pwsh-command",
+    )
+
+    facts = classify_commands(
+        (record,),
+        skill_source=candidate,
+        expected_gateway_subcommands=("draft-declare-artifact-plan",),
+    )
+
+    assert facts.gateway_subcommands == ("draft-declare-artifact-plan",)
+    assert facts.unexpected_commands == ()
+    assert facts.non_gateway_unexpected_commands == ()
+
+
 def test_validated_skill_read_normalizes_only_line_endings(tmp_path: Path) -> None:
     skill = tmp_path / "waapi-skill"
     skill.mkdir()

@@ -2286,7 +2286,8 @@ _DRAFT_HANDLE_RE = re.compile(
 _NUMBERED_DRAFT_ACTION_STEP_RE = re.compile(r"^(?P<prefix>.+\.action\.)\d{3}$")
 _BUSINESS_DRAFT_SETUP_STEP_RE = re.compile(
     r"^(?P<prefix>.+)\.(?:configure|bind-(?:object|field)\.\d{3}|"
-    r"bind-(?:target|reference)-\d{2}-\d{2}|discover-field-\d{2})$"
+    r"bind-(?:target|reference)-\d{2}-\d{2}|discover-field-\d{2}|"
+    r"declare-(?:new|existing)-\d{2})$"
 )
 _BUSINESS_DRAFT_REVISION_SUBCOMMANDS = DRAFT_REVISION_SUBCOMMANDS - {
     "draft-apply",
@@ -9784,6 +9785,11 @@ class CodexGatewayBroker:
             if candidate_match is None or candidate_match.group("prefix") != prefix:
                 break
             candidate = self._rebase_business_draft_revision(candidate)
+            if actual and actual[0] == candidate.subcommand:
+                candidate = self._bind_task_local_declaration_id(
+                    candidate,
+                    actual,
+                )
             try:
                 semantic_hash, execution_arguments = self._validate_step(
                     candidate,

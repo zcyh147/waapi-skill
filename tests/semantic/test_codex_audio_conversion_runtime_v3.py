@@ -801,6 +801,17 @@ def _write_fake_wem(
 
 
 def _gateway_verify_payload(runtime, result: Mapping[str, Any]) -> Mapping[str, Any]:
+    assert runtime.before is not None
+    object_ids = {
+        artifact.object_path: artifact.object_id
+        for artifact in runtime.before.artifacts
+        if artifact.object_path in runtime.plan.objects
+    }
+    assert set(object_ids) == set(runtime.plan.objects)
+    request = copy.deepcopy(runtime.plan.operation_request)
+    request["arguments"]["args"]["objects"] = [
+        object_ids[path] for path in runtime.plan.objects
+    ]
     return {
         "ok": True,
         "status": "result_schema_checked",
@@ -809,7 +820,7 @@ def _gateway_verify_payload(runtime, result: Mapping[str, Any]) -> Mapping[str, 
         "agent_result": {
             "operation": "waapi.call",
             "executed": True,
-            "request": runtime.plan.operation_request,
+            "request": request,
             "result": dict(result),
         },
     }

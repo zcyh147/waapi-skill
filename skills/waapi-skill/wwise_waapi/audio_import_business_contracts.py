@@ -69,6 +69,12 @@ def audio_import_business_contract_data(version: str) -> dict[str, Any]:
         "field_value_types": dict(AUDIO_IMPORT_BUSINESS_VALUE_TYPES),
         "semantic_kinds": list(SUPPORTED_BUSINESS_KINDS),
         "modes": sorted(AUDIO_IMPORT_BUSINESS_MODES),
+        "mode_selection": {
+            "all_new_rows": "derive_create",
+            "one_or_more_existing_rows": "derive_reimport",
+            "replace": "explicit_only_when_user_requests_replacement",
+            "use_existing_objects": "row_target_form_not_a_batch_override",
+        },
         "event_actions": list(AUDIO_IMPORT_EVENT_ACTIONS),
         "gateway_derivations": [
             "canonical_object_path",

@@ -702,6 +702,7 @@ class PreparedAudioConversionRuntime:
     ) -> AudioConversionVerification:
         before = self._before()
         after = self.snapshot()
+        reviewed_request = _bound_conversion_request(self.plan, before)
         failures: list[str] = []
         before_slots = before.by_slot()
         after_slots = after.by_slot()
@@ -886,7 +887,7 @@ class PreparedAudioConversionRuntime:
             try:
                 conversion_result = _tested_conversion_result(
                     verify_payload,
-                    expected_request=self.plan.operation_request,
+                    expected_request=reviewed_request,
                 )
                 agent_result = verify_payload.get("agent_result")
                 verify_request = (
@@ -919,9 +920,9 @@ class PreparedAudioConversionRuntime:
                 ],
                 "volatile_cache_changed_paths": volatile_changed_paths,
                 "byte_change_required_paths": sorted(replacement_paths),
-                "operation_request": _json_clone(self.plan.operation_request),
+                "operation_request": _json_clone(reviewed_request),
                 "operation_request_sha256": _json_sha256(
-                    self.plan.operation_request
+                    reviewed_request
                 ),
                 "verify_request_sha256": (
                     _json_sha256(verify_request)
@@ -2753,6 +2754,39 @@ def _tested_conversion_result(
             "tested transaction agent_result.result must be an object"
         )
     return result
+
+
+def _bound_conversion_request(
+    plan: AudioConversionPlan,
+    snapshot: AudioConversionSnapshot,
+) -> Mapping[str, Any]:
+    object_ids: dict[str, str] = {}
+    requested_paths = set(plan.objects)
+    for artifact in snapshot.artifacts:
+        if artifact.object_path not in requested_paths:
+            continue
+        previous = object_ids.setdefault(
+            artifact.object_path,
+            artifact.object_id,
+        )
+        if previous != artifact.object_id:
+            raise AudioConversionRuntimeError(
+                f"reviewed object path has multiple live identities: {artifact.object_path}"
+            )
+    if set(object_ids) != requested_paths:
+        raise AudioConversionRuntimeError(
+            "reviewed conversion request lacks one exact live identity per object"
+        )
+    request = _json_clone(plan.operation_request)
+    try:
+        request["arguments"]["args"]["objects"] = [
+            object_ids[path] for path in plan.objects
+        ]
+    except (KeyError, TypeError) as exc:  # pragma: no cover - sealed plan invariant
+        raise AudioConversionRuntimeError(
+            "reviewed conversion request has an invalid closed shape"
+        ) from exc
+    return request
 
 
 def _json_clone(value: Any) -> Any:

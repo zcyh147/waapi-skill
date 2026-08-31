@@ -27,6 +27,7 @@ from wwise_waapi.media_build_business_contracts import (
 SOURCE_ID = "{11111111-1111-1111-1111-111111111111}"
 SOUNDBANK_ID = "{22222222-2222-2222-2222-222222222222}"
 INCLUDED_ID = "{33333333-3333-3333-3333-333333333333}"
+MEDIA_DB_ID = "{44444444-4444-4444-4444-444444444444}"
 
 
 def test_issue_85_contract_seals_all_sixteen_version_api_rows() -> None:
@@ -59,6 +60,39 @@ def test_issue_85_execution_contracts_are_direct_bounded_reads() -> None:
             assert contract.effect == "read"
             assert contract.gateway_commands == ("request-schema", "core-call")
             assert contract.requires_authorization is False
+
+
+def test_media_pool_contract_discloses_exact_operator_tokens() -> None:
+    contract = media_build_business_contract_data(
+        MEDIA_POOL_GET_URI,
+        "2025.1",
+    )
+    forms = contract["declaration"]["input_forms"]
+
+    assert forms["text_filters"]["argument_choices"] == {
+        "OPERATOR": [
+            "equals",
+            "notEquals",
+            "contains",
+            "startsWith",
+            "endsWith",
+            "matchesRegex",
+        ]
+    }
+    assert forms["number_filters"]["argument_choices"] == {
+        "OPERATOR": [
+            "equals",
+            "notEquals",
+            "lessThan",
+            "greaterThan",
+            "lessThanOrEqual",
+            "greaterThanOrEqual",
+        ]
+    }
+    assert forms["sort_rules"]["argument_choices"] == {
+        "DIRECTION": ["ascending", "descending"]
+    }
+    assert forms["sort_rules"]["arguments"] == ["FIELD_MEANING", "DIRECTION"]
 
 
 @pytest.mark.parametrize(
@@ -537,7 +571,7 @@ def test_media_pool_result_rejects_missing_or_excess_projection_rows() -> None:
     valid = {
         "Path": "/Audio/Rain.wav",
         "FileId": "rain-id",
-        "Db": "db-id",
+        "Db": {"id": MEDIA_DB_ID, "name": "Project Originals"},
         "Filename": "Rain.wav",
     }
 
@@ -593,6 +627,42 @@ def test_media_pool_database_identity_is_optional_unless_requested() -> None:
     ]
 
 
+def test_media_pool_projects_reflected_database_identity_object() -> None:
+    prepared = materialize_media_build_business_request(
+        MEDIA_POOL_GET_URI,
+        "2025.1",
+        {"max_results": 2, "return_field_meanings": ["filename"]},
+        available_media_fields=["Path", "FileId", "Db", "Filename"],
+    )
+
+    normalized = normalize_media_build_result(
+        prepared,
+        {
+            "return": [
+                {
+                    "Path": "/Audio/Rain.wav",
+                    "FileId": "{2052A756-A386-08C9-1E3B-5A235F25DBDF}",
+                    "Db": {
+                        "id": "{D8CFE25E-5600-4120-86BD-9079EFA32F98}",
+                        "name": "Project Originals",
+                    },
+                    "Filename": "Rain.wav",
+                }
+            ]
+        },
+    )
+
+    assert normalized["items"] == [
+        {
+            "path": "/Audio/Rain.wav",
+            "file_id": "{2052A756-A386-08C9-1E3B-5A235F25DBDF}",
+            "database_id": "{D8CFE25E-5600-4120-86BD-9079EFA32F98}",
+            "database_name": "Project Originals",
+            "values": {"filename": "Rain.wav"},
+        }
+    ]
+
+
 def test_media_pool_descending_sort_keeps_missing_values_last() -> None:
     prepared = materialize_media_build_business_request(
         MEDIA_POOL_GET_URI,
@@ -618,14 +688,14 @@ def test_media_pool_descending_sort_keeps_missing_values_last() -> None:
                 {
                     "Path": "/Audio/unknown.wav",
                     "FileId": "unknown",
-                    "Db": "db",
+                    "Db": {"id": MEDIA_DB_ID, "name": "Project Originals"},
                     "Filename": "unknown.wav",
                     "WAV/Duration": None,
                 },
                 {
                     "Path": "/Audio/long.wav",
                     "FileId": "long",
-                    "Db": "db",
+                    "Db": {"id": MEDIA_DB_ID, "name": "Project Originals"},
                     "Filename": "long.wav",
                     "WAV/Duration": 4.0,
                 },

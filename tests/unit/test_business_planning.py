@@ -194,6 +194,44 @@ def test_business_plan_owns_deterministic_order_batches_and_native_request(
     )
 
 
+def test_business_plan_preserves_gateway_order_for_dependency_free_siblings() -> None:
+    session = _session()
+    effects = (
+        _effect("import:rifle-close"),
+        _effect("import:rifle-tail"),
+        _effect("import:rifle-mechanical"),
+        _effect("import:shotgun-close"),
+        _effect("import:shotgun-tail"),
+        _effect("import:shotgun-mechanical"),
+    )
+
+    compiled = compile_business_plan(
+        session,
+        operation="audio.import",
+        effects=effects,
+        materialize=lambda batches, deadline: {
+            "contract": "waapi-skill.operation-request/v1",
+            "version": session.context.wwise_version,
+            "operation": "audio.import",
+            "arguments": {
+                "imports": [
+                    {
+                        "object_path": (
+                            r"\Actor-Mixer Hierarchy\Default Work Unit"
+                            r"\<Sound SFX>Rain_Bed"
+                        ),
+                        "object_type": "Sound SFX",
+                    }
+                ]
+            },
+        },
+        build_continuation=_continuation,
+        file_evidence=(),
+    )
+
+    assert compiled.ordered_effect_ids == tuple(effect.effect_id for effect in effects)
+
+
 @pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
 def test_business_plan_cycle_and_missing_dependencies_return_atomic_repair(
     version: str,

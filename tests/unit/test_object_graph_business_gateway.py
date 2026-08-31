@@ -257,6 +257,14 @@ def test_gateway_discovers_long_tail_type_then_compiles_only_its_handle(
         kind_handle,
     )
     assert declare_code == 0, declared
+    stored_declaration = OperationDraftStore(tmp_path / "state").inspect(
+        draft_id,
+        task_authority=authority,
+    ).composition["business_session"]["declarations"][-1]
+    assert declared["draft"]["declared_object"] == {
+        "declaration_id": "weather-event",
+        "result_handle": stored_declaration["result_handle"],
+    }
     materialized = OperationDraftStore(tmp_path / "state").materialize_request(
         draft_id,
         task_authority=authority,

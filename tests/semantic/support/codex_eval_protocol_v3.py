@@ -1387,7 +1387,6 @@ def _build_object_set_business_transaction_steps(
             return value
         raise V3ProtocolError("object set field value is unsupported")
 
-    declaration_index = 0
     native_kind = {
         "ActorMixer": "actor-mixer",
         "RandomSequenceContainer": "random-container",
@@ -1401,7 +1400,6 @@ def _build_object_set_business_transaction_steps(
         declaration_id: str,
         step_suffix: str,
     ) -> None:
-        nonlocal declaration_index
         if not isinstance(child, Mapping) or set(child) - {
             "type",
             "name",
@@ -1451,12 +1449,10 @@ def _build_object_set_business_transaction_steps(
                 arguments=tuple(arguments_out),
             )
         )
-        current_index = declaration_index
-        declaration_index += 1
         draft.advance(step_name)
         child_parent = ResponseBinding(
             step_name,
-            f"/draft/declarations/{current_index}/result_handle",
+            "/draft/declared_object/result_handle",
         )
         nested = child.get("children", [])
         if not isinstance(nested, list):
@@ -1509,12 +1505,10 @@ def _build_object_set_business_transaction_steps(
                 arguments=tuple(arguments_out),
             )
         )
-        existing_index = declaration_index
-        declaration_index += 1
         draft.advance(step_name)
         parent_handle = ResponseBinding(
             step_name,
-            f"/draft/declarations/{existing_index}/result_handle",
+            "/draft/declared_object/result_handle",
         )
         children = row.get("children", [])
         if not isinstance(children, list):
@@ -1820,8 +1814,6 @@ def build_object_graph_business_transaction_steps(
         )
         draft.advance(configure_name)
 
-    declaration_index = 0
-
     def declare(
         node: Mapping[str, Any],
         *,
@@ -1829,7 +1821,6 @@ def build_object_graph_business_transaction_steps(
         declaration_id: str,
         step_suffix: str,
     ) -> None:
-        nonlocal declaration_index
         step_name = f"{label}.declare-{step_suffix}"
         declaration_arguments: list[Any] = [
             *draft.prefix(),
@@ -1851,12 +1842,10 @@ def build_object_graph_business_transaction_steps(
                 arguments=tuple(declaration_arguments),
             )
         )
-        current_index = declaration_index
-        declaration_index += 1
         draft.advance(step_name)
         child_parent = ResponseBinding(
             step_name,
-            f"/draft/declarations/{current_index}/result_handle",
+            "/draft/declared_object/result_handle",
         )
         for child_index, child in enumerate(children(node), start=1):
             declare(

@@ -17,6 +17,9 @@ from wwise_waapi.media_build_business_contracts import (
 )
 
 
+MEDIA_DB_ID = "{44444444-4444-4444-4444-444444444444}"
+
+
 SCRIPT_PATH = (
     Path(__file__).resolve().parents[2]
     / "skills"
@@ -392,7 +395,10 @@ def test_media_pool_core_call_binds_live_fields_and_returns_business_rows(
                         {
                             "Path": "/Audio/Rain_Light.wav",
                             "FileId": "light-id",
-                            "Db": "project-db",
+                            "Db": {
+                                "id": MEDIA_DB_ID,
+                                "name": "Project Originals",
+                            },
                             "Filename": "Rain_Light.wav",
                             "WAV/Duration": 1.25,
                             "IXML/Scene": "Exterior",
@@ -400,7 +406,10 @@ def test_media_pool_core_call_binds_live_fields_and_returns_business_rows(
                         {
                             "Path": "/Audio/rain_wrong_case.wav",
                             "FileId": "wrong-id",
-                            "Db": "project-db",
+                            "Db": {
+                                "id": MEDIA_DB_ID,
+                                "name": "Project Originals",
+                            },
                             "Filename": "rain_wrong_case.wav",
                             "WAV/Duration": 2.5,
                             "IXML/Scene": "Exterior",
@@ -408,7 +417,10 @@ def test_media_pool_core_call_binds_live_fields_and_returns_business_rows(
                         {
                             "Path": "/Audio/Rain_Heavy.wav",
                             "FileId": "heavy-id",
-                            "Db": "project-db",
+                            "Db": {
+                                "id": MEDIA_DB_ID,
+                                "name": "Project Originals",
+                            },
                             "Filename": "Rain_Heavy.wav",
                             "WAV/Duration": 4.0,
                             "IXML/Scene": "Exterior",
@@ -464,13 +476,15 @@ def test_media_pool_core_call_binds_live_fields_and_returns_business_rows(
             {
                 "path": "/Audio/Rain_Heavy.wav",
                 "file_id": "heavy-id",
-                "database_id": "project-db",
+                "database_id": MEDIA_DB_ID,
+                "database_name": "Project Originals",
                 "values": {"filename": "Rain_Heavy.wav", "duration_seconds": 4.0},
             },
             {
                 "path": "/Audio/Rain_Light.wav",
                 "file_id": "light-id",
-                "database_id": "project-db",
+                "database_id": MEDIA_DB_ID,
+                "database_name": "Project Originals",
                 "values": {"filename": "Rain_Light.wav", "duration_seconds": 1.25},
             },
         ],
@@ -514,7 +528,10 @@ def test_media_pool_exact_case_filter_fails_closed_at_candidate_ceiling(
                         {
                             "Path": "/Audio/rain.wav",
                             "FileId": "candidate-id",
-                            "Db": "project-db",
+                            "Db": {
+                                "id": MEDIA_DB_ID,
+                                "name": "Project Originals",
+                            },
                             "Filename": "rain.wav",
                         }
                     ]

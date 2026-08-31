@@ -15,6 +15,23 @@ MEDIA_POOL_GET_URI = "ak.wwise.core.mediaPool.get"
 SOUNDBANK_GET_INCLUSIONS_URI = "ak.wwise.core.soundbank.getInclusions"
 
 _ALL_VERSIONS = ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
+MEDIA_POOL_TEXT_OPERATOR_TOKENS = (
+    "equals",
+    "notEquals",
+    "contains",
+    "startsWith",
+    "endsWith",
+    "matchesRegex",
+)
+MEDIA_POOL_NUMBER_OPERATOR_TOKENS = (
+    "equals",
+    "notEquals",
+    "lessThan",
+    "greaterThan",
+    "lessThanOrEqual",
+    "greaterThanOrEqual",
+)
+MEDIA_POOL_SORT_DIRECTIONS = ("ascending", "descending")
 
 _CONTRACTS: dict[str, dict[str, Any]] = {
     PEAKS_REGION_URI: {
@@ -113,11 +130,17 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
                 "flag": "--text-filter",
                 "repeatable": True,
                 "arguments": ["FIELD_MEANING", "OPERATOR", "VALUE"],
+                "argument_choices": {
+                    "OPERATOR": list(MEDIA_POOL_TEXT_OPERATOR_TOKENS),
+                },
             },
             "number_filters": {
                 "flag": "--number-filter",
                 "repeatable": True,
                 "arguments": ["FIELD_MEANING", "OPERATOR", "VALUE"],
+                "argument_choices": {
+                    "OPERATOR": list(MEDIA_POOL_NUMBER_OPERATOR_TOKENS),
+                },
             },
             "audio_descriptions": {
                 "flag": "--audio-description",
@@ -149,7 +172,10 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
             "sort_rules": {
                 "flag": "--sort-by",
                 "repeatable": True,
-                "arguments": ["FIELD_MEANING", "ascending|descending"],
+                "arguments": ["FIELD_MEANING", "DIRECTION"],
+                "argument_choices": {
+                    "DIRECTION": list(MEDIA_POOL_SORT_DIRECTIONS),
+                },
             },
         },
         "result_shape": "bounded_business_media_rows",

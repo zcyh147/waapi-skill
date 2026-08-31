@@ -15,6 +15,9 @@ from .filesystem_security import metadata_is_link_or_reparse
 from .host_paths import HostPathError, localize_waapi_host_path
 from .media_build_business_contracts import (
     MEDIA_POOL_GET_URI,
+    MEDIA_POOL_NUMBER_OPERATOR_TOKENS,
+    MEDIA_POOL_SORT_DIRECTIONS,
+    MEDIA_POOL_TEXT_OPERATOR_TOKENS,
     PEAKS_REGION_URI,
     PEAKS_TRIMMED_URI,
     SOUNDBANK_GET_INCLUSIONS_URI,
@@ -38,19 +41,8 @@ _GUID_RE = re.compile(
     r"^\{[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-"
     r"[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\}$"
 )
-_TEXT_OPERATORS = frozenset(
-    {"equals", "notEquals", "contains", "startsWith", "endsWith", "matchesRegex"}
-)
-_NUMBER_OPERATORS = frozenset(
-    {
-        "equals",
-        "notEquals",
-        "lessThan",
-        "greaterThan",
-        "lessThanOrEqual",
-        "greaterThanOrEqual",
-    }
-)
+_TEXT_OPERATORS = frozenset(MEDIA_POOL_TEXT_OPERATOR_TOKENS)
+_NUMBER_OPERATORS = frozenset(MEDIA_POOL_NUMBER_OPERATOR_TOKENS)
 _DATABASE_SCOPES = {
     "project-originals": r"\Databases\Project Originals",
     "project originals": r"\Databases\Project Originals",
@@ -556,7 +548,7 @@ def _materialize_media_pool(
     sort_bindings: list[dict[str, str]] = []
     for meaning, direction in sort_rows:
         direction = str(direction)
-        if direction not in {"ascending", "descending"}:
+        if direction not in MEDIA_POOL_SORT_DIRECTIONS:
             raise MediaBuildBusinessError(
                 "sort direction must be ascending or descending"
             )
@@ -917,13 +909,21 @@ def _normalize_media_pool_result(raw_result: Any, plan: Mapping[str, Any]) -> di
                 )
             fixed[business] = value
         if "Db" in row:
-            database_id = row.get("Db")
-            if not isinstance(database_id, str) or not database_id:
+            database = row.get("Db")
+            if (
+                not isinstance(database, Mapping)
+                or set(database) != {"id", "name"}
+                or not isinstance(database.get("id"), str)
+                or not _GUID_RE.fullmatch(database["id"])
+                or not isinstance(database.get("name"), str)
+                or not database["name"]
+            ):
                 raise MediaBuildBusinessError(
                     f"Media Pool row {index} has an invalid Db value",
                     code="MEDIA_BUILD_RESULT_INVALID",
                 )
-            fixed["database_id"] = database_id
+            fixed["database_id"] = database["id"].upper()
+            fixed["database_name"] = database["name"]
         values: dict[str, Any] = {}
         for binding in plan.get("output_bindings", ()):
             if binding["field"] not in row:

@@ -24314,17 +24314,26 @@ def _business_next_action_binding(
                 },
                 "use_only_for": "custom_property_or_reference_field_values",
             },
-            "configure": {
+            "target_form_mode": {
+                "all_new_rows": "Gateway derives create",
+                "one_or_more_existing_rows": "Gateway derives reimport",
+                "explicit_replace_request": (
+                    "use explicit_batch_overrides --mode replace"
+                ),
+                "use_existing_is_not_a_batch_override": True,
+            },
+            "explicit_batch_overrides": {
                 **operation_draft_prefix_copy_binding(configure_prefix),
                 "append": [
-                    "[--mode replace]",
+                    "[--mode replace] only_for_explicit_replace_existing",
                     "[--add-to-source-control|--no-add-to-source-control]",
                     "[--check-out-from-source-control|--no-check-out-from-source-control]",
                     "[--default <stable-field> <business-value>]...",
                     "[--default-field-value <bound-field-handle> <business-value>]...",
                 ],
                 "use_only_when": (
-                    "the_user_explicitly_requests_batch_settings_or_defaults"
+                    "the_user_explicitly_requests_replace_existing_media_source_"
+                    "control_behavior_or_one_global_default"
                 ),
             },
             "declare_import_batch": {
@@ -25300,6 +25309,20 @@ def operation_draft_payload(
             )
         )
         if compact_business_update:
+            declared_object: dict[str, str] | None = None
+            if command in {"draft-declare-new", "draft-declare-existing"}:
+                declarations = draft.get("declarations")
+                if isinstance(declarations, list) and declarations:
+                    latest = declarations[-1]
+                    if (
+                        isinstance(latest, Mapping)
+                        and isinstance(latest.get("declaration_id"), str)
+                        and isinstance(latest.get("result_handle"), str)
+                    ):
+                        declared_object = {
+                            "declaration_id": latest["declaration_id"],
+                            "result_handle": latest["result_handle"],
+                        }
             next_action_binding = {
                 key: value
                 for key, value in next_action_binding.items()
@@ -25325,6 +25348,8 @@ def operation_draft_payload(
                 )
                 if key in draft
             }
+            if declared_object is not None:
+                draft["declared_object"] = declared_object
             draft["response_integrity"] = {
                 "complete": True,
                 "truncated": False,

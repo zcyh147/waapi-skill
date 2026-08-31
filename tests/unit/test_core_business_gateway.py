@@ -249,8 +249,8 @@ def test_project_save_draft_start_returns_only_core_business_continuation(
             "auto_check_out": {
                 "flag": "--value",
                 "repeatable": False,
-                "arguments": ["FIELD", "VALUE"],
-            }
+                "arguments": ["auto_check_out", "VALUE"],
+            },
         },
     }
     assert "draft-apply" not in json.dumps(payload, sort_keys=True)

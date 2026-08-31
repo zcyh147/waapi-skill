@@ -219,6 +219,36 @@ def test_project_save_contract_discloses_native_default_and_explicit_intent_bind
     }
 
 
+def test_audio_convert_contract_owns_every_core_plan_field_label() -> None:
+    contract = core_business_contract_data(
+        "ak.wwise.core.audio.convert",
+        "2024.1",
+    )
+
+    assert contract["declaration"]["input_forms"] == {
+        "audio_object_handles": {
+            "flag": "--role",
+            "repeatable": True,
+            "arguments": ["audio_object_handles", "HANDLE"],
+        },
+        "platform_names": {
+            "flag": "--item",
+            "repeatable": True,
+            "arguments": ["platform_names", "VALUE"],
+        },
+        "languages": {
+            "flag": "--item",
+            "repeatable": True,
+            "arguments": ["languages", "VALUE"],
+        },
+        "io_root": {
+            "flag": "--value",
+            "repeatable": False,
+            "arguments": ["io_root", "VALUE"],
+        },
+    }
+
+
 @pytest.mark.parametrize(
     ("operation", "roles", "plan_factory", "native_factory", "read_shape"),
     [

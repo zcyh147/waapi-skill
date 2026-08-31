@@ -1028,15 +1028,78 @@ prevention checks that are expensive to rediscover.
   prose in favor of Gateway schemas/continuations; never weaken byte-for-byte
   read validation or grant PASS merely because the sentinel survived.
 
-The same 27,000-byte envelope applies to the injected entry file. In #60
-native-Windows root `iwin-issue60-aae95e9-r11-fail6`, exact profile-free PowerShell reads of
-the 30,445-character `SKILL.md` preserved its beginning and end but exposed
-only 29,440 characters in one task and 26,902 in another. The corresponding
-`skill_reads_exact` and `read_prefix_exact` gates correctly failed. Keep the
-entry below 27,000 UTF-8 bytes after both LF and CRLF rendering, enforce that
-margin in Program tests, and move repeated route detail behind Gateway-owned
-schemas or the already-bounded lane references. Never infer completeness from
-the command exit code or visible front/back fragments.
+The entry needs a stricter envelope. In #60 native-Windows root
+`iwin-issue60-aae95e9-r11-fail6`, exact profile-free PowerShell reads of the
+30,445-character `SKILL.md` preserved its beginning and end but exposed only
+29,440 characters in one task and 26,902 in another. Root
+`iwin-issue60-99dc470-r13-fail5` then lost a 759-byte interior slice from a
+26,699-byte LF source while still showing the final paragraph. Keep the entry
+below 24,000 bytes after both LF and projected CRLF rendering, enforce both
+calculations in Program tests, and move low-frequency examples behind Gateway
+schemas or lane references. Never infer completeness from exit code or visible
+front/back fragments. Separately, r13 root
+`iwin-issue60-99dc470-r13-fail6` had an audio-import Agent skip `SKILL.md` and
+read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
+
+### Stable dependency order must preserve independent business row order
+
+- Evidence: r13 Windows audio import submitted Rifle and Shotgun rows in the
+  exact manifest order, but the resulting Preview request alphabetized sibling
+  effect ids, so the sealed business witness rejected it. The Agent's complete
+  batch was otherwise accepted.
+- Prevention: use a stable topological order. Dependencies still precede their
+  consumers, while dependency-free siblings retain the Gateway's declaration
+  order. Test a deliberately non-alphabetic batch through the public business
+  planner; import row order is semantic, not transport noise.
+
+### Normalize reflected result shapes from real evidence, not fake fixtures
+
+- Evidence: r13 Windows Media Pool returned `Db` exactly as Wwise 2025.1
+  reflects it: `{id, name}`. The production normalizer and old fake fixtures
+  expected a string and rejected three valid live rows as
+  `MEDIA_BUILD_RESULT_INVALID`.
+- Prevention: read the versioned reflected definition and frozen dispatch
+  evidence before changing a result normalizer. Validate the exact database
+  object and project it as stable `database_id` plus `database_name`; keep fake
+  Gateway fixtures faithful to the native result.
+
+### Compare verified mutations with their live-bound reviewed request
+
+- Evidence: r13 Windows audio conversion executed successfully, produced the
+  expected cache artifacts, and passed reflected result-schema verification.
+  The business Oracle still failed because its static request named object
+  paths while the Gateway's reviewed transaction correctly sealed the live
+  GUIDs bound from those paths.
+- Prevention: derive one exact path-to-GUID mapping from the sealed pre-state,
+  require one stable identity per requested object, and compare the terminal
+  `agent_result.request` with that live-bound reviewed request. Do not weaken
+  the comparison to unordered or partial fields.
+
+### Fresh protocols must accept dependency-ready business interleaving
+
+- Evidence: r13 Windows object-set bound Day and its Bus, discovered Day's
+  Pitch field, then declared the now-complete Day row before binding Night and
+  Storm. The Broker rejected the declaration only because its static recipe
+  placed every binding before every declaration.
+- Prevention: allow a unique later business declaration to move forward only
+  when all of its response-bound handles already exist. Rebase its revision,
+  validate its bounded unique task-local id and exact argv, then reorder the
+  sealed step. Missing dependencies, duplicate matches, changed values, and
+  import row reordering remain rejected.
+
+### Recompute Windows archive facts from the same sealed command records
+
+- Evidence: r13 root `iwin-issue60-99dc470-r13-fail6` Lua completed all nine
+  authenticated steps and its inner task result passed, including exact Skill
+  reads and the new `--arguments-json '{"count":3}'` declaration. The outer
+  campaign nevertheless marked it BLOCKED because cached
+  `no_unexpected_commands=true` differed from one archive recomputation.
+- Diagnostic boundary: rebuilding both turns directly from the exact sealed
+  `CodexCommandRecord` rows classified every Gateway command and produced zero
+  unexpected commands. Preserve this root as BLOCKED; do not replay it or grant
+  PASS. Keep raw records authoritative, add the exact Windows JSON command to
+  archive regressions, and include the recomputed unexpected command identities
+  in any future mismatch instead of reporting only a Boolean gate.
 
 ## New-root preflight
 

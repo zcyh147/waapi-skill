@@ -292,17 +292,17 @@ _CATALOG_INTENTS = {
 }
 
 
-def _mutation_input_form(value_type: str) -> dict[str, Any]:
+def _mutation_input_form(field: str, value_type: str) -> dict[str, Any]:
     if value_type == "bound_object_handle":
-        return {"flag": "--role", "repeatable": False, "arguments": ["FIELD", "HANDLE"]}
+        return {"flag": "--role", "repeatable": False, "arguments": [field, "HANDLE"]}
     if value_type == "bound_object_handle_list":
-        return {"flag": "--role", "repeatable": True, "arguments": ["FIELD", "HANDLE"]}
+        return {"flag": "--role", "repeatable": True, "arguments": [field, "HANDLE"]}
     if value_type == "bound_field_handle":
-        return {"flag": "--field", "repeatable": False, "arguments": ["FIELD", "HANDLE"]}
+        return {"flag": "--field", "repeatable": False, "arguments": [field, "HANDLE"]}
     if value_type == "bound_field_handle_list":
-        return {"flag": "--field", "repeatable": True, "arguments": ["FIELD", "HANDLE"]}
+        return {"flag": "--field", "repeatable": True, "arguments": [field, "HANDLE"]}
     if value_type in {"platform_name_list", "language_name_list"}:
-        return {"flag": "--item", "repeatable": True, "arguments": ["FIELD", "VALUE"]}
+        return {"flag": "--item", "repeatable": True, "arguments": [field, "VALUE"]}
     if value_type == "attenuation_curve_points":
         return {"flag": "--curve-point", "repeatable": True, "arguments": ["X", "Y", "SHAPE"]}
     if value_type == "blend_assignment_edges":
@@ -311,7 +311,7 @@ def _mutation_input_form(value_type: str) -> dict[str, Any]:
             "repeatable": True,
             "arguments": ["EDGE_POSITION", "FADE_MODE", "FADE_POSITION_OR_NONE", "SHAPE"],
         }
-    return {"flag": "--value", "repeatable": False, "arguments": ["FIELD", "VALUE"]}
+    return {"flag": "--value", "repeatable": False, "arguments": [field, "VALUE"]}
 
 
 def core_business_operations() -> frozenset[str]:
@@ -382,7 +382,7 @@ def core_business_contract_data(operation: str, version: str) -> dict[str, Any]:
         read_declaration["input_forms"]
         if read_declaration is not None
         else {
-            name: _mutation_input_form(value_type)
+            name: _mutation_input_form(name, value_type)
             for name, value_type in row["field_types"].items()
         }
     )

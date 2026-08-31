@@ -756,21 +756,31 @@ def _topological_order(
     draft_revision: int,
 ) -> tuple[BusinessEffect, ...]:
     by_id = {row.effect_id: row for row in effects}
+    source_order = {
+        row.effect_id: index for index, row in enumerate(effects)
+    }
     incoming = {row.effect_id: len(row.depends_on) for row in effects}
     dependents: dict[str, list[str]] = {row.effect_id: [] for row in effects}
     for row in effects:
         for dependency in row.depends_on:
             dependents[dependency].append(row.effect_id)
-    ready = [effect_id for effect_id, count in incoming.items() if count == 0]
+    ready = [
+        (source_order[effect_id], effect_id)
+        for effect_id, count in incoming.items()
+        if count == 0
+    ]
     heapq.heapify(ready)
     ordered: list[BusinessEffect] = []
     while ready:
-        effect_id = heapq.heappop(ready)
+        _source_index, effect_id = heapq.heappop(ready)
         ordered.append(by_id[effect_id])
-        for dependent in sorted(dependents[effect_id]):
+        for dependent in dependents[effect_id]:
             incoming[dependent] -= 1
             if incoming[dependent] == 0:
-                heapq.heappush(ready, dependent)
+                heapq.heappush(
+                    ready,
+                    (source_order[dependent], dependent),
+                )
     if len(ordered) != len(effects):
         candidates = sorted(
             effect_id for effect_id, count in incoming.items() if count > 0

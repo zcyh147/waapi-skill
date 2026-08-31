@@ -5462,6 +5462,75 @@ def test_object_set_field_discovery_can_follow_its_bound_target_early(
     assert selected[0].name == discovery.name
 
 
+def test_object_set_declaration_can_follow_its_ready_bindings_early(
+    tmp_path: Path,
+) -> None:
+    steps = build_object_graph_business_transaction_steps(
+        _two_target_object_set_request(),
+        label="tx01",
+    )
+    broker = CodexGatewayBroker(
+        skill_source=make_fake_skill(tmp_path),
+        expected_steps=steps,
+        expected_wwise_version="2022.1",
+    )
+    start = next(step for step in steps if step.name == "tx01.draft-start")
+    first = next(step for step in steps if step.name == "tx01.bind-target-01-01")
+    discovery = next(step for step in steps if step.name == "tx01.discover-field-01")
+    declaration = next(
+        step for step in steps if step.name == "tx01.declare-existing-01"
+    )
+    draft_id = "od1-" + "1" * 32
+    authority = "da1-" + "2" * 40
+    broker._payloads_by_step[start.name] = {  # noqa: SLF001
+        "task_authority": authority,
+        "draft": {"draft_id": draft_id, "revision": 1},
+    }
+    broker._payloads_by_step[first.name] = {  # noqa: SLF001
+        "draft": {"draft_id": draft_id, "revision": 2},
+        "bound_object": {"handle": "boh1-" + "3" * 32},
+    }
+    broker._next_step = steps.index(first) + 1  # noqa: SLF001
+
+    def resolve(step: ExpectedGatewayStep) -> tuple[str, ...]:
+        values: list[str] = []
+        for argument in step.arguments:
+            if isinstance(argument, ResponseBinding):
+                current: object = broker._payloads_by_step[argument.step]  # noqa: SLF001
+                for token in argument.pointer.removeprefix("/").split("/"):
+                    if isinstance(current, dict):
+                        current = current[token]
+                    else:
+                        assert isinstance(current, list)
+                        current = current[int(token)]
+                values.append(str(current))
+            else:
+                assert isinstance(argument, str)
+                values.append(argument)
+        return tuple(values)
+
+    early_discovery = broker._match_dependency_ready_business_setup_step(  # noqa: SLF001
+        (discovery.subcommand, *resolve(broker._rebase_business_draft_revision(discovery)))  # noqa: SLF001
+    )
+    assert early_discovery is not None
+    broker._payloads_by_step[discovery.name] = {  # noqa: SLF001
+        "draft": {"draft_id": draft_id, "revision": 3},
+        "field_candidates": [{"handle": "bfh1-" + "4" * 32}],
+    }
+    broker._next_step += 1  # noqa: SLF001
+
+    rebased = broker._rebase_business_draft_revision(declaration)  # noqa: SLF001
+    actual = list(resolve(rebased))
+    declaration_id = actual.index("--declaration-id") + 1
+    actual[declaration_id] = "first-target"
+    selected = broker._match_dependency_ready_business_setup_step(  # noqa: SLF001
+        (declaration.subcommand, *actual)
+    )
+
+    assert selected is not None
+    assert selected[0].name == declaration.name
+
+
 def test_business_draft_normalizes_live_bound_ids_to_reviewed_paths(
     tmp_path: Path,
 ) -> None:
