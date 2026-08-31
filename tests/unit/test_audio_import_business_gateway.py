@@ -9,7 +9,17 @@ from typing import Any, Mapping, Sequence
 
 from wwise_waapi.operation_composer import operation_composer_digest
 from wwise_waapi.canonical import canonical_sha256
-from wwise_waapi.operation_registry import audio_import_business_contract
+from wwise_waapi.operation_drafts import (
+    OperationDraftState,
+    OperationDraftStore,
+    parse_operation_draft_archive_bytes,
+)
+from wwise_waapi.operation_registry import (
+    audio_import_business_contract,
+    operation_request_schema_digest,
+)
+
+
 def test_audio_import_draft_digest_binds_only_the_registry_business_adapter() -> None:
     version = "2022.1"
 
@@ -30,15 +40,6 @@ def test_audio_import_contract_exposes_only_explicit_replace_mode() -> None:
         "bind_only_handle_typed_business_objects_then_submit_one_complete_"
         "import_batch"
     )
-
-
-from wwise_waapi.operation_drafts import (
-    OperationDraftState,
-    OperationDraftStore,
-    parse_operation_draft_archive_bytes,
-)
-from wwise_waapi.operation_registry import operation_request_schema_digest
-
 
 SCRIPT_PATH = (
     Path(__file__).resolve().parents[2]
