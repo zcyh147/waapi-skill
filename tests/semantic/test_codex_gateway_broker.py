@@ -11788,6 +11788,64 @@ def test_broker_accepts_closed_soundbank_topic_business_shortcuts(
     assert broker.evidence().passed
 
 
+def test_broker_accepts_soundbank_match_shortcut_before_identity_projection(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    topic = "ak.wwise.core.soundbank.generated"
+    expected = (
+        topic,
+        "--event-count",
+        BoundedIntegerArgument(3, 64),
+        "--topic-contract-digest",
+        "a" * 64,
+        "--topic-option",
+        "include",
+        "id",
+        "--topic-option",
+        "include",
+        "name",
+        "--topic-option",
+        "include",
+        "type",
+        "--topic-option",
+        "include",
+        "path",
+        "--event-match",
+        "soundbank-name",
+        "Weapons_Core",
+    )
+    supplied = [
+        "--timeout",
+        "30",
+        "wait-topic",
+        topic,
+        "--event-count",
+        "64",
+        "--topic-contract-digest",
+        "a" * 64,
+        "--match-soundbank-name",
+        "Weapons_Core",
+        "--include-object-identity",
+    ]
+    step = ExpectedGatewayStep(
+        "wait",
+        "wait-topic",
+        expected,
+        gateway_global_arguments=("--timeout", "30"),
+    )
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(step,),
+        transport="tcp",
+    ) as broker:
+        result = run_model_command(broker, supplied)
+
+    assert result.returncode == 0
+    assert broker.evidence().passed
+
+
 def test_broker_rejects_a_different_soundbank_topic_shortcut_value(
     tmp_path: Path,
 ) -> None:

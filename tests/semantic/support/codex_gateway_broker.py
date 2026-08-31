@@ -1591,7 +1591,6 @@ def _normalize_commutative_wait_topic_facts(
     )
     if (
         expected_groups != (*expected_options, *expected_matches)
-        or actual_groups != (*actual_options, *actual_matches)
         or actual_options != expected_options
         or sorted(actual_matches) != sorted(expected_matches)
     ):
