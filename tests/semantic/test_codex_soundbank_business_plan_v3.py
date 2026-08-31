@@ -10,6 +10,7 @@ import pytest
 
 from tests.semantic.support.codex_eval_protocol_v3 import (
     StructuredRefusal,
+    build_operations_discovery_protocol,
     build_optional_topic_schema_protocol,
     build_transaction_protocol,
 )
@@ -1043,6 +1044,27 @@ def test_archive_parser_protocol_and_cross_api_drift(tmp_path: Path) -> None:
     topic, topic_before, topic_protocol = _case(SOUNDBANK_TOPIC, "O22-SB-GENERATED-01", tmp_path / "topic", topic=True)
     with pytest.raises(SoundBankBusinessPlanError):
         validate_soundbank_business_plan_archive(parsed, topic_protocol, scenario=soundbank_archive_identity(materialized))
+
+
+def test_archive_preserves_optional_operations_discovery_in_payload_bindings(
+    tmp_path: Path,
+) -> None:
+    materialized, before, base_protocol = _case(
+        APIS[3],
+        "O22-SB-SET-INCLUSIONS-01",
+        tmp_path,
+    )
+    protocol = build_operations_discovery_protocol(base_protocol)
+    sections = compile_soundbank_business_plan(materialized, before, protocol)
+    parsed = parse_soundbank_business_plan_sections(sections.writer_kwargs())
+
+    validate_soundbank_business_plan_archive(
+        parsed,
+        protocol,
+        scenario=soundbank_archive_identity(materialized),
+    )
+
+    assert parsed.payload_bindings["verification_steps"][0] == "tx01.operations"
 
 
 @pytest.mark.parametrize(

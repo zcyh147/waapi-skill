@@ -5931,10 +5931,15 @@ def _validate_heavy_v3_task_result(
             sealed_composer
         )
         try:
+            selected_protocol_steps = _consumed_heavy_v3_protocol_steps(
+                protocol,
+                previous_prefix,
+                selected_step_names=broker_value.get("expected_step_names"),
+            )
             validator_arguments = {
                 "state_directory": task_root / "broker" / "state",
                 "steps": _steps_in_consumed_order(
-                    protocol.steps[: len(consumed_names)],
+                    selected_protocol_steps[: len(consumed_names)],
                     consumed_names,
                 ),
                 "broker_records": broker_records,
@@ -6170,16 +6175,25 @@ def _consumed_heavy_v3_protocol_steps(
         ):
             return ()
         return tuple(by_name[name] for name in selected_step_names)
-    if (
-        getattr(protocol, "optional_initial_query_schema", False)
-        and consumed_count == len(steps) - 1
+    if getattr(protocol, "optional_initial_query_schema", False) or getattr(
+        protocol,
+        "optional_initial_operations_discovery",
+        False,
     ):
-        return steps[1:]
-    if (
-        getattr(protocol, "optional_initial_operations_discovery", False)
-        and consumed_count == len(steps) - 1
-    ):
-        return steps[1:]
+        names = tuple(step.name for step in steps)
+        selected = (
+            tuple(selected_step_names)
+            if isinstance(selected_step_names, list)
+            else ()
+        )
+        if (
+            selected not in {names, names[1:]}
+            or len(selected) != len(set(selected))
+            or not 0 <= consumed_count <= len(selected)
+        ):
+            return ()
+        by_name = {step.name: step for step in steps}
+        return tuple(by_name[name] for name in selected)
     return steps
 
 

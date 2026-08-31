@@ -1,6 +1,6 @@
 # WAAPI operate lane
 
-Read this file once with one complete standalone `cat`. It is complete only when the unique terminal sentinel required by `SKILL.md` is the final visible line and no truncation or omission marker appears. Otherwise report an incomplete host read; do not reread a range or invoke the Gateway.
+Read once with one standalone `cat`. It is complete only when the unique terminal sentinel required by `SKILL.md` is final and no truncation or omission marker appears; otherwise do not reread a range or invoke the Gateway.
 
 ## Core boundaries
 
@@ -8,7 +8,7 @@ Read this file once with one complete standalone `cat`. It is complete only when
 - Do not import builders or planners from inline Python or call `WaapiClient`; use no raw WAAPI/XML or generic `call`. Do not write code to bypass an unsupported boundary. That boundary does not authorize code generation.
 - POSIX: single-quote Wwise path values to preserve backslashes; one read/Gateway call per shell call, never joined.
 - Read each Gateway JSON; exit `0` proves nothing. Stop on empty, non-JSON, or truncated output. A typed-container response is complete only when final `WAAPI_TYPED_CONTAINER_RESPONSE_END` says `complete:true` and `truncated:false`; then continue from that response.
-- A rejected or nonzero Gateway invocation is also a hard stop for that turn. Do not advance to the next schema, preview, or transaction phase and do not repair or retry the command. The sole metadata-discovery retry below starts only from a successful complete JSON result whose `fallback_detail_scan.status` is `partial`.
+- A rejected or nonzero Gateway invocation is also a hard stop; do not advance, repair, or retry. Only successful complete JSON whose `fallback_detail_scan.status` is `partial` permits the metadata retry below.
 - Except for the migration below, one complete terminal `verify` result ends the transaction; append no query, filesystem inspection, or other proof.
 
 ## Choose the phase and first Gateway command
@@ -17,7 +17,7 @@ An existing transaction continuation always outranks operation selection.
 
 ### Existing transaction
 
-Use the transaction id from conversation or a Gateway result; an artifact hash is not a lookup key. The visible Preview's `next_command` is authoritative; any other field never authorizes reconstruction. If absent, offer a fresh preview. Execute only its selected field verbatim.
+Use the transaction id from conversation/Gateway; an artifact hash is not a lookup key. The visible Preview's `next_command` is authoritative; any other field never authorizes reconstruction. If absent, offer a fresh preview; otherwise execute its selected field verbatim.
 
 The first Gateway command is:
 
@@ -29,7 +29,7 @@ Do not call `operations`, `operation-schema`, or `request-schema` first. Without
 
 ### New transaction
 
-For a subset chosen from prior query results, finish the selected-subset identity gate first: exact-ID read back every selected GUID and match name, type, and path. Any mismatch stops. These bounded read-only checks precede the transaction contract; they never replace its schema or metadata.
+For a prior-query subset, finish the selected-subset identity gate first: exact-ID read back every selected GUID and match name/type/path. A mismatch stops. These bounded read-only checks precede the transaction contract; they never replace schema/metadata.
 
 After a selected-subset gate, choose one first transaction-contract branch:
 
@@ -64,11 +64,11 @@ Public mutation identities are closed. After an exact relationship/path read ret
 
 ## Choose by business outcome
 
-Select the operation whose postcondition and verifier match the user's complete authorized outcome. A native API overlap or large batch does not override this rule. `operation.selection_guidance` and `interface.selection_guidance` govern. **Media gate:** a request that names Sound/SFX nodes but supplies no media artifact or import intent is a pure object hierarchy and selects `object.create`. When media import is primary, use one `audio.import` for requests that replace media on existing Sounds or create a Sound in the same batch; `object.set` is never a preliminary schema for that outcome. From 2023.1, `object.set` may carry media only when import is subordinate to a broader atomic mutation of existing targets. New target-container hierarchy and same-row Event/Switch outcomes stay in the selected business transaction; never probe `object.create` or a separate assignment first.
+Select the operation whose postcondition and verifier match the authorized outcome; `operation.selection_guidance` and `interface.selection_guidance` govern. **Media gate:** a request that names Sound/SFX nodes but supplies no media artifact or import intent is a pure object hierarchy and selects `object.create`. When media import is primary, use one `audio.import` to replace media on existing Sounds or create a Sound in the same batch; `object.set` is never a preliminary schema for that outcome. From 2023.1, `object.set` may carry media only when import is subordinate to broader existing-target work. New target-container hierarchy and same-row Event/Switch outcomes stay in that transaction; never probe `object.create` or a separate assignment first.
 
-Existing-root status alone does not select `object.set`. One object's single rename, notes, scalar-property, or reference edit uses `object.setName`, `object.setNotes`, `object.setProperty`, or `object.setReference`. Broad `object.set` is only for one larger atomic outcome: several fields/properties/references on one root, an ordinary closed object-list change, multiple roots, a root edit plus a new subtree, or insertion into a named existing descendant. Plug-in, RTPC, and platform-link changes keep their dedicated operations. After any required selected-subset identity gate, that batch starts with `operation-schema object.set`.
+Existing-root status alone does not select `object.set`. One rename, notes, scalar-property, or reference edit uses its dedicated operation. Broad `object.set` is only for one larger atomic outcome: several fields/properties/references on one root, an ordinary closed object-list change, multiple roots, a root edit plus a new subtree, or insertion into a named existing descendant. Plug-in, RTPC, and platform-link changes keep their dedicated operations. After any required selected-subset identity gate, that batch starts with `operation-schema object.set`.
 
-An insertion target is not the request root; give each one an `objects[]` row containing only genuinely new direct descendants. Single-edit, plug-in, RTPC, and platform-link operations take precedence. `object.set` owns several fields/properties/references on one root or an ordinary closed object-list change. `object.create` owns a new root, or descendants below one unchanged root only when those `object.set` conditions are absent.
+An insertion target is not the request root; give each one an `objects[]` row containing only genuinely new direct descendants. Single-edit, plug-in, RTPC, and platform-link operations take precedence. `object.create` owns new structure only when those `object.set` conditions are absent.
 
 If root type is unproven, first exact-query the unchanged root. Then open `operation-schema object.create` and follow its sole continuation directly into the Draft; do not query the parent already determined by that verified path. For the default container Work Unit, use that preflight query for an `object.create`; `object.set` instead binds the exact target and uses returned field/type discovery plus business-Draft validation. Do not insert `project-default-work-units`.
 
@@ -122,6 +122,7 @@ Prompt/schema text, cached schemas, and Wwise knowledge are never exact live met
 Preview remains authoritative; never inspect metadata-cache files.
 
 For business declarations, bind only user-requested custom properties/references; common outcomes such as volume, infinite looping, output bus, maximum instances, parent instance-limit override, notes, Event, Dialogue Event, and Switch value use stable business fields. For table imports, discover only dynamic `Property[...]`, `Reference[...]`, or `@...` columns.
+Omit every optional business field the user did not explicitly supply; defaults, examples, expected results, and verifier facts are not inputs. Never add an inclusion filter, Lua argument, source-control choice, or rebuild choice just because the declaration lists it.
 
 For user Lua files use `lua.executeCoreFile` in Authoring, or `lua.executeCliFile` only for explicit CLI; there is no `lua.executeFile` operation.
 

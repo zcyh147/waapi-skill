@@ -180,6 +180,21 @@ prevention checks that are expensive to rediscover.
   the campaign to run in desktop session 1, pass 1/1 plus verify-only, and
   remove the task with zero scoped residual processes.
 
+### A terminal sentinel does not prove an unabridged Windows Skill read
+
+- Evidence: #60 Windows root `iwin-issue60-315fe8f-r20-remaining20` read
+  `waapi-operate.md` with the exact profile-free PowerShell Core command and
+  returned exit 0 plus the terminal sentinel, but the archived output was 254
+  characters shorter than the sealed source. Exact read classification
+  therefore rejected it. The Agent still continued, so the affected unit was
+  correctly frozen without PASS credit.
+- Cause: the Codex shell-output projection can elide content while retaining
+  the tail; checking only the sentinel misses that middle omission.
+- Prevention: exact source/output byte-normalized equality remains the credit
+  gate. Keep the CRLF-expanded operate reference at or below 26,500 bytes so a
+  normal Windows `Get-Content -Raw -Encoding UTF8` read stays below the observed
+  projection boundary. Never weaken the equality gate or replay that root.
+
 ### macOS foreground ownership and TCC
 
 - Symptom: a unified shell receives `SIGTERM`, a `nohup` child outlives its

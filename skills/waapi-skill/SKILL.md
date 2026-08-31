@@ -120,6 +120,7 @@ never rerun solely for detail.
 ### Setup lane
 
 Use setup for connection, version, host/port, saved config, or instance identity.
+`status` covers current status/version/project/process identity: after `SKILL.md`, run `status` directly and do not read `waapi-setup.md`. Read setup only for saved connection/config changes.
 
 Read: `references/waapi-setup.md`
 

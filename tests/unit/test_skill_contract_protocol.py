@@ -717,7 +717,7 @@ def test_media_pool_contains_value_is_disclosed_as_literal_text() -> None:
 def test_operate_reference_is_a_bounded_single_read_control_plane() -> None:
     marker = "<!-- WAAPI_OPERATE_REFERENCE_END -->"
     assert len(OPERATE.encode("utf-8")) <= 27_000
-    assert len(OPERATE.replace("\n", "\r\n").encode("utf-8")) <= 27_000
+    assert len(OPERATE.replace("\n", "\r\n").encode("utf-8")) <= 26_500
     assert len(OPERATE.splitlines()) <= 240
     assert OPERATE.count("WAAPI_OPERATE_REFERENCE_END") == 1
     assert OPERATE.rstrip().endswith(marker)
@@ -938,8 +938,8 @@ def test_single_existing_object_edit_uses_its_dedicated_operation_before_object_
         "insertion into a named existing descendant",
     ):
         assert broad_case in compact
-    assert compact.count("several fields/properties/references on one root") == 3
-    assert compact.count("an ordinary closed object-list change") == 3
+    assert compact.count("several fields/properties/references on one root") == 2
+    assert compact.count("an ordinary closed object-list change") == 2
     assert "Plug-in, RTPC, and platform-link changes keep their dedicated operations" in compact
     assert "Single-edit, plug-in, RTPC, and platform-link operations take precedence" in compact
     assert "when those `object.set` conditions are absent" in compact
@@ -1224,8 +1224,17 @@ def test_named_get_info_uses_status_as_its_only_route() -> None:
     assert "Do not use `request-schema` or `typed-zero-call`" in SKILL
     assert "needs only this `SKILL.md`" in SKILL
     assert "do not read the setup or query reference" in SKILL
+    assert "run `status` directly and do not read `waapi-setup.md`" in SKILL
     assert (
         "Treat the named `getInfo` result's `processId` as the requested live "
         "process identity" in SKILL
     )
     assert "finish from that Gateway evidence without a system process lookup" in SKILL
+
+
+def test_business_declarations_omit_every_unrequested_optional_fact() -> None:
+    assert (
+        "Omit every optional business field the user did not explicitly supply"
+        in OPERATE
+    )
+    assert "defaults, examples, expected results, and verifier facts are not inputs" in OPERATE

@@ -5919,12 +5919,12 @@
               "encoding": "utf-8_no_bom",
               "serialization": {"line_endings": "lf", "field_separator": "tab", "ordinary_event_layout": ["soundbank", "resolved_identity", "filter_columns"], "special_directive_layout": ["soundbank", "directive", "resolved_identity", "filter_columns"], "quoting_policy": "name_identity_double_quoted_guid_and_uint32_unquoted"},
               "rows": [
-                {"soundbank": "UI", "directive": "Event", "identity": "Play_UI_Open", "identity_format": "name", "identity_materialization": "runner_writes_double_quoted_literal_name", "filters": ["Event", "Structure", "Media"], "resolution": "unique"},
-                {"soundbank": "UI", "directive": "Event", "identity": "Play_UI_Confirm", "identity_format": "name", "identity_materialization": "runner_writes_double_quoted_literal_name", "filters": ["Event", "Structure", "Media"], "resolution": "unique"},
-                {"soundbank": "Gameplay", "directive": "Event", "identity": "Play_Combat_Start", "identity_format": "name", "identity_materialization": "runner_writes_double_quoted_literal_name", "filters": ["Event", "Structure", "Media"], "resolution": "unique"},
-                {"soundbank": "Gameplay", "directive": "Event", "identity": "Play_Traversal_Jump", "identity_format": "name", "identity_materialization": "runner_writes_double_quoted_literal_name", "filters": ["Event", "Structure", "Media"], "resolution": "unique"},
-                {"soundbank": "Ambience", "directive": "Event", "identity": "Play_Ambience_Forest", "identity_format": "name", "identity_materialization": "runner_writes_double_quoted_literal_name", "filters": ["Event", "Structure", "Media"], "resolution": "unique"},
-                {"soundbank": "Ambience", "directive": "Event", "identity": "Play_Ambience_City", "identity_format": "name", "identity_materialization": "runner_writes_double_quoted_literal_name", "filters": ["Event", "Structure", "Media"], "resolution": "unique"}
+                {"soundbank": "UI", "directive": "Event", "identity": "Play_UI_Open", "identity_format": "guid", "identity_materialization": "runner_queries_guid", "filters": ["Event", "Structure", "Media"], "resolution": "unique"},
+                {"soundbank": "UI", "directive": "Event", "identity": "Play_UI_Confirm", "identity_format": "guid", "identity_materialization": "runner_queries_guid", "filters": ["Event", "Structure", "Media"], "resolution": "unique"},
+                {"soundbank": "Gameplay", "directive": "Event", "identity": "Play_Combat_Start", "identity_format": "guid", "identity_materialization": "runner_queries_guid", "filters": ["Event", "Structure", "Media"], "resolution": "unique"},
+                {"soundbank": "Gameplay", "directive": "Event", "identity": "Play_Traversal_Jump", "identity_format": "guid", "identity_materialization": "runner_queries_guid", "filters": ["Event", "Structure", "Media"], "resolution": "unique"},
+                {"soundbank": "Ambience", "directive": "Event", "identity": "Play_Ambience_Forest", "identity_format": "guid", "identity_materialization": "runner_queries_guid", "filters": ["Event", "Structure", "Media"], "resolution": "unique"},
+                {"soundbank": "Ambience", "directive": "Event", "identity": "Play_Ambience_City", "identity_format": "guid", "identity_materialization": "runner_queries_guid", "filters": ["Event", "Structure", "Media"], "resolution": "unique"}
               ]
             }
           ],

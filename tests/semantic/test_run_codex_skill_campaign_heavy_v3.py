@@ -3772,6 +3772,38 @@ def test_soundbank_topic_protocol_discloses_each_nested_match_scope() -> None:
     ) == ()
 
 
+def test_optional_operations_archive_selects_the_sealed_lane_before_turn_slicing() -> None:
+    protocol = V3GatewayProtocol(
+        steps=(
+            ExpectedGatewayStep("tx01.operations", "operations", ()),
+            ExpectedGatewayStep(
+                "tx01.operation-schema",
+                "operation-schema",
+                ("object.set",),
+            ),
+            ExpectedGatewayStep("tx01.prepare", "status", ()),
+            ExpectedGatewayStep("tx01.finish", "status", ()),
+        ),
+        turn_prefix_counts=(3, 4),
+        allowed_turn_prefix_counts=((2, 3), (3, 4)),
+        terminal_prefix_counts=(3, 4),
+    )
+    selected_names = [
+        "tx01.operation-schema",
+        "tx01.prepare",
+        "tx01.finish",
+    ]
+
+    selected = campaign._consumed_heavy_v3_protocol_steps(  # noqa: SLF001
+        protocol,
+        2,
+        selected_step_names=selected_names,
+    )
+
+    assert [step.name for step in selected] == selected_names
+    assert [step.name for step in selected[:2]] == selected_names[:2]
+
+
 def test_soundbank_topic_protocol_selects_finite_stream_for_explicit_stream_case() -> None:
     steps = soundbank_topic_protocol_steps(
         scenario_id="O22-SB-GENERATED-03",

@@ -293,6 +293,12 @@ def test_tab_business_draft_binds_the_disclosed_import_location_role(
     assert bind_code == 0, bound
     assert bound["bound_object"]["role"] == "import_location"
     assert bound["bound_object"]["type"] == "WorkUnit"
+    declaration = bound["draft"]["next_action_binding"]["declaration"]
+    assert declaration["business_value_choices"]["mode"] == {
+        "create": "Wwise createNew",
+        "reimport": "Wwise useExisting",
+        "replace": "Wwise replaceExisting",
+    }
 
 
 def test_lua_business_draft_rejects_roleless_object_binding(
@@ -405,7 +411,7 @@ def test_cli_lua_preview_and_dispatch_require_console_host(command: str) -> None
     assert payload["verified"] is False
 
 
-def test_lua_continuation_discloses_top_level_null_argument(
+def test_lua_continuation_discloses_one_closed_wa_args_representation(
     tmp_path: Path,
 ) -> None:
     state_dir = tmp_path / "lua-null-continuation"
@@ -424,7 +430,9 @@ def test_lua_continuation_discloses_top_level_null_argument(
 
     assert code == 0, payload
     append = payload["draft"]["next_action_binding"]["declaration"]["append"]
-    assert any("string|boolean|integer|number|json|null" in row for row in append)
+    assert any("--arguments-json" in row for row in append)
+    assert all("alternative:" not in row for row in append)
+    assert all("--argument <key>" not in row for row in append)
 
 
 def test_lua_artifact_plan_accepts_one_complete_wa_args_object(

@@ -274,9 +274,10 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
         "later_declaration_name; never_skip_the_immediate_parent_or_substitute_"
         "an_ancestor; a_missing_immediate_parent_is_a_structured_stop"
     )
-    assert "returned_name_type_path" in (
-        start_next["object_binding"]["result_validation_rule"]
-    )
+    result_validation = start_next["object_binding"]["result_validation_rule"]
+    assert "returned_name_and_path" in result_validation
+    assert "compare_type_only_when_explicitly_supplied" in result_validation
+    assert "hierarchy_label_is_not_an_object_type" in result_validation
     assert "by_path" not in start_next["object_binding"]
     assert "configure" not in start_next
     assert "declare_new" not in start_next

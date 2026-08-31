@@ -527,7 +527,13 @@ def test_soundbank_draft_derives_type_for_one_exact_name_without_a_separate_quer
 ) -> None:
     code, started = _offline(tmp_path, "draft-start", "soundbank.generate")
     assert code == 0, started
-    binding = started["draft"]["next_action_binding"]["object_binding"]
+    next_action = started["draft"]["next_action_binding"]
+    assert next_action["declaration"]["optional_field_policy"] == {
+        "append_only_when": "explicitly_present_in_user_request",
+        "unspecified": "omit",
+        "infer_defaults": False,
+    }
+    binding = next_action["object_binding"]
     assert binding["direct_query_before_binding"] == "forbidden"
     exact_name = binding["role_routes"]["soundbank"]["by_exact_name"]
     assert exact_name["fixed_argv_prefix"][-2:] == [

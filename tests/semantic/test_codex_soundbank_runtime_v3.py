@@ -2451,6 +2451,12 @@ def test_definition_files_are_lf_utf8_and_live_identity_bound(tmp_path: Path) ->
         runtime, _ = _runtime(tmp_path / scenario.id, scenario)
         case = runtime.materialized
         assert case is not None
+        if scenario.id == "O22-SB-PROCESS-DEF-01":
+            assert {
+                row.identity_format
+                for document in case.blueprint.definitions
+                for row in document.rows
+            } <= {"guid", "decimal_short_id", "hexadecimal_short_id"}
         for document in case.blueprint.definitions:
             data = document.path.read_bytes()
             assert not data.startswith(b"\xef\xbb\xbf")

@@ -22350,8 +22350,9 @@ def _business_next_action_binding(
         "name_rule": "unscoped_name_is_not_a_mutation_identity",
         "result": "copy_the_returned_bound_object.handle",
         "result_validation_rule": (
-            "before_declaration_compare_returned_name_type_path_to_the_user_"
-            "target; bind_again_or_stop_if_they_differ"
+            "before_declaration_compare_returned_name_and_path_to_the_user_"
+            "target; compare_type_only_when_explicitly_supplied; hierarchy_"
+            "label_is_not_an_object_type; bind_again_or_stop_if_they_differ"
         ),
         "use_only_for": [
             "existing_target",
@@ -23345,35 +23346,41 @@ def _business_next_action_binding(
             "lua.executeCliFile": [
                 "--script-file <exact-user-supplied-lua-file>",
                 "[--arguments-json <complete-wa_args-strict-json-object>]",
-                "alternative: [--argument <key> string|boolean|integer|number|json|null <exact-value>]...; never combine forms",
                 "[--watchdog-seconds <non-negative-integer>] (2024.1+)",
             ],
             "lua.executeCoreFile": [
                 "--script-file <exact-user-supplied-lua-file>",
                 "[--arguments-json <complete-wa_args-strict-json-object>]",
-                "alternative: [--argument <key> string|boolean|integer|number|json|null <exact-value>]...; never combine forms",
             ],
             "lua.executeCoreInline": [
                 "--lua-source <exact-user-supplied-utf8-source>",
                 "--io-root <exact-isolated-transaction-root>",
                 "[--arguments-json <complete-wa_args-strict-json-object>]",
-                "alternative: [--argument <key> string|boolean|integer|number|json|null <exact-value>]...; never combine forms",
             ],
         }
+        declaration_binding = {
+            **operation_draft_prefix_copy_binding(
+                declare_artifact_plan_prefix,
+                append_action=(
+                    "copy_verbatim_then_append_one_complete_exact_artifact_plan"
+                ),
+            ),
+            "append": declaration_shapes[record.operation],
+            "submit_once": True,
+            "native_request_input": "forbidden",
+        }
+        if record.operation == "audio.importTabDelimited":
+            declaration_binding["business_value_choices"] = {
+                "mode": {
+                    "create": "Wwise createNew",
+                    "reimport": "Wwise useExisting",
+                    "replace": "Wwise replaceExisting",
+                }
+            }
         return {
             **shared,
             "required_next_phase": "declare_complete_exact_artifact_plan",
-            "declaration": {
-                **operation_draft_prefix_copy_binding(
-                    declare_artifact_plan_prefix,
-                    append_action=(
-                        "copy_verbatim_then_append_one_complete_exact_artifact_plan"
-                    ),
-                ),
-                "append": declaration_shapes[record.operation],
-                "submit_once": True,
-                "native_request_input": "forbidden",
-            },
+            "declaration": declaration_binding,
         }
     if adapter.family == "cli-console-business":
         declaration = business_contract["declaration"]
@@ -23612,6 +23619,11 @@ def _business_next_action_binding(
                 ),
             ),
             "append": declaration_shapes[record.operation],
+            "optional_field_policy": {
+                "append_only_when": "explicitly_present_in_user_request",
+                "unspecified": "omit",
+                "infer_defaults": False,
+            },
             "submit_once": True,
             "native_request_input": "forbidden",
         }

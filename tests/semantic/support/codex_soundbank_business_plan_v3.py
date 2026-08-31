@@ -233,8 +233,7 @@ def validate_soundbank_business_plan_archive(
     else:
         if kind != "soundbank_function_materialized_v1" or sections.assertion_ids != _FUNCTION_ASSERTIONS:
             raise SoundBankBusinessPlanError("archived function kind/assertions drifted")
-        expected = build_transaction_protocol(static["operation_requests"])
-        serial = _protocol(expected)
+        serial = _protocol(protocol)
         expected_primary = [step["name"] for step in serial["steps"] if step["subcommand"] == "execute"]
         expected_verification = [step["name"] for step in serial["steps"] if step["subcommand"] != "execute"]
         expected_delta = _function_archive_delta(static, live)
