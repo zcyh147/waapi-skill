@@ -67,9 +67,9 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_operations_discovery_protocol,
     build_transaction_protocol,
     call_step,
+    media_pool_business_call_step,
     query_object_step,
     request_schema_step,
-    typed_read_draft_steps,
     wait_topic_step,
     topic_schema_step,
 )
@@ -831,7 +831,10 @@ def typed_input_operations_protocol(
         or not unit_id.startswith("TYP")
         or not isinstance(base_scenario_id, str)
         or not protocol.steps
-        or protocol.steps[0].subcommand != "operation-schema"
+        or protocol.steps[0].subcommand not in {
+            "operation-schema",
+            "request-schema",
+        }
     ):
         return protocol
     return build_operations_discovery_protocol(protocol)
@@ -2780,13 +2783,15 @@ def _prepare_media_pool_case(
         call_step("media.get-fields", MEDIA_POOL_GET_FIELDS_URI, version=runtime.version),
     ]
     steps.extend(
-        typed_read_draft_steps(
-            "media",
-            MEDIA_POOL_GET_URI,
-            version=runtime.version,
-            args=request.args,
-            options=request.options,
-            post_filter=request.post_filter,
+        (
+            request_schema_step("media.operation-schema", MEDIA_POOL_GET_URI),
+            media_pool_business_call_step(
+                "media.get",
+                scenario_id=case.scenario_id,
+                args=request.args,
+                options=request.options,
+                post_filter=request.post_filter,
+            ),
         )
     )
     if reference_read is not None:

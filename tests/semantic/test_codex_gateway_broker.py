@@ -77,9 +77,11 @@ from .support.codex_eval_protocol_v3 import (  # pyright: ignore[reportMissingIm
     build_audio_import_composer_transaction_steps,
     build_compound_undo_business_transaction_steps,
     build_core_business_transaction_steps,
+    build_object_graph_business_transaction_steps,
     build_object_set_composer_transaction_steps,
     build_soundengine_business_transaction_steps,
     build_transaction_protocol,
+    media_pool_business_call_step,
     typed_read_draft_steps,
 )
 from wwise_waapi.operation_composer import (
@@ -117,6 +119,18 @@ from wwise_waapi.operation_composer import (
             "Sound SFX",
             "sound-sfx",
         ),
+        (
+            "draft-bind-object",
+            (
+                "--object-path-segment",
+                "Actor-Mixer Hierarchy",
+                "--object-path-segment",
+                "Weapons",
+            ),
+            3,
+            "<Virtual Folder>Weapons",
+            "Weapons",
+        ),
     ),
 )
 def test_closed_business_literal_equivalence_is_broker_owned(
@@ -134,6 +148,79 @@ def test_closed_business_literal_equivalence_is_broker_owned(
         supplied,
         expected,
     ) is True
+
+
+def test_broker_accepts_media_pool_business_aliases_in_any_flag_order(
+    tmp_path: Path,
+) -> None:
+    step = media_pool_business_call_step(
+        "media.get",
+        scenario_id="VS25-F-MEDIAPOOL-GET-01",
+        args={
+            "databases": [r"\Databases\Project Originals"],
+            "filters": [
+                {
+                    "type": "field",
+                    "field": "Filename",
+                    "operator": "contains",
+                    "value": "footstep",
+                },
+                {
+                    "type": "field",
+                    "field": "WAV/Duration",
+                    "operator": "lessThan",
+                    "value": 0.8,
+                },
+            ],
+            "maxResults": 200,
+        },
+        options={"return": ["Path", "FileId", "Db", "Filename", "WAV/Duration"]},
+        post_filter={
+            "field": "Filename",
+            "operator": "containsCaseSensitive",
+            "value": "footstep",
+            "limit": 20,
+        },
+    )
+    broker = CodexGatewayBroker(
+        skill_source=make_fake_skill(tmp_path),
+        expected_steps=(step,),
+        expected_wwise_version="2025.1",
+    )
+    actual = (
+        "core-call",
+        "ak.wwise.core.mediaPool.get",
+        "--max-results",
+        "200",
+        "--final-limit",
+        "20",
+        "--database-scope",
+        "Project Originals",
+        "--text-filter",
+        "name",
+        "contains",
+        "footstep",
+        "--number-filter",
+        "duration",
+        "lessThan",
+        "0.8",
+        "--exact-name-contains",
+        "footstep",
+        "--sort-by",
+        "duration",
+        "ascending",
+        "--sort-by",
+        "path",
+        "ascending",
+    )
+
+    semantic_hash, execution_arguments = broker._validate_step(  # noqa: SLF001
+        step,
+        actual,
+    )
+
+    assert len(semantic_hash) == 64
+    assert execution_arguments == actual
 from wwise_waapi.canonical import canonical_sha256
 from wwise_waapi.builders.debug_lua import LUA_SOURCE_AUTHORITY
 from wwise_waapi.operation_drafts import OperationDraftStore
@@ -2657,6 +2744,55 @@ def test_broker_allows_optional_initial_operations_before_request_schema(
 @pytest.mark.parametrize(
     "commands",
     (
+        (("operation-schema", "waapi.undoGroup"),),
+        (("operations",), ("operation-schema", "waapi.undoGroup")),
+    ),
+    ids=("direct-schema", "catalog-then-schema"),
+)
+def test_broker_can_skip_one_expected_leading_operations_step(
+    tmp_path: Path,
+    commands: tuple[tuple[str, ...], ...],
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    steps = (
+        ExpectedGatewayStep("tx03.operations", "operations"),
+        ExpectedGatewayStep(
+            "tx03.operation-schema",
+            "operation-schema",
+            ("waapi.undoGroup",),
+        ),
+    )
+    observed: list[list[str]] = []
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=steps,
+        optional_expected_initial_operations_discovery=True,
+        transport="tcp",
+    ) as broker:
+        for arguments in commands:
+            result = run_model_command(broker, list(arguments))
+            assert result.returncode == 0, result.stderr
+            observed.append(
+                [
+                    "python",
+                    str(broker.invocation_runner_path),
+                    "gateway.py",
+                    *arguments,
+                ]
+            )
+        evidence = broker.evidence()
+        reconciliation = broker.reconcile(observed)
+
+    assert evidence.passed
+    assert reconciliation.passed
+    assert evidence.expected_step_names == tuple(
+        step.name for step in (steps if len(commands) == 2 else steps[1:])
+    )
+
+
+@pytest.mark.parametrize(
+    "commands",
+    (
         (("operations",), ("operations",)),
         (("operation-schema", "waapi.undoGroup"), ("operations",)),
         (("operation-schema", "waapi.notUndoGroup"),),
@@ -5057,6 +5193,126 @@ def test_business_draft_setup_broker_selects_unique_binding_and_configuration(
     )
     assert isinstance(declaration.arguments[4], ResponseBinding)
     assert declaration.arguments[4].step == previous.name
+
+
+def _two_target_object_set_request() -> dict[str, object]:
+    return {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "object.set",
+        "arguments": {
+            "objects": [
+                {
+                    "object": {
+                        "kind": "path",
+                        "value": (
+                            r"\Actor-Mixer Hierarchy\Default Work Unit\A"
+                        ),
+                    },
+                    "properties": [{"name": "Pitch", "value": 100}],
+                },
+                {
+                    "object": {
+                        "kind": "path",
+                        "value": (
+                            r"\Actor-Mixer Hierarchy\Default Work Unit\B"
+                        ),
+                    },
+                    "properties": [{"name": "Volume", "value": -3.0}],
+                },
+            ],
+            "on_name_conflict": "fail",
+        },
+    }
+
+
+def test_object_set_field_discovery_can_follow_its_bound_target_early(
+    tmp_path: Path,
+) -> None:
+    steps = build_object_graph_business_transaction_steps(
+        _two_target_object_set_request(),
+        label="tx01",
+    )
+    broker = CodexGatewayBroker(
+        skill_source=make_fake_skill(tmp_path),
+        expected_steps=steps,
+        expected_wwise_version="2022.1",
+    )
+    start = next(step for step in steps if step.name == "tx01.draft-start")
+    first = next(step for step in steps if step.name == "tx01.bind-target-01-01")
+    discovery = next(step for step in steps if step.name == "tx01.discover-field-01")
+    broker._payloads_by_step[start.name] = {  # noqa: SLF001
+        "task_authority": "da1-" + "2" * 40,
+        "draft": {"draft_id": "od1-" + "1" * 32, "revision": 1},
+    }
+    broker._payloads_by_step[first.name] = {  # noqa: SLF001
+        "draft": {"draft_id": "od1-" + "1" * 32, "revision": 2},
+        "bound_object": {"handle": "boh1-" + "3" * 32},
+    }
+    broker._next_step = steps.index(first) + 1  # noqa: SLF001
+    rebased = broker._rebase_business_draft_revision(discovery)  # noqa: SLF001
+
+    def resolve(argument: object) -> str:
+        if isinstance(argument, ResponseBinding):
+            current: object = broker._payloads_by_step[argument.step]  # noqa: SLF001
+            for token in argument.pointer.removeprefix("/").split("/"):
+                assert isinstance(current, dict)
+                current = current[token]
+            return str(current)
+        assert isinstance(argument, str)
+        return argument
+
+    actual = tuple(resolve(argument) for argument in rebased.arguments)
+
+    selected = broker._match_dependency_ready_business_setup_step(  # noqa: SLF001
+        (discovery.subcommand, *actual)
+    )
+
+    assert selected is not None
+    assert selected[0].name == discovery.name
+
+
+def test_business_draft_normalizes_live_bound_ids_to_reviewed_paths(
+    tmp_path: Path,
+) -> None:
+    request = _two_target_object_set_request()
+    steps = build_object_graph_business_transaction_steps(request, label="tx01")
+    preview = next(step for step in steps if step.subcommand == "preview-from-draft")
+    broker = CodexGatewayBroker(
+        skill_source=make_fake_skill(tmp_path),
+        expected_steps=steps,
+        expected_wwise_version="2022.1",
+    )
+    ids = (
+        "{11111111-1111-1111-1111-111111111111}",
+        "{22222222-2222-2222-2222-222222222222}",
+    )
+    for step, object_id, path in zip(
+        (item for item in steps if item.subcommand == "draft-bind-object"),
+        ids,
+        (
+            r"\Actor-Mixer Hierarchy\Default Work Unit\A",
+            r"\Actor-Mixer Hierarchy\Default Work Unit\B",
+        ),
+        strict=True,
+    ):
+        broker._payloads_by_step[step.name] = {  # noqa: SLF001
+            "bound_object": {"id": object_id, "path": path}
+        }
+    actual = json.loads(json.dumps(request))
+    actual["arguments"].pop("on_name_conflict")
+    for row, object_id in zip(actual["arguments"]["objects"], ids, strict=True):
+        row["object"] = {"kind": "id", "value": object_id}
+
+    normalized = broker._normalize_operation_draft_query_identities(  # noqa: SLF001
+        actual,
+        preview_step=preview,
+    )
+
+    assert broker_module._object_operation_json_equal(  # noqa: SLF001
+        normalized,
+        request,
+    )
 
 
 def test_business_declaration_ids_are_task_local_but_bounded_and_unique(

@@ -1110,7 +1110,11 @@ def _query_row_field(row: Mapping[str, Any], name: str) -> Any:
     if name == "parent":
         return _reference_id(row.get(name))
     if name == "audioSource:language":
-        return _language_name(row.get(name))
+        return _language_name(
+            row.get("source_language")
+            if "source_language" in row
+            else row.get(name)
+        )
     if name == "childrenCount":
         value = row.get(name)
         return int(value) if isinstance(value, int) and not isinstance(value, bool) else value
@@ -1165,7 +1169,11 @@ def _verify_query_derived_rows(
             failures.append(f"derived row {index} has an unknown activeSource identity")
             continue
         try:
-            language = _language_name(row.get("audioSource:language"))
+            language = _language_name(
+                row.get("source_language")
+                if "source_language" in row
+                else row.get("audioSource:language")
+            )
         except ObjectRuntimeError as exc:
             failures.append(f"derived row {source_id} has invalid language: {exc}")
             language = None

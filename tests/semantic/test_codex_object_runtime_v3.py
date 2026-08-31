@@ -730,6 +730,17 @@ def test_get02_query_oracle_accepts_exact_active_sources_and_paired_paths() -> N
     ]
 
 
+def test_get02_query_oracle_accepts_gateway_business_language_projection() -> None:
+    runtime, payload, answer = _get02_query_runtime()
+    for row in payload["objects"]:
+        if "audioSource:language" in row:
+            row["source_language"] = row.pop("audioSource:language")
+
+    verification = runtime.verify_query_result(payload, final_response=answer)
+
+    assert verification.passed, verification.failures
+
+
 def test_get02_query_oracle_scopes_decoys_to_the_candidate_inventory() -> None:
     runtime, payload, answer = _get02_query_runtime()
     before = runtime.before.by_key()

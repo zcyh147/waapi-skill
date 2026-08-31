@@ -6157,6 +6157,11 @@ def _consumed_heavy_v3_protocol_steps(
         and consumed_count == len(steps) - 1
     ):
         return steps[1:]
+    if (
+        getattr(protocol, "optional_initial_operations_discovery", False)
+        and consumed_count == len(steps) - 1
+    ):
+        return steps[1:]
     return steps
 
 

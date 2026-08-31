@@ -8,6 +8,7 @@ import json
 import math
 import os
 import queue
+import re
 import shlex
 import stat
 import sys
@@ -16223,6 +16224,24 @@ def _runtime_game_object_context_from_live(
     )
 
 
+_BUSINESS_TYPED_OBJECT_PATH_PREFIXES = frozenset(
+    {
+        "Actor-Mixer",
+        "Blend Container",
+        "Music Playlist Container",
+        "Music Segment",
+        "Music Switch Container",
+        "Music Track",
+        "Random Container",
+        "Sequence Container",
+        "Sound SFX",
+        "Sound Voice",
+        "Switch Container",
+        "Virtual Folder",
+    }
+)
+
+
 def _business_object_path_from_segments(values: Any) -> str:
     if (
         not isinstance(values, list)
@@ -16242,6 +16261,16 @@ def _business_object_path_from_segments(values: Any) -> str:
             and not value.startswith("\\\\")
         ):
             value = value[1:]
+        typed_segment = (
+            re.fullmatch(r"<([^<>]+)>(.+)", value)
+            if isinstance(value, str)
+            else None
+        )
+        if (
+            typed_segment is not None
+            and typed_segment.group(1) in _BUSINESS_TYPED_OBJECT_PATH_PREFIXES
+        ):
+            value = typed_segment.group(2)
         if (
             not isinstance(value, str)
             or not value

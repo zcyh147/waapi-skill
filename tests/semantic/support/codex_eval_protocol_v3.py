@@ -4809,6 +4809,34 @@ class V3GatewayProtocol:
             and self.terminal_prefix_counts == (maximum - 1, maximum)
         )
 
+    @property
+    def optional_initial_operations_discovery(self) -> bool:
+        """Whether one leading operations catalog read may be omitted."""
+
+        if (
+            len(self.steps) < 2
+            or self.steps[0].subcommand != "operations"
+            or self.steps[0].arguments
+            or self.steps[1].subcommand not in {
+                "operation-schema",
+                "request-schema",
+            }
+            or len(self.steps[1].arguments) != 1
+            or not self.allowed_turn_prefix_counts
+        ):
+            return False
+        return all(
+            maximum - 1 in allowed and maximum in allowed
+            for maximum, allowed in zip(
+                self.turn_prefix_counts,
+                self.allowed_turn_prefix_counts,
+                strict=True,
+            )
+        ) and {
+            len(self.steps) - 1,
+            len(self.steps),
+        }.issubset(self.terminal_prefix_counts)
+
 
 @dataclass(frozen=True, slots=True)
 class StructuredRefusal:
@@ -5640,7 +5668,7 @@ def build_direct_protocol(
 def build_operations_discovery_protocol(
     base: V3GatewayProtocol,
 ) -> V3GatewayProtocol:
-    """Require the compact named-operation inventory before one business schema.
+    """Permit one compact named-operation inventory before a business schema.
 
     Natural-language mutation intent does not itself disclose an exact named
     operation.  This wrapper seals the public discovery step that makes that
@@ -5652,13 +5680,13 @@ def build_operations_discovery_protocol(
         raise V3ProtocolError("operations discovery requires one protocol")
     first = base.steps[0]
     if (
-        first.subcommand != "operation-schema"
+        first.subcommand not in {"operation-schema", "request-schema"}
         or len(first.arguments) != 1
         or not isinstance(first.arguments[0], str)
         or not first.arguments[0]
     ):
         raise V3ProtocolError(
-            "operations discovery must precede one exact named operation schema"
+            "operations discovery must precede one exact operation or request schema"
         )
     label = first.name.rsplit(".", 1)[0]
     discovery = ExpectedGatewayStep(
@@ -5668,11 +5696,18 @@ def build_operations_discovery_protocol(
     if any(step.name == discovery.name for step in base.steps):
         raise V3ProtocolError("operations discovery step name collides")
 
-    allowed = tuple(
-        tuple(value + 1 for value in values)
-        for values in base.allowed_turn_prefix_counts
+    base_allowed = (
+        base.allowed_turn_prefix_counts
+        or tuple((value,) for value in base.turn_prefix_counts)
     )
-    terminal = tuple(value + 1 for value in base.terminal_prefix_counts)
+    allowed = tuple(
+        tuple(sorted({item for value in values for item in (value, value + 1)}))
+        for values in base_allowed
+    )
+    base_terminal = base.terminal_prefix_counts or (len(base.steps),)
+    terminal = tuple(
+        sorted({item for value in base_terminal for item in (value, value + 1)})
+    )
     return V3GatewayProtocol(
         steps=(discovery, *base.steps),
         turn_prefix_counts=tuple(value + 1 for value in base.turn_prefix_counts),
@@ -5915,6 +5950,171 @@ def call_step(
         name=name,
         subcommand=subcommand,
         arguments=gateway_arguments,
+    )
+
+
+def media_pool_business_call_step(
+    name: str,
+    *,
+    scenario_id: str,
+    args: Mapping[str, Any],
+    options: Mapping[str, Any],
+    post_filter: Mapping[str, Any] | None,
+) -> ExpectedGatewayStep:
+    """Compile one reviewed Media Pool request to the public business CLI."""
+
+    def alternatives(values: tuple[str, ...]) -> Any:
+        return values[0] if len(values) == 1 else ExactArgumentAlternatives(values)
+
+    if set(args) - {"databases", "filters", "maxResults", "searchText"}:
+        raise V3ProtocolError("Media Pool business args contain an unreviewed field")
+    if set(options) != {"return"}:
+        raise V3ProtocolError("Media Pool business options must contain only return")
+    databases = args.get("databases")
+    filters = args.get("filters")
+    max_results = args.get("maxResults")
+    return_fields = options.get("return")
+    if (
+        not isinstance(databases, (list, tuple))
+        or not databases
+        or not all(isinstance(value, str) and value for value in databases)
+        or not isinstance(filters, (list, tuple))
+        or not isinstance(max_results, int)
+        or isinstance(max_results, bool)
+        or not isinstance(return_fields, (list, tuple))
+        or not all(isinstance(value, str) and value for value in return_fields)
+    ):
+        raise V3ProtocolError("Media Pool business request shape is invalid")
+
+    arguments: list[Any] = [
+        "ak.wwise.core.mediaPool.get",
+        "--max-results",
+        str(max_results),
+    ]
+    for database in databases:
+        if database.casefold() == r"\databases\project originals".casefold():
+            database_value: Any = ExactArgumentAlternatives(
+                (
+                    "project-originals",
+                    "Project Originals",
+                    r"\Databases\Project Originals",
+                )
+            )
+        else:
+            database_value = database
+        arguments.extend(("--database-scope", database_value))
+    search_text = args.get("searchText")
+    if search_text is not None:
+        if not isinstance(search_text, str) or not search_text:
+            raise V3ProtocolError("Media Pool searchText must be non-empty text")
+        arguments.extend(("--search-text", search_text))
+    for index, row in enumerate(filters):
+        if (
+            not isinstance(row, Mapping)
+            or set(row) != {"type", "field", "operator", "value"}
+            or row.get("type") != "field"
+            or not isinstance(row.get("field"), str)
+            or not isinstance(row.get("operator"), str)
+        ):
+            raise V3ProtocolError(
+                f"Media Pool filter {index} is outside the closed field shape"
+            )
+        value = row.get("value")
+        if isinstance(value, bool) or not isinstance(value, (str, int, float)):
+            raise V3ProtocolError(
+                f"Media Pool filter {index} has an unsupported business value"
+            )
+        flag = "--text-filter" if isinstance(value, str) else "--number-filter"
+        encoded = value if isinstance(value, str) else json.dumps(value, allow_nan=False)
+        field_aliases = {
+            "Filename": ("Filename", "filename", "name"),
+            "Path": ("Path", "path"),
+            "FileId": ("FileId", "fileid", "file-id"),
+            "Db": ("Db", "database", "database-id"),
+            "WAV/Duration": ("WAV/Duration", "duration", "duration-seconds"),
+            "WAV/Sample Rate": (
+                "WAV/Sample Rate",
+                "sample-rate",
+                "sample-rate-hz",
+            ),
+            "WAV/Bit Depth": ("WAV/Bit Depth", "bit-depth"),
+            "WAV/Channels": ("WAV/Channels", "channels", "channel-count"),
+            "IXML/Scene": ("IXML/Scene", "ixml-scene", "scene"),
+            "IXML/Take": ("IXML/Take", "ixml-take", "take"),
+        }
+        field_name = str(row["field"])
+        field_value = alternatives(field_aliases.get(field_name, (field_name,)))
+        arguments.extend((flag, field_value, str(row["operator"]), encoded))
+
+    canonical_fields = {
+        "Path",
+        "FileId",
+        "Db",
+        "Filename",
+        "WAV/Duration",
+        "WAV/Sample Rate",
+        "WAV/Bit Depth",
+        "WAV/Channels",
+    }
+    for field_name in return_fields:
+        if field_name not in canonical_fields:
+            include_aliases = {
+                "IXML/Scene": ("IXML/Scene", "ixml-scene", "scene"),
+                "IXML/Take": ("IXML/Take", "ixml-take", "take"),
+            }
+            arguments.extend(
+                (
+                    "--include-field",
+                    alternatives(include_aliases.get(field_name, (field_name,))),
+                )
+            )
+
+    if post_filter is not None:
+        if (
+            set(post_filter) != {"field", "operator", "value", "limit"}
+            or post_filter.get("field") != "Filename"
+            or post_filter.get("operator") != "containsCaseSensitive"
+            or not isinstance(post_filter.get("value"), str)
+            or not isinstance(post_filter.get("limit"), int)
+            or isinstance(post_filter.get("limit"), bool)
+        ):
+            raise V3ProtocolError("Media Pool post-filter is outside its business CLI")
+        arguments.extend(("--exact-name-contains", str(post_filter["value"])))
+        arguments.extend(("--final-limit", str(post_filter["limit"])))
+
+    sort_rules = {
+        "VS25-F-MEDIAPOOL-GET-01": (
+            ("WAV/Duration", "ascending"),
+            ("Path", "ascending"),
+        ),
+        "VS25-F-MEDIAPOOL-GET-02": (("Path", "ascending"),),
+        "VS25-F-MEDIAPOOL-GET-03": (),
+        "VS25-F-MEDIAPOOL-GET-04": (),
+        "VS25-F-MEDIAPOOL-GET-05": (
+            ("WAV/Duration", "descending"),
+            ("Path", "ascending"),
+        ),
+    }
+    try:
+        selected_sort_rules = sort_rules[scenario_id]
+    except KeyError as exc:
+        raise V3ProtocolError("Media Pool scenario has no reviewed business order") from exc
+    for field_name, direction in selected_sort_rules:
+        sort_aliases = {
+            "WAV/Duration": ("WAV/Duration", "duration", "duration-seconds"),
+            "Path": ("Path", "path"),
+        }
+        arguments.extend(
+            (
+                "--sort-by",
+                ExactArgumentAlternatives(sort_aliases[field_name]),
+                direction,
+            )
+        )
+    return ExpectedGatewayStep(
+        name=name,
+        subcommand="core-call",
+        arguments=tuple(arguments),
     )
 
 
@@ -6378,6 +6578,7 @@ __all__ = [
     "metadata_candidate_limit",
     "materialize_audio_import_composer_protocol_request",
     "materialize_typed_transaction_protocol_requests",
+    "media_pool_business_call_step",
     "operation_request_equivalence",
     "query_object_step",
     "query_schema_step",

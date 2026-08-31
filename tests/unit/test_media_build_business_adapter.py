@@ -61,6 +61,27 @@ def test_issue_85_execution_contracts_are_direct_bounded_reads() -> None:
             assert contract.requires_authorization is False
 
 
+@pytest.mark.parametrize(
+    "scope",
+    (
+        "project-originals",
+        "Project Originals",
+        r"\Databases\Project Originals",
+    ),
+)
+def test_media_pool_project_originals_scope_accepts_business_display_forms(
+    scope: str,
+) -> None:
+    prepared = materialize_media_build_business_request(
+        MEDIA_POOL_GET_URI,
+        "2025.1",
+        {"max_results": 10, "database_scopes": [scope]},
+        available_media_fields=("Path", "FileId", "Filename"),
+    )
+
+    assert prepared["args"]["databases"] == [r"\Databases\Project Originals"]
+
+
 def test_peak_region_business_read_compiles_and_decodes_known_pcm_pairs() -> None:
     prepared = materialize_media_build_business_request(
         PEAKS_REGION_URI,

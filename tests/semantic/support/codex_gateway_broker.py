@@ -1650,6 +1650,84 @@ def _normalize_commutative_option_pairs(
     return step.arguments if expected is not None and observed == expected else actual
 
 
+def _normalize_media_pool_business_argument_order(
+    step: "ExpectedGatewayStep",
+    supplied: Sequence[str],
+) -> tuple[str, ...]:
+    """Canonicalize the unordered public Media Pool business declaration."""
+
+    actual = tuple(supplied)
+    if (
+        step.subcommand != "core-call"
+        or not step.arguments
+        or step.arguments[0] != "ak.wwise.core.mediaPool.get"
+        or not actual
+        or actual[0] != "ak.wwise.core.mediaPool.get"
+        or actual == step.arguments
+    ):
+        return actual
+    arities = {
+        "--max-results": 1,
+        "--database-scope": 1,
+        "--database-id": 1,
+        "--search-text": 1,
+        "--text-filter": 3,
+        "--number-filter": 3,
+        "--audio-description": 1,
+        "--weighted-audio-description": 2,
+        "--audio-similarity-file": 1,
+        "--weighted-audio-similarity-file": 2,
+        "--include-field": 1,
+        "--exact-name-contains": 1,
+        "--final-limit": 1,
+        "--sort-by": 2,
+    }
+
+    def parse(values: Sequence[Any]) -> list[tuple[Any, ...]] | None:
+        groups: list[tuple[Any, ...]] = []
+        index = 1
+        while index < len(values):
+            option = values[index]
+            arity = arities.get(option) if isinstance(option, str) else None
+            if arity is None or index + arity >= len(values):
+                return None
+            groups.append(tuple(values[index : index + arity + 1]))
+            index += arity + 1
+        return groups
+
+    def equivalent(expected: Any, observed: Any) -> bool:
+        if isinstance(expected, ExactArgumentAlternatives):
+            return observed in expected.values
+        return expected == observed
+
+    expected_groups = parse(step.arguments)
+    actual_groups = parse(actual)
+    if expected_groups is None or actual_groups is None:
+        return actual
+    remaining = list(actual_groups)
+    ordered: list[tuple[Any, ...]] = []
+    for expected_group in expected_groups:
+        matches = [
+            index
+            for index, observed_group in enumerate(remaining)
+            if len(observed_group) == len(expected_group)
+            and all(
+                equivalent(expected, observed)
+                for expected, observed in zip(
+                    expected_group,
+                    observed_group,
+                    strict=True,
+                )
+            )
+        ]
+        if len(matches) != 1:
+            return actual
+        ordered.append(remaining.pop(matches[0]))
+    if remaining:
+        return actual
+    return (actual[0], *(value for group in ordered for value in group))
+
+
 @dataclass(frozen=True, slots=True)
 class ExpectedGatewayStep:
     """One exact, ordered packaged gateway invocation."""
@@ -2202,7 +2280,8 @@ _DRAFT_HANDLE_RE = re.compile(
 )
 _NUMBERED_DRAFT_ACTION_STEP_RE = re.compile(r"^(?P<prefix>.+\.action\.)\d{3}$")
 _BUSINESS_DRAFT_SETUP_STEP_RE = re.compile(
-    r"^(?P<prefix>.+)\.(?:configure|bind-(?:object|field)\.\d{3})$"
+    r"^(?P<prefix>.+)\.(?:configure|bind-(?:object|field)\.\d{3}|"
+    r"bind-(?:target|reference)-\d{2}-\d{2}|discover-field-\d{2})$"
 )
 _BUSINESS_DRAFT_REVISION_SUBCOMMANDS = DRAFT_REVISION_SUBCOMMANDS - {
     "draft-apply",
@@ -3834,6 +3913,13 @@ def _closed_business_literal_equivalent(
         return _BUSINESS_KIND_DISPLAY_ALIASES.get(supplied) == expected
     if prior not in {"--path-segment", "--object-path-segment"}:
         return False
+    typed_segment = re.fullmatch(r"<([^<>]+)>(.+)", supplied)
+    if (
+        typed_segment is not None
+        and typed_segment.group(1) in _BUSINESS_KIND_DISPLAY_ALIASES
+        and typed_segment.group(2) == expected
+    ):
+        return True
     if sum(value == prior for value in step.arguments[:index]) != 1:
         return False
     return (
@@ -8068,6 +8154,7 @@ class CodexGatewayBroker:
         offline_replay_preview_requests: (
             Mapping[str, Mapping[str, Any]] | None
         ) = None,
+        optional_expected_initial_operations_discovery: bool = False,
         optional_initial_operations_discovery_operation: str | None = None,
         optional_initial_query_schema: bool = False,
         optional_query_schema_step_names: Sequence[str] = (),
@@ -8102,6 +8189,13 @@ class CodexGatewayBroker:
         )
         self._execution_steps = list(self.expected_steps)
         self._selected_expected_steps = list(self.expected_steps)
+        if type(optional_expected_initial_operations_discovery) is not bool:
+            raise TypeError(
+                "optional_expected_initial_operations_discovery must be a boolean"
+            )
+        self.optional_expected_initial_operations_discovery = (
+            optional_expected_initial_operations_discovery
+        )
         if optional_initial_operations_discovery_operation is not None and (
             not isinstance(optional_initial_operations_discovery_operation, str)
             or not optional_initial_operations_discovery_operation.strip()
@@ -8225,6 +8319,21 @@ class CodexGatewayBroker:
         names = [step.name for step in self.expected_steps]
         if len(names) != len(set(names)):
             raise ValueError("ExpectedGatewayStep names must be unique")
+        if self.optional_expected_initial_operations_discovery:
+            if (
+                len(self.expected_steps) < 2
+                or self.expected_steps[0].subcommand != "operations"
+                or self.expected_steps[0].arguments
+                or self.expected_steps[1].subcommand not in {
+                    "operation-schema",
+                    "request-schema",
+                }
+                or len(self.expected_steps[1].arguments) != 1
+            ):
+                raise ValueError(
+                    "optional expected operations discovery requires one leading "
+                    "operations step before an exact operation or request schema"
+                )
         if self.optional_initial_operations_discovery_operation is not None:
             first = self.expected_steps[0]
             if first.subcommand not in {
@@ -9258,6 +9367,18 @@ class CodexGatewayBroker:
                 if (
                     self._next_step == 0
                     and not self._records
+                    and self.optional_expected_initial_operations_discovery
+                    and resolved.gateway_arguments
+                    == (
+                        self._execution_steps[1].subcommand,
+                        *self._execution_steps[1].arguments,
+                    )
+                ):
+                    self._execution_steps.pop(0)
+                    self._selected_expected_steps.pop(0)
+                if (
+                    self._next_step == 0
+                    and not self._records
                     and self._optional_initial_operations_step is not None
                     and resolved.gateway_arguments == ("operations",)
                 ):
@@ -9422,7 +9543,9 @@ class CodexGatewayBroker:
                 for candidate in self._execution_steps
                 if candidate.name == f"{prefix}.draft-start"
                 and candidate.subcommand == "draft-start"
-                and candidate.arguments == ("audio.import",)
+                and len(candidate.arguments) == 1
+                and isinstance(candidate.arguments[0], str)
+                and bool(candidate.arguments[0])
             ),
             None,
         )
@@ -10662,6 +10785,10 @@ class CodexGatewayBroker:
             step,
             validation_arguments,
         )
+        validation_arguments = _normalize_media_pool_business_argument_order(
+            step,
+            validation_arguments,
+        )
         validation_arguments = self._normalize_business_declaration_fact_order(
             step,
             validation_arguments,
@@ -11839,7 +11966,13 @@ class CodexGatewayBroker:
             expected_request = _normalize_audio_import_request_named_fields(
                 expected_request
             )
-            if actual_request != expected_request:
+            if (
+                actual_request != expected_request
+                and not _object_operation_json_equal(
+                    actual_request,
+                    expected_request,
+                )
+            ):
                 raise GatewayInvocationError(
                     "preview-from-draft canonical request does not replay from "
                     "the reviewed typed actions"
@@ -12097,6 +12230,21 @@ class CodexGatewayBroker:
 
         preview_index = self._execution_steps.index(preview_step)
         identities: dict[str, str] = {}
+
+        def strings(item: Any) -> set[str]:
+            if isinstance(item, str):
+                return {item}
+            if isinstance(item, Mapping):
+                return {
+                    value
+                    for nested in item.values()
+                    for value in strings(nested)
+                }
+            if isinstance(item, list):
+                return {value for nested in item for value in strings(nested)}
+            return set()
+
+        referenced_strings = strings(value)
         for action_step in self._execution_steps[:preview_index]:
             if action_step.subcommand != "draft-apply":
                 continue
@@ -12135,6 +12283,33 @@ class CodexGatewayBroker:
                         )
                     identities[identity["id"]] = identity["path"]
 
+        for bind_step in self._execution_steps[:preview_index]:
+            if bind_step.subcommand != "draft-bind-object":
+                continue
+            segments = tuple(
+                str(bind_step.arguments[index + 1])
+                for index, item in enumerate(bind_step.arguments[:-1])
+                if item == "--object-path-segment"
+            )
+            if not segments:
+                continue
+            source = self._payloads_by_step.get(bind_step.name)
+            bound = source.get("bound_object") if isinstance(source, Mapping) else None
+            object_id = bound.get("id") if isinstance(bound, Mapping) else None
+            object_path = bound.get("path") if isinstance(bound, Mapping) else None
+            if not isinstance(object_id, str) or object_id not in referenced_strings:
+                continue
+            expected_path = "\\" + "\\".join(segments)
+            if (
+                not isinstance(object_path, str)
+                or object_path != expected_path
+            ):
+                raise GatewayInvocationError(
+                    "Business Draft identity normalization differs from the "
+                    "reviewed bound path"
+                )
+            identities[object_id] = object_path
+
         expected_request = preview_step.expected_operation_request
         expected_arguments = (
             expected_request.get("arguments")
@@ -12146,36 +12321,6 @@ class CodexGatewayBroker:
             and expected_request.get("operation") == "waapi.call"
             and expected_arguments.get("api") == "ak.wwise.core.audio.convert"
         )
-        if audio_convert:
-            for bind_step in self._execution_steps[:preview_index]:
-                if (
-                    bind_step.subcommand != "draft-bind-object"
-                    or "--role" not in bind_step.arguments
-                    or "audio_object" not in bind_step.arguments
-                ):
-                    continue
-                source = self._payloads_by_step.get(bind_step.name)
-                bound = source.get("bound_object") if isinstance(source, Mapping) else None
-                object_id = bound.get("id") if isinstance(bound, Mapping) else None
-                object_path = bound.get("path") if isinstance(bound, Mapping) else None
-                segments = tuple(
-                    str(bind_step.arguments[index + 1])
-                    for index, item in enumerate(bind_step.arguments[:-1])
-                    if item == "--object-path-segment"
-                )
-                expected_path = "\\" + "\\".join(segments)
-                if (
-                    not isinstance(object_id, str)
-                    or not isinstance(object_path, str)
-                    or not segments
-                    or object_path != expected_path
-                ):
-                    raise GatewayInvocationError(
-                        "audio.convert Draft identity normalization differs from "
-                        "the reviewed bound path"
-                    )
-                identities[object_id] = object_path
-
         def normalize(item: Any) -> Any:
             if isinstance(item, Mapping):
                 if (

@@ -351,6 +351,9 @@ def run_v3_codex_task(
         optional_query_schema_step_names=(
             protocol.optional_query_schema_step_names
         ),
+        optional_expected_initial_operations_discovery=(
+            protocol.optional_initial_operations_discovery
+        ),
         expected_wwise_version=version,
         project_modification_policy=project_modification_policy,
         runner_environment=runner_environment,
@@ -680,6 +683,22 @@ def _broker_terminal_protocol_passed(
             and evidence.terminal_state == "COMPLETE"
         )
     if protocol.optional_initial_query_schema:
+        protocol_names = tuple(step.name for step in protocol.steps)
+        selected_names = evidence.expected_step_names
+        if selected_names not in {protocol_names, protocol_names[1:]}:
+            return False
+        return bool(
+            evidence.consumed_step_names == selected_names
+            and len(evidence.records) == len(selected_names)
+            and tuple(record.step_name for record in evidence.records)
+            == selected_names
+            and not evidence.rejected_records
+            and all(record.succeeded for record in evidence.records)
+            and evidence.complete
+            and evidence.passed
+            and evidence.terminal_state == "COMPLETE"
+        )
+    if protocol.optional_initial_operations_discovery:
         protocol_names = tuple(step.name for step in protocol.steps)
         selected_names = evidence.expected_step_names
         if selected_names not in {protocol_names, protocol_names[1:]}:

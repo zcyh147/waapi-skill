@@ -61,6 +61,27 @@ CAPABILITY_COMPACT_KEYS = {
     "read_only",
     "execution_contract",
 }
+
+
+@pytest.mark.parametrize(
+    ("segments", "expected"),
+    (
+        (
+            [
+                "Actor-Mixer Hierarchy",
+                "<Virtual Folder>Weapons",
+                "<Sound SFX>Rifle",
+            ],
+            r"\Actor-Mixer Hierarchy\Weapons\Rifle",
+        ),
+        (["Events", "Default Work Unit"], r"\Events\Default Work Unit"),
+    ),
+)
+def test_business_object_path_segments_normalize_wwise_typed_import_markers(
+    segments: list[str],
+    expected: str,
+) -> None:
+    assert waapi_gateway._business_object_path_from_segments(segments) == expected
 EXPECTED_EXCLUDED_FUNCTION_URIS = frozenset(
     {
         "ak.wwise.ui.commands.register",

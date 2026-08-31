@@ -53,6 +53,8 @@ _NUMBER_OPERATORS = frozenset(
 )
 _DATABASE_SCOPES = {
     "project-originals": r"\Databases\Project Originals",
+    "project originals": r"\Databases\Project Originals",
+    r"\databases\project originals": r"\Databases\Project Originals",
 }
 _FIELD_ALIASES = {
     "filename": "Filename",
@@ -401,10 +403,10 @@ def _materialize_media_pool(
     databases: list[str] = []
     for scope in scopes:
         try:
-            databases.append(_DATABASE_SCOPES[str(scope)])
+            databases.append(_DATABASE_SCOPES[str(scope).casefold()])
         except KeyError as exc:
             raise MediaBuildBusinessError(
-                "database_scope must be project-originals"
+                "database_scope must identify Project Originals"
             ) from exc
     databases.extend(
         _canonical_guid(value, field="database_id")

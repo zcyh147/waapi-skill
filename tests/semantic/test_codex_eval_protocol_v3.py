@@ -25,6 +25,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_schema_query_transaction_protocol,
     build_transaction_protocol,
     call_step,
+    media_pool_business_call_step,
     metadata_candidate_limit,
     query_object_step,
     stream_topic_step,
@@ -908,6 +909,10 @@ def test_operations_discovery_wraps_one_natural_language_business_transaction() 
     assert protocol.turn_prefix_counts == tuple(
         count + 1 for count in base.turn_prefix_counts
     )
+    assert protocol.allowed_turn_prefix_counts == tuple(
+        (count, count + 1) for count in base.turn_prefix_counts
+    )
+    assert protocol.optional_initial_operations_discovery is True
     assert protocol.steps[1:] == base.steps
 
 
@@ -953,6 +958,13 @@ def test_audio_convert_uses_core_business_draft_instead_of_typed_call() -> None:
         step.subcommand for step in steps
     )
     assert all(step.subcommand != "typed-call" for step in protocol.steps)
+
+    discovered = build_operations_discovery_protocol(protocol)
+    assert tuple(step.subcommand for step in discovered.steps[:2]) == (
+        "operations",
+        "request-schema",
+    )
+    assert discovered.optional_initial_operations_discovery is True
 
 
 def test_commutative_read_only_groups_are_adjacent_and_cannot_cross_turns() -> None:
@@ -2115,6 +2127,71 @@ def test_media_pool_read_draft_appends_typed_post_filter() -> None:
             options={"return": ["Filename"]},
             post_filter={},
         )
+
+
+def test_media_pool_public_business_read_uses_one_bounded_core_call() -> None:
+    step = media_pool_business_call_step(
+        "media.get",
+        scenario_id="VS25-F-MEDIAPOOL-GET-01",
+        args={
+            "databases": [r"\Databases\Project Originals"],
+            "filters": [
+                {
+                    "type": "field",
+                    "field": "Filename",
+                    "operator": "contains",
+                    "value": "footstep",
+                },
+                {
+                    "type": "field",
+                    "field": "WAV/Duration",
+                    "operator": "lessThan",
+                    "value": 0.8,
+                },
+            ],
+            "maxResults": 200,
+        },
+        options={"return": ["Path", "FileId", "Db", "Filename", "WAV/Duration"]},
+        post_filter={
+            "field": "Filename",
+            "operator": "containsCaseSensitive",
+            "value": "footstep",
+            "limit": 20,
+        },
+    )
+
+    assert step.subcommand == "core-call"
+    canonical_arguments = tuple(
+        argument.values[0]
+        if isinstance(argument, ExactArgumentAlternatives)
+        else argument
+        for argument in step.arguments
+    )
+    assert canonical_arguments == (
+        "ak.wwise.core.mediaPool.get",
+        "--max-results",
+        "200",
+        "--database-scope",
+        "project-originals",
+        "--text-filter",
+        "Filename",
+        "contains",
+        "footstep",
+        "--number-filter",
+        "WAV/Duration",
+        "lessThan",
+        "0.8",
+        "--exact-name-contains",
+        "footstep",
+        "--final-limit",
+        "20",
+        "--sort-by",
+        "WAV/Duration",
+        "ascending",
+        "--sort-by",
+        "Path",
+        "ascending",
+    )
 
 
 def test_media_pool_read_draft_keeps_dynamic_choice_and_value_in_one_batch() -> None:

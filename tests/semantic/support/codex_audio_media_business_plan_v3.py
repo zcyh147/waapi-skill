@@ -29,6 +29,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_direct_protocol,
     build_transaction_protocol,
     call_step,
+    media_pool_business_call_step,
     query_object_step,
     request_schema_step,
     typed_read_draft_steps,
@@ -1943,26 +1944,51 @@ def _validate_media_inputs(
         oracle.request.post_filter,
     ):
         raise AudioMediaBusinessPlanError("media sealed request is not independently reproducible from its field binding")
-    expected_protocol = _expected_media_protocol(case, oracle)
-    if _protocol_value(protocol) != _protocol_value(expected_protocol):
+    expected_protocols = (
+        _expected_media_protocol(case, oracle),
+        _expected_media_protocol(case, oracle, direct_business=True),
+    )
+    if json.dumps(_protocol_value(protocol), sort_keys=True) not in {
+        json.dumps(_protocol_value(expected), sort_keys=True)
+        for expected in expected_protocols
+    }:
         raise AudioMediaBusinessPlanError("media protocol does not exactly bind fields, request, and association readback")
 
 
-def _expected_media_protocol(case: MaterializedMediaPoolCase, oracle: SealedMediaPoolOracle) -> V3GatewayProtocol:
+def _expected_media_protocol(
+    case: MaterializedMediaPoolCase,
+    oracle: SealedMediaPoolOracle,
+    *,
+    direct_business: bool = False,
+) -> V3GatewayProtocol:
     steps = [
         request_schema_step("media.get-fields.schema", MEDIA_POOL_GET_FIELDS_URI),
         call_step("media.get-fields", MEDIA_POOL_GET_FIELDS_URI, version=MEDIA_VERSION),
     ]
-    steps.extend(
-        typed_read_draft_steps(
-            "media",
-            MEDIA_POOL_GET_URI,
-            version=MEDIA_VERSION,
-            args=oracle.request.args,
-            options=oracle.request.options,
-            post_filter=oracle.request.post_filter,
+    if direct_business:
+        steps.extend(
+            (
+                request_schema_step("media.operation-schema", MEDIA_POOL_GET_URI),
+                media_pool_business_call_step(
+                    "media.get",
+                    scenario_id=case.scenario_id,
+                    args=oracle.request.args,
+                    options=oracle.request.options,
+                    post_filter=oracle.request.post_filter,
+                ),
+            )
         )
-    )
+    else:
+        steps.extend(
+            typed_read_draft_steps(
+                "media",
+                MEDIA_POOL_GET_URI,
+                version=MEDIA_VERSION,
+                args=oracle.request.args,
+                options=oracle.request.options,
+                post_filter=oracle.request.post_filter,
+            )
+        )
     if case.association_expectations is not None:
         steps.append(
             query_object_step(
