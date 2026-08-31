@@ -196,6 +196,21 @@ prevention checks that are expensive to rediscover.
   20,000 bytes. A Program regression enforces that ceiling. Never weaken the
   equality gate or replay a clipped root.
 
+### Repeated Windows path separators are not an extra Skill read
+
+- Evidence: #60 r26 completed the exact PowerShell Core `Get-Content` reads,
+  returned byte-identical Skill/reference content, and completed the intended
+  Gateway workflows, but Codex wrote doubled `\\` separators inside the
+  single-quoted task-local relative locator. PowerShell and the Windows
+  filesystem resolved the same fixed files; the harness alone classified the
+  successful read as an unexpected command.
+- Prevention: for the sealed Windows task-local Skill locators only, collapse
+  one or more backslashes before matching the fixed allow-list. Continue to
+  reject forward slashes, absolute/drive paths, empty components, and `..`, and
+  retain the exact profile-free PowerShell Core wrapper, complete-byte output,
+  read order, and one-read cardinality checks. This equivalence does not apply
+  to Gateway argv, user paths, or shell commands generally.
+
 ### macOS foreground ownership and TCC
 
 - Symptom: a unified shell receives `SIGTERM`, a `nohup` child outlives its

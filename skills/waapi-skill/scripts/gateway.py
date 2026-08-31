@@ -408,6 +408,8 @@ from wwise_waapi.business_declarations import (  # noqa: E402  # pyright: ignore
     revalidate_live_objects,
     revalidate_live_types,
     resolve_semantic_kind,
+    semantic_kind_for_live_type,
+    semantic_kinds_for_live_type,
 )
 from wwise_waapi.soundbank_business_cli import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     SoundBankBusinessCliError,
@@ -707,6 +709,8 @@ QUERY_BUSINESS_RELATIONSHIPS: Mapping[str, str] = {
     "children": "children",
     "parent": "parent",
 }
+SOUNDBANK_GENERATED_TOPIC_URI = "ak.wwise.core.soundbank.generated"
+SOUNDBANK_TOPIC_IDENTITY_FIELDS = ("id", "name", "type", "path")
 QUERY_BUSINESS_OUTPUTS: Mapping[str, tuple[str, str]] = {
     "notes": ("notes", "notes"),
     "volume-db": ("@Volume", "volume_db"),
@@ -3071,6 +3075,25 @@ def add_topic_business_input_arguments(parser: argparse.ArgumentParser) -> None:
             "Exact contract digest copied from topic-schema; execution rejects "
             "a missing or stale business vocabulary before connecting"
         ),
+    )
+    parser.add_argument(
+        "--include-object-identity",
+        action="store_true",
+        help=(
+            "For soundbank.generated, return the SoundBank id, name, type, and "
+            "path as one Gateway-owned business projection"
+        ),
+    )
+    parser.add_argument(
+        "--match-platform-name",
+        help=(
+            "For soundbank.generated, match the exact platform name without "
+            "copying a reflected value-choice handle"
+        ),
+    )
+    parser.add_argument(
+        "--match-soundbank-name",
+        help="For soundbank.generated, match the exact SoundBank object name",
     )
     parser.add_argument(
         "--topic-option",
@@ -5828,21 +5851,57 @@ def preflight_typed_topic_input(
             "different topic/version. Run topic-schema again and copy its exact "
             "--topic-contract-digest value."
         )
-    args.typed_topic_input = materialize_topic_business_inputs(
-        version=version,
-        topic=args.api,
-        option_facts=_topic_business_facts(
+    shortcut_requested = (
+        args.include_object_identity
+        or args.match_platform_name is not None
+        or args.match_soundbank_name is not None
+    )
+    if shortcut_requested and args.api != SOUNDBANK_GENERATED_TOPIC_URI:
+        raise GatewayInputError(
+            "SoundBank Topic business shortcuts are accepted only for "
+            f"{SOUNDBANK_GENERATED_TOPIC_URI}."
+        )
+    option_facts = list(
+        _topic_business_facts(
             args,
             business,
             "topic_option",
             channel="topic-option",
-        ),
-        match_facts=_topic_business_facts(
+        )
+    )
+    if args.include_object_identity:
+        option_facts.extend(
+            TopicBusinessFact("include", field_name)
+            for field_name in SOUNDBANK_TOPIC_IDENTITY_FIELDS
+        )
+    match_facts = list(
+        _topic_business_facts(
             args,
             business,
             "event_match",
             channel="event-match",
-        ),
+        )
+    )
+    if args.match_soundbank_name is not None:
+        match_facts.append(
+            TopicBusinessFact("soundbank-name", args.match_soundbank_name)
+        )
+    entry_facts = list(_topic_business_entry_facts(args, business))
+    if args.match_platform_name is not None:
+        entry_facts.append(
+            TopicBusinessEntryFact(
+                "platform",
+                (),
+                "name",
+                args.match_platform_name,
+                kind="text",
+            )
+        )
+    args.typed_topic_input = materialize_topic_business_inputs(
+        version=version,
+        topic=args.api,
+        option_facts=tuple(option_facts),
+        match_facts=tuple(match_facts),
         option_empty_facts=tuple(
             TopicBusinessEmptyFact(field_name)
             for field_name in args.topic_option_empty
@@ -5859,7 +5918,7 @@ def preflight_typed_topic_input(
             )
             for collection, parent_indices in args.event_row_empty
         ),
-        entry_facts=_topic_business_entry_facts(args, business),
+        entry_facts=tuple(entry_facts),
         entry_empty_facts=tuple(
             TopicBusinessEntryEmptyFact(
                 scope,
@@ -8128,6 +8187,21 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                         "<value-choice-handle> <value>"
                     ),
                 },
+                **(
+                    {
+                        "business_shortcuts": {
+                            "include_object_identity": "--include-object-identity",
+                            "match_platform_name": (
+                                "--match-platform-name <exact-name>"
+                            ),
+                            "match_soundbank_name": (
+                                "--match-soundbank-name <exact-name>"
+                            ),
+                        }
+                    }
+                    if args.api == SOUNDBANK_GENERATED_TOPIC_URI
+                    else {}
+                ),
                 "value_choice_policy": {
                     "choice_on_disclosure": {
                         "disclose_first": True,
@@ -16555,6 +16629,19 @@ def dispatch_business_object_binding(
         semantic_kind = (
             "sound-voice" if subtype_rows[0]["@IsVoice"] else "sound-sfx"
         )
+    business_kind_candidates = (
+        (semantic_kind,)
+        if semantic_kind is not None
+        else semantic_kinds_for_live_type(
+            str(row["type"]),
+            version=detected_version,
+        )
+    )
+    business_kind = (
+        business_kind_candidates[0]
+        if len(business_kind_candidates) == 1
+        else None
+    )
     captured: list[Any] = []
 
     def bind(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
@@ -16605,6 +16692,14 @@ def dispatch_business_object_binding(
                 "handle": bound.handle,
                 "name": bound.name,
                 "type": bound.object_type,
+                "business_kind": business_kind,
+                "business_kind_resolution": {
+                    "status": (
+                        "resolved" if business_kind is not None else "ambiguous"
+                    ),
+                    "candidates": list(business_kind_candidates),
+                    "reflected_type": str(row["type"]),
+                },
                 "semantic_kind": bound.semantic_kind,
                 **({} if bound.role is None else {"role": bound.role}),
             },
@@ -22352,8 +22447,12 @@ def _business_next_action_binding(
         "result": "copy_the_returned_bound_object.handle",
         "result_validation_rule": (
             "before_declaration_compare_returned_name_and_path_to_the_user_"
-            "target; compare_type_only_when_explicitly_supplied; hierarchy_"
-            "label_is_not_an_object_type; bind_again_or_stop_if_they_differ"
+            "target; when_business_kind_resolution_status_is_resolved_and_the_"
+            "user_supplied_a_business_type_compare_business_kind_not_the_"
+            "version_specific_reflected_type; when_status_is_ambiguous_do_not_"
+            "guess_from_the_reflected_type_and_stop_with_the_returned_candidates; "
+            "hierarchy_label_is_not_an_object_type; bind_again_or_stop_if_they_"
+            "differ"
         ),
         "use_only_for": [
             "existing_target",

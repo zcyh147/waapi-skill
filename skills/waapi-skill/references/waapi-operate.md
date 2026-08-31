@@ -48,7 +48,7 @@ Table imports start `operation-schema audio.importTabDelimited`; dynamic columns
 
 `construction_state.complete:false` and compact action receipts are complete JSON. Follow `next_command_decision`; only an exact `business_value_pointer` authorizes it. A business Draft instead follows its returned required phase and completion candidate. Copy handles into the same named role. Corrections reuse the draft; never `draft-apply --action check`.
 
-Public mutation identities are closed to `id`, `path`, `exact-type-name`, `direct-child`, and `scoped-name`. A complete caller path stays intact. After an exact relationship/path read returns canonical `id`/`name`/`type`/`path`, reuse its GUID as an `id` selector for a later object/target; never switch to path/name or retype its Wwise path. Gateway revalidates it. Zero/multiple/truncated results do not identify a target. Raw WAQL never becomes mutation identity.
+Public mutation identities are closed to `id`, `path`, `exact-type-name`, `direct-child`, and `scoped-name`. A complete caller path stays intact. After an exact relationship/path read returns canonical `id`/`name`/`type`/`path`, reuse its GUID as an `id` selector for a later object/target; never switch to path/name or retype its Wwise path. Gateway revalidates it. A bound object's resolved `business_kind` is the version-stable type comparison; do not reject it because the raw reflected `type` uses a version-specific Wwise class name. If `business_kind_resolution.status` is `ambiguous`, stop with its candidates instead of guessing from the reflected class. Zero/multiple/truncated results do not identify a target. Raw WAQL never becomes mutation identity.
 
 ## Choose by business outcome
 

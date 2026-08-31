@@ -19,6 +19,8 @@ from wwise_waapi.business_declarations import (
     revalidate_live_object,
     revalidate_live_objects,
     resolve_semantic_kind,
+    semantic_kind_for_live_type,
+    semantic_kinds_for_live_type,
 )
 
 
@@ -102,6 +104,23 @@ def test_semantic_kind_normalizes_unambiguous_wwise_display_names(
     resolved = resolve_semantic_kind(display_name, version="2025.1")
 
     assert resolved.name == stable_name
+
+
+def test_live_reflected_type_maps_back_to_one_unambiguous_business_kind() -> None:
+    assert semantic_kind_for_live_type(
+        "PropertyContainer",
+        version="2025.1",
+    ) == "actor-mixer"
+    assert semantic_kind_for_live_type("ActorMixer", version="2022.1") == "actor-mixer"
+    assert semantic_kind_for_live_type("Sound", version="2025.1") is None
+    assert semantic_kind_for_live_type(
+        "RandomSequenceContainer",
+        version="2025.1",
+    ) is None
+    assert semantic_kinds_for_live_type(
+        "RandomSequenceContainer",
+        version="2025.1",
+    ) == ("random-container", "sequence-container")
 
 
 def test_new_descendant_uses_parent_handle_name_and_kind_only() -> None:

@@ -75,6 +75,18 @@ def test_weak_verifier_oracle_accepts_clear_chinese_boundary() -> None:
     )
 
 
+def test_get_info_oracle_accepts_exact_wwiseconsole_release_and_labeled_build() -> None:
+    response = (
+        "实时 getInfo 显示：连接的是 WwiseConsole.exe，PID 1104，"
+        "完整版本 v2023.1.19（build 8928）。"
+    )
+
+    assert runner._final_response_has_complete_build_identity(  # noqa: SLF001
+        response,
+        expected_build="2023.1.19.8928",
+    )
+
+
 def _successful_spawn_topic_publisher(
     _host,
     _port,
@@ -2319,10 +2331,6 @@ def test_prepare_case_compiles_and_validates_typed_soundbank_sections_for_all_ap
     if topic:
         assert [step.name for step in prepared.protocol.steps] == [
             "soundbank.generated.schema",
-            "soundbank.generated.schema.language.entry",
-            "soundbank.generated.schema.platform.entry",
-            "soundbank.generated.schema.soundbank.match-group",
-            "soundbank.generated.schema.soundbank.entry",
             "soundbank.generated.wait",
         ]
         assert len(prepared.topic_publishers) == 3

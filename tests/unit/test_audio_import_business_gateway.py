@@ -282,7 +282,10 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
     )
     result_validation = start_next["object_binding"]["result_validation_rule"]
     assert "returned_name_and_path" in result_validation
-    assert "compare_type_only_when_explicitly_supplied" in result_validation
+    assert "compare_business_kind_not_the_version_specific_reflected_type" in (
+        result_validation
+    )
+    assert "stop_with_the_returned_candidates" in result_validation
     assert "hierarchy_label_is_not_an_object_type" in result_validation
     assert "by_path" not in start_next["object_binding"]
     assert "configure" not in start_next

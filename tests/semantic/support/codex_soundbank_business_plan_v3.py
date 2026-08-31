@@ -80,6 +80,9 @@ _DEFINITION_FILTER_TO_INCLUSION = MappingProxyType(
 )
 _STREAM_TOPIC_SCENARIO_IDS = frozenset({"O22-SB-GENERATED-03"})
 _STREAM_TOPIC_TIMEOUT_SECONDS = 30.0
+_RESULT_ONLY_TOPIC_DISCLOSURES = MappingProxyType(
+    {"O22-SB-GENERATED-03": ("platform",)}
+)
 
 
 def soundbank_topic_lifecycle(scenario_id: str) -> tuple[str, str]:
@@ -496,14 +499,17 @@ def soundbank_topic_protocol_steps(
         )
     )
     lifecycle_name, lifecycle_command = soundbank_topic_lifecycle(scenario_id)
-    # A finite stream needs only disclosures that construct its subscription.
-    # Result-only platform/language identities are runner-validated payload
-    # fields, not Agent-authored match parameters. Historical fixed-count waits
-    # retain their sealed result disclosures.
+    # Match construction is Agent-owned. Result-only identities normally come
+    # from the event projection, not hidden schema-read chores. The explicit
+    # stream case keeps platform as one optional disclosure because its prompt
+    # asks the Agent to distinguish two platform records before subscribing.
     disclosure_scopes = (
-        tuple(sorted(canonical_match))
-        if lifecycle_command == "stream-topic"
-        else tuple(sorted({*canonical_match, "language", "platform", "soundbank"}))
+        *tuple(sorted(canonical_match)),
+        *tuple(
+            scope
+            for scope in _RESULT_ONLY_TOPIC_DISCLOSURES.get(scenario_id, ())
+            if scope not in canonical_match
+        ),
     )
     for scope in disclosure_scopes:
         value = canonical_match.get(scope)
@@ -513,15 +519,7 @@ def soundbank_topic_protocol_steps(
             for candidate in field._candidates
         )
         has_entry = any(entry.token == scope for entry in contract.entry_fields)
-        result_only_soundbank_disclosures = (
-            scope == "soundbank"
-            and scope not in canonical_match
-            and has_match_group
-            and has_entry
-        )
-        if (
-            isinstance(value, Mapping) or result_only_soundbank_disclosures
-        ) and has_match_group:
+        if isinstance(value, Mapping) and has_match_group:
             steps.append(
                 topic_schema_match_group_step(
                     f"soundbank.generated.schema.{scope}.match-group",
@@ -529,12 +527,7 @@ def soundbank_topic_protocol_steps(
                     group=scope,
                 )
             )
-        stream_match_group_is_complete = (
-            lifecycle_command == "stream-topic"
-            and scope in canonical_match
-            and has_match_group
-        )
-        if has_entry and not stream_match_group_is_complete:
+        if has_entry and not (scope in canonical_match and has_match_group):
             steps.append(
                 topic_schema_step(
                     f"soundbank.generated.schema.{scope}.entry",

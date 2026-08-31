@@ -3697,42 +3697,28 @@ def test_soundbank_topic_protocol_discloses_each_nested_match_scope() -> None:
 
     assert [step.name for step in steps] == [
         "soundbank.generated.schema",
-        "soundbank.generated.schema.language.entry",
         "soundbank.generated.schema.platform.entry",
         "soundbank.generated.schema.soundbank.match-group",
-        "soundbank.generated.schema.soundbank.entry",
         "soundbank.generated.wait",
     ]
     assert steps[1].arguments == (
         "ak.wwise.core.soundbank.generated",
         "--entry",
-        "language",
-    )
-    assert steps[2].arguments == (
-        "ak.wwise.core.soundbank.generated",
-        "--entry",
         "platform",
     )
-    assert steps[3].arguments == (
+    assert steps[2].arguments == (
         "ak.wwise.core.soundbank.generated",
         "--match-group",
         "soundbank",
     )
-    assert steps[4].arguments == (
-        "ak.wwise.core.soundbank.generated",
-        "--entry",
-        "soundbank",
-    )
 
     protocol = build_optional_topic_schema_protocol(steps)
-    assert protocol.allowed_turn_prefix_counts == ((2, 3, 4, 5, 6),)
-    assert protocol.terminal_prefix_counts == (2, 3, 4, 5, 6)
+    assert protocol.allowed_turn_prefix_counts == ((2, 3, 4),)
+    assert protocol.terminal_prefix_counts == (2, 3, 4)
     assert protocol.optional_topic_schema_step_groups == (
         (
-            "soundbank.generated.schema.language.entry",
             "soundbank.generated.schema.platform.entry",
             "soundbank.generated.schema.soundbank.match-group",
-            "soundbank.generated.schema.soundbank.entry",
         ),
     )
 
@@ -3820,6 +3806,7 @@ def test_soundbank_topic_protocol_selects_finite_stream_for_explicit_stream_case
     assert [step.name for step in steps] == [
         "soundbank.generated.schema",
         "soundbank.generated.schema.soundbank.match-group",
+        "soundbank.generated.schema.platform.entry",
         "soundbank.generated.stream",
     ]
     assert steps[-1].arguments[:2] == (
@@ -3834,6 +3821,7 @@ def test_soundbank_topic_protocol_selects_finite_stream_for_explicit_stream_case
     selected_names = [
         "soundbank.generated.schema",
         "soundbank.generated.schema.soundbank.match-group",
+        "soundbank.generated.schema.platform.entry",
         "soundbank.generated.stream",
     ]
     selected = campaign._consumed_heavy_v3_protocol_steps(  # noqa: SLF001
@@ -3844,8 +3832,8 @@ def test_soundbank_topic_protocol_selects_finite_stream_for_explicit_stream_case
     assert [step.name for step in selected] == selected_names
 
 
-def test_fixed_count_topic_allows_soundbank_match_then_result_entry() -> None:
-    """A fixed wait may inspect both SoundBank match and result projections."""
+def test_fixed_count_topic_needs_only_the_requested_match_disclosure() -> None:
+    """Result projection is a business option, not a hidden schema-read chore."""
 
     steps = soundbank_topic_protocol_steps(
         scenario_id="O22-SB-GENERATED-01",
@@ -3858,8 +3846,6 @@ def test_fixed_count_topic_allows_soundbank_match_then_result_entry() -> None:
     protocol = build_optional_topic_schema_protocol(steps)
     selected_names = [
         "soundbank.generated.schema",
-        "soundbank.generated.schema.soundbank.match-group",
-        "soundbank.generated.schema.soundbank.entry",
         "soundbank.generated.schema.platform.entry",
         "soundbank.generated.wait",
     ]
@@ -3873,7 +3859,7 @@ def test_fixed_count_topic_allows_soundbank_match_then_result_entry() -> None:
     assert [step.name for step in selected] == selected_names
 
 
-def test_soundbank_topic_protocol_seals_result_only_soundbank_disclosures() -> None:
+def test_soundbank_topic_protocol_does_not_force_result_only_disclosures() -> None:
     steps = soundbank_topic_protocol_steps(
         scenario_id="O22-SB-GENERATED-01",
         topic="ak.wwise.core.soundbank.generated",
@@ -3888,19 +3874,7 @@ def test_soundbank_topic_protocol_seals_result_only_soundbank_disclosures() -> N
         if step.name.startswith("soundbank.generated.schema.soundbank.")
     ]
 
-    assert [step.name for step in disclosures] == [
-        "soundbank.generated.schema.soundbank.match-group",
-        "soundbank.generated.schema.soundbank.entry",
-    ]
-    assert all(step.subcommand == "topic-schema" for step in disclosures)
-    assert all(
-        step.arguments[0] == "ak.wwise.core.soundbank.generated"
-        for step in disclosures
-    )
-    assert [step.arguments[1:] for step in disclosures] == [
-        ("--match-group", "soundbank"),
-        ("--entry", "soundbank"),
-    ]
+    assert disclosures == []
 
 
 def _synthetic_audio_transaction_request() -> dict[str, Any]:

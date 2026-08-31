@@ -16,9 +16,9 @@
     ]
   },
   "source_contracts": {
-    "gateway_parser_sha256": "89b917ec571a2383d36d966036db0a56ee9e8a7aebd4790c234392625b484c27",
+    "gateway_parser_sha256": "6b8fe2c100a412c0e2f76b35c02326f7ad5a73fd3d40500a0a2cbb610b79dc2f",
     "operation_contract_sha256": "f687d20d337507d0550fff00214faf73773ae2578e916bef82cc9389d624bad0",
-    "public_continuation_sha256": "1bbb818941b2f52150bde084f7312a66d0fd2d4465bf093af9830345bb8c4282",
+    "public_continuation_sha256": "ec3d7160211bc44c4af82ec52c134610eb18ab48fd3e00341df630d88fcc61ca",
     "typed_request_surface_sha256": "7cbe0a9ba6d9756c94ecea58bb1b2ac56da242059f17c5cdfdaf768271d133a8"
   },
   "ownership_classes": {
@@ -139,7 +139,7 @@
       "owner_issue": null,
       "match": {"item_types": ["topic"]},
       "leaked_mechanics": [],
-      "audit_evidence": "The public waapi-skill.topic-business/v1 envelope covers all 154 exact five-version Topic lanes. Callers supply stable event meanings, business match values, and explicit wait or stream intent; ambiguous scalar meanings are selected only by contract-bound opaque tvc1 handles, so callers never author wire types. The Gateway derives versioned event-schema paths, native types, nested match structure, contract digest, the sole continuation, subscription ACK, projection, and cleanup. wait-topic owns finite timeout or explicitly bounded no-timeout behavior. stream-topic requires an event ceiling even with a finite duration, bounds every event and cumulative NDJSON bytes, emits ordered started/event/terminal records, and reports cancellation unsubscribe truth separately from transport cleanup. The 24-family 2022.1/2025.1 structural policy credits only fresh matching payloads from active safe publishers; prerequisite and prohibited families retain exact blockers and receive no real PASS credit."
+      "audit_evidence": "The public waapi-skill.topic-business/v1 envelope covers all 154 exact five-version Topic lanes. Callers supply stable event meanings, business match values, and explicit wait or stream intent; ambiguous scalar meanings are selected only by contract-bound opaque tvc1 handles, so callers never author wire types. The Gateway derives versioned event-schema paths, native types, nested match structure, contract digest, the sole continuation, subscription ACK, projection, and cleanup. The SoundBank-generated lane additionally exposes closed object-identity, platform-name, and SoundBank-name business shortcuts; the Gateway expands them to the same typed contract and keeps the generic lossless path available. wait-topic owns finite timeout or explicitly bounded no-timeout behavior. stream-topic requires an event ceiling even with a finite duration, bounds every event and cumulative NDJSON bytes, emits ordered started/event/terminal records, and reports cancellation unsubscribe truth separately from transport cleanup. The 24-family 2022.1/2025.1 structural policy credits only fresh matching payloads from active safe publishers; prerequisite and prohibited families retain exact blockers and receive no real PASS credit."
     },
     {
       "id": "generic-core-media-build",

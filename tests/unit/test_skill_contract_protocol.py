@@ -575,12 +575,9 @@ def test_mixed_parent_child_query_keeps_both_required_types_in_candidate_set() -
 def test_soundbank_generated_uses_an_explicit_skill_selected_timeout() -> None:
     assert "For `ak.wwise.core.soundbank.generated`" in QUERY
     assert "Run `topic-schema`" in QUERY
-    assert "--topic-option include <id|name|type|path>" in QUERY
-    assert "--entry platform" in QUERY
-    assert (
-        "--event-entry-as platform - name <literal-text-handle> "
-        "<platform-name>"
-    ) in QUERY
+    assert "--include-object-identity" in QUERY
+    assert "--match-platform-name <exact-name>" in QUERY
+    assert "--match-soundbank-name <exact-name>" in QUERY
     assert "--event-entry platform - name <platform-name>" not in QUERY
     assert "--timeout 10 wait-topic ak.wwise.core.soundbank.generated" not in QUERY
     assert "gateway itself keeps the ordinary 10-second omitted-duration default" in QUERY

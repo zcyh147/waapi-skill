@@ -345,14 +345,37 @@ def verify_media_pool_business_projection(
 
         include_groups = selected_groups("--include-field")
         return_meanings = business_request.get("return_field_meanings")
-        if (
-            not isinstance(return_meanings, list)
-            or len(return_meanings) != len(include_groups)
-            or any(
-                not isinstance(value, str) or value not in choices(group[1])
-                for value, group in zip(return_meanings, include_groups, strict=True)
-            )
+        if not isinstance(return_meanings, list) or any(
+            not isinstance(value, str) or not value for value in return_meanings
         ):
+            raise MediaPoolBusinessOracleError(
+                "Media Pool return projection differs from the sealed step"
+            )
+        fixed_return_fields = tuple(view.options.get("return", ()))
+        if not all(
+            isinstance(value, str) and value for value in fixed_return_fields
+        ):
+            raise MediaPoolBusinessOracleError(
+                "Media Pool sealed fixed return projection is invalid"
+            )
+        selected_bindings: list[tuple[str, str]] = []
+        expected_include_index = 0
+        for value in return_meanings:
+            if (
+                expected_include_index < len(include_groups)
+                and value in choices(include_groups[expected_include_index][1])
+            ):
+                selected_bindings.append(
+                    (value, choices(include_groups[expected_include_index][1])[0])
+                )
+                expected_include_index += 1
+                continue
+            if value not in fixed_return_fields:
+                raise MediaPoolBusinessOracleError(
+                    "Media Pool return projection differs from the sealed step"
+                )
+            selected_bindings.append((value, value))
+        if expected_include_index != len(include_groups):
             raise MediaPoolBusinessOracleError(
                 "Media Pool return projection differs from the sealed step"
             )
@@ -409,10 +432,6 @@ def verify_media_pool_business_projection(
                 "Media Pool business filter count differs from the sealed step"
             )
 
-        selected_bindings = [
-            (str(value), choices(group[1])[0])
-            for value, group in zip(return_meanings, include_groups, strict=True)
-        ]
         selected_bindings.extend(
             (meaning, field) for meaning, field, _direction in sort_rules
         )

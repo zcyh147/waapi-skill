@@ -703,6 +703,53 @@ def test_case_01_verifies_the_closed_gateway_business_projection(
     ).ok
 
 
+def test_case_01_accepts_explicit_fixed_report_fields_as_projection_only(
+    tmp_path: Path,
+) -> None:
+    """Extra fixed report fields must not change candidate-selection semantics."""
+
+    _runtime, _staged, oracle = _sealed_case01(tmp_path)
+    items = []
+    for key in oracle.semantic_answer.ordered_keys:
+        row = oracle.row(key)
+        items.append(
+            {
+                "database_id": row.db["id"].upper(),
+                "database_name": row.db["name"],
+                "file_id": row.file_id.upper(),
+                "path": row.path,
+                "values": {
+                    "filename": row.values["Filename"],
+                    "wav_duration": row.values["WAV/Duration"],
+                    "path": row.path,
+                },
+            }
+        )
+    result = {
+        "contract": "waapi-skill.media-build-result/v1",
+        "kind": "media_pool_rows",
+        "complete": True,
+        "candidate_count": len(oracle.candidate_keys),
+        "returned_count": len(items),
+        "candidate_limit": 200,
+        "incomplete_reason": None,
+        "items": items,
+    }
+    request = _case01_gateway_business_request(max_results=200, exact_name=True)
+    request["return_field_meanings"] = ["Filename", "WAV/Duration"]
+    request["sort_rules"] = [
+        {"field_meaning": "WAV/Duration", "direction": "ascending"},
+        {"field_meaning": "Path", "direction": "ascending"},
+    ]
+
+    assert verify_media_pool_business_projection(
+        oracle,
+        _case01_business_step(oracle),
+        result,
+        request,
+    ).ok
+
+
 def test_case_01_archive_builds_an_explicit_business_oracle_view(
     tmp_path: Path,
 ) -> None:

@@ -485,6 +485,100 @@ def test_topic_schema_leads_with_handle_free_business_input(tmp_path: Path) -> N
     }
 
 
+def test_soundbank_topic_schema_exposes_closed_business_shortcuts(
+    tmp_path: Path,
+) -> None:
+    topic = "ak.wwise.core.soundbank.generated"
+
+    code, payload = gateway.execute_gateway(
+        ["topic-schema", topic],
+        env=_env(tmp_path, "2025.1"),
+        client_factory=lambda url: pytest.fail(f"topic-schema connected to {url}"),
+    )
+
+    assert code == 0
+    assert payload["continuation"]["business_shortcuts"] == {
+        "include_object_identity": "--include-object-identity",
+        "match_platform_name": "--match-platform-name <exact-name>",
+        "match_soundbank_name": "--match-soundbank-name <exact-name>",
+    }
+
+
+def test_soundbank_topic_business_shortcuts_compile_without_handles(
+    tmp_path: Path,
+) -> None:
+    topic = "ak.wwise.core.soundbank.generated"
+    contract = topic_business_contract("2025.1", topic)
+    client = _TopicClient(
+        topic,
+        [
+            {
+                "soundbank": {
+                    "id": "{22222222-2222-2222-2222-222222222222}",
+                    "name": "Main",
+                    "type": "SoundBank",
+                    "path": r"\SoundBanks\Main",
+                },
+                "platform": {"name": "Windows"},
+            }
+        ],
+    )
+
+    code, payload = gateway.execute_gateway(
+        [
+            "--timeout",
+            "0.5",
+            "wait-topic",
+            topic,
+            "--event-count",
+            "1",
+            "--topic-contract-digest",
+            contract.contract_digest,
+            "--include-object-identity",
+            "--match-platform-name",
+            "Windows",
+            "--match-soundbank-name",
+            "Main",
+        ],
+        env=_env(tmp_path, "2025.1"),
+        client_factory=lambda url: client,
+    )
+
+    assert code == 0, payload.get("message", payload)
+    assert payload["event"]["soundbank"] == {
+        "id": "{22222222-2222-2222-2222-222222222222}",
+        "name": "Main",
+        "type": "SoundBank",
+        "path": r"\SoundBanks\Main",
+    }
+    assert payload["event"]["platform"]["name"] == "Windows"
+
+
+def test_soundbank_topic_business_shortcuts_reject_other_topics_before_connecting(
+    tmp_path: Path,
+) -> None:
+    topic = "ak.wwise.core.object.created"
+    contract = topic_business_contract("2025.1", topic)
+
+    code, payload = gateway.execute_gateway(
+        [
+            "wait-topic",
+            topic,
+            "--event-count",
+            "1",
+            "--topic-contract-digest",
+            contract.contract_digest,
+            "--include-object-identity",
+        ],
+        env=_env(tmp_path, "2025.1"),
+        client_factory=lambda url: pytest.fail(f"invalid shortcut connected to {url}"),
+    )
+
+    assert code == 2
+    assert payload["error_code"] == "GatewayInputError"
+    assert "soundbank.generated" in payload["message"]
+
+
 def test_ambiguous_topic_scalar_uses_a_digest_bound_value_choice_handle(
     tmp_path: Path,
 ) -> None:

@@ -4587,6 +4587,20 @@ def validated_skill_read(
 ) -> tuple[str, str] | None:
     """Prove a complete approved Skill read from one closed locator."""
 
+    workspace_path_text = path_text
+    windows_absolute = PureWindowsPath(path_text).is_absolute()
+    host_absolute = Path(path_text).is_absolute()
+    if (
+        exact_workspace_relative_syntax == "windows"
+        and not windows_absolute
+        and not host_absolute
+    ):
+        if "/" in path_text or path_text.startswith("\\") or ":" in path_text:
+            return None
+        windows_parts = tuple(re.split(r"\\+", path_text))
+        if not windows_parts or any(part in {"", ".."} for part in windows_parts):
+            return None
+        workspace_path_text = "\\".join(windows_parts)
     candidate = Path(path_text)
     if ".." in candidate.parts:
         return None
@@ -4601,7 +4615,7 @@ def validated_skill_read(
             exact_workspace_relative_syntax or ""
         )
         relative_parts = (
-            workspace_reads.get(path_text)
+            workspace_reads.get(workspace_path_text)
             if workspace_reads is not None
             else None
         )

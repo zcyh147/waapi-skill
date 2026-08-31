@@ -3483,7 +3483,7 @@ def _final_response_has_complete_build_identity(
     if not separator or not release or not build.isdigit():
         return False
     line_pattern = re.compile(
-        rf"(?im)^[^\n]*\bwwise\b[^\n]{{0,96}}"
+        rf"(?im)^[^\n]*\bwwise(?:console(?:\.exe)?)?\b[^\n]{{0,96}}"
         rf"(?<![0-9.])v?{re.escape(release)}(?![0-9.])"
         rf"[^\n]{{0,48}}(?:build|构建)\s*[:：#]?\s*"
         rf"{re.escape(build)}(?!\d)[^\n]*$"

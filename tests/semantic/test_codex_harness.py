@@ -4195,6 +4195,33 @@ def test_windows_get_content_utf8_newline_contract(
     assert facts.unexpected_commands == (() if accepted else (command,))
 
 
+def test_windows_get_content_accepts_repeated_safe_path_separators(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """PowerShell and NTFS treat repeated relative separators identically."""
+
+    monkeypatch.setattr(
+        codex_harness_module,
+        "split_native_command_line",
+        portable_windows_outer_split,
+    )
+    skill = tmp_path / "agent-workspace" / ".agents" / "skills" / "waapi-skill"
+    skill.mkdir(parents=True)
+    content = "# skill\r\n声音\r\n"
+    (skill / "SKILL.md").write_bytes(content.encode("utf-8"))
+    command = windows_powershell_recording(
+        r"Get-Content -Raw -Encoding UTF8 '.agents\\skills\\waapi-skill\\SKILL.md'"
+    )
+    record = completed_windows_record(command, content)
+
+    facts = classify_commands((record,), skill_source=skill)
+
+    assert facts.skill_read is True
+    assert facts.skill_read_files == ("SKILL.md",)
+    assert facts.unexpected_commands == ()
+
+
 def test_windows_failed_exact_skill_read_can_recover_once_before_success(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

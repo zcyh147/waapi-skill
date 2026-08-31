@@ -1559,7 +1559,7 @@ def _normalize_commutative_wait_topic_facts(
     reordered only when the exact same fact groups target distinct slots.
     """
 
-    actual = tuple(supplied)
+    actual = _expand_soundbank_topic_business_shortcuts(step, supplied)
     if step.subcommand not in {"wait-topic", "stream-topic"} or actual == step.arguments:
         return actual
     fact_start = next(
@@ -1607,6 +1607,96 @@ def _normalize_commutative_wait_topic_facts(
     return (
         *actual[:fact_start],
         *(token for group in expected_groups for token in group),
+    )
+
+
+def _expand_soundbank_topic_business_shortcuts(
+    step: "ExpectedGatewayStep",
+    supplied: Sequence[str],
+) -> tuple[str, ...]:
+    """Expand only the three closed soundbank.generated business aliases."""
+
+    actual = tuple(supplied)
+    topic = "ak.wwise.core.soundbank.generated"
+    shortcuts = {
+        "--include-object-identity",
+        "--match-platform-name",
+        "--match-soundbank-name",
+    }
+    if (
+        step.subcommand not in {"wait-topic", "stream-topic"}
+        or not step.arguments
+        or step.arguments[0] != topic
+        or not actual
+        or actual[0] != topic
+        or not any(token in shortcuts for token in actual)
+    ):
+        return actual
+
+    expected = tuple(step.arguments)
+    identity = (
+        "--topic-option",
+        "include",
+        "id",
+        "--topic-option",
+        "include",
+        "name",
+        "--topic-option",
+        "include",
+        "type",
+        "--topic-option",
+        "include",
+        "path",
+    )
+    if not _contains_exact_argument_group(expected, identity):
+        return actual
+
+    expanded: list[str] = []
+    index = 0
+    while index < len(actual):
+        token = actual[index]
+        if token == "--include-object-identity":
+            expanded.extend(identity)
+            index += 1
+            continue
+        if token == "--match-soundbank-name":
+            if index + 1 >= len(actual):
+                return actual
+            value = actual[index + 1]
+            expected_group = ("--event-match", "soundbank-name", value)
+            if not _contains_exact_argument_group(expected, expected_group):
+                return actual
+            expanded.extend(expected_group)
+            index += 2
+            continue
+        if token == "--match-platform-name":
+            if index + 1 >= len(actual):
+                return actual
+            value = actual[index + 1]
+            matches = [
+                tuple(str(item) for item in expected[cursor : cursor + 6])
+                for cursor in range(len(expected) - 5)
+                if expected[cursor : cursor + 4]
+                == ("--event-entry-as", "platform", "-", "name")
+                and expected[cursor + 5] == value
+            ]
+            if len(matches) != 1:
+                return actual
+            expanded.extend(matches[0])
+            index += 2
+            continue
+        expanded.append(token)
+        index += 1
+    return tuple(expanded)
+
+
+def _contains_exact_argument_group(
+    values: Sequence[Any],
+    group: Sequence[str],
+) -> bool:
+    return any(
+        tuple(values[index : index + len(group)]) == tuple(group)
+        for index in range(len(values) - len(group) + 1)
     )
 
 
@@ -1705,7 +1795,31 @@ def _normalize_media_pool_business_argument_order(
     actual_groups = parse(actual)
     if expected_groups is None or actual_groups is None:
         return actual
-    remaining = list(actual_groups)
+    canonical_projection_fields = {
+        "Path",
+        "FileId",
+        "Db",
+        "Filename",
+        "WAV/Duration",
+        "WAV/Sample Rate",
+        "WAV/Bit Depth",
+        "WAV/Channels",
+    }
+    remaining = [
+        group
+        for group in actual_groups
+        if not (
+            len(group) == 2
+            and group[0] == "--include-field"
+            and group[1] in canonical_projection_fields
+            and not any(
+                len(expected_group) == 2
+                and expected_group[0] == "--include-field"
+                and equivalent(expected_group[1], group[1])
+                for expected_group in expected_groups
+            )
+        )
+    ]
     ordered: list[tuple[Any, ...]] = []
     for expected_group in expected_groups:
         matches = [
@@ -4047,6 +4161,31 @@ def _normalize_business_query_arguments(
 
     supplied = parse(tuple(str(value) for value in supplied_arguments))
     expected = parse(tuple(str(value) for value in expected_arguments))
+    numeric_predicates = {"volume-db-at-most", "volume-db-at-least"}
+    supplied_predicates = []
+    for name, value in supplied["predicates"]:
+        normalized_value = value
+        if name in numeric_predicates:
+            expected_values = [
+                expected_value
+                for expected_name, expected_value in expected["predicates"]
+                if expected_name == name
+            ]
+            if len(expected_values) == 1:
+                try:
+                    observed_number = Decimal(value)
+                    expected_number = Decimal(expected_values[0])
+                except InvalidOperation:
+                    pass
+                else:
+                    if (
+                        observed_number.is_finite()
+                        and expected_number.is_finite()
+                        and observed_number == expected_number
+                    ):
+                        normalized_value = expected_values[0]
+        supplied_predicates.append((name, normalized_value))
+    supplied["predicates"] = sorted(supplied_predicates)
     if supplied != expected:
         raise GatewayInvocationError(
             "query-object business declaration differs from its sealed semantic inputs"
@@ -10267,6 +10406,12 @@ class CodexGatewayBroker:
                 step,
                 actual,
             )
+        if step.subcommand == "draft-declare-soundbank-plan":
+            return CodexGatewayBroker._normalize_soundbank_plan_fact_order(
+                self,
+                step,
+                actual,
+            )
         if step.subcommand in {
             "draft-declare-cli-console-plan",
             "draft-declare-core-plan",
@@ -10367,6 +10512,108 @@ class CodexGatewayBroker:
                 token
                 for expected_key in expected_keys
                 for token in actual_by_key[expected_key]
+            ),
+        )
+
+    def _normalize_soundbank_plan_fact_order(
+        self,
+        step: ExpectedGatewayStep,
+        actual: Sequence[str],
+    ) -> tuple[str, ...]:
+        """Canonicalize independent high-level SoundBank plan flag groups."""
+
+        fixed_count = 5
+        if len(step.arguments) < fixed_count or len(actual) < fixed_count:
+            return tuple(actual)
+        fixed_arities = {
+            "--mode": 1,
+            "--soundbank-handle": 1,
+            "--soundbank": 2,
+            "--event": 2,
+            "--aux-bus": 2,
+            "--rebuild-soundbank": 1,
+            "--no-rebuild-soundbank": 1,
+            "--platform": 1,
+            "--language": 1,
+            "--rebuild-soundbanks": 0,
+            "--no-rebuild-soundbanks": 0,
+            "--clear-audio-file-cache": 0,
+            "--no-clear-audio-file-cache": 0,
+            "--rebuild-init-bank": 0,
+            "--no-rebuild-init-bank": 0,
+            "--source": 3,
+            "--definition-file": 1,
+            "--io-root": 1,
+        }
+        variable_options = {"--inclusion", "--generation-inclusion"}
+
+        def parse(values: Sequence[Any]) -> list[tuple[Any, ...]] | None:
+            groups: list[tuple[Any, ...]] = []
+            cursor = fixed_count
+            while cursor < len(values):
+                option = values[cursor]
+                if not isinstance(option, str):
+                    return None
+                if option in variable_options:
+                    end = cursor + 1
+                    while (
+                        end < len(values)
+                        and not (
+                            isinstance(values[end], str)
+                            and values[end].startswith("--")
+                        )
+                    ):
+                        end += 1
+                    if end - cursor < 3:
+                        return None
+                    groups.append(tuple(values[cursor:end]))
+                    cursor = end
+                    continue
+                arity = fixed_arities.get(option)
+                if arity is None or cursor + arity >= len(values):
+                    return None
+                groups.append(tuple(values[cursor : cursor + arity + 1]))
+                cursor += arity + 1
+            return groups
+
+        def resolve_expected(value: Any) -> Any:
+            if not isinstance(value, ResponseBinding):
+                return value
+            source = self._payloads_by_step.get(value.step)
+            if source is None:
+                return value
+            try:
+                bound = _json_pointer(source, value.pointer)
+            except (GatewayInvocationError, KeyError, TypeError, ValueError):
+                return value
+            return (
+                str(bound)
+                if isinstance(bound, (str, int, float, bool)) and bound is not None
+                else value
+            )
+
+        expected_groups = parse(step.arguments)
+        actual_groups = parse(tuple(actual))
+        if expected_groups is None or actual_groups is None:
+            return tuple(actual)
+        resolved_expected = [
+            tuple(resolve_expected(value) for value in group)
+            for group in expected_groups
+        ]
+        expected_by_option: dict[Any, list[tuple[Any, ...]]] = {}
+        actual_by_option: dict[Any, list[tuple[Any, ...]]] = {}
+        for group in resolved_expected:
+            expected_by_option.setdefault(group[0], []).append(group)
+        for group in actual_groups:
+            actual_by_option.setdefault(group[0], []).append(group)
+        if expected_by_option != actual_by_option:
+            return tuple(actual)
+        return (
+            *tuple(actual[:fixed_count]),
+            *(
+                token
+                for expected_group in resolved_expected
+                for token in expected_group
             ),
         )
 

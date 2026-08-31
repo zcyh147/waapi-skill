@@ -390,6 +390,47 @@ def resolve_semantic_kind(name: str, *, version: str) -> SemanticKind:
     )
 
 
+def semantic_kinds_for_live_type(
+    object_type: str,
+    *,
+    version: str,
+) -> tuple[str, ...]:
+    """Return every stable business kind compatible with one reflected type."""
+
+    if version not in SUPPORTED_WWISE_VERSIONS:
+        raise _error(
+            "WWISE_VERSION_UNSUPPORTED",
+            field="version",
+            choices=SUPPORTED_WWISE_VERSIONS,
+            action="choose one supported Wwise version",
+        )
+    if not isinstance(object_type, str) or not object_type.strip():
+        raise ValueError("object_type must be non-empty text")
+    token = _type_token(object_type)
+    return tuple(
+        name
+        for name in SUPPORTED_BUSINESS_KINDS
+        if any(
+            _type_token(candidate) == token
+            for candidate in resolve_semantic_kind(
+                name,
+                version=version,
+            ).verifier_object_types
+        )
+    )
+
+
+def semantic_kind_for_live_type(
+    object_type: str,
+    *,
+    version: str,
+) -> str | None:
+    """Return one stable business kind only when the live type is unambiguous."""
+
+    matches = semantic_kinds_for_live_type(object_type, version=version)
+    return matches[0] if len(matches) == 1 else None
+
+
 def business_repair(
     error_code: str,
     *,
@@ -2132,4 +2173,6 @@ __all__ = [
     "revalidate_live_types",
     "repair_at_draft_revision",
     "resolve_semantic_kind",
+    "semantic_kind_for_live_type",
+    "semantic_kinds_for_live_type",
 ]

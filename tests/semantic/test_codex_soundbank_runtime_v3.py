@@ -2340,16 +2340,12 @@ def test_each_generated_topic_prompt_reaches_a_name_only_request_and_hidden_guid
 def test_generated_topic_reference_closes_model_owned_request_fields() -> None:
     reference = " ".join(QUERY_REFERENCE.read_text(encoding="utf-8").split())
     assert "Run `topic-schema`" in reference
-    assert "--topic-option include <id|name|type|path>" in reference
-    assert "--entry platform" in reference
-    assert (
-        "--event-entry-as platform - name <literal-text-handle> "
-        "<platform-name>"
-    ) in reference
-    assert "--event-entry platform - name <platform-name>" not in reference
+    assert "--include-object-identity" in reference
+    assert "--match-platform-name <exact-name>" in reference
+    assert "without a handle" in reference
     assert "`id,name,type,path`" in reference
-    assert "--event-match soundbank-name <name>" in reference
-    assert "Otherwise omit that predicate" in reference
+    assert "--match-soundbank-name <exact-name>" in reference
+    assert "Omit a match the user did not request" in reference
     assert "never inject a GUID" in reference
 
 

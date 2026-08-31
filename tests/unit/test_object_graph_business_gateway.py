@@ -116,6 +116,67 @@ def _live_client(tmp_path: Path, extra: Mapping[str, Sequence[Any]]) -> FakeClie
     )
 
 
+def test_object_binding_returns_version_stable_business_kind(
+    tmp_path: Path,
+) -> None:
+    start_code, started = _offline(tmp_path, "draft-start", "object.set")
+    assert start_code == 0, started
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    target_path = r"\Containers\Default Work Unit\SemanticLab\UI\Confirm"
+    client = _live_client(
+        tmp_path,
+        {
+            "ak.wwise.core.object.get": [
+                {
+                    "return": [
+                        {
+                            "id": PARENT_ID,
+                            "name": "Confirm",
+                            "type": "PropertyContainer",
+                            "path": target_path,
+                        }
+                    ]
+                }
+            ]
+        },
+    )
+
+    code, payload = gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(tmp_path / "state"),
+            "draft-bind-object",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            "1",
+            "--object-id",
+            PARENT_ID,
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+
+    assert code == 0, payload
+    assert payload["bound_object"] == {
+        "handle": payload["bound_object"]["handle"],
+        "name": "Confirm",
+        "type": "PropertyContainer",
+        "business_kind": "actor-mixer",
+        "business_kind_resolution": {
+            "status": "resolved",
+            "candidates": ["actor-mixer"],
+            "reflected_type": "PropertyContainer",
+        },
+        "semantic_kind": None,
+    }
+    assert "business_kind" in payload["draft"]["next_action_binding"][
+        "object_binding"
+    ]["result_validation_rule"]
+
+
 def test_gateway_discovers_long_tail_type_then_compiles_only_its_handle(
     tmp_path: Path,
 ) -> None:

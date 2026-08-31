@@ -325,6 +325,85 @@ def test_broker_accepts_media_pool_business_aliases_in_any_flag_order(
 
     assert len(semantic_hash) == 64
     assert execution_arguments == actual
+
+
+def test_broker_accepts_redundant_default_media_pool_projection_fields(
+    tmp_path: Path,
+) -> None:
+    """Canonical fields are always returned, so naming them again is harmless."""
+
+    step = media_pool_business_call_step(
+        "media.get",
+        scenario_id="VS25-F-MEDIAPOOL-GET-01",
+        args={
+            "databases": [r"\Databases\Project Originals"],
+            "filters": [
+                {
+                    "type": "field",
+                    "field": "Filename",
+                    "operator": "contains",
+                    "value": "footstep",
+                },
+                {
+                    "type": "field",
+                    "field": "WAV/Duration",
+                    "operator": "lessThan",
+                    "value": 0.8,
+                },
+            ],
+            "maxResults": 200,
+        },
+        options={"return": ["Path", "FileId", "Db", "Filename", "WAV/Duration"]},
+        post_filter={
+            "field": "Filename",
+            "operator": "containsCaseSensitive",
+            "value": "footstep",
+            "limit": 20,
+        },
+    )
+    broker = CodexGatewayBroker(
+        skill_source=make_fake_skill(tmp_path),
+        expected_steps=(step,),
+        expected_wwise_version="2025.1",
+    )
+    actual = (
+        "core-call",
+        "ak.wwise.core.mediaPool.get",
+        "--max-results",
+        "200",
+        "--database-scope",
+        r"\Databases\Project Originals",
+        "--text-filter",
+        "Filename",
+        "contains",
+        "footstep",
+        "--number-filter",
+        "WAV/Duration",
+        "lessThan",
+        "0.8",
+        "--include-field",
+        "Filename",
+        "--include-field",
+        "WAV/Duration",
+        "--exact-name-contains",
+        "footstep",
+        "--final-limit",
+        "20",
+        "--sort-by",
+        "WAV/Duration",
+        "ascending",
+        "--sort-by",
+        "Path",
+        "ascending",
+    )
+
+    semantic_hash, execution_arguments = broker._validate_step(  # noqa: SLF001
+        step,
+        actual,
+    )
+
+    assert len(semantic_hash) == 64
+    assert execution_arguments == actual
 from wwise_waapi.canonical import canonical_sha256
 from wwise_waapi.builders.debug_lua import LUA_SOURCE_AUTHORITY
 from wwise_waapi.operation_drafts import OperationDraftStore
@@ -4013,6 +4092,118 @@ def test_soundbank_business_plan_witness_replays_the_exact_canonical_request(
     assert broker._replay_expected_operation_draft_request(  # noqa: SLF001
         preview
     ) == request
+
+
+def test_soundbank_generation_plan_accepts_independent_flag_groups_in_any_order(
+    tmp_path: Path,
+) -> None:
+    fixed = (
+        "od1-draft",
+        "--task-authority",
+        "da1-" + "1" * 40,
+        "--expected-revision",
+        "3",
+    )
+    expected = (
+        *fixed,
+        "--soundbank",
+        "boh1-main",
+        "nonlocalized",
+        "--no-rebuild-soundbank",
+        "boh1-main",
+        "--soundbank",
+        "boh1-gameplay",
+        "nonlocalized",
+        "--no-rebuild-soundbank",
+        "boh1-gameplay",
+        "--platform",
+        "Windows",
+        "--no-rebuild-soundbanks",
+        "--no-clear-audio-file-cache",
+        "--no-rebuild-init-bank",
+        "--io-root",
+        r"C:\owned",
+    )
+    supplied = (
+        *fixed,
+        "--no-clear-audio-file-cache",
+        "--io-root",
+        r"C:\owned",
+        "--no-rebuild-init-bank",
+        "--no-rebuild-soundbanks",
+        "--platform",
+        "Windows",
+        "--soundbank",
+        "boh1-main",
+        "nonlocalized",
+        "--no-rebuild-soundbank",
+        "boh1-main",
+        "--soundbank",
+        "boh1-gameplay",
+        "nonlocalized",
+        "--no-rebuild-soundbank",
+        "boh1-gameplay",
+    )
+    step = ExpectedGatewayStep(
+        "declare",
+        "draft-declare-soundbank-plan",
+        expected,
+    )
+    broker = object.__new__(CodexGatewayBroker)
+    broker._payloads_by_step = {}  # noqa: SLF001
+
+    assert broker._normalize_soundbank_plan_fact_order(  # noqa: SLF001
+        step,
+        supplied,
+    ) == expected
+
+
+def test_soundbank_generation_plan_preserves_repeated_source_row_order() -> None:
+    fixed = (
+        "od1-draft",
+        "--task-authority",
+        "da1-" + "1" * 40,
+        "--expected-revision",
+        "3",
+    )
+    expected = (
+        *fixed,
+        "--source",
+        "a.json",
+        "Main",
+        "nonlocalized",
+        "--source",
+        "b.json",
+        "Gameplay",
+        "nonlocalized",
+        "--platform",
+        "Windows",
+    )
+    supplied = (
+        *fixed,
+        "--platform",
+        "Windows",
+        "--source",
+        "b.json",
+        "Gameplay",
+        "nonlocalized",
+        "--source",
+        "a.json",
+        "Main",
+        "nonlocalized",
+    )
+    step = ExpectedGatewayStep(
+        "declare",
+        "draft-declare-soundbank-plan",
+        expected,
+    )
+    broker = object.__new__(CodexGatewayBroker)
+    broker._payloads_by_step = {}  # noqa: SLF001
+
+    assert broker._normalize_soundbank_plan_fact_order(  # noqa: SLF001
+        step,
+        supplied,
+    ) == supplied
 
 
 def test_soundbank_exact_type_name_witness_normalizes_to_bound_guid() -> None:
@@ -11494,6 +11685,165 @@ def test_broker_compares_business_query_meaning_not_option_group_order(
 
     assert result.returncode == 0
     assert broker.evidence().passed
+
+
+def test_broker_accepts_equivalent_business_query_number_spelling(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    expected = (
+        "--path-segment",
+        "Actor-Mixer Hierarchy",
+        "--relationship",
+        "descendants",
+        "--predicate",
+        "volume-db-at-most",
+        "-6.0",
+        "--max-results",
+        "12",
+    )
+    supplied = [
+        "query-object",
+        "--path-segment",
+        "Actor-Mixer Hierarchy",
+        "--relationship",
+        "descendants",
+        "--predicate",
+        "volume-db-at-most",
+        "-6",
+        "--max-results",
+        "12",
+    ]
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(ExpectedGatewayStep("query", "query-object", expected),),
+        transport="tcp",
+    ) as broker:
+        result = run_model_command(broker, supplied)
+
+    assert result.returncode == 0
+    assert broker.evidence().passed
+
+
+def test_broker_accepts_closed_soundbank_topic_business_shortcuts(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    topic = "ak.wwise.core.soundbank.generated"
+    handle = "tvc1-8ef27a61d0fe6eb7197dad1d055ef960"
+    expected = (
+        topic,
+        "--event-count",
+        "3",
+        "--topic-contract-digest",
+        "a" * 64,
+        "--topic-option",
+        "include",
+        "id",
+        "--topic-option",
+        "include",
+        "name",
+        "--topic-option",
+        "include",
+        "type",
+        "--topic-option",
+        "include",
+        "path",
+        "--event-entry-as",
+        "platform",
+        "-",
+        "name",
+        handle,
+        "Windows",
+    )
+    supplied = [
+        "--timeout",
+        "120",
+        "wait-topic",
+        topic,
+        "--event-count",
+        "3",
+        "--topic-contract-digest",
+        "a" * 64,
+        "--include-object-identity",
+        "--match-platform-name",
+        "Windows",
+    ]
+    step = ExpectedGatewayStep(
+        "wait",
+        "wait-topic",
+        expected,
+        gateway_global_arguments=("--timeout", "120"),
+    )
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(step,),
+        transport="tcp",
+    ) as broker:
+        result = run_model_command(broker, supplied)
+
+    assert result.returncode == 0
+    assert broker.evidence().passed
+
+
+def test_broker_rejects_a_different_soundbank_topic_shortcut_value(
+    tmp_path: Path,
+) -> None:
+    topic = "ak.wwise.core.soundbank.generated"
+    handle = "tvc1-8ef27a61d0fe6eb7197dad1d055ef960"
+    step = ExpectedGatewayStep(
+        "wait",
+        "wait-topic",
+        (
+            topic,
+            "--event-count",
+            "1",
+            "--topic-contract-digest",
+            "a" * 64,
+            "--topic-option",
+            "include",
+            "id",
+            "--topic-option",
+            "include",
+            "name",
+            "--topic-option",
+            "include",
+            "type",
+            "--topic-option",
+            "include",
+            "path",
+            "--event-entry-as",
+            "platform",
+            "-",
+            "name",
+            handle,
+            "Windows",
+        ),
+    )
+    with CodexGatewayBroker(
+        skill_source=make_fake_skill(tmp_path),
+        expected_steps=(step,),
+        transport="tcp",
+    ) as broker:
+        result = run_model_command(
+            broker,
+            [
+                "wait-topic",
+                topic,
+                "--event-count",
+                "1",
+                "--topic-contract-digest",
+                "a" * 64,
+                "--include-object-identity",
+                "--match-platform-name",
+                "Mac",
+            ],
+        )
+
+    assert result.returncode == 126
+    assert broker.evidence().terminal_state == "FAILED"
 
 
 def test_broker_accepts_the_closed_all_sound_business_alias(
