@@ -726,6 +726,31 @@ def test_persisted_sections_and_archived_verification_are_independently_bound(tm
         )
 
 
+def test_audio_archive_accepts_sealed_path_identities_resolved_to_live_guids(
+    tmp_path: Path,
+) -> None:
+    plan, before = _audio_case(1, tmp_path)
+    sections = compile_audio_conversion_business_plan(
+        plan,
+        before,
+        build_transaction_protocol([plan.operation_request]),
+        reviewed_scenario_fixture=_audio_reviewed_fixture(plan),
+    )
+    after = _materialize_audio_after(sections)
+    evidence = _audio_verification_evidence(sections, after)
+    request = _json_clone(evidence["operation_request"])
+    request["arguments"]["args"]["objects"] = ["{object-1}"]
+    evidence["operation_request"] = request
+    evidence["operation_request_sha256"] = _canonical_sha(request)
+
+    validate_audio_archived_verification(sections, {"evidence": evidence})
+
+    request["arguments"]["args"]["objects"] = ["{wrong-object}"]
+    evidence["operation_request_sha256"] = _canonical_sha(request)
+    with pytest.raises(AudioMediaBusinessPlanError, match="request drifted"):
+        validate_audio_archived_verification(sections, {"evidence": evidence})
+
+
 def test_audio_archive_rejects_resigned_request_target_and_artifact_drift(
     tmp_path: Path,
 ) -> None:

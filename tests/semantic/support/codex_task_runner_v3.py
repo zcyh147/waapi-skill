@@ -660,6 +660,38 @@ def _broker_terminal_protocol_passed(
     consumed_count = len(evidence.consumed_step_names)
     if consumed_count not in protocol.accepted_terminal_prefixes:
         return False
+
+    def selected_lane_passed(selected_names: Sequence[str]) -> bool:
+        read_groups = getattr(protocol, "commutative_read_only_step_groups", ())
+        setup_groups = getattr(
+            protocol,
+            "commutative_composer_setup_step_groups",
+            (),
+        )
+        return bool(
+            gateway_step_sequence_matches(
+                selected_names,
+                evidence.consumed_step_names,
+                read_groups,
+                setup_groups,
+            )
+            and getattr(evidence, "commutative_read_only_step_groups", ())
+            == read_groups
+            and getattr(
+                evidence,
+                "commutative_composer_setup_step_groups",
+                (),
+            )
+            == setup_groups
+            and len(evidence.records) == len(selected_names)
+            and tuple(record.step_name for record in evidence.records)
+            == evidence.consumed_step_names
+            and not evidence.rejected_records
+            and all(record.succeeded for record in evidence.records)
+            and evidence.complete
+            and evidence.passed
+            and evidence.terminal_state == "COMPLETE"
+        )
     if protocol.optional_query_schema_step_names:
         protocol_names = tuple(step.name for step in protocol.steps)
         optional_names = set(protocol.optional_query_schema_step_names)
@@ -671,49 +703,19 @@ def _broker_terminal_protocol_passed(
             or len(selected_names) != len(set(selected_names))
         ):
             return False
-        return bool(
-            evidence.consumed_step_names == selected_names
-            and len(evidence.records) == len(selected_names)
-            and tuple(record.step_name for record in evidence.records)
-            == selected_names
-            and not evidence.rejected_records
-            and all(record.succeeded for record in evidence.records)
-            and evidence.complete
-            and evidence.passed
-            and evidence.terminal_state == "COMPLETE"
-        )
+        return selected_lane_passed(selected_names)
     if protocol.optional_initial_query_schema:
         protocol_names = tuple(step.name for step in protocol.steps)
         selected_names = evidence.expected_step_names
         if selected_names not in {protocol_names, protocol_names[1:]}:
             return False
-        return bool(
-            evidence.consumed_step_names == selected_names
-            and len(evidence.records) == len(selected_names)
-            and tuple(record.step_name for record in evidence.records)
-            == selected_names
-            and not evidence.rejected_records
-            and all(record.succeeded for record in evidence.records)
-            and evidence.complete
-            and evidence.passed
-            and evidence.terminal_state == "COMPLETE"
-        )
+        return selected_lane_passed(selected_names)
     if protocol.optional_initial_operations_discovery:
         protocol_names = tuple(step.name for step in protocol.steps)
         selected_names = evidence.expected_step_names
         if selected_names not in {protocol_names, protocol_names[1:]}:
             return False
-        return bool(
-            evidence.consumed_step_names == selected_names
-            and len(evidence.records) == len(selected_names)
-            and tuple(record.step_name for record in evidence.records)
-            == selected_names
-            and not evidence.rejected_records
-            and all(record.succeeded for record in evidence.records)
-            and evidence.complete
-            and evidence.passed
-            and evidence.terminal_state == "COMPLETE"
-        )
+        return selected_lane_passed(selected_names)
     if protocol.optional_topic_schema_step_groups:
         protocol_names = tuple(step.name for step in protocol.steps)
         optional_names = {
@@ -736,17 +738,7 @@ def _broker_terminal_protocol_passed(
             or any(name not in optional_names for name in selected_optional)
         ):
             return False
-        return bool(
-            evidence.consumed_step_names == selected_names
-            and len(evidence.records) == len(selected_names)
-            and tuple(record.step_name for record in evidence.records)
-            == selected_names
-            and not evidence.rejected_records
-            and all(record.succeeded for record in evidence.records)
-            and evidence.complete
-            and evidence.passed
-            and evidence.terminal_state == "COMPLETE"
-        )
+        return selected_lane_passed(selected_names)
     expected_names = tuple(
         step.name for step in protocol.steps[:consumed_count]
     )

@@ -293,6 +293,10 @@ def object_graph_business_contract_data(
         },
         "settings": {
             "name_conflict": ["fail", "rename", "merge", "replace"],
+            "merge_existing_same_name_root": (
+                "bind_exact_existing_root_direct_parent_then_declare_root_name_"
+                "once_with_merge"
+            ),
             "replace_owner_handle": "required_only_for_explicit_replace",
             "platform": "exact_user_requested_platform",
             "add_to_source_control": "boolean",

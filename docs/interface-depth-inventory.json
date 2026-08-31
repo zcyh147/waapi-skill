@@ -238,6 +238,201 @@
     {
       "model_values": [
         {
+          "name": "parent_handle",
+          "path": [
+            "declaration",
+            "new",
+            "parent_handle"
+          ],
+          "required": true,
+          "schema_sha256": "25d6e8346bba0889e106631239ea237e9c0dcfe8d0955559f4b68bd23ca8190e",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "live_bound_handle"
+        },
+        {
+          "name": "name",
+          "path": [
+            "declaration",
+            "new",
+            "name"
+          ],
+          "required": true,
+          "schema_sha256": "1c76973b0c63e0fa6df2a3d6fb6c40fdd9e527ae51d847fde34eccfc521f173e",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "kind",
+          "path": [
+            "declaration",
+            "new",
+            "kind"
+          ],
+          "required": true,
+          "schema_sha256": "c8b49ad5ed1ac13a919b826ff982bd0a8be61147fdb1e00d66b74bc6ccafc4cd",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "loop",
+          "path": [
+            "declaration",
+            "new",
+            "loop"
+          ],
+          "required": false,
+          "schema_sha256": "5dfa2a9b6d4f2b88df3fca36a7bc86464d4b084fc599807045c54edd7e527b56",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "max_instances",
+          "path": [
+            "declaration",
+            "new",
+            "max_instances"
+          ],
+          "required": false,
+          "schema_sha256": "fe310443b7b6ea830dae018a2eb7672e89d683c53baa959d0d542014c8f55d7a",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "notes",
+          "path": [
+            "declaration",
+            "new",
+            "notes"
+          ],
+          "required": false,
+          "schema_sha256": "8041528fcf70c1a6d40ec7c26e5f5edee4b71a8bba4b8791ac089c711943ee45",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "output_bus",
+          "path": [
+            "declaration",
+            "new",
+            "output_bus"
+          ],
+          "required": false,
+          "schema_sha256": "f961a53de499c59d0c367c87edbc994aec8ea5c64dc45ba4fbff0384ed388cfc",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "live_bound_handle"
+        },
+        {
+          "name": "override_parent_instance_limit",
+          "path": [
+            "declaration",
+            "new",
+            "override_parent_instance_limit"
+          ],
+          "required": false,
+          "schema_sha256": "03e36ae568f7c05767bb8909835d5391c7e0043fb28ec8383b37257d2a6eef4e",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "volume_db",
+          "path": [
+            "declaration",
+            "new",
+            "volume_db"
+          ],
+          "required": false,
+          "schema_sha256": "3d886a630dea575efc8fbad1e9a416e920661f3351ff724d2d89a5fba5b7cc69",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "field_values",
+          "path": [
+            "declaration",
+            "new",
+            "field_values"
+          ],
+          "required": false,
+          "schema_sha256": "761f7f1dc195dd2a67dfbac0cd3f5c000dbfdcec1b4f5b0b20e8bbd70d7048cf",
+          "shape": "map",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "live_bound_handle"
+        },
+        {
+          "name": "name_conflict",
+          "path": [
+            "settings",
+            "name_conflict"
+          ],
+          "required": false,
+          "schema_sha256": "db1878f0cd1e9fd16deb7ab04d450585f08727aa07e48e037812eb5b83007557",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "merge_existing_same_name_root",
+          "path": [
+            "settings",
+            "merge_existing_same_name_root"
+          ],
+          "required": false,
+          "schema_sha256": "4861db0a23c5969ff587b98692aafdae6f15828dfeae74f4ed4baf0615c542bb",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "replace_owner_handle",
+          "path": [
+            "settings",
+            "replace_owner_handle"
+          ],
+          "required": false,
+          "schema_sha256": "55fcc56aefb0f0acbf7a46d50ffb70b90f2a1079c51b362435e03c8dd87047e1",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "live_bound_handle"
+        },
+        {
+          "name": "platform",
+          "path": [
+            "settings",
+            "platform"
+          ],
+          "required": false,
+          "schema_sha256": "830624edee11325bb5c863d9209445b988337d61f9a432e1ea99a321cf08861a",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "add_to_source_control",
+          "path": [
+            "settings",
+            "add_to_source_control"
+          ],
+          "required": false,
+          "schema_sha256": "3bb56e69cd747cba8be826db3a331e6aacd50da24e864cebaa65f81e094c81d3",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        }
+      ],
+      "sha256": "1a97a64f862b5a67b65cdf9ad4352d19156cf676a57c513d988fac2d1111876c"
+    },
+    {
+      "model_values": [
+        {
           "name": "object_handle",
           "path": [
             "declaration",
@@ -1525,189 +1720,6 @@
         }
       ],
       "sha256": "9fca6fffa8797e04628989aadf8f3cd93b18b4147ab1a8f7da2396063354d928"
-    },
-    {
-      "model_values": [
-        {
-          "name": "parent_handle",
-          "path": [
-            "declaration",
-            "new",
-            "parent_handle"
-          ],
-          "required": true,
-          "schema_sha256": "25d6e8346bba0889e106631239ea237e9c0dcfe8d0955559f4b68bd23ca8190e",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "live_bound_handle"
-        },
-        {
-          "name": "name",
-          "path": [
-            "declaration",
-            "new",
-            "name"
-          ],
-          "required": true,
-          "schema_sha256": "1c76973b0c63e0fa6df2a3d6fb6c40fdd9e527ae51d847fde34eccfc521f173e",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "declaration",
-            "new",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "c8b49ad5ed1ac13a919b826ff982bd0a8be61147fdb1e00d66b74bc6ccafc4cd",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "loop",
-          "path": [
-            "declaration",
-            "new",
-            "loop"
-          ],
-          "required": false,
-          "schema_sha256": "5dfa2a9b6d4f2b88df3fca36a7bc86464d4b084fc599807045c54edd7e527b56",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "max_instances",
-          "path": [
-            "declaration",
-            "new",
-            "max_instances"
-          ],
-          "required": false,
-          "schema_sha256": "fe310443b7b6ea830dae018a2eb7672e89d683c53baa959d0d542014c8f55d7a",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "notes",
-          "path": [
-            "declaration",
-            "new",
-            "notes"
-          ],
-          "required": false,
-          "schema_sha256": "8041528fcf70c1a6d40ec7c26e5f5edee4b71a8bba4b8791ac089c711943ee45",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "output_bus",
-          "path": [
-            "declaration",
-            "new",
-            "output_bus"
-          ],
-          "required": false,
-          "schema_sha256": "f961a53de499c59d0c367c87edbc994aec8ea5c64dc45ba4fbff0384ed388cfc",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "live_bound_handle"
-        },
-        {
-          "name": "override_parent_instance_limit",
-          "path": [
-            "declaration",
-            "new",
-            "override_parent_instance_limit"
-          ],
-          "required": false,
-          "schema_sha256": "03e36ae568f7c05767bb8909835d5391c7e0043fb28ec8383b37257d2a6eef4e",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "volume_db",
-          "path": [
-            "declaration",
-            "new",
-            "volume_db"
-          ],
-          "required": false,
-          "schema_sha256": "3d886a630dea575efc8fbad1e9a416e920661f3351ff724d2d89a5fba5b7cc69",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "field_values",
-          "path": [
-            "declaration",
-            "new",
-            "field_values"
-          ],
-          "required": false,
-          "schema_sha256": "761f7f1dc195dd2a67dfbac0cd3f5c000dbfdcec1b4f5b0b20e8bbd70d7048cf",
-          "shape": "map",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "live_bound_handle"
-        },
-        {
-          "name": "name_conflict",
-          "path": [
-            "settings",
-            "name_conflict"
-          ],
-          "required": false,
-          "schema_sha256": "db1878f0cd1e9fd16deb7ab04d450585f08727aa07e48e037812eb5b83007557",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "replace_owner_handle",
-          "path": [
-            "settings",
-            "replace_owner_handle"
-          ],
-          "required": false,
-          "schema_sha256": "55fcc56aefb0f0acbf7a46d50ffb70b90f2a1079c51b362435e03c8dd87047e1",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "live_bound_handle"
-        },
-        {
-          "name": "platform",
-          "path": [
-            "settings",
-            "platform"
-          ],
-          "required": false,
-          "schema_sha256": "830624edee11325bb5c863d9209445b988337d61f9a432e1ea99a321cf08861a",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "add_to_source_control",
-          "path": [
-            "settings",
-            "add_to_source_control"
-          ],
-          "required": false,
-          "schema_sha256": "3bb56e69cd747cba8be826db3a331e6aacd50da24e864cebaa65f81e094c81d3",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        }
-      ],
-      "sha256": "a004948342a6f0ff69dc60e9e993f5156e4258122c2a66f5a3db403bc0c32ca7"
     },
     {
       "model_values": [
@@ -153899,7 +153911,7 @@
     "contract": "waapi-skill.typed-request-surface/v1",
     "total_lanes": 824
   },
-  "inventory_sha256": "c7fea24e0bbec37382ca819168170f5fafc8ce362b0a0f0a6ccdb90005ebf6e3",
+  "inventory_sha256": "f40cad5db2accdb31d03bb4bf00d3b978d18edf6d17566d941c1fecd03b9bbcb",
   "mechanic_owners": {
     "ambiguous_continuation_selection": "gateway_derivation",
     "batch_layout": "gateway_derivation",
@@ -180837,10 +180849,10 @@
       "version": "2025.1"
     },
     {
-      "argument_contract_sha256": "a004948342a6f0ff69dc60e9e993f5156e4258122c2a66f5a3db403bc0c32ca7",
+      "argument_contract_sha256": "1a97a64f862b5a67b65cdf9ad4352d19156cf676a57c513d988fac2d1111876c",
       "audit_evidence": "The public object-graph-business/v1 Adapters accept named hierarchy outcomes, plug-in roles, stable business fields, exact user artifacts, references, and RTPC points; bind opaque object, field, plug-in-type, control-input, and output-bus handles; compile exact Wwise types, paths, metadata scope/tokens, dependency order, batching, revisions, native requests, and the one Preview continuation inside the Gateway; and retain #78 five-version deterministic, exact macOS/Windows 2022.1 and 2025.1 real-host, and current-v3 Terra Fresh Agent Weather evidence. The pre-#78 Composer action vocabulary and normal fallback are removed.",
       "classification": "named-object-creation-graph",
-      "contract_sha256": "ec8f45f2342c924d294511cc7124f1f3d9090caa0fcce0a5022b3cdc0df375ea",
+      "contract_sha256": "2f906062211aa8321925da46c420af9e8c4dba62de68a89e26f2ba1ac052b99f",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -180862,10 +180874,10 @@
       "version": "2021.1"
     },
     {
-      "argument_contract_sha256": "a004948342a6f0ff69dc60e9e993f5156e4258122c2a66f5a3db403bc0c32ca7",
+      "argument_contract_sha256": "1a97a64f862b5a67b65cdf9ad4352d19156cf676a57c513d988fac2d1111876c",
       "audit_evidence": "The public object-graph-business/v1 Adapters accept named hierarchy outcomes, plug-in roles, stable business fields, exact user artifacts, references, and RTPC points; bind opaque object, field, plug-in-type, control-input, and output-bus handles; compile exact Wwise types, paths, metadata scope/tokens, dependency order, batching, revisions, native requests, and the one Preview continuation inside the Gateway; and retain #78 five-version deterministic, exact macOS/Windows 2022.1 and 2025.1 real-host, and current-v3 Terra Fresh Agent Weather evidence. The pre-#78 Composer action vocabulary and normal fallback are removed.",
       "classification": "named-object-creation-graph",
-      "contract_sha256": "e78b7d31142183b01ec741a5146be01fa83ad015cc24949100aa4203fd00a8e3",
+      "contract_sha256": "66b5fab0689aacb6deab5fc38c2601d06149214dd5c2633fe94e1360f5a52adf",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -180887,10 +180899,10 @@
       "version": "2022.1"
     },
     {
-      "argument_contract_sha256": "a004948342a6f0ff69dc60e9e993f5156e4258122c2a66f5a3db403bc0c32ca7",
+      "argument_contract_sha256": "1a97a64f862b5a67b65cdf9ad4352d19156cf676a57c513d988fac2d1111876c",
       "audit_evidence": "The public object-graph-business/v1 Adapters accept named hierarchy outcomes, plug-in roles, stable business fields, exact user artifacts, references, and RTPC points; bind opaque object, field, plug-in-type, control-input, and output-bus handles; compile exact Wwise types, paths, metadata scope/tokens, dependency order, batching, revisions, native requests, and the one Preview continuation inside the Gateway; and retain #78 five-version deterministic, exact macOS/Windows 2022.1 and 2025.1 real-host, and current-v3 Terra Fresh Agent Weather evidence. The pre-#78 Composer action vocabulary and normal fallback are removed.",
       "classification": "named-object-creation-graph",
-      "contract_sha256": "1b86546cabc3179f139ba887e1f2315cf0ac9ce3fb13605dc668020fa2c8d9fb",
+      "contract_sha256": "937dda12e50782d2be4d77860062ee91b3bf62b74d06f008f52f6854193c323d",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -180912,10 +180924,10 @@
       "version": "2023.1"
     },
     {
-      "argument_contract_sha256": "a004948342a6f0ff69dc60e9e993f5156e4258122c2a66f5a3db403bc0c32ca7",
+      "argument_contract_sha256": "1a97a64f862b5a67b65cdf9ad4352d19156cf676a57c513d988fac2d1111876c",
       "audit_evidence": "The public object-graph-business/v1 Adapters accept named hierarchy outcomes, plug-in roles, stable business fields, exact user artifacts, references, and RTPC points; bind opaque object, field, plug-in-type, control-input, and output-bus handles; compile exact Wwise types, paths, metadata scope/tokens, dependency order, batching, revisions, native requests, and the one Preview continuation inside the Gateway; and retain #78 five-version deterministic, exact macOS/Windows 2022.1 and 2025.1 real-host, and current-v3 Terra Fresh Agent Weather evidence. The pre-#78 Composer action vocabulary and normal fallback are removed.",
       "classification": "named-object-creation-graph",
-      "contract_sha256": "fe0773b66b4d944837f7c91740cb76b7b4cf1ae079465d1893c8930c15b629a5",
+      "contract_sha256": "380c4afac7b6ffd1db47225a2e48bf95dad88dcd4c7ff638d0efd3f82ecb19fb",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -180937,10 +180949,10 @@
       "version": "2024.1"
     },
     {
-      "argument_contract_sha256": "a004948342a6f0ff69dc60e9e993f5156e4258122c2a66f5a3db403bc0c32ca7",
+      "argument_contract_sha256": "1a97a64f862b5a67b65cdf9ad4352d19156cf676a57c513d988fac2d1111876c",
       "audit_evidence": "The public object-graph-business/v1 Adapters accept named hierarchy outcomes, plug-in roles, stable business fields, exact user artifacts, references, and RTPC points; bind opaque object, field, plug-in-type, control-input, and output-bus handles; compile exact Wwise types, paths, metadata scope/tokens, dependency order, batching, revisions, native requests, and the one Preview continuation inside the Gateway; and retain #78 five-version deterministic, exact macOS/Windows 2022.1 and 2025.1 real-host, and current-v3 Terra Fresh Agent Weather evidence. The pre-#78 Composer action vocabulary and normal fallback are removed.",
       "classification": "named-object-creation-graph",
-      "contract_sha256": "35b103b35ea8a49b0e5735124eb5efb853b80f4d2df60540db45bab6c052e32a",
+      "contract_sha256": "c8bafce8c9c7cd9372b533a6dd5c8585cb874684c0188430d297ba551ce46d40",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -183548,7 +183560,7 @@
   },
   "source_contracts": {
     "gateway_parser_sha256": "89b917ec571a2383d36d966036db0a56ee9e8a7aebd4790c234392625b484c27",
-    "operation_contract_sha256": "5a45a8f54fdea7fed324244d32d1717be6e0759e498ba38316f680406539282a",
+    "operation_contract_sha256": "f687d20d337507d0550fff00214faf73773ae2578e916bef82cc9389d624bad0",
     "public_continuation_sha256": "1bbb818941b2f52150bde084f7312a66d0fd2d4465bf093af9830345bb8c4282",
     "typed_request_surface_sha256": "7cbe0a9ba6d9756c94ecea58bb1b2ac56da242059f17c5cdfdaf768271d133a8"
   },

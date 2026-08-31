@@ -191,9 +191,10 @@ prevention checks that are expensive to rediscover.
 - Cause: the Codex shell-output projection can elide content while retaining
   the tail; checking only the sentinel misses that middle omission.
 - Prevention: exact source/output byte-normalized equality remains the credit
-  gate. Keep the CRLF-expanded operate reference at or below 26,500 bytes so a
-  normal Windows `Get-Content -Raw -Encoding UTF8` read stays below the observed
-  projection boundary. Never weaken the equality gate or replay that root.
+  gate. Later r23 evidence showed clipping can begin well below that earlier
+  26,500-byte estimate, so keep every CRLF-expanded lane reference at or below
+  20,000 bytes. A Program regression enforces that ceiling. Never weaken the
+  equality gate or replay a clipped root.
 
 ### macOS foreground ownership and TCC
 
@@ -1164,6 +1165,42 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   Sound rows. The Gateway continuation also requires every segment through the
   immediate parent and treats a missing direct parent as a structured stop;
   never silently substitute an ancestor.
+
+### Windows can clip a lane reference even when both ends survive
+
+- Evidence: #60 native-Windows r23 returned the beginning, final sentinel, and
+  exit 0 for exact PowerShell reads, yet `waapi-query.md` exposed only 28,810
+  characters from a 30,599-byte CRLF source and `waapi-operate.md` exposed
+  25,886 characters from a 26,395-byte CRLF source. Query, Topic, and audio
+  conversion units consequently failed `skill_reads_exact` without receiving
+  semantic credit.
+- Prevention: keep both query and operate references below 20,000 UTF-8 bytes
+  after CRLF projection and enforce that bound in Program tests. Retain exact
+  normalized equality as the credit gate; a sentinel, exit code, or intact
+  beginning and end does not prove an unabridged read.
+
+### Optional discovery and Composer setup may still complete out of recipe order
+
+- Evidence: #60 macOS r23 metadata completed its selected optional lane, but
+  the outer terminal verifier compared the archived consumed order directly to
+  the recipe order and reclassified the task BLOCKED. The Broker had already
+  accepted a permitted commutative read/setup ordering and sealed every step.
+- Prevention: after validating the selected optional lane, run the same
+  `gateway_step_sequence_matches` normalization used by the Broker and require
+  the sealed commutative groups, exact record set, successful records, and
+  terminal COMPLETE state. Do not weaken value or step membership checks.
+
+### Archived conversion identities may change representation without drift
+
+- Evidence: #60 macOS r23 audio conversion sealed object paths in the static
+  request, then the live preflight resolved those exact paths to unique GUIDs
+  for execution. The archive contained the authenticated GUID request and its
+  correct digest, but the outer verifier required literal path equality and
+  reported a false BLOCKED result.
+- Prevention: accept either the exact static path request or the request formed
+  by replacing every sealed path with its unique live-preflight GUID. Bind that
+  equivalence only to sealed artifact fingerprints, require complete and
+  unambiguous resolution, and continue rejecting any other request or digest.
 
 ## New-root preflight
 

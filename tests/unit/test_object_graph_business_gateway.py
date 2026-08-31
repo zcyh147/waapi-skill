@@ -122,6 +122,13 @@ def test_gateway_discovers_long_tail_type_then_compiles_only_its_handle(
     start_code, started = _offline(tmp_path, "draft-start", "object.create")
     assert start_code == 0, started
     assert started["draft"]["allowed_actions"] == ["bind-object"]
+    assert started["draft"]["next_action_binding"]["object_binding"][
+        "existing_same_name_root_merge_rule"
+    ] == (
+        "after_exact_preflight_proves_the_existing_same_name_root_and_the_user_requests_merge; "
+        "bind_that_root_direct_parent_not_the_existing_root; declare_the_existing_root_name_once; "
+        "configure_name_conflict_merge; never_use_the_existing_root_as_its_own_new_parent"
+    )
     draft_id = started["draft"]["draft_id"]
     authority = started["task_authority"]
 

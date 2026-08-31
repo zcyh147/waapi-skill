@@ -22338,8 +22338,9 @@ def _business_next_action_binding(
             "user_selected_guid_uses_by_id"
         ),
         "path_rule": (
-            "copy_each_nonempty_user_path_segment_root_to_leaf; gateway_inserts_"
-            "every_wwise_separator"
+            "copy_each_nonempty_user_path_segment_root_to_leaf; preserve_each_"
+            "literal_typed_segment_including_angle_bracket_type_prefixes; gateway_"
+            "inserts_every_wwise_separator"
         ),
         "new_target_parent_rule": (
             "when_the_user_supplies_a_complete_new_object_path_bind_every_segment_"
@@ -22362,6 +22363,21 @@ def _business_next_action_binding(
             "custom_reference_value",
         ],
     }
+    if record.operation == "object.create":
+        object_binding["existing_same_name_root_merge_rule"] = (
+            "after_exact_preflight_proves_the_existing_same_name_root_and_the_"
+            "user_requests_merge; bind_that_root_direct_parent_not_the_existing_"
+            "root; declare_the_existing_root_name_once; configure_name_conflict_"
+            "merge; never_use_the_existing_root_as_its_own_new_parent"
+        )
+    if adapter.family == "audio-import":
+        object_binding["import_row_path_rule"] = (
+            "copy_the_exact_complete_object_path_from_each_user_supplied_"
+            "import_row; preserve_every_literal_typed_segment_including_"
+            "angle_bracket_type_prefixes; bind_the_complete_row_target_only_"
+            "when_that_row_is_explicitly_existing; otherwise_bind_its_exact_"
+            "immediate_parent"
+        )
     role_declaration = adapter.role_declaration
     if role_declaration is not None:
         object_binding.pop("new_target_parent_rule", None)

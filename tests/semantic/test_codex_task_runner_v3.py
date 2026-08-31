@@ -236,6 +236,51 @@ def test_declared_short_terminal_prefix_is_complete_not_running() -> None:
     assert task_runner._broker_terminal_protocol_passed(protocol, evidence)
 
 
+def test_optional_operations_terminal_accepts_commutative_composer_order() -> None:
+    steps = tuple(
+        SimpleNamespace(name=name, subcommand=subcommand, arguments=arguments)
+        for name, subcommand, arguments in (
+            ("tx01.operations", "operations", ()),
+            ("tx01.operation-schema", "operation-schema", ("object.set",)),
+            ("tx01.bind-a", "draft-bind-object", ()),
+            ("tx01.bind-b", "draft-bind-object", ()),
+            ("tx01.preview", "preview-from-draft", ()),
+        )
+    )
+    protocol = SimpleNamespace(
+        steps=steps,
+        accepted_terminal_prefixes=(4, 5),
+        optional_query_schema_step_names=(),
+        optional_initial_query_schema=False,
+        optional_initial_operations_discovery=True,
+        optional_topic_schema_step_groups=(),
+        commutative_read_only_step_groups=(),
+        commutative_composer_setup_step_groups=(("tx01.bind-a", "tx01.bind-b"),),
+    )
+    selected = tuple(step.name for step in steps[1:])
+    consumed = (
+        "tx01.operation-schema",
+        "tx01.bind-b",
+        "tx01.bind-a",
+        "tx01.preview",
+    )
+    evidence = SimpleNamespace(
+        expected_step_names=selected,
+        consumed_step_names=consumed,
+        records=tuple(
+            SimpleNamespace(step_name=name, succeeded=True) for name in consumed
+        ),
+        rejected_records=(),
+        complete=True,
+        passed=True,
+        terminal_state="COMPLETE",
+        commutative_read_only_step_groups=(),
+        commutative_composer_setup_step_groups=(("tx01.bind-a", "tx01.bind-b"),),
+    )
+
+    assert task_runner._broker_terminal_protocol_passed(protocol, evidence)
+
+
 def test_common_grade_ignores_one_identical_windows_preprocess_failure() -> None:
     result = _result(turn=1, gateway_count=2)
     successful = result.command_facts.command_records[0]

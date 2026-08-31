@@ -716,8 +716,7 @@ def test_media_pool_contains_value_is_disclosed_as_literal_text() -> None:
 
 def test_operate_reference_is_a_bounded_single_read_control_plane() -> None:
     marker = "<!-- WAAPI_OPERATE_REFERENCE_END -->"
-    assert len(OPERATE.encode("utf-8")) <= 27_000
-    assert len(OPERATE.replace("\n", "\r\n").encode("utf-8")) <= 26_500
+    assert len(OPERATE.replace("\n", "\r\n").encode("utf-8")) <= 20_000
     assert len(OPERATE.splitlines()) <= 240
     assert OPERATE.count("WAAPI_OPERATE_REFERENCE_END") == 1
     assert OPERATE.rstrip().endswith(marker)
@@ -731,8 +730,7 @@ def test_query_reference_has_a_deterministic_end_and_separate_alarm_hops() -> No
     marker = "<!-- WAAPI_QUERY_REFERENCE_END -->"
     query_flat = " ".join(QUERY.split())
 
-    assert len(QUERY.encode("utf-8")) <= 32_768
-    assert len(QUERY.encode("utf-8")) + QUERY.count("\n") <= 32_768
+    assert len(QUERY.replace("\n", "\r\n").encode("utf-8")) <= 20_000
     assert QUERY.count("WAAPI_QUERY_REFERENCE_END") == 1
     assert QUERY.rstrip().endswith(marker)
     assert marker not in QUERY[: QUERY.rfind(marker)]
