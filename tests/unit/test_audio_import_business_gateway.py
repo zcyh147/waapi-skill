@@ -19,6 +19,19 @@ def test_audio_import_draft_digest_binds_only_the_registry_business_adapter() ->
             "business_adapter": audio_import_business_contract(version),
         }
     )
+
+
+def test_audio_import_contract_exposes_only_explicit_replace_mode() -> None:
+    contract = audio_import_business_contract("2022.1")
+
+    assert "mode" not in contract["settings"]
+    assert contract["modes"] == ["replace"]
+    assert contract["start"]["first_required_phase"] == (
+        "bind_only_handle_typed_business_objects_then_submit_one_complete_"
+        "import_batch"
+    )
+
+
 from wwise_waapi.operation_drafts import (
     OperationDraftState,
     OperationDraftStore,

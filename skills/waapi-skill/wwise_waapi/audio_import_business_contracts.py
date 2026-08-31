@@ -64,11 +64,15 @@ def audio_import_business_contract_data(version: str) -> dict[str, Any]:
         "operation": "audio.import",
         "version": version,
         "input_mode": "business_declaration",
-        "settings": list(AUDIO_IMPORT_BUSINESS_SETTING_FIELDS),
+        "settings": [
+            field
+            for field in AUDIO_IMPORT_BUSINESS_SETTING_FIELDS
+            if field != "mode"
+        ],
         "declaration_fields": sorted(AUDIO_IMPORT_BUSINESS_DECLARATION_FIELDS),
         "field_value_types": dict(AUDIO_IMPORT_BUSINESS_VALUE_TYPES),
         "semantic_kinds": list(SUPPORTED_BUSINESS_KINDS),
-        "modes": sorted(AUDIO_IMPORT_BUSINESS_MODES),
+        "modes": ["replace"],
         "mode_selection": {
             "all_new_rows": "derive_create",
             "one_or_more_existing_rows": "derive_reimport",
@@ -101,7 +105,8 @@ def audio_import_business_contract_data(version: str) -> dict[str, Any]:
             "append_arguments": "forbidden",
             "preview_change_intent": "gateway_inferred_from_checked_business_draft",
             "first_required_phase": (
-                "bind_only_handle_typed_business_objects_then_configure_and_declare"
+                "bind_only_handle_typed_business_objects_then_submit_one_complete_"
+                "import_batch"
             ),
         },
         "field_transport": {

@@ -126,691 +126,6 @@
     {
       "model_values": [
         {
-          "name": "add_to_source_control",
-          "path": [
-            "settings",
-            "add_to_source_control"
-          ],
-          "required": false,
-          "schema_sha256": "db44928b6b9ad845fffa6f6b57f32e4ae963f4e73aa2124585a951f5d4f82f73",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "check_out_from_source_control",
-          "path": [
-            "settings",
-            "check_out_from_source_control"
-          ],
-          "required": false,
-          "schema_sha256": "96fc3f9a4040063a64f4f31ff10eb46b73240e3eeb1369692316a0dffe88ad14",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "defaults",
-          "path": [
-            "settings",
-            "defaults"
-          ],
-          "required": false,
-          "schema_sha256": "e88deb665e66a1238bb011dbb06d5161c5c34676e00f5b4f13337c8a351f7bdf",
-          "shape": "map",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "gateway_derivation"
-        },
-        {
-          "name": "audio_source_notes",
-          "path": [
-            "settings",
-            "defaults",
-            "audio_source_notes"
-          ],
-          "required": false,
-          "schema_sha256": "1e3f5bc4bfc207aebfcbdaa9852c41823ae49daa01d5f558cd7ca37164d3663b",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "dialogue_event_directive",
-          "path": [
-            "settings",
-            "defaults",
-            "dialogue_event_directive"
-          ],
-          "required": false,
-          "schema_sha256": "306f51c70288943d5698d8df691a39ebfb0730959177f3b9b3d1d2b9b82deee5",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "event",
-          "path": [
-            "settings",
-            "defaults",
-            "event"
-          ],
-          "required": false,
-          "schema_sha256": "5ef87f544e628e2bd40ddaa3cc0177aadaf7fe42abab85cf1ce0728d7d4e0880",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "gateway_derivation"
-        },
-        {
-          "name": "parent_handle",
-          "path": [
-            "settings",
-            "defaults",
-            "event",
-            "parent_handle"
-          ],
-          "required": false,
-          "schema_sha256": "340b92fe4aea927d0df37a46c025a71c34d7fc9fae44de685cc823f15cf132ad",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "live_bound_handle"
-        },
-        {
-          "name": "name",
-          "path": [
-            "settings",
-            "defaults",
-            "event",
-            "name"
-          ],
-          "required": false,
-          "schema_sha256": "9552927aa7d84e1262de69167d7227549c0b0d3b75b1d10172d76c75d1ca962e",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "action",
-          "path": [
-            "settings",
-            "defaults",
-            "event",
-            "action"
-          ],
-          "required": false,
-          "schema_sha256": "34aefb65b7948907123c040a084b2aeb1547eb585d27e289958e7d1b12f2f2d6",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "field_values",
-          "path": [
-            "settings",
-            "defaults",
-            "field_values"
-          ],
-          "required": false,
-          "schema_sha256": "21a97fe96fcfef0fb39c796fc03a4d6e28beb1626c1d23afb1ff0af47e7b5eb6",
-          "shape": "map",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "gateway_derivation"
-        },
-        {
-          "name": "field_handle",
-          "path": [
-            "settings",
-            "defaults",
-            "field_values",
-            "<field_handle>"
-          ],
-          "required": false,
-          "schema_sha256": "61f5f0d1d02a4d46fbca101eab1dd1c3203593176b6158246afc352192f4c576",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "live_bound_handle"
-        },
-        {
-          "name": "value_variant",
-          "path": [
-            "settings",
-            "defaults",
-            "field_values",
-            "<value_variant>"
-          ],
-          "required": false,
-          "schema_sha256": "d8f542c2f3a7919ab944c94da60108b2cde34451be9a3b1639cbd50a47982292",
-          "shape": "branch",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "gateway_derivation"
-        },
-        {
-          "name": "scalar_business_value",
-          "path": [
-            "settings",
-            "defaults",
-            "field_values",
-            "<value_variant>",
-            "scalar_business_value"
-          ],
-          "required": false,
-          "schema_sha256": "4a114dcd6f12154706d8840a058b4470bceb2f4cf3ad907407f08a4b24cab0b4",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "reference_object_handle",
-          "path": [
-            "settings",
-            "defaults",
-            "field_values",
-            "<value_variant>",
-            "reference_object_handle"
-          ],
-          "required": false,
-          "schema_sha256": "28a0cc653eaea78fad23a4f7b7f476d235a2fc4ba0e459e0885286ecd7f11968",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "live_bound_handle"
-        },
-        {
-          "name": "inline_wav",
-          "path": [
-            "settings",
-            "defaults",
-            "inline_wav"
-          ],
-          "required": false,
-          "schema_sha256": "e5ab2b815e88fea953b21b98f86f90074b697f58392fc169a1c7da854364a2d1",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "exact_user_artifact"
-        },
-        {
-          "name": "language",
-          "path": [
-            "settings",
-            "defaults",
-            "language"
-          ],
-          "required": false,
-          "schema_sha256": "668afe88271fabeed0c3316cd3cff9870710e99fc1db959079c074b9aefe364d",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "loop",
-          "path": [
-            "settings",
-            "defaults",
-            "loop"
-          ],
-          "required": false,
-          "schema_sha256": "59662ab2eed4f5f35bb0f698bb18a5529c59644266a3afd4aa6989d89b434996",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "max_instances",
-          "path": [
-            "settings",
-            "defaults",
-            "max_instances"
-          ],
-          "required": false,
-          "schema_sha256": "4fa15ce7ff1572055f90edb0ebc5362d8940d0f909b8a910b75d1f3a52cf9559",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "media_file",
-          "path": [
-            "settings",
-            "defaults",
-            "media_file"
-          ],
-          "required": false,
-          "schema_sha256": "4e394b514903079762898a0a9323f4376b1d96aec78cb974528c622f7c55c431",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "exact_user_artifact"
-        },
-        {
-          "name": "notes",
-          "path": [
-            "settings",
-            "defaults",
-            "notes"
-          ],
-          "required": false,
-          "schema_sha256": "b9efb20dea253595274e9ecae35cbc7eedd7f143b32af7a01daa010d87e8b3cf",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "originals_subfolder",
-          "path": [
-            "settings",
-            "defaults",
-            "originals_subfolder"
-          ],
-          "required": false,
-          "schema_sha256": "ff261b51a80dffe65208b1d950fc98ff129a1ccb1ebe33da1433fcde76e82a61",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "output_bus",
-          "path": [
-            "settings",
-            "defaults",
-            "output_bus"
-          ],
-          "required": false,
-          "schema_sha256": "05639a72d28a6a1df0b145e33e0f4fb42f0027a6561902cafcc331e2c1bba140",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "live_bound_handle"
-        },
-        {
-          "name": "override_parent_instance_limit",
-          "path": [
-            "settings",
-            "defaults",
-            "override_parent_instance_limit"
-          ],
-          "required": false,
-          "schema_sha256": "9ea3e74285c89498c92f28310888850ec943a67b49e15b7434ed906fb834fcac",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "switch_value",
-          "path": [
-            "settings",
-            "defaults",
-            "switch_value"
-          ],
-          "required": false,
-          "schema_sha256": "4d7899e3e353dcecb7947ac9a7445aa71c88af23d7413f257df30ceb45a257f1",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "volume_db",
-          "path": [
-            "settings",
-            "defaults",
-            "volume_db"
-          ],
-          "required": false,
-          "schema_sha256": "b5aab786f0f1c8b572117d823051c7b72e6d1b42e678adac860e1327974e2d5e",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "mode",
-          "path": [
-            "settings",
-            "mode"
-          ],
-          "required": false,
-          "schema_sha256": "66ce5c27c4f14e1612e7913a75331376a1b24a5a84d96e45203f3031d6075503",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "audio_source_notes",
-          "path": [
-            "declaration",
-            "audio_source_notes"
-          ],
-          "required": false,
-          "schema_sha256": "0c8a361de8bfc3daf1dfc587b25d1341c45765ef150913dbb19fd95990eb7bd0",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "dialogue_event_directive",
-          "path": [
-            "declaration",
-            "dialogue_event_directive"
-          ],
-          "required": false,
-          "schema_sha256": "cd5ef32c5d41831f9d9c3901acd78d2679a6bdd6e4de886e1d3c1381de13d0bb",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "event",
-          "path": [
-            "declaration",
-            "event"
-          ],
-          "required": false,
-          "schema_sha256": "c47f474ec55d37bf3bf3f4443f060bf1cf5b4d79cb04e36607ce72a2ffd77710",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "gateway_derivation"
-        },
-        {
-          "name": "parent_handle",
-          "path": [
-            "declaration",
-            "event",
-            "parent_handle"
-          ],
-          "required": false,
-          "schema_sha256": "7080eeb3c548ad914d4b69e637b2f65288e4ad56d3672147d808a75c4a351b97",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "live_bound_handle"
-        },
-        {
-          "name": "name",
-          "path": [
-            "declaration",
-            "event",
-            "name"
-          ],
-          "required": false,
-          "schema_sha256": "5aba9210dc77ed5b46620f5019f9952d1100ff11844857945c7220f427a4cbcc",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "action",
-          "path": [
-            "declaration",
-            "event",
-            "action"
-          ],
-          "required": false,
-          "schema_sha256": "77567558b375da7710ca2eb44ce8c21ebaf6b6faaf3ecaa049c2f474b2b70d3e",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "field_values",
-          "path": [
-            "declaration",
-            "field_values"
-          ],
-          "required": false,
-          "schema_sha256": "a6a0802610116afdf116a22721494364aac7a34b90c2335b7106787972cd1665",
-          "shape": "map",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "gateway_derivation"
-        },
-        {
-          "name": "field_handle",
-          "path": [
-            "declaration",
-            "field_values",
-            "<field_handle>"
-          ],
-          "required": false,
-          "schema_sha256": "e638885c2338291cd79b09a9b28e46d00cc96cfc342c627488fa224ada1a9b8c",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "live_bound_handle"
-        },
-        {
-          "name": "value_variant",
-          "path": [
-            "declaration",
-            "field_values",
-            "<value_variant>"
-          ],
-          "required": false,
-          "schema_sha256": "97c3831c998830a49a6b10dc03f8a8648c000ff3493c794e86105d133fac6d50",
-          "shape": "branch",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "gateway_derivation"
-        },
-        {
-          "name": "scalar_business_value",
-          "path": [
-            "declaration",
-            "field_values",
-            "<value_variant>",
-            "scalar_business_value"
-          ],
-          "required": false,
-          "schema_sha256": "4ef8df7ded018678e5f0ea9a8a08ebf4470a6b8ca452003062827b70b9c1d788",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "reference_object_handle",
-          "path": [
-            "declaration",
-            "field_values",
-            "<value_variant>",
-            "reference_object_handle"
-          ],
-          "required": false,
-          "schema_sha256": "f9df347de2b0cd6a7e3461e865b13ef860057c6e5789d5c25be3a5f16d74ff61",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "live_bound_handle"
-        },
-        {
-          "name": "inline_wav",
-          "path": [
-            "declaration",
-            "inline_wav"
-          ],
-          "required": false,
-          "schema_sha256": "019c34afc4cdf10d3d05870fa0df99f1f7217593ecb93e42cf42bf49463de424",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "exact_user_artifact"
-        },
-        {
-          "name": "language",
-          "path": [
-            "declaration",
-            "language"
-          ],
-          "required": false,
-          "schema_sha256": "b1c2fe2bf88dce09e25ea377147cfb28f2e7e1a34f9558a77f3975a1ad7e6e36",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "loop",
-          "path": [
-            "declaration",
-            "loop"
-          ],
-          "required": false,
-          "schema_sha256": "8aeec3ca35a388aad0f9a9e48ec7d17e8da83055364fd87218eacdbac7cc187c",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "max_instances",
-          "path": [
-            "declaration",
-            "max_instances"
-          ],
-          "required": false,
-          "schema_sha256": "a859001194eb1e1471af5c8ff6fc38d91373b2585f13e2fc343389e40c61b88f",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "media_file",
-          "path": [
-            "declaration",
-            "media_file"
-          ],
-          "required": false,
-          "schema_sha256": "c51848365a1e651657425be721de9c30cab4add9706f2c41e416006ff56c7209",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "exact_user_artifact"
-        },
-        {
-          "name": "notes",
-          "path": [
-            "declaration",
-            "notes"
-          ],
-          "required": false,
-          "schema_sha256": "6f3089acdbd5dfec7e22f30ba1f9d0db45c48f4bb30c1a5565bca5996464472d",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "originals_subfolder",
-          "path": [
-            "declaration",
-            "originals_subfolder"
-          ],
-          "required": false,
-          "schema_sha256": "55550e75cd393fcbc086882aad93fe8243e30819c81fdf10d94d12966eb6eef0",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "output_bus",
-          "path": [
-            "declaration",
-            "output_bus"
-          ],
-          "required": false,
-          "schema_sha256": "4cfe1002ef41c45d72c72d96f878b97ad9aee848057470ea666bcf69b0ad7137",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "live_bound_handle"
-        },
-        {
-          "name": "override_parent_instance_limit",
-          "path": [
-            "declaration",
-            "override_parent_instance_limit"
-          ],
-          "required": false,
-          "schema_sha256": "cc43ca55efd05b49c14cb7c9420e64accaa7588aa295bf1a9453b90bb15853e5",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "switch_value",
-          "path": [
-            "declaration",
-            "switch_value"
-          ],
-          "required": false,
-          "schema_sha256": "8468a8fd7009a805593f1a45a708999aca04cb87b55623cd7ebdc554e0d8ee38",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "volume_db",
-          "path": [
-            "declaration",
-            "volume_db"
-          ],
-          "required": false,
-          "schema_sha256": "f18617f97b85847a608e0d4f2c74fc18aee8bee14d1a6061b052fa8f69ba4e97",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "declaration_id",
-          "path": [
-            "target",
-            "declaration_id"
-          ],
-          "required": false,
-          "schema_sha256": "1c31f69ed87a4a57eac6aaa13515d266303984824b7572f27b9e409323a93340",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "gateway_derivation"
-        },
-        {
-          "name": "parent_handle",
-          "path": [
-            "target",
-            "new",
-            "parent_handle"
-          ],
-          "required": false,
-          "schema_sha256": "9bc2b8b7dbfb633c93bef6417a5e7a41be6612ba88f12414ebd1d2b5ea9a34be",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "live_bound_handle"
-        },
-        {
-          "name": "name",
-          "path": [
-            "target",
-            "new",
-            "name"
-          ],
-          "required": false,
-          "schema_sha256": "2a59ae4eeb99870835f73fbbbde76c41d417640a296aad41bb6a75a8d260c3cf",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "semantic_kind",
-          "path": [
-            "target",
-            "new",
-            "semantic_kind"
-          ],
-          "required": true,
-          "schema_sha256": "92789b57d2ae9d8dc631348332b4bcef3603a7a54df253303bd1a33ffb6135ba",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "object_handle",
-          "path": [
-            "target",
-            "existing",
-            "object_handle"
-          ],
-          "required": false,
-          "schema_sha256": "c444c04d2365a26ae4326d55bb98b53e6dc0c011f70ca837fc5517c6ac5e07bc",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "live_bound_handle"
-        }
-      ],
-      "sha256": "08a24dd1facd14bacecb067fa828095d00bd4fe5a1e21a9ef6b9a472399a8aac"
-    },
-    {
-      "model_values": [
-        {
           "name": "sources",
           "path": [
             "soundbank_plan",
@@ -3366,6 +2681,679 @@
         }
       ],
       "sha256": "f7bf9a7937905dc43643cf88d473c10bcca91e1361462b86c3e27cbb5224c46f"
+    },
+    {
+      "model_values": [
+        {
+          "name": "add_to_source_control",
+          "path": [
+            "settings",
+            "add_to_source_control"
+          ],
+          "required": false,
+          "schema_sha256": "db44928b6b9ad845fffa6f6b57f32e4ae963f4e73aa2124585a951f5d4f82f73",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "check_out_from_source_control",
+          "path": [
+            "settings",
+            "check_out_from_source_control"
+          ],
+          "required": false,
+          "schema_sha256": "96fc3f9a4040063a64f4f31ff10eb46b73240e3eeb1369692316a0dffe88ad14",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "defaults",
+          "path": [
+            "settings",
+            "defaults"
+          ],
+          "required": false,
+          "schema_sha256": "e88deb665e66a1238bb011dbb06d5161c5c34676e00f5b4f13337c8a351f7bdf",
+          "shape": "map",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "gateway_derivation"
+        },
+        {
+          "name": "audio_source_notes",
+          "path": [
+            "settings",
+            "defaults",
+            "audio_source_notes"
+          ],
+          "required": false,
+          "schema_sha256": "1e3f5bc4bfc207aebfcbdaa9852c41823ae49daa01d5f558cd7ca37164d3663b",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "dialogue_event_directive",
+          "path": [
+            "settings",
+            "defaults",
+            "dialogue_event_directive"
+          ],
+          "required": false,
+          "schema_sha256": "306f51c70288943d5698d8df691a39ebfb0730959177f3b9b3d1d2b9b82deee5",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "event",
+          "path": [
+            "settings",
+            "defaults",
+            "event"
+          ],
+          "required": false,
+          "schema_sha256": "5ef87f544e628e2bd40ddaa3cc0177aadaf7fe42abab85cf1ce0728d7d4e0880",
+          "shape": "object",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "gateway_derivation"
+        },
+        {
+          "name": "parent_handle",
+          "path": [
+            "settings",
+            "defaults",
+            "event",
+            "parent_handle"
+          ],
+          "required": false,
+          "schema_sha256": "340b92fe4aea927d0df37a46c025a71c34d7fc9fae44de685cc823f15cf132ad",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "live_bound_handle"
+        },
+        {
+          "name": "name",
+          "path": [
+            "settings",
+            "defaults",
+            "event",
+            "name"
+          ],
+          "required": false,
+          "schema_sha256": "9552927aa7d84e1262de69167d7227549c0b0d3b75b1d10172d76c75d1ca962e",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "action",
+          "path": [
+            "settings",
+            "defaults",
+            "event",
+            "action"
+          ],
+          "required": false,
+          "schema_sha256": "34aefb65b7948907123c040a084b2aeb1547eb585d27e289958e7d1b12f2f2d6",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "field_values",
+          "path": [
+            "settings",
+            "defaults",
+            "field_values"
+          ],
+          "required": false,
+          "schema_sha256": "21a97fe96fcfef0fb39c796fc03a4d6e28beb1626c1d23afb1ff0af47e7b5eb6",
+          "shape": "map",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "gateway_derivation"
+        },
+        {
+          "name": "field_handle",
+          "path": [
+            "settings",
+            "defaults",
+            "field_values",
+            "<field_handle>"
+          ],
+          "required": false,
+          "schema_sha256": "61f5f0d1d02a4d46fbca101eab1dd1c3203593176b6158246afc352192f4c576",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "live_bound_handle"
+        },
+        {
+          "name": "value_variant",
+          "path": [
+            "settings",
+            "defaults",
+            "field_values",
+            "<value_variant>"
+          ],
+          "required": false,
+          "schema_sha256": "d8f542c2f3a7919ab944c94da60108b2cde34451be9a3b1639cbd50a47982292",
+          "shape": "branch",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "gateway_derivation"
+        },
+        {
+          "name": "scalar_business_value",
+          "path": [
+            "settings",
+            "defaults",
+            "field_values",
+            "<value_variant>",
+            "scalar_business_value"
+          ],
+          "required": false,
+          "schema_sha256": "4a114dcd6f12154706d8840a058b4470bceb2f4cf3ad907407f08a4b24cab0b4",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "reference_object_handle",
+          "path": [
+            "settings",
+            "defaults",
+            "field_values",
+            "<value_variant>",
+            "reference_object_handle"
+          ],
+          "required": false,
+          "schema_sha256": "28a0cc653eaea78fad23a4f7b7f476d235a2fc4ba0e459e0885286ecd7f11968",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "live_bound_handle"
+        },
+        {
+          "name": "inline_wav",
+          "path": [
+            "settings",
+            "defaults",
+            "inline_wav"
+          ],
+          "required": false,
+          "schema_sha256": "e5ab2b815e88fea953b21b98f86f90074b697f58392fc169a1c7da854364a2d1",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "exact_user_artifact"
+        },
+        {
+          "name": "language",
+          "path": [
+            "settings",
+            "defaults",
+            "language"
+          ],
+          "required": false,
+          "schema_sha256": "668afe88271fabeed0c3316cd3cff9870710e99fc1db959079c074b9aefe364d",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "loop",
+          "path": [
+            "settings",
+            "defaults",
+            "loop"
+          ],
+          "required": false,
+          "schema_sha256": "59662ab2eed4f5f35bb0f698bb18a5529c59644266a3afd4aa6989d89b434996",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "max_instances",
+          "path": [
+            "settings",
+            "defaults",
+            "max_instances"
+          ],
+          "required": false,
+          "schema_sha256": "4fa15ce7ff1572055f90edb0ebc5362d8940d0f909b8a910b75d1f3a52cf9559",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "media_file",
+          "path": [
+            "settings",
+            "defaults",
+            "media_file"
+          ],
+          "required": false,
+          "schema_sha256": "4e394b514903079762898a0a9323f4376b1d96aec78cb974528c622f7c55c431",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "exact_user_artifact"
+        },
+        {
+          "name": "notes",
+          "path": [
+            "settings",
+            "defaults",
+            "notes"
+          ],
+          "required": false,
+          "schema_sha256": "b9efb20dea253595274e9ecae35cbc7eedd7f143b32af7a01daa010d87e8b3cf",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "originals_subfolder",
+          "path": [
+            "settings",
+            "defaults",
+            "originals_subfolder"
+          ],
+          "required": false,
+          "schema_sha256": "ff261b51a80dffe65208b1d950fc98ff129a1ccb1ebe33da1433fcde76e82a61",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "output_bus",
+          "path": [
+            "settings",
+            "defaults",
+            "output_bus"
+          ],
+          "required": false,
+          "schema_sha256": "05639a72d28a6a1df0b145e33e0f4fb42f0027a6561902cafcc331e2c1bba140",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "live_bound_handle"
+        },
+        {
+          "name": "override_parent_instance_limit",
+          "path": [
+            "settings",
+            "defaults",
+            "override_parent_instance_limit"
+          ],
+          "required": false,
+          "schema_sha256": "9ea3e74285c89498c92f28310888850ec943a67b49e15b7434ed906fb834fcac",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "switch_value",
+          "path": [
+            "settings",
+            "defaults",
+            "switch_value"
+          ],
+          "required": false,
+          "schema_sha256": "4d7899e3e353dcecb7947ac9a7445aa71c88af23d7413f257df30ceb45a257f1",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "volume_db",
+          "path": [
+            "settings",
+            "defaults",
+            "volume_db"
+          ],
+          "required": false,
+          "schema_sha256": "b5aab786f0f1c8b572117d823051c7b72e6d1b42e678adac860e1327974e2d5e",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "audio_source_notes",
+          "path": [
+            "declaration",
+            "audio_source_notes"
+          ],
+          "required": false,
+          "schema_sha256": "0c8a361de8bfc3daf1dfc587b25d1341c45765ef150913dbb19fd95990eb7bd0",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "dialogue_event_directive",
+          "path": [
+            "declaration",
+            "dialogue_event_directive"
+          ],
+          "required": false,
+          "schema_sha256": "cd5ef32c5d41831f9d9c3901acd78d2679a6bdd6e4de886e1d3c1381de13d0bb",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "event",
+          "path": [
+            "declaration",
+            "event"
+          ],
+          "required": false,
+          "schema_sha256": "c47f474ec55d37bf3bf3f4443f060bf1cf5b4d79cb04e36607ce72a2ffd77710",
+          "shape": "object",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "gateway_derivation"
+        },
+        {
+          "name": "parent_handle",
+          "path": [
+            "declaration",
+            "event",
+            "parent_handle"
+          ],
+          "required": false,
+          "schema_sha256": "7080eeb3c548ad914d4b69e637b2f65288e4ad56d3672147d808a75c4a351b97",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "live_bound_handle"
+        },
+        {
+          "name": "name",
+          "path": [
+            "declaration",
+            "event",
+            "name"
+          ],
+          "required": false,
+          "schema_sha256": "5aba9210dc77ed5b46620f5019f9952d1100ff11844857945c7220f427a4cbcc",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "action",
+          "path": [
+            "declaration",
+            "event",
+            "action"
+          ],
+          "required": false,
+          "schema_sha256": "77567558b375da7710ca2eb44ce8c21ebaf6b6faaf3ecaa049c2f474b2b70d3e",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "field_values",
+          "path": [
+            "declaration",
+            "field_values"
+          ],
+          "required": false,
+          "schema_sha256": "a6a0802610116afdf116a22721494364aac7a34b90c2335b7106787972cd1665",
+          "shape": "map",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "gateway_derivation"
+        },
+        {
+          "name": "field_handle",
+          "path": [
+            "declaration",
+            "field_values",
+            "<field_handle>"
+          ],
+          "required": false,
+          "schema_sha256": "e638885c2338291cd79b09a9b28e46d00cc96cfc342c627488fa224ada1a9b8c",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "live_bound_handle"
+        },
+        {
+          "name": "value_variant",
+          "path": [
+            "declaration",
+            "field_values",
+            "<value_variant>"
+          ],
+          "required": false,
+          "schema_sha256": "97c3831c998830a49a6b10dc03f8a8648c000ff3493c794e86105d133fac6d50",
+          "shape": "branch",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "gateway_derivation"
+        },
+        {
+          "name": "scalar_business_value",
+          "path": [
+            "declaration",
+            "field_values",
+            "<value_variant>",
+            "scalar_business_value"
+          ],
+          "required": false,
+          "schema_sha256": "4ef8df7ded018678e5f0ea9a8a08ebf4470a6b8ca452003062827b70b9c1d788",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "reference_object_handle",
+          "path": [
+            "declaration",
+            "field_values",
+            "<value_variant>",
+            "reference_object_handle"
+          ],
+          "required": false,
+          "schema_sha256": "f9df347de2b0cd6a7e3461e865b13ef860057c6e5789d5c25be3a5f16d74ff61",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "live_bound_handle"
+        },
+        {
+          "name": "inline_wav",
+          "path": [
+            "declaration",
+            "inline_wav"
+          ],
+          "required": false,
+          "schema_sha256": "019c34afc4cdf10d3d05870fa0df99f1f7217593ecb93e42cf42bf49463de424",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "exact_user_artifact"
+        },
+        {
+          "name": "language",
+          "path": [
+            "declaration",
+            "language"
+          ],
+          "required": false,
+          "schema_sha256": "b1c2fe2bf88dce09e25ea377147cfb28f2e7e1a34f9558a77f3975a1ad7e6e36",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "loop",
+          "path": [
+            "declaration",
+            "loop"
+          ],
+          "required": false,
+          "schema_sha256": "8aeec3ca35a388aad0f9a9e48ec7d17e8da83055364fd87218eacdbac7cc187c",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "max_instances",
+          "path": [
+            "declaration",
+            "max_instances"
+          ],
+          "required": false,
+          "schema_sha256": "a859001194eb1e1471af5c8ff6fc38d91373b2585f13e2fc343389e40c61b88f",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "media_file",
+          "path": [
+            "declaration",
+            "media_file"
+          ],
+          "required": false,
+          "schema_sha256": "c51848365a1e651657425be721de9c30cab4add9706f2c41e416006ff56c7209",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "exact_user_artifact"
+        },
+        {
+          "name": "notes",
+          "path": [
+            "declaration",
+            "notes"
+          ],
+          "required": false,
+          "schema_sha256": "6f3089acdbd5dfec7e22f30ba1f9d0db45c48f4bb30c1a5565bca5996464472d",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "originals_subfolder",
+          "path": [
+            "declaration",
+            "originals_subfolder"
+          ],
+          "required": false,
+          "schema_sha256": "55550e75cd393fcbc086882aad93fe8243e30819c81fdf10d94d12966eb6eef0",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "output_bus",
+          "path": [
+            "declaration",
+            "output_bus"
+          ],
+          "required": false,
+          "schema_sha256": "4cfe1002ef41c45d72c72d96f878b97ad9aee848057470ea666bcf69b0ad7137",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "live_bound_handle"
+        },
+        {
+          "name": "override_parent_instance_limit",
+          "path": [
+            "declaration",
+            "override_parent_instance_limit"
+          ],
+          "required": false,
+          "schema_sha256": "cc43ca55efd05b49c14cb7c9420e64accaa7588aa295bf1a9453b90bb15853e5",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "switch_value",
+          "path": [
+            "declaration",
+            "switch_value"
+          ],
+          "required": false,
+          "schema_sha256": "8468a8fd7009a805593f1a45a708999aca04cb87b55623cd7ebdc554e0d8ee38",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "volume_db",
+          "path": [
+            "declaration",
+            "volume_db"
+          ],
+          "required": false,
+          "schema_sha256": "f18617f97b85847a608e0d4f2c74fc18aee8bee14d1a6061b052fa8f69ba4e97",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "declaration_id",
+          "path": [
+            "target",
+            "declaration_id"
+          ],
+          "required": false,
+          "schema_sha256": "1c31f69ed87a4a57eac6aaa13515d266303984824b7572f27b9e409323a93340",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "gateway_derivation"
+        },
+        {
+          "name": "parent_handle",
+          "path": [
+            "target",
+            "new",
+            "parent_handle"
+          ],
+          "required": false,
+          "schema_sha256": "9bc2b8b7dbfb633c93bef6417a5e7a41be6612ba88f12414ebd1d2b5ea9a34be",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "live_bound_handle"
+        },
+        {
+          "name": "name",
+          "path": [
+            "target",
+            "new",
+            "name"
+          ],
+          "required": false,
+          "schema_sha256": "2a59ae4eeb99870835f73fbbbde76c41d417640a296aad41bb6a75a8d260c3cf",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "semantic_kind",
+          "path": [
+            "target",
+            "new",
+            "semantic_kind"
+          ],
+          "required": true,
+          "schema_sha256": "92789b57d2ae9d8dc631348332b4bcef3603a7a54df253303bd1a33ffb6135ba",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "object_handle",
+          "path": [
+            "target",
+            "existing",
+            "object_handle"
+          ],
+          "required": false,
+          "schema_sha256": "c444c04d2365a26ae4326d55bb98b53e6dc0c011f70ca837fc5517c6ac5e07bc",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "live_bound_handle"
+        }
+      ],
+      "sha256": "ff26496baa78a474b03ec21ad99149ad8f4af660571e34f55bfe0fdff1eb1622"
     }
   ],
   "completed_family_seals": [
@@ -153911,7 +153899,7 @@
     "contract": "waapi-skill.typed-request-surface/v1",
     "total_lanes": 824
   },
-  "inventory_sha256": "b3a94576a7d95ab852f1f16e56e11dead067c4ab6d0285eab183aa1265176b2e",
+  "inventory_sha256": "c7fea24e0bbec37382ca819168170f5fafc8ce362b0a0f0a6ccdb90005ebf6e3",
   "mechanic_owners": {
     "ambiguous_continuation_selection": "gateway_derivation",
     "batch_layout": "gateway_derivation",
@@ -179724,10 +179712,10 @@
   ],
   "operation_lanes": [
     {
-      "argument_contract_sha256": "08a24dd1facd14bacecb067fa828095d00bd4fe5a1e21a9ef6b9a472399a8aac",
+      "argument_contract_sha256": "ff26496baa78a474b03ec21ad99149ad8f4af660571e34f55bfe0fdff1eb1622",
       "audit_evidence": "The public audio-import-business/v1 contract exposes semantic kinds and stable declaration values, binds objects and fields live, derives native paths/types/order/batches/continuation, preserves media artifacts exactly, and has complete #54 five-version Program plus macOS/Windows Fresh and real-host evidence.",
       "classification": "named-audio-import-audited-deep",
-      "contract_sha256": "a94907e0df648c83926d29ef6682eb5284ba0f06a676f931034d4dd1aef5d7df",
+      "contract_sha256": "747105daba1dbf796b2d078362223d37b174e9deb9ae79c5c85831ad2e30b029",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -179749,10 +179737,10 @@
       "version": "2021.1"
     },
     {
-      "argument_contract_sha256": "08a24dd1facd14bacecb067fa828095d00bd4fe5a1e21a9ef6b9a472399a8aac",
+      "argument_contract_sha256": "ff26496baa78a474b03ec21ad99149ad8f4af660571e34f55bfe0fdff1eb1622",
       "audit_evidence": "The public audio-import-business/v1 contract exposes semantic kinds and stable declaration values, binds objects and fields live, derives native paths/types/order/batches/continuation, preserves media artifacts exactly, and has complete #54 five-version Program plus macOS/Windows Fresh and real-host evidence.",
       "classification": "named-audio-import-audited-deep",
-      "contract_sha256": "a6e6dc4e513695d485a4cf33145d2d601c343dc22f914e7c4cc6c170fe9e915e",
+      "contract_sha256": "c976be4e6c0274332659c8bc0319fc1308c1ae3c6ece8d019895ee4699aae799",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -179774,10 +179762,10 @@
       "version": "2022.1"
     },
     {
-      "argument_contract_sha256": "08a24dd1facd14bacecb067fa828095d00bd4fe5a1e21a9ef6b9a472399a8aac",
+      "argument_contract_sha256": "ff26496baa78a474b03ec21ad99149ad8f4af660571e34f55bfe0fdff1eb1622",
       "audit_evidence": "The public audio-import-business/v1 contract exposes semantic kinds and stable declaration values, binds objects and fields live, derives native paths/types/order/batches/continuation, preserves media artifacts exactly, and has complete #54 five-version Program plus macOS/Windows Fresh and real-host evidence.",
       "classification": "named-audio-import-audited-deep",
-      "contract_sha256": "edf37d1da683f270ae9bc60fcfb399d6a6d3428dd6e3be6dcc170795a78e7a41",
+      "contract_sha256": "dff915c2395ff257521377ddd8452d4472af987b9d757e2ac54e7b78a9938794",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -179799,10 +179787,10 @@
       "version": "2023.1"
     },
     {
-      "argument_contract_sha256": "08a24dd1facd14bacecb067fa828095d00bd4fe5a1e21a9ef6b9a472399a8aac",
+      "argument_contract_sha256": "ff26496baa78a474b03ec21ad99149ad8f4af660571e34f55bfe0fdff1eb1622",
       "audit_evidence": "The public audio-import-business/v1 contract exposes semantic kinds and stable declaration values, binds objects and fields live, derives native paths/types/order/batches/continuation, preserves media artifacts exactly, and has complete #54 five-version Program plus macOS/Windows Fresh and real-host evidence.",
       "classification": "named-audio-import-audited-deep",
-      "contract_sha256": "800cd47e5cf14b82af238e9173904bcaed7e29036b661b7e15ed3bd333a496d9",
+      "contract_sha256": "4977023fd5dd219a761e84b9bef02b32e8b467489fdbf97c9ebbaa67c24db9ba",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -179824,10 +179812,10 @@
       "version": "2024.1"
     },
     {
-      "argument_contract_sha256": "08a24dd1facd14bacecb067fa828095d00bd4fe5a1e21a9ef6b9a472399a8aac",
+      "argument_contract_sha256": "ff26496baa78a474b03ec21ad99149ad8f4af660571e34f55bfe0fdff1eb1622",
       "audit_evidence": "The public audio-import-business/v1 contract exposes semantic kinds and stable declaration values, binds objects and fields live, derives native paths/types/order/batches/continuation, preserves media artifacts exactly, and has complete #54 five-version Program plus macOS/Windows Fresh and real-host evidence.",
       "classification": "named-audio-import-audited-deep",
-      "contract_sha256": "4ad02a8cb51fd498ca7d735876c1d722fb1cda157f5bbafd0d4773ea50f2e57c",
+      "contract_sha256": "c7567bb93d4642d5466f9ca22e622762c76dcb58423c0cbaa10f84d20e96e2f9",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -183560,7 +183548,7 @@
   },
   "source_contracts": {
     "gateway_parser_sha256": "89b917ec571a2383d36d966036db0a56ee9e8a7aebd4790c234392625b484c27",
-    "operation_contract_sha256": "79b5bbca1632aaa2dcfc8630084ee6bb1dbf150f16bc24ff9297fd9181d19244",
+    "operation_contract_sha256": "5a45a8f54fdea7fed324244d32d1717be6e0759e498ba38316f680406539282a",
     "public_continuation_sha256": "1bbb818941b2f52150bde084f7312a66d0fd2d4465bf093af9830345bb8c4282",
     "typed_request_surface_sha256": "7cbe0a9ba6d9756c94ecea58bb1b2ac56da242059f17c5cdfdaf768271d133a8"
   },
