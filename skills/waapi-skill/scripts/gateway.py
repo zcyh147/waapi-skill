@@ -16695,7 +16695,7 @@ def dispatch_business_object_binding(
             )
         semantic_kind = (
             "random-container"
-            if subtype_rows[0]["@RandomOrSequence"] == 0
+            if subtype_rows[0]["@RandomOrSequence"] == 1
             else "sequence-container"
         )
         business_kind_source = "live_random_or_sequence_discriminator"

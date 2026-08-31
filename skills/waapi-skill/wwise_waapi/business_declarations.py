@@ -1499,7 +1499,7 @@ def revalidate_live_objects(
                 )
             live["semantic_kind"] = (
                 "random-container"
-                if random_or_sequence == 0
+                if random_or_sequence == 1
                 else "sequence-container"
             )
         elif bound.semantic_kind is not None:

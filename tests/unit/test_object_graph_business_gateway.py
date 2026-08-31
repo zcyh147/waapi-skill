@@ -199,7 +199,7 @@ def test_typed_random_container_path_resolves_ambiguous_live_kind(
                         }
                     ]
                 },
-                {"return": [{"id": PARENT_ID, "@RandomOrSequence": 0}]},
+                {"return": [{"id": PARENT_ID, "@RandomOrSequence": 1}]},
             ]
         },
     )
@@ -257,7 +257,7 @@ def test_typed_random_container_path_rejects_live_sequence_discriminator(
                         }
                     ]
                 },
-                {"return": [{"id": PARENT_ID, "@RandomOrSequence": 1}]},
+                {"return": [{"id": PARENT_ID, "@RandomOrSequence": 0}]},
             ]
         },
     )

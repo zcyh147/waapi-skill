@@ -423,7 +423,7 @@ def test_live_sound_revalidation_seals_the_exact_is_voice_subtype(
 @pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
 @pytest.mark.parametrize(
     ("semantic_kind", "random_or_sequence"),
-    (("random-container", 0), ("sequence-container", 1)),
+    (("random-container", 1), ("sequence-container", 0)),
 )
 def test_live_random_sequence_revalidation_seals_the_exact_discriminator(
     version: str,
