@@ -278,6 +278,7 @@ GATEWAY_SUBCOMMANDS = frozenset(
         "typed-zero-call",
         "typed-call",
         "typed-operation",
+        "core-call",
         "execute",
         "verify",
         "call",

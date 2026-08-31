@@ -1058,6 +1058,7 @@ def gateway_command(skill: Path, arguments: str) -> str:
         "draft-discover-types",
         "draft-remove-declaration",
         "draft-revise-declaration",
+        "core-call",
     ),
 )
 def test_business_draft_gateway_subcommands_are_classified(

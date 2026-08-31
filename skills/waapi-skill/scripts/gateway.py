@@ -22344,7 +22344,8 @@ def _business_next_action_binding(
         "new_target_parent_rule": (
             "when_the_user_supplies_a_complete_new_object_path_bind_every_segment_"
             "except_the_final_new_object_name; pass_that_final_segment_once_as_the_"
-            "later_declaration_name"
+            "later_declaration_name; never_skip_the_immediate_parent_or_substitute_"
+            "an_ancestor; a_missing_immediate_parent_is_a_structured_stop"
         ),
         "name_rule": "unscoped_name_is_not_a_mutation_identity",
         "result": "copy_the_returned_bound_object.handle",

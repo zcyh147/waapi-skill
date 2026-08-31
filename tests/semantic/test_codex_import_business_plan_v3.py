@@ -220,6 +220,9 @@ def test_reviewed_2021_profile_import_compiles_and_replays_its_business_plan(
         for row in load_typed_input_profile(TYPED_PROFILE).units
         if row.unit_id == "TYP21-FILE-AUDIO-IMPORT"
     )
+    assert "Rifle 和 Shotgun 两个 Random Container 已经存在" in unit.scenario.prompt
+    assert "只补齐缺少的 Sound" in unit.scenario.prompt
+    assert "缺少的层级" not in unit.scenario.prompt
     project = tmp_path / "sandbox" / "SampleProject.wproj"
     project.parent.mkdir(parents=True)
     project.write_text("<WwiseDocument/>", encoding="utf-8")

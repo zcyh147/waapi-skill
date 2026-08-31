@@ -222,7 +222,11 @@ def test_business_draft_runner_projects_a_compact_copy_only_prefix(
         projected["route"]["fixed_argv_prefix_copy"],
         platform_name=platform_name,
     )
-    assert projected_argv[1] == str(invocation)
+    assert projected_argv[1] == (
+        TASK_LOCAL_RUNNER_WINDOWS
+        if platform_name == "nt"
+        else str(invocation)
+    )
     assert "fixed_argv_prefix" not in projected["route"]
 
     tampered = json.loads(json.dumps(binding))
@@ -5142,6 +5146,63 @@ def test_cli_console_plan_group_order_is_transport_not_business_meaning() -> Non
         step,
         tuple(changed),
     ) != step.arguments
+
+
+def test_core_plan_group_order_is_transport_not_business_meaning() -> None:
+    fixed = (
+        "od1-" + "1" * 32,
+        "--task-authority",
+        "da1-" + "2" * 40,
+        "--expected-revision",
+        "5",
+    )
+    step = ExpectedGatewayStep(
+        name="tx01.declare-core-plan",
+        subcommand="draft-declare-core-plan",
+        arguments=(
+            *fixed,
+            "--role",
+            "audio_object_handles",
+            "object-a",
+            "--role",
+            "audio_object_handles",
+            "object-b",
+            "--item",
+            "platform_names",
+            "Windows",
+            "--item",
+            "languages",
+            "SFX",
+            "--value",
+            "io_root",
+            "/tmp/io",
+        ),
+    )
+    reordered = (
+        *fixed,
+        "--value",
+        "io_root",
+        "/tmp/io",
+        "--role",
+        "audio_object_handles",
+        "object-a",
+        "--role",
+        "audio_object_handles",
+        "object-b",
+        "--item",
+        "platform_names",
+        "Windows",
+        "--item",
+        "languages",
+        "SFX",
+    )
+    broker = SimpleNamespace(_payloads_by_step={})
+
+    assert CodexGatewayBroker._normalize_business_declaration_fact_order(
+        broker,
+        step,
+        reordered,
+    ) == step.arguments
 
 
 def test_host_plan_group_order_is_transport_not_business_meaning() -> None:

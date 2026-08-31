@@ -93,6 +93,7 @@ from tests.semantic.support.codex_gateway_contracts import (
     TYPED_CONTAINER_HANDLE_CONTRACT,
     TYPED_MAP_CONTAINER_CHOICES_CONTRACT,
     TYPED_REQUEST_SCHEMA_CONTRACT,
+    TASK_LOCAL_RUNNER_WINDOWS,
     gateway_payload_contracts,
     metadata_candidate_limit_for_query_count,
     task_local_runner_matches_normalized,
@@ -7795,10 +7796,15 @@ def _project_operation_draft_runner(
                     )
                 if compact_copy_only:
                     projected_count += 1
+                projected_runner = (
+                    TASK_LOCAL_RUNNER_WINDOWS
+                    if compact_copy_only and platform_name == "nt"
+                    else str(invocation_runner)
+                )
                 projected["fixed_argv_prefix_copy"] = _draft_copy_command(
                     [
                         "python",
-                        str(invocation_runner),
+                        projected_runner,
                         "gateway.py",
                         *argv[3:],
                     ],
@@ -10266,6 +10272,11 @@ class CodexGatewayBroker:
                 step,
                 actual,
             )
+        if step.subcommand == "draft-declare-core-plan":
+            return CodexGatewayBroker._normalize_cli_console_plan_fact_order(
+                step,
+                actual,
+            )
         if step.subcommand == "draft-declare-host-plan":
             return CodexGatewayBroker._normalize_host_plan_fact_order(
                 step,
@@ -10372,6 +10383,7 @@ class CodexGatewayBroker:
         option_arity = {
             "--value": 2,
             "--item": 2,
+            "--role": 2,
             "--mapping": 3,
             "--toggle": 2,
         }

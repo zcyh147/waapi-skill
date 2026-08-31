@@ -1101,6 +1101,55 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   archive regressions, and include the recomputed unexpected command identities
   in any future mismatch instead of reporting only a Boolean gate.
 
+### A bounded business route must also be a classified Gateway subcommand
+
+- Evidence: #60 macOS r15 and native-Windows r14 both executed the complete
+  Media Pool `core-call` successfully, returned the exact two sorted rows, and
+  passed Broker reconciliation. The task gate still failed
+  `gateway_count_exact` / `no_unexpected_commands` because the shared command
+  classifier omitted `core-call` from its Gateway subcommand registry.
+- Prevention: every public command accepted by a formal protocol must use the
+  one shared classifier registry. Add a completed-payload classifier regression
+  when a route is added; a correct Wwise result cannot compensate for an
+  unclassified command, and the fix must not weaken unexpected-command checks.
+
+### Core business declaration groups are commutative transport facts
+
+- Evidence: #60 macOS r15 audio conversion supplied the exact `io_root`, four
+  bound audio-object handles, three platforms, and one language, but placed the
+  scalar `--value` before repeated `--role` / `--item` groups. The Broker
+  rejected the declaration before Gateway dispatch solely because the sealed
+  recipe listed the same groups in another order. Native Windows r14 used the
+  recipe order and passed the complete real workflow.
+- Prevention: normalize independent `draft-declare-core-plan` groups by their
+  closed flag, field, and exact value before comparison. Preserve repeated
+  values, reject duplicates or changed values, and keep the original argv for
+  execution after semantic equality is proved.
+
+### Windows compact Draft commands need the fixed task-local runner
+
+- Evidence: #60 native-Windows r14 object-set accepted eleven exact business
+  commands, then the Agent shortened the very long scenario-root runner path
+  while declaring Night. The Broker correctly rejected the altered path; no
+  further Gateway or Wwise dispatch occurred.
+- Prevention: after verifying the candidate's canonical full runner, project
+  compact Windows `fixed_argv_prefix_copy` commands to the fixed literal
+  `.agents\\skills\\waapi-skill\\scripts\\run.py`. Keep full candidate paths in
+  sealed audit state, accept no other relative spelling, and cover both the
+  short model grammar and long encoded-PowerShell fallback.
+
+### Import acceptance prompts must not contradict their parent fixtures
+
+- Evidence: #60 macOS r15 told the Agent both to fill missing hierarchy and to
+  add no container rows. The fixture already contained the Rifle and Shotgun
+  Random Containers. The Agent therefore bound `Weapons` as an ancestor for a
+  new Shotgun row; the Broker rejected it because the direct Shotgun parent was
+  required. Native Windows r14 selected that direct parent and passed.
+- Prevention: state fixture-owned parents explicitly and ask only for missing
+  Sound rows. The Gateway continuation also requires every segment through the
+  immediate parent and treats a missing direct parent as a structured stop;
+  never silently substitute an ancestor.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:
