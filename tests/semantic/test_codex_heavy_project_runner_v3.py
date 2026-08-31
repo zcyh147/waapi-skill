@@ -70,6 +70,10 @@ def test_weak_verifier_oracle_accepts_clear_chinese_boundary() -> None:
         "已验证返回结果符合反射结果结构；未验证、也不能声称已验证"
         "该 Lua 脚本的全部业务副作用。"
     )
+    assert runner.final_response_reports_weak_verifier_boundary(
+        "profile：`typed_input`; count：`3`; "
+        "仅完成返回结果结构验证；不能声称已验证脚本的全部业务副作用。"
+    )
     assert not runner.final_response_reports_weak_verifier_boundary(
         "profile: typed_input; count: 3; 已验证全部业务副作用"
     )

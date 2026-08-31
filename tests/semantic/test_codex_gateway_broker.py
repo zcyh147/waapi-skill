@@ -413,6 +413,8 @@ from wwise_waapi.platform_commands import (
     PlatformCommandError,
     WINDOWS_MODEL_COMMAND_FAMILY,
     WINDOWS_POWERSHELL_ENCODED_FAMILY,
+    decode_windows_model_argv,
+    decode_windows_powershell_argv,
     encode_windows_model_argv,
     encode_windows_powershell_argv,
 )
@@ -1820,11 +1822,28 @@ def test_broker_projects_only_exact_candidate_continuation_to_task_install(
         platform_name=platform_name,
     )
 
-    assert projected == expected_fake_confirmation_next_command(
+    expected = expected_fake_confirmation_next_command(
         invocation_runner,
         "tx-projected",
         platform_name=platform_name,
     )
+    if platform_name == "nt":
+        assert projected["full_argv"] == expected["full_argv"]
+        assert decode_windows_powershell_argv(projected["shell_command"]) == tuple(
+            expected["full_argv"]
+        )
+        assert decode_windows_model_argv(projected["model_command"]) == tuple(
+            [
+                "python",
+                TASK_LOCAL_RUNNER_WINDOWS,
+                "gateway.py",
+                *expected["gateway_argv"],
+            ]
+        )
+        expected["model_command"] = projected["model_command"]
+        assert projected == expected
+    else:
+        assert projected == expected
 
     tampered = dict(original)
     tampered["shell_command"] = str(original["shell_command"]) + " --extra"

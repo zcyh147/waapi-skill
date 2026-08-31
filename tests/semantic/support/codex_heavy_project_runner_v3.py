@@ -860,7 +860,11 @@ def final_response_reports_weak_verifier_boundary(value: str) -> bool:
             or "only confirms that the returned result matches the expected structure"
             in folded
             or (
-                ("仅确认" in folded or "仅已验证" in folded)
+                (
+                    "仅确认" in folded
+                    or "仅已验证" in folded
+                    or "仅完成" in folded
+                )
                 and "返回结果" in folded
                 and "结构" in folded
             )

@@ -7579,7 +7579,14 @@ def _project_next_command_runner(
         result["shell_family"] = WINDOWS_POWERSHELL_ENCODED_FAMILY
         shell_command = encode_windows_powershell_argv(projected_argv)
         try:
-            model_command = encode_windows_model_argv(projected_argv)
+            model_command = encode_windows_model_argv(
+                [
+                    "python",
+                    TASK_LOCAL_RUNNER_WINDOWS,
+                    "gateway.py",
+                    *gateway_argv,
+                ]
+            )
         except PlatformCommandError:
             model_command = None
     elif platform_name == "posix":

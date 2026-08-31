@@ -1244,6 +1244,19 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   `required_next_phase`. Do not rely on a prose rule beside a contradictory
   generic phase label.
 
+### Windows transaction continuations also need the fixed task-local runner
+
+- Evidence: #60 native-Windows r27 object-set read a correct absolute
+  `model_command`, but the Agent changed the long
+  `skills\\waapi-skill-workspace` segment into
+  `skills\\waapi-skill\\workspace`. The Broker rejected the nonexistent runner
+  before `draft-start`; no project change or later Gateway dispatch occurred.
+- Prevention: keep the canonical absolute argv in `full_argv` and the encoded
+  `shell_command`, but project the selected Windows `model_command` onto the
+  one fixed `.agents\\skills\\waapi-skill\\scripts\\run.py` spelling. Resolve
+  that spelling only through the sealed task-local Skill installation and
+  reject every other relative path.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:
