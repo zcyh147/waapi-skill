@@ -1255,7 +1255,11 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   `shell_command`, but project the selected Windows `model_command` onto the
   one fixed `.agents\\skills\\waapi-skill\\scripts\\run.py` spelling. Resolve
   that spelling only through the sealed task-local Skill installation and
-  reject every other relative path.
+  reject every other relative path. The outer continuation-copy audit must
+  compare the selected short runner through that same exact binding while
+  still requiring the encoded fallback to decode to absolute `full_argv`;
+  native-Windows r28 exposed the otherwise contradictory audit in both Lua and
+  object-set before any rejected follow-up reached Gateway or Wwise.
 
 ## New-root preflight
 

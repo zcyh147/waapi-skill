@@ -319,6 +319,39 @@ def test_response_derived_windows_model_command_binds_exact_inner_script() -> No
     assert errors == ()
 
 
+def test_response_derived_windows_model_command_accepts_sealed_task_local_runner() -> None:
+    full_argv = (
+        "python",
+        r"C:\Agent Workspace\.agents\skills\waapi-skill\scripts\run.py",
+        "gateway.py",
+        "confirm",
+        "tx-1",
+    )
+    next_command = _closed_next_command(full_argv, platform_name="nt")
+    next_command["model_command"] = encode_windows_model_argv(
+        ("python", TASK_LOCAL_RUNNER_WINDOWS, *full_argv[2:])
+    )
+    payload = {"next_command": next_command}
+    selected = str(next_command["model_command"])
+    prior = completed_windows_record(
+        windows_powershell_recording("python initial.py"),
+        payload,
+    )
+    current = completed_windows_record(
+        windows_powershell_recording(selected),
+        {},
+    )
+
+    errors = gateway_continuation_binding_errors(
+        (prior, current),
+        (SimpleNamespace(payload=payload), SimpleNamespace(payload={})),
+        platform_name="nt",
+        windows_powershell_core_host=_WINDOWS_POWERSHELL_CORE_HOST,
+    )
+
+    assert errors == ()
+
+
 def test_response_derived_windows_fallback_binds_exact_encoded_script() -> None:
     full_argv = (
         "python",

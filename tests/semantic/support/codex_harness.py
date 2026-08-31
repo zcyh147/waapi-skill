@@ -3569,11 +3569,24 @@ def _selected_gateway_continuation(
         ):
             return None
         try:
+            model_argv = decode_windows_model_argv(str(value["model_command"]))
+            full_argv_tuple = tuple(full_argv)
+            model_runner_matches = (
+                model_argv == full_argv_tuple
+                or (
+                    len(model_argv) == len(full_argv_tuple)
+                    and model_argv[0] == "python"
+                    and model_argv[2:] == full_argv_tuple[2:]
+                    and task_local_runner_matches_normalized(
+                        model_argv[1],
+                        full_argv_tuple[1],
+                    )
+                )
+            )
             if (
-                decode_windows_model_argv(str(value["model_command"]))
-                != tuple(full_argv)
+                not model_runner_matches
                 or decode_windows_powershell_argv(str(value["shell_command"]))
-                != tuple(full_argv)
+                != full_argv_tuple
             ):
                 return None
         except PlatformCommandError:
