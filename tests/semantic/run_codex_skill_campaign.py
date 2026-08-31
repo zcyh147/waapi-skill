@@ -110,6 +110,7 @@ from tests.semantic.support.codex_business_oracle_plan_v3 import (  # noqa: E402
 from tests.semantic.support.codex_audio_media_business_plan_v3 import (  # noqa: E402
     AudioMediaBusinessPlanError,
     AudioMediaBusinessPlanSections,
+    audio_request_matches_resolved_object_ids,
     parse_audio_media_business_plan_sections,
     validate_audio_archived_verification,
     validate_audio_media_business_plan_archive,
@@ -11974,10 +11975,23 @@ def _validate_heavy_v3_audio_conversion_oracle(
     _validate_audio_conversion_snapshot(
         evidence.get("after"), label=f"{label} after"
     )
+    before = evidence["before"]
+    after = evidence["after"]
     paths = evidence.get("observed_target_paths")
     byte_change_paths = evidence.get("byte_change_required_paths")
     slots = evidence.get("target_slots")
     operation_request = evidence.get("operation_request")
+    try:
+        request_identity_matches = isinstance(
+            operation_request,
+            Mapping,
+        ) and audio_request_matches_resolved_object_ids(
+            operation_request,
+            expected_operation_request,
+            before.get("artifacts"),
+        )
+    except AudioMediaBusinessPlanError:
+        request_identity_matches = False
     if (
         row.get("phase") != "after"
         or not _plain_int(slots, minimum=1)
@@ -11991,7 +12005,7 @@ def _validate_heavy_v3_audio_conversion_oracle(
         or evidence.get("after_digest")
         != evidence.get("after", {}).get("digest")
         or not isinstance(operation_request, Mapping)
-        or operation_request != expected_operation_request
+        or not request_identity_matches
         or evidence.get("operation_request_sha256")
         != _canonical_sha256(operation_request)
         or evidence.get("verify_request_sha256")
@@ -12011,23 +12025,36 @@ def _validate_heavy_v3_audio_conversion_oracle(
         raise CampaignEvidenceError(
             f"{label} audio conversion target paths are duplicated"
         )
-    before = evidence["before"]
-    after = evidence["after"]
     arguments = operation_request.get("arguments")
     request_args = arguments.get("args") if isinstance(arguments, Mapping) else None
     objects = request_args.get("objects") if isinstance(request_args, Mapping) else None
     platforms = request_args.get("platforms") if isinstance(request_args, Mapping) else None
     languages = request_args.get("languages") if isinstance(request_args, Mapping) else None
     io_root = arguments.get("io_root") if isinstance(arguments, Mapping) else None
+    expected_arguments = expected_operation_request.get("arguments")
+    expected_request_args = (
+        expected_arguments.get("args")
+        if isinstance(expected_arguments, Mapping)
+        else None
+    )
+    expected_objects = (
+        expected_request_args.get("objects")
+        if isinstance(expected_request_args, Mapping)
+        else None
+    )
     if (
         operation_request.get("operation") != "waapi.call"
         or not isinstance(arguments, Mapping)
         or arguments.get("api") != "ak.wwise.core.audio.convert"
         or arguments.get("options") != {}
         or not isinstance(objects, list)
+        or not isinstance(expected_objects, list)
         or not isinstance(platforms, list)
         or not isinstance(languages, list)
-        or not all(objects) or not all(platforms) or not all(languages)
+        or not all(objects)
+        or not all(expected_objects)
+        or not all(platforms)
+        or not all(languages)
         or any(not _nonempty_text(item) for item in (*objects, *platforms, *languages))
         or not _nonempty_text(io_root)
         or before["input_files"] != after["input_files"]
@@ -12101,11 +12128,11 @@ def _validate_heavy_v3_audio_conversion_oracle(
         )
     expected_slots = {
         (str(object_path), str(platform), str(language))
-        for object_path in objects
+        for object_path in expected_objects
         for platform in platforms
         for language in languages
     }
-    if not set(byte_change_paths).issubset(set(objects)):
+    if not set(byte_change_paths).issubset(set(expected_objects)):
         raise CampaignEvidenceError(
             f"{label} byte-change paths escape the target object set"
         )

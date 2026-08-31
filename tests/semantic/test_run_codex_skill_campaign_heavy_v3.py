@@ -7459,6 +7459,7 @@ def test_heavy_validator_accepts_frozen_materialized_request_prompt(
     assert [row["status"] for row in result.observations] == ["PASS"], "\n".join(
         verdict.reason for verdict in result.phase_verdicts
     )
+
     archived = (
         root
         / "scenarios"
@@ -7470,6 +7471,75 @@ def test_heavy_validator_accepts_frozen_materialized_request_prompt(
         / "prompt.txt"
     ).read_text(encoding="utf-8")
     assert archived == f"请把目标音频转换到 {io_root} 并汇总。\n"
+
+
+def test_heavy_validator_accepts_audio_request_resolved_to_live_guid(
+    tmp_path: Path,
+) -> None:
+    options = _options(tmp_path)
+    units = (_visible_request_unit(1),)
+    root = tmp_path / "matrix"
+    io_root = str(
+        root / "scenarios" / "001-VS24-F-AUDIO-CONVERT-01" / "owned" / "io"
+    )
+    _write_matrix_evidence(
+        root,
+        options=options,
+        units=units,
+        statuses=("PASS",),
+        visible_values_by_id={units[0].unit_id: {"io_root": io_root}},
+    )
+
+    scenario_root = root / "scenarios" / "001-VS24-F-AUDIO-CONVERT-01"
+    outcome_path = scenario_root / "outcome.json"
+    case_path = scenario_root / "matrix-case.json"
+    outcome = json.loads(outcome_path.read_text(encoding="utf-8"))
+    evidence = outcome["checks"]["business_verification"]["verification"][
+        "evidence"
+    ]
+    operation_request = copy.deepcopy(evidence["operation_request"])
+    operation_request["arguments"]["args"]["objects"] = [
+        evidence["before"]["artifacts"][0]["object_id"]
+    ]
+    request_sha256 = campaign._canonical_sha256(operation_request)
+    evidence["operation_request"] = operation_request
+    evidence["operation_request_sha256"] = request_sha256
+    evidence["verify_request_sha256"] = request_sha256
+    matrix_case = json.loads(case_path.read_text(encoding="utf-8"))
+    matrix_case["runner_outcome"] = outcome
+    matrix.write_json(outcome_path, outcome)
+    matrix.write_json(case_path, matrix_case)
+
+    result = campaign.validate_heavy_v3_child_run(
+        root,
+        expected_units=units,
+        options=options,
+        returncode=0,
+    )
+
+    assert [row["status"] for row in result.observations] == ["PASS"], "\n".join(
+        verdict.reason for verdict in result.phase_verdicts
+    )
+
+    operation_request["arguments"]["args"]["objects"] = [
+        "{99999999-9999-9999-9999-999999999999}"
+    ]
+    request_sha256 = campaign._canonical_sha256(operation_request)
+    evidence["operation_request_sha256"] = request_sha256
+    evidence["verify_request_sha256"] = request_sha256
+    matrix_case["runner_outcome"] = outcome
+    matrix.write_json(outcome_path, outcome)
+    matrix.write_json(case_path, matrix_case)
+
+    blocked = campaign.validate_heavy_v3_child_run(
+        root,
+        expected_units=units,
+        options=options,
+        returncode=0,
+    )
+
+    assert [row["status"] for row in blocked.observations] == ["BLOCKED"]
+    assert "request drifted" in blocked.phase_verdicts[0].reason
 
 
 def test_heavy_validator_accepts_sealed_optional_query_schema_terminal_prefixes(

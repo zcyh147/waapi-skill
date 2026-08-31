@@ -558,17 +558,16 @@ def _archived_reference_match_expectations(
 
 def _audio_request_with_live_object_ids(
     expected_request: Mapping[str, Any],
-    live_binding: Mapping[str, Any],
+    identity_rows: Any,
 ) -> Mapping[str, Any]:
     """Resolve only sealed audio object paths to their live GUID identities."""
 
-    fingerprints = live_binding.get("artifact_fingerprints")
-    if not isinstance(fingerprints, list) or not fingerprints:
+    if not isinstance(identity_rows, list) or not identity_rows:
         raise AudioMediaBusinessPlanError(
             "archived conversion live object identities are unavailable"
         )
     ids_by_path: dict[str, set[str]] = {}
-    for row in fingerprints:
+    for row in identity_rows:
         if not isinstance(row, Mapping):
             raise AudioMediaBusinessPlanError(
                 "archived conversion live object identity is malformed"
@@ -611,6 +610,21 @@ def _audio_request_with_live_object_ids(
     return resolved
 
 
+def audio_request_matches_resolved_object_ids(
+    actual_request: Mapping[str, Any],
+    expected_request: Mapping[str, Any],
+    identity_rows: Any,
+) -> bool:
+    """Match a sealed path request or its unique sealed live-GUID equivalent."""
+
+    if actual_request == expected_request:
+        return True
+    return actual_request == _audio_request_with_live_object_ids(
+        expected_request,
+        identity_rows,
+    )
+
+
 def validate_audio_archived_verification(sections: AudioMediaBusinessPlanSections, verification: Mapping[str, Any]) -> None:
     """Bind archived conversion-oracle evidence to the sealed pre-Codex plan."""
 
@@ -628,15 +642,14 @@ def validate_audio_archived_verification(sections: AudioMediaBusinessPlanSection
     if evidence.get("operation_request_sha256") != _sha256(operation_request):
         raise AudioMediaBusinessPlanError("archived conversion verification request digest drifted")
     expected_request = static["operation_request"]
-    if operation_request != expected_request:
-        resolved_request = _audio_request_with_live_object_ids(
-            expected_request,
-            live,
+    if not audio_request_matches_resolved_object_ids(
+        operation_request,
+        expected_request,
+        live.get("artifact_fingerprints"),
+    ):
+        raise AudioMediaBusinessPlanError(
+            "archived conversion verification request drifted"
         )
-        if operation_request != resolved_request:
-            raise AudioMediaBusinessPlanError(
-                "archived conversion verification request drifted"
-            )
     if evidence.get("target_slots") != static["expected_output_count"]:
         raise AudioMediaBusinessPlanError("archived conversion verification target count drifted")
     after = evidence.get("after")
@@ -2430,6 +2443,7 @@ def _plain(value: Any) -> Any:
 
 __all__ = [
     "AudioMediaBusinessPlanError", "AudioMediaBusinessPlanSections",
+    "audio_request_matches_resolved_object_ids",
     "compile_audio_conversion_business_plan", "validate_audio_conversion_business_plan",
     "compile_media_pool_business_plan", "validate_media_pool_business_plan",
     "parse_audio_media_business_plan_sections", "validate_audio_media_business_plan_archive",

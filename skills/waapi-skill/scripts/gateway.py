@@ -24041,16 +24041,64 @@ def _business_next_action_binding(
                 "[--add-to-source-control|--no-add-to-source-control]",
             ],
         }
+        merge_configured = (
+            record.operation == "object.create"
+            and session.settings.get("name_conflict") == "merge"
+        )
+        existing_same_name_root_merge = {
+            **operation_draft_prefix_copy_binding(
+                configure_prefix,
+                append_action="execute_verbatim_to_configure_the_proven_merge",
+            ),
+            "append": ["--name-conflict", "merge"],
+            "use_only_when": (
+                "the_exact_preflight_found_the_existing_same_name_root_and_the_"
+                "user_requested_merge"
+            ),
+            "required_before_root_declaration": True,
+            "then": (
+                "declare_that_existing_root_name_once_under_its_bound_direct_"
+                "parent_then_declare_only_the_requested_descendants"
+            ),
+        }
         return {
             **shared,
             "required_next_phase": (
                 "declare_remaining_named_objects_or_check_complete_graph"
                 if session.declarations
-                else "declare_named_object_or_discover_long_tail_kind"
+                else (
+                    "merge_configured_declare_existing_same_name_root_once_then_"
+                    "requested_descendants"
+                    if merge_configured
+                    else (
+                        "if_exact_preflight_found_an_existing_same_name_root_"
+                        "configure_merge_before_its_declaration; otherwise_"
+                        "declare_named_object_or_discover_long_tail_kind"
+                        if record.operation == "object.create"
+                        else "declare_named_object_or_discover_long_tail_kind"
+                    )
+                )
             ),
             "type_discovery": type_discovery,
             "field_discovery": field_discovery,
             "configure": configure,
+            **(
+                {
+                    "existing_same_name_root_merge_status": "satisfied",
+                }
+                if merge_configured
+                else (
+                    {
+                        "existing_same_name_root_merge": (
+                            existing_same_name_root_merge
+                        ),
+                        "existing_same_name_root_merge_status": "required_when_"
+                        "exact_preflight_found_the_existing_root",
+                    }
+                    if record.operation == "object.create"
+                    else {}
+                )
+            ),
             "declaration": declare,
             "completion_candidate": {
                 "condition": "all_user_requested_named_objects_are_declared",

@@ -1202,6 +1202,33 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   equivalence only to sealed artifact fingerprints, require complete and
   unambiguous resolution, and continue rejecting any other request or digest.
 
+### Every archive validator must share the same identity equivalence
+
+- Evidence: #60 macOS r24 produced a passing audio-conversion task and passing
+  typed archived oracle after replacing sealed object paths with their unique
+  live GUIDs. The campaign still classified the unit BLOCKED because its older
+  secondary conversion validator independently required literal equality with
+  the path request.
+- Prevention: when a campaign retains a secondary oracle, make it accept the
+  same narrowly proven equivalence as the typed validator. Reconstruct the GUID
+  request only from unique `object_path`/`object_id` pairs in the sealed before
+  snapshot, compare the complete request, and continue building artifact slots
+  from the sealed business paths. Add a full campaign-classification regression;
+  a unit-level typed-validator test alone is insufficient.
+
+### Conditional business phases need copy-ready continuations
+
+- Evidence: #60 macOS r24 correctly preflighted the existing `Robot_VO` root
+  and bound its direct parent, then skipped `draft-business-configure` because
+  `required_next_phase` said to declare the object. The Broker rejected the
+  declaration before mutation. The same candidate passed on Windows only
+  because that Agent happened to configure merge first.
+- Prevention: expose a dedicated `existing_same_name_root_merge` continuation
+  whose fixed prefix appends exactly `--name-conflict merge`, mark it required
+  before the root declaration, and state that conditional in
+  `required_next_phase`. Do not rely on a prose rule beside a contradictory
+  generic phase label.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:

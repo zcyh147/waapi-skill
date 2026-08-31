@@ -169,7 +169,9 @@ def test_gateway_discovers_long_tail_type_then_compiles_only_its_handle(
     parent_handle = bound["bound_object"]["handle"]
     bind_next = bound["draft"]["next_action_binding"]
     assert bind_next["required_next_phase"] == (
-        "declare_named_object_or_discover_long_tail_kind"
+        "if_exact_preflight_found_an_existing_same_name_root_configure_merge_"
+        "before_its_declaration; otherwise_declare_named_object_or_discover_"
+        "long_tail_kind"
     )
     assert bind_next["type_discovery"]["native_type_input"] == "forbidden"
     assert bind_next["field_discovery"]["scope_decision"] == {
@@ -188,6 +190,12 @@ def test_gateway_discovers_long_tail_type_then_compiles_only_its_handle(
         "[--replace-owner-handle <bound-existing-owner-handle>]",
         "[--platform <exact-user-platform>]",
         "[--add-to-source-control|--no-add-to-source-control]",
+    ]
+    merge = bind_next["existing_same_name_root_merge"]
+    assert merge["required_before_root_declaration"] is True
+    assert merge["append"] == ["--name-conflict", "merge"]
+    assert merge["fixed_argv_prefix_copy"] == bind_next["configure"][
+        "fixed_argv_prefix_copy"
     ]
     assert "--token" not in json.dumps(bind_next)
 
@@ -290,6 +298,75 @@ def test_gateway_discovers_long_tail_type_then_compiles_only_its_handle(
         "type": "Event",
         "name": "Play_Weather",
     }
+
+
+def test_gateway_closes_merge_configuration_before_root_declaration(
+    tmp_path: Path,
+) -> None:
+    start_code, started = _offline(tmp_path, "draft-start", "object.create")
+    assert start_code == 0, started
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    bind_client = _live_client(
+        tmp_path,
+        {
+            "ak.wwise.core.object.get": [
+                {
+                    "return": [
+                        {
+                            "id": PARENT_ID,
+                            "name": "NPC",
+                            "type": "ActorMixer",
+                            "path": (
+                                r"\Actor-Mixer Hierarchy\Default Work Unit"
+                                r"\SemanticLab\NPC"
+                            ),
+                        }
+                    ]
+                }
+            ]
+        },
+    )
+    bind_code, bound = gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(tmp_path / "state"),
+            "draft-bind-object",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            "1",
+            "--object-id",
+            PARENT_ID,
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda _url: bind_client,
+    )
+    assert bind_code == 0, bound
+    assert "existing_same_name_root_merge" in bound["draft"][
+        "next_action_binding"
+    ]
+
+    configure_code, configured = _offline(
+        tmp_path,
+        "draft-business-configure",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "2",
+        "--name-conflict",
+        "merge",
+    )
+    assert configure_code == 0, configured
+    next_action = configured["draft"]["next_action_binding"]
+    assert next_action["required_next_phase"] == (
+        "merge_configured_declare_existing_same_name_root_once_then_requested_"
+        "descendants"
+    )
+    assert next_action["existing_same_name_root_merge_status"] == "satisfied"
+    assert "existing_same_name_root_merge" not in next_action
 
 
 def test_gateway_builds_rtpc_curve_from_bound_business_facts(tmp_path: Path) -> None:
