@@ -75,27 +75,7 @@ python scripts/run.py gateway.py --version 2022.1 operation-schema object.copy
 
 Use the listed route for the corresponding intent:
 
-| User intent | Command |
-| --- | --- |
-| current Wwise version, endpoint, or project | `status` |
-| inspect or save connection/version/policy config | `config-show` / `config-set` |
-| list current project Buses | `buses` |
-| current UI selection | `selected` |
-| inspect project default Work Units | `project-default-work-units` |
-| list profiler game objects at a time/cursor | `profiler-game-objects` |
-| inspect one voice-path contribution tree | `profiler-voice-contributions` |
-| migrated business request | run `request-schema`, then its sole continuation |
-| register/unregister a runtime Game Object | `request-schema ak.soundengine.registerGameObj` / `request-schema ak.soundengine.unregisterGameObj`; never `object.create` |
-| inspect the private WAL tree | `debug-wal-tree` |
-| validate one reflected call in Debug Wwise | `debug-validate-call` |
-| inspect packaged API support, schema, route, or boundary | `capabilities` / `describe` |
-| run a reviewed reflected capability | `request-schema <exact-uri>` and its sole continuation |
-| object lookup | use the `query-object` business declaration; disclose advanced WAQL only when needed |
-| packaged object-type discovery without Wwise | `object-types` |
-| live object type/property/reference metadata | `metadata` |
-| wait for one or a fixed bounded count of topic events | `wait-topic` |
-| explicitly stream topic events continuously, with a maximum event count | `stream-topic` |
-| inspect project-changing operation support | `operations` / `operation-schema` |
+Register a runtime Game Object with `request-schema ak.soundengine.registerGameObj`; unregister through its matching schema; never `object.create`.
 
 `status` is the sole Gateway-owned `getInfo` route and completes a connection/version/project request. Do not use `request-schema` or `typed-zero-call` as another `getInfo` path. This complete route needs only this `SKILL.md`; do not read the setup or query reference for it.
 Treat the named `getInfo` result's `processId` as the requested live process identity; finish from that Gateway evidence without a system process lookup.
@@ -126,13 +106,13 @@ unsubscribe result.
 
 Exact reflection-call fast route: for `ak.wwise.waapi.getFunctions` or `ak.wwise.waapi.getTopics`, run `request-schema` and follow its sole typed continuation. Do not run `describe` or `capabilities` first. If that continuation is rejected or fails, stop and report the result.
 
-For five-version totals, first read coverage as directed below, then run exactly `capabilities --all-versions --summary-only`; it includes every route count. Row filters omit `--summary-only`. The list defaults to at most 50 compact rows; `--limit 0` is an explicit all-row opt-in, and `--detail` is only for nested interface, schema-summary, policy, or evidence auditing. When a URI is already known, use `request-schema <uri>` instead of listing the matrix. Natural-language business intent is not proof of an exact operation identifier. If that identifier was not supplied by the user or returned by a visible Gateway result in this conversation, run the compact `operations` inventory once and copy its exact matching name; never invent, expand, translate, or specialize a name. When the exact name is already visible, use `operation-schema <name>` directly. Reserve `operations --detail` for an explicit full-catalog contract audit.
+For five-version totals, first read coverage as directed below, then run exactly `capabilities --all-versions --summary-only`; it includes every route count. Row filters omit `--summary-only`. The list defaults to at most 50 compact rows; `--limit 0` opts into all rows and `--detail` is diagnostic. For a known URI use `request-schema <uri>`. For business intent, use a user/Gateway-supplied exact operation name or run compact `operations` once and copy the match; never invent a name. Use `operation-schema <name>` when known. Reserve `operations --detail` for an explicit full-catalog contract audit.
 
 For five-version totals, coverage, exclusions, or matrix proof, read `references/waapi-coverage.md` once after `SKILL.md` and before the summary; combine both. Program tests are not live-Wwise verification.
 
-Object discovery starts with the closed business declaration returned by `query-schema`; use the bounded exact advanced contract only when that declaration cannot express a required server-side read semantic. Advanced WAQL is fixed read-only `object.get`, Gateway-bounded, and its schema states UTF-8/framing limits. Never rewrite a rejection or mutate from its result: a one-row response never certifies uniqueness. Before a later change, show candidates and exact-ID verify the chosen GUID/name/type/path. Do likewise for a mutation subset selected from multiple business-declaration or advanced results; relationship-GUID read hops are exempt. Generic `call` remains forbidden; obey `QUERY_OBJECT_REQUIRED`, `FIXED_COMMAND_REQUIRED`, and `WAIT_TOPIC_REQUIRED`.
+Object discovery starts with the closed `query-schema` business declaration; use its bounded advanced contract only for otherwise inexpressible server-side read semantics. Advanced WAQL is fixed read-only `object.get`: a one-row response never certifies uniqueness. Before mutation, show candidates and exact-ID verify the chosen GUID/name/type/path. The same applies to a mutation subset selected from multiple business-declaration or advanced results; relationship-GUID read hops are exempt. Generic `call` is forbidden; obey `QUERY_OBJECT_REQUIRED`, `FIXED_COMMAND_REQUIRED`, and `WAIT_TOPIC_REQUIRED`.
 
-When a machine-readable answer is requested and any successful gateway payload contains `agent_result`, compact-serialize exactly that object as the result body and stop. This rule applies to fixed reads as well as transactions. Do not reconstruct its fields from the prompt, `normalized`, summaries, or verification evidence; do not alter JSON escaping or keys; and do not run another command after receiving it. For `WAAPI_RESULT_JSON=<json>`, append compact `agent_result` directly after the prefix. Failed, deferred, indeterminate, or boundary payloads have no successful `agent_result`; report their actual state. Put the one-time introduction in a separate progress update; it never changes the exact machine-readable body. Normal query answers use default business fields. Use `query-object --detail` only for explicit user requests or compile/dispatch diagnosis; never rerun solely for detail.
+When a machine-readable answer is requested and any successful gateway payload contains `agent_result`, compact-serialize exactly that object and stop. This rule applies to fixed reads as well as transactions. Do not reconstruct its fields from the prompt, `normalized`, summaries, or evidence; do not run another command after receiving it. Append it after `WAAPI_RESULT_JSON=` when requested. Otherwise report the failure state. Keep the introduction separate. Normal query answers use default business fields. Use `query-object --detail` only for explicit user requests or compile/dispatch diagnosis; never rerun solely for detail.
 
 ## Routing
 
@@ -204,24 +184,17 @@ Conditional read for a closed transaction: `references/waapi-operate.md`
 
 ## Runner and packaged runtime
 
-The runtime loads `resources/manifest/<version>/`, `resources/semantic/<version>/`, `resources/waql/<version>/`, and `resources/deferred/<version>.json` through the packaged gateway. Use `describe <uri> --full-schema` only when a complete reflected schema is necessary. For exact registry counts, profile meanings, exclusions, and evidence scope, read `references/waapi-coverage.md` once as directed above; evidence status never substitutes for live behavioral proof.
+The gateway loads `resources/manifest/<version>/`, `resources/semantic/<version>/`, `resources/waql/<version>/`, and `resources/deferred/<version>.json`. Use `describe <uri> --full-schema` only for a needed complete schema. Read `references/waapi-coverage.md` as directed for exact counts and evidence scope; it never substitutes for live proof.
 
 ## Boundaries
 
-- Do not invent fixed API maps in the prompt when the runtime resources can resolve the correct URI.
-- Never write disposable business logic for a user Wwise task. No heredoc script, inline Python, new `.py`/`.js`/`.sh` helper, or direct client construction.
-- `scripts/run.py` and the environment helper accept only their immutable packaged script allowlist. Never attempt another runner target or temporary script path.
-- Fixed functions require their packaged command, reviewed Topics require `wait-topic` or `stream-topic`, and every other reviewed API follows only its `request-schema` or named `operation-schema` continuation. Mutations always require immutable Preview plus confirmation or policy authorization. The reviewed Core business family rejects `typed-call`, dynamic typed-container commands, and shallow `draft-apply`; environment variables and retired flags do not bypass those route decisions.
-- Lua uses only dedicated policy-gated operations: an existing non-symlink `.lua` inside `io_root`, or exact user-supplied inline source on Wwise 2025.1. Set `source_authority` only when the current message supplies the complete code or path. Never generate, repair, wrap, augment, or hide Lua. Loader/module and CLI switches stay closed; rebind source path, size, and hash before execution; never infer rollback or retry.
-- Private debug reads use only `debug-wal-tree`, typed `ak.wwise.debug.validateCall`, or bounded `wait-topic ak.wwise.debug.assertFailed`. Process controls use dedicated policy-gated operations with fixed acknowledgements, require later confirmation even under `allow_changes`, execute once, and end terminal-indeterminate on disconnect uncertainty—never retry, reconnect, or substitute generic verification.
-- Raw UI-command hooks and model-supplied CLI custom commands remain blocked. Use only closed Authoring-host routes; a fresh live `getCommands` result, not packaged inventory, owns command IDs. Rebind registration paths/content; treat `user_supplied_verbatim` only as a caller assertion. Confine explicit writes below `io_root` and disclose implicit Wwise-managed writes as unproven.
+- Never invent API maps or disposable business logic. No heredoc, inline Python, new `.py`/`.js`/`.sh` helper, direct client construction, alternate runner target, or temporary script.
+- Use only each packaged fixed command or returned `request-schema` / named `operation-schema` continuation. Mutations always require immutable Preview plus confirmation or policy authorization. `typed-call` and retired commands cannot bypass route decisions.
+- Lua is limited to its policy-gated operations and exact user-supplied source/path; never generate or repair it. Debug process controls execute once and never retry after disconnect uncertainty. Raw UI hooks and model-supplied CLI commands stay blocked; closed Authoring routes use fresh live command IDs. Explicit writes stay below `io_root`.
 - Do not search the repository to recover from a gateway error. A structured failure is the result unless the user explicitly asked to develop or debug this Skill itself.
 - If a capability has no packaged executable path, return a clear `unsupported_by_skill_interface` boundary instead of synthesizing code.
 - Editing this Skill's implementation is allowed only when the user's task is Skill development, testing, or debugging—not as a way to complete an ordinary Wwise request.
 
 ## Detailed references
 
-- `references/waapi-setup.md` — connection, version, config, and status troubleshooting
-- `references/waapi-query.md` — read-only inspection, selection/object lookup, topic waits/streams, and no-code failure rules
-- `references/waapi-operate.md` — closed operation JSON, durable policy-aware preview/authorize/execute/verify flow, retry rules, and explicit boundaries
-- `references/waapi-coverage.md` — exact five-version counts, exclusions, route meanings, and program-test scope
+- In `references/`: `waapi-setup.md` config, `waapi-query.md` reads/topics, `waapi-operate.md` changes, `waapi-coverage.md` counts/evidence.

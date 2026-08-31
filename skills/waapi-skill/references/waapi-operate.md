@@ -4,10 +4,10 @@ Read this file once with one complete standalone `cat`. It is complete only when
 
 ## Core boundaries
 
-- The only normal change path is the packaged transaction CLI through absolute `scripts/run.py` from the injected `SKILL.md` locator.
-- Do not import builders or planners from inline Python, write a helper, call `WaapiClient`, construct raw WAAPI mutations, edit Wwise XML, or bypass a dedicated operation with generic `call`. Do not write code to bypass an unsupported boundary. That boundary does not authorize code generation.
+- The only normal change path is the packaged transaction CLI through absolute `scripts/run.py` from the injected Skill.
+- Do not import builders or planners from inline Python or call `WaapiClient`; use no raw WAAPI/XML or generic `call`. Do not write code to bypass an unsupported boundary. That boundary does not authorize code generation.
 - POSIX: single-quote Wwise path values to preserve backslashes; one read/Gateway call per shell call, never joined.
-- Read each Gateway JSON before continuing; exit `0` proves nothing. Stop on empty, non-JSON, or host-truncated output. A typed-container response is complete only when final `WAAPI_TYPED_CONTAINER_RESPONSE_END` says `complete:true` and `truncated:false`; then continue from that response.
+- Read each Gateway JSON; exit `0` proves nothing. Stop on empty, non-JSON, or truncated output. A typed-container response is complete only when final `WAAPI_TYPED_CONTAINER_RESPONSE_END` says `complete:true` and `truncated:false`; then continue from that response.
 - A rejected or nonzero Gateway invocation is also a hard stop for that turn. Do not advance to the next schema, preview, or transaction phase and do not repair or retry the command. The sole metadata-discovery retry below starts only from a successful complete JSON result whose `fallback_detail_scan.status` is `partial`.
 - Except for the migration below, one complete terminal `verify` result ends the transaction; append no query, filesystem inspection, or other proof.
 
@@ -17,7 +17,7 @@ An existing transaction continuation always outranks operation selection.
 
 ### Existing transaction
 
-Use the transaction id from conversation or a prior Gateway result; an artifact hash is not a lookup key. If absent, offer a fresh preview without inspecting state. The visible Preview's `next_command` is authoritative: execute its selected field verbatim. Its template never authorizes reconstruction.
+Use the transaction id from conversation or a Gateway result; an artifact hash is not a lookup key. The visible Preview's `next_command` is authoritative; any other field never authorizes reconstruction. If absent, offer a fresh preview. Execute only its selected field verbatim.
 
 The first Gateway command is:
 
@@ -25,7 +25,7 @@ The first Gateway command is:
 python /absolute/path/to/waapi-skill/scripts/run.py gateway.py transaction-show <transaction-id> --summary-only
 ```
 
-This is a mandatory safety gate. Do not call `operations`, `operation-schema`, or `request-schema` first. If its complete JSON is not visible, stop without a later transaction command, even with exit code `0` or a previously known id/hash.
+Do not call `operations`, `operation-schema`, or `request-schema` first. Without complete JSON, stop before any later transaction command.
 
 ### New transaction
 
@@ -33,7 +33,7 @@ For a subset chosen from prior query results, finish the selected-subset identit
 
 After a selected-subset gate, choose one first transaction-contract branch:
 
-A natural-language outcome is not an exact operation name or URI. Unless the user supplied it or a visible Gateway result returned it, run compact `operations` once. Match either one named `operations` row or one raw-Core `request_schema_routes` row by its business summary/intent, then copy that row's `next_command` exactly; never invent, translate, specialize, or repair a name or URI. `operations --detail` is audit-only.
+A natural-language outcome is not an exact name/URI. Use one supplied by the user/Gateway, or run compact `operations` once, match one business summary, and copy its `next_command`; never invent or repair it. `operations --detail` is audit-only.
 | Request | First transaction-contract sequence |
 |---|---|
 | `object.create` | Preflight: explicit pre-Preview same-name-root type/path only; not parent/sibling or later verification. Then `operation-schema`; metadata. |
@@ -44,11 +44,11 @@ A natural-language outcome is not an exact operation name or URI. Unless the use
 | A named operation using only closed schema fields and side effects | its named `operation-schema` directly |
 | A known native URI without a named route | `request-schema <uri>` and follow its sole typed or business continuation |
 
-Follow the schema's sole `input_mode`. No schema-to-preview shortcut. The business Adapter owns object paths, native types, metadata scopes, tokens/enums, order, batching, and Preview intent. Bind through returned path/GUID/role routes and submit only disclosed high-level fields; never type a native request fragment.
+Follow the schema's sole `input_mode`. No schema-to-preview shortcut. The business Adapter owns object paths, native types, metadata scopes, tokens/enums, order, batching, and Preview intent. Use returned binding routes and submit only disclosed high-level fields.
 
 Complete paths use `by_path_segments`; GUIDs use `by_id`.
 
-For `composer`, run only its returned start and action argv. For `business_declaration`, run `draft-start` when returned. Bind exact owners, parents, and references. Supply stable facts such as `volume_db=-4`. The Gateway derives Wwise paths, types, metadata scopes, and Preview change intent; configure a default only when the user requested it. Exact reflected URIs use `request-schema`. For a complete caller path, keep it as one `path` selector.
+For `composer`, run only its returned start and action argv. For `business_declaration`, run `draft-start` when returned. Bind exact owners, parents, and references. Supply stable facts such as `volume_db=-4`. The Gateway derives Wwise paths, types, metadata scopes, and Preview change intent; configure a default only when the user requested it. Exact reflected URIs use `request-schema`; for a complete caller path, keep it as one `path` selector.
 
 Table imports start `operation-schema audio.importTabDelimited`; dynamic columns stay metadata-first.
 
@@ -139,19 +139,19 @@ For user Lua files use `lua.executeCoreFile` in Authoring, or `lua.executeCliFil
 
 ## CLI versus connected Authoring
 
-Only explicit WwiseConsole, CLI, command-line, or 命令行 wording selects an `ak.wwise.cli.*` route. A `.wproj` path, JSON `project` field, project-copy description, or output/cache path alone does not establish CLI intent.
+Only explicit WwiseConsole, CLI, command-line, or 命令行 wording selects `ak.wwise.cli.*`; a project/output path alone does not establish CLI intent.
 
-Without explicit CLI wording, use the connected Authoring operations: `soundbank.generate`, `soundbank.convertExternalSources`, `soundbank.processDefinitionFiles`, and `audio.importTabDelimited`. When the earlier metadata-bound branch does not apply, their first Gateway command is the named `operation-schema`; otherwise complete that branch's one discovery first and then read the same schema. Do not probe a same-named CLI API first. The singular CLI `convertExternalSource`, CLI `generateSoundbank`, and CLI `tabDelimitedImport` are not their connected `ak.wwise.core.*` counterparts.
+Otherwise use connected `soundbank.generate`, `soundbank.convertExternalSources`, `soundbank.processDefinitionFiles`, or `audio.importTabDelimited`: run its named schema after any required metadata discovery, never a same-named CLI route.
 
 ### Reviewed CLI and Console business routes
 
 Every reflected `ak.wwise.cli.*` route plus `ak.wwise.console.project.create` and `ak.wwise.console.project.open` uses `request-schema <exact-uri>`. Follow its exact `draft-start`, then submit one complete `draft-declare-cli-console-plan` with only the returned business fields and input forms. These routes require WwiseConsole; an Authoring-host boundary ends the attempt.
 
-The declaration forms are fixed: `--value` for one scalar, `--item` for each member of a business collection, `--mapping` for each named platform/value association, and `--toggle <field> enable|disable` for an explicit Boolean outcome. Copy the field names from the current schema. Never type native CLI option names, negative flags, request objects, shell fragments, or array layouts. The Gateway owns version availability, native option spelling, mapping shape and order, `io_root`, and shell serialization.
+Forms are fixed: `--value` for one scalar, `--item` for each member, `--mapping` for each named platform/value association, and `--toggle <field> enable|disable`. Copy schema field names. Never type native CLI option names or request/shell shapes. The Gateway owns version availability, native spelling/order, `io_root`, and serialization.
 
-Closed scalar choices appear in each current version's returned input form only where that version supports them; copy one of those exact values. Exact project, table, definition, license, source, and output paths remain caller artifacts. Do not infer an optional value the user did not request. Model-supplied global, pre-build, post-build, or other custom command hooks remain prohibited.
+Copy only returned scalar choices and caller-supplied artifact paths; omit unrequested options. Model-supplied global, pre-build, post-build, or other custom command hooks remain prohibited.
 
-The Gateway also owns the Wwise 2022 external-source partial-success boundary, all per-version field deltas, collection ceilings, and isolated-I/O checks. On rejection, report the returned repair action instead of reconstructing a native request. After every successful CLI execute, including `ak.wwise.cli.migrate`, copy the returned `verify` continuation exactly. Migration verification may end at the explicit weaker result-schema boundary: disconnect or continued reachability never authorizes replay, and result-schema-only evidence is not a reopened-project business oracle.
+The Gateway owns the Wwise 2022 external-source partial-success boundary, version deltas, ceilings, and I/O checks. Report returned rejections. After successful CLI execute, copy `verify` exactly. Migration's weaker result boundary means disconnect or continued reachability never authorizes replay; result-schema-only evidence is not a reopened-project business oracle.
 
 ### WAAPI schema, test tone, and Authoring project routes
 
@@ -167,7 +167,7 @@ For exact `ak.wwise.core.audio.convert` in `2024.1`/`2025.1`, run `request-schem
 
 ## Closed input, preview, and policy
 
-Unknown fields fail; there is no caller-authored request document. Use only its continuation. Never ask for confirmation while typed composition or Preview creation is still incomplete. Under `ask_before_changes`, use its executable Preview. Business Drafts return `preview-from-draft` without `--apply`; never append it. Design uses the non-executable form. Unless a trusted caller supplied an absolute override, omit `--state-dir`; the Gateway owns the external runtime state root.
+Unknown fields fail; there is no caller-authored request document. Use only its continuation. Never ask for confirmation while typed composition or Preview creation is still incomplete. Business Drafts return `preview-from-draft` without `--apply`. Design is non-executable. Unless a trusted caller supplied an absolute override, omit `--state-dir`; the Gateway owns the external runtime state root.
 
 A rejected or incomplete preview is a hard same-turn boundary. Do not repair JSON, change an operation, or retry preview in that turn. A changed target/value requires a new preview.
 

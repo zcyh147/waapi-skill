@@ -7457,6 +7457,25 @@ def _draft_copy_command(
     )
 
 
+def _decode_draft_copy_command(
+    command: str,
+    *,
+    platform_name: str,
+) -> list[str]:
+    """Decode either canonical host envelope before runner projection."""
+
+    if platform_name == "nt":
+        try:
+            return list(decode_windows_model_argv(command))
+        except PlatformCommandError:
+            return list(decode_windows_powershell_argv(command))
+    if platform_name == "posix":
+        return shlex.split(command)
+    raise GatewayInvocationError(
+        f"unsupported Gateway continuation platform {platform_name!r}"
+    )
+
+
 def _project_operation_draft_runner(
     value: Mapping[str, Any],
     *,
@@ -7523,21 +7542,10 @@ def _project_operation_draft_runner(
                         "Gateway Draft disclosure copy command is invalid"
                     )
                 try:
-                    if platform_name == "nt":
-                        try:
-                            candidate_argv = list(
-                                decode_windows_model_argv(copy_command)
-                            )
-                        except PlatformCommandError:
-                            candidate_argv = list(
-                                decode_windows_powershell_argv(copy_command)
-                            )
-                    elif platform_name == "posix":
-                        candidate_argv = shlex.split(copy_command)
-                    else:
-                        raise GatewayInvocationError(
-                            f"unsupported Gateway continuation platform {platform_name!r}"
-                        )
+                    candidate_argv = _decode_draft_copy_command(
+                        copy_command,
+                        platform_name=platform_name,
+                    )
                 except (PlatformCommandError, ValueError) as exc:
                     raise GatewayInvocationError(
                         "Gateway Draft disclosure copy command cannot be decoded"
@@ -7739,9 +7747,22 @@ def _project_operation_draft_runner(
             if "fixed_argv_prefix_copy" in nested:
                 argv = nested.get("fixed_argv_prefix")
                 instruction = nested.get("fixed_argv_prefix_copy_instruction")
+                copy_command = nested.get("fixed_argv_prefix_copy")
+                compact_copy_only = not isinstance(argv, list)
+                if compact_copy_only and isinstance(copy_command, str):
+                    try:
+                        argv = _decode_draft_copy_command(
+                            copy_command,
+                            platform_name=platform_name,
+                        )
+                    except (PlatformCommandError, ValueError):
+                        argv = None
                 if (
                     not isinstance(argv, list)
-                    or nested.get("fixed_argv_prefix_copy")
+                    or len(argv) < 4
+                    or argv[:3]
+                    != ["python", expected_candidate, "gateway.py"]
+                    or copy_command
                     != _draft_copy_command(argv, platform_name=platform_name)
                     or not isinstance(instruction, Mapping)
                     or instruction.get("source_field")
@@ -7750,8 +7771,15 @@ def _project_operation_draft_runner(
                     raise GatewayInvocationError(
                         "Gateway business Draft copy-ready prefix is not exact"
                     )
+                if compact_copy_only:
+                    projected_count += 1
                 projected["fixed_argv_prefix_copy"] = _draft_copy_command(
-                    projected["fixed_argv_prefix"],
+                    [
+                        "python",
+                        str(invocation_runner),
+                        "gateway.py",
+                        *argv[3:],
+                    ],
                     platform_name=platform_name,
                 )
             return projected

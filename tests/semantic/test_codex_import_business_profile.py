@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -417,7 +418,11 @@ def test_use_existing_protocol_binds_live_rows_and_declares_missing_rows() -> No
     steps = build_audio_import_composer_transaction_steps(
         request,
         label="tx01",
-        existing_target_paths=frozenset({existing}),
+        existing_target_paths=frozenset(
+            {
+                re.sub(r"(?<=\\)<[^<>\\]+>", "", existing),
+            }
+        ),
     )
     bindings = [
         step for step in steps if step.subcommand == "draft-bind-object"

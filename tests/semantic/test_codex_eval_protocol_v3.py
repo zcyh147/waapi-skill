@@ -2161,6 +2161,9 @@ def test_media_pool_public_business_read_uses_one_bounded_core_call() -> None:
     )
 
     assert step.subcommand == "core-call"
+    filename_meaning = step.arguments[6]
+    assert isinstance(filename_meaning, ExactArgumentAlternatives)
+    assert "name/file" in filename_meaning.values
     canonical_arguments = tuple(
         argument.values[0]
         if isinstance(argument, ExactArgumentAlternatives)

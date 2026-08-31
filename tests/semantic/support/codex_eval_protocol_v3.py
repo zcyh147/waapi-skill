@@ -682,6 +682,14 @@ def build_audio_import_composer_transaction_steps(
         raise V3ProtocolError("audio.import business mode is unsupported")
     mode = "replace" if native_mode == "replaceExisting" else None
     existing_target_form = native_mode in {"useExisting", "replaceExisting"}
+    normalized_existing_target_paths = (
+        None
+        if existing_target_paths is None
+        else frozenset(
+            re.sub(r"(?<=\\)<[^<>\\]+>", "", path)
+            for path in existing_target_paths
+        )
+    )
     configure_arguments: list[Any] = [*draft.prefix()]
     if mode is not None:
         configure_arguments.extend(("--mode", mode))
@@ -813,8 +821,9 @@ def build_audio_import_composer_transaction_steps(
         existing_target_handle: ResponseBinding | None = None
         row_uses_existing_target = existing_target_form and not (
             native_mode == "useExisting"
-            and existing_target_paths is not None
-            and target_path not in existing_target_paths
+            and normalized_existing_target_paths is not None
+            and re.sub(r"(?<=\\)<[^<>\\]+>", "", target_path)
+            not in normalized_existing_target_paths
         )
         if row_uses_existing_target:
             existing_target_handle = bind_object({"kind": "path", "value": target_path})
@@ -6035,7 +6044,7 @@ def media_pool_business_call_step(
         flag = "--text-filter" if isinstance(value, str) else "--number-filter"
         encoded = value if isinstance(value, str) else json.dumps(value, allow_nan=False)
         field_aliases = {
-            "Filename": ("Filename", "filename", "name"),
+            "Filename": ("Filename", "filename", "name", "name/file"),
             "Path": ("Path", "path"),
             "FileId": ("FileId", "fileid", "file-id"),
             "Db": ("Db", "database", "database-id"),

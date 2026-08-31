@@ -157,6 +157,98 @@ def test_closed_business_literal_equivalence_is_broker_owned(
     ) is True
 
 
+@pytest.mark.parametrize(
+    ("platform_name", "copy_family"),
+    (("posix", "posix"), ("nt", "model"), ("nt", "powershell")),
+)
+def test_business_draft_runner_projects_a_compact_copy_only_prefix(
+    tmp_path: Path,
+    platform_name: str,
+    copy_family: str,
+) -> None:
+    candidate = tmp_path / "candidate" / "scripts" / "run.py"
+    invocation = tmp_path / "task" / "scripts" / "run.py"
+    candidate.parent.mkdir(parents=True)
+    invocation.parent.mkdir(parents=True)
+    candidate.write_text("candidate", encoding="utf-8")
+    invocation.write_text("task", encoding="utf-8")
+    argv = [
+        "python",
+        str(candidate),
+        "gateway.py",
+        "draft-bind-object",
+        "od1-" + "1" * 32,
+        "--task-authority",
+        "da1-" + "2" * 40,
+        "--expected-revision",
+        "2",
+    ]
+    if copy_family == "powershell":
+        argv.extend(("--opaque-long-value", "x" * 1_100))
+    binding = {
+        "contract": "waapi-skill.business-draft-next-action/v1",
+        "required_next_phase": "bind_next_object",
+        "shell_tool_timeout_ms": 30_000,
+        "route": {
+            "fixed_argv_prefix_copy": (
+                broker_module.encode_windows_powershell_argv(argv)
+                if copy_family == "powershell"
+                else (
+                    broker_module.encode_windows_model_argv(argv)
+                    if copy_family == "model"
+                    else shlex.join(argv)
+                )
+            ),
+            "fixed_argv_prefix_copy_instruction": {
+                "contract": (
+                    "waapi-skill.operation-draft-command-copy-instruction/v1"
+                ),
+                "source_field": "fixed_argv_prefix_copy",
+                "action": (
+                    "copy_verbatim_then_append_complete_typed_action_groups"
+                ),
+            },
+        },
+    }
+
+    projected = broker_module._project_operation_draft_runner(  # noqa: SLF001
+        binding,
+        candidate_runner=candidate,
+        invocation_runner=invocation,
+        platform_name=platform_name,
+    )
+
+    projected_argv = broker_module._decode_draft_copy_command(  # noqa: SLF001
+        projected["route"]["fixed_argv_prefix_copy"],
+        platform_name=platform_name,
+    )
+    assert projected_argv[1] == str(invocation)
+    assert "fixed_argv_prefix" not in projected["route"]
+
+    tampered = json.loads(json.dumps(binding))
+    tampered_argv = [*argv]
+    tampered_argv[1] = str(tmp_path / "other" / "scripts" / "run.py")
+    tampered["route"]["fixed_argv_prefix_copy"] = (
+        broker_module.encode_windows_powershell_argv(tampered_argv)
+        if copy_family == "powershell"
+        else (
+            broker_module.encode_windows_model_argv(tampered_argv)
+            if copy_family == "model"
+            else shlex.join(tampered_argv)
+        )
+    )
+    with pytest.raises(
+        GatewayInvocationError,
+        match="business Draft copy-ready prefix is not exact",
+    ):
+        broker_module._project_operation_draft_runner(  # noqa: SLF001
+            tampered,
+            candidate_runner=candidate,
+            invocation_runner=invocation,
+            platform_name=platform_name,
+        )
+
+
 def test_broker_accepts_media_pool_business_aliases_in_any_flag_order(
     tmp_path: Path,
 ) -> None:

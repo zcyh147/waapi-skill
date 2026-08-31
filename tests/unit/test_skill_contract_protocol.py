@@ -216,8 +216,11 @@ def test_skill_frontmatter_uses_the_closed_plain_scalar_shape() -> None:
 
 def test_skill_entry_fits_the_fresh_codex_bootstrap_window() -> None:
     assert len(SKILL.splitlines()) <= 230
-    assert len(SKILL.encode("utf-8")) <= 35_000
-    assert len(SKILL.replace("\n", "\r\n").encode("utf-8")) <= 35_000
+    # Real native-Windows Fresh Agent runs have clipped the middle of larger
+    # PowerShell output despite preserving both ends.  Keep material margin
+    # below that variable transport window instead of merely fitting 32 KiB.
+    assert len(SKILL.encode("utf-8")) <= 27_000
+    assert len(SKILL.replace("\n", "\r\n").encode("utf-8")) <= 27_000
 
 
 def test_exact_identity_query_is_complete_in_entry_file() -> None:
@@ -712,8 +715,8 @@ def test_media_pool_contains_value_is_disclosed_as_literal_text() -> None:
 
 def test_operate_reference_is_a_bounded_single_read_control_plane() -> None:
     marker = "<!-- WAAPI_OPERATE_REFERENCE_END -->"
-    assert len(OPERATE.encode("utf-8")) <= 32_768
-    assert len(OPERATE) + OPERATE.count("\n") <= 28_550
+    assert len(OPERATE.encode("utf-8")) <= 27_000
+    assert len(OPERATE.replace("\n", "\r\n").encode("utf-8")) <= 27_000
     assert len(OPERATE.splitlines()) <= 240
     assert OPERATE.count("WAAPI_OPERATE_REFERENCE_END") == 1
     assert OPERATE.rstrip().endswith(marker)

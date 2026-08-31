@@ -951,6 +951,21 @@ prevention checks that are expensive to rediscover.
   by the outer verifier remains diagnostic only; repair the verifier and use a
   new root rather than editing or replaying the sealed root.
 
+### Broker projection must follow the copy contract, not a sibling array
+
+- Evidence: #60 roots `imac-issue60-aae95e9-r11-fail7` and
+  `iwin-issue60-aae95e9-r11-fail6` received valid compact business-Draft
+  continuations containing `fixed_argv_prefix_copy` plus its instruction, but
+  the Broker still required the removed sibling `fixed_argv_prefix` array and
+  rejected the command before Gateway/Wwise dispatch.
+- Cause: the model-facing receipt and Broker projector encoded the same argv in
+  two independently evolving shapes.
+- Prevention: decode the instruction-selected copy string through one host
+  function, verify its canonical candidate runner, project only that runner,
+  and canonically re-encode it. Retain the legacy array path solely for sealed
+  replay. Parameterize POSIX, short Windows model commands, long encoded
+  PowerShell commands, and tampered-runner rejection.
+
 ### A complete lane-reference read must fit the Codex shell-output envelope
 
 - Evidence: #60 native-Windows root `iwin-issue60-616fe68-r10-fail9` reached
@@ -962,11 +977,21 @@ prevention checks that are expensive to rediscover.
 - Cause: a terminal sentinel alone cannot prove a whole-file read when the
   host transcript may preserve both ends while clipping the middle. The lane
   reference had grown beyond the observed output envelope.
-- Prevention: keep Windows-rendered `waapi-operate.md` at or below 28,550
-  characters (source characters plus LF count), with a
-  deterministic size regression and one terminal sentinel. Remove repeated
+- Prevention: keep both LF and Windows-rendered `waapi-operate.md` below
+  27,000 UTF-8 bytes, with a deterministic size regression and one terminal
+  sentinel. Remove repeated
   prose in favor of Gateway schemas/continuations; never weaken byte-for-byte
   read validation or grant PASS merely because the sentinel survived.
+
+The same 27,000-byte envelope applies to the injected entry file. In #60
+native-Windows root `iwin-issue60-aae95e9-r11-fail6`, exact profile-free PowerShell reads of
+the 30,445-character `SKILL.md` preserved its beginning and end but exposed
+only 29,440 characters in one task and 26,902 in another. The corresponding
+`skill_reads_exact` and `read_prefix_exact` gates correctly failed. Keep the
+entry below 27,000 UTF-8 bytes after both LF and CRLF rendering, enforce that
+margin in Program tests, and move repeated route detail behind Gateway-owned
+schemas or the already-bounded lane references. Never infer completeness from
+the command exit code or visible front/back fragments.
 
 ## New-root preflight
 
