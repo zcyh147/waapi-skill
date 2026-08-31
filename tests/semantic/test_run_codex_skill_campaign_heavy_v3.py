@@ -10219,6 +10219,23 @@ def test_campaign_extracts_exact_media_pool_post_filter_protocol(
             "limit": 20,
         },
     }
+    direct_protocol = _expected_media_protocol(
+        staged.materialized,
+        oracle,
+        direct_business=True,
+    )
+    direct_evidence = SimpleNamespace(
+        provenance=_direct_typed_provenance(
+            scenario,
+            version="2025.1",
+            scenario_root=tmp_path / "direct-provenance",
+            protocol=direct_protocol,
+            visible_values={},
+        )
+    )
+    direct_step = campaign._heavy_v3_media_business_protocol_step(direct_evidence)
+    assert direct_step.name == "media.get"
+    assert direct_step.subcommand == "core-call"
 
     steps = list(protocol.steps)
     media_index = next(

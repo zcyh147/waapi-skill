@@ -26,6 +26,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     media_pool_business_call_step,
 )
 from tests.semantic.support.codex_media_pool_business_oracle_v3 import (
+    MediaPoolBusinessOracleView,
     verify_media_pool_business_projection,
 )
 from tests.semantic.support.codex_media_pool_runtime_v3 import (
@@ -700,6 +701,31 @@ def test_case_01_verifies_the_closed_gateway_business_projection(
         boolean_duration,
         _case01_gateway_business_request(max_results=200, exact_name=True),
     ).ok
+
+
+def test_case_01_archive_builds_an_explicit_business_oracle_view(
+    tmp_path: Path,
+) -> None:
+    _runtime, _staged, oracle = _sealed_case01(tmp_path)
+    archived = campaign._heavy_v3_plan_json_value(oracle)
+
+    view = MediaPoolBusinessOracleView.from_archive(
+        archived,
+        scenario_id=oracle.scenario_id,
+    )
+
+    assert view.candidate_keys == oracle.candidate_keys
+    assert view.exact_field("duration") == "WAV/Duration"
+    assert view.row("footstep_gravel_short").file_id == oracle.row(
+        "footstep_gravel_short"
+    ).file_id
+    malformed = json.loads(json.dumps(archived))
+    malformed["rows"][0]["values"] = []
+    with pytest.raises(ValueError, match="archived Media Pool row"):
+        MediaPoolBusinessOracleView.from_archive(
+            malformed,
+            scenario_id=oracle.scenario_id,
+        )
 
 
 def test_gateway_business_projection_at_limit_is_incomplete_with_exact_name(

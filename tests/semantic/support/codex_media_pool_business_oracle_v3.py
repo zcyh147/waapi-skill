@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any, Mapping
 
@@ -16,6 +17,159 @@ from .codex_media_pool_runtime_v3 import (
 
 class MediaPoolBusinessOracleError(ValueError):
     """The observed business projection differs from its sealed protocol."""
+
+
+@dataclass(frozen=True, slots=True)
+class MediaPoolBusinessRowView:
+    """Minimal sealed row needed by the business projection oracle."""
+
+    key: str
+    path: str
+    file_id: str
+    db: Mapping[str, Any]
+    values: Mapping[str, Any]
+
+
+@dataclass(frozen=True, slots=True)
+class MediaPoolBusinessOracleView:
+    """Explicit common view over live and archived Media Pool evidence."""
+
+    scenario_id: str
+    candidate_keys: tuple[str, ...]
+    options: Mapping[str, Any]
+    binding_by_concept: Mapping[str, str]
+    rows: tuple[MediaPoolBusinessRowView, ...]
+
+    def exact_field(self, concept: str) -> str:
+        try:
+            return self.binding_by_concept[concept]
+        except KeyError as exc:
+            raise MediaPoolBusinessOracleError(
+                f"Media Pool archive lacks field concept {concept!r}"
+            ) from exc
+
+    def row(self, key: str) -> MediaPoolBusinessRowView:
+        matches = tuple(item for item in self.rows if item.key == key)
+        if len(matches) != 1:
+            raise MediaPoolBusinessOracleError(
+                f"Media Pool oracle row {key!r} is not unique"
+            )
+        return matches[0]
+
+    @classmethod
+    def from_live(
+        cls,
+        oracle: SealedMediaPoolOracle,
+    ) -> "MediaPoolBusinessOracleView":
+        return cls(
+            scenario_id=oracle.scenario_id,
+            candidate_keys=tuple(oracle.candidate_keys),
+            options=MappingProxyType(dict(oracle.request.options)),
+            binding_by_concept=MappingProxyType(
+                dict(oracle.request.binding.by_concept)
+            ),
+            rows=tuple(
+                MediaPoolBusinessRowView(
+                    key=row.key,
+                    path=row.path,
+                    file_id=row.file_id,
+                    db=MappingProxyType(dict(row.db)),
+                    values=MappingProxyType(dict(row.values)),
+                )
+                for row in oracle.rows
+            ),
+        )
+
+    @classmethod
+    def from_archive(
+        cls,
+        value: Mapping[str, Any],
+        *,
+        scenario_id: str,
+    ) -> "MediaPoolBusinessOracleView":
+        if not isinstance(value, Mapping):
+            raise MediaPoolBusinessOracleError(
+                "archived Media Pool oracle view is not an object"
+            )
+        request = value.get("request")
+        options = request.get("options") if isinstance(request, Mapping) else None
+        binding = request.get("binding") if isinstance(request, Mapping) else None
+        by_concept = (
+            binding.get("by_concept") if isinstance(binding, Mapping) else None
+        )
+        candidate_keys = value.get("candidate_keys")
+        raw_rows = value.get("rows")
+        if (
+            value.get("scenario_id") != scenario_id
+            or not isinstance(options, Mapping)
+            or not isinstance(by_concept, Mapping)
+            or any(
+                not isinstance(key, str)
+                or not key
+                or not isinstance(item, str)
+                or not item
+                for key, item in by_concept.items()
+            )
+            or not isinstance(candidate_keys, list)
+            or not candidate_keys
+            or any(not isinstance(item, str) or not item for item in candidate_keys)
+            or len(set(candidate_keys)) != len(candidate_keys)
+            or not isinstance(raw_rows, list)
+            or not raw_rows
+        ):
+            raise MediaPoolBusinessOracleError(
+                "archived Media Pool oracle view is malformed"
+            )
+        rows: list[MediaPoolBusinessRowView] = []
+        for index, raw in enumerate(raw_rows):
+            if not isinstance(raw, Mapping):
+                raise MediaPoolBusinessOracleError(
+                    f"archived Media Pool row {index} is not an object"
+                )
+            key = raw.get("key")
+            path = raw.get("path")
+            file_id = raw.get("file_id")
+            db = raw.get("db")
+            values = raw.get("values")
+            if (
+                not isinstance(key, str)
+                or not key
+                or not isinstance(path, str)
+                or not path
+                or not isinstance(file_id, str)
+                or not file_id
+                or not isinstance(db, Mapping)
+                or not isinstance(values, Mapping)
+            ):
+                raise MediaPoolBusinessOracleError(
+                    f"archived Media Pool row {index} is malformed"
+                )
+            rows.append(
+                MediaPoolBusinessRowView(
+                    key=key,
+                    path=path,
+                    file_id=file_id,
+                    db=MappingProxyType(dict(db)),
+                    values=MappingProxyType(dict(values)),
+                )
+            )
+        if len({row.key for row in rows}) != len(rows):
+            raise MediaPoolBusinessOracleError(
+                "archived Media Pool row keys are not unique"
+            )
+        if not set(candidate_keys).issubset({row.key for row in rows}):
+            raise MediaPoolBusinessOracleError(
+                "archived Media Pool candidates are not sealed rows"
+            )
+        return cls(
+            scenario_id=scenario_id,
+            candidate_keys=tuple(candidate_keys),
+            options=MappingProxyType(dict(options)),
+            binding_by_concept=MappingProxyType(
+                dict(by_concept)
+            ),
+            rows=tuple(rows),
+        )
 
 
 def _strict_json_equal(actual: Any, expected: Any) -> bool:
@@ -40,7 +194,7 @@ def _strict_json_equal(actual: Any, expected: Any) -> bool:
 
 
 def verify_media_pool_business_projection(
-    oracle: SealedMediaPoolOracle,
+    oracle: SealedMediaPoolOracle | MediaPoolBusinessOracleView,
     step: ExpectedGatewayStep,
     payload: Mapping[str, Any],
     business_request: Mapping[str, Any],
@@ -48,6 +202,11 @@ def verify_media_pool_business_projection(
     """Check one Gateway business result against the sealed protocol and index."""
 
     try:
+        view = (
+            oracle
+            if isinstance(oracle, MediaPoolBusinessOracleView)
+            else MediaPoolBusinessOracleView.from_live(oracle)
+        )
         if (
             step.name != "media.get"
             or step.subcommand != "core-call"
@@ -272,17 +431,17 @@ def verify_media_pool_business_projection(
             seen_keys.add(key)
             output_bindings.append((key, field))
 
-        candidate_keys = oracle.candidate_keys
+        candidate_keys = view.candidate_keys
         complete = not (
             exact_name is not None and len(candidate_keys) >= candidate_limit
         )
         selected_keys = list(candidate_keys) if complete else []
         if exact_name is not None and complete:
-            filename_field = oracle.request.binding.exact("name")
+            filename_field = view.exact_field("name")
             selected_keys = [
                 key
                 for key in selected_keys
-                if exact_name in str(oracle.row(key).values[filename_field])
+                if exact_name in str(view.row(key).values[filename_field])
             ]
 
         def sort_value(value: Any) -> tuple[int, Any]:
@@ -294,13 +453,13 @@ def verify_media_pool_business_projection(
 
         for _meaning, field, direction in reversed(sort_rules):
             present = [
-                key for key in selected_keys if oracle.row(key).values.get(field) is not None
+                key for key in selected_keys if view.row(key).values.get(field) is not None
             ]
             missing = [
-                key for key in selected_keys if oracle.row(key).values.get(field) is None
+                key for key in selected_keys if view.row(key).values.get(field) is None
             ]
             present.sort(
-                key=lambda key: sort_value(oracle.row(key).values.get(field)),
+                key=lambda key: sort_value(view.row(key).values.get(field)),
                 reverse=direction == "descending",
             )
             selected_keys = [*present, *missing]
@@ -308,9 +467,9 @@ def verify_media_pool_business_projection(
             selected_keys = selected_keys[:final_limit]
 
         items: list[dict[str, Any]] = []
-        includes_database = "Db" in tuple(oracle.request.options["return"])
+        includes_database = "Db" in tuple(view.options["return"])
         for key in selected_keys:
-            row = oracle.row(key)
+            row = view.row(key)
             item: dict[str, Any] = {
                 "path": row.path,
                 "file_id": row.file_id,
@@ -368,8 +527,8 @@ def verify_media_pool_business_projection(
             code="MEDIA_POOL_BUSINESS_RESULT_EXACT",
             details=MappingProxyType(
                 {
-                    "scenario_id": oracle.scenario_id,
-                    "file_ids": tuple(oracle.row(key).file_id for key in selected_keys),
+                    "scenario_id": view.scenario_id,
+                    "file_ids": tuple(view.row(key).file_id for key in selected_keys),
                     "row_count": len(items),
                 }
             ),
@@ -381,5 +540,7 @@ def verify_media_pool_business_projection(
             details=MappingProxyType({"error": str(exc)}),
         )
 
-__all__ = ["verify_media_pool_business_projection"]
-
+__all__ = [
+    "MediaPoolBusinessOracleView",
+    "verify_media_pool_business_projection",
+]

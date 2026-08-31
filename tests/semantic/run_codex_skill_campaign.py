@@ -128,6 +128,10 @@ from tests.semantic.support.codex_media_pool_runtime_v3 import (  # noqa: E402
     media_grouped_report_failures,
     media_near_classification,
 )
+from tests.semantic.support.codex_media_pool_business_oracle_v3 import (  # noqa: E402
+    MediaPoolBusinessOracleView,
+    verify_media_pool_business_projection,
+)
 from tests.semantic.support.codex_import_business_plan_v3 import (  # noqa: E402
     COMPOUND_IMPORT_BUSINESS_PLAN_SCHEMA,
     COMPOUND_IMPORT_FIXTURE_KIND,
@@ -8531,16 +8535,24 @@ def _validate_heavy_v3_archived_verification(
         )
         return
     if api == "ak.wwise.core.mediaPool.get":
+        sections = prompt_evidence.typed_sections
+        if not isinstance(sections, AudioMediaBusinessPlanSections):
+            raise CampaignEvidenceError(
+                f"{label} Media Pool case lacks its typed business plan"
+            )
+        expected_request = sections.live_binding.get("request")
+        if not isinstance(expected_request, Mapping):
+            raise CampaignEvidenceError(
+                f"{label} Media Pool typed request is unavailable"
+            )
         _validate_heavy_v3_media_pool_oracle(
             verification,
             scenario_id=scenario_id,
             task_root=task_root,
             expected_final_response_sha256=_heavy_v3_final_response_sha256(task_root),
             final_response=_heavy_v3_final_response(task_root),
-            expected_request=_heavy_v3_protocol_call_request(
-                prompt_evidence,
-                api="ak.wwise.core.mediaPool.get",
-            ),
+            expected_request=expected_request,
+            expected_step=_heavy_v3_media_business_protocol_step(prompt_evidence),
             label=label,
         )
         return
@@ -9663,6 +9675,26 @@ def _heavy_v3_protocol_call_request(
             f"heavy protocol does not contain one exact call request for {api}"
         )
     return values[0]
+
+
+def _heavy_v3_media_business_protocol_step(
+    evidence: HeavyV3PromptEvidence,
+) -> ExpectedGatewayStep:
+    """Return the one sealed direct Media Pool business step."""
+
+    matches = tuple(
+        step
+        for step in evidence.provenance.protocol.steps
+        if step.name == "media.get"
+        and step.subcommand == "core-call"
+        and step.arguments
+        and step.arguments[0] == "ak.wwise.core.mediaPool.get"
+    )
+    if len(matches) != 1:
+        raise CampaignEvidenceError(
+            "heavy protocol does not contain one exact Media Pool business step"
+        )
+    return matches[0]
 
 
 def _heavy_v3_audio_byte_change_paths(fixture: Any) -> tuple[str, ...]:
@@ -12393,6 +12425,7 @@ def _validate_heavy_v3_media_pool_oracle(
     expected_final_response_sha256: str,
     final_response: str,
     expected_request: Mapping[str, Any],
+    expected_step: ExpectedGatewayStep,
     label: str,
 ) -> None:
     row = _closed_oracle_mapping(
@@ -12505,35 +12538,42 @@ def _validate_heavy_v3_media_pool_oracle(
         or model_get_fields.get("return") != available_fields
     ):
         raise CampaignEvidenceError(f"{label} getFields differs from sealed inventory")
-    requested_fields = sealed_request.get("options", {}).get("return")
     model_result = evidence.get("model_media_result")
-    raw_rows = model_result.get("return") if isinstance(model_result, Mapping) else None
-    expected_by_id = {
-        item["file_id"]: item
-        for item in oracle.get("rows", [])
-        if item.get("key") in expected_keys
-    }
-    actual_by_id: dict[str, Mapping[str, Any]] = {}
-    if not isinstance(requested_fields, list) or not isinstance(raw_rows, list):
-        raise CampaignEvidenceError(f"{label} Media Pool result is malformed")
-    for item in raw_rows:
-        if not isinstance(item, Mapping) or not _nonempty_text(item.get("FileId")):
-            raise CampaignEvidenceError(f"{label} Media Pool result row is malformed")
-        file_id = str(item["FileId"])
-        if file_id in actual_by_id:
-            raise CampaignEvidenceError(f"{label} Media Pool result duplicates FileId")
-        actual_by_id[file_id] = item
-    if set(actual_by_id) != set(expected_by_id):
-        raise CampaignEvidenceError(f"{label} Media Pool FileId set is invalid")
-    for file_id, item in actual_by_id.items():
-        expected_row = expected_by_id[file_id]
-        if set(item) != set(requested_fields) or any(
-            not _same_media_value_v3(
-                item.get(field), expected_row.get("values", {}).get(field)
-            )
-            for field in requested_fields
-        ):
-            raise CampaignEvidenceError(f"{label} Media Pool return fields/values drifted")
+    broker_payload = _heavy_v3_broker_step_payload(
+        task_root,
+        step_name="media.get",
+    )
+    broker_result = broker_payload.get("agent_result")
+    business_request = broker_payload.get("business_request")
+    if (
+        not isinstance(model_result, Mapping)
+        or not isinstance(broker_result, Mapping)
+        or not isinstance(business_request, Mapping)
+        or _canonical_sha256(model_result) != _canonical_sha256(broker_result)
+    ):
+        raise CampaignEvidenceError(
+            f"{label} Media Pool business result is not bound to Broker evidence"
+        )
+    try:
+        archived_oracle = MediaPoolBusinessOracleView.from_archive(
+            oracle,
+            scenario_id=scenario_id,
+        )
+    except ValueError as exc:
+        raise CampaignEvidenceError(
+            f"{label} Media Pool archived projection inputs are malformed"
+        ) from exc
+    projection = verify_media_pool_business_projection(
+        archived_oracle,
+        expected_step,
+        model_result,
+        business_request,
+    )
+    if not projection.ok:
+        raise CampaignEvidenceError(
+            f"{label} Media Pool business projection is invalid: "
+            f"{projection.details.get('error', projection.code)}"
+        )
     if supporting:
         _validate_compact_media_reference_archive(
             evidence.get("model_reference_result"),
