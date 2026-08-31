@@ -2488,7 +2488,7 @@ class _PreparedMediaPoolAdapter:
                 )
             self.model_get_fields = raw
             return
-        if step.name == "media.check":
+        if step.name == "media.get":
             raw = _agent_result_mapping(payload, context=step.name)
             verification = verify_media_pool_result(self.oracle, raw)
             _assert_verification(verification, context="Media Pool business result")
@@ -2517,7 +2517,7 @@ class _PreparedMediaPoolAdapter:
 
         requirements = (
             ("media.get-fields", MEDIA_POOL_GET_FIELDS_URI),
-            ("media.check", MEDIA_POOL_GET_URI),
+            ("media.get", MEDIA_POOL_GET_URI),
         )
         results = result.command_facts.gateway_results
         for step_name, api in requirements:

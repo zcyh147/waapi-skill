@@ -4261,7 +4261,7 @@ def test_media_verifier_restores_only_exact_reconciled_gateway_reads() -> None:
     adapter.protocol = SimpleNamespace(
         steps=(
             ExpectedGatewayStep("media.get-fields", "typed-zero-call"),
-            ExpectedGatewayStep("media.check", "draft-check"),
+            ExpectedGatewayStep("media.get", "core-call"),
         )
     )
     observed: list[tuple[str, object]] = []
@@ -4276,7 +4276,7 @@ def test_media_verifier_restores_only_exact_reconciled_gateway_reads() -> None:
         "agent_result": {"return": ["Filename"]},
     }
     media_get = {
-        "command": "draft-check",
+        "command": "core-call",
         "api_attempted": runner.MEDIA_POOL_GET_URI,
         "ok": True,
         "status": "ok",
@@ -4293,11 +4293,11 @@ def test_media_verifier_restores_only_exact_reconciled_gateway_reads() -> None:
 
     assert observed == [
         ("media.get-fields", get_fields["agent_result"]),
-        ("media.check", media_get["agent_result"]),
+        ("media.get", media_get["agent_result"]),
     ]
     with pytest.raises(
         runner.HeavyProjectRunnerError,
-        match="exactly one reconciled media.check gateway result",
+        match="exactly one reconciled media.get gateway result",
     ):
         adapter._restore_model_reads_from_gateway_results(
             SimpleNamespace(
@@ -4308,7 +4308,7 @@ def test_media_verifier_restores_only_exact_reconciled_gateway_reads() -> None:
         )
 
 
-def test_media_observer_records_the_sealed_media_check_result(
+def test_media_observer_records_the_sealed_media_get_result(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     adapter = object.__new__(runner._PreparedMediaPoolAdapter)
@@ -4328,7 +4328,7 @@ def test_media_observer_records_the_sealed_media_check_result(
     result = {"return": [{"id": "media-row"}]}
 
     adapter.observe_payload(
-        ExpectedGatewayStep("media.check", "draft-check"),
+        ExpectedGatewayStep("media.get", "core-call"),
         {"agent_result": result},
     )
 
