@@ -3833,7 +3833,11 @@ def _validate_audio_import_business_agent_protocol(
             raise CampaignEvidenceError(
                 "audio import business sealed Broker record is not successful"
             )
-        if step.subcommand in {"draft-declare-new", "draft-declare-existing"}:
+        if step.subcommand in {
+            "draft-declare-new",
+            "draft-declare-existing",
+            "draft-declare-import-batch",
+        }:
             _validate_audio_import_business_declaration_language(step, arguments)
         if step.subcommand == "preview-from-draft":
             payload = record.get("payload")
@@ -3862,14 +3866,24 @@ def _validate_audio_import_business_declaration_language(
     arguments: Sequence[Any],
 ) -> None:
     values = tuple(str(value) for value in arguments)
-    language_values = tuple(
-        values[index + 2]
-        for index, value in enumerate(values[:-2])
-        if value == "--field" and values[index + 1] == "language"
-    )
-    if len(language_values) > 1 or any(
-        value != "SFX" for value in language_values
-    ):
+    if step.subcommand == "draft-declare-import-batch":
+        language_rows = tuple(
+            (values[index + 1], values[index + 3])
+            for index, value in enumerate(values[:-3])
+            if value == "--field" and values[index + 2] == "language"
+        )
+        language_values = tuple(value for _row, value in language_rows)
+        duplicate_language = len({row for row, _value in language_rows}) != len(
+            language_rows
+        )
+    else:
+        language_values = tuple(
+            values[index + 2]
+            for index, value in enumerate(values[:-2])
+            if value == "--field" and values[index + 1] == "language"
+        )
+        duplicate_language = len(language_values) > 1
+    if duplicate_language or any(value != "SFX" for value in language_values):
         raise CampaignEvidenceError(
             "audio import business derived SFX declaration is contradictory"
         )
@@ -7036,9 +7050,12 @@ def _validate_heavy_v3_codex_facts(
         expected_wwise_version=version,
     )
     expected_command_facts = _json_canonical_value(asdict(classified))
-    if command_facts != expected_command_facts:
+    if any(
+        command_facts.get(key) != expected_command_facts.get(key)
+        for key in ("commands", "command_records")
+    ):
         raise CampaignEvidenceError(
-            "heavy command facts differ from the classification of events.jsonl"
+            "heavy raw command facts differ from the sealed events.jsonl"
         )
 
     records = classified.command_records

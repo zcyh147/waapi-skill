@@ -23343,17 +23343,20 @@ def _business_next_action_binding(
             ],
             "lua.executeCliFile": [
                 "--script-file <exact-user-supplied-lua-file>",
-                "[--argument <key> string|boolean|integer|number|json|null <exact-value>]...",
+                "[--arguments-json <complete-wa_args-strict-json-object>]",
+                "alternative: [--argument <key> string|boolean|integer|number|json|null <exact-value>]...; never combine forms",
                 "[--watchdog-seconds <non-negative-integer>] (2024.1+)",
             ],
             "lua.executeCoreFile": [
                 "--script-file <exact-user-supplied-lua-file>",
-                "[--argument <key> string|boolean|integer|number|json|null <exact-value>]...",
+                "[--arguments-json <complete-wa_args-strict-json-object>]",
+                "alternative: [--argument <key> string|boolean|integer|number|json|null <exact-value>]...; never combine forms",
             ],
             "lua.executeCoreInline": [
                 "--lua-source <exact-user-supplied-utf8-source>",
                 "--io-root <exact-isolated-transaction-root>",
-                "[--argument <key> string|boolean|integer|number|json|null <exact-value>]...",
+                "[--arguments-json <complete-wa_args-strict-json-object>]",
+                "alternative: [--argument <key> string|boolean|integer|number|json|null <exact-value>]...; never combine forms",
             ],
         }
         return {
@@ -25272,7 +25275,31 @@ def operation_draft_payload(
             record,
             task_authority=task_authority,
         )
-        if command == "draft-bind-object" and record.check is None:
+        adapter = business_adapter(record.operation)
+        audio_import_declaration_receipt = (
+            record.operation == "audio.import"
+            and command
+            in {
+                "draft-declare-import-batch",
+                "draft-declare-new",
+                "draft-declare-existing",
+            }
+        )
+        compact_business_update = (
+            record.check is None
+            and not audio_import_declaration_receipt
+            and (
+                command
+                in {
+                    "draft-bind-object",
+                    "draft-bind-field",
+                    "draft-discover-fields",
+                    "draft-discover-types",
+                }
+                or adapter.accepts_update_command(command)
+            )
+        )
+        if compact_business_update:
             next_action_binding = {
                 key: value
                 for key, value in next_action_binding.items()
@@ -25301,7 +25328,11 @@ def operation_draft_payload(
             draft["response_integrity"] = {
                 "complete": True,
                 "truncated": False,
-                "projection": "bound_object_and_copy_ready_continuation",
+                "projection": (
+                    "bound_object_and_copy_ready_continuation"
+                    if command == "draft-bind-object"
+                    else "business_update_and_copy_ready_continuation"
+                ),
                 "compact_projection_is_not_truncation": True,
             }
         if (

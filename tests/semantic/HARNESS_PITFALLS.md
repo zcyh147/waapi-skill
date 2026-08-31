@@ -966,6 +966,51 @@ prevention checks that are expensive to rediscover.
   replay. Parameterize POSIX, short Windows model commands, long encoded
   PowerShell commands, and tampered-runner rejection.
 
+### Compact business receipts are complete projections, not full Draft dumps
+
+- Evidence: #60 r12 `draft-discover-fields` returned a valid 21,550-character
+  object-set receipt that repeated the business contract and every argv array.
+  The Windows Agent stopped because it interpreted the large reply as
+  truncated. Other update routes had already switched to compact copy-ready
+  continuations, so compactness depended on which Draft action ran.
+- Prevention: every business Draft bind, discovery, and adapter-update receipt
+  removes repeated contracts and `fixed_argv_prefix` arrays, retains the
+  instruction-selected copy string and dynamic candidates, and reports
+  `response_integrity.complete=true` with
+  `compact_projection_is_not_truncation=true`. Durable Draft state remains the
+  lossless source for materialization; tests must inspect that state instead of
+  requiring the public continuation to echo it.
+
+### Recompute derived archive facts and honor declared terminal prefixes
+
+- Evidence: #60 r12 completed macOS object-set and Lua lifecycles, but the outer
+  verifier reclassified them BLOCKED. One gate required cached derived command
+  facts to equal a new reconstruction of the sealed `events.jsonl`; another
+  accepted an optional terminal prefix and then incorrectly called it RUNNING
+  because it was shorter than the maximum step count.
+- Prevention: authenticate and compare the raw archived commands and command
+  records, then recompute derived classifications from those sealed records and
+  use the recomputation as authoritative. After an accepted terminal prefix has
+  passed its sequence checks, require its declared `passed`, `complete`, and
+  `COMPLETE` state; do not compare its length with the longest possible path.
+  Raw command tampering must still fail closed.
+
+### Formal protocols must preserve closed business values
+
+- Evidence: #60 r12 rejected three otherwise correct high-level declarations:
+  import rows explicitly repeated the prompt's `language SFX`; Media Pool used
+  fixed result field `Path`, which live dynamic-field discovery did not list;
+  and Lua supplied the prompt's complete `wa_args` object instead of manually
+  decomposing it into typed leaf flags.
+- Prevention: accept exactly one explicit `SFX` language group on a
+  `sound-sfx` import row and reject other or duplicate derived language values.
+  Treat `Path`, `FileId`, and `Db` as fixed Media result fields while retaining
+  the business alias `name/file` for `Filename`. Expose strict
+  `--arguments-json` for one complete Lua arguments object, reject duplicate
+  keys and non-finite JSON, and keep repeated typed `--argument` only as a
+  mutually exclusive compatibility form. The Broker and archive verifier must
+  normalize these forms through the same closed contract.
+
 ### A complete lane-reference read must fit the Codex shell-output envelope
 
 - Evidence: #60 native-Windows root `iwin-issue60-616fe68-r10-fail9` reached

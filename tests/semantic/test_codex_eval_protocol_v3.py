@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -196,7 +197,11 @@ def test_exact_artifact_business_steps_hide_lua_loader_fields(
     ]
     declaration = steps[2]
     assert "--source-authority" not in declaration.arguments
-    assert "--argument" in declaration.arguments
+    assert "--argument" not in declaration.arguments
+    arguments_index = declaration.arguments.index("--arguments-json")
+    assert json.loads(declaration.arguments[arguments_index + 1]) == request[
+        "arguments"
+    ]["wa_args"]
     lua_index = declaration.arguments.index("--lua-source")
     assert declaration.arguments[lua_index : lua_index + 4] == (
         "--lua-source",

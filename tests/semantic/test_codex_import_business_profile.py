@@ -427,6 +427,10 @@ def test_use_existing_protocol_binds_live_rows_and_declares_missing_rows() -> No
     bindings = [
         step for step in steps if step.subcommand == "draft-bind-object"
     ]
+    batch = next(
+        step for step in steps if step.subcommand == "draft-declare-import-batch"
+    )
+    assert batch.allow_explicit_derived_sfx_language is True
     declaration = next(
         step
         for step in steps

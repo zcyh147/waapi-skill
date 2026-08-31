@@ -768,12 +768,10 @@ def _broker_terminal_protocol_passed(
         or not all(record.succeeded for record in evidence.records)
     ):
         return False
-    if consumed_count == len(protocol.steps):
-        return evidence.passed
-    return (
-        protocol.allowed_turn_prefix_counts
-        and not evidence.complete
-        and evidence.terminal_state == "RUNNING"
+    return bool(
+        evidence.passed
+        and evidence.complete
+        and evidence.terminal_state == "COMPLETE"
     )
 
 

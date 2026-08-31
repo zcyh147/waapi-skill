@@ -207,6 +207,35 @@ def test_optional_query_repair_protocol_accepts_one_sealed_repair_chain(
     assert task_runner._broker_terminal_protocol_passed(protocol, evidence)
 
 
+def test_declared_short_terminal_prefix_is_complete_not_running() -> None:
+    steps = tuple(
+        ExpectedGatewayStep(name, "operations")
+        for name in ("one", "two", "optional-three")
+    )
+    protocol = V3GatewayProtocol(
+        steps=steps,
+        turn_prefix_counts=(3,),
+        allowed_turn_prefix_counts=((2, 3),),
+        terminal_prefix_counts=(2, 3),
+    )
+    selected = ("one", "two")
+    evidence = SimpleNamespace(
+        expected_step_names=selected,
+        consumed_step_names=selected,
+        records=tuple(
+            SimpleNamespace(step_name=name, succeeded=True) for name in selected
+        ),
+        rejected_records=(),
+        complete=True,
+        passed=True,
+        terminal_state="COMPLETE",
+        commutative_read_only_step_groups=(),
+        commutative_composer_setup_step_groups=(),
+    )
+
+    assert task_runner._broker_terminal_protocol_passed(protocol, evidence)
+
+
 def test_common_grade_ignores_one_identical_windows_preprocess_failure() -> None:
     result = _result(turn=1, gateway_count=2)
     successful = result.command_facts.command_records[0]

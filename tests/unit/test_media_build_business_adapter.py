@@ -105,6 +105,45 @@ def test_media_pool_deduplicates_the_same_filename_candidate_filter() -> None:
     ) == 1
 
 
+def test_media_pool_fixed_path_sort_does_not_require_live_field_discovery() -> None:
+    prepared = materialize_media_build_business_request(
+        MEDIA_POOL_GET_URI,
+        "2025.1",
+        {
+            "max_results": 200,
+            "text_filters": [["filename", "contains", "footstep"]],
+            "sort_rules": [["path", "ascending"]],
+        },
+        available_media_fields=("Filename", "WAV/Duration"),
+    )
+
+    assert prepared["options"]["return"][:2] == ["Path", "FileId"]
+    assert prepared["business_request"]["sort_rules"] == [
+        {"field_meaning": "path", "direction": "ascending"}
+    ]
+    assert prepared["result_plan"]["sort_bindings"] == [
+        {"meaning": "path", "field": "Path", "direction": "ascending"}
+    ]
+
+
+def test_media_pool_fixed_database_and_name_file_meanings_are_gateway_owned() -> None:
+    prepared = materialize_media_build_business_request(
+        MEDIA_POOL_GET_URI,
+        "2025.1",
+        {
+            "max_results": 20,
+            "text_filters": [["name/file", "contains", "footstep"]],
+            "return_field_meanings": ["database"],
+        },
+        available_media_fields=("Filename", "WAV/Duration"),
+    )
+
+    assert prepared["args"]["filters"][0]["field"] == "Filename"
+    assert prepared["result_plan"]["output_bindings"] == [
+        {"meaning": "database", "field": "Db", "key": "database"}
+    ]
+
+
 def test_media_pool_rejects_conflicting_filename_candidate_filters() -> None:
     with pytest.raises(MediaBuildBusinessError, match="conflicts"):
         materialize_media_build_business_request(

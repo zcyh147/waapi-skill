@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import importlib.util
 import json
 from pathlib import Path
@@ -9,6 +10,11 @@ from typing import Any, Mapping
 import pytest
 
 from wwise_waapi.business_adapters import business_adapter
+from wwise_waapi.exact_artifact_business_cli import (
+    ExactArtifactBusinessCliError,
+    add_exact_artifact_plan_arguments,
+    exact_artifact_plan_from_namespace,
+)
 from wwise_waapi.operation_composer import operation_composer_digest
 from wwise_waapi.operation_drafts import OperationDraftStore
 from wwise_waapi.typed_operations import (
@@ -419,6 +425,112 @@ def test_lua_continuation_discloses_top_level_null_argument(
     assert code == 0, payload
     append = payload["draft"]["next_action_binding"]["declaration"]["append"]
     assert any("string|boolean|integer|number|json|null" in row for row in append)
+
+
+def test_lua_artifact_plan_accepts_one_complete_wa_args_object(
+    tmp_path: Path,
+) -> None:
+    operation = "lua.executeCoreFile"
+    state_dir = tmp_path / "lua-complete-args-state"
+    script = tmp_path / "script.lua"
+    script.write_text("return wa_args.count\n", encoding="utf-8")
+    start_code, started = gateway.execute_gateway(
+        [
+            "--version",
+            "2025.1",
+            "--state-dir",
+            str(state_dir),
+            "draft-start",
+            operation,
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda url: pytest.fail(f"draft-start connected to {url}"),
+    )
+    assert start_code == 0, started
+
+    declaration_code, declared = gateway.execute_gateway(
+        [
+            "--version",
+            "2025.1",
+            "--state-dir",
+            str(state_dir),
+            "draft-declare-artifact-plan",
+            started["draft"]["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            str(started["draft"]["revision"]),
+            "--script-file",
+            str(script),
+            "--arguments-json",
+            '{"count":3}',
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda _url: _LuaClient(tmp_path),
+    )
+
+    assert declaration_code == 0, declared
+    request = OperationDraftStore(state_dir).materialize_request(
+        started["draft"]["draft_id"],
+        task_authority=started["task_authority"],
+        expected_revision=declared["draft"]["revision"],
+        schema_digest=gateway.operation_draft_schema_digest(
+            operation,
+            "2025.1",
+        ),
+        composer_digest=operation_composer_digest(operation, "2025.1"),
+    ).request
+    assert request["arguments"]["wa_args"] == {"count": 3}
+
+
+@pytest.mark.parametrize(
+    "arguments_json",
+    (
+        "[]",
+        '{"count":NaN}',
+        '{"count":1,"count":2}',
+    ),
+)
+def test_lua_complete_wa_args_rejects_non_strict_objects(
+    arguments_json: str,
+) -> None:
+    parser = argparse.ArgumentParser()
+    add_exact_artifact_plan_arguments(parser)
+    namespace = parser.parse_args(
+        ["--script-file", "/tmp/user.lua", "--arguments-json", arguments_json]
+    )
+
+    with pytest.raises(
+        ExactArtifactBusinessCliError,
+        match="one strict JSON object",
+    ):
+        exact_artifact_plan_from_namespace(
+            namespace,
+            operation="lua.executeCoreFile",
+        )
+
+
+def test_lua_complete_wa_args_cannot_mix_argument_forms() -> None:
+    parser = argparse.ArgumentParser()
+    add_exact_artifact_plan_arguments(parser)
+    namespace = parser.parse_args(
+        [
+            "--script-file",
+            "/tmp/user.lua",
+            "--arguments-json",
+            '{"count":3}',
+            "--argument",
+            "count",
+            "integer",
+            "3",
+        ]
+    )
+
+    with pytest.raises(ExactArtifactBusinessCliError, match="cannot be combined"):
+        exact_artifact_plan_from_namespace(
+            namespace,
+            operation="lua.executeCoreFile",
+        )
 
 
 def _preview_public_cli_lua_file(

@@ -5011,6 +5011,67 @@ def test_import_batch_group_order_is_transport_but_row_order_is_business_meaning
     ) != step.arguments
 
 
+def test_import_batch_accepts_one_exact_derived_sfx_language_per_row() -> None:
+    fixed = (
+        "od1-" + "1" * 32,
+        "--task-authority",
+        "da1-" + "2" * 40,
+        "--expected-revision",
+        "2",
+    )
+    step = ExpectedGatewayStep(
+        name="tx01.declare-batch",
+        subcommand="draft-declare-import-batch",
+        arguments=(
+            *fixed,
+            "--expected-declaration-count",
+            "2",
+            "--expected-switch-assignment-count",
+            "0",
+            "--row-order",
+            "rifle",
+            "--existing-row",
+            "rifle",
+            "boh1-" + "3" * 32,
+            "--row-order",
+            "tail",
+            "--new-row",
+            "tail",
+            "boh1-" + "4" * 32,
+            "Rifle_Tail",
+            "sound-sfx",
+        ),
+        allow_explicit_derived_sfx_language=True,
+    )
+    broker = SimpleNamespace(_payloads_by_step={})
+    explicit = (
+        *step.arguments,
+        "--field",
+        "rifle",
+        "language",
+        "SFX",
+        "--field",
+        "tail",
+        "language",
+        "SFX",
+    )
+
+    assert CodexGatewayBroker._normalize_business_declaration_fact_order(
+        broker,
+        step,
+        explicit,
+    ) == step.arguments
+    for invalid in (
+        (*step.arguments, "--field", "rifle", "language", "English(US)"),
+        (*explicit, "--field", "rifle", "language", "SFX"),
+    ):
+        assert CodexGatewayBroker._normalize_business_declaration_fact_order(
+            broker,
+            step,
+            invalid,
+        ) == invalid
+
+
 def test_cli_console_plan_group_order_is_transport_not_business_meaning() -> None:
     fixed = (
         "od1-" + "1" * 32,
@@ -5192,6 +5253,36 @@ def test_business_request_normalizes_only_exact_live_bound_reference_paths() -> 
         "kind": "path",
         "value": unknown_path,
     }
+
+
+def test_audio_convert_witness_normalizes_only_its_bound_object_paths() -> None:
+    bound_path = r"\Actor-Mixer Hierarchy\Default Work Unit\Weather\Rain"
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2024.1",
+        "operation": "waapi.call",
+        "arguments": {
+            "api": "ak.wwise.core.audio.convert",
+            "args": {
+                "objects": [bound_path, r"\Unknown"],
+                "platforms": ["Windows"],
+                "languages": ["SFX"],
+            },
+            "options": {},
+            "io_root": "/tmp/io",
+        },
+    }
+
+    normalized = broker_module._normalize_bound_business_reference_paths(  # noqa: SLF001
+        request,
+        path_to_id={bound_path: "{11111111-1111-1111-1111-111111111111}"},
+    )
+
+    assert normalized["arguments"]["args"]["objects"] == [
+        "{11111111-1111-1111-1111-111111111111}",
+        r"\Unknown",
+    ]
+    assert normalized["arguments"]["args"]["platforms"] == ["Windows"]
 
 
 def test_business_draft_setup_broker_selects_unique_binding_and_configuration(

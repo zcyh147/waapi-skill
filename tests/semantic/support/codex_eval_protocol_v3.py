@@ -1079,6 +1079,9 @@ def build_audio_import_composer_transaction_steps(
             name=batch_name,
             subcommand="draft-declare-import-batch",
             arguments=tuple(batch_arguments),
+            allow_explicit_derived_sfx_language=all(
+                row["kind"] == "sound-sfx" for row in batch_rows
+            ),
         )
     )
     draft.advance(batch_name)
@@ -3323,6 +3326,8 @@ def _exact_artifact_argument_cli(
 
     values: list[str] = []
     for key, value in arguments.items():
+        if not isinstance(key, str) or not key:
+            raise V3ProtocolError("Lua business argument keys must be non-empty strings")
         if isinstance(value, str):
             value_type = "string"
             encoded = value
@@ -3351,7 +3356,17 @@ def _exact_artifact_argument_cli(
                 "Lua business arguments must contain only strict JSON values"
             )
         values.extend(("--argument", key, value_type, encoded))
-    return tuple(values)
+    if not values:
+        return ()
+    return (
+        "--arguments-json",
+        json.dumps(
+            dict(arguments),
+            ensure_ascii=False,
+            allow_nan=False,
+            separators=(",", ":"),
+        ),
+    )
 
 
 def build_exact_artifact_business_transaction_steps(

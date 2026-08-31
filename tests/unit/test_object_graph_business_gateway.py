@@ -367,6 +367,14 @@ def test_gateway_builds_rtpc_curve_from_bound_business_facts(tmp_path: Path) -> 
     )
     assert discover_code == 0, discovered
     field_handle = discovered["field_candidates"][0]["handle"]
+    assert discovered["draft"]["response_integrity"] == {
+        "complete": True,
+        "truncated": False,
+        "projection": "business_update_and_copy_ready_continuation",
+        "compact_projection_is_not_truncation": True,
+    }
+    assert "business_contract" not in discovered["draft"]["next_action_binding"]
+    assert '"fixed_argv_prefix":' not in json.dumps(discovered["draft"])
     assert discovered["draft"]["next_action_binding"]["required_next_phase"] == (
         "bind_rtpc_control_input"
     )
@@ -791,7 +799,18 @@ def test_gateway_adds_subordinate_media_without_model_authored_json(
     assert media_code == 0, added
     serialized_session = json.dumps(added["draft"])
     assert '"import"' not in serialized_session
-    assert "media_files" in serialized_session
+    assert "media_files" not in serialized_session
+    assert added["draft"]["response_integrity"] == {
+        "complete": True,
+        "truncated": False,
+        "projection": "business_update_and_copy_ready_continuation",
+        "compact_projection_is_not_truncation": True,
+    }
+    stored = OperationDraftStore(tmp_path / "state").inspect(
+        draft_id,
+        task_authority=authority,
+    )
+    assert "media_files" in json.dumps(stored.composition)
 
     materialized = OperationDraftStore(tmp_path / "state").materialize_request(
         draft_id,

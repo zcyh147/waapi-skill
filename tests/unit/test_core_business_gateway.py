@@ -299,7 +299,13 @@ def test_project_save_core_plan_closes_business_draft_without_dispatch(
     updated = payload["draft"]
     assert updated["revision"] == 2
     assert updated["business_revision"] == 1
-    assert updated["missing_fields_status"] == "complete"
+    assert "missing_fields_status" not in updated
+    assert updated["response_integrity"] == {
+        "complete": True,
+        "truncated": False,
+        "projection": "business_update_and_copy_ready_continuation",
+        "compact_projection_is_not_truncation": True,
+    }
     assert updated["next_action_binding"]["required_next_phase"] == (
         "check_complete_core_plan"
     )
@@ -796,7 +802,8 @@ def test_audio_convert_core_plan_accepts_bound_objects_names_and_exact_io_root(
     )
 
     assert declare_code == 0, declared
-    assert declared["draft"]["missing_fields_status"] == "complete"
+    assert "missing_fields_status" not in declared["draft"]
+    assert declared["draft"]["response_integrity"]["complete"] is True
     assert declared["draft"]["next_action_binding"]["required_next_phase"] == (
         "check_complete_core_plan"
     )
@@ -934,5 +941,9 @@ def test_randomizer_core_plan_discovers_field_by_meaning_then_closes_values(
     )
 
     assert declare_code == 0, declared
-    assert declared["draft"]["missing_fields_status"] == "complete"
+    assert "missing_fields_status" not in declared["draft"]
+    assert declared["draft"]["response_integrity"]["complete"] is True
+    assert declared["draft"]["next_action_binding"]["required_next_phase"] == (
+        "check_complete_core_plan"
+    )
     assert all(call[0] != operation for call in declare_client.calls)

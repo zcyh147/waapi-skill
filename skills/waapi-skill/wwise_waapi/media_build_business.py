@@ -59,6 +59,7 @@ _DATABASE_SCOPES = {
 _FIELD_ALIASES = {
     "filename": "Filename",
     "name": "Filename",
+    "name/file": "Filename",
     "path": "Path",
     "fileid": "FileId",
     "file-id": "FileId",
@@ -76,7 +77,7 @@ _FIELD_ALIASES = {
     "ixml-take": "IXML/Take",
     "take": "IXML/Take",
 }
-_FIXED_MEDIA_FIELDS = ("Path", "FileId")
+_FIXED_MEDIA_FIELDS = ("Path", "FileId", "Db")
 
 
 class MediaBuildBusinessError(ValueError):
@@ -134,6 +135,9 @@ def _resolve_media_field(meaning: str, available_fields: Sequence[str]) -> str:
         raise MediaBuildBusinessError(
             f"field meaning exceeds {MAX_MEDIA_POOL_FIELD_TOKEN_CHARS} characters"
         )
+    alias = _FIELD_ALIASES.get(meaning.casefold())
+    if alias in _FIXED_MEDIA_FIELDS:
+        return alias
     available = tuple(available_fields)
     if not available or not all(isinstance(item, str) and item for item in available):
         raise MediaBuildBusinessError(
@@ -145,7 +149,6 @@ def _resolve_media_field(meaning: str, available_fields: Sequence[str]) -> str:
             "Media Pool field discovery returned duplicate fields",
             code="MEDIA_BUILD_FIELD_DISCOVERY_INVALID",
         )
-    alias = _FIELD_ALIASES.get(meaning.casefold())
     if alias is not None and alias in available:
         return alias
     casefold_matches = [item for item in available if item.casefold() == meaning.casefold()]

@@ -7501,6 +7501,44 @@ def test_heavy_validator_accepts_typed_profile_query_repair_archive(
     )
 
 
+def test_heavy_validator_recomputes_derived_command_facts_from_sealed_events(
+    tmp_path: Path,
+) -> None:
+    options = _options(tmp_path)
+    units = (_unit(1),)
+    root = tmp_path / "matrix"
+    _write_matrix_evidence(
+        root,
+        options=options,
+        units=units,
+        statuses=("PASS",),
+    )
+    facts_path = (
+        root
+        / "scenarios"
+        / "001-OBJ22-F-GET-01"
+        / "evidence"
+        / "codex-task"
+        / "turns"
+        / "turn-01"
+        / "codex-facts.json"
+    )
+    facts = json.loads(facts_path.read_text(encoding="utf-8"))
+    facts["command_facts"]["gateway_subcommands"] = []
+    matrix.write_json(facts_path, facts)
+
+    result = campaign.validate_heavy_v3_child_run(
+        root,
+        expected_units=units,
+        options=options,
+        returncode=0,
+    )
+
+    assert [row["status"] for row in result.observations] == ["PASS"], "\n".join(
+        verdict.reason for verdict in result.phase_verdicts
+    )
+
+
 @pytest.mark.parametrize(
     ("field", "replacement"),
     (

@@ -4,6 +4,7 @@ import os
 import subprocess
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Mapping, Sequence
 
 import pytest
@@ -91,6 +92,43 @@ def test_reviewed_audio_import_harness_selects_sfx_protocol_revision(
     assert campaign._sealed_protocol_manifest_revision(effective) == (
         campaign.AUDIO_IMPORT_DERIVED_SFX_PROTOCOL_REVISION
     )
+
+
+def test_audio_import_batch_archive_accepts_only_one_exact_sfx_per_row() -> None:
+    step = SimpleNamespace(
+        subcommand="draft-declare-import-batch",
+        allow_explicit_derived_sfx_language=True,
+    )
+    valid = (
+        "draft-declare-import-batch",
+        "od1-example",
+        "--field",
+        "rifle",
+        "language",
+        "SFX",
+        "--field",
+        "tail",
+        "language",
+        "SFX",
+    )
+
+    campaign._validate_audio_import_business_declaration_language(step, valid)
+    for invalid in (
+        (*valid, "--field", "rifle", "language", "SFX"),
+        (
+            "draft-declare-import-batch",
+            "od1-example",
+            "--field",
+            "rifle",
+            "language",
+            "English(US)",
+        ),
+    ):
+        with pytest.raises(CampaignEvidenceError, match="contradictory"):
+            campaign._validate_audio_import_business_declaration_language(
+                step,
+                invalid,
+            )
 
 
 def test_unreviewed_harness_does_not_select_protocol_revision() -> None:

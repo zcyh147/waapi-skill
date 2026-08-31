@@ -1807,7 +1807,12 @@ class ExpectedGatewayStep:
             )
         if type(self.allow_explicit_derived_sfx_language) is not bool or (
             self.allow_explicit_derived_sfx_language
-            and self.subcommand not in {"draft-declare-new", "draft-declare-existing"}
+            and self.subcommand
+            not in {
+                "draft-declare-new",
+                "draft-declare-existing",
+                "draft-declare-import-batch",
+            }
         ):
             raise ValueError(
                 "ExpectedGatewayStep derived SFX-language policy is invalid"
@@ -6275,6 +6280,22 @@ def _normalize_bound_business_reference_paths(
     """Replace exact live-bound business identities with their sealed GUIDs."""
 
     if isinstance(value, Mapping):
+        if value.get("operation") == "waapi.call":
+            arguments = value.get("arguments")
+            api = arguments.get("api") if isinstance(arguments, Mapping) else None
+            args = arguments.get("args") if isinstance(arguments, Mapping) else None
+            objects = args.get("objects") if isinstance(args, Mapping) else None
+            if api == "ak.wwise.core.audio.convert" and isinstance(objects, list):
+                normalized = dict(value)
+                normalized_arguments = dict(arguments)
+                normalized_args = dict(args)
+                normalized_args["objects"] = [
+                    path_to_id.get(item, item) if isinstance(item, str) else item
+                    for item in objects
+                ]
+                normalized_arguments["args"] = normalized_args
+                normalized["arguments"] = normalized_arguments
+                value = normalized
         if (
             set(value) == {"kind", "value"}
             and value.get("kind") == "path"
@@ -10601,6 +10622,31 @@ class CodexGatewayBroker:
         actual_groups = [
             group for group in canonical_actual_groups if group is not None
         ]
+        if step.allow_explicit_derived_sfx_language:
+            expected_language_keys = {
+                ("--field", group[1], "language")
+                for group in expected_groups
+                if group[0] == "--field" and group[2] == "language"
+            }
+            optional_language_groups = [
+                group
+                for group in actual_groups
+                if group[0] == "--field"
+                and group[2] == "language"
+                and ("--field", group[1], "language")
+                not in expected_language_keys
+            ]
+            if any(group[3] != "SFX" for group in optional_language_groups):
+                return tuple(actual)
+            optional_language_keys = [
+                (group[0], group[1], group[2])
+                for group in optional_language_groups
+            ]
+            if len(optional_language_keys) != len(set(optional_language_keys)):
+                return tuple(actual)
+            actual_groups = [
+                group for group in actual_groups if group not in optional_language_groups
+            ]
         expected_keys = [key(group, expected=True) for group in expected_groups]
         actual_keys = [key(group, expected=False) for group in actual_groups]
         if (
