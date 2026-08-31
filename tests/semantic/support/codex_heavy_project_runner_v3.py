@@ -45,6 +45,9 @@ from tests.semantic.support.codex_audio_media_business_plan_v3 import (
     validate_audio_conversion_business_plan,
     validate_media_pool_business_plan,
 )
+from tests.semantic.support.codex_media_pool_business_oracle_v3 import (
+    verify_media_pool_business_projection,
+)
 from tests.semantic.support.codex_eval_bundle_v3 import OnlineScenario
 from tests.semantic.support.codex_eval_execution_v3 import HeavyScenarioUnit
 from tests.semantic.support.codex_filesystem_security import (
@@ -2490,7 +2493,17 @@ class _PreparedMediaPoolAdapter:
             return
         if step.name == "media.get":
             raw = _agent_result_mapping(payload, context=step.name)
-            verification = verify_media_pool_result(self.oracle, raw)
+            business_request = payload.get("business_request")
+            if not isinstance(business_request, Mapping):
+                raise HeavyProjectRunnerError(
+                    "Media Pool business result lacks its exact request evidence"
+                )
+            verification = verify_media_pool_business_projection(
+                self.oracle,
+                step,
+                raw,
+                business_request,
+            )
             _assert_verification(verification, context="Media Pool business result")
             unchanged = verify_media_pool_read_unchanged(self.staged, self.oracle)
             _assert_verification(unchanged, context="Media Pool read-only state")

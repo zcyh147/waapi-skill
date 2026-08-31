@@ -4317,8 +4317,8 @@ def test_media_observer_records_the_sealed_media_get_result(
     adapter.model_media_result = None
     monkeypatch.setattr(
         runner,
-        "verify_media_pool_result",
-        lambda _oracle, _raw: _Verification(),
+        "verify_media_pool_business_projection",
+        lambda _oracle, _step, _raw, _business_request: _Verification(),
     )
     monkeypatch.setattr(
         runner,
@@ -4329,7 +4329,7 @@ def test_media_observer_records_the_sealed_media_get_result(
 
     adapter.observe_payload(
         ExpectedGatewayStep("media.get", "core-call"),
-        {"agent_result": result},
+        {"agent_result": result, "business_request": {"operation": "media.get"}},
     )
 
     assert adapter.model_media_result == result
