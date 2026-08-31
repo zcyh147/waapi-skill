@@ -74,6 +74,7 @@ from .support.codex_gateway_contracts import (
 )
 from .support.codex_eval_protocol_v3 import (  # pyright: ignore[reportMissingImports]
     CompoundUndoChildExpectation,
+    build_audio_convert_business_transaction_steps,
     build_audio_import_composer_transaction_steps,
     build_compound_undo_business_transaction_steps,
     build_core_business_transaction_steps,
@@ -5203,6 +5204,68 @@ def test_core_plan_group_order_is_transport_not_business_meaning() -> None:
         step,
         reordered,
     ) == step.arguments
+
+
+def test_audio_convert_core_plan_reorders_resolved_role_handles() -> None:
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2024.1",
+        "operation": "waapi.call",
+        "arguments": {
+            "api": "ak.wwise.core.audio.convert",
+            "args": {
+                "objects": [
+                    r"\Actor-Mixer Hierarchy\Weapons\Rifle",
+                    r"\Actor-Mixer Hierarchy\Weapons\Shotgun",
+                ],
+                "platforms": ["Windows"],
+                "languages": ["SFX"],
+            },
+            "options": {},
+            "io_root": "/tmp/audio-convert",
+        },
+    }
+    steps = build_audio_convert_business_transaction_steps(request, label="tx01")
+    step = next(item for item in steps if item.subcommand == "draft-declare-core-plan")
+    payloads = {
+        "tx01.draft-start": {
+            "draft": {"draft_id": "od1-" + "1" * 32, "revision": 3},
+            "task_authority": "da1-" + "2" * 40,
+        },
+        "tx01.bind-audio-object-01": {
+            "bound_object": {"handle": "object-a"},
+            "draft": {"revision": 2},
+        },
+        "tx01.bind-audio-object-02": {
+            "bound_object": {"handle": "object-b"},
+            "draft": {"revision": 3},
+        },
+    }
+
+    def resolve(value: object) -> str:
+        if not isinstance(value, ResponseBinding):
+            return str(value)
+        source = payloads[value.step]
+        current: object = source
+        for token in value.pointer.lstrip("/").split("/"):
+            assert isinstance(current, Mapping)
+            current = current[token]
+        return str(current)
+
+    resolved = tuple(resolve(value) for value in step.arguments)
+    io_root_index = resolved.index("--value")
+    reordered = (
+        *resolved[:5],
+        *resolved[io_root_index:],
+        *resolved[5:io_root_index],
+    )
+    broker = SimpleNamespace(_payloads_by_step=payloads)
+
+    assert CodexGatewayBroker._normalize_business_declaration_fact_order(
+        broker,
+        step,
+        reordered,
+    ) == resolved
 
 
 def test_host_plan_group_order_is_transport_not_business_meaning() -> None:

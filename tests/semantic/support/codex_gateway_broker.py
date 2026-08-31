@@ -10267,18 +10267,18 @@ class CodexGatewayBroker:
                 step,
                 actual,
             )
-        if step.subcommand == "draft-declare-cli-console-plan":
-            return CodexGatewayBroker._normalize_cli_console_plan_fact_order(
-                step,
-                actual,
-            )
-        if step.subcommand == "draft-declare-core-plan":
-            return CodexGatewayBroker._normalize_cli_console_plan_fact_order(
+        if step.subcommand in {
+            "draft-declare-cli-console-plan",
+            "draft-declare-core-plan",
+        }:
+            return CodexGatewayBroker._normalize_closed_plan_fact_order(
+                self,
                 step,
                 actual,
             )
         if step.subcommand == "draft-declare-host-plan":
             return CodexGatewayBroker._normalize_host_plan_fact_order(
+                self,
                 step,
                 actual,
             )
@@ -10370,12 +10370,12 @@ class CodexGatewayBroker:
             ),
         )
 
-    @staticmethod
-    def _normalize_cli_console_plan_fact_order(
+    def _normalize_closed_plan_fact_order(
+        self,
         step: ExpectedGatewayStep,
         actual: Sequence[str],
     ) -> tuple[str, ...]:
-        """Canonicalize independent closed CLI/Console declaration groups."""
+        """Canonicalize independent groups in one closed business plan."""
 
         fixed_count = 5
         if len(step.arguments) < fixed_count or len(actual) < fixed_count:
@@ -10400,21 +10400,44 @@ class CodexGatewayBroker:
                 cursor += arity + 1
             return groups
 
-        def key(group: tuple[Any, ...]) -> tuple[Any, ...] | None:
+        def resolve_expected(value: Any) -> Any:
+            if not isinstance(value, ResponseBinding):
+                return value
+            source = self._payloads_by_step.get(value.step)
+            if source is None:
+                return value
+            try:
+                bound = _json_pointer(source, value.pointer)
+            except (GatewayInvocationError, KeyError, TypeError, ValueError):
+                return value
+            return (
+                str(bound)
+                if isinstance(bound, (str, int, float, bool)) and bound is not None
+                else value
+            )
+
+        def key(
+            group: tuple[Any, ...],
+            *,
+            expected: bool,
+        ) -> tuple[Any, ...] | None:
             option = group[0]
             field = group[1] if len(group) > 1 else None
             if not isinstance(option, str) or not isinstance(field, str):
                 return None
             if option in {"--value", "--toggle"}:
                 return (option, field)
-            return group
+            return tuple(
+                resolve_expected(value) if expected else value
+                for value in group
+            )
 
         expected_groups = parse(step.arguments)
         actual_groups = parse(tuple(actual))
         if expected_groups is None or actual_groups is None:
             return tuple(actual)
-        expected_keys = [key(group) for group in expected_groups]
-        actual_keys = [key(group) for group in actual_groups]
+        expected_keys = [key(group, expected=True) for group in expected_groups]
+        actual_keys = [key(group, expected=False) for group in actual_groups]
         if (
             any(item is None for item in (*expected_keys, *actual_keys))
             or len(set(expected_keys)) != len(expected_keys)
@@ -10432,14 +10455,15 @@ class CodexGatewayBroker:
             ),
         )
 
-    @staticmethod
     def _normalize_host_plan_fact_order(
+        self,
         step: ExpectedGatewayStep,
         actual: Sequence[str],
     ) -> tuple[str, ...]:
         """Canonicalize group order and equivalent numeric spellings."""
 
-        reordered = CodexGatewayBroker._normalize_cli_console_plan_fact_order(
+        reordered = CodexGatewayBroker._normalize_closed_plan_fact_order(
+            self,
             step,
             actual,
         )
