@@ -64,6 +64,10 @@ _ACTIVE_SOURCE_FIELDS = (
     "audioSource:language",
 )
 _NUMBER_TOKEN_RE = re.compile(r"(?<![\w.])[-+]?\d+(?:\.\d+)?(?![\w.])")
+_DB_VALUE_RE = re.compile(
+    r"(?<![\w.])([-+]?\d+(?:\.\d+)?)\s*dB\b",
+    re.IGNORECASE,
+)
 _ANSWER_CLAUSE_SPLIT_RE = re.compile(
     r"[，,、；;。.!！？?：:（）()\[\]\n]+|但(?:是)?|不过|然而|\bbut\b|\bhowever\b",
     re.IGNORECASE,
@@ -1413,7 +1417,7 @@ def _paired_path_answer_proof(
         line_index = child_matches[0][0] if child_matches else None
         line = lines[line_index] if line_index is not None else ""
         expected_volume = _one_volume(child)
-        numeric_values = [float(value) for value in _NUMBER_TOKEN_RE.findall(line)]
+        numeric_values = [float(value) for value in _DB_VALUE_RE.findall(line)]
         language_present = (
             isinstance(child.source_language, str)
             and child.source_language.casefold() in line.casefold()

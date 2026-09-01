@@ -1279,6 +1279,20 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   commit. Never interpret downstream semantic or file-integrity failures from
   that root as independent product defects.
 
+### A reported GUID must not be parsed as a Volume value
+
+- Evidence: #60 native-Windows r30 returned the exact four requested Sound
+  rows, paths, languages, notes, and `-4.0`, `-2.0`, `-3.0`, and `-1.0 dB`
+  values. The Agent also included each requested Sound GUID in its table. The
+  object-query oracle scanned every number on the row, interpreted GUID digit
+  groups as additional Volume values, and falsely failed all four rows.
+- Prevention: the paired object-query oracle extracts Volume only from an
+  explicit finite number immediately labeled `dB`. Identity numbers in GUIDs,
+  names, paths, or other columns remain independent evidence and cannot affect
+  the Volume comparison. Preserve exact row identity, pairing, language, notes,
+  order, exclusions, and the single expected dB value; do not weaken those
+  business assertions to accept arbitrary numeric prose.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:

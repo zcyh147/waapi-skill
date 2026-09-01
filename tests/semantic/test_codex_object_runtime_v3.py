@@ -741,6 +741,22 @@ def test_get02_query_oracle_accepts_gateway_business_language_projection() -> No
     assert verification.passed, verification.failures
 
 
+def test_get02_query_oracle_ignores_numbers_inside_reported_sound_guids() -> None:
+    runtime, payload, answer = _get02_query_runtime()
+    before = runtime.before.by_key()
+    for key in ("hero_damage", "hero_greeting", "npc_alert", "npc_idle"):
+        child = before[key]
+        answer = answer.replace(
+            f"`{child.path}`",
+            f"{child.name} (`{child.id}`) · `{child.path}`",
+            1,
+        )
+
+    verification = runtime.verify_query_result(payload, final_response=answer)
+
+    assert verification.passed, verification.failures
+
+
 def test_get02_query_oracle_scopes_decoys_to_the_candidate_inventory() -> None:
     runtime, payload, answer = _get02_query_runtime()
     before = runtime.before.by_key()
