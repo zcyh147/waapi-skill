@@ -23,6 +23,10 @@ from wwise_waapi.business_declarations import (
     semantic_kind_for_live_type,
     semantic_kinds_for_live_type,
 )
+from wwise_waapi.object_identity_semantics import (
+    NON_INTRINSIC_NAME_OBJECT_TYPES,
+    object_identity_semantics,
+)
 
 
 PROJECT_ID = "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"
@@ -30,6 +34,13 @@ OTHER_PROJECT_ID = "{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}"
 OBJECT_ID = "{11111111-1111-1111-1111-111111111111}"
 BUS_ID = "{22222222-2222-2222-2222-222222222222}"
 METADATA_DIGEST = "a" * 64
+
+
+def test_non_intrinsic_object_name_capabilities_are_centralized() -> None:
+    assert NON_INTRINSIC_NAME_OBJECT_TYPES == {"Action", "EffectSlot"}
+    assert object_identity_semantics("Action").name_mode == "derived"
+    assert object_identity_semantics("EffectSlot").name_mode == "anonymous_slot"
+    assert object_identity_semantics("Sound").name_mode == "intrinsic"
 
 
 def _context(**overrides: str) -> BusinessContext:
@@ -272,34 +283,47 @@ def test_live_object_revalidation_deduplicates_guids_into_one_bounded_read() -> 
     ]
 
 
-def test_unnamed_action_handle_round_trips_and_revalidates_exactly() -> None:
+@pytest.mark.parametrize(
+    ("object_type", "path"),
+    (
+        ("Action", r"\Events\Default Work Unit\Play_Rain\[Play - Rain]"),
+        (
+            "EffectSlot",
+            r"\Actor-Mixer Hierarchy\Default Work Unit\Weather\[Effect Slot 0]",
+        ),
+    ),
+)
+def test_unnamed_object_handle_round_trips_and_revalidates_exactly(
+    object_type: str,
+    path: str,
+) -> None:
     registry = BusinessHandleRegistry(
         _context(),
         token_bytes=lambda size: b"a" * size,
     )
-    action = registry.bind_object(
+    bound = registry.bind_object(
         object_id=OBJECT_ID,
         name="",
-        object_type="Action",
-        path=r"\Events\Default Work Unit\Play_Rain\[Play - Rain]",
+        object_type=object_type,
+        path=path,
     )
     restored = BusinessHandleRegistry.from_dict(registry.as_dict())
 
-    assert restored.resolve_object(action.handle).name == ""
+    assert restored.resolve_object(bound.handle).name == ""
     assert revalidate_live_objects(
         restored,
-        (action,),
+        (bound,),
         read_call=lambda _uri, _args, _options: {
             "return": [
                 {
                     "id": OBJECT_ID,
                     "name": "",
-                    "type": "Action",
-                    "path": r"\Events\Default Work Unit\Play_Rain\[Play - Rain]",
+                    "type": object_type,
+                    "path": path,
                 }
             ]
         },
-    ) == (action,)
+    ) == (bound,)
 
     with pytest.raises(ValueError, match="name must be non-empty"):
         registry.bind_object(
@@ -319,6 +343,15 @@ def test_unnamed_action_handle_round_trips_and_revalidates_exactly() -> None:
                 "name": "",
                 "type": "Action",
                 "path": r"\Events\Default Work Unit\Play_Rain\[Play - Rain]",
+            },
+            "",
+        ),
+        (
+            {
+                "id": OBJECT_ID,
+                "name": "",
+                "type": "EffectSlot",
+                "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Weather\[Effect Slot 0]",
             },
             "",
         ),

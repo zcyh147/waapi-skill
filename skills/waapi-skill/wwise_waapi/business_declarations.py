@@ -28,6 +28,7 @@ from .builders.metadata import (
 from .canonical import canonical_json_bytes, canonical_sha256, sha256_hex
 from .metadata_discovery import metadata_typed_value_type
 from .identity_limits import MULTI_IDENTITY_READ_MAX_IDS
+from .object_identity_semantics import object_identity_semantics
 from .metadata_restrictions import (
     MetadataRestrictionError,
     reference_allowed_types,
@@ -2190,9 +2191,9 @@ def _bounded_required_text(value: Any, *, field: str, maximum_bytes: int) -> str
 
 
 def _bounded_object_name(value: Any, *, object_type: str) -> str:
-    """Accept Wwise's intentionally unnamed Action rows, and nothing broader."""
+    """Apply the reviewed name capability for the exact live object type."""
 
-    if value == "" and object_type == "Action":
+    if value == "" and object_identity_semantics(object_type).empty_name_allowed:
         return ""
     return _bounded_required_text(
         value,
@@ -2205,9 +2206,9 @@ def normalize_live_object_identity(row: Any) -> LiveObjectIdentity:
     """Normalize the exact Wwise object identity shape once for every caller.
 
     Wwise Authoring objects use canonical GUIDs and absolute object paths.
-    Most object types also own a non-empty name. ``Action`` is the deliberate
-    exception: Wwise returns an empty ``name`` and derives its bracketed display
-    segment from the operation and target.
+    Most object types also own a non-empty name. The shared object-identity
+    capability table owns the reviewed exceptions, including derived Action
+    displays and anonymous EffectSlot list entries.
     """
 
     if not isinstance(row, Mapping):

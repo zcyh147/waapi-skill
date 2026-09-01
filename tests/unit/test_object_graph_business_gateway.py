@@ -166,6 +166,7 @@ def test_object_binding_returns_version_stable_business_kind(
         "handle": payload["bound_object"]["handle"],
         "name": "Confirm",
         "type": "PropertyContainer",
+        "path": target_path,
         "business_kind": "actor-mixer",
         "business_kind_resolution": {
             "status": "resolved",
@@ -175,23 +176,24 @@ def test_object_binding_returns_version_stable_business_kind(
         "semantic_kind": None,
     }
     continuation = payload["draft"]["next_action_binding"]
-    assert "business_kind" in continuation["object_binding"][
-        "result_validation_rule"
-    ]
+    assert continuation["object_binding"]["repeat_selector_form"] == "by_id"
+    assert set(continuation["object_binding"]) == {
+        "repeat_selector_form",
+        "by_id",
+    }
     assert set(continuation) == {
         "contract",
         "required_next_phase",
         "object_binding",
         "field_discovery",
         "declare_existing",
-        "declare_new",
         "more_actions",
         "shell_tool_timeout_ms",
         "then_read_next_response",
         "precompute_or_increment_revision",
     }
     assert continuation["more_actions"]["fixed_full_argv"][3] == "draft-inspect"
-    assert len(json.dumps(payload, separators=(",", ":")).encode("utf-8")) < 12_000
+    assert len(json.dumps(payload, separators=(",", ":")).encode("utf-8")) < 8_000
 
 
 def test_literal_random_container_path_resolves_ambiguous_live_kind(

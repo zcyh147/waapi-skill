@@ -280,7 +280,7 @@ def test_operation_request_schema_digest_owns_only_versioned_machine_contract() 
     assert "selection_guidance" not in contract_2022
     assert "next_step" not in contract_2022
     assert operation_request_schema_digest("object.set", "2022.1") == (
-        "c1545e0d05010c77fb80cd859f4cb6c0b77ad313a332b1241be94f9a43d11c6a"
+        "dba9f58d0b292a9350a59dea465659e7834ed770e4a56154d60e00bc80696187"
     )
     assert operation_request_schema_digest("object.set", "2025.1") != (
         operation_request_schema_digest("object.set", "2022.1")
@@ -2064,13 +2064,31 @@ def test_request_contract_rejects_unknown_fields_metadata_injection_and_boundari
 
 
 @pytest.mark.parametrize("operation", ("object.copy", "object.move"))
-def test_name_collision_operations_report_the_unnamed_action_boundary(
+@pytest.mark.parametrize(
+    ("object_type", "path", "name_mode"),
+    (
+        (
+            "Action",
+            r"\Events\Default Work Unit\Play_Rain\[Play - Rain]",
+            "derived",
+        ),
+        (
+            "EffectSlot",
+            r"\Actor-Mixer Hierarchy\Default Work Unit\Weather\[Effect Slot 0]",
+            "anonymous_slot",
+        ),
+    ),
+)
+def test_name_collision_operations_report_the_non_intrinsic_name_boundary(
     operation: str,
+    object_type: str,
+    path: str,
+    name_mode: str,
 ) -> None:
-    action = object_row(
+    source = object_row(
         name="",
-        object_type="Action",
-        path=r"\Events\Default Work Unit\Play_Rain\[Play - Rain]",
+        object_type=object_type,
+        path=path,
     )
     parent = object_row(
         object_id=TARGET_GUID,
@@ -2091,18 +2109,20 @@ def test_name_collision_operations_report_the_unnamed_action_boundary(
                 )
             ),
             read_call=ScriptedReader(
-                {"ak.wwise.core.object.get": [{"return": [action]}, {"return": [parent]}]}
+                {"ak.wwise.core.object.get": [{"return": [source]}, {"return": [parent]}]}
             ),
         )
 
     assert error.value.error_code == "DERIVED_OBJECT_NAME_BOUNDARY"
-    assert error.value.details["object_type"] == "Action"
+    assert error.value.details["object_type"] == object_type
+    assert error.value.details["name_mode"] == name_mode
 
 
-def test_set_name_reports_the_unnamed_action_boundary() -> None:
-    action = object_row(
+@pytest.mark.parametrize("object_type", ("Action", "EffectSlot"))
+def test_set_name_reports_the_non_intrinsic_name_boundary(object_type: str) -> None:
+    target = object_row(
         name="",
-        object_type="Action",
+        object_type=object_type,
         path=r"\Events\Default Work Unit\Play_Rain\[Play - Rain]",
     )
 
@@ -2118,17 +2138,20 @@ def test_set_name_reports_the_unnamed_action_boundary() -> None:
                 )
             ),
             read_call=ScriptedReader(
-                {"ak.wwise.core.object.get": [{"return": [action]}]}
+                {"ak.wwise.core.object.get": [{"return": [target]}]}
             ),
         )
 
     assert error.value.error_code == "DERIVED_OBJECT_NAME_BOUNDARY"
 
 
-def test_object_set_rename_reports_the_unnamed_action_boundary() -> None:
-    action = object_row(
+@pytest.mark.parametrize("object_type", ("Action", "EffectSlot"))
+def test_object_set_rename_reports_the_non_intrinsic_name_boundary(
+    object_type: str,
+) -> None:
+    target = object_row(
         name="",
-        object_type="Action",
+        object_type=object_type,
         path=r"\Events\Default Work Unit\Play_Rain\[Play - Rain]",
     )
 
@@ -2150,7 +2173,7 @@ def test_object_set_rename_reports_the_unnamed_action_boundary() -> None:
             read_call=ScriptedReader(
                 {
                     "ak.wwise.core.object.getTypes": [SOUND_TYPE_RESULT],
-                    "ak.wwise.core.object.get": [{"return": [action]}],
+                    "ak.wwise.core.object.get": [{"return": [target]}],
                 }
             ),
         )

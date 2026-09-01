@@ -441,7 +441,21 @@ def test_core_call_resolves_two_exact_objects_and_dispatches_one_bounded_diff(
     ]
 
 
-def test_core_call_accepts_real_wwise_unnamed_action_identity(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("object_type", "path"),
+    (
+        ("Action", r"\Events\Default Work Unit\Play_Rain\[Play - Rain]"),
+        (
+            "EffectSlot",
+            r"\Actor-Mixer Hierarchy\Default Work Unit\Weather\[Effect Slot 0]",
+        ),
+    ),
+)
+def test_core_call_accepts_real_wwise_unnamed_identity(
+    tmp_path: Path,
+    object_type: str,
+    path: str,
+) -> None:
     client = FakeClient(
         {
             "ak.wwise.core.getInfo": [_info()],
@@ -452,8 +466,8 @@ def test_core_call_accepts_real_wwise_unnamed_action_identity(tmp_path: Path) ->
                         {
                             "id": SOURCE_ID,
                             "name": "",
-                            "type": "Action",
-                            "path": r"\Events\Default Work Unit\Play_Rain\[Play - Rain]",
+                            "type": object_type,
+                            "path": path,
                         },
                         {
                             "id": TARGET_ID,

@@ -17020,6 +17020,43 @@ def dispatch_business_object_binding(
             },
         }
     )
+    if binding.record.operation == "object.set":
+        bound_payload = payload.get("bound_object")
+        if isinstance(bound_payload, dict):
+            bound_payload["path"] = bound.path
+        draft = payload.get("draft")
+        continuation = (
+            draft.get("next_action_binding")
+            if isinstance(draft, Mapping)
+            else None
+        )
+        routes = (
+            continuation.get("object_binding")
+            if isinstance(continuation, dict)
+            else None
+        )
+        selector_route = (
+            "by_id"
+            if args.object_id is not None
+            else "by_path_segments"
+            if args.object_path_segment is not None
+            else "event_action_by_event_path_segments"
+            if args.event_action_of_path_segment is not None
+            else None
+        )
+        if isinstance(continuation, dict):
+            continuation.pop("declare_new", None)
+            if (
+                isinstance(routes, Mapping)
+                and selector_route is not None
+                and selector_route in routes
+            ):
+                continuation["object_binding"] = {
+                    "repeat_selector_form": selector_route,
+                    selector_route: routes[selector_route],
+                }
+            else:
+                continuation.pop("object_binding", None)
     return payload
 
 
