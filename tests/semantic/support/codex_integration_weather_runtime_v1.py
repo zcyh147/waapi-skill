@@ -21,8 +21,6 @@ from typing import Any, Callable, Mapping, Sequence
 
 from tests.semantic.support.codex_eval_protocol_v3 import (
     V3GatewayProtocol,
-    build_audio_import_composer_transaction_steps,
-    build_object_graph_business_transaction_steps,
     build_transaction_protocol,
     metadata_candidate_limit,
 )
@@ -1154,33 +1152,7 @@ def _build_metadata_workflow_protocol(
             "weather transactions require schema-first token discovery and "
             "Gateway-owned draft-check validation"
         )
-    composer_tx01 = build_audio_import_composer_transaction_steps(
-        requests[0],
-        label="tx01",
-    )
-    legacy_base = build_transaction_protocol(requests)
-    composer_tx02 = build_object_graph_business_transaction_steps(
-        requests[1],
-        label="tx02",
-    )
-    composer_by_tx = {
-        "tx01": composer_tx01,
-        "tx02": composer_tx02,
-    }
-    base_steps: list[ExpectedGatewayStep] = []
-    inserted_composer: set[str] = set()
-    for step in legacy_base.steps:
-        prefix = step.name.split(".", 1)[0]
-        composer_steps = composer_by_tx.get(prefix)
-        if composer_steps is None:
-            base_steps.append(step)
-        elif prefix not in inserted_composer:
-            base_steps.extend(composer_steps)
-            inserted_composer.add(prefix)
-    if inserted_composer != set(composer_by_tx):
-        raise IntegrationWeatherRuntimeError(
-            "weather Composer transactions are missing from the base protocol"
-        )
+    base_steps = list(build_transaction_protocol(requests).steps)
     metadata_by_tx = {
         f"tx{index:02d}": row
         for index, row in enumerate(metadata, start=1)

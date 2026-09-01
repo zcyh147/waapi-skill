@@ -781,6 +781,50 @@ def test_object_set_business_binds_one_unnamed_direct_child_by_parent() -> None:
     )
 
 
+def test_object_set_rtpc_business_uses_bound_curve_declaration() -> None:
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "object.setRTPC",
+        "arguments": {
+            "object": {
+                "kind": "path",
+                "value": r"\Actor-Mixer Hierarchy\Default Work Unit\Rain",
+            },
+            "property": "Volume",
+            "control_input": {
+                "kind": "path",
+                "value": r"\Game Parameters\Ambience\Rain_Intensity",
+            },
+            "points": [
+                {"x": 0.0, "y": -48.0, "shape": "Linear"},
+                {"x": 100.0, "y": 0.0, "shape": "Linear"},
+            ],
+            "mode": "add_or_replace",
+        },
+    }
+
+    steps = build_object_graph_business_transaction_steps(request, label="tx03")
+
+    assert [step.subcommand for step in steps] == [
+        "operation-schema",
+        "draft-start",
+        "draft-bind-object",
+        "draft-discover-fields",
+        "draft-bind-object",
+        "draft-declare-rtpc",
+        "draft-check",
+        "preview-from-draft",
+    ]
+    declaration = next(
+        step for step in steps if step.subcommand == "draft-declare-rtpc"
+    )
+    assert "--point" in declaration.arguments
+    assert "--mode" in declaration.arguments
+    assert "add-or-update" in declaration.arguments
+    assert steps[-1].expected_operation_request == request
+
+
 def test_object_set_composer_keeps_nondefault_request_options_explicit() -> None:
     steps = build_object_set_composer_transaction_steps(
         _object_set_request(

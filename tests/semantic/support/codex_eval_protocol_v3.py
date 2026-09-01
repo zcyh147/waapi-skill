@@ -1305,7 +1305,9 @@ SOUNDBANK_BUSINESS_OPERATIONS = frozenset(
     }
 )
 
-OBJECT_GRAPH_BUSINESS_OPERATIONS = frozenset({"object.create", "object.set"})
+OBJECT_GRAPH_BUSINESS_OPERATIONS = frozenset(
+    {"object.create", "object.set", "object.setRTPC"}
+)
 
 
 def _business_selector_key(selector: Mapping[str, Any], *, subject: str) -> str:
@@ -1649,6 +1651,133 @@ def _build_object_set_business_transaction_steps(
     return tuple(steps)
 
 
+def _build_object_set_rtpc_business_transaction_steps(
+    normalized: Mapping[str, Any],
+    *,
+    label: str,
+) -> tuple[ExpectedGatewayStep, ...]:
+    """Translate one closed RTPC curve into bound Business Draft facts."""
+
+    try:
+        parsed = parse_operation_request(normalized)
+    except OperationContractError as exc:
+        raise V3ProtocolError(
+            f"object setRTPC business request is invalid: {exc}"
+        ) from exc
+    arguments = parsed.arguments
+    if set(arguments) - {
+        "object",
+        "property",
+        "control_input",
+        "points",
+        "notes",
+        "mode",
+    }:
+        raise V3ProtocolError("object setRTPC business request fields are not closed")
+    property_name = arguments.get("property")
+    points = arguments.get("points")
+    if not isinstance(property_name, str) or not property_name:
+        raise V3ProtocolError("object setRTPC requires one property meaning")
+    if not isinstance(points, list) or not points:
+        raise V3ProtocolError("object setRTPC requires one or more curve points")
+
+    draft = _BusinessDraftSteps.start(operation="object.setRTPC", label=label)
+    owner = draft.bind_object(
+        arguments.get("object"),
+        step_name=f"{label}.bind-owner",
+        error_subject="object setRTPC owner",
+    )
+    discover_name = f"{label}.discover-property"
+    draft.steps.append(
+        ExpectedGatewayStep(
+            name=discover_name,
+            subcommand="draft-discover-fields",
+            arguments=(
+                *draft.prefix(),
+                "--object-handle",
+                owner,
+                "--meaning",
+                property_name.casefold(),
+            ),
+        )
+    )
+    draft.advance(discover_name)
+    field = ResponseBinding(discover_name, "/field_candidates/0/handle")
+    control = draft.bind_object(
+        arguments.get("control_input"),
+        step_name=f"{label}.bind-control-input",
+        error_subject="object setRTPC control input",
+    )
+
+    declaration_arguments: list[Any] = [
+        *draft.prefix(),
+        "--object-handle",
+        owner,
+        "--field-handle",
+        field,
+        "--control-input-handle",
+        control,
+    ]
+    for index, point in enumerate(points, start=1):
+        if (
+            not isinstance(point, Mapping)
+            or set(point) != {"x", "y", "shape"}
+            or not isinstance(point.get("shape"), str)
+        ):
+            raise V3ProtocolError(
+                f"object setRTPC curve point {index} is not closed"
+            )
+        declaration_arguments.extend(
+            (
+                "--point",
+                _business_scalar_cli_value(
+                    point.get("x"), subject="object setRTPC point x"
+                ),
+                _business_scalar_cli_value(
+                    point.get("y"), subject="object setRTPC point y"
+                ),
+                point["shape"],
+            )
+        )
+    mode = arguments.get("mode", "add_or_replace")
+    mode_cli = {
+        "add": "add-only",
+        "add_or_replace": "add-or-update",
+    }.get(mode)
+    if mode_cli is None:
+        raise V3ProtocolError("object setRTPC mode is unsupported")
+    declaration_arguments.extend(("--mode", mode_cli))
+    if "notes" in arguments:
+        declaration_arguments.extend(("--notes", arguments["notes"]))
+    declare_name = f"{label}.declare-rtpc"
+    draft.steps.append(
+        ExpectedGatewayStep(
+            name=declare_name,
+            subcommand="draft-declare-rtpc",
+            arguments=tuple(declaration_arguments),
+        )
+    )
+    draft.advance(declare_name)
+    check_name = f"{label}.check"
+    draft.steps.append(
+        ExpectedGatewayStep(
+            name=check_name,
+            subcommand="draft-check",
+            arguments=draft.prefix(),
+        )
+    )
+    draft.advance(check_name)
+    draft.steps.append(
+        ExpectedGatewayStep(
+            name=f"{label}.preview",
+            subcommand="preview-from-draft",
+            arguments=draft.prefix(),
+            expected_operation_request=normalized,
+        )
+    )
+    return tuple(draft.steps)
+
+
 def build_object_graph_business_transaction_steps(
     request: Mapping[str, Any],
     *,
@@ -1666,6 +1795,11 @@ def build_object_graph_business_transaction_steps(
         raise V3ProtocolError("business transaction label must be txNN")
     if normalized["operation"] == "object.set":
         return _build_object_set_business_transaction_steps(
+            normalized,
+            label=label,
+        )
+    if normalized["operation"] == "object.setRTPC":
+        return _build_object_set_rtpc_business_transaction_steps(
             normalized,
             label=label,
         )
