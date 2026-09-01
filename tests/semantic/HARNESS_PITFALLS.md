@@ -1319,6 +1319,39 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   order, exclusions, and the single expected dB value; do not weaken those
   business assertions to accept arbitrary numeric prose.
 
+### Category coverage is not migration-family coverage
+
+- Evidence: #60 r41 began the five-version `typed_input_cross_version_25`
+  profile on exact candidate `9303d1d`, but final Spec review proved that its
+  25 tasks represented only 13 APIs and omitted the Authoring UI,
+  SoundEngine, CLI/Console, runtime/remote/transport, relationship, compound,
+  and named Debug families changed by #54, #56, and #57. The macOS and native
+  Windows roots were stopped while still partial, frozen without replay, and
+  their exact campaign/Codex/Wwise descendants and temporary launch resources
+  were removed. A 25/25 result from that profile would still not have met #60.
+- Prevention: the release profile declares the exact 19 migration-family IDs
+  and one reviewed component task for each. Its loader validates the complete
+  task count, unique families, all five versions, component profile, suite
+  path, and unit identity before applying any case/version filter. Do not infer
+  interface-family coverage from broad labels such as `generic`, `draft`,
+  `file_code`, or from the raw task count.
+
+### The semantic oracle must not normalize a forbidden caller mechanic
+
+- Evidence: final #60 Standards review found two passing-oracle shortcuts. Lua
+  artifact continuations asked the Agent for one complete
+  `--arguments-json` map even though the typed key/value form already existed,
+  and object-binding grading treated `<Virtual Folder>Weapons` as equivalent
+  to the business name `Weapons`. Both forms made native request/path syntax
+  caller-visible while the resulting Preview could still be correct.
+- Prevention: Lua maps accept only repeatable `--argument KEY TYPE VALUE`
+  facts and retain the existing reserved-key, key-count, and byte ceilings.
+  Business object bindings accept exact GUIDs or ordered literal name segments;
+  angle-bracket Wwise type prefixes are rejected by the Gateway and no longer
+  receive Broker equivalence. New-row semantic kind and name stay in the
+  business declaration, while the Adapter constructs the complete typed Wwise
+  path.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:

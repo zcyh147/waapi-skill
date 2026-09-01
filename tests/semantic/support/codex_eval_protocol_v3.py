@@ -209,10 +209,20 @@ class _BusinessDraftSteps:
                 name,
             )
         elif kind == "path" and isinstance(value, str) and value:
-            segments = tuple(segment for segment in value.split("\\") if segment)
-            if not segments or "\\" + "\\".join(segments) != value:
+            native_segments = tuple(
+                segment for segment in value.split("\\") if segment
+            )
+            if not native_segments or "\\" + "\\".join(native_segments) != value:
                 raise V3ProtocolError(
                     f"{error_subject} path must have canonical Wwise segments"
+                )
+            segments = tuple(
+                re.sub(r"^<[^<>\\]+>", "", segment)
+                for segment in native_segments
+            )
+            if any(not segment or "<" in segment or ">" in segment for segment in segments):
+                raise V3ProtocolError(
+                    f"{error_subject} path contains unsupported native type syntax"
                 )
             selector_arguments: tuple[Any, ...] = tuple(
                 item
@@ -1245,6 +1255,38 @@ SOUNDBANK_BUSINESS_OPERATIONS = frozenset(
 OBJECT_GRAPH_BUSINESS_OPERATIONS = frozenset({"object.create", "object.set"})
 
 
+def _business_selector_key(selector: Mapping[str, Any], *, subject: str) -> str:
+    """Return one strict, order-independent identity key for protocol reuse."""
+
+    try:
+        return json.dumps(
+            selector,
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    except (TypeError, ValueError) as exc:
+        raise V3ProtocolError(f"{subject} identity is not strict JSON") from exc
+
+
+def _business_scalar_cli_value(value: Any, *, subject: str) -> Any:
+    """Encode one closed scalar without leaking a native field type choice."""
+
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        if isinstance(value, float) and not math.isfinite(value):
+            raise V3ProtocolError(f"{subject} numeric value must be finite")
+        encoded = json.dumps(value, ensure_ascii=False, allow_nan=False)
+        if isinstance(value, float) and value.is_integer():
+            return ExactArgumentAlternatives((str(int(value)), encoded))
+        return encoded
+    if isinstance(value, str):
+        return value
+    raise V3ProtocolError(f"{subject} field value is unsupported")
+
+
 def _build_object_set_business_transaction_steps(
     normalized: Mapping[str, Any],
     *,
@@ -1270,21 +1312,10 @@ def _build_object_set_business_transaction_steps(
     object_handles: dict[str, ResponseBinding] = {}
     field_handles: dict[tuple[str, str], ResponseBinding] = {}
 
-    def selector_key(selector: Mapping[str, Any]) -> str:
-        try:
-            return json.dumps(
-                selector,
-                ensure_ascii=False,
-                sort_keys=True,
-                separators=(",", ":"),
-            )
-        except (TypeError, ValueError) as exc:
-            raise V3ProtocolError("object set identity is not strict JSON") from exc
-
     def bind(selector: Any, *, role: str) -> ResponseBinding:
         if not isinstance(selector, Mapping):
             raise V3ProtocolError("object set identity must be an object")
-        key = selector_key(selector)
+        key = _business_selector_key(selector, subject="object set")
         existing = object_handles.get(key)
         if existing is not None:
             return existing
@@ -1350,7 +1381,10 @@ def _build_object_set_business_transaction_steps(
             name = str(prop["name"])
             if name == "Volume":
                 continue
-            key = (selector_key(row["object"]), name)
+            key = (
+                _business_selector_key(row["object"], subject="object set"),
+                name,
+            )
             if key in field_handles:
                 continue
             step_name = f"{label}.discover-field-{len(field_handles) + 1:02d}"
@@ -1372,20 +1406,6 @@ def _build_object_set_business_transaction_steps(
                 step_name,
                 "/field_candidates/0/handle",
             )
-
-    def scalar(value: Any) -> Any:
-        if isinstance(value, bool):
-            return "true" if value else "false"
-        if isinstance(value, (int, float)) and not isinstance(value, bool):
-            if isinstance(value, float) and not math.isfinite(value):
-                raise V3ProtocolError("object set numeric value must be finite")
-            encoded = json.dumps(value, ensure_ascii=False, allow_nan=False)
-            if isinstance(value, float) and value.is_integer():
-                return ExactArgumentAlternatives((str(int(value)), encoded))
-            return encoded
-        if isinstance(value, str):
-            return value
-        raise V3ProtocolError("object set field value is unsupported")
 
     native_kind = {
         "ActorMixer": "actor-mixer",
@@ -1425,7 +1445,13 @@ def _build_object_set_business_transaction_steps(
         ]
         notes = child.get("notes")
         if notes is not None:
-            arguments_out.extend(("--field", "notes", scalar(notes)))
+            arguments_out.extend(
+                (
+                    "--field",
+                    "notes",
+                    _business_scalar_cli_value(notes, subject="object set"),
+                )
+            )
         properties = child.get("properties", [])
         if not isinstance(properties, list):
             raise V3ProtocolError("object set child properties must be an array")
@@ -1439,7 +1465,13 @@ def _build_object_set_business_transaction_steps(
                     "object set child property requires a reviewed stable field"
                 )
             arguments_out.extend(
-                ("--field", "volume_db", scalar(prop.get("value")))
+                (
+                    "--field",
+                    "volume_db",
+                    _business_scalar_cli_value(
+                        prop.get("value"), subject="object set"
+                    ),
+                )
             )
         step_name = f"{label}.declare-{step_suffix}"
         steps.append(
@@ -1476,19 +1508,42 @@ def _build_object_set_business_transaction_steps(
             item["target"],
         ]
         if "notes" in row:
-            arguments_out.extend(("--field", "notes", scalar(row["notes"])))
+            arguments_out.extend(
+                (
+                    "--field",
+                    "notes",
+                    _business_scalar_cli_value(
+                        row["notes"], subject="object set"
+                    ),
+                )
+            )
         for prop in row.get("properties", []):
             name = str(prop["name"])
             if name == "Volume":
                 arguments_out.extend(
-                    ("--field", "volume_db", scalar(prop.get("value")))
+                    (
+                        "--field",
+                        "volume_db",
+                        _business_scalar_cli_value(
+                            prop.get("value"), subject="object set"
+                        ),
+                    )
                 )
             else:
                 arguments_out.extend(
                     (
                         "--field-value",
-                        field_handles[(selector_key(row["object"]), name)],
-                        scalar(prop.get("value")),
+                        field_handles[
+                            (
+                                _business_selector_key(
+                                    row["object"], subject="object set"
+                                ),
+                                name,
+                            )
+                        ],
+                        _business_scalar_cli_value(
+                            prop.get("value"), subject="object set"
+                        ),
                     )
                 )
         for name, target_handle in item["references"]:
@@ -1603,19 +1658,6 @@ def build_object_graph_business_transaction_steps(
     }
     reference_handles: dict[str, ResponseBinding] = {}
 
-    def reference_key(selector: Mapping[str, Any]) -> str:
-        try:
-            return json.dumps(
-                selector,
-                ensure_ascii=False,
-                sort_keys=True,
-                separators=(",", ":"),
-            )
-        except (TypeError, ValueError) as exc:
-            raise V3ProtocolError(
-                "object graph reference identity is not strict JSON"
-            ) from exc
-
     def semantic_kind(node: Mapping[str, Any]) -> str:
         native_type = node.get("type")
         try:
@@ -1628,20 +1670,6 @@ def build_object_graph_business_transaction_steps(
         if native_type == "Sound" and isinstance(language, str) and language != "SFX":
             return "sound-voice"
         return kind
-
-    def scalar_text(value: Any) -> Any:
-        if isinstance(value, bool):
-            return "true" if value else "false"
-        if isinstance(value, (int, float)) and not isinstance(value, bool):
-            if isinstance(value, float) and not math.isfinite(value):
-                raise V3ProtocolError("object graph numeric field must be finite")
-            encoded = json.dumps(value, ensure_ascii=False, allow_nan=False)
-            if isinstance(value, float) and value.is_integer():
-                return ExactArgumentAlternatives((str(int(value)), encoded))
-            return encoded
-        if isinstance(value, str):
-            return value
-        raise V3ProtocolError("object graph business field value is unsupported")
 
     def stable_fields(node: Mapping[str, Any]) -> tuple[tuple[str, Any], ...]:
         fields: list[tuple[str, Any]] = []
@@ -1691,7 +1719,12 @@ def build_object_graph_business_transaction_steps(
                 raise V3ProtocolError(
                     f"object graph property {native_name!r} requires a bound field handle"
                 ) from exc
-            fields.append((field_name, scalar_text(value)))
+            fields.append(
+                (
+                    field_name,
+                    _business_scalar_cli_value(value, subject="object graph"),
+                )
+            )
         references = node.get("references", [])
         if not isinstance(references, list):
             raise V3ProtocolError("object graph references must be an array")
@@ -1706,7 +1739,12 @@ def build_object_graph_business_transaction_steps(
                     "object graph reference requires one output bus target"
                 )
             try:
-                handle = reference_handles[reference_key(reference["target"])]
+                handle = reference_handles[
+                    _business_selector_key(
+                        reference["target"],
+                        subject="object graph reference",
+                    )
+                ]
             except KeyError as exc:
                 raise V3ProtocolError(
                     "object graph reference target was not pre-bound"
@@ -1765,7 +1803,10 @@ def build_object_graph_business_transaction_steps(
                     "object graph reference requires one output bus target"
                 )
             selector = reference["target"]
-            key = reference_key(selector)
+            key = _business_selector_key(
+                selector,
+                subject="object graph reference",
+            )
             if key not in reference_handles:
                 step_name = (
                     f"{label}.bind-reference-{len(reference_handles) + 1:02d}"
@@ -2488,6 +2529,59 @@ def build_cli_console_business_transaction_steps(
             expected_operation_request=request,
         ),
     )
+
+
+def build_debug_control_business_transaction_steps(
+    *,
+    version: str,
+    label: str,
+    enabled: bool,
+) -> tuple[ExpectedGatewayStep, ...]:
+    """Build one safe named Debug boolean Preview from one business outcome."""
+
+    if version != "2021.1" or type(enabled) is not bool:
+        raise V3ProtocolError(
+            "Debug-control Fresh proof requires Wwise 2021.1 and one boolean outcome"
+        )
+    draft = _BusinessDraftSteps.start(
+        operation="debug.setAutomationMode",
+        label=label,
+    )
+    declaration_name = f"{label}.declare-debug-intent"
+    draft.steps.append(
+        ExpectedGatewayStep(
+            name=declaration_name,
+            subcommand="draft-declare-debug-intent",
+            arguments=(
+                *draft.prefix(),
+                "--enable" if enabled else "--disable",
+            ),
+        )
+    )
+    draft.advance(declaration_name)
+    check_name = f"{label}.check"
+    draft.steps.append(
+        ExpectedGatewayStep(
+            name=check_name,
+            subcommand="draft-check",
+            arguments=draft.prefix(),
+        )
+    )
+    draft.advance(check_name)
+    draft.steps.append(
+        ExpectedGatewayStep(
+            name=f"{label}.preview",
+            subcommand="preview-from-draft",
+            arguments=draft.prefix(),
+            expected_operation_request={
+                "contract": "waapi-skill.operation-request/v1",
+                "version": version,
+                "operation": "debug.setAutomationMode",
+                "arguments": {"enabled": enabled},
+            },
+        )
+    )
+    return tuple(draft.steps)
 
 
 def build_host_ui_debug_business_transaction_steps(
@@ -3345,17 +3439,7 @@ def _exact_artifact_argument_cli(
                 "Lua business arguments must contain only strict JSON values"
             )
         values.extend(("--argument", key, value_type, encoded))
-    if not values:
-        return ()
-    return (
-        "--arguments-json",
-        json.dumps(
-            dict(arguments),
-            ensure_ascii=False,
-            allow_nan=False,
-            separators=(",", ":"),
-        ),
-    )
+    return tuple(values)
 
 
 def build_exact_artifact_business_transaction_steps(
@@ -6579,6 +6663,7 @@ __all__ = [
     "build_audio_import_composer_transaction_steps",
     "build_authoring_ui_business_transaction_steps",
     "build_cli_console_business_transaction_steps",
+    "build_debug_control_business_transaction_steps",
     "build_host_ui_debug_business_transaction_steps",
     "build_core_business_transaction_steps",
     "build_project_setting_business_transaction_steps",

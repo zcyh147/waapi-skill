@@ -1,0 +1,19 @@
+{
+  "contract": "waapi-skill.debug-control-business-profile/v1",
+  "profile_id": "debug_control_business_1",
+  "model": {
+    "name": "gpt-5.6-terra",
+    "reasoning_effort": "medium",
+    "service_tier": "default",
+    "memory": "disabled"
+  },
+  "units": [
+    {
+      "unit_id": "DBG21-AUTOMATION-PREVIEW",
+      "operation": "debug.setAutomationMode",
+      "version": "2021.1",
+      "prompt": "请启用当前 Wwise 进程的自动化模式。只生成预览，不要执行。",
+      "final_markers": ["自动化", "启用", "预览"]
+    }
+  ]
+}

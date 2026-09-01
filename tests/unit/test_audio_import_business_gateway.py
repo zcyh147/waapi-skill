@@ -268,17 +268,15 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
     assert "gateway_inserts_every_wwise_separator" in (
         start_next["object_binding"]["path_rule"]
     )
-    assert "preserve_each_literal_typed_segment_including_angle_bracket_type_prefixes" in (
-        start_next["object_binding"]["path_rule"]
-    )
+    assert "type_prefixes_are_forbidden" in start_next["object_binding"]["path_rule"]
     assert "bind_every_segment_except_the_final_new_object_name" in (
         start_next["object_binding"]["new_target_parent_rule"]
     )
     assert start_next["object_binding"]["import_row_path_rule"] == (
-        "copy_the_exact_complete_object_path_from_each_user_supplied_import_row; "
-        "preserve_every_literal_typed_segment_including_angle_bracket_type_prefixes; "
-        "bind_the_complete_row_target_only_when_that_row_is_explicitly_existing; "
-        "otherwise_bind_its_exact_immediate_parent"
+        "bind_an_explicitly_existing_row_by_exact_guid_or_literal_name_segments; "
+        "otherwise_bind_only_its_exact_existing_immediate_parent; new_row_name_and_"
+        "semantic_kind_belong_to_the_business_declaration; wwise_type_prefixes_and_"
+        "complete_mutation_paths_are_forbidden"
     )
     result_validation = start_next["object_binding"]["result_validation_rule"]
     assert "returned_name_and_path" in result_validation

@@ -197,6 +197,7 @@ EXPECTED_DRAFT_REVISION_SUBCOMMANDS = frozenset(
         "draft-bind-field",
         "draft-bind-object",
         "draft-business-configure",
+        "draft-declare-debug-intent",
         "draft-declare-import-batch",
         "draft-clear-object-list",
         "draft-declare-existing",

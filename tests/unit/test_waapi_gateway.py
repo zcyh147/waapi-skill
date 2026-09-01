@@ -66,22 +66,25 @@ CAPABILITY_COMPACT_KEYS = {
 @pytest.mark.parametrize(
     ("segments", "expected"),
     (
-        (
-            [
-                "Actor-Mixer Hierarchy",
-                "<Virtual Folder>Weapons",
-                "<Sound SFX>Rifle",
-            ],
-            r"\Actor-Mixer Hierarchy\Weapons\Rifle",
-        ),
+        (["Actor-Mixer Hierarchy", "Weapons", "Rifle"], r"\Actor-Mixer Hierarchy\Weapons\Rifle"),
         (["Events", "Default Work Unit"], r"\Events\Default Work Unit"),
     ),
 )
-def test_business_object_path_segments_normalize_wwise_typed_import_markers(
+def test_business_object_path_segments_join_literal_business_names(
     segments: list[str],
     expected: str,
 ) -> None:
     assert waapi_gateway._business_object_path_from_segments(segments) == expected
+
+
+@pytest.mark.parametrize("segment", ("<Virtual Folder>Weapons", "<Sound SFX>Rifle"))
+def test_business_object_path_segments_reject_native_type_prefixes(
+    segment: str,
+) -> None:
+    with pytest.raises(waapi_gateway.GatewayInputError, match="Wwise type syntax"):
+        waapi_gateway._business_object_path_from_segments(
+            ["Actor-Mixer Hierarchy", segment]
+        )
 EXPECTED_EXCLUDED_FUNCTION_URIS = frozenset(
     {
         "ak.wwise.ui.commands.register",

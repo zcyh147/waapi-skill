@@ -4035,13 +4035,6 @@ def _closed_business_literal_equivalent(
         return _BUSINESS_KIND_DISPLAY_ALIASES.get(supplied) == expected
     if prior not in {"--path-segment", "--object-path-segment"}:
         return False
-    typed_segment = re.fullmatch(r"<([^<>]+)>(.+)", supplied)
-    if (
-        typed_segment is not None
-        and typed_segment.group(1) in _BUSINESS_KIND_DISPLAY_ALIASES
-        and typed_segment.group(2) == expected
-    ):
-        return True
     if sum(value == prior for value in step.arguments[:index]) != 1:
         return False
     return (

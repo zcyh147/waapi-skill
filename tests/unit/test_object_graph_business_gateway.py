@@ -179,7 +179,7 @@ def test_object_binding_returns_version_stable_business_kind(
     ]["result_validation_rule"]
 
 
-def test_typed_random_container_path_resolves_ambiguous_live_kind(
+def test_literal_random_container_path_resolves_ambiguous_live_kind(
     tmp_path: Path,
 ) -> None:
     start_code, started = _offline(tmp_path, "draft-start", "object.set")
@@ -219,9 +219,9 @@ def test_typed_random_container_path_resolves_ambiguous_live_kind(
             "--object-path-segment",
             "Default Work Unit",
             "--object-path-segment",
-            "<Virtual Folder>Weapons",
+            "Weapons",
             "--object-path-segment",
-            "<Random Container>Rifle",
+            "Rifle",
         ],
         env=_env(tmp_path),
         client_factory=lambda _url: client,
@@ -237,30 +237,13 @@ def test_typed_random_container_path_resolves_ambiguous_live_kind(
     }
 
 
-def test_typed_random_container_path_rejects_live_sequence_discriminator(
+def test_typed_random_container_path_is_rejected_before_live_dispatch(
     tmp_path: Path,
 ) -> None:
     start_code, started = _offline(tmp_path, "draft-start", "object.set")
     assert start_code == 0, started
     target_path = r"\Actor-Mixer Hierarchy\Default Work Unit\Weapons\Rifle"
-    client = _live_client(
-        tmp_path,
-        {
-            "ak.wwise.core.object.get": [
-                {
-                    "return": [
-                        {
-                            "id": PARENT_ID,
-                            "name": "Rifle",
-                            "type": "RandomSequenceContainer",
-                            "path": target_path,
-                        }
-                    ]
-                },
-                {"return": [{"id": PARENT_ID, "@RandomOrSequence": 0}]},
-            ]
-        },
-    )
+    client = _live_client(tmp_path, {})
 
     code, payload = gateway.execute_gateway(
         [
@@ -286,11 +269,8 @@ def test_typed_random_container_path_rejects_live_sequence_discriminator(
     )
 
     assert code == 2
-    assert payload["error_code"] == "BUSINESS_OBJECT_KIND_MISMATCH"
-    assert payload["details"] == {
-        "expected_business_kind": "random-container",
-        "actual_business_kind": "sequence-container",
-    }
+    assert payload["error_code"] == "GatewayInputError"
+    assert "Wwise type syntax" in payload["message"]
 
 
 @pytest.mark.parametrize("discriminator", (None, True, 2, "0"))

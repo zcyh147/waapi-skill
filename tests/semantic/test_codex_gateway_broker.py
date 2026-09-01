@@ -121,18 +121,6 @@ from wwise_waapi.operation_composer import (
             "sound-sfx",
         ),
         (
-            "draft-bind-object",
-            (
-                "--object-path-segment",
-                "Actor-Mixer Hierarchy",
-                "--object-path-segment",
-                "Weapons",
-            ),
-            3,
-            "<Virtual Folder>Weapons",
-            "Weapons",
-        ),
-        (
             "draft-discover-fields",
             ("--meaning", "pitch"),
             1,
@@ -156,6 +144,26 @@ def test_closed_business_literal_equivalence_is_broker_owned(
         supplied,
         expected,
     ) is True
+
+
+def test_closed_business_literal_equivalence_rejects_native_path_type_prefix() -> None:
+    step = ExpectedGatewayStep(
+        "step",
+        "draft-bind-object",
+        (
+            "--object-path-segment",
+            "Actor-Mixer Hierarchy",
+            "--object-path-segment",
+            "Weapons",
+        ),
+    )
+
+    assert broker_module._closed_business_literal_equivalent(
+        step,
+        3,
+        "<Virtual Folder>Weapons",
+        "Weapons",
+    ) is False
 
 
 @pytest.mark.parametrize(

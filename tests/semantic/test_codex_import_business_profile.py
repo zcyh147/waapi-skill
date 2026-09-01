@@ -440,11 +440,11 @@ def test_use_existing_protocol_binds_live_rows_and_declares_missing_rows() -> No
     assert len(bindings) == 2
     assert bindings[0].arguments[-2:] == (
         "--object-path-segment",
-        "<Sound SFX>Rifle_Close",
+        "Rifle_Close",
     )
     assert bindings[1].arguments[-2:] == (
         "--object-path-segment",
-        "<Random Container>Rifle",
+        "Rifle",
     )
     assert "--existing-row" in declaration.arguments
     assert "--new-row" in declaration.arguments

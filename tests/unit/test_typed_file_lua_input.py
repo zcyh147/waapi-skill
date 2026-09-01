@@ -411,7 +411,7 @@ def test_cli_lua_preview_and_dispatch_require_console_host(command: str) -> None
     assert payload["verified"] is False
 
 
-def test_lua_continuation_discloses_one_closed_wa_args_representation(
+def test_lua_continuation_discloses_one_bounded_typed_argument_at_a_time(
     tmp_path: Path,
 ) -> None:
     state_dir = tmp_path / "lua-null-continuation"
@@ -430,12 +430,12 @@ def test_lua_continuation_discloses_one_closed_wa_args_representation(
 
     assert code == 0, payload
     append = payload["draft"]["next_action_binding"]["declaration"]["append"]
-    assert any("--arguments-json" in row for row in append)
+    assert any("--argument <key> <type> <value>" in row for row in append)
     assert all("alternative:" not in row for row in append)
-    assert all("--argument <key>" not in row for row in append)
+    assert all("--arguments-json" not in row for row in append)
 
 
-def test_lua_artifact_plan_accepts_one_complete_wa_args_object(
+def test_lua_artifact_plan_accepts_repeated_typed_business_arguments(
     tmp_path: Path,
 ) -> None:
     operation = "lua.executeCoreFile"
@@ -470,8 +470,10 @@ def test_lua_artifact_plan_accepts_one_complete_wa_args_object(
             str(started["draft"]["revision"]),
             "--script-file",
             str(script),
-            "--arguments-json",
-            '{"count":3}',
+            "--argument",
+            "count",
+            "integer",
+            "3",
         ],
         env=_env(tmp_path),
         client_factory=lambda _url: _LuaClient(tmp_path),
@@ -491,53 +493,17 @@ def test_lua_artifact_plan_accepts_one_complete_wa_args_object(
     assert request["arguments"]["wa_args"] == {"count": 3}
 
 
-@pytest.mark.parametrize(
-    "arguments_json",
-    (
-        "[]",
-        '{"count":NaN}',
-        '{"count":1,"count":2}',
-    ),
-)
-def test_lua_complete_wa_args_rejects_non_strict_objects(
-    arguments_json: str,
-) -> None:
+def test_lua_artifact_cli_has_no_complete_json_map_input() -> None:
     parser = argparse.ArgumentParser()
     add_exact_artifact_plan_arguments(parser)
-    namespace = parser.parse_args(
-        ["--script-file", "/tmp/user.lua", "--arguments-json", arguments_json]
-    )
-
-    with pytest.raises(
-        ExactArtifactBusinessCliError,
-        match="one strict JSON object",
-    ):
-        exact_artifact_plan_from_namespace(
-            namespace,
-            operation="lua.executeCoreFile",
-        )
-
-
-def test_lua_complete_wa_args_cannot_mix_argument_forms() -> None:
-    parser = argparse.ArgumentParser()
-    add_exact_artifact_plan_arguments(parser)
-    namespace = parser.parse_args(
-        [
-            "--script-file",
-            "/tmp/user.lua",
-            "--arguments-json",
-            '{"count":3}',
-            "--argument",
-            "count",
-            "integer",
-            "3",
-        ]
-    )
-
-    with pytest.raises(ExactArtifactBusinessCliError, match="cannot be combined"):
-        exact_artifact_plan_from_namespace(
-            namespace,
-            operation="lua.executeCoreFile",
+    with pytest.raises(SystemExit):
+        parser.parse_args(
+            [
+                "--script-file",
+                "/tmp/user.lua",
+                "--arguments-json",
+                '{"count":3}',
+            ]
         )
 
 

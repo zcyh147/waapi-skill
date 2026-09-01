@@ -197,11 +197,17 @@ def test_exact_artifact_business_steps_hide_lua_loader_fields(
     ]
     declaration = steps[2]
     assert "--source-authority" not in declaration.arguments
-    assert "--argument" not in declaration.arguments
-    arguments_index = declaration.arguments.index("--arguments-json")
-    assert json.loads(declaration.arguments[arguments_index + 1]) == request[
-        "arguments"
-    ]["wa_args"]
+    assert "--arguments-json" not in declaration.arguments
+    argument_rows = []
+    for index, value in enumerate(declaration.arguments):
+        if value == "--argument":
+            argument_rows.append(declaration.arguments[index : index + 4])
+    assert argument_rows == [
+        ("--argument", "name", "string", "Weather"),
+        ("--argument", "enabled", "boolean", "true"),
+        ("--argument", "missing", "null", "null"),
+        ("--argument", "rows", "json", "[1,2]"),
+    ]
     lua_index = declaration.arguments.index("--lua-source")
     assert declaration.arguments[lua_index : lua_index + 4] == (
         "--lua-source",

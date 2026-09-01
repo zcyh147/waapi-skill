@@ -23,9 +23,11 @@ named test documents plus closed adapter and request-mapping registries:
   oracle, and cleanup identifier referenced by the cases. The registry remains
   specification-only for the full V3 catalog; only the 16 heavy APIs named
   below currently have closed executable adapters in that review bundle. The
-  fixed `typed_input_cross_version_25` release profile additionally owns its
-  two direct representative seams (`getInfo` and Core Lua); it does not broaden
-  the heavy-profile API inventory.
+  fixed `typed_input_cross_version_25` component profile additionally owns its
+  two direct representative seams (`getInfo` and Core Lua). The #60
+  `deep_business_cross_version_19` release profile composes reviewed component
+  tasks but grants no new per-API credit; neither profile broadens the heavy
+  inventory.
 - `request_mapping_registry.json` records natural-language values and complex
   request shapes that the current packaged resources cannot yet map reliably.
   Any listed scenario is blocked from real execution until all of its entries
@@ -556,12 +558,14 @@ The separately approved V3 executable profiles are:
 | `heavy_cross_version_80` | 80 | 145 | Real sandboxed business-oracle coverage for the 16 implemented heavy APIs |
 | `compound_heavy_cross_version_24` | 24 | 48 | Complex batch composition and real business assertions on Wwise 2022.1 and 2025.1 |
 | `typed_input_cross_version_25` | 25 | 39 | Fixed representative typed-input profile: five fresh tasks per Wwise version, no same-root retries, and one public Gateway continuation at each step |
+| `deep_business_cross_version_19` | 19 | 21 | #60 release profile: one reviewed packaged-Skill task for every migration family from #54/#56/#57 across all five versions; mixed proportional real-Wwise and production-Gateway Preview evidence |
 | `integration` | 12 | 36 | Six cross-operation workflows on Wwise 2022.1 and 2025.1; 20 previewed transactions and no additional per-API coverage credit |
 | `modification_policy_9` | 9 | 15 | Three isolated repetitions of each canonical project-modification policy on one reviewed object.create business case |
 | `switch_assignment_business_1` | 1 | 1 | Preview-only routing proof for one independent Switch assignment through three opaque business-object handles and Gateway-owned native materialization |
 | `core_business_1` | 1 | 1 | Preview-only routing proof that a zero-input Core mutation follows `request-schema` into one Gateway-owned Core business plan and immutable Preview |
 | `project_setting_business_1` | 1 | 1 | Preview-only routing proof that one natural Game Parameter range request becomes a bound object handle and Gateway-owned project-setting plan |
 | `runtime_control_business_1` | 1 | 1 | Preview-only routing proof that one natural Profiler capture request becomes a Gateway-owned runtime-control plan and exact native data-type request |
+| `debug_control_business_1` | 1 | 1 | Preview-only proof that one named Debug boolean outcome becomes a Gateway-owned host-control request without native acknowledgement or retry mechanics |
 | `soundengine_business_4` | 4 | 4 | Preview-only routing proof for monitor, game-object registration, Event action, and listener spatialization parameter closure |
 | `compound_undo_business_1` | 1 | 1 | Preview-only routing proof that two checked child business changes become one Gateway-compiled Undo Group and one immutable Preview |
 
@@ -587,6 +591,7 @@ skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py -
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile heavy_cross_version_80 --case-id OBJ22-F-GET-01 --version 2022.1 --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-heavy-v3-pilot-object-get
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile compound_heavy_cross_version_24 --suite tests/semantic/data/compound-heavy-v1/profile.json --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-compound-heavy-v1
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile typed_input_cross_version_25 --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-typed-input-new-candidate-r1
+skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile deep_business_cross_version_19 --model gpt-5.6-terra --reasoning-effort medium --service-tier default --max-pre-action-retries 0 --campaign-root skills/waapi-skill-workspace/campaign-deep-business-new-candidate-r1
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile integration --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-integration-new-candidate-r1
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile modification_policy_9 --campaign-root skills/waapi-skill-workspace/campaign-modification-policy-9
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile switch_assignment_business_1 --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-switch-assignment-business
@@ -609,6 +614,20 @@ starts one memory-off Agent per task, and forbids same-root pre-action retries.
 Freeze ordinary semantic failures and repair them only in a new campaign root
 and candidate. A fully passing fresh root may receive identical
 `--resume --verify-only` replay; a failed root remains frozen without replay.
+
+`deep_business_cross_version_19` is the stricter #60 release contract. It
+composes reviewed component runners into one immutable campaign and contains
+exactly one task for every migration family owned by #54, #56, and #57. It
+covers all five supported versions and explicitly includes type/path
+construction, live metadata handles, ordering, batching, structured query
+repair, Preview reading, Topics, Authoring UI, SoundEngine, CLI/Console,
+runtime control, named Debug control, and compound Undo. Component tasks that
+only need routing evidence use the production Gateway with a closed fixture and
+start no Wwise process; the real query/Topic/SoundBank/Lua/media tasks retain
+their normal sandboxed Wwise lifecycle. Every task still starts a fresh
+memory-off Terra Agent and reads only the packaged Skill. The full profile
+forbids same-root retry and is the acceptance profile that must pass on one
+frozen candidate on both hosts before public `integration`.
 
 `switch_assignment_business_1` is a single 2022.1 preview-only routing probe.
 It starts no Wwise process and grants no real-host coverage credit. The Agent

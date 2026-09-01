@@ -12,35 +12,6 @@ class ExactArtifactBusinessCliError(ValueError):
     """One complete exact-artifact declaration is malformed."""
 
 
-def _strict_arguments_object(raw: str) -> dict[str, Any]:
-    def reject_constant(value: str) -> None:
-        raise ValueError(f"non-finite JSON constant {value!r}")
-
-    def unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
-        result: dict[str, Any] = {}
-        for key, value in pairs:
-            if key in result:
-                raise ValueError(f"duplicate JSON object key {key!r}")
-            result[key] = value
-        return result
-
-    try:
-        decoded = json.loads(
-            raw,
-            parse_constant=reject_constant,
-            object_pairs_hook=unique_object,
-        )
-    except (json.JSONDecodeError, RecursionError, ValueError) as exc:
-        raise ExactArtifactBusinessCliError(
-            "--arguments-json must be one strict JSON object"
-        ) from exc
-    if not isinstance(decoded, dict):
-        raise ExactArtifactBusinessCliError(
-            "--arguments-json must be one strict JSON object"
-        )
-    return decoded
-
-
 def add_exact_artifact_plan_arguments(parser: argparse.ArgumentParser) -> None:
     """Attach all closed high-level flags to the shared declaration command."""
 
@@ -84,7 +55,6 @@ def add_exact_artifact_plan_arguments(parser: argparse.ArgumentParser) -> None:
         default=[],
         metavar=("KEY", "TYPE", "VALUE"),
     )
-    parser.add_argument("--arguments-json")
     parser.add_argument("--watchdog-seconds", type=int)
 
 
@@ -106,7 +76,6 @@ def exact_artifact_plan_from_namespace(
         "lua_source",
         "io_root",
         "argument",
-        "arguments_json",
         "watchdog_seconds",
     }
     allowed = {
@@ -121,15 +90,13 @@ def exact_artifact_plan_from_namespace(
         "lua.executeCliFile": {
             "script_file",
             "argument",
-            "arguments_json",
             "watchdog_seconds",
         },
-        "lua.executeCoreFile": {"script_file", "argument", "arguments_json"},
+        "lua.executeCoreFile": {"script_file", "argument"},
         "lua.executeCoreInline": {
             "lua_source",
             "io_root",
             "argument",
-            "arguments_json",
         },
     }.get(operation)
     if allowed is None:
@@ -147,20 +114,13 @@ def exact_artifact_plan_from_namespace(
             f"{operation} does not accept {unexpected[0].replace('_', '-')}"
         )
 
-    if args.arguments_json is not None and args.argument:
-        raise ExactArtifactBusinessCliError(
-            "--arguments-json cannot be combined with --argument"
-        )
-    if args.arguments_json is not None:
-        arguments = _strict_arguments_object(args.arguments_json)
-    else:
-        arguments = {}
-        for key, value_type, raw_value in args.argument:
-            if key in arguments:
-                raise ExactArtifactBusinessCliError(
-                    "one Lua argument key was supplied twice"
-                )
-            arguments[key] = _typed_value(value_type, raw_value)
+    arguments = {}
+    for key, value_type, raw_value in args.argument:
+        if key in arguments:
+            raise ExactArtifactBusinessCliError(
+                "one Lua argument key was supplied twice"
+            )
+        arguments[key] = _typed_value(value_type, raw_value)
 
     if operation == "audio.importTabDelimited":
         plan: dict[str, Any] = {

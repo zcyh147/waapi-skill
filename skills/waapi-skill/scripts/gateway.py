@@ -16298,24 +16298,6 @@ def _runtime_game_object_context_from_live(
     )
 
 
-_BUSINESS_TYPED_OBJECT_PATH_PREFIXES = frozenset(
-    {
-        "Actor-Mixer",
-        "Blend Container",
-        "Music Playlist Container",
-        "Music Segment",
-        "Music Switch Container",
-        "Music Track",
-        "Random Container",
-        "Sequence Container",
-        "Sound SFX",
-        "Sound Voice",
-        "Switch Container",
-        "Virtual Folder",
-    }
-)
-
-
 def _business_object_path_from_segments(values: Any) -> str:
     if (
         not isinstance(values, list)
@@ -16335,16 +16317,6 @@ def _business_object_path_from_segments(values: Any) -> str:
             and not value.startswith("\\\\")
         ):
             value = value[1:]
-        typed_segment = (
-            re.fullmatch(r"<([^<>]+)>(.+)", value)
-            if isinstance(value, str)
-            else None
-        )
-        if (
-            typed_segment is not None
-            and typed_segment.group(1) in _BUSINESS_TYPED_OBJECT_PATH_PREFIXES
-        ):
-            value = typed_segment.group(2)
         if (
             not isinstance(value, str)
             or not value
@@ -16353,6 +16325,8 @@ def _business_object_path_from_segments(values: Any) -> str:
             or "\\" in value
             or "/" in value
             or '"' in value
+            or "<" in value
+            or ">" in value
             or any(
                 ord(character) < 32
                 or ord(character) == 127
@@ -16362,7 +16336,7 @@ def _business_object_path_from_segments(values: Any) -> str:
         ):
             raise GatewayInputError(
                 "Each business object path segment must be one bounded literal name "
-                "without a path separator."
+                "without a path separator or Wwise type syntax."
             )
         segments.append(value)
     path = "\\" + "\\".join(segments)
@@ -16371,35 +16345,6 @@ def _business_object_path_from_segments(values: Any) -> str:
             "Business object path segments exceed the fixed path byte limit."
         )
     return path
-
-
-def _business_kind_from_final_typed_path_segment(
-    values: Any,
-    *,
-    version: str,
-) -> str | None:
-    """Return the stable kind explicitly carried by the final path segment."""
-
-    if not isinstance(values, list) or not values:
-        return None
-    final_segment = values[-1]
-    typed_segment = (
-        re.fullmatch(r"<([^<>]+)>(.+)", final_segment)
-        if isinstance(final_segment, str)
-        else None
-    )
-    if (
-        typed_segment is None
-        or typed_segment.group(1) not in _BUSINESS_TYPED_OBJECT_PATH_PREFIXES
-    ):
-        return None
-    try:
-        return resolve_semantic_kind(
-            typed_segment.group(1),
-            version=version,
-        ).name
-    except BusinessDeclarationError:
-        return None
 
 
 @dataclass(frozen=True, slots=True)
@@ -16558,13 +16503,8 @@ def dispatch_business_object_binding(
                 f"The next business object binding requires --role {expected_role}"
             )
     object_path = args.object_path
-    expected_business_kind: str | None = None
     if args.object_path_segment is not None:
         object_path = _business_object_path_from_segments(args.object_path_segment)
-        expected_business_kind = _business_kind_from_final_typed_path_segment(
-            args.object_path_segment,
-            version=detected_version,
-        )
     exact_type_name: tuple[str, str] | None = None
     if args.exact_type_name is not None:
         try:
@@ -16708,18 +16648,6 @@ def dispatch_business_object_binding(
             else None
         )
     )
-    if (
-        expected_business_kind is not None
-        and business_kind != expected_business_kind
-    ):
-        raise GatewayResultShapeError(
-            "Live business object kind differs from the typed path segment.",
-            details={
-                "expected_business_kind": expected_business_kind,
-                "actual_business_kind": business_kind,
-            },
-            error_code="BUSINESS_OBJECT_KIND_MISMATCH",
-        )
     captured: list[Any] = []
 
     def bind(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
@@ -22516,9 +22444,8 @@ def _business_next_action_binding(
             "user_selected_guid_uses_by_id"
         ),
         "path_rule": (
-            "copy_each_nonempty_user_path_segment_root_to_leaf; preserve_each_"
-            "literal_typed_segment_including_angle_bracket_type_prefixes; gateway_"
-            "inserts_every_wwise_separator"
+            "copy_each_nonempty_literal_business_name_root_to_leaf; gateway_"
+            "inserts_every_wwise_separator; type_prefixes_are_forbidden"
         ),
         "new_target_parent_rule": (
             "when_the_user_supplies_a_complete_new_object_path_bind_every_segment_"
@@ -22554,11 +22481,10 @@ def _business_next_action_binding(
         )
     if adapter.family == "audio-import":
         object_binding["import_row_path_rule"] = (
-            "copy_the_exact_complete_object_path_from_each_user_supplied_"
-            "import_row; preserve_every_literal_typed_segment_including_"
-            "angle_bracket_type_prefixes; bind_the_complete_row_target_only_"
-            "when_that_row_is_explicitly_existing; otherwise_bind_its_exact_"
-            "immediate_parent"
+            "bind_an_explicitly_existing_row_by_exact_guid_or_literal_name_segments; "
+            "otherwise_bind_only_its_exact_existing_immediate_parent; new_row_name_and_"
+            "semantic_kind_belong_to_the_business_declaration; wwise_type_prefixes_and_"
+            "complete_mutation_paths_are_forbidden"
         )
     role_declaration = adapter.role_declaration
     if role_declaration is not None:
@@ -23543,17 +23469,17 @@ def _business_next_action_binding(
             ],
             "lua.executeCliFile": [
                 "--script-file <exact-user-supplied-lua-file>",
-                "[--arguments-json <complete-wa_args-strict-json-object>]",
+                "[--argument <key> <type> <value>]...",
                 "[--watchdog-seconds <non-negative-integer>] (2024.1+)",
             ],
             "lua.executeCoreFile": [
                 "--script-file <exact-user-supplied-lua-file>",
-                "[--arguments-json <complete-wa_args-strict-json-object>]",
+                "[--argument <key> <type> <value>]...",
             ],
             "lua.executeCoreInline": [
                 "--lua-source <exact-user-supplied-utf8-source>",
                 "--io-root <exact-isolated-transaction-root>",
-                "[--arguments-json <complete-wa_args-strict-json-object>]",
+                "[--argument <key> <type> <value>]...",
             ],
         }
         declaration_binding = {

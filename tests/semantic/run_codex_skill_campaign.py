@@ -326,6 +326,7 @@ HEAVY_V3_PROFILE_ID = matrix.HEAVY_V3_PROFILE_ID
 MODIFICATION_POLICY_V3_PROFILE_ID = matrix.MODIFICATION_POLICY_V3_PROFILE_ID
 COMPOUND_HEAVY_V1_PROFILE_ID = matrix.COMPOUND_HEAVY_V1_PROFILE_ID
 TYPED_INPUT_PROFILE_ID = matrix.TYPED_INPUT_PROFILE_ID
+DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID = matrix.DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID
 DEEP_INTERFACE_MVP_PROFILE_ID = matrix.DEEP_INTERFACE_MVP_PROFILE_ID
 AUDIO_IMPORT_BUSINESS_PROFILE_ID = matrix.AUDIO_IMPORT_BUSINESS_PROFILE_ID
 OFFLINE_BUSINESS_AGENT_PROFILE_IDS = frozenset(
@@ -365,6 +366,7 @@ TERRA_LOCKED_V3_PROFILE_IDS = frozenset(
         MODIFICATION_POLICY_V3_PROFILE_ID,
         COMPOUND_HEAVY_V1_PROFILE_ID,
         TYPED_INPUT_PROFILE_ID,
+        DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID,
         DEEP_INTERFACE_MVP_PROFILE_ID,
         *OFFLINE_BUSINESS_AGENT_PROFILE_IDS,
         INTEGRATION_WORKFLOWS_V1_PROFILE_ID,
@@ -412,6 +414,9 @@ BUSINESS_AGENT_OUTCOME_CONTRACTS = {
     ),
     matrix.RUNTIME_CONTROL_BUSINESS_PROFILE_ID: (
         "waapi-skill.runtime-control-business-agent-outcome/v1"
+    ),
+    matrix.DEBUG_CONTROL_BUSINESS_PROFILE_ID: (
+        "waapi-skill.debug-control-business-agent-outcome/v1"
     ),
     matrix.SOUNDENGINE_BUSINESS_PROFILE_ID: (
         "waapi-skill.soundengine-business-agent-outcome/v1"
@@ -1155,7 +1160,8 @@ def run_heavy_v3_campaign(options: CampaignOptions) -> int:
         write_consolidated(root, consolidated)
         terminal = heavy_v3_consolidated_exit(
             consolidated,
-            freeze_retryable=options.profile == TYPED_INPUT_PROFILE_ID,
+            freeze_retryable=options.profile
+            in {TYPED_INPUT_PROFILE_ID, DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID},
         )
         if terminal is not None:
             return terminal
@@ -1349,7 +1355,8 @@ def run_heavy_v3_campaign(options: CampaignOptions) -> int:
                 return EXIT_INTERRUPTED
             terminal = heavy_v3_consolidated_exit(
                 consolidated,
-                freeze_retryable=options.profile == TYPED_INPUT_PROFILE_ID,
+                freeze_retryable=options.profile
+                in {TYPED_INPUT_PROFILE_ID, DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID},
             )
             return terminal if terminal is not None else EXIT_PENDING
 
@@ -3260,7 +3267,9 @@ def _validate_business_agent_outcome(
             raise CampaignEvidenceError(
                 f"business Agent outcome mismatch for {key}"
             )
-    profile = options.profile
+    profile = str(
+        getattr(expected_unit, "component_profile_id", options.profile)
+    )
     gates = outcome.get("gates")
     transaction_count = getattr(expected_unit, "transaction_count", None)
     if (
@@ -15149,6 +15158,9 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
     is_policy_v3 = args.profile == MODIFICATION_POLICY_V3_PROFILE_ID
     is_compound_v1 = args.profile == COMPOUND_HEAVY_V1_PROFILE_ID
     is_typed_input = args.profile == TYPED_INPUT_PROFILE_ID
+    is_deep_business_acceptance = (
+        args.profile == DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID
+    )
     is_deep_interface_mvp = args.profile == DEEP_INTERFACE_MVP_PROFILE_ID
     business_agent_profile = matrix.OFFLINE_BUSINESS_AGENT_PROFILES.get(args.profile)
     is_integration_v1 = args.profile == INTEGRATION_WORKFLOWS_V1_PROFILE_ID
@@ -15161,7 +15173,7 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
             matrix.INTEGRATION_CODEX_TIMEOUT_SECONDS
             if is_integration
             else matrix.TYPED_INPUT_CODEX_TIMEOUT_SECONDS
-            if is_typed_input
+            if is_typed_input or is_deep_business_acceptance
             else matrix.DEFAULT_CODEX_TIMEOUT_SECONDS
         )
     )
@@ -15178,14 +15190,22 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
     max_pre_action_retries = (
         0
         if args.max_pre_action_retries is None
-        and (is_typed_input or business_agent_profile is not None)
+        and (
+            is_typed_input
+            or is_deep_business_acceptance
+            or business_agent_profile is not None
+        )
         else 1
         if args.max_pre_action_retries is None
         else int(args.max_pre_action_retries)
     )
     if max_pre_action_retries < 0:
         parser.error("--max-pre-action-retries must be zero or greater")
-    if (is_typed_input or business_agent_profile is not None) and max_pre_action_retries != 0:
+    if (
+        is_typed_input
+        or is_deep_business_acceptance
+        or business_agent_profile is not None
+    ) and max_pre_action_retries != 0:
         parser.error(
             f"{args.profile} forbids same-root pre-action retries"
         )
@@ -15270,6 +15290,8 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
             if business_agent_profile is not None
             else matrix.DEFAULT_TYPED_INPUT_SUITE
             if is_typed_input
+            else matrix.DEFAULT_DEEP_BUSINESS_ACCEPTANCE_SUITE
+            if is_deep_business_acceptance
             else (
                 matrix.DEFAULT_INTEGRATION_SUITE
                 if is_integration

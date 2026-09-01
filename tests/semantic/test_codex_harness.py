@@ -5685,14 +5685,13 @@ def test_task_classifier_accepts_exact_task_local_gateway_runner(
     assert facts.unexpected_commands == ()
 
 
-def test_archive_classifier_keeps_windows_lua_arguments_json_gateway_owned(
+def test_archive_classifier_keeps_windows_lua_typed_argument_gateway_owned(
     tmp_path: Path,
 ) -> None:
     candidate = tmp_path / "candidate" / "waapi-skill"
     runner = candidate / "scripts" / "run.py"
     runner.parent.mkdir(parents=True)
     runner.write_text("# runner\n", encoding="utf-8")
-    arguments_json = '{"count":3}'
     argv = (
         "python",
         str(runner),
@@ -5705,8 +5704,10 @@ def test_archive_classifier_keeps_windows_lua_arguments_json_gateway_owned(
         "1",
         "--script-file",
         str(tmp_path / "user-script.lua"),
-        "--arguments-json",
-        arguments_json,
+        "--argument",
+        "count",
+        "integer",
+        "3",
     )
     command = windows_powershell_recording(encode_windows_model_argv(argv))
     record = CodexCommandRecord(

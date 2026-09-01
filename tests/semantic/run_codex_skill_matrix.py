@@ -125,6 +125,14 @@ DEFAULT_COMPOUND_HEAVY_V1_SUITE = (
 DEFAULT_TYPED_INPUT_SUITE = (
     REPO_ROOT / "tests" / "semantic" / "data" / "typed-input-v1" / "profile.json"
 )
+DEFAULT_DEEP_BUSINESS_ACCEPTANCE_SUITE = (
+    REPO_ROOT
+    / "tests"
+    / "semantic"
+    / "data"
+    / "deep-business-acceptance"
+    / "profile.json"
+)
 DEFAULT_DEEP_INTERFACE_MVP_SUITE = (
     REPO_ROOT / "tests" / "semantic" / "data" / "deep-interface-mvp" / "profile.json"
 )
@@ -190,6 +198,14 @@ DEFAULT_RUNTIME_CONTROL_BUSINESS_SUITE = (
     / "semantic"
     / "data"
     / "runtime-control-business"
+    / "profile.json"
+)
+DEFAULT_DEBUG_CONTROL_BUSINESS_SUITE = (
+    REPO_ROOT
+    / "tests"
+    / "semantic"
+    / "data"
+    / "debug-control-business"
     / "profile.json"
 )
 DEFAULT_SOUNDENGINE_BUSINESS_SUITE = (
@@ -272,6 +288,11 @@ DEFAULT_COMPOUND_HEAVY_V1_ITERATION_ROOT = (
 DEFAULT_TYPED_INPUT_ITERATION_ROOT = (
     SKILL_ROOT.parent / "waapi-skill-workspace" / "typed-input-cross-version-25"
 )
+DEFAULT_DEEP_BUSINESS_ACCEPTANCE_ITERATION_ROOT = (
+    SKILL_ROOT.parent
+    / "waapi-skill-workspace"
+    / "deep-business-cross-version-19"
+)
 DEFAULT_AUDIO_IMPORT_BUSINESS_ITERATION_ROOT = (
     SKILL_ROOT.parent / "waapi-skill-workspace" / "audio-import-business-8"
 )
@@ -295,6 +316,9 @@ DEFAULT_PROJECT_SETTING_BUSINESS_ITERATION_ROOT = (
 )
 DEFAULT_RUNTIME_CONTROL_BUSINESS_ITERATION_ROOT = (
     SKILL_ROOT.parent / "waapi-skill-workspace" / "runtime-control-business-1"
+)
+DEFAULT_DEBUG_CONTROL_BUSINESS_ITERATION_ROOT = (
+    SKILL_ROOT.parent / "waapi-skill-workspace" / "debug-control-business-1"
 )
 DEFAULT_SOUNDENGINE_BUSINESS_ITERATION_ROOT = (
     SKILL_ROOT.parent / "waapi-skill-workspace" / "soundengine-business-1"
@@ -357,6 +381,7 @@ HEAVY_V3_PROFILE_ID = "heavy_cross_version_80"
 MODIFICATION_POLICY_V3_PROFILE_ID = "modification_policy_9"
 COMPOUND_HEAVY_V1_PROFILE_ID = "compound_heavy_cross_version_24"
 TYPED_INPUT_PROFILE_ID = "typed_input_cross_version_25"
+DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID = "deep_business_cross_version_19"
 DEEP_INTERFACE_MVP_PROFILE_ID = "deep_interface_mvp_8"
 AUDIO_IMPORT_BUSINESS_PROFILE_ID = "audio_import_business_8"
 OBJECT_LIFECYCLE_BUSINESS_PROFILE_ID = "object_lifecycle_business_3"
@@ -366,6 +391,7 @@ SWITCH_ASSIGNMENT_BUSINESS_PROFILE_ID = "switch_assignment_business_1"
 CORE_BUSINESS_PROFILE_ID = "core_business_1"
 PROJECT_SETTING_BUSINESS_PROFILE_ID = "project_setting_business_1"
 RUNTIME_CONTROL_BUSINESS_PROFILE_ID = "runtime_control_business_1"
+DEBUG_CONTROL_BUSINESS_PROFILE_ID = "debug_control_business_1"
 SOUNDENGINE_BUSINESS_PROFILE_ID = "soundengine_business_4"
 CLI_CONSOLE_BUSINESS_PROFILE_ID = "cli_console_business_1"
 HOST_UI_DEBUG_BUSINESS_PROFILE_ID = "host_ui_debug_business_1"
@@ -502,6 +528,21 @@ OFFLINE_BUSINESS_AGENT_PROFILES = {
         options_name="RuntimeControlBusinessAgentOptions",
         run_name="run_runtime_control_business_agent_unit",
     ),
+    DEBUG_CONTROL_BUSINESS_PROFILE_ID: OfflineBusinessAgentProfileDescriptor(
+        suite_path=DEFAULT_DEBUG_CONTROL_BUSINESS_SUITE,
+        iteration_root=DEFAULT_DEBUG_CONTROL_BUSINESS_ITERATION_ROOT,
+        supported_versions=frozenset({"2021.1"}),
+        preflight_contract="waapi-skill.debug-control-business-preflight/v1",
+        profile_module=(
+            "tests.semantic.support.codex_debug_control_business_profile"
+        ),
+        loader_name="load_debug_control_business_profile",
+        runner_module=(
+            "tests.semantic.support.codex_debug_control_business_agent_runner"
+        ),
+        options_name="DebugControlBusinessAgentOptions",
+        run_name="run_debug_control_business_agent_unit",
+    ),
     SOUNDENGINE_BUSINESS_PROFILE_ID: OfflineBusinessAgentProfileDescriptor(
         suite_path=DEFAULT_SOUNDENGINE_BUSINESS_SUITE,
         iteration_root=DEFAULT_SOUNDENGINE_BUSINESS_ITERATION_ROOT,
@@ -579,7 +620,11 @@ OFFLINE_BUSINESS_AGENT_PROFILES = {
     ),
 }
 SEMANTIC_BOOTSTRAP_PROFILE_IDS = frozenset(
-    {TYPED_INPUT_PROFILE_ID, INTEGRATION_PROFILE_ID}
+    {
+        TYPED_INPUT_PROFILE_ID,
+        DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID,
+        INTEGRATION_PROFILE_ID,
+    }
 )
 DEFAULT_CODEX_TIMEOUT_SECONDS = 240.0
 TYPED_INPUT_CODEX_TIMEOUT_SECONDS = 360.0
@@ -590,6 +635,7 @@ EXECUTABLE_V3_PROFILE_IDS = frozenset(
         MODIFICATION_POLICY_V3_PROFILE_ID,
         COMPOUND_HEAVY_V1_PROFILE_ID,
         TYPED_INPUT_PROFILE_ID,
+        DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID,
         DEEP_INTERFACE_MVP_PROFILE_ID,
         AUDIO_IMPORT_BUSINESS_PROFILE_ID,
         OBJECT_LIFECYCLE_BUSINESS_PROFILE_ID,
@@ -599,6 +645,7 @@ EXECUTABLE_V3_PROFILE_IDS = frozenset(
         CORE_BUSINESS_PROFILE_ID,
         PROJECT_SETTING_BUSINESS_PROFILE_ID,
         RUNTIME_CONTROL_BUSINESS_PROFILE_ID,
+        DEBUG_CONTROL_BUSINESS_PROFILE_ID,
         SOUNDENGINE_BUSINESS_PROFILE_ID,
         CLI_CONSOLE_BUSINESS_PROFILE_ID,
         HOST_UI_DEBUG_BUSINESS_PROFILE_ID,
@@ -797,6 +844,16 @@ HeavyV3DependencyPreflight = Callable[[], Mapping[str, Any]]
 def load_heavy_v3_units(options: RunnerOptions) -> tuple[Any, ...]:
     """Load and filter the reviewed V3 bundle without importing live runners."""
 
+    if options.profile == DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID:
+        acceptance_module = importlib.import_module(
+            "tests.semantic.support.codex_deep_business_acceptance_profile"
+        )
+        profile = acceptance_module.load_deep_business_acceptance_profile(
+            options.suite_path,
+            unit_ids=options.case_ids,
+            versions=options.versions,
+        )
+        return tuple(profile.units)
     if options.profile == DEEP_INTERFACE_MVP_PROFILE_ID:
         mvp_module = importlib.import_module(
             "tests.semantic.support.codex_import_mvp_profile"
@@ -1147,6 +1204,29 @@ def run_heavy_v3_unit(
 ) -> Any:
     """Dispatch one V3 unit only through a closed project or CLI runner."""
 
+    if options.profile == DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID:
+        component_profile = getattr(unit, "component_profile_id", None)
+        component_suite = getattr(unit, "component_suite_path", None)
+        component_unit = getattr(unit, "component_unit", None)
+        if (
+            not isinstance(component_profile, str)
+            or component_profile not in EXECUTABLE_V3_PROFILE_IDS
+            or component_profile == DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID
+            or not isinstance(component_suite, Path)
+            or component_unit is None
+        ):
+            raise HeavyV3RunnerUnavailableError(
+                "deep-business acceptance unit has no reviewed component runner"
+            )
+        return run_heavy_v3_unit(
+            component_unit,
+            scenario_root=scenario_root,
+            options=replace(
+                options,
+                profile=component_profile,
+                suite_path=component_suite,
+            ),
+        )
     unit_row = _heavy_v3_unit_row(unit, sequence=1)
     api = unit_row["api"]
     if options.profile == DEEP_INTERFACE_MVP_PROFILE_ID:
@@ -1337,6 +1417,24 @@ def _heavy_v3_unit_row(unit: Any, *, sequence: int) -> dict[str, Any]:
                 "V3 heavy unit has an invalid base-scenario identity"
             )
         row["base_scenario_id"] = base_scenario_id
+    component_profile_id = getattr(unit, "component_profile_id", None)
+    family = getattr(unit, "family", None)
+    if component_profile_id is not None:
+        if (
+            not isinstance(component_profile_id, str)
+            or not component_profile_id
+            or not isinstance(family, str)
+            or not family
+        ):
+            raise HeavyV3MatrixError(
+                "deep-business acceptance unit metadata is invalid"
+            )
+        row.update(
+            {
+                "component_profile_id": component_profile_id,
+                "family": family,
+            }
+        )
     policy = getattr(unit, "project_modification_policy", None)
     if policy is not None:
         repetition = getattr(unit, "repetition", None)
@@ -1551,6 +1649,8 @@ def _heavy_v3_summary(
                     "api",
                     "runner",
                     "base_scenario_id",
+                    "component_profile_id",
+                    "family",
                     "policy_mode",
                     "project_modification_policy",
                     "repetition",
@@ -3984,6 +4084,9 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
     is_policy_v3 = args.profile == MODIFICATION_POLICY_V3_PROFILE_ID
     is_compound_v1 = args.profile == COMPOUND_HEAVY_V1_PROFILE_ID
     is_typed_input = args.profile == TYPED_INPUT_PROFILE_ID
+    is_deep_business_acceptance = (
+        args.profile == DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID
+    )
     is_deep_interface_mvp = args.profile == DEEP_INTERFACE_MVP_PROFILE_ID
     business_agent_profile = OFFLINE_BUSINESS_AGENT_PROFILES.get(args.profile)
     is_integration_v1 = args.profile == INTEGRATION_WORKFLOWS_V1_PROFILE_ID
@@ -3996,13 +4099,14 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
             INTEGRATION_CODEX_TIMEOUT_SECONDS
             if is_integration
             else TYPED_INPUT_CODEX_TIMEOUT_SECONDS
-            if is_typed_input
+            if is_typed_input or is_deep_business_acceptance
             else DEFAULT_CODEX_TIMEOUT_SECONDS
         )
     )
     is_terra_v3 = (
         is_policy_v3
         or is_typed_input
+        or is_deep_business_acceptance
         or is_deep_interface_mvp
         or business_agent_profile is not None
         or is_compound_v1
@@ -4099,6 +4203,8 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
             if business_agent_profile is not None
             else DEFAULT_TYPED_INPUT_SUITE
             if is_typed_input
+            else DEFAULT_DEEP_BUSINESS_ACCEPTANCE_SUITE
+            if is_deep_business_acceptance
             else (
                 DEFAULT_INTEGRATION_SUITE
                 if is_integration
@@ -4130,6 +4236,8 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
             if business_agent_profile is not None
             else DEFAULT_TYPED_INPUT_ITERATION_ROOT
             if is_typed_input
+            else DEFAULT_DEEP_BUSINESS_ACCEPTANCE_ITERATION_ROOT
+            if is_deep_business_acceptance
             else (
                 DEFAULT_INTEGRATION_ITERATION_ROOT
                 if is_integration
