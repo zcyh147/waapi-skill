@@ -669,13 +669,15 @@ def test_generate_plan_binds_business_objects_and_derives_native_switches(
         bank["bound_object"]["handle"],
         "events",
         "media",
-        "--rebuild-soundbank",
+        "--soundbank-rebuild",
         bank["bound_object"]["handle"],
+        "true",
         "--platform",
         "Windows",
         "--language",
         "English(US)",
         "--clear-audio-file-cache",
+        "true",
         "--io-root",
         str(io_root),
     )
@@ -842,13 +844,17 @@ def test_generate_plan_preserves_every_explicit_false_rebuild_choice(
         "--soundbank",
         bank["bound_object"]["handle"],
         "nonlocalized",
-        "--no-rebuild-soundbank",
+        "--soundbank-rebuild",
         bank["bound_object"]["handle"],
+        "false",
         "--platform",
         "Windows",
-        "--no-rebuild-soundbanks",
-        "--no-clear-audio-file-cache",
-        "--no-rebuild-init-bank",
+        "--rebuild-soundbanks",
+        "false",
+        "--clear-audio-file-cache",
+        "false",
+        "--rebuild-init-bank",
+        "false",
         "--io-root",
         str(io_root),
     )
@@ -883,6 +889,24 @@ def test_generate_plan_preserves_every_explicit_false_rebuild_choice(
         "rebuild_init_bank": False,
         "io_root": str(io_root),
     }
+
+
+@pytest.mark.parametrize(
+    "legacy_flag",
+    ("--rebuild-soundbank", "--no-rebuild-soundbank", "--no-rebuild-soundbanks"),
+)
+def test_removed_mutually_exclusive_rebuild_flags_are_not_public(
+    legacy_flag: str,
+) -> None:
+    with pytest.raises(SystemExit):
+        gateway.build_parser().parse_args(
+            [
+                "draft-declare-soundbank-plan",
+                "od1-placeholder",
+                legacy_flag,
+                "boh1-placeholder",
+            ]
+        )
 
 
 def test_business_inclusion_plan_checks_and_seals_one_immutable_preview(

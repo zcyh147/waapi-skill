@@ -2970,6 +2970,55 @@ def test_broker_allows_optional_initial_operations_before_request_schema(
 
 
 @pytest.mark.parametrize(
+    "preflight",
+    ((), (("query-object", "--path-segment", "Weather"),)),
+    ids=("direct-schema", "one-exact-root-preflight"),
+)
+def test_broker_accepts_one_optional_exact_root_preflight(
+    tmp_path: Path,
+    preflight: tuple[tuple[str, ...], ...],
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    steps = (
+        ExpectedGatewayStep(
+            "tx01.operation-schema",
+            "operation-schema",
+            ("object.create",),
+        ),
+    )
+    observed: list[list[str]] = []
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=steps,
+        optional_initial_query_object_arguments=(
+            "--path-segment",
+            "Weather",
+        ),
+        transport="tcp",
+    ) as broker:
+        for arguments in (*preflight, ("operation-schema", "object.create")):
+            result = run_model_command(broker, list(arguments))
+            assert result.returncode == 0, result.stderr
+            observed.append(
+                [
+                    "python",
+                    str(broker.invocation_runner_path),
+                    "gateway.py",
+                    *arguments,
+                ]
+            )
+        evidence = broker.evidence()
+        reconciliation = broker.reconcile(observed)
+
+    assert evidence.passed
+    assert reconciliation.passed
+    assert evidence.expected_step_names == (
+        *(("tx01.query-object-preflight",) if preflight else ()),
+        "tx01.operation-schema",
+    )
+
+
+@pytest.mark.parametrize(
     "commands",
     (
         (("operation-schema", "waapi.undoGroup"),),
@@ -4154,40 +4203,50 @@ def test_soundbank_generation_plan_accepts_independent_flag_groups_in_any_order(
         "--soundbank",
         "boh1-main",
         "nonlocalized",
-        "--no-rebuild-soundbank",
+        "--soundbank-rebuild",
         "boh1-main",
+        "false",
         "--soundbank",
         "boh1-gameplay",
         "nonlocalized",
-        "--no-rebuild-soundbank",
+        "--soundbank-rebuild",
         "boh1-gameplay",
+        "false",
         "--platform",
         "Windows",
-        "--no-rebuild-soundbanks",
-        "--no-clear-audio-file-cache",
-        "--no-rebuild-init-bank",
+        "--rebuild-soundbanks",
+        "false",
+        "--clear-audio-file-cache",
+        "false",
+        "--rebuild-init-bank",
+        "false",
         "--io-root",
         r"C:\owned",
     )
     supplied = (
         *fixed,
-        "--no-clear-audio-file-cache",
+        "--clear-audio-file-cache",
+        "false",
         "--io-root",
         r"C:\owned",
-        "--no-rebuild-init-bank",
-        "--no-rebuild-soundbanks",
+        "--rebuild-init-bank",
+        "false",
+        "--rebuild-soundbanks",
+        "false",
         "--platform",
         "Windows",
         "--soundbank",
         "boh1-main",
         "nonlocalized",
-        "--no-rebuild-soundbank",
+        "--soundbank-rebuild",
         "boh1-main",
+        "false",
         "--soundbank",
         "boh1-gameplay",
         "nonlocalized",
-        "--no-rebuild-soundbank",
+        "--soundbank-rebuild",
         "boh1-gameplay",
+        "false",
     )
     step = ExpectedGatewayStep(
         "declare",

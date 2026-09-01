@@ -9,6 +9,7 @@ from tests.semantic import run_codex_skill_matrix as matrix
 from tests.semantic.support.codex_object_graph_business_agent_runner import (
     _final_response_reports_preview,
     build_preview_only_object_graph_steps,
+    object_graph_optional_root_preflight,
     prepare_object_graph_business_runtime,
 )
 from tests.semantic.support.codex_object_graph_business_profile import (
@@ -38,6 +39,22 @@ def test_preview_prose_does_not_require_exact_numeric_glyphs_or_markers() -> Non
     assert _final_response_reports_preview(
         "预览已生成：Rain 为 −4 dB，Wind 为 −6 dB；尚未执行。",
         markers=("Rain", "Wind", "-4", "-6", "固定英文措辞"),
+    )
+
+
+def test_object_graph_permits_only_the_exact_requested_root_preflight(
+    tmp_path: Path,
+) -> None:
+    unit = load_object_graph_business_profile(PROFILE).units[0]
+    runtime = prepare_object_graph_business_runtime(unit, tmp_path / "runtime")
+
+    assert object_graph_optional_root_preflight(runtime) == (
+        "--path-segment",
+        "Actor-Mixer Hierarchy",
+        "--path-segment",
+        "Default Work Unit",
+        "--path-segment",
+        "Weather",
     )
 
 

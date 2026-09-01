@@ -2577,7 +2577,7 @@ def build_debug_control_business_transaction_steps(
                 "contract": "waapi-skill.operation-request/v1",
                 "version": version,
                 "operation": "debug.setAutomationMode",
-                "arguments": {"enabled": enabled},
+                "arguments": {"enable": enabled},
             },
         )
     )
@@ -3329,10 +3329,9 @@ def build_soundbank_business_transaction_steps(
             if "rebuild" in bank:
                 declaration_arguments.extend(
                     (
-                        "--rebuild-soundbank"
-                        if bank["rebuild"] is True
-                        else "--no-rebuild-soundbank",
+                        "--soundbank-rebuild",
                         handle,
+                        "true" if bank["rebuild"] is True else "false",
                     )
                 )
         for platform in arguments["platforms"]:
@@ -3345,8 +3344,11 @@ def build_soundbank_business_transaction_steps(
             ("rebuild_init_bank", "rebuild-init-bank"),
         ):
             if field in arguments:
-                declaration_arguments.append(
-                    f"--{flag}" if arguments[field] is True else f"--no-{flag}"
+                declaration_arguments.extend(
+                    (
+                        f"--{flag}",
+                        "true" if arguments[field] is True else "false",
+                    )
                 )
         declaration_arguments.extend(("--io-root", str(arguments["io_root"])))
     elif operation == "soundbank.convertExternalSources":

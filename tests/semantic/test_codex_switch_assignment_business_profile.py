@@ -63,6 +63,11 @@ def test_natural_language_business_intent_permits_one_initial_operations_lookup(
         unit,
         explicit="reviewed.override",
     ) == "reviewed.override"
+    assert business_agent_optional_operations_discovery(
+        SimpleNamespace(operation="ui.commands.execute"),
+        explicit=None,
+        steps=(SimpleNamespace(subcommand="operations"),),
+    ) is None
 
 
 def test_prompt_exposes_three_business_paths_not_gateway_mechanics() -> None:

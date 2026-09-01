@@ -19,6 +19,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
 from tests.semantic.support.codex_object_graph_business_profile import (
     ObjectGraphBusinessUnit,
 )
+from wwise_waapi.builders.common import split_wwise_path
 
 
 OUTCOME_CONTRACT = "waapi-skill.object-graph-business-agent-outcome/v1"
@@ -129,6 +130,18 @@ def build_preview_only_object_graph_steps(
     )
 
 
+def object_graph_optional_root_preflight(
+    runtime: ObjectGraphBusinessRuntime,
+) -> tuple[str, ...]:
+    root_name = runtime.request["arguments"]["name"]
+    segments = (*split_wwise_path(runtime.parent_path), str(root_name))
+    return tuple(
+        argument
+        for segment in segments
+        for argument in ("--path-segment", segment)
+    )
+
+
 def _final_response_reports_preview(
     final_response: str,
     *,
@@ -188,6 +201,9 @@ def run_object_graph_business_agent_unit(
             transaction_count=lambda _runtime: 1,
             preview_gates=_object_graph_preview_gates,
             outcome_factory=ObjectGraphBusinessAgentOutcome,
+            optional_initial_query_object_arguments=(
+                object_graph_optional_root_preflight
+            ),
         ),
     )
 

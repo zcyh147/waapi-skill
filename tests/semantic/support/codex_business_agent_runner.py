@@ -53,6 +53,9 @@ class BusinessAgentRunSpec:
     optional_initial_operations_discovery_operation: str | None = None
     prepare_broker_state: Callable[[Any, Path], None] | None = None
     allow_compound_checked_child_handoff: bool = False
+    optional_initial_query_object_arguments: (
+        Callable[[Any], Sequence[str]] | None
+    ) = None
 
 
 def _only_expected_business_commands(
@@ -73,22 +76,35 @@ def _expected_gateway_subcommands(
     steps: Sequence[Any],
     *,
     optional_initial_operations_discovery_operation: str | None,
+    optional_initial_query_object_arguments: Sequence[str] | None = None,
 ) -> tuple[str, ...]:
     prefix = (
         ("operations",)
         if optional_initial_operations_discovery_operation is not None
         else ()
     )
-    return tuple(dict.fromkeys((*prefix, *(step.subcommand for step in steps))))
+    query_prefix = (
+        ("query-object",)
+        if optional_initial_query_object_arguments is not None
+        else ()
+    )
+    return tuple(
+        dict.fromkeys(
+            (*prefix, *query_prefix, *(step.subcommand for step in steps))
+        )
+    )
 
 
 def business_agent_optional_operations_discovery(
     unit: Any,
     *,
     explicit: str | None,
+    steps: Sequence[Any] = (),
 ) -> str | None:
     """Permit the one Skill-documented discovery hop for natural-language intent."""
 
+    if steps and getattr(steps[0], "subcommand", None) == "operations":
+        return None
     if explicit is not None:
         return explicit
     operation = getattr(unit, "operation", None)
@@ -115,6 +131,12 @@ def run_business_agent_unit(
     optional_operations_discovery = business_agent_optional_operations_discovery(
         unit,
         explicit=spec.optional_initial_operations_discovery_operation,
+        steps=steps,
+    )
+    optional_query_arguments = (
+        None
+        if spec.optional_initial_query_object_arguments is None
+        else tuple(spec.optional_initial_query_object_arguments(runtime))
     )
     runner_environment = dict(os.environ)
     runner_environment.update(
@@ -146,6 +168,7 @@ def run_business_agent_unit(
         optional_initial_operations_discovery_operation=(
             optional_operations_discovery
         ),
+        optional_initial_query_object_arguments=optional_query_arguments,
     )
     developer_instructions = semantic_task_developer_instructions(
         options.skill_source / "scripts" / "run.py",
@@ -167,6 +190,7 @@ def run_business_agent_unit(
             optional_initial_operations_discovery_operation=(
                 optional_operations_discovery
             ),
+            optional_initial_query_object_arguments=optional_query_arguments,
         ),
         expected_wwise_version=unit.version,
         sandbox_mode="workspace-write",

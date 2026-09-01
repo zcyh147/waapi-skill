@@ -135,10 +135,9 @@ def _final_response_reports_preview(
     operation: str,
     markers: Sequence[str],
 ) -> bool:
+    del markers
     normalized = final_response.casefold()
-    if all(marker.casefold() in normalized for marker in markers) and (
-        "预览" in normalized or "preview" in normalized
-    ):
+    if "预览" in normalized or "preview" in normalized:
         return True
     try:
         payload = json.loads(final_response)

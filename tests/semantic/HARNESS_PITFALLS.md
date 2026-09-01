@@ -1467,6 +1467,77 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   final `agent_result`. The live event records remain immediate and authoritative;
   the terminal handoff does not broaden fields, counts, or result limits.
 
+### A sealed witness must use the public request's exact business keys
+
+- Evidence: #60 r43 reached the correct `debug.setAutomationMode` Preview with
+  `arguments.enable=true`, but the semantic protocol still expected the retired
+  spelling `enabled`. The Broker changed the runner's zero exit to 125 after
+  comparing the durable declaration with that stale witness.
+- Prevention: build the Fresh witness from the same closed public request key
+  (`enable`) used by the operation contract and Preview. A mismatched witness is
+  a deterministic harness defect, not an Agent or Wwise failure.
+
+### Optional discovery must not wrap a component's required discovery step
+
+- Evidence: #60 r43's Authoring UI component already begins with one required
+  `operations` step. The shared natural-language helper inferred a second
+  optional discovery from the unit operation, so Broker construction stopped
+  before Codex or Wwise with “optional operations discovery must bind the exact
+  first schema operation.”
+- Prevention: derive optional discovery only after building the component
+  steps. If the first reviewed step is already `operations`, do not add the
+  optional wrapper. The one catalog read remains required and singular.
+
+### One exact same-name-root preflight is a valid object-create variation
+
+- Evidence: #60 macOS r43 checked the exact requested `Weather` root path before
+  `operation-schema object.create`; native Windows went directly to the schema.
+  Both orders are safe and Skill-documented, but the Broker accepted only the
+  direct order and rejected the macOS query before Gateway dispatch.
+- Prevention: the object-graph profile may optionally accept exactly one
+  Gateway `query-object` whose literal segments equal the requested parent plus
+  new root name. It remains before the first schema and cannot be replaced by a
+  broad query, repository discovery, another target, or a second preflight.
+
+### Final prose must not duplicate every already-proven object marker
+
+- Evidence: #60 macOS r43 produced the exact closed Switch-assignment Preview
+  and reported `Snow_Step` assigned to `Surface\Snow`, but omitted the container
+  name `Player_Footsteps`; every Broker and business request gate passed while
+  the prose-marker gate alone failed.
+- Prevention: when the hidden closed request and Preview already prove every
+  object and no execution, natural prose needs only identify the result as a
+  Preview. Do not require every fixture marker, exact minus glyph, synonym, or
+  presentation detail to be repeated.
+
+### Boolean business input must not use positive-or-negative flag prose
+
+- Evidence: #60 native-Windows r43 received explicit `rebuild=false` for two
+  SoundBanks, then interpreted the continuation's
+  `--rebuild-soundbank|--no-rebuild-soundbank` notation as both flags for each
+  Bank. The Broker rejected the duplicated mutually exclusive choices before
+  Gateway/Wwise dispatch.
+- Prevention: expose one value-bearing form:
+  `--soundbank-rebuild HANDLE true|false`; batch rebuild/cache/Init choices also
+  take one `true|false` value. Remove the positive/negative aliases so the Agent
+  cannot select both branches.
+
+### Temporary desktop launchers must be one-shot in their native vocabulary
+
+- Evidence: macOS #60 r43 used `launchctl submit`; after the campaign stopped at
+  a BLOCKED frontier, the submitted job's inferred `keepalive` relaunched four
+  times. Each relaunch failed safely because the immutable root already existed,
+  but the repeated launcher attempts were unnecessary. On the same round,
+  Windows `New-ScheduledTaskPrincipal` rejected the XML term
+  `InteractiveToken`; its cmdlet enum is `Interactive` (stored as LogonType 3),
+  while RunLevel 0 is `Limited`.
+- Prevention: macOS formal Fresh uses a temporary LaunchAgent plist with
+  `RunAtLoad=true` and `KeepAlive=false`, then boots it out and removes it after
+  exit. Windows uses `-LogonType Interactive -RunLevel Limited`, attests the
+  resulting principal as InteractiveToken/Limited semantics, and deletes the
+  task after reading exit/evidence. A registration failure before task creation
+  is infrastructure setup, not a campaign retry.
+
 ### Natural-language business intent may use one documented discovery hop
 
 - Evidence: #60 macOS r42 correctly used `operations` before the Switch

@@ -51,16 +51,11 @@ def add_soundbank_plan_arguments(parser: argparse.ArgumentParser) -> None:
         metavar="SOUNDBANK_HANDLE_OR_FILTER",
     )
     parser.add_argument(
-        "--rebuild-soundbank",
+        "--soundbank-rebuild",
         action="append",
+        nargs=2,
         default=[],
-        metavar="SOUNDBANK_HANDLE",
-    )
-    parser.add_argument(
-        "--no-rebuild-soundbank",
-        action="append",
-        default=[],
-        metavar="SOUNDBANK_HANDLE",
+        metavar=("SOUNDBANK_HANDLE", "TRUE_OR_FALSE"),
     )
     parser.add_argument("--platform", action="append", default=[])
     parser.add_argument("--language", action="append", default=[])
@@ -69,19 +64,10 @@ def add_soundbank_plan_arguments(parser: argparse.ArgumentParser) -> None:
         "clear-audio-file-cache",
         "rebuild-init-bank",
     ):
-        destination = flag.replace("-", "_")
-        choice = parser.add_mutually_exclusive_group()
-        choice.add_argument(
+        parser.add_argument(
             f"--{flag}",
-            dest=destination,
-            action="store_true",
+            choices=("true", "false"),
         )
-        choice.add_argument(
-            f"--no-{flag}",
-            dest=destination,
-            action="store_false",
-        )
-        parser.set_defaults(**{destination: None})
     parser.add_argument(
         "--source",
         action="append",
@@ -108,8 +94,7 @@ def soundbank_plan_from_namespace(
         "event",
         "aux_bus",
         "generation_inclusion",
-        "rebuild_soundbank",
-        "no_rebuild_soundbank",
+        "soundbank_rebuild",
         "platform",
         "language",
         "rebuild_soundbanks",
@@ -130,8 +115,7 @@ def soundbank_plan_from_namespace(
             "event",
             "aux_bus",
             "generation_inclusion",
-            "rebuild_soundbank",
-            "no_rebuild_soundbank",
+            "soundbank_rebuild",
             "platform",
             "language",
             "rebuild_soundbanks",
@@ -226,22 +210,22 @@ def soundbank_plan_from_namespace(
                         "one generated SoundBank inclusion filter was supplied twice"
                     )
                 inclusions.append(filter_name)
-        rebuild_choices = [
-            *((handle, True) for handle in args.rebuild_soundbank),
-            *((handle, False) for handle in args.no_rebuild_soundbank),
-        ]
-        if len(rebuild_choices) != len(
-            {handle for handle, _value in rebuild_choices}
+        if len(args.soundbank_rebuild) != len(
+            {handle for handle, _value in args.soundbank_rebuild}
         ):
             raise SoundBankBusinessCliError(
                 "one SoundBank rebuild choice was supplied twice"
             )
-        for handle, rebuild in rebuild_choices:
+        for handle, raw_rebuild in args.soundbank_rebuild:
             if handle not in rows:
                 raise SoundBankBusinessCliError(
                     "SoundBank rebuild references an undeclared handle"
                 )
-            rows[handle]["rebuild"] = rebuild
+            if raw_rebuild not in {"true", "false"}:
+                raise SoundBankBusinessCliError(
+                    "SoundBank rebuild must be true or false"
+                )
+            rows[handle]["rebuild"] = raw_rebuild == "true"
         plan: dict[str, Any] = {
             "soundbanks": [rows[handle] for handle in order],
             "platforms": list(args.platform),
@@ -256,7 +240,7 @@ def soundbank_plan_from_namespace(
         ):
             value = getattr(args, name)
             if value is not None:
-                plan[name] = value
+                plan[name] = value == "true"
         return plan
     if operation == "soundbank.convertExternalSources":
         return {

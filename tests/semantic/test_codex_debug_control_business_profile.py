@@ -69,7 +69,7 @@ def test_debug_control_runtime_uses_production_gateway_without_wwise(
         "contract": "waapi-skill.operation-request/v1",
         "version": "2021.1",
         "operation": "debug.setAutomationMode",
-        "arguments": {"enabled": True},
+        "arguments": {"enable": True},
     }
 
 
@@ -136,7 +136,7 @@ def test_debug_control_protocol_is_singular_and_complete() -> None:
         "draft-check",
         "preview-from-draft",
     ]
-    assert steps[-1].expected_operation_request["arguments"] == {"enabled": True}
+    assert steps[-1].expected_operation_request["arguments"] == {"enable": True}
     assert all(
         step.subcommand not in {"typed-call", "draft-apply", "execute"}
         for step in steps

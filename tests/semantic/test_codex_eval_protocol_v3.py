@@ -390,13 +390,17 @@ def test_real_gateway_helper_reuses_soundbank_plan_cli_grammar() -> None:
             "--soundbank",
             handle,
             "nonlocalized",
-            "--no-rebuild-soundbank",
+            "--soundbank-rebuild",
             handle,
+            "false",
             "--platform",
             "Windows",
-            "--no-rebuild-soundbanks",
-            "--no-clear-audio-file-cache",
-            "--no-rebuild-init-bank",
+            "--rebuild-soundbanks",
+            "false",
+            "--clear-audio-file-cache",
+            "false",
+            "--rebuild-init-bank",
+            "false",
             "--io-root",
             r"C:\owned",
         ),
@@ -1462,9 +1466,15 @@ def test_soundbank_generate_transaction_uses_one_complete_business_plan() -> Non
 
     assert "--soundbank" in declare.arguments
     assert "--platform" in declare.arguments
-    assert "--no-rebuild-soundbanks" in declare.arguments
-    assert "--no-clear-audio-file-cache" in declare.arguments
-    assert "--no-rebuild-init-bank" in declare.arguments
+    assert ("--rebuild-soundbanks", "false") in tuple(
+        zip(declare.arguments, declare.arguments[1:])
+    )
+    assert ("--clear-audio-file-cache", "false") in tuple(
+        zip(declare.arguments, declare.arguments[1:])
+    )
+    assert ("--rebuild-init-bank", "false") in tuple(
+        zip(declare.arguments, declare.arguments[1:])
+    )
     assert any(step.subcommand == "draft-bind-object" for step in protocol.steps)
     binding = next(
         step for step in protocol.steps if step.subcommand == "draft-bind-object"
@@ -1530,7 +1540,7 @@ def test_multi_bank_business_plan_binds_each_bank_once_before_one_declaration() 
     assert len(declarations) == 1
     declare = declarations[0]
     assert declare.arguments.count("--soundbank") == 2
-    assert declare.arguments.count("--no-rebuild-soundbank") == 2
+    assert declare.arguments.count("--soundbank-rebuild") == 2
     assert declare.arguments[4] == ResponseBinding(
         "tx01.bind-object.002",
         "/draft/revision",

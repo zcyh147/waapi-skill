@@ -8318,6 +8318,7 @@ class CodexGatewayBroker:
         ) = None,
         optional_expected_initial_operations_discovery: bool = False,
         optional_initial_operations_discovery_operation: str | None = None,
+        optional_initial_query_object_arguments: Sequence[str] | None = None,
         optional_initial_query_schema: bool = False,
         optional_query_schema_step_names: Sequence[str] = (),
     ) -> None:
@@ -8370,6 +8371,24 @@ class CodexGatewayBroker:
             optional_initial_operations_discovery_operation
         )
         self._optional_initial_operations_step: ExpectedGatewayStep | None = None
+        if optional_initial_query_object_arguments is not None and (
+            not isinstance(optional_initial_query_object_arguments, (list, tuple))
+            or not optional_initial_query_object_arguments
+            or any(
+                not isinstance(argument, str) or not argument
+                for argument in optional_initial_query_object_arguments
+            )
+        ):
+            raise TypeError(
+                "optional_initial_query_object_arguments must be a non-empty "
+                "string sequence or None"
+            )
+        self.optional_initial_query_object_arguments = (
+            None
+            if optional_initial_query_object_arguments is None
+            else tuple(optional_initial_query_object_arguments)
+        )
+        self._optional_initial_query_object_step: ExpectedGatewayStep | None = None
         if type(optional_initial_query_schema) is not bool:
             raise TypeError("optional_initial_query_schema must be a boolean")
         self.optional_initial_query_schema = optional_initial_query_schema
@@ -8519,6 +8538,18 @@ class CodexGatewayBroker:
                     "required step"
                 )
             self._optional_initial_operations_step = discovery
+        if self.optional_initial_query_object_arguments is not None:
+            first = self.expected_steps[0]
+            if first.subcommand not in {"operation-schema", "request-schema"}:
+                raise ValueError(
+                    "optional initial query-object requires an exact first schema step"
+                )
+            label = first.name.rsplit(".", 1)[0]
+            self._optional_initial_query_object_step = ExpectedGatewayStep(
+                name=f"{label}.query-object-preflight",
+                subcommand="query-object",
+                arguments=self.optional_initial_query_object_arguments,
+            )
         if self.optional_initial_query_schema:
             if (
                 len(self.expected_steps) < 2
@@ -9555,6 +9586,24 @@ class CodexGatewayBroker:
                 if (
                     self._next_step == 0
                     and not self._records
+                    and self._optional_initial_query_object_step is not None
+                    and resolved.gateway_arguments
+                    == (
+                        "query-object",
+                        *self.optional_initial_query_object_arguments,
+                    )
+                ):
+                    self._execution_steps.insert(
+                        0,
+                        self._optional_initial_query_object_step,
+                    )
+                    self._selected_expected_steps.insert(
+                        0,
+                        self._optional_initial_query_object_step,
+                    )
+                if (
+                    self._next_step == 0
+                    and not self._records
                     and self.optional_initial_query_schema
                     and resolved.gateway_arguments
                     and resolved.gateway_arguments[0] == "query-object"
@@ -10496,16 +10545,12 @@ class CodexGatewayBroker:
             "--soundbank": 2,
             "--event": 2,
             "--aux-bus": 2,
-            "--rebuild-soundbank": 1,
-            "--no-rebuild-soundbank": 1,
+            "--soundbank-rebuild": 2,
             "--platform": 1,
             "--language": 1,
-            "--rebuild-soundbanks": 0,
-            "--no-rebuild-soundbanks": 0,
-            "--clear-audio-file-cache": 0,
-            "--no-clear-audio-file-cache": 0,
-            "--rebuild-init-bank": 0,
-            "--no-rebuild-init-bank": 0,
+            "--rebuild-soundbanks": 1,
+            "--clear-audio-file-cache": 1,
+            "--rebuild-init-bank": 1,
             "--source": 3,
             "--definition-file": 1,
             "--io-root": 1,
