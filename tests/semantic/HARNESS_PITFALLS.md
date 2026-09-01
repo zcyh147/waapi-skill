@@ -1064,11 +1064,14 @@ The entry needs a stricter envelope. In #60 native-Windows root
 30,445-character `SKILL.md` preserved its beginning and end but exposed only
 29,440 characters in one task and 26,902 in another. Root
 `iwin-issue60-99dc470-r13-fail5` then lost a 759-byte interior slice from a
-26,699-byte LF source while still showing the final paragraph. Keep the entry
-below 24,000 bytes after both LF and projected CRLF rendering, enforce both
-calculations in Program tests, and move low-frequency examples behind Gateway
-schemas or lane references. Never infer completeness from exit code or visible
-front/back fragments. Separately, r13 root
+26,699-byte LF source while still showing the final paragraph. After the CP936
+transport fix, exact candidate `fae4551` r39 still lost one 250-character
+interior slice from a 23,713-byte `SKILL.md` while preserving both ends and
+adding only its normal terminal newline. This proves the earlier 24,000-byte
+entry bound was insufficient. Keep both LF and projected CRLF rendering below
+20,000 bytes, enforce both in Program tests, and move conditional detail behind
+Gateway schemas or lane references. Never infer completeness from exit code or
+visible front/back fragments. Separately, r13 root
 `iwin-issue60-99dc470-r13-fail6` had an audio-import Agent skip `SKILL.md` and
 read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
 
@@ -1211,8 +1214,10 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
 - Prevention: before PowerShell attestation or any Codex child launch, the
   native Windows harness sets both Console input and output code pages to
   65001 through WinAPI and reads both values back. Failure to set or attest
-  them blocks before the Fresh turn. Keep byte-normalized source equality as
-  the Skill-read credit gate; shrinking files, accepting mojibake, or merely
+  them blocks before the Fresh turn. Candidate `fae4551` r39 then produced zero
+  replacement characters and passed SoundBank generation, proving the encoding
+  repair independently of the remaining clipping boundary. Keep byte-normalized
+  source equality as the Skill-read credit gate; accepting mojibake or merely
   setting `$OutputEncoding` does not repair this transport boundary.
 
 ### Optional discovery and Composer setup may still complete out of recipe order

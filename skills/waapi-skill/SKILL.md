@@ -9,29 +9,37 @@ Automate Wwise through the packaged gateway. Use no inline Python or direct `Waa
 
 Read the injected `SKILL.md` exactly once as the sole first shell action in a fresh task. A successful read is complete; a second `SKILL.md` read is forbidden. Never combine it with `pwd`, `git`, `rg`, `ls`, `find`, `printf`, a user-file read, or a gateway command; finish before the next command.
 
-Supported Wwise versions are `2021.1`, `2022.1`, `2023.1`, `2024.1`, and `2025.1`.
+Versions: `2021.1`, `2022.1`, `2023.1`, `2024.1`, and `2025.1`.
 
 ## One-time conversation introduction
 
-The first time this Skill is used in a conversation, do not announce that it is loaded before the first gateway result. When the visible conversation lacks an introduction, the first Agent message after that result must express `session_context.one_time_introduction.facts` as one short, atomic introduction: say naturally that `waapi-skill` is loaded, report the current WAAPI address, WAAPI adapter version, and project modification policy, and offer the three available modes. The same introduction must name them exactly: `read_only`, `ask_before_changes`, and `allow_changes`. Do not split those facts across an earlier message and a gateway-backed message. Match the user's language and use ordinary prose, not a status bar, table, field list, or rigid template.
+When the visible conversation lacks an introduction, wait for the task's first
+required Gateway result. The very next Agent message states
+`session_context.one_time_introduction.facts` together in natural prose: Skill
+loaded, current WAAPI address, adapter version, policy, and three modes. The
+same introduction must name them exactly: `read_only`, `ask_before_changes`,
+and `allow_changes`. A Skill/reference read is not a Gateway result; never
+announce early, split facts, use memory, or format a status table. Say
+“当前连接的” only for a proved live connection; otherwise “当前使用的/配置的”.
 
-A Skill or lane-reference file read is not a Gateway result. Before a complete result, do not emit a placeholder introduction. After it, the very next Agent message must state every actual returned fact together, even if an earlier message mentioned part. Natural Chinese may say “若有需要，可按需切换模式”. Say “当前连接的” only for a proved live connection; otherwise say “当前使用的/配置的”.
-
-Use the first gateway command already required by the user's task. For a pure explanation, run exactly one offline `config-show` to obtain the introduction facts; never run `status` or open a live WAAPI connection only for the introduction. An offline task stays offline. Show it only when the visible conversation does not already contain this introduction; do not use memory to make that decision. Repeat only on request or changed facts. Keep an exact answer in a separate normal progress update.
+Use the task's first required Gateway command. For a pure explanation, use one
+offline `config-show`; never open a live connection only for the introduction.
+Repeat only on request or changed facts. Keep any exact machine answer in a
+separate progress update.
 
 ## Entry rules
 
-1. Route the request into **setup**, **query**, or **operate** from the user's words.
+1. Route the user's request into **setup**, **query**, or **operate**.
 2. Bootstrap only from the injected `SKILL.md` locator. Never guess a repository-relative `skills/waapi-skill` path or probe with `pwd`, `git status`, `ls`, `find`, or `rg`, including for Wwise CLI and project-migration requests.
-3. For common reads below, run the matching gateway command immediately: resolve that locator to the absolute Skill directory without probing and invoke its absolute `scripts/run.py` before `ls`, `find`, `rg`, research, or implementation reads.
-4. Connection order is explicit gateway flags, `WWISE_WAAPI_HOST` / `WWISE_WAAPI_PORT` / `WWISE_VERSION`, then `config-show`. Put version after `gateway.py`: `python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version 2022.1 operation-schema object.copy`. `--wwise-version` is its compatibility alias and the `config-set` field. Never hand-edit config. Do not scan unrelated ports or processes.
-5. Treat gateway JSON as authoritative. Every gateway command must leave its complete JSON visible to the conversation before the next command: never suppress or redirect its output, request a zero/short tool-output budget, or continue from the shell exit code alone. When a successful response supplies `shell_tool_timeout_ms`, set that exact value on the outer shell tool call that executes its next Gateway command. This is transport wait metadata: never add it to the command argv or change the Gateway's own timeout. If no complete JSON is visible, stop and report that missing result instead of assuming success. On native Windows only, if the outer shell reports `CreateProcessAsUserW failed: 267` before PowerShell starts, repeat that identical complete shell command once. This is process-launch recovery, not a Gateway retry. A second 267 or any other shell failure stops. On a structured Gateway error or boundary, report it; do not improvise another WAAPI client or write a helper.
+3. For common reads below, resolve the locator to the absolute Skill directory without probing and run its absolute `scripts/run.py` before `ls`, `find`, `rg`, research, or implementation reads.
+4. Connection precedence is explicit flags, `WWISE_WAAPI_HOST` / `WWISE_WAAPI_PORT` / `WWISE_VERSION`, then config. Put version after `gateway.py`: `python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version 2022.1 operation-schema object.copy`. `--wwise-version` is the compatibility/config field. Never hand-edit config or scan unrelated ports/processes.
+5. Treat gateway JSON as authoritative. Every gateway command must leave its complete JSON visible before the next command: never suppress or redirect its output, request a zero/short tool-output budget, or continue from the shell exit code alone. Copy returned `shell_tool_timeout_ms` to the outer shell tool call; never add it to the command argv. If no complete JSON is visible, stop. A structured error is final. On native Windows, only `CreateProcessAsUserW failed: 267` before PowerShell starts permits you to repeat that identical complete shell command once. This is process-launch recovery, not a Gateway retry. A second 267 or any other shell failure stops.
 6. Read only the current-turn lane; never preload. Read-only work cannot read `waapi-operate.md` before a change request.
-7. Read each later named lane reference exactly once in its own shell call. POSIX uses `cat <absolute-reference>`. Native Windows always copies the short task-local form `Get-Content -Raw -Encoding UTF8 '.agents\skills\waapi-skill\references\<file>.md'` exactly instead of reconstructing a scenario-root absolute path. Exactly once spans the visible task, not each turn; never reread an already-visible file. Do not probe with `wc -l`, `ls`, `rg`, `find`, `stat`, or `test`, and never split a reference. `waapi-query.md` and `waapi-operate.md` use `WAAPI_QUERY_REFERENCE_END` and `WAAPI_OPERATE_REFERENCE_END`; proceed only when the matching sentinel is the final visible line, otherwise report an incomplete read and stop. Do not check with another reader. Each later gateway invocation gets its own shell call. Only POSIX may bootstrap the initial complete `SKILL.md` against the same literal file with exact `wc -l <SKILL.md> && sed -n '1,<enough-lines>p' <SKILL.md>`; this is the only combined read allowed. Never combine any other command.
+7. Read each later named lane reference exactly once in its own shell call. POSIX uses `cat <absolute-reference>`. Native Windows always copies the short task-local form `Get-Content -Raw -Encoding UTF8 '.agents\skills\waapi-skill\references\<file>.md'` exactly instead of reconstructing a scenario-root absolute path. Exactly once spans the visible task, not each turn; never reread an already-visible file. Do not probe with `wc -l`, `ls`, `rg`, `find`, `stat`, or `test`, and never split a reference. For `WAAPI_QUERY_REFERENCE_END` and `WAAPI_OPERATE_REFERENCE_END`, proceed only when the matching sentinel is the final visible line. Each Gateway call is separate. Only POSIX may bootstrap the initial complete `SKILL.md` against the same literal file with exact `wc -l <SKILL.md> && sed -n '1,<enough-lines>p' <SKILL.md>`; this is the only combined read allowed. Never combine any other command.
 
 ## Fixed gateway commands
 
-Below, `scripts/run.py` is shorthand; automated calls replace it with the injected absolute path, for example `python /absolute/path/to/waapi-skill/scripts/run.py gateway.py status`.
+Below, replace `scripts/run.py` with the injected absolute path.
 
 ```bash
 python scripts/run.py gateway.py status
@@ -68,7 +76,7 @@ Register a runtime Game Object with `request-schema ak.soundengine.registerGameO
 
 `status` is the sole Gateway-owned `getInfo` route for connection/version/project. Do not use `request-schema` or `typed-zero-call` instead. It needs only this `SKILL.md`; do not read the setup or query reference. Treat the named `getInfo` result's `processId` as the requested live process identity; finish from that Gateway evidence without a system process lookup.
 
-Every command except `stream-topic` prints one JSON document; streaming emits bounded NDJSON plus one terminal record. Every `session_context` is authoritative.
+Every command except `stream-topic` prints one JSON document; streaming emits bounded NDJSON plus one terminal record.
 
 Route ordinary vague “subscribe”, “listen”, or “monitor” wording to `wait-topic`.
 Before invoking it, tell the user the effective policy naturally. Its ordinary
@@ -92,11 +100,7 @@ terminal record includes the completion and unsubscribe result.
 
 For `ak.wwise.waapi.getFunctions`/`getTopics`, run `request-schema` and follow its sole typed continuation. Do not run `describe` or `capabilities` first. Any failure stops.
 
-For five-version totals, first read coverage as directed below, then run exactly `capabilities --all-versions --summary-only`; it includes every route count. Row filters omit `--summary-only`. The list defaults to at most 50 compact rows;
-`--limit 0` requests all, and `--detail` is diagnostic. A known URI
-uses `request-schema`. Business intent uses an exact supplied operation name or
-one compact `operations` lookup, then `operation-schema`; never invent names.
-Reserve `operations --detail` for an explicit full-catalog audit.
+For five-version totals, read coverage then run exactly `capabilities --all-versions --summary-only`; it includes every route count. Row filters omit `--summary-only`. The list defaults to at most 50 compact rows; `--limit 0` requests all and `--detail` is diagnostic. A known URI uses `request-schema`; business intent uses an exact operation or one `operations` lookup then `operation-schema`. Reserve `operations --detail` for an explicit full-catalog audit.
 
 For five-version totals, coverage, exclusions, or matrix proof, read `references/waapi-coverage.md` once after `SKILL.md` and before the summary; combine both. Program tests are not live-Wwise verification.
 
@@ -134,10 +138,6 @@ Classify the complete read-only task before its first hop. If it needs multiple 
 
 For a complete single-hop exact path/GUID existence or identity lookup, run exactly `query-object` with one literal `--path-segment` per hierarchy level, or `--exact-id '<exact-guid>'`. The Gateway constructs path separators and always returns the four identity fields. Exact `not_found` stays Gateway-owned in compact output; use `--detail` only for explicit compile/dispatch diagnostics. This route is complete: do not read the query reference before or after it; do not retry a rejected or failed gateway invocation.
 
-For current-selection questions, use the live selected-object query first. On a headless/command-line Wwise host, report the UI boundary; do not research or pretend a selection exists.
-
-Repeated `query-object --predicate BUSINESS_CONDITION VALUE` declarations mean AND; the Gateway owns native fields, operators, and value types.
-
 Conditional read for a query not fully covered by the fixed commands, exact-identity fast route, or exact reflection-call fast route: `references/waapi-query.md`
 
 ### Operate lane
@@ -147,53 +147,45 @@ Use operate for project-changing work: create, move, copy, delete, property/refe
 Finish any required selected-subset exact-ID readback first. Finish any user-requested exact path/type preflight before `operation-schema object.create`. Only an explicit before-preview type/path check of the same-name request root triggers it; a parent path, preserved sibling, or post-execution verification does not.
 After that preflight, `object.create` runs `operation-schema`, one `metadata discover` for its 1–8 dynamic fields, then `draft-start`. `object.set` batches and revalidates its dynamic fields. Import, lifecycle, scalar property/reference, and platform-link operations use `business_declaration`. For the last three, bind the target, pass its English field meaning and optional platform to `draft-discover-fields`, and copy one handle—never a token. Import alone uses token custom-field binding. For other
 operations, only an explicit unknown dynamic property/reference token needs
-metadata in the order stated by the operate reference. Never infer a token or
-scope.
-For `object.create`, metadata proves the matching top-level `properties` or `references` pointer present; after scalar facts, follow every prompt-present disclosure row in schema-table order and finish both before `children`. Never jump to the child tree while a requested metadata-proven field remains undisclosed.
+metadata in the operate-reference order; never infer a token or scope.
+For `object.create`, finish every prompt-present metadata-disclosed field before `children`.
 
-Apply the canonical policy from the latest gateway `session_context`:
+Apply the latest `session_context` policy and copy the returned Preview exactly. For Business Drafts, copy the returned `preview-from-draft` continuation exactly; it is executable without the flag. Never append `--apply` to `preview-from-draft`.
 
-Copy the returned Preview exactly; use `--apply` only if present. For Business Drafts, copy the returned `preview-from-draft` continuation exactly; it is executable without the flag. Never append `--apply` to `preview-from-draft`.
-
-- `read_only`: do not change the project. Explain the mode block, state the project is unchanged, and stop after its schema; do not create an executable Preview. Design-only Preview remains read-only and omits `--apply`.
-- `ask_before_changes`: immediately create the executable Preview; it asks permission, so do not ask first. Summarize targets, values, result, and risks; state nothing changed, ask naturally whether to proceed, and end the turn. Even when the same request names later independent changes, run no more Gateway commands in that turn.
-- `allow_changes`: for an actual unambiguous change, create the executable Preview. If it returns `policy_authorized`, name the root and major children, state the impending permitted change, execute exactly once from `next_command.copy_instruction.source_field`, then verify. Counts alone are insufficient. Preview/plan/explain requests stop after the returned non-executable Preview.
+- `read_only`: keep the project unchanged; stop after schema or a design-only non-executable Preview.
+- `ask_before_changes`: create the executable Preview without asking first, summarize it, state nothing changed, ask to proceed, and end the turn. Even when the same request names later independent changes, run no more Gateway commands in that turn.
+- `allow_changes`: an unambiguous actual change may return `policy_authorized`; name its root/major children, execute once from `next_command.copy_instruction.source_field`, then verify. Preview/plan/explain requests stop at the non-executable Preview.
 
 Normal prose covers only objects, changes, results, risks, and whether anything changed. Hide API/operation names, Draft/transaction internals, ids, hashes, tokens, states, and commands. Keep exact `agent_result` machine-readable.
 
-`read_only` still permits reads. A reflected function whose packaged execution contract has `effect: read` may use the transaction lane only for bounded schema validation and result verification: omit `--apply`, preserve its explicit-confirmation-only authority, and never reclassify a mutation from prompt wording.
-
-The original user message supplies authority; the Gateway-owned command decides whether `--apply` is present. Imperative tone is insufficient when target, value, scope, or action is ambiguous. `allow_changes` records `policy_authorized`, re-reads policy before dispatch, and never auto-authorizes `debug.restartWaapiServers`, `debug.testAssert`, or `debug.testCrash`.
+`read_only` still permits reads. A packaged `effect: read` function may use the transaction lane for bounded schema/result validation without `--apply`; never reclassify a mutation from wording. The original user message supplies authority and the Gateway decides whether `--apply` is present. Ambiguity stops. Never auto-authorize `debug.restartWaapiServers`, `debug.testAssert`, or `debug.testCrash`.
 
 Choose the transaction phase before choosing a command. An existing transaction continuation takes precedence over the named-operation rule; it requires the transaction id, and an artifact hash alone is not a transaction lookup key. For a confirmation, check, or continuation, reuse the already-visible Skill/reference and run `transaction-show <transaction-id> --summary-only` first; skip schema discovery and start with `transaction-show`. Follow only its complete returned continuation and selected `copy_instruction.source_field`; diagnostic `full_argv` is not executable. An incomplete result stops the turn. `awaiting_confirmation` also requires current user authorization and its opaque token; `policy_authorized` has no token. A status or check request stops after `transaction-show`.
 
-For a new change, use its named operation or exact-URI `request-schema` and follow one continuation. For `core-business/v1`, the exact returned continuation owns the read shape: simple fixed reads may use `core-call`; complex bounded reads may use a Draft. Changes bind returned object/Field Handles, follow `binding.role_fields`, and submit one complete Core plan. Never type native tokens, enums, GUID arrays, curve/edge objects, or request fragments. Execute once; `verify` is terminal authority. Rejection, incompleteness, or `indeterminate` ends without repair, retry, or extra readback. `ak.wwise.cli.migrate` stops after execute; result-schema-only is not business-state verification. Never invoke internal planners/builders, construct raw requests, or write code.
+For a new change, use its named operation or exact-URI `request-schema` and follow one continuation. For `core-business/v1`, the exact returned continuation owns the read shape. Bind returned object/Field Handles and submit one complete Core plan; never type native tokens, enums, GUID arrays, curve/edge objects, or request fragments. Execute once; `verify` is terminal authority. Rejection, incompleteness, or `indeterminate` stops. `ak.wwise.cli.migrate` stops after execute. Never invoke internal planners/builders or construct raw requests.
 
-For multiple independent transactions already ordered by the user, apply the same policy to each without inferring, reordering, or adding work.
-
-In ordinary agent use, omit `--state-dir`: the Gateway owns a deterministic external runtime-state default. Never run `env`, `printenv`, shell expansion, or another probe to discover `WAAPI_SKILL_STATE_DIR`; never ask a normal user for this implementation path. Pass `--state-dir` only when the user or trusted caller explicitly supplied a trusted absolute override, and reuse it unchanged.
+For user-ordered independent transactions, preserve order and scope. In ordinary agent use, omit `--state-dir`: the Gateway owns a deterministic external runtime-state default. Never probe `WAAPI_SKILL_STATE_DIR`; pass `--state-dir` only when a trusted absolute override was explicitly supplied, and reuse it unchanged.
 
 Fast route from this entry file:
 
-- Closed transaction operations include `waapi.undoGroup`, all `object.*`, `audio.*`, `soundbank.*`, `switchContainer.*`, `ui.*`, `lua.*`, and `debug.*` operations returned by `operation-schema`; other reviewed mutations are discovered by exact URI through `request-schema`. For a new request, read `references/waapi-operate.md` in its own tool call and follow the returned typed or business flow. For an existing transaction continuation, do not reread an already-visible Skill or operate reference; skip schema discovery and start with `transaction-show`.
-- For structure-only changes, one existing object's single rename/notes/property/reference edit uses its dedicated operation. `object.set` is for broader atomic existing-target work; `object.create` handles a new root or descendants below one unchanged same-name root.
-- Choose overlaps by the complete outcome and selection guidance. Primary media import uses one `audio.import`; its business declarations own hierarchy and Event/Switch outcomes while Gateway derives native mechanics. Never probe `object.create` or a separate assignment first. On Wwise 2023.1+, use `object.set` when import is subordinate to a broader existing-target mutation. Caller-supplied tables use `audio.importTabDelimited`.
+- Closed transaction operations include `waapi.undoGroup`, all `object.*`, `audio.*`, `soundbank.*`, `switchContainer.*`, `ui.*`, `lua.*`, and `debug.*` operations returned by `operation-schema`; other reviewed mutations use exact-URI `request-schema`. New work reads `references/waapi-operate.md`; an existing transaction skips schema discovery and starts with `transaction-show`.
+- For structure-only changes, one existing object's single rename/notes/property/reference edit uses its dedicated operation. `object.set` is for broader atomic existing-target work; `object.create` is for a new root or descendants below one unchanged same-name root.
+- Primary media import uses one `audio.import`; business declarations own hierarchy and Event/Switch outcomes. Never probe `object.create` or a separate assignment first. On Wwise 2023.1+, use `object.set` when import is subordinate to a broader existing-target mutation. Caller tables use `audio.importTabDelimited`.
 - The operate reference owns version-specific typed request mappings and all remaining operation rules. Follow that reference literally after its one complete read.
 
 Conditional read for a closed transaction: `references/waapi-operate.md`
 
 ## Runner and packaged runtime
 
-The gateway loads `resources/manifest/<version>/`, `resources/semantic/<version>/`, `resources/waql/<version>/`, and `resources/deferred/<version>.json`. Use `describe <uri> --full-schema` only when needed. `waapi-coverage.md` owns counts/evidence, never live proof.
+The gateway loads versioned manifest, semantic, WAQL, and deferred resources. Use `describe <uri> --full-schema` only when needed. `waapi-coverage.md` owns counts/evidence, never live proof.
 
 ## Boundaries
 
-- Never invent API maps or disposable business logic. No heredoc, inline Python, new `.py`/`.js`/`.sh` helper, direct client construction, alternate runner target, or temporary script.
-- Use only each packaged fixed command or returned `request-schema` / named `operation-schema` continuation. Mutations always require immutable Preview plus confirmation or policy authorization. `typed-call` and retired commands cannot bypass route decisions.
-- Lua is limited to its policy-gated operations and exact user-supplied source/path; never generate or repair it. Debug process controls execute once and never retry after disconnect uncertainty. Raw UI hooks and model-supplied CLI commands stay blocked; closed Authoring routes use fresh live command IDs. Explicit writes stay below `io_root`.
-- Do not search the repository to recover from a gateway error. A structured failure is the result unless the user explicitly asked to develop or debug this Skill itself.
-- If a capability has no packaged executable path, return a clear `unsupported_by_skill_interface` boundary instead of synthesizing code.
-- Editing this Skill's implementation is allowed only when the user's task is Skill development, testing, or debugging—not as a way to complete an ordinary Wwise request.
+- Never invent API maps or disposable logic: no heredoc, inline Python, new `.py`/`.js`/`.sh` helper, direct client construction, alternate runner, or temporary script.
+- Use only packaged commands or returned `request-schema` / `operation-schema` continuations. Mutations always require immutable Preview plus confirmation or policy authorization; `typed-call` cannot bypass routing.
+- Lua uses only exact user source/path. Debug controls execute once. Raw UI hooks/model CLI stay blocked; writes stay below `io_root`.
+- Do not search the repository to recover from a gateway error. Return structured failure or `unsupported_by_skill_interface` unless the user requested Skill development/debugging.
+- Editing is allowed only for Skill development, testing, or debugging—not to complete ordinary Wwise work.
 
 ## Detailed references
 

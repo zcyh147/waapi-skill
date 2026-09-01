@@ -22,8 +22,8 @@ TYPED_INPUT_ADR = (
 
 
 def test_skill_entry_stays_within_one_complete_agent_tool_read() -> None:
-    assert len(SKILL.encode("utf-8")) <= 24_000
-    assert len(SKILL.encode("utf-8")) + SKILL.count("\n") <= 24_000
+    assert len(SKILL.encode("utf-8")) <= 20_000
+    assert len(SKILL.encode("utf-8")) + SKILL.count("\n") <= 20_000
 
 
 def test_first_gateway_backed_introduction_names_all_three_policy_modes() -> None:
@@ -220,8 +220,8 @@ def test_skill_entry_fits_the_fresh_codex_bootstrap_window() -> None:
     # Real native-Windows Fresh Agent runs have clipped the middle of larger
     # PowerShell output despite preserving both ends.  Keep material margin
     # below that variable transport window instead of merely fitting 32 KiB.
-    assert len(SKILL.encode("utf-8")) <= 27_000
-    assert len(SKILL.replace("\n", "\r\n").encode("utf-8")) <= 27_000
+    assert len(SKILL.encode("utf-8")) <= 20_000
+    assert len(SKILL.replace("\n", "\r\n").encode("utf-8")) <= 20_000
 
 
 def test_exact_identity_query_is_complete_in_entry_file() -> None:
@@ -1139,7 +1139,7 @@ def test_capability_summary_is_unfiltered_and_route_filters_are_row_only() -> No
     summary_command = "capabilities --all-versions --summary-only"
 
     assert f"run exactly `{summary_command}`" in SKILL
-    assert "For five-version totals, first read coverage as directed below" in SKILL
+    assert "For five-version totals, read coverage then run exactly" in SKILL
     assert "it includes every route count" in SKILL
     assert "Row filters omit `--summary-only`" in SKILL
     assert "read `references/waapi-coverage.md` once after `SKILL.md`" in SKILL
@@ -1178,35 +1178,27 @@ def test_public_config_surface_excludes_runtime_internals() -> None:
 
 
 def test_one_time_onboarding_is_global_natural_and_does_not_add_a_gateway_call() -> None:
+    skill_compact = " ".join(SKILL.split())
     for phrase in (
-        "The first time this Skill is used in a conversation",
-        "do not announce that it is loaded before the first gateway result",
-        "A Skill or lane-reference file read is not a Gateway result",
+        "When the visible conversation lacks an introduction",
+        "wait for the task's first required Gateway result",
         "Read the injected `SKILL.md` exactly once",
         "A successful read is complete; a second `SKILL.md` read is forbidden",
-        "do not emit a placeholder introduction",
-        "the very next Agent message",
-        "state every actual returned fact together, even if an earlier message mentioned part",
-        "`session_context.one_time_introduction.facts`",
-        "the first Agent message after that result",
-        "one short, atomic introduction",
-        "Do not split those facts across an earlier message and a gateway-backed message",
-        "`waapi-skill` is loaded",
+        "The very next Agent message",
+        "`session_context.one_time_introduction.facts` together",
+        "Skill loaded",
         "current WAAPI address",
-        "WAAPI adapter version",
-        "project modification policy",
-        "若有需要，可按需切换模式",
-        "offer the three available modes",
-        "ordinary prose, not a status bar, table, field list, or rigid template",
-        "Use the first gateway command already required by the user's task",
-        "An offline task stays offline",
-        "visible conversation does not already contain this introduction",
-        "do not use memory to make that decision",
-        "separate normal progress update",
+        "adapter version, policy, and three modes",
+        "A Skill/reference read is not a Gateway result",
+        "never announce early, split facts, use memory",
+        "status table",
+        "Use the task's first required Gateway command",
+        "For a pure explanation, use one offline `config-show`",
+        "never open a live connection only for the introduction",
+        "Repeat only on request or changed facts",
+        "separate progress update",
     ):
-        assert phrase in SKILL
-    assert "run exactly one offline `config-show` to obtain the introduction facts" in SKILL
-    assert "never run `status` or open a live WAAPI connection only for the introduction" in SKILL
+        assert phrase in skill_compact
     assert "The entry file owns the one-time conversation introduction for every lane" in SETUP
     assert "emit the Gateway's structured `session_context.one_time_introduction` atomically" in SETUP
     assert "Do not add policy or implementation narration to a simple read-only result" not in SETUP

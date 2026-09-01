@@ -21,13 +21,7 @@ def test_skill_contract_documents_fixed_runner_and_versioned_runtime() -> None:
         "python scripts/run.py gateway.py metadata types",
     ):
         assert command in text
-    for resource in (
-        "resources/manifest/<version>/",
-        "resources/semantic/<version>/",
-        "resources/waql/<version>/",
-        "resources/deferred/<version>.json",
-    ):
-        assert resource in text
+    assert "versioned manifest, semantic, WAQL, and deferred resources" in text
 
 
 def test_skill_contract_documents_gateway_inputs_outputs_and_failure_boundary() -> None:
@@ -43,9 +37,9 @@ def test_skill_contract_documents_gateway_inputs_outputs_and_failure_boundary() 
 def test_skill_contract_prefers_fixed_live_query_before_discovery() -> None:
     text = doc_text("SKILL.md")
 
-    assert "run the matching gateway command immediately" in text
+    assert "run its absolute `scripts/run.py` before" in text
     assert "before `ls`, `find`, `rg`" in text
-    assert "Do not scan unrelated ports or processes" in text
+    assert "Never hand-edit config or scan unrelated ports/processes" in text
     assert "Do not search the repository to recover from a gateway error" in text
 
 
