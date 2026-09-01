@@ -2904,6 +2904,8 @@ def _validate_heavy_v3_summary(
                 key
                 for key in (
                     "base_scenario_id",
+                    "component_profile_id",
+                    "family",
                     "policy_mode",
                     "project_modification_policy",
                     "repetition",

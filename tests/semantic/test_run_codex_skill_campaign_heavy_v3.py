@@ -649,6 +649,63 @@ def test_deep_business_campaign_unit_row_matches_matrix_wrapper_metadata() -> No
     }
 
 
+def test_deep_business_summary_accepts_the_same_wrapper_metadata(
+    tmp_path: Path,
+) -> None:
+    row = {
+        "sequence": 1,
+        "scenario_id": "CLI25-SOUNDBANK-BUILD-PREVIEW",
+        "version": "2025.1",
+        "api": "ak.wwise.cli.generateSoundbank",
+        "runner": "agent",
+        "component_profile_id": "cli_console_business_1",
+        "family": "generic-cli-console",
+    }
+    timestamp = "2026-09-01T00:00:00Z"
+    summary = {
+        "contract": matrix.HEAVY_V3_SUMMARY_CONTRACT,
+        "started_at": timestamp,
+        "updated_at": timestamp,
+        "completed_at": timestamp,
+        "profile": matrix.DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID,
+        "preflight": "passed",
+        "selected_unit_count": 1,
+        "attempted_unit_count": 1,
+        "attempted_unit_ids": [row["scenario_id"]],
+        "status_counts": {
+            "PASS": 1,
+            "FAIL": 0,
+            "BLOCKED": 0,
+            "INDETERMINATE": 0,
+        },
+        "passed_unit_ids": [row["scenario_id"]],
+        "failed_unit_ids": [],
+        "blocked_unit_ids": [],
+        "indeterminate_unit_ids": [],
+        "pending_unit_ids": [],
+        "stop_reason": None,
+        "stopped_early": False,
+        "all_selected_passed": True,
+        "run_errors": [],
+        "case_records": [
+            {
+                **row,
+                "status": "PASS",
+                "reason": "",
+                "scenario_root": str(tmp_path / "scenario"),
+            }
+        ],
+    }
+
+    campaign._validate_heavy_v3_summary(  # noqa: SLF001
+        summary,
+        expected_ids=(row["scenario_id"],),
+        returncode=0,
+        expected_profile=matrix.DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID,
+        expected_rows=(row,),
+    )
+
+
 def test_archived_business_replay_rebinds_check_to_latest_batch_revision(
     tmp_path: Path,
 ) -> None:
