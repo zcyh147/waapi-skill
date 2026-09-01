@@ -184,7 +184,7 @@ def test_public_draft_expiry_is_bounded_offline_and_does_not_create_preview(
         operation="object.set",
         version="2022.1",
         schema_digest=(
-            "2b6d3903c5b3e11618c3eaf0a3d5a26aa0045db26750320f3a8ce8c7da004cee"
+            "c1545e0d05010c77fb80cd859f4cb6c0b77ad313a332b1241be94f9a43d11c6a"
         ),
         now=datetime(2000, 1, 1, tzinfo=timezone.utc),
     )

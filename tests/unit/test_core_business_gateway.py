@@ -441,6 +441,53 @@ def test_core_call_resolves_two_exact_objects_and_dispatches_one_bounded_diff(
     ]
 
 
+def test_core_call_accepts_real_wwise_unnamed_action_identity(tmp_path: Path) -> None:
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": [_info()],
+            "ak.wwise.core.getProjectInfo": [_project(tmp_path)],
+            "ak.wwise.core.object.get": [
+                {
+                    "return": [
+                        {
+                            "id": SOURCE_ID,
+                            "name": "",
+                            "type": "Action",
+                            "path": r"\Events\Default Work Unit\Play_Rain\[Play - Rain]",
+                        },
+                        {
+                            "id": TARGET_ID,
+                            "name": "Target",
+                            "type": "Sound",
+                            "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Target",
+                        },
+                    ]
+                }
+            ],
+            "ak.wwise.core.object.diff": [{"properties": [], "lists": []}],
+        }
+    )
+    env = _env(tmp_path)
+    env["WWISE_WAAPI_HOST"] = "127.0.0.1"
+    env["WWISE_WAAPI_PORT"] = "31337"
+
+    exit_code, payload = gateway.execute_gateway(
+        [
+            "core-call",
+            "ak.wwise.core.object.diff",
+            "--source-id",
+            SOURCE_ID,
+            "--target-id",
+            TARGET_ID,
+        ],
+        env=env,
+        client_factory=lambda _url: client,
+    )
+
+    assert exit_code == 0, payload
+    assert payload["agent_result"] == {"properties": [], "lists": []}
+
+
 @pytest.mark.parametrize(
     ("operation", "result"),
     [

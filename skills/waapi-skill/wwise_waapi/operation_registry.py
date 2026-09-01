@@ -2383,6 +2383,9 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             {"object": IDENTITY_ARGUMENT_SCHEMA, "value": {"type": "string", "minLength": 1}},
         ),
         identity_arguments=("object",),
+        constraints=(
+            "Action objects have Wwise-derived display paths and no mutable name; they fail before preview instead of dispatching setName",
+        ),
         selection_guidance=_selection_guidance(
             use_when=("Exactly one existing object receives only a rename.",),
             avoid_when=("The rename is one part of a multi-field or multi-object atomic change.",),
@@ -2738,6 +2741,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "canonical request limit: 262144 bytes including inline Base64 audio",
             "auto_add_to_source_control is explicit and defaults to false",
             "partial results or per-target readback mismatches fail verification",
+            "an Action target may receive supported fields, references, or notes, but cannot supply name because Wwise derives Action display paths and exposes no mutable Action name",
         ),
         supported_versions=("2022.1", "2023.1", "2024.1", "2025.1"),
         parent_child_contract=OBJECT_CREATE_SPECIALIZED_CHILD_TYPES_BY_PARENT,
@@ -3198,7 +3202,10 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             optional=("on_name_conflict", "auto_add_to_source_control", "auto_check_out_to_source_control"),
         ),
         identity_arguments=("object", "parent"),
-        constraints=("the returned copy GUID is captured and verified under the requested parent",),
+        constraints=(
+            "the returned copy GUID is captured and verified under the requested parent",
+            "unnamed Action objects fail before preview because their display path is Wwise-derived and cannot support the closed name-collision proof",
+        ),
     ),
     "object.move": OperationSpec(
         "object.move",
@@ -3218,7 +3225,10 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             optional=("on_name_conflict", "auto_check_out_to_source_control"),
         ),
         identity_arguments=("object", "parent"),
-        constraints=("the source GUID is preserved and its new parent/path are verified",),
+        constraints=(
+            "the source GUID is preserved and its new parent/path are verified",
+            "unnamed Action objects fail before preview because their display path is Wwise-derived and cannot support the closed name-collision proof",
+        ),
     ),
     "soundbank.setInclusions": OperationSpec(
         "soundbank.setInclusions",
@@ -5537,6 +5547,10 @@ def _prepare_object_set(
                 raise OperationContractError("INVALID_ARGUMENT", f"object.set objects[{index}].notes must be a string.")
             trusted["notes"] = notes
         if "name" in item:
+            _reject_derived_object_name_operation(
+                target,
+                operation="object.set objects[].name",
+            )
             requested_name = item.get("name")
             if not isinstance(requested_name, str) or not requested_name.strip():
                 raise OperationContractError(
@@ -8510,6 +8524,10 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
             )
         source_name = source.row.get("name")
         parent_path = parent.row.get("path")
+        _reject_derived_object_name_operation(
+            source,
+            operation=request.operation,
+        )
         if not isinstance(source_name, str) or not source_name or not isinstance(parent_path, str):
             raise OperationContractError(
                 "INVALID_READBACK",
@@ -8581,6 +8599,10 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
         if not isinstance(value, str) or (request.operation == "object.setName" and not value.strip()):
             raise OperationContractError("INVALID_ARGUMENT", "value must be a non-empty string for setName and a string for setNotes.")
         if request.operation == "object.setName":
+            _reject_derived_object_name_operation(
+                target,
+                operation=request.operation,
+            )
             if target.row.get("name") == value:
                 raise OperationContractError("NO_OP", "setName value already matches the live object name.")
             preview = PropertyReferenceBuilder(version=request.version).set_name(object=target, value=value)
@@ -20277,6 +20299,31 @@ def _transport_list_rows(result: Mapping[str, Any]) -> tuple[list[dict[str, Any]
         return [], False
     rows = [dict(item) for item in value]
     return rows, all(_valid_transport_id(row.get("transport")) for row in rows)
+
+
+def _reject_derived_object_name_operation(
+    target: ResolvedObject,
+    *,
+    operation: str,
+) -> None:
+    """Fail clearly when an operation requires a mutable intrinsic name.
+
+    Wwise Actions expose ``name: ""`` and a bracketed display path derived from
+    their operation and target. Treating that display segment as a mutable name
+    would make rename and collision proofs unsound.
+    """
+
+    if target.row.get("type") == "Action" and target.row.get("name") == "":
+        raise OperationContractError(
+            "DERIVED_OBJECT_NAME_BOUNDARY",
+            f"{operation} cannot target a Wwise Action because Action display paths are derived and Action has no mutable name.",
+            details={
+                "operation": operation,
+                "object_id": target.object,
+                "object_type": "Action",
+                "path": target.row.get("path"),
+            },
+        )
 
 
 def _reject_protected_delete(target: ResolvedObject) -> None:

@@ -331,7 +331,7 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
 
     assert len(non_object_set_digests) == 149
     assert canonical_sha256(non_object_set_digests) == (
-        "4fd8204e97688a364b6fbf8eff36c8404a92be63dc08a5f0d62c9888c82c3796"
+        "4d08fae31a66f13352a3d5f3fda7839a2ce486f89330d96e2ddf4baeff6780d0"
     )
     assert {
         version: operation_input_mode("object.set", version)
@@ -1923,7 +1923,7 @@ def _archive_test_legacy_record_is_readable_but_composer_requires_recreate_witho
         operation="object.set",
         version="2022.1",
         schema_digest=(
-            "2b6d3903c5b3e11618c3eaf0a3d5a26aa0045db26750320f3a8ce8c7da004cee"
+            "c1545e0d05010c77fb80cd859f4cb6c0b77ad313a332b1241be94f9a43d11c6a"
         ),
     )
     record_path = store.records_dir / f"{started.draft_id}.json"

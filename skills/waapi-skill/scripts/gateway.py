@@ -404,6 +404,7 @@ from wwise_waapi.business_declarations import (  # noqa: E402  # pyright: ignore
     NewDescendantTarget,
     bind_live_field,
     business_repair,
+    normalize_live_object_identity,
     revalidate_live_field,
     revalidate_live_objects,
     revalidate_live_types,
@@ -10647,14 +10648,14 @@ def dispatch_soundengine_business_read(
         if isinstance(identity_rows, list) and len(identity_rows) == 1
         else None
     )
+    try:
+        normalized_identity = normalize_live_object_identity(identity)
+    except ValueError:
+        normalized_identity = None
     if (
-        not isinstance(identity, Mapping)
-        or str(identity.get("id", "")).upper() != group_id
-        or identity.get("type") != required_type
-        or not all(
-            isinstance(identity.get(field), str) and bool(identity[field])
-            for field in ("name", "path")
-        )
+        normalized_identity is None
+        or normalized_identity.object_id != group_id
+        or normalized_identity.object_type != required_type
     ):
         raise GatewayResultShapeError(
             f"SoundEngine read requires one exact live {required_type} identity.",
@@ -10862,25 +10863,26 @@ def dispatch_core_business_read(
         )
     by_id: dict[str, Mapping[str, Any]] = {}
     for row in rows:
-        if (
-            not isinstance(row, Mapping)
-            or not _canonical_guid(row.get("id"))
-            or not all(
-                isinstance(row.get(field), str) and bool(row[field])
-                for field in ("name", "type", "path")
-            )
-        ):
+        try:
+            identity = normalize_live_object_identity(row)
+        except ValueError as exc:
             raise GatewayResultShapeError(
                 "Core business identity row is malformed.",
                 error_code="CORE_BUSINESS_IDENTITY_MISMATCH",
-            )
-        key = str(row["id"]).upper()
+            ) from exc
+        key = identity.object_id
         if key in by_id:
             raise GatewayResultShapeError(
                 "Core business identity read returned a duplicate object.",
                 error_code="CORE_BUSINESS_IDENTITY_MISMATCH",
             )
-        by_id[key] = row
+        by_id[key] = {
+            **row,
+            "id": identity.object_id,
+            "name": identity.name,
+            "type": identity.object_type,
+            "path": identity.path,
+        }
     if set(by_id) != {value.upper() for value in requested.values()}:
         raise GatewayResultShapeError(
             "Core business identity read did not match the requested objects.",
@@ -11332,14 +11334,14 @@ def dispatch_media_build_business_read(
             if isinstance(identity_rows, list) and len(identity_rows) == 1
             else None
         )
+        try:
+            normalized_identity = normalize_live_object_identity(identity)
+        except ValueError:
+            normalized_identity = None
         if (
-            not isinstance(identity, Mapping)
-            or str(identity.get("id", "")).upper() != identity_id.upper()
-            or identity.get("type") != required_type
-            or not all(
-                isinstance(identity.get(field), str) and bool(identity[field])
-                for field in ("name", "path")
-            )
+            normalized_identity is None
+            or normalized_identity.object_id != identity_id.upper()
+            or normalized_identity.object_type != required_type
         ):
             raise GatewayResultShapeError(
                 f"Media/build read requires one exact live {required_type} identity.",
@@ -16767,34 +16769,38 @@ def dispatch_business_object_binding(
             error_code="BUSINESS_OBJECT_NOT_UNIQUE",
         )
     row = dict(rows[0])
-    row_type = row.get("type")
-    row_name = row.get("name")
-    valid_name = isinstance(row_name, str) and (
-        bool(row_name.strip()) or (row_name == "" and row_type == "Action")
+    try:
+        identity = normalize_live_object_identity(row)
+    except ValueError as exc:
+        raise GatewayResultShapeError(
+            "Exact business object binding returned a malformed live identity.",
+            details={"required_fields": ["id", "name", "type", "path"]},
+            error_code="BUSINESS_OBJECT_BINDING_MISMATCH",
+        ) from exc
+    row.update(
+        {
+            "id": identity.object_id,
+            "name": identity.name,
+            "type": identity.object_type,
+            "path": identity.path,
+        }
     )
     if (
-        not _canonical_guid(row.get("id"))
-        or not valid_name
-        or not all(
-            isinstance(row.get(field), str) and bool(str(row.get(field)).strip())
-            for field in ("type", "path")
-        )
-        or (
+        (
             closed_selector.expected_id is not None
-            and str(row["id"]).upper()
-            != closed_selector.expected_id.upper()
+            and identity.object_id != closed_selector.expected_id.upper()
         )
         or (
             closed_selector.expected_path is not None
-            and row["path"] != closed_selector.expected_path
+            and identity.path != closed_selector.expected_path
         )
         or (
             closed_selector.expected_type is not None
-            and row["type"] != closed_selector.expected_type
+            and identity.object_type != closed_selector.expected_type
         )
         or (
             closed_selector.expected_name is not None
-            and row["name"] != closed_selector.expected_name
+            and identity.name != closed_selector.expected_name
         )
     ):
         raise GatewayResultShapeError(

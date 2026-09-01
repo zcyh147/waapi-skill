@@ -15,6 +15,7 @@ from wwise_waapi.business_declarations import (
     SUPPORTED_WWISE_VERSIONS,
     bind_live_field,
     normalize_common_business_fields,
+    normalize_live_object_identity,
     revalidate_live_field,
     revalidate_live_object,
     revalidate_live_objects,
@@ -307,6 +308,77 @@ def test_unnamed_action_handle_round_trips_and_revalidates_exactly() -> None:
             object_type="Bus",
             path=r"\Master-Mixer Hierarchy\Default Work Unit\Bus",
         )
+
+
+@pytest.mark.parametrize(
+    ("row", "expected_name"),
+    (
+        (
+            {
+                "id": OBJECT_ID.lower(),
+                "name": "",
+                "type": "Action",
+                "path": r"\Events\Default Work Unit\Play_Rain\[Play - Rain]",
+            },
+            "",
+        ),
+        (
+            {
+                "id": BUS_ID,
+                "name": "Music",
+                "type": "Bus",
+                "path": r"\Master-Mixer Hierarchy\Default Work Unit\Music",
+            },
+            "Music",
+        ),
+    ),
+)
+def test_live_object_identity_seam_normalizes_real_wwise_shapes(
+    row: dict[str, str],
+    expected_name: str,
+) -> None:
+    identity = normalize_live_object_identity(row)
+
+    assert identity.object_id == row["id"].upper()
+    assert identity.name == expected_name
+    assert identity.object_type == row["type"]
+    assert identity.path == row["path"]
+
+
+@pytest.mark.parametrize(
+    "row",
+    (
+        {
+            "id": OBJECT_ID,
+            "name": "",
+            "type": "Sound",
+            "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Sound",
+        },
+        {
+            "id": "not-a-guid",
+            "name": "Action",
+            "type": "Action",
+            "path": r"\Events\Default Work Unit\Action",
+        },
+        {
+            "id": OBJECT_ID,
+            "name": "Action",
+            "type": "",
+            "path": r"\Events\Default Work Unit\Action",
+        },
+        {
+            "id": OBJECT_ID,
+            "name": "Action",
+            "type": "Action",
+            "path": "Events/Action",
+        },
+    ),
+)
+def test_live_object_identity_seam_rejects_only_malformed_shapes(
+    row: dict[str, str],
+) -> None:
+    with pytest.raises(ValueError):
+        normalize_live_object_identity(row)
 
 
 @pytest.mark.parametrize(

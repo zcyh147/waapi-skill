@@ -13,6 +13,7 @@ from typing import Any, Mapping, Sequence
 
 from .filesystem_security import metadata_is_link_or_reparse
 from .host_paths import HostPathError, localize_waapi_host_path
+from .business_declarations import normalize_live_object_identity
 from .media_build_business_contracts import (
     MEDIA_POOL_GET_URI,
     MEDIA_POOL_NUMBER_OPERATOR_TOKENS,
@@ -770,26 +771,26 @@ def _normalize_inclusions_result(
         )
     identities: dict[str, Mapping[str, Any]] = {}
     for row in identity_rows:
-        if not isinstance(row, Mapping):
+        try:
+            identity = normalize_live_object_identity(row)
+        except ValueError as exc:
             raise MediaBuildBusinessError(
                 "SoundBank inclusion identity row is malformed",
                 code="MEDIA_BUILD_RESULT_INVALID",
-            )
-        object_id = _canonical_guid(row.get("id"), field="identity id")
+            ) from exc
+        object_id = identity.object_id
         if object_id in identities:
             raise MediaBuildBusinessError(
                 "SoundBank inclusion identity read returned a duplicate",
                 code="MEDIA_BUILD_RESULT_INVALID",
             )
-        if not all(
-            isinstance(row.get(field), str) and row[field]
-            for field in ("name", "type", "path")
-        ):
-            raise MediaBuildBusinessError(
-                "SoundBank inclusion identity row lacks name, type, or path",
-                code="MEDIA_BUILD_RESULT_INVALID",
-            )
-        identities[object_id] = row
+        identities[object_id] = {
+            **row,
+            "id": identity.object_id,
+            "name": identity.name,
+            "type": identity.object_type,
+            "path": identity.path,
+        }
     normalized: list[dict[str, Any]] = []
     expected_ids: set[str] = set()
     for index, row in enumerate(inclusions):

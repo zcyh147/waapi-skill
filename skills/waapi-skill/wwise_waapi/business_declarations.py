@@ -227,6 +227,16 @@ class BoundObjectHandle:
 
 
 @dataclass(frozen=True, slots=True)
+class LiveObjectIdentity:
+    """Normalized identity fields shared by every Gateway-owned object seam."""
+
+    object_id: str
+    name: str
+    object_type: str
+    path: str
+
+
+@dataclass(frozen=True, slots=True)
 class BoundFieldHandle:
     handle: str
     context: BusinessContext
@@ -510,17 +520,17 @@ class BusinessHandleRegistry:
         semantic_kind: str | None = None,
         role: str | None = None,
     ) -> BoundObjectHandle:
-        if not isinstance(object_id, str) or not _CANONICAL_GUID.fullmatch(object_id):
-            raise ValueError("object_id must be a canonical Wwise GUID")
-        normalized_type = _bounded_required_text(
-            object_type, field="object_type", maximum_bytes=MAX_FIELD_TOKEN_BYTES
+        identity = normalize_live_object_identity(
+            {
+                "id": object_id,
+                "name": name,
+                "type": object_type,
+                "path": path,
+            }
         )
-        normalized_name = _bounded_object_name(name, object_type=normalized_type)
-        normalized_path = _bounded_required_text(
-            path, field="path", maximum_bytes=MAX_BUSINESS_PATH_BYTES
-        ).rstrip("\\")
-        if not normalized_path.startswith("\\"):
-            raise ValueError("path must be an absolute Wwise path")
+        normalized_type = identity.object_type
+        normalized_name = identity.name
+        normalized_path = identity.path
         if semantic_kind is not None:
             resolved_kind = resolve_semantic_kind(
                 semantic_kind,
@@ -545,7 +555,7 @@ class BusinessHandleRegistry:
         material = {
             "contract": BOUND_OBJECT_HANDLE_CONTRACT,
             "context": self.context.as_binding_dict(),
-            "object_id": object_id.upper(),
+            "object_id": identity.object_id,
             "name": normalized_name,
             "object_type": normalized_type,
             "path": normalized_path,
@@ -557,7 +567,7 @@ class BusinessHandleRegistry:
         bound = BoundObjectHandle(
             handle=handle,
             context=self.context,
-            object_id=object_id.upper(),
+            object_id=identity.object_id,
             name=normalized_name,
             object_type=normalized_type,
             path=normalized_path,
@@ -1434,12 +1444,8 @@ def revalidate_live_objects(
         expected_ids = set(unique_ids)
         rows_by_id: dict[str, Mapping[str, Any]] = {}
         for row in rows:
-            if not isinstance(row, Mapping):
-                raise ValueError("object readback row is not an object")
-            object_id = row.get("id")
-            if not isinstance(object_id, str) or not _CANONICAL_GUID.fullmatch(object_id):
-                raise ValueError("object readback row has no canonical GUID")
-            canonical_id = object_id.upper()
+            identity = normalize_live_object_identity(row)
+            canonical_id = identity.object_id
             if (
                 canonical_id not in expected_ids
                 and len(unique_ids) == 1
@@ -1453,7 +1459,13 @@ def revalidate_live_objects(
                 )
             if canonical_id not in expected_ids or canonical_id in rows_by_id:
                 raise ValueError("object readback contains an extra or duplicate GUID")
-            rows_by_id[canonical_id] = row
+            rows_by_id[canonical_id] = {
+                **row,
+                "id": identity.object_id,
+                "name": identity.name,
+                "type": identity.object_type,
+                "path": identity.path,
+            }
         if set(rows_by_id) != expected_ids:
             raise ValueError("object readback is missing one or more exact GUIDs")
     except BusinessDeclarationError:
@@ -1744,14 +1756,19 @@ def _bound_object_from_dict(
         raise ValueError("bound object handle contract is invalid")
     if not isinstance(handle, str) or not _OBJECT_HANDLE.fullmatch(handle):
         raise ValueError("bound object handle token is invalid")
-    if not isinstance(object_id, str) or not _CANONICAL_GUID.fullmatch(object_id):
-        raise ValueError("bound object id is invalid")
-    object_type = _bounded_required_text(
-        payload.get("object_type"),
-        field="object_type",
-        maximum_bytes=MAX_FIELD_TOKEN_BYTES,
-    )
-    name = _bounded_object_name(payload.get("name"), object_type=object_type)
+    try:
+        identity = normalize_live_object_identity(
+            {
+                "id": object_id,
+                "name": payload.get("name"),
+                "type": payload.get("object_type"),
+                "path": payload.get("path"),
+            }
+        )
+    except ValueError as exc:
+        raise ValueError("bound object identity is invalid") from exc
+    object_type = identity.object_type
+    name = identity.name
     semantic_kind = payload.get("semantic_kind")
     if semantic_kind is not None:
         resolved_kind = resolve_semantic_kind(
@@ -1772,15 +1789,11 @@ def _bound_object_from_dict(
             field="role",
             maximum_bytes=MAX_FIELD_TOKEN_BYTES,
         )
-    path = _bounded_required_text(
-        payload.get("path"), field="path", maximum_bytes=MAX_BUSINESS_PATH_BYTES
-    )
-    if not path.startswith("\\") or path.endswith("\\"):
-        raise ValueError("bound object path is invalid")
+    path = identity.path
     material = {
         "contract": BOUND_OBJECT_HANDLE_CONTRACT,
         "context": context.as_binding_dict(),
-        "object_id": object_id.upper(),
+        "object_id": identity.object_id,
         "name": name,
         "object_type": object_type,
         "path": path,
@@ -1797,7 +1810,7 @@ def _bound_object_from_dict(
     return BoundObjectHandle(
         handle=handle,
         context=context,
-        object_id=object_id.upper(),
+        object_id=identity.object_id,
         name=name,
         object_type=object_type,
         path=path,
@@ -2191,6 +2204,41 @@ def _bounded_object_name(value: Any, *, object_type: str) -> str:
     )
 
 
+def normalize_live_object_identity(row: Any) -> LiveObjectIdentity:
+    """Normalize the exact Wwise object identity shape once for every caller.
+
+    Wwise Authoring objects use canonical GUIDs and absolute object paths.
+    Most object types also own a non-empty name. ``Action`` is the deliberate
+    exception: Wwise returns an empty ``name`` and derives its bracketed display
+    segment from the operation and target.
+    """
+
+    if not isinstance(row, Mapping):
+        raise ValueError("live object identity must be a mapping")
+    object_id = row.get("id")
+    if not isinstance(object_id, str) or not _CANONICAL_GUID.fullmatch(object_id):
+        raise ValueError("object_id must be a canonical Wwise GUID")
+    object_type = _bounded_required_text(
+        row.get("type"),
+        field="object_type",
+        maximum_bytes=MAX_FIELD_TOKEN_BYTES,
+    )
+    name = _bounded_object_name(row.get("name"), object_type=object_type)
+    path = _bounded_required_text(
+        row.get("path"),
+        field="path",
+        maximum_bytes=MAX_BUSINESS_PATH_BYTES,
+    ).rstrip("\\")
+    if not path.startswith("\\"):
+        raise ValueError("path must be an absolute Wwise path")
+    return LiveObjectIdentity(
+        object_id=object_id.upper(),
+        name=name,
+        object_type=object_type,
+        path=path,
+    )
+
+
 def _type_token(value: str) -> str:
     return re.sub(r"[^a-z0-9]", "", value.casefold())
 
@@ -2206,6 +2254,7 @@ __all__ = [
     "BoundFieldHandle",
     "BoundObjectHandle",
     "BoundTypeHandle",
+    "LiveObjectIdentity",
     "BusinessContext",
     "BusinessDeclarationError",
     "BusinessHandleRegistry",
@@ -2219,6 +2268,7 @@ __all__ = [
     "bound_object_identity_for_handle",
     "business_repair",
     "normalize_common_business_fields",
+    "normalize_live_object_identity",
     "revalidate_live_field",
     "revalidate_live_object",
     "revalidate_live_objects",

@@ -1803,10 +1803,16 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   rejected the legitimate row before Preview.
 - Prevention: permit an empty object name only when the reflected type is
   exactly `Action`; GUID, type, absolute path, uniqueness, handle digest, and
-  Preview-time readback remain exact. Empty names for every other object type
-  still fail closed. Alarm observers accept the Gateway business aliases
-  `action_type`/`target` as exact equivalents of native `ActionType`/`Target`
-  and reject conflicting dual aliases.
+  Preview-time readback remain exact. Normalize that shape once at the shared
+  Gateway-owned live-object identity seam, then reuse it for binding,
+  persistence, readback, Core business reads, fixed SoundEngine/media identities,
+  and SoundBank inclusion projection. Empty names for every other object type
+  still fail closed. Name-dependent operations (`setName`, `object.set` rename,
+  and copy/move collision proof) report the explicit derived-name boundary for
+  Actions instead of leaking a generic malformed-readback failure. Alarm
+  observers accept the Gateway business aliases `action_type`/`target` as exact
+  equivalents of native `ActionType`/`Target` and reject conflicting dual
+  aliases.
 
 ## New-root preflight
 

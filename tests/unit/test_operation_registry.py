@@ -280,7 +280,7 @@ def test_operation_request_schema_digest_owns_only_versioned_machine_contract() 
     assert "selection_guidance" not in contract_2022
     assert "next_step" not in contract_2022
     assert operation_request_schema_digest("object.set", "2022.1") == (
-        "2b6d3903c5b3e11618c3eaf0a3d5a26aa0045db26750320f3a8ce8c7da004cee"
+        "c1545e0d05010c77fb80cd859f4cb6c0b77ad313a332b1241be94f9a43d11c6a"
     )
     assert operation_request_schema_digest("object.set", "2025.1") != (
         operation_request_schema_digest("object.set", "2022.1")
@@ -2061,6 +2061,101 @@ def test_request_contract_rejects_unknown_fields_metadata_injection_and_boundari
             )
         )
     assert nested_inclusion.value.error_code == "INVALID_REQUEST"
+
+
+@pytest.mark.parametrize("operation", ("object.copy", "object.move"))
+def test_name_collision_operations_report_the_unnamed_action_boundary(
+    operation: str,
+) -> None:
+    action = object_row(
+        name="",
+        object_type="Action",
+        path=r"\Events\Default Work Unit\Play_Rain\[Play - Rain]",
+    )
+    parent = object_row(
+        object_id=TARGET_GUID,
+        name="Destination Event",
+        object_type="Event",
+        path=r"\Events\Default Work Unit\Destination Event",
+    )
+
+    with pytest.raises(OperationContractError) as error:
+        prepare_operation(
+            parse_operation_request(
+                request(
+                    operation,
+                    {
+                        "object": {"kind": "id", "value": GUID},
+                        "parent": {"kind": "id", "value": TARGET_GUID},
+                    },
+                )
+            ),
+            read_call=ScriptedReader(
+                {"ak.wwise.core.object.get": [{"return": [action]}, {"return": [parent]}]}
+            ),
+        )
+
+    assert error.value.error_code == "DERIVED_OBJECT_NAME_BOUNDARY"
+    assert error.value.details["object_type"] == "Action"
+
+
+def test_set_name_reports_the_unnamed_action_boundary() -> None:
+    action = object_row(
+        name="",
+        object_type="Action",
+        path=r"\Events\Default Work Unit\Play_Rain\[Play - Rain]",
+    )
+
+    with pytest.raises(OperationContractError) as error:
+        prepare_operation(
+            parse_operation_request(
+                request(
+                    "object.setName",
+                    {
+                        "object": {"kind": "id", "value": GUID},
+                        "value": "Renamed Action",
+                    },
+                )
+            ),
+            read_call=ScriptedReader(
+                {"ak.wwise.core.object.get": [{"return": [action]}]}
+            ),
+        )
+
+    assert error.value.error_code == "DERIVED_OBJECT_NAME_BOUNDARY"
+
+
+def test_object_set_rename_reports_the_unnamed_action_boundary() -> None:
+    action = object_row(
+        name="",
+        object_type="Action",
+        path=r"\Events\Default Work Unit\Play_Rain\[Play - Rain]",
+    )
+
+    with pytest.raises(OperationContractError) as error:
+        prepare_operation(
+            parse_operation_request(
+                request(
+                    "object.set",
+                    {
+                        "objects": [
+                            {
+                                "object": {"kind": "id", "value": GUID},
+                                "name": "Renamed Action",
+                            }
+                        ]
+                    },
+                )
+            ),
+            read_call=ScriptedReader(
+                {
+                    "ak.wwise.core.object.getTypes": [SOUND_TYPE_RESULT],
+                    "ak.wwise.core.object.get": [{"return": [action]}],
+                }
+            ),
+        )
+
+    assert error.value.error_code == "DERIVED_OBJECT_NAME_BOUNDARY"
 
 
 @pytest.mark.parametrize(
