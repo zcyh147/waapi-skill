@@ -16351,6 +16351,11 @@ def _business_object_path_from_segments(values: Any) -> str:
 @dataclass(frozen=True, slots=True)
 class _BusinessObjectSelector:
     request: Mapping[str, Any]
+    kind: str
+    expected_id: str | None = None
+    expected_path: str | None = None
+    expected_type: str | None = None
+    expected_name: str | None = None
 
 
 def _business_object_selector_from_namespace(
@@ -16362,7 +16367,9 @@ def _business_object_selector_from_namespace(
                 "Business object --object-id must be one canonical Wwise GUID."
             )
         return _BusinessObjectSelector(
-            request={"from": {"id": [args.object_id]}}
+            request={"from": {"id": [args.object_id]}},
+            kind="id",
+            expected_id=args.object_id,
         )
     if args.object_path_segment is not None:
         raw_identity = {
@@ -16400,7 +16407,15 @@ def _business_object_selector_from_namespace(
                 f"{quote_waql_literal(identity.name)} take 2"
             )
         }
-    return _BusinessObjectSelector(request=request)
+    return _BusinessObjectSelector(
+        request=request,
+        kind=identity.kind,
+        expected_path=(
+            str(identity.value) if identity.kind == "path" else None
+        ),
+        expected_type=identity.type,
+        expected_name=identity.name,
+    )
 
 
 def preflight_business_object_binding_input(args: argparse.Namespace) -> None:
@@ -16568,7 +16583,9 @@ def dispatch_business_object_binding(
             )
     closed_selector = getattr(args, "_business_object_selector", None)
     if not isinstance(closed_selector, _BusinessObjectSelector):
-        closed_selector = _business_object_selector_from_namespace(args)
+        raise GatewayInputError(
+            "Business object selector preflight evidence is unavailable."
+        )
     raw = binding.read_call(
         OBJECT_GET_URI,
         closed_selector.request,
@@ -16600,11 +16617,22 @@ def dispatch_business_object_binding(
             isinstance(row.get(field), str) and bool(str(row.get(field)).strip())
             for field in ("name", "type", "path")
         )
-        or (args.object_id is not None and str(row["id"]).upper() != args.object_id.upper())
-        or (object_path is not None and row["path"] != object_path)
         or (
-            exact_type_name is not None
-            and (row["type"], row["name"]) != exact_type_name
+            closed_selector.expected_id is not None
+            and str(row["id"]).upper()
+            != closed_selector.expected_id.upper()
+        )
+        or (
+            closed_selector.expected_path is not None
+            and row["path"] != closed_selector.expected_path
+        )
+        or (
+            closed_selector.expected_type is not None
+            and (row["type"], row["name"])
+            != (
+                closed_selector.expected_type,
+                closed_selector.expected_name,
+            )
         )
     ):
         raise GatewayResultShapeError(
