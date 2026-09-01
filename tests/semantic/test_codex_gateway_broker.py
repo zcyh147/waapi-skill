@@ -7989,6 +7989,39 @@ def test_business_query_includes_expand_to_complete_legacy_projection(
     assert normalized == ("--object-id", object_id, *tail)
 
 
+def test_business_query_path_segments_expand_to_complete_legacy_projection() -> None:
+    path = r"\Master-Mixer Hierarchy\Default Work Unit\Master Audio Bus\SFX_Machinery"
+    tail = tuple(
+        item
+        for field in ("id", "name", "type", "path", "@Volume")
+        for item in ("--return-field", field)
+    )
+    step = ExpectedGatewayStep(
+        "diag.target_bus",
+        "query-object",
+        ("--path", path, *tail),
+    )
+    actual = (
+        "--path-segment",
+        "Master-Mixer Hierarchy",
+        "--path-segment",
+        "Default Work Unit",
+        "--path-segment",
+        "Master Audio Bus",
+        "--path-segment",
+        "SFX_Machinery",
+        "--include",
+        "volume-db",
+    )
+
+    normalized = broker_module._normalize_query_object_business_projection(  # noqa: SLF001
+        step,
+        actual,
+    )
+
+    assert normalized == ("--path", path, *tail)
+
+
 def test_event_action_draft_binding_expands_to_direct_child_selector() -> None:
     fixed = (
         "od1-" + "1" * 32,

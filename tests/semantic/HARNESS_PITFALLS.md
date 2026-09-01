@@ -1795,21 +1795,25 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   projection, and single-direct-child validation. The Agent supplies only the
   Event path or GUID.
 
-### Real Wwise Action rows may be intentionally unnamed
+### Wwise object names are capabilities, not a universal identity field
 
 - Evidence: #51 macOS 9cb4550 Weather selected the new Event Action binding and
   resolved exactly one live `Action`, but Wwise returned `name: ""` and a
   bracketed path such as `[Play - Rain_Bed]`. The generic handle validator
   rejected the legitimate row before Preview.
-- Prevention: permit an empty object name only when the reflected type is
-  exactly `Action`; GUID, type, absolute path, uniqueness, handle digest, and
-  Preview-time readback remain exact. Normalize that shape once at the shared
-  Gateway-owned live-object identity seam, then reuse it for binding,
-  persistence, readback, Core business reads, fixed SoundEngine/media identities,
-  and SoundBank inclusion projection. Empty names for every other object type
-  still fail closed. Name-dependent operations (`setName`, `object.set` rename,
-  and copy/move collision proof) report the explicit derived-name boundary for
-  Actions instead of leaking a generic malformed-readback failure. Alarm
+- Generalized audit finding: `EffectSlot` is another legitimate empty-name
+  object, but for a different reason: it is an anonymous owned-list slot rather
+  than an Action-derived display path. An Action-only exception would merely
+  defer the same defect to another API family.
+- Prevention: keep one reviewed object-identity capability table that declares
+  intrinsic, derived, and anonymous-slot name modes. Normalize all live object
+  handles through it; GUID, type, absolute path, uniqueness, handle digest, and
+  Preview-time readback remain exact. Name-dependent operations (`setName`,
+  `object.set` rename, and copy/move collision proof) consult the same capability
+  and fail before Preview for every type without a mutable intrinsic name.
+  Deterministic tests cover both Action and EffectSlot through handle binding,
+  Core reads, rename, bulk rename, copy, and move, so a future special object
+  type must be added once rather than patched operation by operation. Alarm
   observers accept the Gateway business aliases `action_type`/`target` as exact
   equivalents of native `ActionType`/`Target` and reject conflicting dual
   aliases.
@@ -1826,6 +1830,12 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   copy-ready continuation for each exact target. The view accepts only one
   exact path/GUID, validates that the live row is a Sound, and cannot be mixed
   with caller-selected fields, predicates, relationships, or result bounds.
+- Oracle rule: judge the Gateway-owned business projection, not legacy argv
+  length. `--exact-id` and an exact sequence of `--path-segment` values are
+  equivalent identity forms, and `--include volume-db` owns the default
+  `id/name/type/path` projection plus native `@Volume`. Normalize both forms to
+  the sealed witness before comparison; do not fail a correct Wwise read merely
+  because the Agent did not restate Gateway-owned return fields.
 
 ### Omitted business platform means Wwise's unlinked value
 
@@ -1880,9 +1890,11 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   action catalog and copy policy. The result declared itself complete, while
   the Codex command view clipped its text; the Agent safely stopped rather than
   invent the hidden continuation.
-- Prevention: after `object.set` object binding, return a sub-12-KiB common
-  continuation containing object binding, field discovery, existing/new
-  declaration, and one exact `draft-inspect` escape hatch for uncommon actions.
+- Prevention: after `object.set` object binding, return a sub-8-KiB common
+  continuation containing only the just-used selector form, field discovery,
+  existing-object declaration, and one exact `draft-inspect` escape hatch for
+  uncommon actions. Include the resolved object path directly in the compact
+  receipt; new-object and alternate-selector actions remain in `draft-inspect`.
   The full capability remains losslessly reachable, but is not repeated after
   every target. Keep a byte-budget regression on the public payload; do not
   treat `response_integrity.complete=true` as proof of model visibility.

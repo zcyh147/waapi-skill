@@ -4139,14 +4139,14 @@ def _normalize_query_object_business_projection(
     step: "ExpectedGatewayStep",
     supplied_arguments: Sequence[str],
 ) -> tuple[Any, ...]:
-    """Expand reviewed business includes to their legacy field witnesses."""
+    """Expand reviewed identity selectors/includes to legacy field witnesses."""
 
     actual = tuple(supplied_arguments)
     expected = tuple(step.arguments)
     if (
         step.subcommand != "query-object"
         or len(expected) < 4
-        or expected[0] != "--object-id"
+        or expected[0] not in {"--object-id", "--path"}
         or len(expected[2:]) % 2
         or expected[2::2] != ("--return-field",) * (len(expected[2:]) // 2)
     ):
@@ -4169,18 +4169,37 @@ def _normalize_query_object_business_projection(
             "@Volume",
         ): frozenset({"volume-db"}),
     }.get(expected_fields)
-    if business_includes is None or len(actual) < 4 or actual[:1] != ("--exact-id",):
+    if business_includes is None or len(actual) < 4 or len(actual) % 2:
         return actual
-    groups = actual[2:]
-    if len(groups) % 2 or groups[::2] != ("--include",) * (len(groups) // 2):
+    pairs = tuple(zip(actual[::2], actual[1::2], strict=True))
+    source_pairs = tuple(
+        pair for pair in pairs if pair[0] in {"--exact-id", "--path-segment"}
+    )
+    include_pairs = tuple(pair for pair in pairs if pair[0] == "--include")
+    if len(source_pairs) + len(include_pairs) != len(pairs):
         return actual
-    supplied_includes = tuple(groups[1::2])
+    if source_pairs and source_pairs[0][0] == "--exact-id":
+        if expected[0] != "--object-id" or len(source_pairs) != 1:
+            return actual
+        normalized_source = ("--object-id", source_pairs[0][1])
+    elif source_pairs and all(pair[0] == "--path-segment" for pair in source_pairs):
+        segments = tuple(pair[1] for pair in source_pairs)
+        if (
+            expected[0] != "--path"
+            or any(not segment or "\\" in segment for segment in segments)
+            or "\\" + "\\".join(segments) != expected[1]
+        ):
+            return actual
+        normalized_source = ("--path", expected[1])
+    else:
+        return actual
+    supplied_includes = tuple(pair[1] for pair in include_pairs)
     if (
         len(supplied_includes) != len(set(supplied_includes))
         or frozenset(supplied_includes) != business_includes
     ):
         return actual
-    return ("--object-id", actual[1], *expected[2:])
+    return (*normalized_source, *expected[2:])
 
 
 def _normalize_event_action_draft_binding(
