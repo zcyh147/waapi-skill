@@ -1119,7 +1119,7 @@ def _alarm_protocol(
             "diag.sound",
             source=(
                 "--object-id",
-                ResponseBinding("diag.action", "/objects/0/Target/id"),
+                ResponseBinding("diag.action", "/objects/0/target/id"),
             ),
             take=None,
             fields=_DIAGNOSTIC_SOUND_FIELDS,
@@ -1675,14 +1675,38 @@ def _diagnostic_projection(
         "path": _wwise_path(row.get("path"), f"diagnostic {kind} path"),
     }
     if kind == "action":
+        native_action_type = row.get("ActionType")
+        business_action_type = row.get("action_type")
+        if (
+            native_action_type is not None
+            and business_action_type is not None
+            and native_action_type != business_action_type
+        ):
+            raise AlarmIntegrationRuntimeError(
+                "diagnostic ActionType aliases disagree"
+            )
+        native_target = row.get("Target")
+        business_target = row.get("target")
+        if (
+            native_target is not None
+            and business_target is not None
+            and native_target != business_target
+        ):
+            raise AlarmIntegrationRuntimeError(
+                "diagnostic Target aliases disagree"
+            )
         result.update(
             {
                 "action_type": _optional_plain_int(
-                    row.get("ActionType"),
+                    (
+                        native_action_type
+                        if native_action_type is not None
+                        else business_action_type
+                    ),
                     "diagnostic ActionType",
                 ),
                 "target_id": _optional_identity(
-                    row.get("Target"),
+                    native_target if native_target is not None else business_target,
                     "diagnostic Target",
                 ),
             }

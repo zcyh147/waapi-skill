@@ -1795,6 +1795,19 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   projection, and single-direct-child validation. The Agent supplies only the
   Event path or GUID.
 
+### Real Wwise Action rows may be intentionally unnamed
+
+- Evidence: #51 macOS 9cb4550 Weather selected the new Event Action binding and
+  resolved exactly one live `Action`, but Wwise returned `name: ""` and a
+  bracketed path such as `[Play - Rain_Bed]`. The generic handle validator
+  rejected the legitimate row before Preview.
+- Prevention: permit an empty object name only when the reflected type is
+  exactly `Action`; GUID, type, absolute path, uniqueness, handle digest, and
+  Preview-time readback remain exact. Empty names for every other object type
+  still fail closed. Alarm observers accept the Gateway business aliases
+  `action_type`/`target` as exact equivalents of native `ActionType`/`Target`
+  and reject conflicting dual aliases.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:

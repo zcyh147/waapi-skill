@@ -16767,11 +16767,17 @@ def dispatch_business_object_binding(
             error_code="BUSINESS_OBJECT_NOT_UNIQUE",
         )
     row = dict(rows[0])
+    row_type = row.get("type")
+    row_name = row.get("name")
+    valid_name = isinstance(row_name, str) and (
+        bool(row_name.strip()) or (row_name == "" and row_type == "Action")
+    )
     if (
         not _canonical_guid(row.get("id"))
+        or not valid_name
         or not all(
             isinstance(row.get(field), str) and bool(str(row.get(field)).strip())
-            for field in ("name", "type", "path")
+            for field in ("type", "path")
         )
         or (
             closed_selector.expected_id is not None

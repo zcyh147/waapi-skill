@@ -471,7 +471,7 @@ def test_protocol_exposes_six_exact_chain_reads_then_one_standard_transaction(
     )
     assert protocol.steps[2].arguments[1] == ResponseBinding(
         "diag.action",
-        "/objects/0/Target/id",
+        "/objects/0/target/id",
     )
     assert protocol.steps[3].arguments[1] == ResponseBinding(
         "diag.sound",
@@ -584,6 +584,25 @@ def test_diagnostic_payload_observer_seals_exact_chain_evidence(
                 "objects": [row],
             },
         )
+
+
+def test_diagnostic_action_observer_accepts_gateway_business_projection(
+    tmp_path: Path,
+) -> None:
+    prepared, _fake = _prepared(tmp_path)
+    action = dict(_payload_row(prepared.before_snapshot.by_key()["action"]))
+    action["action_type"] = action.pop("ActionType")
+    action["target"] = action.pop("Target")
+
+    prepared.observe_payload(
+        prepared.protocol.steps[1],
+        {
+            "ok": True,
+            "command": "query-object",
+            "count": 1,
+            "objects": [action],
+        },
+    )
 
 
 def test_diagnostic_payload_observer_rejects_wrong_chain_identity(

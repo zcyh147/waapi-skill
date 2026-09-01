@@ -913,9 +913,9 @@ def test_object_set_business_draft_binds_unnamed_direct_child(
     assert code == 0, started
     action_row = {
         "id": OBJECT_GUID,
-        "name": "Action 1",
+        "name": "",
         "type": "Action",
-        "path": r"\Events\Default Work Unit\Play_Rain\Action 1",
+        "path": r"\Events\Default Work Unit\Play_Rain\[Play - Rain]",
     }
     client = FakeClient(
         {
@@ -957,7 +957,7 @@ def test_object_set_business_draft_binds_unnamed_direct_child(
         )
     }
     assert bound["bound_object"]["type"] == "Action"
-    assert bound["bound_object"]["name"] == "Action 1"
+    assert bound["bound_object"]["name"] == ""
     assert bound["bound_object"]["handle"].startswith("boh1-")
 
 
@@ -987,9 +987,9 @@ def test_object_set_business_draft_binds_event_action_from_event_path(
     )
     action_row = {
         "id": OBJECT_GUID,
-        "name": "Action 1",
+        "name": "",
         "type": "Action",
-        "path": r"\Events\Default Work Unit\Play_Rain\Action 1",
+        "path": r"\Events\Default Work Unit\Play_Rain\[Play - Rain]",
     }
     client = FakeClient(
         {
@@ -1029,6 +1029,7 @@ def test_object_set_business_draft_binds_event_action_from_event_path(
         )
     }
     assert bound["bound_object"]["type"] == "Action"
+    assert bound["bound_object"]["name"] == ""
 
 
 def test_object_set_name_business_draft_binds_declares_and_materializes(

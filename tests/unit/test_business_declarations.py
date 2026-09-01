@@ -271,6 +271,44 @@ def test_live_object_revalidation_deduplicates_guids_into_one_bounded_read() -> 
     ]
 
 
+def test_unnamed_action_handle_round_trips_and_revalidates_exactly() -> None:
+    registry = BusinessHandleRegistry(
+        _context(),
+        token_bytes=lambda size: b"a" * size,
+    )
+    action = registry.bind_object(
+        object_id=OBJECT_ID,
+        name="",
+        object_type="Action",
+        path=r"\Events\Default Work Unit\Play_Rain\[Play - Rain]",
+    )
+    restored = BusinessHandleRegistry.from_dict(registry.as_dict())
+
+    assert restored.resolve_object(action.handle).name == ""
+    assert revalidate_live_objects(
+        restored,
+        (action,),
+        read_call=lambda _uri, _args, _options: {
+            "return": [
+                {
+                    "id": OBJECT_ID,
+                    "name": "",
+                    "type": "Action",
+                    "path": r"\Events\Default Work Unit\Play_Rain\[Play - Rain]",
+                }
+            ]
+        },
+    ) == (action,)
+
+    with pytest.raises(ValueError, match="name must be non-empty"):
+        registry.bind_object(
+            object_id=BUS_ID,
+            name="",
+            object_type="Bus",
+            path=r"\Master-Mixer Hierarchy\Default Work Unit\Bus",
+        )
+
+
 @pytest.mark.parametrize(
     "rows",
     (

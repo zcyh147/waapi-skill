@@ -512,12 +512,10 @@ class BusinessHandleRegistry:
     ) -> BoundObjectHandle:
         if not isinstance(object_id, str) or not _CANONICAL_GUID.fullmatch(object_id):
             raise ValueError("object_id must be a canonical Wwise GUID")
-        normalized_name = _bounded_required_text(
-            name, field="name", maximum_bytes=MAX_BUSINESS_NAME_BYTES
-        )
         normalized_type = _bounded_required_text(
             object_type, field="object_type", maximum_bytes=MAX_FIELD_TOKEN_BYTES
         )
+        normalized_name = _bounded_object_name(name, object_type=normalized_type)
         normalized_path = _bounded_required_text(
             path, field="path", maximum_bytes=MAX_BUSINESS_PATH_BYTES
         ).rstrip("\\")
@@ -1748,14 +1746,12 @@ def _bound_object_from_dict(
         raise ValueError("bound object handle token is invalid")
     if not isinstance(object_id, str) or not _CANONICAL_GUID.fullmatch(object_id):
         raise ValueError("bound object id is invalid")
-    name = _bounded_required_text(
-        payload.get("name"), field="name", maximum_bytes=MAX_BUSINESS_NAME_BYTES
-    )
     object_type = _bounded_required_text(
         payload.get("object_type"),
         field="object_type",
         maximum_bytes=MAX_FIELD_TOKEN_BYTES,
     )
+    name = _bounded_object_name(payload.get("name"), object_type=object_type)
     semantic_kind = payload.get("semantic_kind")
     if semantic_kind is not None:
         resolved_kind = resolve_semantic_kind(
@@ -2181,6 +2177,18 @@ def _bounded_required_text(value: Any, *, field: str, maximum_bytes: int) -> str
     if len(normalized.encode("utf-8")) > maximum_bytes:
         raise ValueError(f"{field} exceeds its fixed byte limit")
     return normalized
+
+
+def _bounded_object_name(value: Any, *, object_type: str) -> str:
+    """Accept Wwise's intentionally unnamed Action rows, and nothing broader."""
+
+    if value == "" and object_type == "Action":
+        return ""
+    return _bounded_required_text(
+        value,
+        field="name",
+        maximum_bytes=MAX_BUSINESS_NAME_BYTES,
+    )
 
 
 def _type_token(value: str) -> str:
