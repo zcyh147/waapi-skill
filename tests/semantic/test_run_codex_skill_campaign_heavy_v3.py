@@ -628,6 +628,27 @@ def test_archived_broker_replay_precomputes_audio_import_after_media_cleanup(
     )
 
 
+def test_deep_business_campaign_unit_row_matches_matrix_wrapper_metadata() -> None:
+    unit = SimpleNamespace(
+        unit_id="CLI25-SOUNDBANK-BUILD-PREVIEW",
+        version="2025.1",
+        scenario=SimpleNamespace(api="ak.wwise.cli.generateSoundbank"),
+        runner_lane="agent",
+        component_profile_id="cli_console_business_1",
+        family="generic-cli-console",
+    )
+
+    assert campaign.heavy_v3_unit_row(unit, sequence=1) == {
+        "sequence": 1,
+        "scenario_id": "CLI25-SOUNDBANK-BUILD-PREVIEW",
+        "version": "2025.1",
+        "api": "ak.wwise.cli.generateSoundbank",
+        "runner": "agent",
+        "component_profile_id": "cli_console_business_1",
+        "family": "generic-cli-console",
+    }
+
+
 def test_archived_business_replay_rebinds_check_to_latest_batch_revision(
     tmp_path: Path,
 ) -> None:

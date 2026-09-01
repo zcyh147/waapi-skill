@@ -2452,6 +2452,24 @@ def heavy_v3_unit_row(unit: Any, *, sequence: int) -> dict[str, Any]:
                 "heavy unit has an invalid base-scenario identity"
             )
         row["base_scenario_id"] = base_scenario_id
+    component_profile_id = getattr(unit, "component_profile_id", None)
+    family = getattr(unit, "family", None)
+    if component_profile_id is not None:
+        if (
+            not isinstance(component_profile_id, str)
+            or not component_profile_id
+            or not isinstance(family, str)
+            or not family
+        ):
+            raise CampaignEvidenceError(
+                "deep-business acceptance unit metadata is invalid"
+            )
+        row.update(
+            {
+                "component_profile_id": component_profile_id,
+                "family": family,
+            }
+        )
     policy_metadata = _policy_unit_metadata(unit)
     for key in (
         "base_scenario_id",

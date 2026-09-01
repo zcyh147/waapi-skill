@@ -1614,15 +1614,17 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   Preserve multiplicity, values, required fields, and mutually exclusive
   choices; only their transport order is commutative.
 
-### Topic results need one exact machine handoff, not a prose interpretation
+### Topic terminal evidence, not final prose, owns the business truth
 
 - Evidence: #60 r45 captured a complete two-event terminal Topic record while
   the Agent's final prose said that no complete event or terminal record was
   returned. Wwise and the Gateway evidence were correct; the model reconstructed
   the result incorrectly after the command finished.
-- Prevention: for this machine-readable Topic acceptance case, require one line
-  `WAAPI_RESULT_JSON=<terminal agent_result>` copied from the final terminal
-  record. The Agent must not infer, summarize, or rebuild that object.
+- Prevention: validate the bounded terminal payload and real Wwise event rows
+  directly, and keep the final response requirement to non-empty natural prose.
+  Do not inject harness-only markers such as `WAAPI_RESULT_JSON` into a natural
+  user prompt. A contradictory summary remains review evidence, but it cannot
+  overturn an otherwise exact Topic/Wwise business result.
 
 ### Independent compound children may be semantically commutative
 
