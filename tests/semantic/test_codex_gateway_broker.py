@@ -281,7 +281,7 @@ def test_business_draft_runner_projects_a_compact_copy_only_prefix(
     assert projected_argv[1] == (
         TASK_LOCAL_RUNNER_WINDOWS
         if platform_name == "nt"
-        else str(invocation)
+        else TASK_LOCAL_RUNNER_POSIX
     )
     assert "fixed_argv_prefix" not in projected["route"]
 

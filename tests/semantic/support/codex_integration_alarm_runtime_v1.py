@@ -1750,17 +1750,32 @@ def _diagnostic_projection(
             }
         )
     elif kind == "source":
+        original_file_path = _coalesced_alias(
+            row.get("originalFilePath"),
+            row.get("original_file_path"),
+            "diagnostic originalFilePath",
+        )
+        source_language = _coalesced_alias(
+            row.get("audioSource:language"),
+            row.get("source_language"),
+            "diagnostic source language",
+        )
         result.update(
             {
                 "original_file_path": _optional_text(
-                    row.get("originalFilePath")
+                    original_file_path
                 ),
-                "language": _language(row.get("audioSource:language")),
+                "language": _language(source_language),
             }
         )
     elif kind == "bus":
-        result["volume"] = _optional_number(
+        volume = _coalesced_alias(
             row.get("@Volume"),
+            row.get("volume_db"),
+            "diagnostic Bus Volume",
+        )
+        result["volume"] = _optional_number(
+            volume,
             "diagnostic Bus Volume",
         )
     elif kind != "event":

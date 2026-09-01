@@ -1921,6 +1921,27 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   ordinary exact-ID business queries and the oracle still rejects missing,
   extra, or contradictory fields.
 
+### Fresh POSIX Draft commands should use the task-local runner
+
+- Evidence: #61 r17 Weather reached the correct declaration but reconstructed
+  a nearly correct absolute runner path with one directory segment missing.
+  Broker authentication rejected it before Gateway.
+- Prevention: as on Windows, project model-visible compact Draft prefixes onto
+  `.agents/skills/waapi-skill/scripts/run.py`. Broker validation first proves
+  the candidate's absolute canonical command, then rewrites only the runner
+  locator; semantic argv and evidence remain exact. Long absolute paths stay in
+  sealed audit data, not in text the Agent must reproduce.
+
+### Source and Bus observers need the same stable-key rule as Sound
+
+- Evidence: #61 r17 Alarm copied the source continuation and returned the exact
+  AudioFileSource, but the observer still compared only native
+  `originalFilePath`/`audioSource:language`; Bus volume has the same `@Volume`
+  versus `volume_db` boundary.
+- Prevention: coalesce the reviewed source and Bus business aliases exactly as
+  for Sound, reject contradictory dual values, and keep sealed path, language,
+  dB, and identity comparisons unchanged.
+
 ### Draft field discovery is a bounded batch, not one command per meaning
 
 - Evidence: #51 `f0d1945` r10 macOS and native Windows both completed and

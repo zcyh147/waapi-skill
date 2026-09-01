@@ -93,6 +93,7 @@ from tests.semantic.support.codex_gateway_contracts import (
     TYPED_CONTAINER_HANDLE_CONTRACT,
     TYPED_MAP_CONTAINER_CHOICES_CONTRACT,
     TYPED_REQUEST_SCHEMA_CONTRACT,
+    TASK_LOCAL_RUNNER_POSIX,
     TASK_LOCAL_RUNNER_WINDOWS,
     gateway_payload_contracts,
     metadata_candidate_limit_for_query_count,
@@ -8210,6 +8211,8 @@ def _project_operation_draft_runner(
                 projected_runner = (
                     TASK_LOCAL_RUNNER_WINDOWS
                     if compact_copy_only and platform_name == "nt"
+                    else TASK_LOCAL_RUNNER_POSIX
+                    if compact_copy_only
                     else str(invocation_runner)
                 )
                 projected["fixed_argv_prefix_copy"] = _draft_copy_command(

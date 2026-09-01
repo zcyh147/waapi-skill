@@ -644,6 +644,34 @@ def test_diagnostic_sound_observer_rejects_conflicting_business_alias(
         )
 
 
+@pytest.mark.parametrize(
+    ("step_index", "state_key"),
+    ((3, "source"), (4, "dead_bus"), (5, "target_bus")),
+)
+def test_diagnostic_source_and_bus_observers_accept_business_projection(
+    tmp_path: Path,
+    step_index: int,
+    state_key: str,
+) -> None:
+    prepared, _fake = _prepared(tmp_path)
+    row = dict(_payload_row(prepared.before_snapshot.by_key()[state_key]))
+    if state_key == "source":
+        row["original_file_path"] = row.pop("originalFilePath")
+        row["source_language"] = row.pop("audioSource:language")
+    else:
+        row["volume_db"] = row.pop("@Volume")
+
+    prepared.observe_payload(
+        prepared.protocol.steps[step_index],
+        {
+            "ok": True,
+            "command": "query-object",
+            "count": 1,
+            "objects": [row],
+        },
+    )
+
+
 def test_diagnostic_payload_observer_rejects_wrong_chain_identity(
     tmp_path: Path,
 ) -> None:
