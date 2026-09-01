@@ -3372,6 +3372,28 @@ def test_direct_turn_requires_natural_intro_and_runs_final_business_oracle() -> 
     assert "business_verification" in observer.checks
 
 
+def test_deep_business_turn_delegates_first_use_intro_to_dedicated_profile() -> None:
+    prepared = _prepared()
+    observer = runner._CaseObservers(
+        scenario=_scenario(),
+        prepared=prepared,
+        direct=_FakeDirect(),
+        endpoint="127.0.0.1:49152",
+        version="2022.1",
+        business_oracle_plan_sha256="a" * 64,
+        require_first_use_intro=False,
+    )
+    observer.payloads[prepared.protocol.steps[-1].name] = {"objects": []}
+    result = _first_turn_result(
+        after_gateway=("已生成不可变预览，尚未执行任何改动。",),
+    )
+
+    observer.after_turn(1, result, SimpleNamespace())
+
+    assert observer.checks["first_use_intro"] == "delegated_to_dedicated_profile"
+    assert "business_verification" in observer.checks
+
+
 def test_natural_intro_accepts_human_spacing_in_the_skill_name() -> None:
     runner._require_natural_intro(
         "已加载 WAAPI skill，当前 WAAPI 地址是 127.0.0.1:49152，"

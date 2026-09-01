@@ -180,3 +180,4 @@ def test_deep_business_acceptance_delegates_to_the_sealed_component_runner(
     assert observed["scenario_root"] == tmp_path / "scenario"
     delegated_options = observed["options"]
     assert delegated_options.model == "gpt-5.6-terra"
+    assert options.require_first_use_intro is True

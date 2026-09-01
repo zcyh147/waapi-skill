@@ -1583,6 +1583,58 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   still accepts only the one reviewed lookup followed by the exact expected
   closed schema; an explicit profile override remains authoritative.
 
+### Deep API acceptance must not multiply the first-use prose oracle
+
+- Evidence: #60 r45 native Windows completed the generic object query and
+  returned the correct bounded eight-row business result, while macOS completed
+  the two-event Topic stream, but each could be marked FAIL solely because the
+  first visible reply omitted part of the one-time Skill introduction.
+- Prevention: the 19-unit deep-business profile grades route selection, closed
+  business input, Gateway evidence, safety, and the real Wwise result. Delegate
+  the one-time introduction wording to its dedicated Fresh profile instead of
+  multiplying that same prose assertion across every API acceptance unit.
+
+### Natural-language routing starts from the Gateway operation catalog
+
+- Evidence: #60 r45 Agents invented `ak.wwise.ui.commands.project.save` and
+  `ak.wwise.cli.soundbank.generate`, and selected generic `object.set` for a
+  single-reference mutation even though exact closed routes already existed.
+- Prevention: require `operations` as the first Gateway command for each new
+  natural-language business task, then copy the catalog's exact selection
+  guidance into `operation-schema` or `request-schema`. Do not select routes
+  from model memory, similar wording, or prior examples.
+
+### Named business options are transport-order independent
+
+- Evidence: #60 r45 project-setting and SoundEngine Agents supplied every
+  correct closed field and value, but placed the target handle after other
+  named options. The earlier Broker compared argv groups positionally and
+  rejected the otherwise identical business request.
+- Prevention: normalize reviewed named option/value groups before comparison.
+  Preserve multiplicity, values, required fields, and mutually exclusive
+  choices; only their transport order is commutative.
+
+### Topic results need one exact machine handoff, not a prose interpretation
+
+- Evidence: #60 r45 captured a complete two-event terminal Topic record while
+  the Agent's final prose said that no complete event or terminal record was
+  returned. Wwise and the Gateway evidence were correct; the model reconstructed
+  the result incorrectly after the command finished.
+- Prevention: for this machine-readable Topic acceptance case, require one line
+  `WAAPI_RESULT_JSON=<terminal agent_result>` copied from the final terminal
+  record. The Agent must not infer, summarize, or rebuild that object.
+
+### Independent compound children may be semantically commutative
+
+- Evidence: #60 r45 applied the requested rename before the requested notes
+  change inside the same unexecuted compound Undo Draft, while the canonical
+  fixture listed notes first. Both children target different fields, neither
+  consumes the other, and the final Preview is identical.
+- Prevention: do not count an independent child ordering difference as a
+  product failure. Keep dependent children ordered, and retain exact checks for
+  child membership, target identity, values, the single compound Undo boundary,
+  Preview-only behavior, and final business result.
+
 ### The 2021 Debug fixture must expose the project guard row
 
 - Evidence: #60 r42's Debug Agent copied the exact Gateway continuation and

@@ -9332,6 +9332,29 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             "request_schema_route_count": len(request_schema_routes),
             "request_schema_command_template": ["request-schema", "<api>"],
             "request_schema_routes": request_schema_routes,
+            "selection_guidance": {
+                "authoring_ui_command_id": {
+                    "choose": ["operation-schema", "ui.commands.execute"],
+                    "example": "SaveProject",
+                    "never_substitute": (
+                        "a similarly named native project API"
+                    ),
+                },
+                "single_reference_edit": {
+                    "choose": ["operation-schema", "object.setReference"],
+                    "never_substitute": ["operation-schema", "object.set"],
+                },
+                "wwise_console_soundbank_generation": {
+                    "choose": [
+                        "request-schema",
+                        "ak.wwise.cli.generateSoundbank",
+                    ],
+                    "never_substitute": [
+                        "operation-schema",
+                        "soundbank.generate",
+                    ],
+                },
+            },
         }
     if args.command == "operation-schema":
         if args.operation == "waapi.call":

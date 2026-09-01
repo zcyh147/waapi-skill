@@ -3018,6 +3018,48 @@ def test_broker_accepts_one_optional_exact_root_preflight(
     )
 
 
+def test_broker_accepts_exact_root_preflight_after_required_operations(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    steps = (
+        ExpectedGatewayStep("tx01.operations", "operations"),
+        ExpectedGatewayStep(
+            "tx01.operation-schema",
+            "operation-schema",
+            ("object.create",),
+        ),
+    )
+    commands = (
+        ("operations",),
+        ("query-object", "--path-segment", "Weather"),
+        ("operation-schema", "object.create"),
+    )
+    observed: list[list[str]] = []
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=steps,
+        optional_initial_query_object_arguments=("--path-segment", "Weather"),
+        transport="tcp",
+    ) as broker:
+        for arguments in commands:
+            result = run_model_command(broker, list(arguments))
+            assert result.returncode == 0, result.stderr
+            observed.append(
+                ["python", str(broker.invocation_runner_path), "gateway.py", *arguments]
+            )
+        evidence = broker.evidence()
+        reconciliation = broker.reconcile(observed)
+
+    assert evidence.passed
+    assert reconciliation.passed
+    assert evidence.expected_step_names == (
+        "tx01.operations",
+        "tx01.query-object-preflight",
+        "tx01.operation-schema",
+    )
+
+
 @pytest.mark.parametrize(
     "commands",
     (
@@ -5442,6 +5484,68 @@ def test_cli_console_plan_group_order_is_transport_not_business_meaning() -> Non
         step,
         tuple(changed),
     ) != step.arguments
+
+
+@pytest.mark.parametrize(
+    ("subcommand", "expected_groups", "reordered_groups"),
+    (
+        (
+            "draft-declare-project-setting-plan",
+            (
+                ("--game-parameter-handle", "boh1-game-parameter"),
+                ("--minimum", "-10"),
+                ("--maximum", "100"),
+                ("--curve-update-outcome", "stretch"),
+            ),
+            (
+                ("--minimum", "-10"),
+                ("--maximum", "100"),
+                ("--curve-update-outcome", "stretch"),
+                ("--game-parameter-handle", "boh1-game-parameter"),
+            ),
+        ),
+        (
+            "draft-declare-soundengine-plan",
+            (
+                ("--event-handle", "boh1-event"),
+                ("--action", "Stop"),
+                ("--fade-duration-ms", "250"),
+                ("--fade-curve", "Linear"),
+            ),
+            (
+                ("--action", "Stop"),
+                ("--fade-duration-ms", "250"),
+                ("--fade-curve", "Linear"),
+                ("--event-handle", "boh1-event"),
+            ),
+        ),
+    ),
+)
+def test_closed_business_plan_named_argument_order_is_transport(
+    subcommand: str,
+    expected_groups: tuple[tuple[str, str], ...],
+    reordered_groups: tuple[tuple[str, str], ...],
+) -> None:
+    fixed = (
+        "od1-" + "1" * 32,
+        "--task-authority",
+        "da1-" + "2" * 40,
+        "--expected-revision",
+        "2",
+    )
+    step = ExpectedGatewayStep(
+        name="tx01.declare-plan",
+        subcommand=subcommand,
+        arguments=(*fixed, *(token for group in expected_groups for token in group)),
+    )
+    actual = (*fixed, *(token for group in reordered_groups for token in group))
+    broker = SimpleNamespace(_payloads_by_step={})
+
+    assert CodexGatewayBroker._normalize_business_declaration_fact_order(
+        broker,
+        step,
+        actual,
+    ) == step.arguments
 
 
 def test_core_plan_group_order_is_transport_not_business_meaning() -> None:

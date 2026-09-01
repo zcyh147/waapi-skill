@@ -358,6 +358,12 @@ def test_topic_prompts_separate_subscription_scope_from_returned_event_checks() 
     assert "持续流式监听 30 秒" in prompts[
         "TYP24-TOPIC-SOUNDBANK-GENERATED"
     ]
+    assert "最后一个 terminal record 中的 `agent_result`" in prompts[
+        "TYP24-TOPIC-SOUNDBANK-GENERATED"
+    ]
+    assert "WAAPI_RESULT_JSON=<紧凑 JSON>" in prompts[
+        "TYP24-TOPIC-SOUNDBANK-GENERATED"
+    ]
     assert all(
         command not in prompt
         for prompt in prompts.values()

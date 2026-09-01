@@ -8539,10 +8539,17 @@ class CodexGatewayBroker:
                 )
             self._optional_initial_operations_step = discovery
         if self.optional_initial_query_object_arguments is not None:
-            first = self.expected_steps[0]
+            schema_index = (
+                1
+                if len(self.expected_steps) >= 2
+                and self.expected_steps[0].subcommand == "operations"
+                else 0
+            )
+            first = self.expected_steps[schema_index]
             if first.subcommand not in {"operation-schema", "request-schema"}:
                 raise ValueError(
-                    "optional initial query-object requires an exact first schema step"
+                    "optional initial query-object requires an exact first schema "
+                    "step, optionally after one required operations catalog"
                 )
             label = first.name.rsplit(".", 1)[0]
             self._optional_initial_query_object_step = ExpectedGatewayStep(
@@ -9583,9 +9590,15 @@ class CodexGatewayBroker:
                         0,
                         self._optional_initial_operations_step,
                     )
+                optional_query_index = (
+                    1
+                    if self._execution_steps
+                    and self._execution_steps[0].subcommand == "operations"
+                    else 0
+                )
                 if (
-                    self._next_step == 0
-                    and not self._records
+                    self._next_step == optional_query_index
+                    and len(self._records) == optional_query_index
                     and self._optional_initial_query_object_step is not None
                     and resolved.gateway_arguments
                     == (
@@ -9594,11 +9607,11 @@ class CodexGatewayBroker:
                     )
                 ):
                     self._execution_steps.insert(
-                        0,
+                        optional_query_index,
                         self._optional_initial_query_object_step,
                     )
                     self._selected_expected_steps.insert(
-                        0,
+                        optional_query_index,
                         self._optional_initial_query_object_step,
                     )
                 if (
@@ -10429,6 +10442,8 @@ class CodexGatewayBroker:
         if step.subcommand in {
             "draft-declare-cli-console-plan",
             "draft-declare-core-plan",
+            "draft-declare-project-setting-plan",
+            "draft-declare-soundengine-plan",
         }:
             return CodexGatewayBroker._normalize_closed_plan_fact_order(
                 self,
@@ -10643,6 +10658,14 @@ class CodexGatewayBroker:
             "--role": 2,
             "--mapping": 3,
             "--toggle": 2,
+            "--game-parameter-handle": 1,
+            "--minimum": 1,
+            "--maximum": 1,
+            "--curve-update-outcome": 1,
+            "--event-handle": 1,
+            "--action": 1,
+            "--fade-duration-ms": 1,
+            "--fade-curve": 1,
         }
 
         def parse(values: Sequence[Any]) -> list[tuple[Any, ...]] | None:

@@ -804,6 +804,7 @@ class RunnerOptions:
     overwrite: bool
     wwise_readiness_timeout_seconds: float = 60.0
     windows_powershell_core_host: WindowsPowerShellCoreHost | None = None
+    require_first_use_intro: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -1225,6 +1226,11 @@ def run_heavy_v3_unit(
                 options,
                 profile=component_profile,
                 suite_path=component_suite,
+                # The public deep-business profile grades the operation's
+                # business boundary.  First-use wording remains covered by
+                # the dedicated semantic profiles instead of multiplying the
+                # same prose oracle across all 19 API cases.
+                require_first_use_intro=False,
             ),
         )
     unit_row = _heavy_v3_unit_row(unit, sequence=1)
@@ -1334,6 +1340,7 @@ def run_heavy_v3_unit(
                 if options.profile in SEMANTIC_BOOTSTRAP_PROFILE_IDS
                 else ""
             ),
+            require_first_use_intro=options.require_first_use_intro,
         )
         return runner(unit, scenario_root=scenario_root, options=project_options)
 

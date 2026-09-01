@@ -579,6 +579,21 @@ def test_operations_catalog_routes_cli_console_intent_to_request_schema(
     assert "generate SoundBanks" in rows[
         "ak.wwise.cli.generateSoundbank"
     ]["intent"]
+    assert payload["selection_guidance"] == {
+        "authoring_ui_command_id": {
+            "choose": ["operation-schema", "ui.commands.execute"],
+            "example": "SaveProject",
+            "never_substitute": "a similarly named native project API",
+        },
+        "single_reference_edit": {
+            "choose": ["operation-schema", "object.setReference"],
+            "never_substitute": ["operation-schema", "object.set"],
+        },
+        "wwise_console_soundbank_generation": {
+            "choose": ["request-schema", "ak.wwise.cli.generateSoundbank"],
+            "never_substitute": ["operation-schema", "soundbank.generate"],
+        },
+    }
 
 
 def test_add_platform_business_plan_derives_native_names(tmp_path) -> None:

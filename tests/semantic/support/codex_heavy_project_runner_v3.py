@@ -372,6 +372,7 @@ class HeavyProjectRunnerOptions:
     live_environment: Mapping[str, str]
     windows_powershell_core_host: WindowsPowerShellCoreHost | None = None
     developer_instructions: str = ""
+    require_first_use_intro: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -1047,6 +1048,7 @@ def run_heavy_project_unit(
                 policy_mode or "ask_before_changes"
             ),
             enforce_policy_turn_oracles=policy_mode is not None,
+            require_first_use_intro=options.require_first_use_intro,
         )
 
         def observe_turn(
@@ -1389,6 +1391,7 @@ class _CaseObservers:
         business_oracle_plan_sha256: str,
         project_modification_policy: str = "ask_before_changes",
         enforce_policy_turn_oracles: bool = False,
+        require_first_use_intro: bool = True,
         publisher_client_factory: Callable[[], OwnedDirectWaapiCall] | None = None,
         publisher_process_target: Callable[..., None] | None = None,
     ) -> None:
@@ -1399,6 +1402,7 @@ class _CaseObservers:
         self.version = version
         self.business_oracle_plan_sha256 = business_oracle_plan_sha256
         self.project_modification_policy = project_modification_policy
+        self.require_first_use_intro = require_first_use_intro
         self.policy_baseline = (
             prepared.snapshot()
             if enforce_policy_turn_oracles
@@ -1575,7 +1579,7 @@ class _CaseObservers:
         result: CodexRunResult,
         _broker_evidence: Any,
     ) -> None:
-        if turn_index == 1:
+        if turn_index == 1 and self.require_first_use_intro:
             intro_response = first_gateway_backed_agent_message(
                 result.stdout,
                 validated_gateway_commands=result.command_facts.gateway_commands,
@@ -1592,6 +1596,8 @@ class _CaseObservers:
                 policy=self.project_modification_policy,
             )
             self.checks["first_use_intro"] = True
+        elif turn_index == 1:
+            self.checks["first_use_intro"] = "delegated_to_dedicated_profile"
         if self.policy_baseline is not None and (
             self.project_modification_policy == "read_only"
             or (

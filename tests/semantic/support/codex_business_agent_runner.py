@@ -8,7 +8,10 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
-from tests.semantic.support.codex_gateway_broker import CodexGatewayBroker
+from tests.semantic.support.codex_gateway_broker import (
+    CodexGatewayBroker,
+    ExpectedGatewayStep,
+)
 from tests.semantic.support.codex_harness import (
     CodexCliTask,
     CodexHarnessConfig,
@@ -125,6 +128,35 @@ def business_agent_optional_operations_discovery(
     return None
 
 
+def business_agent_required_operations_steps(
+    unit: Any,
+    *,
+    steps: Sequence[Any],
+    explicit: str | None,
+) -> tuple[Any, ...]:
+    """Put one catalog read before every new natural-language schema route."""
+
+    reviewed = tuple(steps)
+    if not reviewed or getattr(reviewed[0], "subcommand", None) == "operations":
+        return reviewed
+    target = business_agent_optional_operations_discovery(
+        unit,
+        explicit=explicit,
+        steps=reviewed,
+    )
+    if target is None:
+        return reviewed
+    first_name = getattr(reviewed[0], "name", "business.schema")
+    label = first_name.rsplit(".", 1)[0]
+    return (
+        ExpectedGatewayStep(
+            name=f"{label}.operations",
+            subcommand="operations",
+        ),
+        *reviewed,
+    )
+
+
 def run_business_agent_unit(
     unit: Any,
     *,
@@ -141,12 +173,12 @@ def run_business_agent_unit(
     evidence.mkdir(parents=True, exist_ok=False)
     skill_install = prepare_workspace_skill_install(workspace, options.skill_source)
     runtime = spec.prepare_runtime(unit, task_root / "runtime")
-    steps = tuple(spec.build_steps(runtime))
-    optional_operations_discovery = business_agent_optional_operations_discovery(
+    steps = business_agent_required_operations_steps(
         unit,
+        steps=tuple(spec.build_steps(runtime)),
         explicit=spec.optional_initial_operations_discovery_operation,
-        steps=steps,
     )
+    optional_operations_discovery = None
     optional_query_arguments = (
         None
         if spec.optional_initial_query_object_arguments is None

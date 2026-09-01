@@ -378,6 +378,7 @@ def test_project_dispatch_passes_closed_runtime_options_without_starting_it(
         live_environment: Mapping[str, str]
         windows_powershell_core_host: Any = None
         developer_instructions: str = ""
+        require_first_use_intro: bool = True
 
     def fake_run(value: _Unit, *, scenario_root: Path, options: FakeOptions):
         observed.update(unit=value, root=scenario_root, options=options)
@@ -407,6 +408,7 @@ def test_project_dispatch_passes_closed_runtime_options_without_starting_it(
         options.live_config
     )
     assert runtime_options.developer_instructions == ""
+    assert runtime_options.require_first_use_intro is True
 
 
 @pytest.mark.parametrize(
@@ -438,6 +440,7 @@ def test_agent_facing_project_dispatch_seals_pre_action_developer_instructions(
         live_environment: Mapping[str, str]
         windows_powershell_core_host: Any = None
         developer_instructions: str = ""
+        require_first_use_intro: bool = True
 
     def fake_run(value: _Unit, *, scenario_root: Path, options: FakeOptions):
         observed.update(options=options)
