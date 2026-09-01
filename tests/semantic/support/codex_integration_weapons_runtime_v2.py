@@ -3,9 +3,8 @@
 The model receives only two reviewed object paths.  The runtime seals the
 copied SampleProject against the version manifest, requires one bounded audit
 query, one exact-ID hop per distinct returned OutputBus, and one exact-ID
-readback per selected Sound.  It builds one metadata-bound ``object.set`` batch
-from those revalidated GUIDs and independently reads back all selected and
-protected state.
+readback per selected Sound.  It builds one bound business ``object.set`` batch
+and independently reads back all selected and protected state.
 
 Direct WAAPI access is runner-owned and read-only.  The model can mutate only
 through the ordinary immutable Gateway transaction protocol.
@@ -28,12 +27,10 @@ from tests.semantic.support.codex_campaign import canonical_json_bytes
 from tests.semantic.support.codex_eval_protocol_v3 import (
     OPERATION_REQUEST_CONTRACT,
     V3GatewayProtocol,
-    build_object_set_composer_transaction_steps,
+    build_transaction_protocol,
 )
 from tests.semantic.support.codex_gateway_broker import (
-    DraftActionMetadataBinding,
     ExpectedGatewayStep,
-    MetadataQueryArgument,
     gateway_step_prefix_matches,
     gateway_step_sequence_matches,
 )
@@ -412,63 +409,24 @@ def prepare_weapons_integration_runtime(
         before, visible_values, request = session.prepare()
         audit_step = _audit_query_step(visible_values["weapons_audit_root_path"])
         output_bus_steps = _output_bus_readback_steps(before)
-        output_bus_states = _distinct_output_bus_states(before)
-        reference_identity_sources = {
-            state.path: step.name
-            for state, step in zip(
-                output_bus_states,
-                output_bus_steps,
-                strict=True,
-            )
-        }
-        metadata_step = ExpectedGatewayStep(
-            name="tx01.metadata",
-            subcommand="metadata",
-            arguments=(
-                "discover",
-                "--object-type",
-                "Sound",
-                "--query",
-                MetadataQueryArgument("Volume"),
-                "--query",
-                MetadataQueryArgument("Output Bus"),
-                "--limit",
-                "8",
-            ),
-        )
-        metadata_binding = DraftActionMetadataBinding(
-            step=metadata_step.name,
-            object_type="Sound",
-            required_tokens=("Volume", "OutputBus"),
-        )
-        composer_steps = build_object_set_composer_transaction_steps(
-            request,
-            label="tx01",
-            reference_identity_sources=reference_identity_sources,
-            metadata_binding=metadata_binding,
-        )
-        transaction_steps = (
-            composer_steps[0],
-            metadata_step,
-            *composer_steps[1:],
-        )
+        transaction_steps = build_transaction_protocol((request,)).steps
         identity_steps = tuple(
             _identity_readback_step(role, before.objects_by_role()[role])
             for role in _SELECTED_ROLES
         )
         read_prefix = 1 + len(output_bus_steps)
-        transaction_prefix = read_prefix + len(identity_steps)
+        steps = (audit_step, *output_bus_steps, *identity_steps, *transaction_steps)
+        preview_prefix = next(
+            index
+            for index, step in enumerate(steps, start=1)
+            if step.name == "tx01.preview"
+        )
         protocol = V3GatewayProtocol(
-            (audit_step, *output_bus_steps, *identity_steps, *transaction_steps),
+            steps,
             (
                 read_prefix,
-                transaction_prefix
-                + next(
-                    index
-                    for index, step in enumerate(transaction_steps, start=1)
-                    if step.name == "tx01.preview"
-                ),
-                len(transaction_steps) + transaction_prefix,
+                preview_prefix,
+                len(steps),
             ),
             commutative_read_only_step_groups=(
                 tuple(step.name for step in output_bus_steps),
@@ -648,6 +606,11 @@ class _WeaponsSession:
         output_bus_names = tuple(step.name for step in output_bus_steps)
         names = tuple(step.name for step in protocol.steps)
         transaction_names = names[6:]
+        expected_turn_prefixes = (
+            3,
+            names.index("tx01.preview") + 1,
+            len(names),
+        )
         if (
             names[:6]
             != (
@@ -657,12 +620,19 @@ class _WeaponsSession:
                 "identity.audit_tail",
                 "identity.audit_mechanical",
             )
-            or transaction_names[:3]
-            != ("tx01.operation-schema", "tx01.metadata", "tx01.draft-start")
-            or tuple(
-                step.subcommand for step in protocol.steps[6:]
-            ).count("draft-apply")
-            != 1
+            or transaction_names[:2]
+            != ("tx01.operation-schema", "tx01.draft-start")
+            or any(
+                step.subcommand == "draft-apply" for step in protocol.steps[6:]
+            )
+            or sum(
+                step.subcommand == "draft-bind-object"
+                for step in protocol.steps[6:]
+            ) < 4
+            or sum(
+                step.subcommand == "draft-declare-existing"
+                for step in protocol.steps[6:]
+            ) != 3
             or transaction_names[-6:]
             != (
                 "tx01.check",
@@ -674,7 +644,7 @@ class _WeaponsSession:
             )
             or tuple(protocol.steps[1 : 1 + len(output_bus_steps)])
             != output_bus_steps
-            or protocol.turn_prefix_counts != (3, 12, 16)
+            or protocol.turn_prefix_counts != expected_turn_prefixes
             or protocol.commutative_read_only_step_groups
             != (output_bus_names,)
         ):

@@ -1387,6 +1387,7 @@ def _build_object_set_business_transaction_steps(
     for index, row in enumerate(objects, start=1):
         if not isinstance(row, Mapping) or set(row) - {
             "object",
+            "name",
             "notes",
             "properties",
             "references",
@@ -1562,6 +1563,8 @@ def _build_object_set_business_transaction_steps(
             "--object-handle",
             item["target"],
         ]
+        if "name" in row:
+            arguments_out.extend(("--field", "new_name", row["name"]))
         if "notes" in row:
             arguments_out.extend(
                 (
@@ -6010,6 +6013,37 @@ def build_operations_discovery_protocol(
         turn_prefix_counts=tuple(value + 1 for value in base.turn_prefix_counts),
         allowed_turn_prefix_counts=allowed,
         terminal_prefix_counts=terminal,
+        commutative_read_only_step_groups=base.commutative_read_only_step_groups,
+        commutative_composer_setup_step_groups=(
+            base.commutative_composer_setup_step_groups
+        ),
+        optional_topic_schema_step_groups=base.optional_topic_schema_step_groups,
+    )
+
+
+def build_required_operations_discovery_protocol(
+    base: V3GatewayProtocol,
+) -> V3GatewayProtocol:
+    """Require one catalog read before a natural-language workflow protocol."""
+
+    if not isinstance(base, V3GatewayProtocol) or not base.steps:
+        raise V3ProtocolError("required operations discovery requires one protocol")
+    discovery = ExpectedGatewayStep(
+        name="routing.operations",
+        subcommand="operations",
+    )
+    if any(step.name == discovery.name for step in base.steps):
+        raise V3ProtocolError("required operations discovery step name collides")
+    return V3GatewayProtocol(
+        steps=(discovery, *base.steps),
+        turn_prefix_counts=tuple(value + 1 for value in base.turn_prefix_counts),
+        allowed_turn_prefix_counts=tuple(
+            tuple(value + 1 for value in values)
+            for values in base.allowed_turn_prefix_counts
+        ),
+        terminal_prefix_counts=tuple(
+            value + 1 for value in base.terminal_prefix_counts
+        ),
         commutative_read_only_step_groups=base.commutative_read_only_step_groups,
         commutative_composer_setup_step_groups=(
             base.commutative_composer_setup_step_groups

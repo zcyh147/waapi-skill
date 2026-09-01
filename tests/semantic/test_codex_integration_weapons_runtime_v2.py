@@ -536,7 +536,7 @@ def _prepared(tmp_path: Path, *, version: str = "2022.1") -> tuple[Any, FakeWeap
     return prepared, fake, runtime
 
 
-def _archive_test_weapons_composer_protocol_compiles_as_one_complete_workflow_transaction(
+def test_weapons_business_protocol_compiles_as_one_complete_workflow_transaction(
     tmp_path: Path,
 ) -> None:
     from tests.semantic.support import codex_heavy_project_runner_v3 as project_runner
@@ -783,7 +783,7 @@ def test_prepares_scoped_complete_query_and_one_strict_batch(
         if version == "2022.1"
         else r"\Busses\Default Work Unit\WAAPI_V2_Weapons"
     )
-    assert tuple(step.name for step in prepared.protocol.steps[:9]) == (
+    assert tuple(step.name for step in prepared.protocol.steps[:8]) == (
         "audit.scope",
         "relationship.output_bus.01",
         "relationship.output_bus.02",
@@ -791,10 +791,9 @@ def test_prepares_scoped_complete_query_and_one_strict_batch(
         "identity.audit_tail",
         "identity.audit_mechanical",
         "tx01.operation-schema",
-        "tx01.metadata",
         "tx01.draft-start",
     )
-    assert prepared.protocol.turn_prefix_counts == (3, 12, 16)
+    assert prepared.protocol.turn_prefix_counts == (3, 17, 21)
     assert prepared.protocol.commutative_read_only_step_groups == (
         (
             "relationship.output_bus.01",
@@ -803,79 +802,31 @@ def test_prepares_scoped_complete_query_and_one_strict_batch(
     )
     serialized = serialize_protocol(prepared.protocol)
     assert deserialize_protocol(serialized) == prepared.protocol
-    tampered = copy.deepcopy(serialized)
-    identity_bound_argument = next(
-        action
-        for step in tampered["steps"]
-        for argument in step["arguments"]
-        if argument.get("kind") == "draft_typed_action_batch"
-        for action in argument["actions"]
-        if action.get("query_identity_bindings")
-    )
-    identity_bound_argument["query_identity_bindings"][0]["step"] = (
-        "missing.output.bus.query"
-    )
-    with pytest.raises(
-        PromptProvenanceError,
-        match="pre-Draft query-object response",
-    ):
-        deserialize_protocol(tampered)
-    metadata_step = prepared.protocol.steps[7]
-    assert metadata_step.subcommand == "metadata"
-    assert metadata_step.arguments == (
-        "discover",
-        "--object-type",
-        "Sound",
-        "--query",
-        MetadataQueryArgument("Volume"),
-        "--query",
-        MetadataQueryArgument("Output Bus"),
-        "--limit",
-        "8",
-    )
-    composer_steps = prepared.protocol.steps[8:12]
-    assert composer_steps[0].subcommand == "draft-start"
-    assert [step.subcommand for step in composer_steps[-2:]] == [
+    business_steps = prepared.protocol.steps[7:17]
+    assert business_steps[0].subcommand == "draft-start"
+    assert [step.subcommand for step in business_steps[-2:]] == [
         "draft-check",
         "preview-from-draft",
     ]
-    action_steps = [
-        step for step in composer_steps if step.subcommand == "draft-apply"
-    ]
-    assert len(action_steps) == 1
-    assert isinstance(action_steps[0].arguments[-1], DraftTypedActionBatchArgument)
-    assert {
-        member.metadata_binding
-        for member in _draft_action_members(action_steps[0])
-    } == {
-        DraftActionMetadataBinding(
-            step="tx01.metadata",
-            object_type="Sound",
-            required_tokens=("Volume", "OutputBus"),
-        )
-    }
-    reference_actions = [
-        argument
-        for step in action_steps
-        for argument in _draft_action_members(step)
-        if argument.expected.get("references")
-    ]
-    assert len(reference_actions) == 2
-    assert all(
-        argument.query_identity_bindings
-        == (
-            DraftActionQueryIdentityBinding(
-                pointer="/references/0/target",
-                step="relationship.output_bus.02",
-            ),
-        )
-        for argument in reference_actions
-    )
     assert not any(
-        isinstance(argument, SealedQueryIdentityBoundJsonArgument)
-        for step in composer_steps
-        for argument in step.arguments
+        step.subcommand == "draft-apply" for step in business_steps
     )
+    binding_steps = [
+        step for step in business_steps if step.subcommand == "draft-bind-object"
+    ]
+    assert [step.name for step in binding_steps] == [
+        "tx01.bind-target-01-01",
+        "tx01.bind-reference-01-02",
+        "tx01.bind-target-02-03",
+        "tx01.bind-target-03-04",
+    ]
+    declarations = [
+        step for step in business_steps if step.subcommand == "draft-declare-existing"
+    ]
+    assert len(declarations) == 3
+    assert declarations[0].arguments.count("--field") == 3
+    assert declarations[1].arguments.count("--field") == 1
+    assert declarations[2].arguments.count("--field") == 2
     audit = prepared.protocol.steps[0]
     assert audit.subcommand == "query-object"
     assert audit.arguments[:4] == (
@@ -964,76 +915,65 @@ def test_prepares_scoped_complete_query_and_one_strict_batch(
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])
-def test_weapons_fast_path_keeps_canonical_volume_and_rejects_query_accessor(
+def test_weapons_business_draft_keeps_canonical_volume_field(
     tmp_path: Path,
     version: str,
 ) -> None:
     prepared, _fake, _runtime = _prepared(tmp_path, version=version)
-    broker, step, action = _typed_action_broker(
-        prepared,
-        action="set_property",
+    declaration = next(
+        step
+        for step in prepared.protocol.steps
+        if step.name == "tx01.declare-existing-02"
     )
 
-    assert action["properties"] == [{"name": "Volume", "value": -3.0}]
-    broker._validate_step(step, _typed_action_argv(step, action))  # noqa: SLF001
-
-    action["properties"][0]["name"] = "@Volume"
-    with pytest.raises(GatewayInvocationError, match="typed Draft (?:action|batch)"):
-        broker._validate_step(  # noqa: SLF001
-            step,
-            _typed_action_argv(step, action),
-        )
+    assert ("--field", "volume_db") in tuple(
+        zip(declaration.arguments, declaration.arguments[1:])
+    )
+    assert "@Volume" not in declaration.arguments
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])
-def test_composer_repeats_the_exact_reviewed_output_bus_path(
+def test_business_draft_binds_one_exact_reviewed_output_bus(
     tmp_path: Path,
     version: str,
 ) -> None:
     prepared, _fake, _runtime = _prepared(tmp_path, version=version)
-    references = [
-        argument.expected["references"][0]
+    reference_bindings = [
+        step
         for step in prepared.protocol.steps
-        if step.subcommand == "draft-apply"
-        for argument in _draft_action_members(step)
-        if argument.expected.get("references")
+        if step.name.startswith("tx01.bind-reference-")
     ]
+    assert len(reference_bindings) == 1
+    binding = reference_bindings[0]
+    expected_segments = tuple(
+        segment
+        for segment in prepared.visible_values["weapons_bus_path"].split("\\")
+        if segment
+    )
+    actual_segments = tuple(
+        binding.arguments[index + 1]
+        for index, value in enumerate(binding.arguments[:-1])
+        if value == "--object-path-segment"
+    )
+    assert actual_segments == expected_segments
 
-    assert len(references) == 2
-    assert [row["name"] for row in references] == ["OutputBus", "OutputBus"]
-    assert [row["target"] for row in references] == [
-        {
-            "kind": "path",
-            "value": prepared.visible_values["weapons_bus_path"],
-        },
-        {
-            "kind": "path",
-            "value": prepared.visible_values["weapons_bus_path"],
-        },
+    declarations = [
+        step
+        for step in prepared.protocol.steps
+        if step.subcommand == "draft-declare-existing"
     ]
-    for occurrence in range(2):
-        broker, step, action = _typed_action_broker(
-            prepared,
-            action="set_reference",
-            occurrence=occurrence,
+    output_bus_bindings = [
+        argument
+        for declaration in declarations
+        for index, argument in enumerate(declaration.arguments)
+        if index >= 2
+        and declaration.arguments[index - 2 : index] == (
+            "--field",
+            "output_bus",
         )
-        broker._validate_step(step, _typed_action_argv(step, action))  # noqa: SLF001
-        binding = next(
-            argument.query_identity_bindings[0]
-            for argument in _draft_action_members(step)
-            if argument.expected.get("selector") == action.get("selector")
-        )
-        source_step = next(
-            candidate
-            for candidate in prepared.protocol.steps
-            if candidate.name == binding.step
-        )
-        _set_action_pointer(
-            action,
-            binding.pointer,
-            {"kind": "id", "value": source_step.arguments[1]},
-        )
-        broker._validate_step(step, _typed_action_argv(step, action))  # noqa: SLF001
+    ]
+    assert len(output_bus_bindings) == 2
+    assert output_bus_bindings[0] == output_bus_bindings[1]
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])
@@ -1220,43 +1160,6 @@ def _archive_test_compact_draft_replay_accepts_only_the_exact_queried_bus_guid(
         match="canonical request does not replay",
     ):
         broker._validate_operation_draft_payload(preview, tampered)  # noqa: SLF001
-
-
-@pytest.mark.parametrize("version", ["2022.1", "2025.1"])
-@pytest.mark.parametrize("reference_index", [0, 1])
-@pytest.mark.parametrize("wrong_identity", ["guid", "path"])
-def test_composer_rejects_wrong_output_bus_guid_or_path(
-    tmp_path: Path,
-    version: str,
-    reference_index: int,
-    wrong_identity: str,
-) -> None:
-    prepared, _fake, _runtime = _prepared(tmp_path, version=version)
-    broker, step, action = _typed_action_broker(
-        prepared,
-        action="set_reference",
-        occurrence=reference_index,
-    )
-    binding = next(
-        argument.query_identity_bindings[0]
-        for argument in _draft_action_members(step)
-        if argument.expected.get("selector") == action.get("selector")
-    )
-    target = action["references"][0]["target"]
-    if wrong_identity == "guid":
-        _set_action_pointer(
-            action,
-            binding.pointer,
-            {"kind": "id", "value": _guid("wrong-output-bus")},
-        )
-    else:
-        target["value"] += "_Wrong"
-
-    with pytest.raises(GatewayInvocationError, match="typed Draft (?:action|batch)"):
-        broker._validate_step(  # noqa: SLF001
-            step,
-            _typed_action_argv(step, action),
-        )
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])

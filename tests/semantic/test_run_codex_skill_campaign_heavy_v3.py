@@ -317,6 +317,111 @@ def test_typed_input_business_plan_accepts_sealed_operations_discovery() -> None
     assert parsed.static_expectation["profile_unit_id"] == unit.unit_id
 
 
+def test_integration_plan_requires_catalog_before_query_first_protocol() -> None:
+    from tests.semantic.support.codex_workflow_business_plan_v3 import (
+        compile_workflow_business_plan_sections,
+    )
+
+    unit = SimpleNamespace(
+        workflow_id="alarm_diagnose_and_repair",
+    )
+    protocol = V3GatewayProtocol(
+        steps=(
+            ExpectedGatewayStep("diag.search", "query-object"),
+            ExpectedGatewayStep(
+                "tx01.operation-schema",
+                "operation-schema",
+                ("object.setReference",),
+            ),
+            ExpectedGatewayStep("tx01.preview", "preview"),
+            ExpectedGatewayStep("tx01.transaction-show", "transaction-show"),
+            ExpectedGatewayStep("tx01.confirm", "confirm"),
+            ExpectedGatewayStep("tx01.execute", "execute"),
+            ExpectedGatewayStep("tx01.verify", "verify"),
+        ),
+        turn_prefix_counts=(1, 3, 7),
+    )
+    sections = compile_workflow_business_plan_sections(
+        workflow_id=unit.workflow_id,
+        transactions=(
+            {
+                "transaction_id": "tx01",
+                "api": "ak.wwise.core.object.set",
+                "operation": "object.setReference",
+                "phase": f"{unit.workflow_id}.transaction_01",
+                "primary_step": "tx01.execute",
+            },
+        ),
+        workflow_steps=(
+            {
+                "name": "diag.search",
+                "kind": "diagnostic",
+                "phase": f"{unit.workflow_id}.diagnosis",
+                "transaction_id": None,
+                "api": "ak.wwise.core.object.get",
+            },
+            *(
+                {
+                    "name": step.name,
+                    "kind": kind,
+                    "phase": f"{unit.workflow_id}.transaction_01",
+                    "transaction_id": "tx01",
+                    "api": "ak.wwise.core.object.set",
+                }
+                for step, kind in zip(
+                    protocol.steps[1:],
+                    (
+                        "operation_schema",
+                        "preview",
+                        "transaction_show",
+                        "confirm",
+                        "execute",
+                        "verify",
+                    ),
+                    strict=True,
+                )
+            ),
+            {
+                "name": "cleanup.success",
+                "kind": "cleanup",
+                "phase": f"{unit.workflow_id}.cleanup",
+                "transaction_id": None,
+                "api": None,
+            },
+        ),
+        diagnostic_evidence=(
+            {
+                "evidence_id": "diag/search",
+                "step": "diag.search",
+                "api": "ak.wwise.core.object.get",
+                "phase": f"{unit.workflow_id}.diagnosis",
+                "expectation": {"bounded": True},
+            },
+        ),
+        live_bindings={"version": "2022.1"},
+        transaction_expectations=(
+            {"transaction_id": "tx01", "expectation": {"changed": True}},
+        ),
+    )
+
+    wrapped, rebuilt = (
+        project_runner.integration_required_operations_protocol_and_plan(
+            unit=unit,
+            protocol=protocol,
+            sections=sections,
+        )
+    )
+
+    assert wrapped.steps[0].name == "routing.operations"
+    assert wrapped.steps[0].subcommand == "operations"
+    assert rebuilt.static_expectation["workflow_steps"][0] == {
+        "name": "routing.operations",
+        "kind": "checkpoint",
+        "phase": f"{unit.workflow_id}.checkpoint",
+        "transaction_id": None,
+        "api": None,
+    }
+
 @pytest.mark.parametrize(
     "subcommand",
     sorted(EXPECTED_DRAFT_REVISION_SUBCOMMANDS),

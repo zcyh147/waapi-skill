@@ -68,6 +68,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_optional_query_schema_protocol,
     build_optional_topic_schema_protocol,
     build_operations_discovery_protocol,
+    build_required_operations_discovery_protocol,
     build_transaction_protocol,
     call_step,
     media_pool_business_call_step,
@@ -1524,7 +1525,10 @@ class _CaseObservers:
         _evidence_directory: Path,
     ) -> None:
         self.payloads[step.name] = payload
-        if self.prepared.observe_payload is not None:
+        if (
+            step.name != "routing.operations"
+            and self.prepared.observe_payload is not None
+        ):
             self.prepared.observe_payload(step, payload)
         if step.name.endswith(".transaction-show"):
             self.checks[f"{step.name}.confirmation_binding"] = (
@@ -4102,6 +4106,11 @@ def _prepare_integration_workflow_case(
             f"integration workflow has no runtime: {workflow_id}"
         )
 
+    protocol, typed_sections = integration_required_operations_protocol_and_plan(
+        unit=unit,
+        protocol=prepared.protocol,
+        sections=typed_sections,
+    )
     visible_values = MappingProxyType(dict(prepared.visible_values))
     expected_dispatches = _integration_expected_dispatches(
         prepared.expected_dispatches
@@ -4113,7 +4122,7 @@ def _prepare_integration_workflow_case(
     return _PreparedCase(
         prompt=prompt,
         visible_values=visible_values,
-        protocol=prepared.protocol,
+        protocol=protocol,
         required_reference=(
             "references/waapi-query.md"
             if workflow_id in _INTEGRATION_QUERY_FIRST_WORKFLOW_IDS
@@ -4442,6 +4451,60 @@ def _compile_integration_workflow_plan(
         live_bindings=live_bindings,
         transaction_expectations=tuple(requirements),
     )
+
+
+def integration_required_operations_protocol_and_plan(
+    *,
+    unit: Any,
+    protocol: V3GatewayProtocol,
+    sections: WorkflowBusinessPlanSections,
+) -> tuple[V3GatewayProtocol, WorkflowBusinessPlanSections]:
+    """Bind one required catalog read into a complete integration plan."""
+
+    if not isinstance(sections, WorkflowBusinessPlanSections):
+        raise HeavyProjectRunnerError(
+            "integration operations discovery requires one workflow plan"
+        )
+    wrapped = build_required_operations_discovery_protocol(protocol)
+    static = sections.static_expectation
+    live = sections.live_binding
+    transactions = tuple(dict(row) for row in static["transactions"])
+    workflow_steps = tuple(dict(row) for row in static["workflow_steps"])
+    if not transactions or not workflow_steps:
+        raise HeavyProjectRunnerError(
+            "integration operations discovery requires complete workflow topology"
+        )
+    routing_step = {
+        "name": "routing.operations",
+        "kind": "checkpoint",
+        "phase": f"{unit.workflow_id}.checkpoint",
+        "transaction_id": None,
+        "api": None,
+    }
+    diagnostic_evidence = tuple(
+        {
+            key: value
+            for key, value in dict(row).items()
+            if key != "expectation_sha256"
+        }
+        for row in static["diagnostic_evidence"]
+    )
+    transaction_expectations = tuple(
+        {
+            "transaction_id": row["transaction_id"],
+            "expectation": dict(row["expectation"]),
+        }
+        for row in sections.delta_rules
+    )
+    rebuilt = compile_workflow_business_plan_sections(
+        workflow_id=str(unit.workflow_id),
+        transactions=transactions,
+        workflow_steps=(routing_step, *workflow_steps),
+        diagnostic_evidence=diagnostic_evidence,
+        live_bindings=dict(live["bindings"]),
+        transaction_expectations=transaction_expectations,
+    )
+    return wrapped, rebuilt
 
 
 def _prepare_case(
