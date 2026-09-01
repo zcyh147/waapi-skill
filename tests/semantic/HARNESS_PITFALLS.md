@@ -1850,6 +1850,29 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   returns the copy-ready `sound-routing-diagnostics` hop, so the Agent need not
   reconstruct either query or its result bound.
 
+### Business meaning qualifiers are not native-parameter drift
+
+- Evidence: #61 r14 Weather used `Play Action Fade Time` and
+  `Play Action delay time in seconds` for the exact scope-bound field discovery
+  that the protocol labeled `FadeTime` and `Delay`. The Broker rejected the
+  harmless wording before Gateway metadata could prove the exact fields.
+- Prevention: meaning-only equivalence removes a small reviewed set of object,
+  field, and unit qualifiers, then requires one non-empty exact lexical core.
+  Negation and unreviewed semantic words remain unequal. The live Gateway still
+  binds the exact metadata token and all subsequent field handles, values, and
+  native requests remain exact.
+
+### A business query oracle must accept the Gateway's stable result keys
+
+- Evidence: #61 r14 Alarm followed both copy-ready hops correctly on macOS and
+  Windows and read the exact Sound, but the observer compared only native
+  `OverrideOutput`/`activeSource`/`OutputBus` keys. Production intentionally
+  returned `override_output`/`active_source`/`output_bus`.
+- Prevention: observers coalesce the reviewed native and business aliases,
+  reject contradictory dual values, and compare the resulting exact GUIDs and
+  booleans against sealed Wwise state. Stable presentation-key differences do
+  not become semantic FAILs.
+
 ### Draft field discovery is a bounded batch, not one command per meaning
 
 - Evidence: #51 `f0d1945` r10 macOS and native Windows both completed and

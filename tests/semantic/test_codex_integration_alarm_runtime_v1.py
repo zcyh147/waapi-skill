@@ -605,6 +605,45 @@ def test_diagnostic_action_observer_accepts_gateway_business_projection(
     )
 
 
+def test_diagnostic_sound_observer_accepts_gateway_business_projection(
+    tmp_path: Path,
+) -> None:
+    prepared, _fake = _prepared(tmp_path)
+    sound = dict(_payload_row(prepared.before_snapshot.by_key()["sound"]))
+    sound["override_output"] = sound.pop("OverrideOutput")
+    sound["active_source"] = sound.pop("activeSource")
+    sound["output_bus"] = sound.pop("OutputBus")
+
+    prepared.observe_payload(
+        prepared.protocol.steps[2],
+        {
+            "ok": True,
+            "command": "query-object",
+            "count": 1,
+            "objects": [sound],
+        },
+    )
+
+
+def test_diagnostic_sound_observer_rejects_conflicting_business_alias(
+    tmp_path: Path,
+) -> None:
+    prepared, _fake = _prepared(tmp_path)
+    sound = dict(_payload_row(prepared.before_snapshot.by_key()["sound"]))
+    sound["override_output"] = not sound["OverrideOutput"]
+
+    with pytest.raises(AlarmIntegrationRuntimeError, match="aliases disagree"):
+        prepared.observe_payload(
+            prepared.protocol.steps[2],
+            {
+                "ok": True,
+                "command": "query-object",
+                "count": 1,
+                "objects": [sound],
+            },
+        )
+
+
 def test_diagnostic_payload_observer_rejects_wrong_chain_identity(
     tmp_path: Path,
 ) -> None:

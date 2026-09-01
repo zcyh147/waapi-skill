@@ -1712,20 +1712,39 @@ def _diagnostic_projection(
             }
         )
     elif kind == "sound":
+        native_override_output = _bool_alias(
+            row,
+            "OverrideOutput",
+            "@OverrideOutput",
+            "diagnostic OverrideOutput",
+        )
+        override_output = _coalesced_alias(
+            native_override_output,
+            _optional_bool(
+                row.get("override_output"),
+                "diagnostic override_output",
+            ),
+            "diagnostic OverrideOutput",
+        )
+        active_source = _coalesced_alias(
+            row.get("activeSource"),
+            row.get("active_source"),
+            "diagnostic activeSource",
+        )
+        output_bus = _coalesced_alias(
+            row.get("OutputBus"),
+            row.get("output_bus"),
+            "diagnostic OutputBus",
+        )
         result.update(
             {
-                "override_output": _bool_alias(
-                    row,
-                    "OverrideOutput",
-                    "@OverrideOutput",
-                    "diagnostic OverrideOutput",
-                ),
+                "override_output": override_output,
                 "active_source_id": _optional_identity(
-                    row.get("activeSource"),
+                    active_source,
                     "diagnostic activeSource",
                 ),
                 "output_bus_id": _optional_identity(
-                    row.get("OutputBus"),
+                    output_bus,
                     "diagnostic OutputBus",
                 ),
             }
@@ -1922,6 +1941,14 @@ def _bool_alias(
     if len(set(values)) != 1:
         raise AlarmIntegrationRuntimeError(f"{label} aliases disagree")
     return values[0]
+
+
+def _coalesced_alias(first: Any, second: Any, label: str) -> Any:
+    """Accept one native/business alias and reject contradictory dual values."""
+
+    if first is not None and second is not None and first != second:
+        raise AlarmIntegrationRuntimeError(f"{label} aliases disagree")
+    return first if first is not None else second
 
 
 def _file_proof(path: Path) -> AlarmFileProof:

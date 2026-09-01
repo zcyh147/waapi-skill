@@ -4209,7 +4209,47 @@ def _closed_business_literal_equivalent(
     if prior == "--meaning":
         supplied_token = re.sub(r"[^a-z0-9]", "", supplied.casefold())
         expected_token = re.sub(r"[^a-z0-9]", "", expected.casefold())
-        return bool(supplied_token) and supplied_token == expected_token
+        if bool(supplied_token) and supplied_token == expected_token:
+            return True
+        prefix_qualifiers = {
+            "action",
+            "field",
+            "play",
+            "property",
+            "value",
+        }
+        suffix_qualifiers = {
+            "in",
+            "millisecond",
+            "milliseconds",
+            "ms",
+            "second",
+            "seconds",
+            "time",
+        }
+
+        def meaning_core(value: str) -> str:
+            core = re.sub(r"[^a-z0-9]", "", value.casefold())
+            changed = True
+            while core and changed:
+                changed = False
+                for qualifier in sorted(prefix_qualifiers, key=len, reverse=True):
+                    if core.startswith(qualifier) and len(core) > len(qualifier):
+                        core = core[len(qualifier) :]
+                        changed = True
+                        break
+                if changed:
+                    continue
+                for qualifier in sorted(suffix_qualifiers, key=len, reverse=True):
+                    if core.endswith(qualifier) and len(core) > len(qualifier):
+                        core = core[: -len(qualifier)]
+                        changed = True
+                        break
+            return core
+
+        supplied_core = meaning_core(supplied)
+        expected_core = meaning_core(expected)
+        return bool(supplied_core) and supplied_core == expected_core
     return False
 
 

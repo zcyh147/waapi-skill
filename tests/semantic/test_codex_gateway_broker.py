@@ -106,6 +106,20 @@ from wwise_waapi.operation_composer import (
             "Pitch",
             "pitch",
         ),
+        (
+            "draft-discover-fields",
+            ("--meaning", "FadeTime"),
+            1,
+            "Play Action Fade Time",
+            "FadeTime",
+        ),
+        (
+            "draft-discover-fields",
+            ("--meaning", "Delay"),
+            1,
+            "Play Action delay time in seconds",
+            "Delay",
+        ),
     ),
 )
 def test_closed_business_literal_equivalence_is_broker_owned(
@@ -142,6 +156,21 @@ def test_closed_business_literal_equivalence_rejects_native_path_type_prefix() -
         3,
         "<Virtual Folder>Weapons",
         "Weapons",
+    ) is False
+
+
+def test_closed_business_meaning_equivalence_rejects_semantic_negation() -> None:
+    step = ExpectedGatewayStep(
+        "step",
+        "draft-discover-fields",
+        ("--meaning", "FadeTime"),
+    )
+
+    assert broker_module._closed_business_literal_equivalent(
+        step,
+        1,
+        "not Play Action Fade Time",
+        "FadeTime",
     ) is False
 
 
@@ -6176,7 +6205,9 @@ def test_object_set_field_discovery_can_follow_its_bound_target_early(
     actual_values = [resolve(argument) for argument in rebased.arguments]
     first_meaning = actual_values.index("--meaning") + 1
     assert actual_values[first_meaning] == "fadetime"
-    actual_values[first_meaning] = "Fade Time"
+    second_meaning = actual_values.index("--meaning", first_meaning + 1) + 1
+    actual_values[first_meaning] = "Play Action Fade Time"
+    actual_values[second_meaning] = "Play Action delay time in seconds"
     actual = tuple(actual_values)
     assert actual.count("--meaning") == 2
 
