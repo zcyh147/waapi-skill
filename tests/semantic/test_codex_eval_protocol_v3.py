@@ -753,6 +753,34 @@ def test_object_set_composer_lets_gateway_own_schema_defaults() -> None:
     ]
 
 
+def test_object_set_business_binds_one_unnamed_direct_child_by_parent() -> None:
+    request = _object_set_request()
+    request["arguments"]["objects"][0]["object"] = {  # type: ignore[index]
+        "kind": "direct-child",
+        "type": "Action",
+        "parent": {
+            "kind": "path",
+            "value": r"\Events\Default Work Unit\Play_Rain",
+        },
+    }
+
+    steps = build_object_graph_business_transaction_steps(request, label="tx01")
+    binding = next(
+        step for step in steps if step.subcommand == "draft-bind-object"
+    )
+
+    assert binding.arguments[-8:] == (
+        "--direct-child-type",
+        "Action",
+        "--parent-path-segment",
+        "Events",
+        "--parent-path-segment",
+        "Default Work Unit",
+        "--parent-path-segment",
+        "Play_Rain",
+    )
+
+
 def test_object_set_composer_keeps_nondefault_request_options_explicit() -> None:
     steps = build_object_set_composer_transaction_steps(
         _object_set_request(

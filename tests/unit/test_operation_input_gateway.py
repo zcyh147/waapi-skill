@@ -897,6 +897,70 @@ def test_object_set_name_draft_start_returns_only_business_continuation(
     assert "typed-operation" not in json.dumps(binding)
 
 
+def test_object_set_business_draft_binds_unnamed_direct_child(
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "state"
+    code, started = offline_execute(
+        tmp_path,
+        "--state-dir",
+        str(state_dir),
+        "--version",
+        "2022.1",
+        "draft-start",
+        "object.set",
+    )
+    assert code == 0, started
+    action_row = {
+        "id": OBJECT_GUID,
+        "name": "Action 1",
+        "type": "Action",
+        "path": r"\Events\Default Work Unit\Play_Rain\Action 1",
+    }
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": [live_info()],
+            "ak.wwise.core.getProjectInfo": [project_row()],
+            "ak.wwise.core.object.get": [{"return": [action_row]}],
+        }
+    )
+
+    bind_code, bound = waapi_gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(state_dir),
+            "draft-bind-object",
+            started["draft"]["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            "1",
+            "--direct-child-type",
+            "Action",
+            "--parent-path-segment",
+            "Events",
+            "--parent-path-segment",
+            "Default Work Unit",
+            "--parent-path-segment",
+            "Play_Rain",
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+
+    assert bind_code == 0, bound
+    object_get = next(call for call in client.calls if call[0] == "ak.wwise.core.object.get")
+    assert object_get[1] == {
+        "waql": (
+            'from object "\\Events\\Default Work Unit\\Play_Rain" '
+            'select children where type = "Action" take 2'
+        )
+    }
+    assert bound["bound_object"]["type"] == "Action"
+    assert bound["bound_object"]["name"] == "Action 1"
+    assert bound["bound_object"]["handle"].startswith("boh1-")
+
+
 def test_object_set_name_business_draft_binds_declares_and_materializes(
     tmp_path: Path,
 ) -> None:

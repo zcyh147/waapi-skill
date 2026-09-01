@@ -231,9 +231,62 @@ class _BusinessDraftSteps:
             )
         elif kind == "id" and isinstance(value, str) and value:
             selector_arguments = ("--object-id", value)
+        elif kind == "direct-child":
+            parent = selector.get("parent")
+            object_type = selector.get("type")
+            if (
+                set(selector) != {"kind", "type", "parent"}
+                or not isinstance(object_type, str)
+                or not object_type
+                or not isinstance(parent, Mapping)
+            ):
+                raise V3ProtocolError(
+                    f"{error_subject} direct-child identity is invalid"
+                )
+            parent_kind = parent.get("kind")
+            parent_value = parent.get("value")
+            if parent_kind == "id" and isinstance(parent_value, str) and parent_value:
+                parent_arguments: tuple[Any, ...] = ("--parent-id", parent_value)
+            elif parent_kind == "path" and isinstance(parent_value, str) and parent_value:
+                native_segments = tuple(
+                    segment for segment in parent_value.split("\\") if segment
+                )
+                if (
+                    not native_segments
+                    or "\\" + "\\".join(native_segments) != parent_value
+                ):
+                    raise V3ProtocolError(
+                        f"{error_subject} direct-child parent path is invalid"
+                    )
+                segments = tuple(
+                    re.sub(r"^<[^<>\\]+>", "", segment)
+                    for segment in native_segments
+                )
+                if any(
+                    not segment or "<" in segment or ">" in segment
+                    for segment in segments
+                ):
+                    raise V3ProtocolError(
+                        f"{error_subject} direct-child parent path is invalid"
+                    )
+                parent_arguments = tuple(
+                    item
+                    for segment in segments
+                    for item in ("--parent-path-segment", segment)
+                )
+            else:
+                raise V3ProtocolError(
+                    f"{error_subject} direct-child parent must be exact id or path"
+                )
+            selector_arguments = (
+                "--direct-child-type",
+                object_type,
+                *parent_arguments,
+            )
         else:
             raise V3ProtocolError(
-                f"{error_subject} identity must be exact id, path, or typed name"
+                f"{error_subject} identity must be exact id, path, typed name, "
+                "or direct child"
             )
         role_arguments: tuple[Any, ...] = () if role is None else ("--role", role)
         self.steps.append(

@@ -22,7 +22,7 @@ from typing import Any, Callable, Mapping, Sequence
 from tests.semantic.support.codex_eval_protocol_v3 import (
     V3GatewayProtocol,
     build_audio_import_composer_transaction_steps,
-    build_object_set_composer_transaction_steps,
+    build_object_graph_business_transaction_steps,
     build_transaction_protocol,
     metadata_candidate_limit,
 )
@@ -1154,22 +1154,14 @@ def _build_metadata_workflow_protocol(
             "weather transactions require schema-first token discovery and "
             "Gateway-owned draft-check validation"
         )
-    tx02_metadata = metadata[1]
-    assert tx02_metadata is not None
     composer_tx01 = build_audio_import_composer_transaction_steps(
         requests[0],
         label="tx01",
     )
     legacy_base = build_transaction_protocol(requests)
-    composer_tx02 = build_object_set_composer_transaction_steps(
+    composer_tx02 = build_object_graph_business_transaction_steps(
         requests[1],
         label="tx02",
-        metadata_binding=DraftActionMetadataBinding(
-            step="tx02.metadata",
-            object_type=tx02_metadata[0],
-            required_tokens=tuple(tx02_metadata[2]),
-            expected_projection=tuple(tx02_metadata[3]),
-        ),
     )
     composer_by_tx = {
         "tx01": composer_tx01,
@@ -1222,7 +1214,7 @@ def _build_metadata_workflow_protocol(
             metadata_row = metadata_by_tx[prefix]
             transaction_index = int(prefix[2:]) - 1
             operation = requests[transaction_index].get("operation")
-            if operation == "audio.import":
+            if operation in {"audio.import", "object.set"}:
                 steps.append(step)
                 continue
             if metadata_row is None:
@@ -1327,7 +1319,7 @@ def _build_metadata_workflow_protocol(
             if metadata_row is not None
             and prefix not in reused_metadata_steps
             and requests[int(prefix[2:]) - 1].get("operation")
-            in {"object.create", "object.set"}
+            == "object.create"
         ),
     )
 

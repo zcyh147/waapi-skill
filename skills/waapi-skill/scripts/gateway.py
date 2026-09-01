@@ -2929,6 +2929,10 @@ def build_parser() -> argparse.ArgumentParser:
         nargs=2,
         metavar=("TYPE", "NAME"),
     )
+    object_selector.add_argument("--direct-child-type")
+    parent_selector = draft_bind_object.add_mutually_exclusive_group()
+    parent_selector.add_argument("--parent-id")
+    parent_selector.add_argument("--parent-path-segment", action="append")
     draft_bind_object.add_argument("--role")
 
     draft_bind_field = subparsers.add_parser(
@@ -16411,6 +16415,13 @@ class _BusinessObjectSelector:
 def _business_object_selector_from_namespace(
     args: argparse.Namespace,
 ) -> _BusinessObjectSelector:
+    parent_supplied = (
+        args.parent_id is not None or args.parent_path_segment is not None
+    )
+    if args.direct_child_type is None and parent_supplied:
+        raise GatewayInputError(
+            "Business object parent selectors require --direct-child-type."
+        )
     if args.object_id is not None:
         if not _canonical_guid(args.object_id):
             raise GatewayInputError(
@@ -16434,10 +16445,33 @@ def _business_object_selector_from_namespace(
             "type": args.exact_type_name[0],
             "name": args.exact_type_name[1],
         }
+    elif args.direct_child_type is not None:
+        if args.parent_id is not None:
+            if not _canonical_guid(args.parent_id):
+                raise GatewayInputError(
+                    "Business direct-child --parent-id must be one canonical Wwise GUID."
+                )
+            parent = {"kind": "id", "value": args.parent_id}
+        elif args.parent_path_segment is not None:
+            parent = {
+                "kind": "path",
+                "value": _business_object_path_from_segments(
+                    args.parent_path_segment
+                ),
+            }
+        else:
+            raise GatewayInputError(
+                "Business direct-child binding requires one parent id or path."
+            )
+        raw_identity = {
+            "kind": "direct-child",
+            "type": args.direct_child_type,
+            "parent": parent,
+        }
     else:  # pragma: no cover - argparse requires exactly one selector
         raise GatewayInputError(
             "Business object binding requires an exact GUID, literal path "
-            "segments, or typed name"
+            "segments, typed name, or direct-child type plus parent"
         )
     try:
         identity = normalize_object_identity(
@@ -16449,6 +16483,24 @@ def _business_object_selector_from_namespace(
     if identity.kind == "path":
         assert identity.value is not None
         request: Mapping[str, Any] = {"from": {"path": [identity.value]}}
+    elif identity.kind == "direct-child":
+        assert identity.type is not None and identity.parent is not None
+        parent_literal = identity.parent.value
+        assert isinstance(parent_literal, (str, int)) and not isinstance(
+            parent_literal, bool
+        )
+        try:
+            request = {
+                "waql": (
+                    f"from object {quote_waql_literal(str(parent_literal))} "
+                    "select children where type = "
+                    f"{quote_waql_literal(identity.type)} take 2"
+                )
+            }
+        except ValueError as exc:
+            raise GatewayInputError(
+                "Business direct-child selector contains an unsupported literal."
+            ) from exc
     else:
         assert identity.type is not None and identity.name is not None
         request = {
@@ -16678,11 +16730,11 @@ def dispatch_business_object_binding(
         )
         or (
             closed_selector.expected_type is not None
-            and (row["type"], row["name"])
-            != (
-                closed_selector.expected_type,
-                closed_selector.expected_name,
-            )
+            and row["type"] != closed_selector.expected_type
+        )
+        or (
+            closed_selector.expected_name is not None
+            and row["name"] != closed_selector.expected_name
         )
     ):
         raise GatewayResultShapeError(
