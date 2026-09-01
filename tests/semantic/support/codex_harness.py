@@ -3503,6 +3503,8 @@ def _business_draft_copy_mode(
 
 def _business_draft_continuation_candidates(
     payload: Mapping[str, Any],
+    *,
+    platform_name: str,
 ) -> tuple[bool, tuple[tuple[str, str], ...]]:
     """Return valid exact/prefix copies owned by one business continuation."""
 
@@ -3522,6 +3524,13 @@ def _business_draft_continuation_candidates(
         )
         if value.get("contract") == _BUSINESS_DRAFT_NEXT_ACTION_CONTRACT:
             found_contract = True
+        standard = _selected_gateway_continuation(
+            value.get("next_command"),
+            platform_name=platform_name,
+        )
+        if standard is not None:
+            _source_field, exact_command = standard
+            candidates.add(("exact", exact_command))
         if current_binding:
             instruction = value.get("fixed_argv_prefix_copy_instruction")
             prefix = value.get("fixed_argv_prefix_copy")
@@ -3596,7 +3605,10 @@ def gateway_continuation_binding_errors(
                     )
                 ):
                     _, compound_parent_candidates = (
-                        _business_draft_continuation_candidates(payload)
+                        _business_draft_continuation_candidates(
+                            payload,
+                            platform_name=active_platform,
+                        )
                     )
             if arguments[:1] == ("draft-declare-undo-plan",):
                 for argument_index, item in enumerate(arguments[:-2]):
@@ -3616,7 +3628,10 @@ def gateway_continuation_binding_errors(
         if not isinstance(prior_payload, Mapping):
             continue
         business_contract, business_candidates = (
-            _business_draft_continuation_candidates(prior_payload)
+            _business_draft_continuation_candidates(
+                prior_payload,
+                platform_name=active_platform,
+            )
         )
         if "next_command" not in prior_payload and not business_contract:
             continue

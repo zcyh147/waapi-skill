@@ -7797,6 +7797,98 @@ def test_query_object_does_not_omit_a_custom_projection(
         assert not (broker.state_directory / "fake-runner-calls.jsonl").exists()
 
 
+def test_query_object_event_actions_preset_expands_to_sealed_action_hop() -> None:
+    event_id = "{11111111-1111-1111-1111-111111111111}"
+    tail = (
+        "--select",
+        "children",
+        "--take",
+        "100",
+        "--return-field",
+        "id",
+        "--return-field",
+        "name",
+        "--return-field",
+        "type",
+        "--return-field",
+        "path",
+        "--return-field",
+        "ActionType",
+        "--return-field",
+        "Target",
+    )
+    step = ExpectedGatewayStep(
+        "diag.action",
+        "query-object",
+        (
+            ExactArgumentAlternatives(("--object-id", "--path")),
+            ResponseBindingOrExactArgument(
+                ResponseBinding("diag.event", "/objects/0/id"),
+                (r"\Events\Default Work Unit\Play_Rain",),
+            ),
+            *tail,
+        ),
+    )
+
+    normalized = broker_module._normalize_query_object_event_actions(  # noqa: SLF001
+        step,
+        ("--exact-id", event_id, "--relationship", "event-actions"),
+    )
+
+    assert normalized == ("--object-id", event_id, *tail)
+    incomplete = (
+        "--exact-id",
+        event_id,
+        "--relationship",
+        "children",
+        "--include",
+        "target",
+    )
+    assert broker_module._normalize_query_object_event_actions(  # noqa: SLF001
+        step,
+        incomplete,
+    ) == incomplete
+
+
+def test_event_action_draft_binding_expands_to_direct_child_selector() -> None:
+    fixed = (
+        "od1-" + "1" * 32,
+        "--task-authority",
+        "da1-" + "2" * 40,
+        "--expected-revision",
+        "1",
+    )
+    expected_tail = (
+        "--direct-child-type",
+        "Action",
+        "--parent-path-segment",
+        "Events",
+        "--parent-path-segment",
+        "Default Work Unit",
+        "--parent-path-segment",
+        "Play_Rain",
+    )
+    step = ExpectedGatewayStep(
+        "tx01.bind-action",
+        "draft-bind-object",
+        (*fixed, *expected_tail),
+    )
+    supplied = (
+        *fixed,
+        "--event-action-of-path-segment",
+        "Events",
+        "--event-action-of-path-segment",
+        "Default Work Unit",
+        "--event-action-of-path-segment",
+        "Play_Rain",
+    )
+
+    assert broker_module._normalize_event_action_draft_binding(  # noqa: SLF001
+        step,
+        supplied,
+    ) == step.arguments
+
+
 @pytest.mark.parametrize(
     ("supplied_arguments", "error_fragment"),
     (

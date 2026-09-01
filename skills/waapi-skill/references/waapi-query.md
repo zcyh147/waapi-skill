@@ -137,7 +137,10 @@ Each returns its stable `agent_result`; do not rebuild it. Remaining reflected r
 
 ## Exact-hop playback diagnosis
 
-Resolve exact `id,name,type,path`, then follow relationship ids. The Event children result is already the Action hop; do not query the Action id again; use the returned `Target.id` directly for the next exact-id Sound lookup.
+For an exact Event use `--relationship event-actions`; Gateway owns
+`children`, bound 100, `action_type`, and `target`. The Event children result is
+already the Action hop; use the returned `Target.id` directly for the next
+exact-id Sound lookup; do not query the Action id again.
 
 That Sound projection ends at `output_bus`; do not add `volume-db` to the Sound hop. Request source file/language on the exact active-source id. For routing versus Bus mute, request `volume-db` only on the exact Bus identities: first the returned `output_bus` id, then the requested comparison Bus path or id. Both exact Bus reads must use the same fixed identity plus `volume_db`; never omit `--include volume-db` from the comparison Bus.
 

@@ -1770,6 +1770,31 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   Never omit or normalize a custom return field, relationship, predicate,
   result bound, broad source, or other query behavior.
 
+### One response may expose two independently closed Draft continuations
+
+- Evidence: #51 macOS 561f4f5 Weather reached the correct Preview, but after
+  the import batch it copied the nested standard `next_command` exactly rather
+  than the sibling business `next_action_binding`. Both carried complete copy
+  instructions and resolved to the same checked Draft command; the audit only
+  admitted the business field and recorded a false semantic failure.
+- Prevention: when a business Draft payload also exposes a structurally valid
+  nested Gateway v2 continuation, accept that selected field as one exact
+  candidate. Continue to require byte-exact copying, a complete instruction,
+  a matching prior payload, and one unique longest candidate. Do not grant
+  equivalent reconstructed argv credit.
+
+### Event Action is one business identity, not Event plus Wwise trivia
+
+- Evidence: #51 561f4f5 Alarm found the exact Event on both hosts but requested
+  only its target; Windows Weather later bound the Event itself when the change
+  targeted its Action child. The generic deep interface still required the
+  Agent to remember `children`, `Action`, `ActionType`, and `Target`.
+- Prevention: use the Gateway-owned `event-actions` read preset for one exact
+  Event and `event_action_by_event_path_segments` for mutation binding. Gateway
+  owns the child traversal, Action type, 100-row bound, action type/target
+  projection, and single-direct-child validation. The Agent supplies only the
+  Event path or GUID.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:

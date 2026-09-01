@@ -961,6 +961,76 @@ def test_object_set_business_draft_binds_unnamed_direct_child(
     assert bound["bound_object"]["handle"].startswith("boh1-")
 
 
+def test_object_set_business_draft_binds_event_action_from_event_path(
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "state"
+    code, started = offline_execute(
+        tmp_path,
+        "--state-dir",
+        str(state_dir),
+        "--version",
+        "2022.1",
+        "draft-start",
+        "object.set",
+    )
+    assert code == 0, started
+    shortcut = started["draft"]["next_action_binding"]["object_binding"][
+        "event_action_by_event_path_segments"
+    ]
+    assert shortcut["append_repeated"] == [
+        "--event-action-of-path-segment",
+        "<one-exact-event-path-segment-without-separators>",
+    ]
+    assert shortcut["gateway_owned_resolution"] == (
+        "the_single_direct_Action_child_of_the_exact_Event"
+    )
+    action_row = {
+        "id": OBJECT_GUID,
+        "name": "Action 1",
+        "type": "Action",
+        "path": r"\Events\Default Work Unit\Play_Rain\Action 1",
+    }
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": [live_info()],
+            "ak.wwise.core.getProjectInfo": [project_row()],
+            "ak.wwise.core.object.get": [{"return": [action_row]}],
+        }
+    )
+
+    bind_code, bound = waapi_gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(state_dir),
+            "draft-bind-object",
+            started["draft"]["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            "1",
+            "--event-action-of-path-segment",
+            "Events",
+            "--event-action-of-path-segment",
+            "Default Work Unit",
+            "--event-action-of-path-segment",
+            "Play_Rain",
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+
+    assert bind_code == 0, bound
+    object_get = next(call for call in client.calls if call[0] == "ak.wwise.core.object.get")
+    assert object_get[1] == {
+        "waql": (
+            'from object "\\Events\\Default Work Unit\\Play_Rain" '
+            'select children where type = "Action" take 2'
+        )
+    }
+    assert bound["bound_object"]["type"] == "Action"
+
+
 def test_object_set_name_business_draft_binds_declares_and_materializes(
     tmp_path: Path,
 ) -> None:

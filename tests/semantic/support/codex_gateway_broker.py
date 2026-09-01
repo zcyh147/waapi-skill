@@ -4022,6 +4022,112 @@ def _normalize_query_object_default_identity_projection(
     return expected if "\\" + "\\".join(segments) == expected[1] else actual
 
 
+def _normalize_query_object_event_actions(
+    step: "ExpectedGatewayStep",
+    supplied_arguments: Sequence[str],
+) -> tuple[Any, ...]:
+    """Expand the closed Event Action preset to its legacy protocol witness."""
+
+    actual = tuple(supplied_arguments)
+    expected_tail = (
+        "--select",
+        "children",
+        "--take",
+        "100",
+        "--return-field",
+        "id",
+        "--return-field",
+        "name",
+        "--return-field",
+        "type",
+        "--return-field",
+        "path",
+        "--return-field",
+        "ActionType",
+        "--return-field",
+        "Target",
+    )
+    if (
+        step.subcommand != "query-object"
+        or len(step.arguments) != 18
+        or tuple(step.arguments[2:]) != expected_tail
+        or not isinstance(step.arguments[0], ExactArgumentAlternatives)
+    ):
+        return actual
+
+    groups: list[tuple[str, str]] = []
+    index = 0
+    while index < len(actual):
+        option = actual[index]
+        if option not in {
+            "--exact-id",
+            "--path-segment",
+            "--relationship",
+            "--max-results",
+        } or index + 1 >= len(actual):
+            return actual
+        groups.append((option, actual[index + 1]))
+        index += 2
+    if groups.count(("--relationship", "event-actions")) != 1:
+        return actual
+    bounds = [value for option, value in groups if option == "--max-results"]
+    if bounds not in ([], ["100"]):
+        return actual
+    sources = [
+        (option, value)
+        for option, value in groups
+        if option in {"--exact-id", "--path-segment"}
+    ]
+    if not sources:
+        return actual
+    if sources[0][0] == "--exact-id":
+        if len(sources) != 1:
+            return actual
+        source_option = "--object-id"
+        source_value = sources[0][1]
+    elif all(option == "--path-segment" for option, _value in sources):
+        segments = [value for _option, value in sources]
+        if any(not value or "\\" in value for value in segments):
+            return actual
+        source_option = "--path"
+        source_value = "\\" + "\\".join(segments)
+    else:
+        return actual
+    if source_option not in step.arguments[0].values:
+        return actual
+    return (source_option, source_value, *expected_tail)
+
+
+def _normalize_event_action_draft_binding(
+    step: "ExpectedGatewayStep",
+    supplied_arguments: Sequence[str],
+) -> tuple[Any, ...]:
+    """Expand one Event path into the sealed direct-Action child selector."""
+
+    actual = tuple(supplied_arguments)
+    fixed_count = 5
+    expected_tail = tuple(step.arguments[fixed_count:])
+    if (
+        step.subcommand != "draft-bind-object"
+        or expected_tail[:2] != ("--direct-child-type", "Action")
+        or len(actual) <= fixed_count
+    ):
+        return actual
+    expected_path = expected_tail[2:]
+    if len(expected_path) % 2 or expected_path[::2] != (
+        "--parent-path-segment",
+    ) * (len(expected_path) // 2):
+        return actual
+    actual_path = actual[fixed_count:]
+    if len(actual_path) % 2 or actual_path[::2] != (
+        "--event-action-of-path-segment",
+    ) * (len(actual_path) // 2):
+        return actual
+    if actual_path[1::2] != expected_path[1::2]:
+        return actual
+    return (*actual[:fixed_count], *expected_tail)
+
+
 _BUSINESS_QUERY_OPTION_ARITIES = {
     "--path-segment": 1,
     "--exact-id": 1,
@@ -11331,6 +11437,14 @@ class CodexGatewayBroker:
             )
             execution_arguments = (*expected_prefix, *validation_arguments)
         validation_arguments = _normalize_query_object_default_identity_projection(
+            step,
+            validation_arguments,
+        )
+        validation_arguments = _normalize_query_object_event_actions(
+            step,
+            validation_arguments,
+        )
+        validation_arguments = _normalize_event_action_draft_binding(
             step,
             validation_arguments,
         )

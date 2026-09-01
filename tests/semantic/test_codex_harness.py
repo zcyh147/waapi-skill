@@ -547,6 +547,39 @@ def test_business_draft_prefix_continuation_binds_exact_copied_bytes() -> None:
     ) == ()
 
 
+def test_business_draft_accepts_its_nested_closed_standard_continuation() -> None:
+    business_prefix = (
+        "python '/tmp/Task Skill/scripts/run.py' gateway.py draft-check "
+        "od1-opaque --task-authority da1-opaque --expected-revision 5"
+    )
+    standard_argv = (
+        "python",
+        "/tmp/Candidate Skill/scripts/run.py",
+        "gateway.py",
+        "draft-check",
+        "od1-opaque",
+        "--task-authority",
+        "da1-opaque",
+        "--expected-revision",
+        "5",
+    )
+    payload = _business_prefix_payload(business_prefix)
+    payload["draft"]["next_command"] = _closed_next_command(
+        standard_argv,
+        platform_name="posix",
+    )
+    standard_command = shlex.join(standard_argv)
+
+    assert gateway_continuation_binding_errors(
+        (
+            completed_record("python initial.py", payload),
+            completed_record(standard_command, {}),
+        ),
+        (SimpleNamespace(payload=payload), SimpleNamespace(payload={})),
+        platform_name="posix",
+    ) == ()
+
+
 def test_business_draft_boolean_continuation_binds_exact_copied_prefix() -> None:
     prefix = (
         "python '/tmp/Skill Path/scripts/run.py' gateway.py "

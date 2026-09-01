@@ -3937,6 +3937,106 @@ def test_query_object_event_children_expose_closed_action_target_without_metadat
     }
 
 
+def test_query_object_event_actions_preset_owns_bound_and_projection(
+    tmp_path: Path,
+) -> None:
+    target = {"id": "{22222222-2222-2222-2222-222222222222}"}
+    row = {
+        "id": "{11111111-1111-1111-1111-111111111111}",
+        "name": "Play_Rain_Action",
+        "type": "Action",
+        "path": r"\Events\Default Work Unit\Play_Rain\Play_Rain_Action",
+        "ActionType": 1,
+        "Target": target,
+    }
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": live_info(),
+            "ak.wwise.core.object.get": {"return": [row]},
+        }
+    )
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "query-object",
+            "--path-segment",
+            "Events",
+            "--path-segment",
+            "Default Work Unit",
+            "--path-segment",
+            "Play_Rain",
+            "--relationship",
+            "event-actions",
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 0, payload
+    assert payload["query_bound"] == {"mode": "take", "value": 100}
+    assert payload["agent_result"][0]["action_type"] == 1
+    assert payload["agent_result"][0]["target"] == target
+    assert client.calls[-1] == (
+        "ak.wwise.core.object.get",
+        {
+            "waql": (
+                'from object "\\Events\\Default Work Unit\\Play_Rain" '
+                "select children take 100"
+            )
+        },
+        {"return": ["id", "name", "type", "path", "ActionType", "Target"]},
+    )
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    (
+        (
+            "--path-segment",
+            "Events",
+            "--relationship",
+            "event-actions",
+            "--relationship",
+            "children",
+        ),
+        (
+            "--path-segment",
+            "Events",
+            "--relationship",
+            "event-actions",
+            "--max-results",
+            "6",
+        ),
+        (
+            "--kind",
+            "actor-mixer",
+            "--relationship",
+            "event-actions",
+        ),
+    ),
+)
+def test_query_object_event_actions_preset_rejects_open_variants_before_connecting(
+    tmp_path: Path,
+    arguments: tuple[str, ...],
+) -> None:
+    connected = False
+
+    def client_factory(_url: str) -> FakeClient:
+        nonlocal connected
+        connected = True
+        raise AssertionError("invalid Event Action preset must fail before WAAPI")
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["query-object", *arguments],
+        env=gateway_env(tmp_path),
+        client_factory=client_factory,
+    )
+
+    assert exit_code == 2
+    assert connected is False
+    assert payload["error_code"] == "GatewayInputError"
+
+
 def test_query_object_rejects_custom_field_across_every_relationship_scope(
     tmp_path: Path,
 ) -> None:
@@ -4262,6 +4362,7 @@ def test_query_object_help_names_closed_query_editor_specifier_and_relationships
         "ancestors",
         "references-to",
         "children",
+        "event-actions",
         "parent",
     )
 

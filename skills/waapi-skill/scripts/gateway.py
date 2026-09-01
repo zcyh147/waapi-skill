@@ -707,6 +707,7 @@ QUERY_BUSINESS_RELATIONSHIPS: Mapping[str, str] = {
     "ancestors": "ancestors",
     "references-to": "referencesTo",
     "children": "children",
+    "event-actions": "children",
     "parent": "parent",
 }
 SOUNDBANK_GENERATED_TOPIC_URI = "ak.wwise.core.soundbank.generated"
@@ -2930,6 +2931,14 @@ def build_parser() -> argparse.ArgumentParser:
         metavar=("TYPE", "NAME"),
     )
     object_selector.add_argument("--direct-child-type")
+    object_selector.add_argument(
+        "--event-action-of-path-segment",
+        action="append",
+        help=(
+            "Repeat the exact Event path root-to-leaf; the Gateway resolves its "
+            "single direct Action child"
+        ),
+    )
     parent_selector = draft_bind_object.add_mutually_exclusive_group()
     parent_selector.add_argument("--parent-id")
     parent_selector.add_argument("--parent-path-segment", action="append")
@@ -5178,6 +5187,26 @@ def _query_kind_predicates(
 def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, str]) -> None:
     """Reject closed query input errors before opening a WAAPI transport."""
 
+    relationships = tuple(getattr(args, "relationships", ()) or ())
+    if "event-actions" in relationships:
+        if relationships != ("event-actions",):
+            raise GatewayInputError(
+                "--relationship event-actions cannot be combined with another "
+                "relationship."
+            )
+        if not (
+            getattr(args, "path_segments", None)
+            or getattr(args, "object_id", None)
+        ):
+            raise GatewayInputError(
+                "--relationship event-actions requires one exact Event path or GUID."
+            )
+        if args.max_results not in {None, 100}:
+            raise GatewayInputError(
+                "--relationship event-actions owns the fixed 100-row bound; omit "
+                "--max-results or pass exactly 100."
+            )
+        args.max_results = 100
     _compile_query_business_projection(args)
     args.where = []
     args.select = [
@@ -5325,6 +5354,12 @@ def _compile_query_business_projection(args: argparse.Namespace) -> None:
     """Compile stable business output names into exact object.get accessors."""
 
     requested = list(getattr(args, "business_outputs", ()) or ())
+    if "event-actions" in tuple(getattr(args, "relationships", ()) or ()):
+        requested.extend(
+            output
+            for output in ("action-type", "target")
+            if output not in requested
+        )
     custom_meanings = list(getattr(args, "custom_field_meanings", ()) or ())
     if len(requested) > MAX_QUERY_BUSINESS_OUTPUTS:
         raise GatewayInputError(
@@ -8083,6 +8118,14 @@ def query_business_schema_payload(
             }
         },
         "relationships": list(QUERY_BUSINESS_RELATIONSHIPS),
+        "relationship_presets": {
+            "event-actions": {
+                "source": "one exact Event path or GUID",
+                "native_relationship": "children",
+                "fixed_max_results": 100,
+                "automatic_outputs": ["action-type", "target"],
+            }
+        },
         "continuation": {
             "subcommand": "query-object",
             "predicate": "--predicate <business-condition> <value>",
@@ -16445,6 +16488,17 @@ def _business_object_selector_from_namespace(
             "type": args.exact_type_name[0],
             "name": args.exact_type_name[1],
         }
+    elif args.event_action_of_path_segment is not None:
+        raw_identity = {
+            "kind": "direct-child",
+            "type": "Action",
+            "parent": {
+                "kind": "path",
+                "value": _business_object_path_from_segments(
+                    args.event_action_of_path_segment
+                ),
+            },
+        }
     elif args.direct_child_type is not None:
         if args.parent_id is not None:
             if not _canonical_guid(args.parent_id):
@@ -22673,6 +22727,28 @@ def _business_next_action_binding(
             "custom_reference_value",
         ],
     }
+    if record.operation == "object.set":
+        event_action_by_event_path_segments = (
+            operation_draft_prefix_copy_binding(object_bind_prefix)
+        )
+        event_action_by_event_path_segments["append_repeated"] = [
+            "--event-action-of-path-segment",
+            "<one-exact-event-path-segment-without-separators>",
+        ]
+        event_action_by_event_path_segments["segment_order"] = "root_to_leaf"
+        event_action_by_event_path_segments["gateway_owned_resolution"] = (
+            "the_single_direct_Action_child_of_the_exact_Event"
+        )
+        object_binding["event_action_by_event_path_segments"] = (
+            event_action_by_event_path_segments
+        )
+        object_binding["selection_rule"] = (
+            "user_supplied_complete_path_requires_by_path_segments; "
+            "the_Action_owned_by_a_named_Event_requires_"
+            "event_action_by_event_path_segments; "
+            "user_supplied_name_without_a_path_requires_query_then_by_id; "
+            "user_selected_guid_uses_by_id"
+        )
     if record.operation == "object.create":
         object_binding["existing_same_name_root_merge_rule"] = (
             "after_exact_preflight_proves_the_existing_same_name_root_and_the_"
