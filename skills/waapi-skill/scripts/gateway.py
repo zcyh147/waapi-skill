@@ -16348,11 +16348,67 @@ def _business_object_path_from_segments(values: Any) -> str:
     return path
 
 
-def preflight_business_object_binding_input(args: argparse.Namespace) -> None:
-    """Reject malformed business identity input before opening a live client."""
+@dataclass(frozen=True, slots=True)
+class _BusinessObjectSelector:
+    request: Mapping[str, Any]
 
+
+def _business_object_selector_from_namespace(
+    args: argparse.Namespace,
+) -> _BusinessObjectSelector:
+    if args.object_id is not None:
+        if not _canonical_guid(args.object_id):
+            raise GatewayInputError(
+                "Business object --object-id must be one canonical Wwise GUID."
+            )
+        return _BusinessObjectSelector(
+            request={"from": {"id": [args.object_id]}}
+        )
     if args.object_path_segment is not None:
-        _business_object_path_from_segments(args.object_path_segment)
+        raw_identity = {
+            "kind": "path",
+            "value": _business_object_path_from_segments(
+                args.object_path_segment
+            ),
+        }
+    elif args.exact_type_name is not None:
+        raw_identity = {
+            "kind": "exact-type-name",
+            "type": args.exact_type_name[0],
+            "name": args.exact_type_name[1],
+        }
+    else:  # pragma: no cover - argparse requires exactly one selector
+        raise GatewayInputError(
+            "Business object binding requires an exact GUID, literal path "
+            "segments, or typed name"
+        )
+    try:
+        identity = normalize_object_identity(
+            raw_identity,
+            path="draft-bind-object.selector",
+        )
+    except ObjectOperationContractError as exc:
+        raise GatewayInputError(str(exc)) from exc
+    if identity.kind == "path":
+        assert identity.value is not None
+        request: Mapping[str, Any] = {"from": {"path": [identity.value]}}
+    else:
+        assert identity.type is not None and identity.name is not None
+        request = {
+            "waql": (
+                f"from type {identity.type} where name = "
+                f"{quote_waql_literal(identity.name)} take 2"
+            )
+        }
+    return _BusinessObjectSelector(request=request)
+
+
+def preflight_business_object_binding_input(args: argparse.Namespace) -> None:
+    """Materialize one closed identity before opening a live client."""
+
+    args._business_object_selector = (  # noqa: SLF001 - argparse namespace cache
+        _business_object_selector_from_namespace(args)
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -16510,46 +16566,12 @@ def dispatch_business_object_binding(
             raise GatewayInputError(
                 f"The next business object binding requires --role {expected_role}"
             )
-    object_path = (
-        _business_object_path_from_segments(args.object_path_segment)
-        if args.object_path_segment is not None
-        else None
-    )
-    exact_type_name: tuple[str, str] | None = None
-    if args.exact_type_name is not None:
-        try:
-            identity = normalize_object_identity(
-                {
-                    "kind": "exact-type-name",
-                    "type": args.exact_type_name[0],
-                    "name": args.exact_type_name[1],
-                },
-                path="draft-bind-object.exact-type-name",
-            )
-        except ObjectOperationContractError as exc:
-            raise GatewayInputError(str(exc)) from exc
-        assert identity.type is not None and identity.name is not None
-        exact_type_name = (identity.type, identity.name)
-    if args.object_id is not None:
-        selector = {"from": {"id": [args.object_id]}}
-    elif object_path is not None:
-        selector = {"from": {"path": [object_path]}}
-    elif exact_type_name is not None:
-        object_type, object_name = exact_type_name
-        selector = {
-            "waql": (
-                f"from type {object_type} where name = "
-                f"{quote_waql_literal(object_name)} take 2"
-            )
-        }
-    else:
-        raise GatewayInputError(
-            "Business object binding requires an exact GUID, literal path "
-            "segments, or typed name"
-        )
+    closed_selector = getattr(args, "_business_object_selector", None)
+    if not isinstance(closed_selector, _BusinessObjectSelector):
+        closed_selector = _business_object_selector_from_namespace(args)
     raw = binding.read_call(
         OBJECT_GET_URI,
-        selector,
+        closed_selector.request,
         {"return": ["id", "name", "type", "path"]},
     )
     rows = raw.get("return")

@@ -149,6 +149,42 @@ def test_draft_bind_object_rejects_separator_bearing_segment_before_client() -> 
     assert payload["error_code"] == "GatewayInputError"
     assert "literal name" in payload["message"]
     assert client_factory_called is False
+
+
+@pytest.mark.parametrize(
+    "selector_args",
+    (
+        ("--object-id", "not-a-guid"),
+        ("--exact-type-name", "Sound SFX", "Rifle"),
+    ),
+)
+def test_draft_bind_object_rejects_malformed_closed_selector_before_client(
+    selector_args: tuple[str, ...],
+) -> None:
+    client_factory_called = False
+
+    def client_factory(_url: str) -> FakeClient:
+        nonlocal client_factory_called
+        client_factory_called = True
+        raise AssertionError("malformed business selector must fail before client")
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "draft-bind-object",
+            "od1-" + "1" * 32,
+            "--task-authority",
+            "da1-" + "2" * 40,
+            "--expected-revision",
+            "1",
+            *selector_args,
+        ],
+        env={},
+        client_factory=client_factory,
+    )
+
+    assert exit_code == 2
+    assert payload["error_code"] == "GatewayInputError"
+    assert client_factory_called is False
 EXPECTED_EXCLUDED_FUNCTION_URIS = frozenset(
     {
         "ak.wwise.ui.commands.register",
