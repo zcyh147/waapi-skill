@@ -696,7 +696,7 @@ def test_media_pool_live_field_miss_stops_before_the_pool_query(tmp_path: Path) 
 
 def test_operations_catalog_lists_all_media_business_routes(tmp_path: Path) -> None:
     exit_code, payload = gateway.execute_gateway(
-        ["operations"],
+        ["operations", "--detail"],
         env=_env(tmp_path),
         client_factory=lambda url: pytest.fail(f"offline catalog connected to {url}"),
     )

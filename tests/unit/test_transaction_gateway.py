@@ -1583,57 +1583,43 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
     assert catalog["ok"] is True
     assert catalog["offline"] is True
     operations = {item["name"]: item for item in catalog["operations"]}
-    assert operations["object.create"]["input_mode"] == "business_declaration"
+    assert set(operations["object.create"]) == {"name", "summary", "next_command"}
     assert operations["object.create"]["next_command"] == [
         "operation-schema",
         "object.create",
     ]
-    assert "required_arguments" not in operations["object.create"]
-    assert "optional_arguments" not in operations["object.create"]
-    assert operations["object.create"]["implemented"] is True
-    assert operations["object.copy"]["implemented"] is True
-    assert operations["object.copy"]["input_mode"] == "business_declaration"
     assert operations["object.copy"]["next_command"] == [
         "operation-schema",
         "object.copy",
     ]
-    assert "required_arguments" not in operations["object.copy"]
-    assert "optional_arguments" not in operations["object.copy"]
-    assert "required_arguments" not in operations["object.setReference"]
-    assert "optional_arguments" not in operations["object.setReference"]
-    assert "argument_contract" not in operations["object.create"]
-    assert operations["ui.commands.execute"]["implemented"] is True
-    assert operations["ui.commands.register"]["implemented"] is True
-    assert operations["ui.commands.unregister"]["implemented"] is True
-    request_schema_routes = {
-        item["api"]: item for item in catalog["request_schema_routes"]
-    }
-    project_save = request_schema_routes["ak.wwise.core.project.save"]
-    assert "save the current Wwise project" in project_save["intent"]
+    assert "request_schema_routes" not in catalog
+    assert catalog["detail_available"] is True
     assert catalog["request_schema_command_template"] == [
         "request-schema",
         "<api>",
     ]
-    assert all("next_command" not in row for row in request_schema_routes.values())
     assert catalog["request_schema_route_count"] == 105
-    assert catalog["request_schema_route_count"] == len(request_schema_routes)
-    assert "ak.wwise.cli.generateSoundbank" in request_schema_routes
-    assert "ak.wwise.console.project.open" in request_schema_routes
-    assert "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion" in request_schema_routes
-    assert "ak.wwise.core.mediaPool.get" in request_schema_routes
-    assert "ak.wwise.core.sound.setActiveSource" in request_schema_routes
-    assert "ak.wwise.core.sourceControl.commit" in request_schema_routes
     encoded_size = waapi_gateway.gateway_json_document_size(catalog)
-    # The 14 exact CLI/Console business routes retain their per-version
-    # availability and one-line intent while keeping the complete catalog
-    # well below the general Gateway result ceiling.
-    assert encoded_size < 36 * 1024
+    assert encoded_size < 10 * 1024
     assert "\n" not in waapi_gateway.gateway_stdout_json_encoder(catalog).encode(catalog)
 
     exit_code, detail_catalog = execute(["operations", "--detail"], tmp_path=tmp_path)
 
     assert exit_code == 0
     detailed = {item["name"]: item for item in detail_catalog["operations"]}
+    request_schema_routes = {
+        item["api"]: item for item in detail_catalog["request_schema_routes"]
+    }
+    project_save = request_schema_routes["ak.wwise.core.project.save"]
+    assert "save the current Wwise project" in project_save["intent"]
+    assert all("next_command" not in row for row in request_schema_routes.values())
+    assert detail_catalog["request_schema_route_count"] == len(request_schema_routes)
+    assert "ak.wwise.cli.generateSoundbank" in request_schema_routes
+    assert "ak.wwise.console.project.open" in request_schema_routes
+    assert "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion" in request_schema_routes
+    assert "ak.wwise.core.mediaPool.get" in request_schema_routes
+    assert "ak.wwise.core.sound.setActiveSource" in request_schema_routes
+    assert "ak.wwise.core.sourceControl.commit" in request_schema_routes
     assert set(detailed["object.create"]["input_modes_by_version"].values()) == {
         "business_declaration"
     }

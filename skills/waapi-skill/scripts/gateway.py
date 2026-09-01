@@ -9319,13 +9319,13 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 for version in spec.supported_versions
             }
             if not args.detail:
-                projection = spec.as_compact_dict()
-                if set(modes.values()) == {BUSINESS_DECLARATION_INPUT_MODE}:
-                    projection.pop("required_arguments", None)
-                    projection.pop("optional_arguments", None)
-                    projection["input_mode"] = BUSINESS_DECLARATION_INPUT_MODE
-                    projection["next_command"] = ["operation-schema", spec.name]
-                operations.append(projection)
+                operations.append(
+                    {
+                        "name": spec.name,
+                        "summary": spec.summary,
+                        "next_command": ["operation-schema", spec.name],
+                    }
+                )
                 continue
             if BUSINESS_DECLARATION_INPUT_MODE in modes.values():
                 projection = composer_operation_projection(spec, version=None)
@@ -9368,18 +9368,22 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 *source_control_business_catalog_rows(),
             )
         )
-        return {
+        payload = {
             "contract": GATEWAY_RESULT_CONTRACT,
             "ok": True,
             "status": "ok",
             "command": "operations",
             "offline": True,
             "count": len(operations),
-            "implemented_count": sum(item["implemented"] is True for item in operations),
+            "implemented_count": sum(
+                spec.implemented is True
+                for spec in list_operation_specs()
+                if spec.name != "waapi.call"
+            ),
             "operations": operations,
             "request_schema_route_count": len(request_schema_routes),
             "request_schema_command_template": ["request-schema", "<api>"],
-            "request_schema_routes": request_schema_routes,
+            "detail_available": True,
             "selection_guidance": {
                 "authoring_ui_command_id": {
                     "choose": ["operation-schema", "ui.commands.execute"],
@@ -9404,6 +9408,9 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 },
             },
         }
+        if args.detail:
+            payload["request_schema_routes"] = request_schema_routes
+        return payload
     if args.command == "operation-schema":
         if args.operation == "waapi.call":
             raise OperationContractError(

@@ -81,7 +81,7 @@ def test_operations_catalog_lists_all_soundengine_business_routes(
     tmp_path: Path,
 ) -> None:
     code, payload = gateway.execute_gateway(
-        ["operations"],
+        ["operations", "--detail"],
         env=_env(tmp_path),
         client_factory=lambda url: pytest.fail(f"offline operations connected to {url}"),
     )

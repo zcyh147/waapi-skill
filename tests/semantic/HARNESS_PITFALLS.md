@@ -1829,6 +1829,20 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   repeated-meaning command on both shell families; do not repair this by asking
   the Agent to split an otherwise closed batch into more commands.
 
+### The default operation router must fit one complete Agent-visible frame
+
+- Evidence: #51 macOS `8fcf481` r11 verified the Weather import transaction,
+  then stopped safely when default `operations` emitted about 34.5 KB: 33 named
+  operation rows plus all 105 request-schema route rows. Broker evidence kept
+  the full JSON, but the Fresh Agent's shell view was clipped, so it could not
+  safely select `object.set`.
+- Prevention: default `operations` returns only each named operation's name,
+  business summary, and copy-ready `operation-schema` continuation, with a
+  fixed sub-10-KiB program test. The count and `request-schema <api>` template
+  remain visible; the complete native route inventory and expanded contracts
+  require explicit `operations --detail`. Do not increase Agent tool-output
+  limits to compensate for an unnecessarily broad router response.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:

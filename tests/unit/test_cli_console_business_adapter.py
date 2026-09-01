@@ -563,7 +563,7 @@ def test_operations_catalog_routes_cli_console_intent_to_request_schema(
     tmp_path: Path,
 ) -> None:
     code, payload = gateway.execute_gateway(
-        ["operations"],
+        ["operations", "--detail"],
         env=_env(tmp_path, "2025.1"),
         client_factory=lambda url: pytest.fail(f"offline catalog connected to {url}"),
     )
