@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import importlib.util
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -68,6 +70,54 @@ def test_debug_control_runtime_uses_production_gateway_without_wwise(
         "version": "2021.1",
         "operation": "debug.setAutomationMode",
         "arguments": {"enabled": True},
+    }
+
+
+def test_debug_fixture_supplies_the_2021_project_guard(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    unit = load_debug_control_business_profile(PROFILE).units[0]
+    runtime = prepare_debug_control_business_runtime(unit, tmp_path / "runtime")
+    shim_path = (
+        REPO_ROOT
+        / "tests"
+        / "semantic"
+        / "data"
+        / "business-agent"
+        / "waapi-shim"
+        / "waapi.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "debug_control_business_waapi_shim",
+        shim_path,
+    )
+    assert spec is not None and spec.loader is not None
+    shim = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = shim
+    spec.loader.exec_module(shim)
+    monkeypatch.setenv("WAAPI_BUSINESS_AGENT_FIXTURE", str(runtime.fixture_path))
+
+    result = shim.WaapiClient().call(
+        "ak.wwise.core.object.get",
+        {"waql": "from type Project take 1"},
+        {"return": ["id", "name", "type", "path", "filePath"]},
+    )
+
+    assert result == {
+        "return": [
+            {
+                "id": "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}",
+                "name": "SemanticProject",
+                "type": "Project",
+                "path": str(runtime.fixture_path.parent / "project"),
+                "filePath": str(
+                    runtime.fixture_path.parent
+                    / "project"
+                    / "SemanticProject.wproj"
+                ),
+            }
+        ]
     }
 
 

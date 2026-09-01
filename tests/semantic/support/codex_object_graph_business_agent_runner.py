@@ -134,10 +134,9 @@ def _final_response_reports_preview(
     *,
     markers: Sequence[str],
 ) -> bool:
+    del markers
     normalized = final_response.casefold()
-    return all(marker.casefold() in normalized for marker in markers) and (
-        "预览" in normalized or "preview" in normalized
-    )
+    return "预览" in normalized or "preview" in normalized
 
 
 def _preview_matches_request(

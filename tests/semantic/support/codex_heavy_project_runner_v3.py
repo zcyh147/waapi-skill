@@ -6544,8 +6544,9 @@ def _require_natural_intro(
     policy: str,
 ) -> None:
     folded = text.casefold()
+    normalized_product_name = re.sub(r"[\s_-]+", "", folded)
     required = {
-        "skill": "waapi-skill" in folded,
+        "skill": "waapiskill" in normalized_product_name,
         "endpoint": endpoint.casefold() in folded,
         "version": version.casefold() in folded,
         "policy": policy.casefold() in folded,

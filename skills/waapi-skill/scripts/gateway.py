@@ -13908,6 +13908,7 @@ def dispatch_topic_stream(
     )
 
     event_count = 0
+    agent_events: list[dict[str, Any]] = []
     primary_error: Exception | None = None
     cleanup_status = "unknown"
     cleanup_failure: dict[str, Any] | None = None
@@ -13997,6 +13998,11 @@ def dispatch_topic_stream(
                 cumulative_bytes=streamed_output_bytes,
                 cumulative_limit_bytes=TOPIC_STREAM_EVENT_OUTPUT_LIMIT_BYTES,
             )
+            if (
+                args.api == SOUNDBANK_GENERATED_TOPIC_URI
+                and args.include_object_identity
+            ):
+                agent_events.append(dict(event.payload))
             event_count = sequence
             if event_count >= args.event_count:
                 break
@@ -14094,6 +14100,12 @@ def dispatch_topic_stream(
             ),
         }
     )
+    if args.api == SOUNDBANK_GENERATED_TOPIC_URI and args.include_object_identity:
+        terminal["agent_result"] = {
+            "contract": "waapi-skill.topic-stream-agent-result/v1",
+            "event_count": event_count,
+            "events": agent_events,
+        }
     return terminal
 
 
@@ -16709,6 +16721,13 @@ def dispatch_business_object_binding(
             else None
         )
     )
+    if (
+        business_kind is None
+        and isinstance(args.role, str)
+        and closed_selector.expected_type is not None
+    ):
+        business_kind = args.role
+        business_kind_source = "closed_role_exact_type_selector"
     captured: list[Any] = []
 
     def bind(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
@@ -22273,6 +22292,38 @@ def operation_draft_prefix_copy_binding(
     }
 
 
+def operation_draft_exact_copy_binding(
+    full_argv: Sequence[str],
+) -> dict[str, Any]:
+    """Return one complete Draft command with a closed exact-copy policy."""
+
+    normalized = [str(value) for value in full_argv]
+    return {
+        "fixed_full_argv": normalized,
+        "copy_command": operation_draft_copy_command(normalized),
+        "copy_exactly": True,
+        "copy_instruction": {
+            "contract": OPERATION_DRAFT_COMMAND_COPY_INSTRUCTION_CONTRACT,
+            "source_field": "copy_command",
+            "action": "copy_and_execute_verbatim_once",
+            "forbidden_transformations": [
+                "reconstruct",
+                "shorten",
+                "normalize",
+                "substitute_path_segments",
+                "select_another_field",
+            ],
+            "opaque_token_guard": {
+                "task_authority": {
+                    "prefix": "da1-",
+                    "hex_characters_after_prefix": 40,
+                    "truncate_to_32_hex_characters": "invalid",
+                }
+            },
+        },
+    }
+
+
 def _compact_business_binding_continuation(value: Any) -> Any:
     """Remove repeated argv arrays while preserving every copy-ready route."""
 
@@ -22395,9 +22446,7 @@ def _business_next_action_binding(
         return {
             "contract": "waapi-skill.business-draft-next-action/v1",
             "required_next_phase": "preview_from_checked_business_draft",
-            "fixed_full_argv": preview,
-            "copy_command": operation_draft_copy_command(preview),
-            "copy_exactly": True,
+            **operation_draft_exact_copy_binding(preview),
             "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
         }
     object_bind_prefix = [*base, "draft-bind-object", *binding]
@@ -22520,8 +22569,9 @@ def _business_next_action_binding(
             "before_declaration_compare_returned_name_and_path_to_the_user_"
             "target; when_business_kind_resolution_status_is_resolved_and_the_"
             "user_supplied_a_business_type_compare_business_kind_not_the_"
-            "version_specific_reflected_type; when_status_is_ambiguous_do_not_"
-            "guess_from_the_reflected_type_and_stop_with_the_returned_candidates; "
+            "version_specific_reflected_type; when_status_is_ambiguous_stop_only_"
+            "when_the_user_supplied_a_business_type; continue_when_the_user_did_"
+            "not_state_a_business_type_and_the_returned_name_and_path_match; "
             "hierarchy_label_is_not_an_object_type; bind_again_or_stop_if_they_"
             "differ"
         ),
@@ -23530,17 +23580,17 @@ def _business_next_action_binding(
             ],
             "lua.executeCliFile": [
                 "--script-file <exact-user-supplied-lua-file>",
-                "[--argument <key> <type> <value>]...",
+                "[--argument <key> string|boolean|integer|number|json|null <value>]...",
                 "[--watchdog-seconds <non-negative-integer>] (2024.1+)",
             ],
             "lua.executeCoreFile": [
                 "--script-file <exact-user-supplied-lua-file>",
-                "[--argument <key> <type> <value>]...",
+                "[--argument <key> string|boolean|integer|number|json|null <value>]...",
             ],
             "lua.executeCoreInline": [
                 "--lua-source <exact-user-supplied-utf8-source>",
                 "--io-root <exact-isolated-transaction-root>",
-                "[--argument <key> <type> <value>]...",
+                "[--argument <key> string|boolean|integer|number|json|null <value>]...",
             ],
         }
         declaration_binding = {
@@ -23554,6 +23604,15 @@ def _business_next_action_binding(
             "submit_once": True,
             "native_request_input": "forbidden",
         }
+        if record.operation.startswith("lua."):
+            declaration_binding["argument_types"] = {
+                "string": "exact_text_value",
+                "boolean": "true_or_false",
+                "integer": "strict_json_integer_not_a_native_width",
+                "number": "finite_json_number",
+                "json": "strict_json_object_or_array",
+                "null": "literal_null",
+            }
         if record.operation == "audio.importTabDelimited":
             declaration_binding["business_value_choices"] = {
                 "mode": {
@@ -24130,9 +24189,10 @@ def _business_next_action_binding(
                 ),
                 "completion_candidate": {
                     "condition": "all_user_requested_object_outcomes_are_declared",
-                    "fixed_full_argv": check,
-                    "copy_command": operation_draft_copy_command(check),
-                    "is_next_command_when_condition_true": bool(session.declarations),
+                    **operation_draft_exact_copy_binding(check),
+                    "is_next_command_when_condition_true": bool(
+                        session.declarations
+                    ),
                 },
             }
         shared = {
@@ -24271,8 +24331,7 @@ def _business_next_action_binding(
             "declaration": declare,
             "completion_candidate": {
                 "condition": "all_user_requested_named_objects_are_declared",
-                "fixed_full_argv": check,
-                "copy_command": operation_draft_copy_command(check),
+                **operation_draft_exact_copy_binding(check),
                 "is_next_command_when_condition_true": bool(session.declarations),
             },
         }
@@ -24817,8 +24876,7 @@ def _business_next_action_binding(
         },
         "completion_candidate": {
             "condition": "all_user_requested_business_declarations_are_complete",
-            "fixed_full_argv": check,
-            "copy_command": operation_draft_copy_command(check),
+            **operation_draft_exact_copy_binding(check),
             "is_next_command_when_condition_true": bool(
                 session is not None and session.declarations
             ),

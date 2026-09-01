@@ -4910,6 +4910,58 @@ def test_stream_topic_stops_at_its_explicit_event_count_bound(
     assert client.handlers[0].unsubscribe_calls == 1
 
 
+def test_soundbank_stream_terminal_repeats_bounded_identity_events_for_agent(
+    tmp_path: Path,
+) -> None:
+    topic = "ak.wwise.core.soundbank.generated"
+    events = [
+        {
+            "platform": {"id": "{11111111-1111-1111-1111-111111111111}", "name": platform, "type": "Platform"},
+            "soundbank": {
+                "id": "{22222222-2222-2222-2222-222222222222}",
+                "name": "Weapons_Core",
+                "path": r"\SoundBanks\Default Work Unit\Weapons_Core",
+                "type": "SoundBank",
+            },
+        }
+        for platform in ("Mac", "Windows")
+    ]
+    client = FakeClient(
+        {"ak.wwise.core.getInfo": live_info(year=2024)},
+        subscription_events={topic: events},
+    )
+    records: list[Mapping[str, Any]] = []
+    env = gateway_env(tmp_path)
+    env["WWISE_VERSION"] = "2024.1"
+
+    exit_code, terminal = waapi_gateway.execute_gateway(
+        [
+            "--timeout",
+            "0.1",
+            "stream-topic",
+            topic,
+            "--event-count",
+            "6",
+            *_typed_topic_bindings(topic, "2024.1"),
+            "--match-soundbank-name",
+            "Weapons_Core",
+            "--include-object-identity",
+        ],
+        env=env,
+        client_factory=lambda _url: client,
+        stream_sink=records.append,
+    )
+
+    assert exit_code == 0, terminal
+    assert terminal["event_count"] == 2
+    assert terminal["agent_result"] == {
+        "contract": "waapi-skill.topic-stream-agent-result/v1",
+        "event_count": 2,
+        "events": events,
+    }
+    assert list(terminal)[-1] == "agent_result"
+
+
 def test_stream_topic_bounds_cumulative_event_record_output(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

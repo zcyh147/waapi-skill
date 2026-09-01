@@ -3372,6 +3372,17 @@ def test_direct_turn_requires_natural_intro_and_runs_final_business_oracle() -> 
     assert "business_verification" in observer.checks
 
 
+def test_natural_intro_accepts_human_spacing_in_the_skill_name() -> None:
+    runner._require_natural_intro(
+        "已加载 WAAPI skill，当前 WAAPI 地址是 127.0.0.1:49152，"
+        "适配层版本 2022.1，修改策略 ask_before_changes，可用模式为 "
+        "read_only、ask_before_changes、allow_changes。",
+        endpoint="127.0.0.1:49152",
+        version="2022.1",
+        policy="ask_before_changes",
+    )
+
+
 def test_first_use_intro_rejects_later_agent_message_after_gateway() -> None:
     prepared = _prepared()
     observer = runner._CaseObservers(

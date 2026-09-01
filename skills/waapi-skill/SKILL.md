@@ -100,7 +100,7 @@ terminal record includes the completion and unsubscribe result.
 
 For `ak.wwise.waapi.getFunctions`/`getTopics`, run `request-schema` and follow its sole typed continuation. Do not run `describe` or `capabilities` first. Any failure stops.
 
-For five-version totals, read coverage then run exactly `capabilities --all-versions --summary-only`; it includes every route count. Row filters omit `--summary-only`. The list defaults to at most 50 compact rows; `--limit 0` requests all and `--detail` is diagnostic. A known URI uses `request-schema`; business intent uses an exact operation or one `operations` lookup then `operation-schema`. Reserve `operations --detail` for an explicit full-catalog audit.
+For five-version totals, read coverage then run exactly `capabilities --all-versions --summary-only`; it includes every route count. Row filters omit `--summary-only`. The list defaults to at most 50 compact rows; `--limit 0` requests all and `--detail` is diagnostic. A user-literal URI uses `request-schema`. If natural-language intent lacks an exact visible route, run one `operations` lookup and copy its route; never synthesize one. Then use `operation-schema` for a name or `request-schema` for a URI. Reserve `operations --detail` for an explicit full-catalog audit.
 
 For five-version totals, coverage, exclusions, or matrix proof, read `references/waapi-coverage.md` once after `SKILL.md` and before the summary; combine both. Program tests are not live-Wwise verification.
 

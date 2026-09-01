@@ -1389,6 +1389,107 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   reconciliation still proves semantics, but cannot replace either raw copy
   proof.
 
+### Semantic strictness belongs at the business and safety boundary
+
+- Evidence: the first #60 `deep_business_cross_version_19` roots reported many
+  failures because the shared oracle recognized only one reviewed
+  `copy_verbatim_then_append_*` action spelling, even when another operation's
+  closed copy instruction required the same prefix-copy mechanic. Other cases
+  were at risk of treating harmless response wording, synonymous presentation,
+  or an irrelevant ordering choice as semantic failure despite a correct
+  Preview and unchanged Wwise business result.
+- Prevention: hard semantic gates cover the requested Wwise/Preview business
+  effect, safety and authorization boundaries, the no-bypass Gateway rule, and
+  exact opaque continuation bytes where the Gateway explicitly publishes a
+  closed copy instruction. Do not require identical prose, harmless
+  terminology, formatting, or presentation order. Order is hard only when it
+  changes transaction safety, dependencies, or business effect. Classify
+  prefix-versus-exact copy from the complete closed instruction contract rather
+  than one operation-specific action suffix; unknown instruction shapes still
+  fail closed.
+- The one-time introduction still requires every Gateway-owned fact, but the
+  product name is natural prose: `waapi-skill`, `WAAPI skill`, and equivalent
+  case/space/hyphen presentation identify the same Skill. Requiring the literal
+  hyphen produced a false native-Windows Topic FAIL after a complete successful
+  subscription and two valid events.
+
+### A business type ambiguity is relevant only when the intent supplied a type
+
+- Evidence: #60 macOS r42 bound the requested `Alarm_Main` object exactly while
+  preparing an Output Bus change, then stopped because the shared object-binding
+  continuation unconditionally treated the reflected Sound subtype ambiguity as
+  blocking. The user had not supplied a Sound subtype and the reference change
+  did not require choosing one, so the stop was unrelated to target identity or
+  business effect.
+- Prevention: compare a resolved business kind when the user supplied a
+  business type. If no type was stated, an ambiguous reflected subtype does not
+  block an otherwise exact matching name/path binding. Exact identity mismatch,
+  an explicitly stated incompatible type, or an operation that genuinely
+  requires subtype selection must still stop.
+- A role route that fixes both the role and exact Wwise type is also resolved
+  evidence. #60 r42 bound `Main_UI` through the disclosed SoundBank exact-name
+  route, but the generic semantic-kind table had no SoundBank row and reported
+  an empty ambiguity. The Gateway now reports the role as resolved from the
+  closed exact-type selector; this does not invent a caller-authored type.
+
+### Compound children defer their own Preview to one parent transaction
+
+- Evidence: #60 r42 correctly checked two closed child Drafts and consumed them
+  in one `waapi.undoGroup` parent Preview. The shared immediate-continuation
+  oracle nevertheless demanded a Preview after each child and also demanded
+  the parent's declaration before the children existed.
+- Prevention: the compound profile alone permits the reviewed checked-child
+  handoff. It verifies that each deferred child id/authority is consumed by the
+  later parent declaration and that the parent declaration copies the original
+  opaque parent prefix exactly. Ordinary Drafts still follow their immediate
+  `next_command`; this is not a global continuation bypass.
+
+### Business scalar types must be enumerated, not implied by native APIs
+
+- Evidence: #60 r42's Lua Agent saw `--argument <key> <type> <value>` and chose
+  the plausible native-looking `int32`, while the business parser accepts the
+  JSON-level `integer`. The Broker correctly rejected the command before
+  Gateway/Wwise dispatch.
+- Prevention: Lua artifact continuations enumerate exactly `string`,
+  `boolean`, `integer`, `number`, `json`, and `null`, with compact value rules.
+  `integer` explicitly says it is not a native width. Do not rely on a generic
+  `<type>` placeholder when the public vocabulary is closed.
+
+### Streamed events need a compact terminal handoff for the Agent
+
+- Evidence: #60 native-Windows r42 received two valid SoundBank generated event
+  records and a terminal `event_count=2`, but the Agent reported no events after
+  the large Topic schema and NDJSON transcript. This is a real business-report
+  error even though the introduction's `WAAPI skill` spacing was a separate
+  false-negative oracle.
+- Prevention: when the reviewed SoundBank identity shortcut is selected, the
+  terminal stream record repeats the already bounded matched identity events in
+  final `agent_result`. The live event records remain immediate and authoritative;
+  the terminal handoff does not broaden fields, counts, or result limits.
+
+### Natural-language business intent may use one documented discovery hop
+
+- Evidence: #60 macOS r42 correctly used `operations` before the Switch
+  assignment schema, but the profile expected `operation-schema` as the first
+  command and rejected the legal discovery command before any Preview.
+- Prevention: a natural-language business request may perform one
+  Skill-documented `operations` lookup before its closed schema, even when the
+  profile's internal expected operation is a reflected URI. The user did not
+  supply that hidden URI, so forbidding discovery rewards guessing. The Broker
+  still accepts only the one reviewed lookup followed by the exact expected
+  closed schema; an explicit profile override remains authoritative.
+
+### The 2021 Debug fixture must expose the project guard row
+
+- Evidence: #60 r42's Debug Agent copied the exact Gateway continuation and
+  selected the requested enable action, but the semantic WAAPI shim returned no
+  Project for the 2021.1 preflight guard, so the correct path stopped before the
+  Preview.
+- Prevention: fixture-backed Debug campaigns synthesize the bounded Project row
+  required by `from type Project take 1` and `take 2`, including stable id,
+  name, type, project-directory path, and `.wproj` file path. This is fixture
+  completeness, not Agent semantic credit.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:

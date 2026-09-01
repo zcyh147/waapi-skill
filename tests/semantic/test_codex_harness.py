@@ -483,7 +483,11 @@ def test_model_authored_command_without_prior_continuation_is_unchanged() -> Non
     ) == ()
 
 
-def _business_prefix_payload(copy_command: str) -> dict[str, object]:
+def _business_prefix_payload(
+    copy_command: str,
+    *,
+    action: str = "copy_verbatim_then_append_complete_typed_action_groups",
+) -> dict[str, object]:
     return {
         "draft": {
             "next_action_binding": {
@@ -498,10 +502,7 @@ def _business_prefix_payload(copy_command: str) -> dict[str, object]:
                                 "copy-instruction/v1"
                             ),
                             "source_field": "fixed_argv_prefix_copy",
-                            "action": (
-                                "copy_verbatim_then_append_complete_"
-                                "typed_action_groups"
-                            ),
+                            "action": action,
                             "forbidden_transformations": [
                                 "reconstruct",
                                 "shorten",
@@ -509,6 +510,13 @@ def _business_prefix_payload(copy_command: str) -> dict[str, object]:
                                 "substitute_path_segments",
                                 "select_another_field",
                             ],
+                            "opaque_token_guard": {
+                                "task_authority": {
+                                    "prefix": "da1-",
+                                    "hex_characters_after_prefix": 40,
+                                    "truncate_to_32_hex_characters": "invalid",
+                                }
+                            },
                         },
                         "append_repeated": [
                             "--object-path-segment",
@@ -537,6 +545,261 @@ def test_business_draft_prefix_continuation_binds_exact_copied_bytes() -> None:
         (SimpleNamespace(payload=payload), SimpleNamespace(payload={})),
         platform_name="posix",
     ) == ()
+
+
+def test_business_draft_boolean_continuation_binds_exact_copied_prefix() -> None:
+    prefix = (
+        "python '/tmp/Skill Path/scripts/run.py' gateway.py "
+        "draft-declare-debug-intent od1-opaque --task-authority da1-opaque "
+        "--expected-revision 1"
+    )
+    payload = _business_prefix_payload(
+        prefix,
+        action="copy_verbatim_then_append_the_stable_boolean_outcome",
+    )
+    current = completed_record(prefix + " --enable", {})
+
+    assert gateway_continuation_binding_errors(
+        (completed_record("python initial.py", payload), current),
+        (SimpleNamespace(payload=payload), SimpleNamespace(payload={})),
+        platform_name="posix",
+    ) == ()
+
+
+def test_business_draft_plan_continuation_binds_exact_copied_prefix() -> None:
+    prefix = (
+        "python '/tmp/Skill Path/scripts/run.py' gateway.py "
+        "draft-declare-soundengine-plan od1-opaque --task-authority da1-opaque "
+        "--expected-revision 1"
+    )
+    payload = _business_prefix_payload(
+        prefix,
+        action="copy_verbatim_then_append_one_complete_soundengine_plan",
+    )
+    current = completed_record(prefix + " --game-object-name Player", {})
+
+    assert gateway_continuation_binding_errors(
+        (completed_record("python initial.py", payload), current),
+        (SimpleNamespace(payload=payload), SimpleNamespace(payload={})),
+        platform_name="posix",
+    ) == ()
+
+
+def test_business_draft_uses_the_unique_longest_matching_nested_prefix() -> None:
+    broad = (
+        "python '/tmp/Skill Path/scripts/run.py' gateway.py "
+        "draft-bind-object od1-opaque --task-authority da1-opaque "
+        "--expected-revision 1 --role event"
+    )
+    specific = broad + " --exact-type-name Event"
+    payload = _business_prefix_payload(broad)
+    payload["draft"]["next_action_binding"]["object_binding"]["by_exact_type"] = (
+        _business_prefix_payload(specific)["draft"]["next_action_binding"]
+        ["object_binding"]
+    )
+    current = completed_record(specific + " 'Fresh Alarm Event'", {})
+
+    assert gateway_continuation_binding_errors(
+        (completed_record("python initial.py", payload), current),
+        (SimpleNamespace(payload=payload), SimpleNamespace(payload={})),
+        platform_name="posix",
+    ) == ()
+
+
+def test_business_draft_execute_once_requires_the_exact_complete_command() -> None:
+    command = (
+        "python '/tmp/Skill Path/scripts/run.py' gateway.py "
+        "draft-declare-debug-intent od1-opaque --task-authority da1-opaque "
+        "--expected-revision 1"
+    )
+    payload = _business_prefix_payload(
+        command,
+        action="copy_and_execute_verbatim_once",
+    )
+    prior = completed_record("python initial.py", payload)
+    broker_records = (
+        SimpleNamespace(payload=payload),
+        SimpleNamespace(payload={}),
+    )
+
+    assert gateway_continuation_binding_errors(
+        (prior, completed_record(command, {})),
+        broker_records,
+        platform_name="posix",
+    ) == ()
+    assert gateway_continuation_binding_errors(
+        (prior, completed_record(command + " --unexpected", {})),
+        broker_records,
+        platform_name="posix",
+    ) == (
+        "command 2: Gateway business Draft continuation was not copied "
+        "from its selected source field",
+    )
+
+
+def test_compound_checked_children_defer_preview_and_copy_parent_prefix() -> None:
+    parent_authority = "da1-" + "a" * 40
+    child_one = "od1-child-one"
+    child_one_authority = "da1-" + "b" * 40
+    child_two = "od1-child-two"
+    child_two_authority = "da1-" + "c" * 40
+    parent_prefix = (
+        "python /tmp/run.py gateway.py draft-declare-undo-plan od1-parent "
+        f"--task-authority {parent_authority} --expected-revision 1"
+    )
+    parent_payload = _business_prefix_payload(
+        parent_prefix,
+        action=(
+            "copy_verbatim_then_append_display_name_and_each_checked_child_"
+            "draft_in_user_requested_order"
+        ),
+    )
+    parent_payload["draft"]["next_action_binding"]["required_next_phase"] = (
+        "declare_ordered_checked_child_business_drafts"
+    )
+
+    def child_payload(child_id: str, authority: str) -> dict[str, object]:
+        return {
+            "next_command": _closed_next_command(
+                (
+                    "python",
+                    "/tmp/run.py",
+                    "gateway.py",
+                    "preview-from-draft",
+                    child_id,
+                    "--task-authority",
+                    authority,
+                    "--expected-revision",
+                    "4",
+                ),
+                platform_name="posix",
+            )
+        }
+
+    child_one_payload = child_payload(child_one, child_one_authority)
+    child_two_payload = child_payload(child_two, child_two_authority)
+    parent_command = (
+        parent_prefix
+        + " --display-name 'Weather cleanup' --child-draft "
+        + child_one
+        + " "
+        + child_one_authority
+        + " --child-draft "
+        + child_two
+        + " "
+        + child_two_authority
+    )
+    command_records = (
+        completed_record(
+            "python /tmp/run.py gateway.py draft-start waapi.undoGroup",
+            parent_payload,
+        ),
+        completed_record(
+            "python /tmp/run.py gateway.py draft-check "
+            + child_one
+            + " --task-authority "
+            + child_one_authority,
+            child_one_payload,
+        ),
+        completed_record(
+            "python /tmp/run.py gateway.py operation-schema object.setName",
+            {},
+        ),
+        completed_record(
+            "python /tmp/run.py gateway.py draft-check "
+            + child_two
+            + " --task-authority "
+            + child_two_authority,
+            child_two_payload,
+        ),
+        completed_record(parent_command, {}),
+    )
+    broker_records = (
+        SimpleNamespace(
+            payload=parent_payload,
+            gateway_arguments=("draft-start", "waapi.undoGroup"),
+        ),
+        SimpleNamespace(
+            payload=child_one_payload,
+            gateway_arguments=(
+                "draft-check",
+                child_one,
+                "--task-authority",
+                child_one_authority,
+            ),
+        ),
+        SimpleNamespace(
+            payload={},
+            gateway_arguments=("operation-schema", "object.setName"),
+        ),
+        SimpleNamespace(
+            payload=child_two_payload,
+            gateway_arguments=(
+                "draft-check",
+                child_two,
+                "--task-authority",
+                child_two_authority,
+            ),
+        ),
+        SimpleNamespace(
+            payload={},
+            gateway_arguments=(
+                "draft-declare-undo-plan",
+                "od1-parent",
+                "--child-draft",
+                child_one,
+                child_one_authority,
+                "--child-draft",
+                child_two,
+                child_two_authority,
+            ),
+        ),
+    )
+
+    assert gateway_continuation_binding_errors(
+        command_records,
+        broker_records,
+        platform_name="posix",
+        allow_compound_checked_child_handoff=True,
+    ) == ()
+
+    reconstructed = list(command_records)
+    reconstructed[-1] = completed_record(
+        parent_command.replace(parent_authority, "da1-" + "d" * 40),
+        {},
+    )
+    assert gateway_continuation_binding_errors(
+        tuple(reconstructed),
+        broker_records,
+        platform_name="posix",
+        allow_compound_checked_child_handoff=True,
+    ) == (
+        "command 5: deferred compound Draft continuation was not copied from its "
+        "selected source field",
+    )
+
+
+def test_business_draft_continuation_rejects_unreviewed_copy_action() -> None:
+    prefix = (
+        "python '/tmp/Skill Path/scripts/run.py' gateway.py draft-check "
+        "od1-opaque --task-authority da1-opaque --expected-revision 1"
+    )
+    payload = _business_prefix_payload(
+        prefix,
+        action="normalize_then_execute",
+    )
+
+    assert gateway_continuation_binding_errors(
+        (
+            completed_record("python initial.py", payload),
+            completed_record(prefix, {}),
+        ),
+        (SimpleNamespace(payload=payload), SimpleNamespace(payload={})),
+        platform_name="posix",
+    ) == (
+        "command 2: Gateway business Draft continuation was not copied "
+        "from its selected source field",
+    )
 
 
 def test_business_draft_prefix_continuation_rejects_equivalent_requote() -> None:

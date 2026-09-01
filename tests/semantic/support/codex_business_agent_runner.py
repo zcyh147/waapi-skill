@@ -52,6 +52,7 @@ class BusinessAgentRunSpec:
     outcome_factory: Callable[..., Any]
     optional_initial_operations_discovery_operation: str | None = None
     prepare_broker_state: Callable[[Any, Path], None] | None = None
+    allow_compound_checked_child_handoff: bool = False
 
 
 def _only_expected_business_commands(
@@ -81,6 +82,19 @@ def _expected_gateway_subcommands(
     return tuple(dict.fromkeys((*prefix, *(step.subcommand for step in steps))))
 
 
+def business_agent_optional_operations_discovery(
+    unit: Any,
+    *,
+    explicit: str | None,
+) -> str | None:
+    """Permit the one Skill-documented discovery hop for natural-language intent."""
+
+    if explicit is not None:
+        return explicit
+    operation = getattr(unit, "operation", None)
+    return operation if isinstance(operation, str) and operation else None
+
+
 def run_business_agent_unit(
     unit: Any,
     *,
@@ -98,6 +112,10 @@ def run_business_agent_unit(
     skill_install = prepare_workspace_skill_install(workspace, options.skill_source)
     runtime = spec.prepare_runtime(unit, task_root / "runtime")
     steps = tuple(spec.build_steps(runtime))
+    optional_operations_discovery = business_agent_optional_operations_discovery(
+        unit,
+        explicit=spec.optional_initial_operations_discovery_operation,
+    )
     runner_environment = dict(os.environ)
     runner_environment.update(
         {
@@ -126,7 +144,7 @@ def run_business_agent_unit(
         transport="tcp",
         runner_timeout_seconds=max(120.0, options.timeout_seconds),
         optional_initial_operations_discovery_operation=(
-            spec.optional_initial_operations_discovery_operation
+            optional_operations_discovery
         ),
     )
     developer_instructions = semantic_task_developer_instructions(
@@ -147,7 +165,7 @@ def run_business_agent_unit(
         expected_gateway_subcommands=_expected_gateway_subcommands(
             steps,
             optional_initial_operations_discovery_operation=(
-                spec.optional_initial_operations_discovery_operation
+                optional_operations_discovery
             ),
         ),
         expected_wwise_version=unit.version,
@@ -185,6 +203,9 @@ def run_business_agent_unit(
             ),
             windows_powershell_core_host=(
                 options.windows_powershell_core_host
+            ),
+            allow_compound_checked_child_handoff=(
+                spec.allow_compound_checked_child_handoff
             ),
         )
 

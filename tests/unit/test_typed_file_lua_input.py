@@ -429,8 +429,16 @@ def test_lua_continuation_discloses_one_bounded_typed_argument_at_a_time(
     )
 
     assert code == 0, payload
-    append = payload["draft"]["next_action_binding"]["declaration"]["append"]
-    assert any("--argument <key> <type> <value>" in row for row in append)
+    declaration = payload["draft"]["next_action_binding"]["declaration"]
+    append = declaration["append"]
+    assert any(
+        "--argument <key> string|boolean|integer|number|json|null <value>"
+        in row
+        for row in append
+    )
+    assert declaration["argument_types"]["integer"] == (
+        "strict_json_integer_not_a_native_width"
+    )
     assert all("alternative:" not in row for row in append)
     assert all("--arguments-json" not in row for row in append)
 

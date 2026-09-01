@@ -167,6 +167,22 @@ class WaapiClient:
             ids = source.get("id")
             paths = source.get("path")
             waql = arguments.get("waql")
+            if waql in {
+                "from type Project take 1",
+                "from type Project take 2",
+            }:
+                project_path = Path(self.fixture["project_path"])
+                return {
+                    "return": [
+                        {
+                            "id": "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}",
+                            "name": "SemanticProject",
+                            "type": "Project",
+                            "path": str(project_path.parent),
+                            "filePath": str(project_path),
+                        }
+                    ]
+                }
             name_match = (
                 _UNIQUE_NAME_WAQL.fullmatch(waql)
                 if isinstance(waql, str)

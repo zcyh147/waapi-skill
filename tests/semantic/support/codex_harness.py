@@ -3449,9 +3449,56 @@ _BUSINESS_DRAFT_NEXT_ACTION_CONTRACT = (
 _BUSINESS_DRAFT_COPY_INSTRUCTION_CONTRACT = (
     "waapi-skill.operation-draft-command-copy-instruction/v1"
 )
-_BUSINESS_DRAFT_PREFIX_COPY_ACTION = (
-    "copy_verbatim_then_append_complete_typed_action_groups"
+_BUSINESS_DRAFT_FORBIDDEN_TRANSFORMATIONS = (
+    "reconstruct",
+    "shorten",
+    "normalize",
+    "substitute_path_segments",
+    "select_another_field",
 )
+_BUSINESS_DRAFT_EXACT_COPY_ACTION = "copy_and_execute_verbatim_once"
+
+
+def _business_draft_copy_mode(
+    instruction: Any,
+    *,
+    source_field: str = "fixed_argv_prefix_copy",
+) -> str | None:
+    """Classify one closed copy instruction without coupling to business prose."""
+
+    if (
+        not isinstance(instruction, Mapping)
+        or set(instruction)
+        != {
+            "contract",
+            "source_field",
+            "action",
+            "forbidden_transformations",
+            "opaque_token_guard",
+        }
+        or instruction.get("contract")
+        != _BUSINESS_DRAFT_COPY_INSTRUCTION_CONTRACT
+        or instruction.get("source_field") != source_field
+        or instruction.get("forbidden_transformations")
+        != list(_BUSINESS_DRAFT_FORBIDDEN_TRANSFORMATIONS)
+        or instruction.get("opaque_token_guard")
+        != {
+            "task_authority": {
+                "prefix": "da1-",
+                "hex_characters_after_prefix": 40,
+                "truncate_to_32_hex_characters": "invalid",
+            }
+        }
+    ):
+        return None
+    action = instruction.get("action")
+    if isinstance(action, str) and action.startswith(
+        "copy_verbatim_then_append_"
+    ):
+        return "prefix"
+    if action == _BUSINESS_DRAFT_EXACT_COPY_ACTION:
+        return "exact"
+    return None
 
 
 def _business_draft_continuation_candidates(
@@ -3478,21 +3525,24 @@ def _business_draft_continuation_candidates(
         if current_binding:
             instruction = value.get("fixed_argv_prefix_copy_instruction")
             prefix = value.get("fixed_argv_prefix_copy")
+            copy_mode = _business_draft_copy_mode(instruction)
             if (
                 isinstance(prefix, str)
                 and prefix
-                and isinstance(instruction, Mapping)
-                and instruction.get("contract")
-                == _BUSINESS_DRAFT_COPY_INSTRUCTION_CONTRACT
-                and instruction.get("source_field") == "fixed_argv_prefix_copy"
-                and instruction.get("action") == _BUSINESS_DRAFT_PREFIX_COPY_ACTION
+                and copy_mode is not None
             ):
-                candidates.add(("prefix", prefix))
+                candidates.add((copy_mode, prefix))
+            exact_instruction = value.get("copy_instruction")
             exact = value.get("copy_command")
             if (
                 isinstance(exact, str)
                 and exact
                 and value.get("copy_exactly") is True
+                and _business_draft_copy_mode(
+                    exact_instruction,
+                    source_field="copy_command",
+                )
+                == "exact"
             ):
                 candidates.add(("exact", exact))
         for item in value.values():
@@ -3508,6 +3558,7 @@ def gateway_continuation_binding_errors(
     *,
     platform_name: str | None = None,
     windows_powershell_core_host: WindowsPowerShellCoreHost | None = None,
+    allow_compound_checked_child_handoff: bool = False,
 ) -> tuple[str, ...]:
     """Bind every response-derived continuation to its exact selected bytes.
 
@@ -3526,6 +3577,39 @@ def gateway_continuation_binding_errors(
 
     active_platform = os.name if platform_name is None else platform_name
     errors: list[str] = []
+    compound_parent_candidates: tuple[tuple[str, str], ...] = ()
+    compound_child_bindings: set[tuple[str, str]] = set()
+    if allow_compound_checked_child_handoff:
+        for record_index, broker_record in enumerate(broker_records):
+            arguments = _record_field(broker_record, "gateway_arguments", ())
+            if not isinstance(arguments, (list, tuple)):
+                continue
+            arguments = tuple(arguments)
+            if arguments[:2] == ("draft-start", "waapi.undoGroup"):
+                payload = _record_field(broker_record, "payload")
+                if (
+                    isinstance(payload, Mapping)
+                    and record_index < len(command_records)
+                    and _command_output_matches_payload(
+                        command_records[record_index],
+                        payload,
+                    )
+                ):
+                    _, compound_parent_candidates = (
+                        _business_draft_continuation_candidates(payload)
+                    )
+            if arguments[:1] == ("draft-declare-undo-plan",):
+                for argument_index, item in enumerate(arguments[:-2]):
+                    if item == "--child-draft":
+                        child_id = arguments[argument_index + 1]
+                        child_authority = arguments[argument_index + 2]
+                        if isinstance(child_id, str) and isinstance(
+                            child_authority,
+                            str,
+                        ):
+                            compound_child_bindings.add(
+                                (child_id, child_authority)
+                            )
     for index in range(1, len(broker_records)):
         prior_broker = broker_records[index - 1]
         prior_payload = _record_field(prior_broker, "payload")
@@ -3549,6 +3633,91 @@ def gateway_continuation_binding_errors(
                 f"command {command_number}: prior Gateway output does not match Broker evidence"
             )
             continue
+        current_arguments = _record_field(
+            broker_records[index],
+            "gateway_arguments",
+            (),
+        )
+        current_arguments = (
+            tuple(current_arguments)
+            if isinstance(current_arguments, (list, tuple))
+            else ()
+        )
+        prior_arguments = _record_field(
+            prior_broker,
+            "gateway_arguments",
+            (),
+        )
+        prior_arguments = (
+            tuple(prior_arguments)
+            if isinstance(prior_arguments, (list, tuple))
+            else ()
+        )
+        if allow_compound_checked_child_handoff:
+            current_subcommand = (
+                current_arguments[0] if current_arguments else None
+            )
+            if current_subcommand == "draft-declare-undo-plan":
+                observed_command, _ = _raw_shell_tool_command(
+                    current_command,
+                    platform_name=active_platform,
+                    windows_powershell_core_host=windows_powershell_core_host,
+                )
+                matches = {
+                    command
+                    for mode, command in compound_parent_candidates
+                    if observed_command is not None
+                    and (
+                        observed_command == command
+                        or (
+                            mode == "prefix"
+                            and observed_command.startswith(command + " ")
+                        )
+                    )
+                }
+                longest_matches = {
+                    command
+                    for command in matches
+                    if len(command)
+                    == max((len(item) for item in matches), default=-1)
+                }
+                if observed_command is None or len(longest_matches) != 1:
+                    errors.append(
+                        f"command {command_number}: deferred compound Draft "
+                        "continuation was not copied from its selected source field"
+                    )
+                continue
+            if (
+                isinstance(prior_payload.get("draft"), Mapping)
+                and isinstance(
+                    prior_payload["draft"].get("next_action_binding"),
+                    Mapping,
+                )
+                and prior_payload["draft"]["next_action_binding"].get(
+                    "required_next_phase"
+                )
+                == "declare_ordered_checked_child_business_drafts"
+            ):
+                continue
+            if prior_arguments[:1] == ("draft-check",):
+                try:
+                    authority_index = prior_arguments.index("--task-authority")
+                except ValueError:
+                    authority_index = -1
+                child_binding = (
+                    (
+                        prior_arguments[1],
+                        prior_arguments[authority_index + 1],
+                    )
+                    if authority_index > 0
+                    and authority_index + 1 < len(prior_arguments)
+                    else None
+                )
+                if (
+                    child_binding in compound_child_bindings
+                    and current_subcommand != "preview-from-draft"
+                ):
+                    continue
         if "next_command" not in prior_payload:
             observed_command, _ = _raw_shell_tool_command(
                 current_command,
@@ -3567,7 +3736,12 @@ def gateway_continuation_binding_errors(
                     )
                 )
             }
-            if observed_command is None or len(matches) != 1:
+            longest_matches = {
+                command
+                for command in matches
+                if len(command) == max((len(item) for item in matches), default=-1)
+            }
+            if observed_command is None or len(longest_matches) != 1:
                 errors.append(
                     f"command {command_number}: Gateway business Draft "
                     "continuation was not copied from its selected source field"

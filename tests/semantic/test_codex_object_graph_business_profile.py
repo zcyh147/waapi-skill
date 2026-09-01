@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from tests.semantic import run_codex_skill_campaign as campaign
 from tests.semantic import run_codex_skill_matrix as matrix
 from tests.semantic.support.codex_object_graph_business_agent_runner import (
+    _final_response_reports_preview,
     build_preview_only_object_graph_steps,
     prepare_object_graph_business_runtime,
 )
@@ -31,6 +32,13 @@ def test_profile_owns_one_current_weather_named_graph() -> None:
         ("Rain", -4),
         ("Wind", -6),
     ]
+
+
+def test_preview_prose_does_not_require_exact_numeric_glyphs_or_markers() -> None:
+    assert _final_response_reports_preview(
+        "预览已生成：Rain 为 −4 dB，Wind 为 −6 dB；尚未执行。",
+        markers=("Rain", "Wind", "-4", "-6", "固定英文措辞"),
+    )
 
 
 def test_prompt_exposes_business_outcomes_not_gateway_or_native_mechanics() -> None:

@@ -57,6 +57,8 @@ def test_skill_declares_fixed_gateway_before_discovery_and_no_code_fallback() ->
     assert "describe <uri> --full-schema" in skill
     assert "The list defaults to at most 50 compact rows" in skill
     assert "operations --detail" in skill
+    assert "never synthesize one" in skill
+    assert "run one `operations` lookup and copy its route" in skill
     assert "do not read the query reference before or after it" in skill
     assert "do not retry a rejected or failed gateway invocation" in skill
     assert "Do not run `describe` or `capabilities` first" in skill

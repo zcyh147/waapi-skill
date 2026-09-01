@@ -585,6 +585,13 @@ def test_soundbank_draft_derives_type_for_one_exact_name_without_a_separate_quer
 
     assert code == 0, bound
     assert bound["bound_object"]["handle"].startswith("boh1-")
+    assert bound["bound_object"]["business_kind"] == "soundbank"
+    assert bound["bound_object"]["business_kind_resolution"] == {
+        "status": "resolved",
+        "candidates": [],
+        "reflected_type": "SoundBank",
+        "source": "closed_role_exact_type_selector",
+    }
     object_calls = [
         call for call in client.calls if call[0] == "ak.wwise.core.object.get"
     ]

@@ -283,7 +283,10 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
     assert "compare_business_kind_not_the_version_specific_reflected_type" in (
         result_validation
     )
-    assert "stop_with_the_returned_candidates" in result_validation
+    assert "stop_only_when_the_user_supplied_a_business_type" in result_validation
+    assert "continue_when_the_user_did_not_state_a_business_type" in (
+        result_validation
+    )
     assert "hierarchy_label_is_not_an_object_type" in result_validation
     assert "by_path" not in start_next["object_binding"]
     assert "configure" not in start_next
@@ -1122,6 +1125,27 @@ def test_structure_declaration_reaches_live_check_and_persists_readable_preview(
     assert checked["draft"]["next_action_binding"]["required_next_phase"] == (
         "preview_from_checked_business_draft"
     )
+    checked_copy = checked["draft"]["next_action_binding"]
+    assert checked_copy["copy_exactly"] is True
+    assert checked_copy["copy_instruction"] == {
+        "contract": "waapi-skill.operation-draft-command-copy-instruction/v1",
+        "source_field": "copy_command",
+        "action": "copy_and_execute_verbatim_once",
+        "forbidden_transformations": [
+            "reconstruct",
+            "shorten",
+            "normalize",
+            "substitute_path_segments",
+            "select_another_field",
+        ],
+        "opaque_token_guard": {
+            "task_authority": {
+                "prefix": "da1-",
+                "hex_characters_after_prefix": 40,
+                "truncate_to_32_hex_characters": "invalid",
+            }
+        },
+    }
     assert checked["next_command"]["gateway_argv"][0] == "preview-from-draft"
     assert "--apply" not in checked["next_command"]["gateway_argv"]
     record = OperationDraftStore(tmp_path / "state").inspect(

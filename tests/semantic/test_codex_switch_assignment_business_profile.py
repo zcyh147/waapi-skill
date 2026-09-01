@@ -6,6 +6,9 @@ from types import SimpleNamespace
 
 from tests.semantic import run_codex_skill_campaign as campaign
 from tests.semantic import run_codex_skill_matrix as matrix
+from tests.semantic.support.codex_business_agent_runner import (
+    business_agent_optional_operations_discovery,
+)
 from tests.semantic.support.codex_switch_assignment_business_agent_runner import (
     build_preview_only_switch_assignment_steps,
     prepare_switch_assignment_business_runtime,
@@ -44,6 +47,22 @@ def test_profile_owns_one_current_add_assignment_preview() -> None:
     )
     assert unit.objects["child"]["parent"] == unit.objects["switch_container"]["id"]
     assert unit.objects["state_or_switch"]["parent"] == unit.objects["group"]["id"]
+
+
+def test_natural_language_business_intent_permits_one_initial_operations_lookup() -> None:
+    unit = load_switch_assignment_business_profile(PROFILE).units[0]
+
+    assert business_agent_optional_operations_discovery(unit, explicit=None) == (
+        "switchContainer.addAssignment"
+    )
+    assert business_agent_optional_operations_discovery(
+        SimpleNamespace(operation="ak.wwise.core.project.save"),
+        explicit=None,
+    ) == "ak.wwise.core.project.save"
+    assert business_agent_optional_operations_discovery(
+        unit,
+        explicit="reviewed.override",
+    ) == "reviewed.override"
 
 
 def test_prompt_exposes_three_business_paths_not_gateway_mechanics() -> None:
