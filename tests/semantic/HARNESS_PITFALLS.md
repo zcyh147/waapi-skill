@@ -1873,6 +1873,32 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   booleans against sealed Wwise state. Stable presentation-key differences do
   not become semantic FAILs.
 
+### A complete JSON reply can still exceed the Agent shell view
+
+- Evidence: #61 r15 macOS Weather correctly bound the second Action, but the
+  generic `object.set` post-bind reply repeated the complete long-tail Draft
+  action catalog and copy policy. The result declared itself complete, while
+  the Codex command view clipped its text; the Agent safely stopped rather than
+  invent the hidden continuation.
+- Prevention: after `object.set` object binding, return a sub-12-KiB common
+  continuation containing object binding, field discovery, existing/new
+  declaration, and one exact `draft-inspect` escape hatch for uncommon actions.
+  The full capability remains losslessly reachable, but is not repeated after
+  every target. Keep a byte-budget regression on the public payload; do not
+  treat `response_integrity.complete=true` as proof of model visibility.
+
+### Closed business includes are equivalent only after exact projection proof
+
+- Evidence: #61 r15 Alarm reached the exact active AudioFileSource using
+  `--include original-file-path --include source-language`; the old protocol
+  expected native `originalFilePath` and `audioSource:language` flags and
+  rejected it before Gateway. The same mismatch applies to Bus `volume-db`
+  versus native `@Volume`.
+- Prevention: normalize only the two reviewed complete include sets to their
+  legacy witnesses. Source identity, include cardinality, uniqueness, and the
+  exact returned fields remain sealed; partial or extra projections remain
+  failures.
+
 ### Draft field discovery is a bounded batch, not one command per meaning
 
 - Evidence: #51 `f0d1945` r10 macOS and native Windows both completed and

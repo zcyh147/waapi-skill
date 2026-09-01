@@ -4134,6 +4134,54 @@ def _normalize_query_object_sound_routing_view(
     return ("--object-id", actual[1], *expected_tail)
 
 
+def _normalize_query_object_business_projection(
+    step: "ExpectedGatewayStep",
+    supplied_arguments: Sequence[str],
+) -> tuple[Any, ...]:
+    """Expand reviewed business includes to their legacy field witnesses."""
+
+    actual = tuple(supplied_arguments)
+    expected = tuple(step.arguments)
+    if (
+        step.subcommand != "query-object"
+        or len(expected) < 4
+        or expected[0] != "--object-id"
+        or len(expected[2:]) % 2
+        or expected[2::2] != ("--return-field",) * (len(expected[2:]) // 2)
+    ):
+        return actual
+    expected_fields = tuple(expected[3::2])
+    business_includes = {
+        (
+            "id",
+            "name",
+            "type",
+            "path",
+            "originalFilePath",
+            "audioSource:language",
+        ): frozenset({"original-file-path", "source-language"}),
+        (
+            "id",
+            "name",
+            "type",
+            "path",
+            "@Volume",
+        ): frozenset({"volume-db"}),
+    }.get(expected_fields)
+    if business_includes is None or len(actual) < 4 or actual[:1] != ("--exact-id",):
+        return actual
+    groups = actual[2:]
+    if len(groups) % 2 or groups[::2] != ("--include",) * (len(groups) // 2):
+        return actual
+    supplied_includes = tuple(groups[1::2])
+    if (
+        len(supplied_includes) != len(set(supplied_includes))
+        or frozenset(supplied_includes) != business_includes
+    ):
+        return actual
+    return ("--object-id", actual[1], *expected[2:])
+
+
 def _normalize_event_action_draft_binding(
     step: "ExpectedGatewayStep",
     supplied_arguments: Sequence[str],
@@ -11520,6 +11568,10 @@ class CodexGatewayBroker:
             validation_arguments,
         )
         validation_arguments = _normalize_query_object_event_actions(
+            step,
+            validation_arguments,
+        )
+        validation_arguments = _normalize_query_object_business_projection(
             step,
             validation_arguments,
         )

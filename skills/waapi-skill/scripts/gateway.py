@@ -22720,6 +22720,77 @@ def _compact_business_binding_continuation(value: Any) -> Any:
     return value
 
 
+def _compact_object_set_post_bind_continuation(
+    value: Mapping[str, Any],
+    *,
+    draft_id: str,
+    task_authority: str,
+) -> dict[str, Any]:
+    """Keep common object.set follow-ups visible after one object binding.
+
+    The complete capability catalog remains available through one exact
+    ``draft-inspect`` continuation. Repeating every long-tail action and copy
+    policy after each target binding can exceed an Agent shell view even though
+    the JSON result itself is complete.
+    """
+
+    object_binding = value.get("object_binding")
+    compact_object_binding = (
+        {
+            key: object_binding[key]
+            for key in (
+                "by_id",
+                "by_path_segments",
+                "event_action_by_event_path_segments",
+                "selection_rule",
+                "result_validation_rule",
+                "result",
+            )
+            if key in object_binding
+        }
+        if isinstance(object_binding, Mapping)
+        else None
+    )
+    inspect_argv = [
+        "python",
+        str(GATEWAY_RUNNER_PATH),
+        "gateway.py",
+        "draft-inspect",
+        draft_id,
+        "--task-authority",
+        task_authority,
+    ]
+    compact: dict[str, Any] = {
+        key: value[key]
+        for key in (
+            "contract",
+            "required_next_phase",
+        )
+        if key in value
+    }
+    if compact_object_binding:
+        compact["object_binding"] = compact_object_binding
+    for key in (
+        "field_discovery",
+        "declare_existing",
+        "declare_new",
+    ):
+        if key in value:
+            compact[key] = value[key]
+    compact["more_actions"] = {
+        "use_only_when_common_followups_cannot_express_the_user_intent": True,
+        **operation_draft_exact_copy_binding(inspect_argv),
+    }
+    for key in (
+        "shell_tool_timeout_ms",
+        "then_read_next_response",
+        "precompute_or_increment_revision",
+    ):
+        if key in value:
+            compact[key] = value[key]
+    return compact
+
+
 def transaction_state_payload(
     command: str,
     record: Any,
@@ -26065,6 +26136,14 @@ def operation_draft_payload(
             next_action_binding = _compact_business_binding_continuation(
                 next_action_binding
             )
+            if command == "draft-bind-object" and record.operation == "object.set":
+                next_action_binding = _compact_object_set_post_bind_continuation(
+                    next_action_binding,
+                    draft_id=record.draft_id,
+                    task_authority=(
+                        task_authority or "<task-authority-from-draft-start>"
+                    ),
+                )
             draft = {
                 key: draft[key]
                 for key in (

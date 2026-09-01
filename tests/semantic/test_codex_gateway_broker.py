@@ -7940,6 +7940,55 @@ def test_sound_routing_view_expands_to_complete_legacy_projection() -> None:
     ) == partial
 
 
+@pytest.mark.parametrize(
+    ("fields", "includes"),
+    (
+        (
+            (
+                "id",
+                "name",
+                "type",
+                "path",
+                "originalFilePath",
+                "audioSource:language",
+            ),
+            ("source-language", "original-file-path"),
+        ),
+        (
+            ("id", "name", "type", "path", "@Volume"),
+            ("volume-db",),
+        ),
+    ),
+)
+def test_business_query_includes_expand_to_complete_legacy_projection(
+    fields: tuple[str, ...],
+    includes: tuple[str, ...],
+) -> None:
+    object_id = "{33333333-3333-3333-3333-333333333333}"
+    tail = tuple(
+        item
+        for field in fields
+        for item in ("--return-field", field)
+    )
+    step = ExpectedGatewayStep(
+        "diag.business",
+        "query-object",
+        ("--object-id", ResponseBinding("prior", "/objects/0/id"), *tail),
+    )
+    actual = (
+        "--exact-id",
+        object_id,
+        *(item for include in includes for item in ("--include", include)),
+    )
+
+    normalized = broker_module._normalize_query_object_business_projection(  # noqa: SLF001
+        step,
+        actual,
+    )
+
+    assert normalized == ("--object-id", object_id, *tail)
+
+
 def test_event_action_draft_binding_expands_to_direct_child_selector() -> None:
     fixed = (
         "od1-" + "1" * 32,

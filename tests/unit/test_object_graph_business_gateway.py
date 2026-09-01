@@ -174,9 +174,24 @@ def test_object_binding_returns_version_stable_business_kind(
         },
         "semantic_kind": None,
     }
-    assert "business_kind" in payload["draft"]["next_action_binding"][
-        "object_binding"
-    ]["result_validation_rule"]
+    continuation = payload["draft"]["next_action_binding"]
+    assert "business_kind" in continuation["object_binding"][
+        "result_validation_rule"
+    ]
+    assert set(continuation) == {
+        "contract",
+        "required_next_phase",
+        "object_binding",
+        "field_discovery",
+        "declare_existing",
+        "declare_new",
+        "more_actions",
+        "shell_tool_timeout_ms",
+        "then_read_next_response",
+        "precompute_or_increment_revision",
+    }
+    assert continuation["more_actions"]["fixed_full_argv"][3] == "draft-inspect"
+    assert len(json.dumps(payload, separators=(",", ":")).encode("utf-8")) < 12_000
 
 
 def test_literal_random_container_path_resolves_ambiguous_live_kind(
@@ -1204,9 +1219,19 @@ def test_gateway_adds_subordinate_media_without_model_authored_json(
             "<selected-type-handle>",
         ],
     }
-    assert "[--list-behavior append|replace-all]" in set_next["configure"][
-        "append"
-    ]
+    assert "configure" not in set_next
+    assert set_next["more_actions"]["fixed_full_argv"][3] == "draft-inspect"
+    inspect_code, inspected = _offline(
+        tmp_path,
+        "draft-inspect",
+        draft_id,
+        "--task-authority",
+        authority,
+    )
+    assert inspect_code == 0, inspected
+    assert "[--list-behavior append|replace-all]" in inspected["draft"][
+        "next_action_binding"
+    ]["configure"]["append"]
 
     declare_code, declared = _offline(
         tmp_path,
