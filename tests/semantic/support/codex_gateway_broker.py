@@ -3972,6 +3972,56 @@ def _query_object_return_field_value_indexes(
     return frozenset(index + 1 for index in expected_option_indexes)
 
 
+def _normalize_query_object_default_identity_projection(
+    step: "ExpectedGatewayStep",
+    supplied_arguments: Sequence[str],
+) -> tuple[str, ...]:
+    """Match the deep exact-identity query to its legacy sealed witness.
+
+    The current business seam accepts path segments or one exact GUID and owns
+    the fixed ``id/name/type/path`` projection. Older integration witnesses
+    spell the same request as one native path/GUID plus four explicit return
+    fields. Only that complete default projection is eligible; custom fields,
+    transformations, and broader sources remain exact.
+    """
+
+    actual = tuple(supplied_arguments)
+    expected = tuple(step.arguments)
+    if (
+        step.subcommand != "query-object"
+        or not all(isinstance(value, str) for value in expected)
+        or len(expected) != 10
+    ):
+        return actual
+    source_option = expected[0]
+    business_source = {
+        "--path": "--path-segment",
+        "--object-id": "--exact-id",
+    }.get(source_option)
+    if business_source is None:
+        return actual
+    projection = expected[2:]
+    if projection[::2] != ("--return-field",) * 4 or set(
+        projection[1::2]
+    ) != {"id", "name", "type", "path"}:
+        return actual
+
+    if business_source == "--exact-id":
+        return expected if actual == (business_source, expected[1]) else actual
+
+    if len(actual) < 2 or len(actual) % 2 or actual[::2] != (
+        business_source,
+    ) * (len(actual) // 2):
+        return actual
+    segments = actual[1::2]
+    if any(
+        not segment or segment != segment.strip() or "\\" in segment
+        for segment in segments
+    ):
+        return actual
+    return expected if "\\" + "\\".join(segments) == expected[1] else actual
+
+
 _BUSINESS_QUERY_OPTION_ARITIES = {
     "--path-segment": 1,
     "--exact-id": 1,
@@ -6358,10 +6408,34 @@ def _normalize_audio_import_request_named_fields(value: Any) -> Any:
             imports = normalized_arguments["imports"]
             if not isinstance(imports, list):
                 return value
-            normalized_arguments["imports"] = [
+            normalized_imports = [
                 normalize_owner(row, path=f"arguments.imports[{index}]")
                 for index, row in enumerate(imports)
             ]
+            if all(
+                isinstance(row.get("object_path"), str)
+                and row["object_path"]
+                for row in normalized_imports
+            ):
+                structure_rows = [
+                    row
+                    for row in normalized_imports
+                    if not any(
+                        field in row
+                        for field in ("audio_file", "audio_file_base64", "inline_wav")
+                    )
+                ]
+                media_rows = [
+                    row for row in normalized_imports if row not in structure_rows
+                ]
+                structure_rows.sort(
+                    key=lambda row: (
+                        str(row["object_path"]).count("\\"),
+                        str(row["object_path"]),
+                    )
+                )
+                normalized_imports = [*structure_rows, *media_rows]
+            normalized_arguments["imports"] = normalized_imports
     except ValueError:
         return value
 
@@ -11256,6 +11330,10 @@ class CodexGatewayBroker:
                 *supplied_arguments[event_count_index:],
             )
             execution_arguments = (*expected_prefix, *validation_arguments)
+        validation_arguments = _normalize_query_object_default_identity_projection(
+            step,
+            validation_arguments,
+        )
         metadata_discovery = _validate_metadata_discover_query_arguments(
             step,
             validation_arguments,

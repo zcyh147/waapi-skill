@@ -1747,6 +1747,29 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   token, option, order, and appended business argument. A different runner or
   general re-quoting still fails.
 
+### Import topology equivalence must survive the final Draft replay
+
+- Evidence: #51 d0aabe1 Weather passed the Broker's declaration-graph check on
+  both hosts, then the final Preview validator rejected the same graph because
+  its durable request placed all structure-only rows before the media rows
+  while the sealed witness interleaved each container and Sound.
+- Prevention: apply the reviewed topology equivalence at both boundaries.
+  Canonicalize structure-only import rows independently of presentation order,
+  but preserve the relative order of every media-bearing row. Continue to
+  compare paths, types, properties, references, events, media, and all other
+  business values exactly after Gateway-owned path/reference normalization.
+
+### A deep exact query owns its default identity projection
+
+- Evidence: #51 d0aabe1 Alarm used the current closed `--path-segment` query on
+  both hosts. The Gateway deterministically supplied `id`, `name`, `type`, and
+  `path`, but the legacy protocol witness required the Agent to repeat four
+  native `--return-field` pairs and rejected the command before dispatch.
+- Prevention: treat the deep exact path/GUID form as equivalent only when the
+  sealed witness requests exactly the complete default identity projection.
+  Never omit or normalize a custom return field, relationship, predicate,
+  result bound, broad source, or other query behavior.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:

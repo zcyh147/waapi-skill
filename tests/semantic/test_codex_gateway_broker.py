@@ -5109,6 +5109,57 @@ def test_audio_import_witness_normalizes_only_gateway_owned_type_path_segments()
     assert normalize(wrong_type) != normalize(expected)
 
 
+def test_audio_import_witness_accepts_topological_structure_reordering_only() -> None:
+    structure_root = {
+        "object_path": r"\Actor-Mixer Hierarchy\Default Work Unit\Weather",
+        "object_type": "ActorMixer",
+    }
+    structure_rain = {
+        "object_path": r"\Actor-Mixer Hierarchy\Default Work Unit\Weather\Rain",
+        "object_type": "ActorMixer",
+    }
+    structure_wind = {
+        "object_path": r"\Actor-Mixer Hierarchy\Default Work Unit\Weather\Wind",
+        "object_type": "ActorMixer",
+    }
+    rain = {
+        "object_path": (
+            r"\Actor-Mixer Hierarchy\Default Work Unit\Weather\Rain\Rain_Bed"
+        ),
+        "object_type": "Sound SFX",
+        "audio_file": "/tmp/rain.wav",
+    }
+    wind = {
+        "object_path": (
+            r"\Actor-Mixer Hierarchy\Default Work Unit\Weather\Wind\Wind_Bed"
+        ),
+        "object_type": "Sound SFX",
+        "audio_file": "/tmp/wind.wav",
+    }
+
+    def request(imports: list[dict[str, object]]) -> dict[str, object]:
+        return {
+            "contract": "waapi-skill.operation-request/v1",
+            "version": "2022.1",
+            "operation": "audio.import",
+            "arguments": {"imports": imports},
+        }
+
+    expected = request(
+        [structure_root, structure_rain, rain, structure_wind, wind]
+    )
+    structure_first = request(
+        [structure_root, structure_rain, structure_wind, rain, wind]
+    )
+    media_reversed = request(
+        [structure_root, structure_rain, structure_wind, wind, rain]
+    )
+    normalize = broker_module._normalize_audio_import_request_named_fields  # noqa: SLF001
+
+    assert normalize(structure_first) == normalize(expected)
+    assert normalize(media_reversed) != normalize(expected)
+
+
 def test_numbered_draft_action_sequence_matches_any_exact_permutation() -> None:
     expected = (
         "tx01.draft-start",
@@ -7652,6 +7703,98 @@ def test_query_object_accepts_a_permutation_of_unique_return_fields(
 
         assert result.returncode == 0
         assert broker.evidence().passed is True
+
+
+def test_query_object_accepts_gateway_owned_default_identity_projection(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    step = ExpectedGatewayStep(
+        "query-object",
+        "query-object",
+        (
+            "--path",
+            r"\Events\Default Work Unit\IntegrationLab\Alarm\Play_Generator_Alarm",
+            "--return-field",
+            "id",
+            "--return-field",
+            "name",
+            "--return-field",
+            "type",
+            "--return-field",
+            "path",
+        ),
+    )
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(step,),
+        transport="tcp",
+    ) as broker:
+        result = run_model_command(
+            broker,
+            [
+                "query-object",
+                "--path-segment",
+                "Events",
+                "--path-segment",
+                "Default Work Unit",
+                "--path-segment",
+                "IntegrationLab",
+                "--path-segment",
+                "Alarm",
+                "--path-segment",
+                "Play_Generator_Alarm",
+            ],
+        )
+
+        assert result.returncode == 0
+        assert broker.evidence().passed is True
+
+
+def test_query_object_does_not_omit_a_custom_projection(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    step = ExpectedGatewayStep(
+        "query-object",
+        "query-object",
+        (
+            "--path",
+            r"\Events\Default Work Unit\Play",
+            "--return-field",
+            "id",
+            "--return-field",
+            "name",
+            "--return-field",
+            "type",
+            "--return-field",
+            "notes",
+        ),
+    )
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(step,),
+        transport="tcp",
+    ) as broker:
+        result = run_model_command(
+            broker,
+            [
+                "query-object",
+                "--path-segment",
+                "Events",
+                "--path-segment",
+                "Default Work Unit",
+                "--path-segment",
+                "Play",
+            ],
+        )
+
+        assert result.returncode == 126
+        assert "expected step 'query-object'" in result.stderr
+        assert broker.evidence().terminal_state == "FAILED"
+        assert not (broker.state_directory / "fake-runner-calls.jsonl").exists()
 
 
 @pytest.mark.parametrize(
