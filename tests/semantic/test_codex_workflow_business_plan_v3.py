@@ -84,6 +84,34 @@ def _composer_transaction_steps(
     ]
 
 
+def _business_transaction_steps(
+    transaction: dict[str, object],
+    construction: list[str],
+) -> list[dict[str, object]]:
+    transaction_id = transaction["transaction_id"]
+    values = [
+        ("operation-schema", "operation_schema"),
+        ("draft-start", "operation_compose"),
+        *((name, "operation_compose") for name in construction),
+        ("check", "operation_compose_check"),
+        ("preview", "preview"),
+        ("transaction-show", "transaction_show"),
+        ("confirm", "confirm"),
+        ("execute", "execute"),
+        ("verify", "verify"),
+    ]
+    return [
+        {
+            "name": f"{transaction_id}.{suffix}",
+            "kind": kind,
+            "phase": transaction["phase"],
+            "transaction_id": transaction_id,
+            "api": transaction["api"],
+        }
+        for suffix, kind in values
+    ]
+
+
 def _workflow_inputs(kind: str) -> dict[str, object]:
     if kind == "three_transactions":
         transactions = [
@@ -265,6 +293,58 @@ def test_workflow_sections_are_deeply_immutable() -> None:
         sections.static_expectation["transactions"][0]["api"] = "other"  # type: ignore[index]
     assert isinstance(sections.static_expectation, MappingProxyType)
     assert isinstance(sections.static_expectation["transactions"], tuple)
+
+
+@pytest.mark.parametrize(
+    ("transaction_index", "construction"),
+    [
+        (
+            1,
+            [
+                "bind-target-01-01",
+                "discover-field-01",
+                "declare-existing-01",
+            ],
+        ),
+        (
+            2,
+            [
+                "bind-owner",
+                "discover-property",
+                "bind-control-input",
+                "declare-rtpc",
+            ],
+        ),
+    ],
+)
+def test_business_object_transactions_are_complete_workflow_transactions(
+    transaction_index: int,
+    construction: list[str],
+) -> None:
+    inputs = _workflow_inputs("three_transactions")
+    transaction = inputs["transactions"][transaction_index]
+    steps = inputs["workflow_steps"]
+    transaction_id = transaction["transaction_id"]
+    first = next(
+        index
+        for index, row in enumerate(steps)
+        if row["transaction_id"] == transaction_id
+    )
+    last = max(
+        index
+        for index, row in enumerate(steps)
+        if row["transaction_id"] == transaction_id
+    )
+    steps[first : last + 1] = _business_transaction_steps(
+        transaction,
+        construction,
+    )
+
+    sections = compile_workflow_business_plan_sections(**inputs)
+
+    assert sections.static_expectation["transactions"][transaction_index][
+        "transaction_id"
+    ] == transaction_id
 
 
 def _archive_test_object_set_composer_is_one_complete_ordered_transaction() -> None:

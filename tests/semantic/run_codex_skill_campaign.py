@@ -7796,6 +7796,7 @@ def _validate_integration_workflow_business_plan(
         "draft-discover-fields": "operation_compose",
         "query-object": "operation_compose",
         "draft-declare-field-change": "operation_compose",
+        "draft-declare-rtpc": "operation_compose",
         "draft-declare-switch-assignment": "operation_compose",
         "draft-declare-soundbank-plan": "operation_compose",
         "draft-declare-artifact-plan": "operation_compose",

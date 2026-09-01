@@ -606,6 +606,37 @@ def _matches_transaction_step_sequence(
     if input_mode == BUSINESS_DECLARATION_INPUT_MODE:
         if not prefixes:
             return False
+        if transaction.get("operation") == "object.setRTPC":
+            return prefixes == [
+                "bind-owner",
+                "discover-property",
+                "bind-control-input",
+                "declare-rtpc",
+            ]
+        if transaction.get("operation") == "object.set":
+            phase = 0
+            saw_binding = False
+            saw_declaration = False
+            for prefix in prefixes:
+                if re.fullmatch(r"bind-(?:target|reference)-[0-9]{2}-[0-9]{2}", prefix):
+                    if phase > 0:
+                        return False
+                    saw_binding = True
+                    continue
+                if re.fullmatch(r"discover-field-[0-9]{2}", prefix):
+                    if phase > 1:
+                        return False
+                    phase = 1
+                    continue
+                if re.fullmatch(
+                    r"declare-(?:existing-[0-9]{2}|child-[0-9]{2}(?:-[0-9]{2})+)",
+                    prefix,
+                ):
+                    phase = 2
+                    saw_declaration = True
+                    continue
+                return False
+            return saw_binding and saw_declaration
         if transaction.get("operation") in {
             "object.setLinked",
             "object.setProperty",

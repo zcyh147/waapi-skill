@@ -9,11 +9,7 @@ from typing import Mapping
 
 import pytest
 
-from tests.semantic.support.codex_gateway_broker import (
-    DraftTypedActionArgument,
-    DraftTypedActionBatchArgument,
-    MetadataTokenProjection,
-)
+from tests.semantic.support.codex_gateway_broker import MetadataTokenProjection
 from tests.semantic.support.codex_integration_weather_runtime_v1 import (
     ACTION_METADATA_QUERIES,
     ACTION_TOKENS,
@@ -342,7 +338,7 @@ def test_weather_dependency_closure_uses_only_exact_live_names_and_values() -> N
         )
 
 
-def _archive_test_weather_protocol_and_business_plan_cover_all_three_transactions(
+def test_weather_protocol_and_business_plan_cover_all_three_transactions(
     tmp_path: Path,
 ) -> None:
     targets = _targets(tmp_path)
@@ -406,10 +402,7 @@ def _archive_test_weather_protocol_and_business_plan_cover_all_three_transaction
     metadata_steps = [
         step for step in protocol.steps if step.subcommand == "metadata"
     ]
-    assert [step.name for step in metadata_steps] == [
-        "tx02.metadata",
-        "tx03.metadata",
-    ]
+    assert metadata_steps == []
     from tests.semantic.support.codex_typed_draft_evidence_v3 import (
         _composer_flow_step_indexes,
     )
@@ -418,15 +411,9 @@ def _archive_test_weather_protocol_and_business_plan_cover_all_three_transaction
         protocol.steps[index].name
         for index in _composer_flow_step_indexes(protocol.steps, "tx03")
     )
-    assert "tx03.metadata" in tx03_archive_names
+    assert "tx03.metadata" not in tx03_archive_names
     assert "tx01.draft-start" not in tx03_archive_names
-    assert [step.arguments[-2:] for step in metadata_steps] == [
-        ("--limit", "8"),
-        ("--limit", "8"),
-    ]
-    assert protocol.commutative_read_only_step_groups == (
-        ("tx02.operation-schema", "tx02.metadata"),
-    )
+    assert protocol.commutative_read_only_step_groups == ()
     assert [
         (step.name, step.subcommand)
         for step in protocol.steps
@@ -434,8 +421,6 @@ def _archive_test_weather_protocol_and_business_plan_cover_all_three_transaction
     ] == [
         ("tx01.operation-schema", "operation-schema"),
         ("tx02.operation-schema", "operation-schema"),
-        ("tx02.metadata", "metadata"),
-        ("tx03.metadata", "metadata"),
         ("tx03.operation-schema", "operation-schema"),
     ]
     assert [step.name for step in protocol.steps if step.subcommand == "execute"] == [
@@ -471,73 +456,53 @@ def _archive_test_weather_protocol_and_business_plan_cover_all_three_transaction
     )
     assert action_preview.subcommand == "preview-from-draft"
     assert "--request-json" not in action_preview.arguments
-    action_steps = [
+    action_bindings = [
         step
         for step in protocol.steps
-        if step.name.startswith("tx02.action.")
+        if step.name.startswith("tx02.bind-target-")
     ]
-    assert len(action_steps) == 1
-    assert all(step.subcommand == "draft-apply" for step in action_steps)
-    action_arguments = [
-        action
-        for step in action_steps
-        for action in (
-            step.arguments[-1].actions
-            if isinstance(step.arguments[-1], DraftTypedActionBatchArgument)
-            else (step.arguments[-1],)
-        )
-    ]
-    assert len(action_arguments) == 5
+    assert len(action_bindings) == 5
     assert all(
-        isinstance(argument, DraftTypedActionArgument)
-        for argument in action_arguments
+        step.subcommand == "draft-bind-object" for step in action_bindings
     )
+    assert all("--direct-child-type" in step.arguments for step in action_bindings)
+    action_disclosures = [
+        step
+        for step in protocol.steps
+        if step.name.startswith("tx02.discover-field-")
+    ]
+    assert len(action_disclosures) == 10
     assert all(
-        argument.metadata_binding is not None
-        and argument.metadata_binding.step == "tx02.metadata"
-        for argument in action_arguments
+        step.subcommand == "draft-discover-fields"
+        for step in action_disclosures
     )
-    assert action_arguments[0].expected == {
-        "contract": "waapi-skill.operation-draft-action/v1",
-        "action": "add_target",
-        "selector": {
-            "kind": "direct-child",
-            "parent": {
-                "kind": "path",
-                "value": targets[0].event_path,
-            },
-            "type": "Action",
-        },
-        "properties": [
-            {"name": "FadeTime", "value": targets[0].fade_time},
-            {"name": "Delay", "value": targets[0].delay},
-        ],
-    }
-    add_targets = [
-        argument.expected
-        for argument in action_arguments
-        if argument.expected["action"] == "add_target"
+    action_declarations = [
+        step
+        for step in protocol.steps
+        if step.name.startswith("tx02.declare-existing-")
     ]
-    assert [
-        (row["selector"], row["properties"])
-        for row in add_targets
-    ] == [
-        (
-            {
-                "kind": "direct-child",
-                "parent": {
-                    "kind": "path",
-                    "value": target.event_path,
-                },
-                "type": "Action",
-            },
-            [
-                {"name": "FadeTime", "value": target.fade_time},
-                {"name": "Delay", "value": target.delay},
-            ],
-        )
-        for target in targets
-    ]
+    assert len(action_declarations) == 5
+    assert all(
+        step.subcommand == "draft-declare-existing"
+        for step in action_declarations
+    )
+    assert not any(
+        step.subcommand == "draft-apply" and step.name.startswith("tx02.")
+        for step in protocol.steps
+    )
+    first_binding = action_bindings[0].arguments
+    expected_selector = (
+        "--direct-child-type",
+        "Action",
+        *(
+            item
+            for segment in targets[0].event_path.split("\\")
+            if segment
+            for item in ("--parent-path-segment", segment)
+        ),
+    )
+    assert first_binding[-len(expected_selector) :] == expected_selector
+    assert action_declarations[0].arguments.count("--field-value") == 2
     assert not any(
         step.subcommand == "preview" and step.name.startswith("tx02.")
         for step in protocol.steps
@@ -545,56 +510,19 @@ def _archive_test_weather_protocol_and_business_plan_cover_all_three_transaction
     rtpc_steps = [
         step for step in protocol.steps if step.name.startswith("tx03.")
     ]
-    assert [step.name for step in rtpc_steps[:3]] == [
-        "tx03.metadata",
+    assert [step.name for step in rtpc_steps[:2]] == [
         "tx03.operation-schema",
         "tx03.draft-start",
     ]
     rtpc_preview = next(step for step in rtpc_steps if step.name == "tx03.preview")
     assert rtpc_preview.subcommand == "preview-from-draft"
-    rtpc_actions = [
-        step.arguments[-1]
-        for step in rtpc_steps
-        if step.subcommand == "draft-apply"
-    ]
-    assert rtpc_actions
-    rtpc_action_members = [
-        action
-        for argument in rtpc_actions
-        for action in (
-            argument.actions
-            if isinstance(argument, DraftTypedActionBatchArgument)
-            else (argument,)
-        )
-    ]
-    bound_rtpc_actions = [
-        argument
-        for argument in rtpc_action_members
-        if argument.metadata_binding is not None
-    ]
-    assert bound_rtpc_actions
-    assert all(
-        argument.metadata_binding.step == "tx03.metadata"
-        and argument.metadata_binding.object_type == "Sound"
-        and argument.metadata_binding.required_tokens == ("Volume",)
-        and tuple(
-            item.name
-            for item in (argument.metadata_binding.expected_projection or ())
-        )
-        == ("Volume",)
-        for argument in bound_rtpc_actions
+    assert not any(step.subcommand == "draft-apply" for step in rtpc_steps)
+    rtpc_declaration = next(
+        step for step in rtpc_steps if step.subcommand == "draft-declare-rtpc"
     )
+    assert rtpc_declaration.arguments.count("--point") == 3
+    assert rtpc_declaration.arguments[-2:] == ("--mode", "add-or-update")
     serialized = serialize_protocol(protocol)
-    serialized_action_steps = [
-        step
-        for step in serialized["steps"]
-        if step["name"].startswith("tx02.action.")
-    ]
-    assert len(serialized_action_steps) == 1
-    assert serialized_action_steps[0]["arguments"][-1]["kind"] == (
-        "draft_typed_action_batch"
-    )
-    assert len(serialized_action_steps[0]["arguments"][-1]["actions"]) == 5
     assert deserialize_protocol(serialized) == protocol
     plan_steps = _workflow_plan_steps(
         protocol,

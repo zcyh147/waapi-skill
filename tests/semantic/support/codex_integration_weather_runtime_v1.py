@@ -1186,7 +1186,7 @@ def _build_metadata_workflow_protocol(
             metadata_row = metadata_by_tx[prefix]
             transaction_index = int(prefix[2:]) - 1
             operation = requests[transaction_index].get("operation")
-            if operation in {"audio.import", "object.set"}:
+            if operation in {"audio.import", "object.set", "object.setRTPC"}:
                 steps.append(step)
                 continue
             if metadata_row is None:
@@ -1352,6 +1352,7 @@ def _workflow_plan_steps(
         "draft-bind-field": "operation_compose",
         "draft-discover-fields": "operation_compose",
         "draft-declare-field-change": "operation_compose",
+        "draft-declare-rtpc": "operation_compose",
         "draft-declare-new": "operation_compose",
         "draft-declare-existing": "operation_compose",
         "draft-declare-ui-plan": "operation_compose",
