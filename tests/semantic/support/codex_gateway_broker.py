@@ -4098,6 +4098,42 @@ def _normalize_query_object_event_actions(
     return (source_option, source_value, *expected_tail)
 
 
+def _normalize_query_object_sound_routing_view(
+    step: "ExpectedGatewayStep",
+    supplied_arguments: Sequence[str],
+) -> tuple[Any, ...]:
+    """Expand the closed Sound routing view to its legacy protocol witness."""
+
+    actual = tuple(supplied_arguments)
+    expected_tail = (
+        "--return-field",
+        "id",
+        "--return-field",
+        "name",
+        "--return-field",
+        "type",
+        "--return-field",
+        "path",
+        "--return-field",
+        "OverrideOutput",
+        "--return-field",
+        "activeSource",
+        "--return-field",
+        "OutputBus",
+    )
+    if (
+        step.subcommand != "query-object"
+        or len(step.arguments) != 16
+        or step.arguments[0] != "--object-id"
+        or tuple(step.arguments[2:]) != expected_tail
+        or len(actual) != 4
+        or actual[0] != "--exact-id"
+        or actual[2:] != ("--view", "sound-routing-diagnostics")
+    ):
+        return actual
+    return ("--object-id", actual[1], *expected_tail)
+
+
 def _normalize_event_action_draft_binding(
     step: "ExpectedGatewayStep",
     supplied_arguments: Sequence[str],
@@ -4143,6 +4179,7 @@ _BUSINESS_QUERY_OPTION_ARITIES = {
     "--predicate": 2,
     "--match-original-file-path": 1,
     "--relationship": 1,
+    "--view": 1,
     "--detail": 0,
 }
 _BUSINESS_QUERY_SOURCE_OPTIONS = frozenset(
@@ -4170,7 +4207,9 @@ def _closed_business_literal_equivalent(
         return False
     prior = step.arguments[index - 1]
     if prior == "--meaning":
-        return supplied.casefold() == expected.casefold()
+        supplied_token = re.sub(r"[^a-z0-9]", "", supplied.casefold())
+        expected_token = re.sub(r"[^a-z0-9]", "", expected.casefold())
+        return bool(supplied_token) and supplied_token == expected_token
     return False
 
 
@@ -11441,6 +11480,10 @@ class CodexGatewayBroker:
             validation_arguments,
         )
         validation_arguments = _normalize_query_object_event_actions(
+            step,
+            validation_arguments,
+        )
+        validation_arguments = _normalize_query_object_sound_routing_view(
             step,
             validation_arguments,
         )

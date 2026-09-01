@@ -1814,6 +1814,19 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   equivalents of native `ActionType`/`Target` and reject conflicting dual
   aliases.
 
+### A diagnostic hop is one business view, not a hand-built field list
+
+- Evidence: #61 r11/r12 Alarm Agents correctly followed Event to Action to the
+  exact target GUID, then requested either a bare Sound identity or only
+  `output-bus`. The formal oracle needed the complete Sound routing facts, so
+  the Broker rejected those partial reads before Wwise.
+- Prevention: `query-object --view sound-routing-diagnostics` owns the exact
+  Sound projection (`OverrideOutput`, `activeSource`, and `OutputBus`) and
+  returns stable business keys. The `event-actions` result exposes a bounded
+  copy-ready continuation for each exact target. The view accepts only one
+  exact path/GUID, validates that the live row is a Sound, and cannot be mixed
+  with caller-selected fields, predicates, relationships, or result bounds.
+
 ### Draft field discovery is a bounded batch, not one command per meaning
 
 - Evidence: #51 `f0d1945` r10 macOS and native Windows both completed and

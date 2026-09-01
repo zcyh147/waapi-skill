@@ -711,6 +711,13 @@ QUERY_BUSINESS_RELATIONSHIPS: Mapping[str, str] = {
     "event-actions": "children",
     "parent": "parent",
 }
+QUERY_BUSINESS_VIEWS: Mapping[str, tuple[str, ...]] = {
+    "sound-routing-diagnostics": (
+        "override-output",
+        "active-source",
+        "output-bus",
+    ),
+}
 SOUNDBANK_GENERATED_TOPIC_URI = "ak.wwise.core.soundbank.generated"
 SOUNDBANK_TOPIC_IDENTITY_FIELDS = ("id", "name", "type", "path")
 QUERY_BUSINESS_OUTPUTS: Mapping[str, tuple[str, str]] = {
@@ -731,9 +738,9 @@ QUERY_BUSINESS_OUTPUTS: Mapping[str, tuple[str, str]] = {
     "file-path": ("filePath", "file_path"),
     "original-file-path": ("originalFilePath", "original_file_path"),
     "active-source": ("activeSource", "active_source"),
+    "override-output": ("OverrideOutput", "override_output"),
     "action-type": ("ActionType", "action_type"),
     "target": ("Target", "target"),
-    "override-output": ("OverrideOutput", "override_output"),
     "work-unit": ("workunit", "work_unit"),
     "source-duration": ("audioSource:playbackDuration", "source_duration"),
     "max-radius": ("audioSource:maxRadiusAttenuation", "max_radius"),
@@ -1919,6 +1926,15 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Repeat one user-requested object relationship; the Gateway "
             "derives the exact WAQL select token and order"
+        ),
+    )
+    query_object.add_argument(
+        "--view",
+        choices=tuple(QUERY_BUSINESS_VIEWS),
+        dest="business_view",
+        help=(
+            "Select one Gateway-owned diagnostic view; the Gateway owns its "
+            "complete native projection and stable business result keys"
         ),
     )
     query_object.add_argument(
@@ -5189,6 +5205,29 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
     """Reject closed query input errors before opening a WAAPI transport."""
 
     relationships = tuple(getattr(args, "relationships", ()) or ())
+    business_view = getattr(args, "business_view", None)
+    if business_view is not None:
+        if not (
+            getattr(args, "path_segments", None)
+            or getattr(args, "object_id", None)
+        ):
+            raise GatewayInputError(
+                "query-object --view requires one exact object path or GUID."
+            )
+        if any(
+            (
+                relationships,
+                getattr(args, "business_outputs", None),
+                getattr(args, "custom_field_meanings", None),
+                getattr(args, "business_predicates", None),
+                args.max_results is not None,
+            )
+        ):
+            raise GatewayInputError(
+                "query-object --view owns its complete projection and exact-object "
+                "bound; do not combine it with relationship, include, predicate, "
+                "custom-field, or max-results options."
+            )
     if "event-actions" in relationships:
         if relationships != ("event-actions",):
             raise GatewayInputError(
@@ -5355,6 +5394,9 @@ def _compile_query_business_projection(args: argparse.Namespace) -> None:
     """Compile stable business output names into exact object.get accessors."""
 
     requested = list(getattr(args, "business_outputs", ()) or ())
+    business_view = getattr(args, "business_view", None)
+    if business_view is not None:
+        requested.extend(QUERY_BUSINESS_VIEWS[business_view])
     if "event-actions" in tuple(getattr(args, "relationships", ()) or ()):
         requested.extend(
             output
@@ -8119,6 +8161,17 @@ def query_business_schema_payload(
             }
         },
         "relationships": list(QUERY_BUSINESS_RELATIONSHIPS),
+        "views": {
+            "sound-routing-diagnostics": {
+                "source": "one exact Sound path or GUID",
+                "automatic_outputs": [
+                    "override-output",
+                    "active-source",
+                    "output-bus",
+                ],
+                "native_projection_owned_by_gateway": True,
+            }
+        },
         "relationship_presets": {
             "event-actions": {
                 "source": "one exact Event path or GUID",
@@ -8131,6 +8184,7 @@ def query_business_schema_payload(
             "subcommand": "query-object",
             "predicate": "--predicate <business-condition> <value>",
             "relationship": "--relationship <business-relationship>",
+            "diagnostic_view": "--view <business-view>",
             "result_bound": f"--max-results <1..{MAX_QUERY_TAKE}>",
             "business_output": "--include <business-field> (repeat)",
         },
@@ -13550,8 +13604,14 @@ def dispatch_command(
         )
         if result.get("ok"):
             validate_exact_query_identity(args, rows)
+            validate_query_business_view_result(args, rows)
         business_rows = (
             _project_query_business_rows(args, rows) if result.get("ok") else []
+        )
+        continuations = (
+            _query_business_continuations(args, business_rows)
+            if result.get("ok")
+            else []
         )
         return {
             "ok": bool(result.get("ok")),
@@ -13562,6 +13622,7 @@ def dispatch_command(
             "call": dispatch_call_summary(result),
             "count": len(rows) if result.get("ok") else None,
             "objects": business_rows if result.get("ok") else None,
+            **({"continuations": continuations} if continuations else {}),
             "agent_result": business_rows if result.get("ok") else None,
         }
     if args.command == "metadata":
@@ -21062,6 +21123,28 @@ def validate_exact_query_identity(
         )
 
 
+def validate_query_business_view_result(
+    args: argparse.Namespace,
+    rows: Sequence[Mapping[str, Any]],
+) -> None:
+    """Bind a high-level diagnostic view to its exact live object kind."""
+
+    view = getattr(args, "business_view", None)
+    if view != "sound-routing-diagnostics" or not rows:
+        return
+    if len(rows) != 1 or rows[0].get("type") != "Sound":
+        raise GatewayResultShapeError(
+            "sound-routing-diagnostics requires one exact live Sound object.",
+            details={
+                "command": "query-object --view sound-routing-diagnostics",
+                "returned_count": len(rows),
+                "returned_type": rows[0].get("type") if len(rows) == 1 else None,
+                "repair": "select the exact Sound target before requesting this view",
+            },
+            error_code="QUERY_VIEW_OBJECT_KIND_MISMATCH",
+        )
+
+
 def _normalize_wwise_identity_path(value: Any) -> str | None:
     """Normalize hierarchy separators and case for exact-path identity checks."""
 
@@ -21108,6 +21191,41 @@ def _project_query_business_rows(
             item["references"] = references
         projected.append(item)
     return projected
+
+
+def _query_business_continuations(
+    args: argparse.Namespace,
+    rows: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Return bounded copy-ready business reads implied by an exact hop."""
+
+    relationships = tuple(getattr(args, "relationships", ()) or ())
+    if relationships != ("event-actions",):
+        return []
+    continuations: list[dict[str, Any]] = []
+    for row in rows[:8]:
+        target = row.get("target")
+        target_id = target.get("id") if isinstance(target, Mapping) else None
+        if not _canonical_guid(target_id):
+            continue
+        continuations.append(
+            {
+                "purpose": "inspect the exact Action target as a Sound routing hop",
+                "source_action_id": row.get("id"),
+                "target_id": target_id,
+                "next_command": transaction_next_command(
+                    "query-object sound-routing-diagnostics",
+                    [
+                        "query-object",
+                        "--exact-id",
+                        target_id,
+                        "--view",
+                        "sound-routing-diagnostics",
+                    ],
+                ),
+            }
+        )
+    return continuations
 
 
 def _bind_custom_kind_from_live_types(
@@ -21270,6 +21388,7 @@ def project_successful_query_object_payload(
         "count",
         "limit_reached",
         "objects",
+        "continuations",
     )
     projected = {key: payload[key] for key in compact_keys if key in payload}
     if "agent_result" in payload:

@@ -3976,6 +3976,15 @@ def test_query_object_event_actions_preset_owns_bound_and_projection(
     assert payload["query_bound"] == {"mode": "take", "value": 100}
     assert payload["agent_result"][0]["action_type"] == 1
     assert payload["agent_result"][0]["target"] == target
+    continuation = payload["continuations"][0]
+    assert continuation["target_id"] == target["id"]
+    assert continuation["next_command"]["gateway_argv"] == [
+        "query-object",
+        "--exact-id",
+        target["id"],
+        "--view",
+        "sound-routing-diagnostics",
+    ]
     assert client.calls[-1] == (
         "ak.wwise.core.object.get",
         {
@@ -3986,6 +3995,104 @@ def test_query_object_event_actions_preset_owns_bound_and_projection(
         },
         {"return": ["id", "name", "type", "path", "ActionType", "Target"]},
     )
+
+
+def test_query_object_sound_routing_view_owns_projection_and_business_keys(
+    tmp_path: Path,
+) -> None:
+    sound_id = "{33333333-3333-3333-3333-333333333333}"
+    active_source = {"id": "{44444444-4444-4444-4444-444444444444}"}
+    output_bus = {"id": "{55555555-5555-5555-5555-555555555555}"}
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": live_info(),
+            "ak.wwise.core.object.get": {
+                "return": [
+                    {
+                        "id": sound_id,
+                        "name": "Generator_Alarm",
+                        "type": "Sound",
+                        "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Generator_Alarm",
+                        "OverrideOutput": True,
+                        "activeSource": active_source,
+                        "OutputBus": output_bus,
+                    }
+                ]
+            },
+        }
+    )
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "query-object",
+            "--exact-id",
+            sound_id,
+            "--view",
+            "sound-routing-diagnostics",
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 0, payload
+    assert payload["agent_result"] == [
+        {
+            "id": sound_id,
+            "name": "Generator_Alarm",
+            "type": "Sound",
+            "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Generator_Alarm",
+            "override_output": True,
+            "active_source": active_source,
+            "output_bus": output_bus,
+        }
+    ]
+    assert client.calls[-1][2] == {
+        "return": [
+            "id",
+            "name",
+            "type",
+            "path",
+            "OverrideOutput",
+            "activeSource",
+            "OutputBus",
+        ]
+    }
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    (
+        ("--kind", "all-sounds", "--view", "sound-routing-diagnostics"),
+        (
+            "--exact-id",
+            "{33333333-3333-3333-3333-333333333333}",
+            "--view",
+            "sound-routing-diagnostics",
+            "--include",
+            "volume-db",
+        ),
+    ),
+)
+def test_query_object_sound_routing_view_rejects_open_variants_before_connecting(
+    tmp_path: Path,
+    arguments: tuple[str, ...],
+) -> None:
+    connected = False
+
+    def client_factory(_url: str) -> FakeClient:
+        nonlocal connected
+        connected = True
+        raise AssertionError("invalid diagnostic view must fail before WAAPI")
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["query-object", *arguments],
+        env=gateway_env(tmp_path),
+        client_factory=client_factory,
+    )
+
+    assert exit_code == 2
+    assert connected is False
+    assert payload["error_code"] == "GatewayInputError"
 
 
 @pytest.mark.parametrize(
@@ -4365,6 +4472,10 @@ def test_query_object_help_names_closed_query_editor_specifier_and_relationships
         "event-actions",
         "parent",
     )
+    view_action = next(
+        action for action in query_parser._actions if action.dest == "business_view"
+    )
+    assert tuple(view_action.choices) == ("sound-routing-diagnostics",)
 
 
 def test_query_object_exposes_no_model_authored_return_projection() -> None:

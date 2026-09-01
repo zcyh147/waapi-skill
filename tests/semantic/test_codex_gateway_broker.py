@@ -6137,6 +6137,8 @@ def test_object_set_field_discovery_can_follow_its_bound_target_early(
     assert isinstance(objects, list) and isinstance(objects[0], dict)
     properties = objects[0]["properties"]
     assert isinstance(properties, list)
+    assert isinstance(properties[0], dict)
+    properties[0]["name"] = "FadeTime"
     properties.append({"name": "Delay", "value": 0.25})
     steps = build_object_graph_business_transaction_steps(
         request,
@@ -6171,7 +6173,11 @@ def test_object_set_field_discovery_can_follow_its_bound_target_early(
         assert isinstance(argument, str)
         return argument
 
-    actual = tuple(resolve(argument) for argument in rebased.arguments)
+    actual_values = [resolve(argument) for argument in rebased.arguments]
+    first_meaning = actual_values.index("--meaning") + 1
+    assert actual_values[first_meaning] == "fadetime"
+    actual_values[first_meaning] = "Fade Time"
+    actual = tuple(actual_values)
     assert actual.count("--meaning") == 2
 
     selected = broker._match_dependency_ready_business_setup_step(  # noqa: SLF001
@@ -7860,6 +7866,47 @@ def test_query_object_event_actions_preset_expands_to_sealed_action_hop() -> Non
         step,
         incomplete,
     ) == incomplete
+
+
+def test_sound_routing_view_expands_to_complete_legacy_projection() -> None:
+    sound_id = "{33333333-3333-3333-3333-333333333333}"
+    tail = (
+        "--return-field",
+        "id",
+        "--return-field",
+        "name",
+        "--return-field",
+        "type",
+        "--return-field",
+        "path",
+        "--return-field",
+        "OverrideOutput",
+        "--return-field",
+        "activeSource",
+        "--return-field",
+        "OutputBus",
+    )
+    step = ExpectedGatewayStep(
+        "diag.sound",
+        "query-object",
+        (
+            "--object-id",
+            ResponseBinding("diag.action", "/objects/0/target/id"),
+            *tail,
+        ),
+    )
+
+    normalized = broker_module._normalize_query_object_sound_routing_view(  # noqa: SLF001
+        step,
+        ("--exact-id", sound_id, "--view", "sound-routing-diagnostics"),
+    )
+
+    assert normalized == ("--object-id", sound_id, *tail)
+    partial = ("--exact-id", sound_id, "--include", "output-bus")
+    assert broker_module._normalize_query_object_sound_routing_view(  # noqa: SLF001
+        step,
+        partial,
+    ) == partial
 
 
 def test_event_action_draft_binding_expands_to_direct_child_selector() -> None:

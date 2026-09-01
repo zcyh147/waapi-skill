@@ -285,10 +285,10 @@ def test_exact_hop_playback_diagnosis_does_not_repeat_the_action_lookup() -> Non
     )[0]
     section_flat = " ".join(section.split())
 
-    assert "The Event children result is already the Action hop" in section_flat
-    assert "do not query the Action id again" in section_flat
-    assert "use the returned `Target.id` directly" in section_flat
-    assert "for the next exact-id Sound lookup" in section_flat
+    assert "`--relationship event-actions`" in section_flat
+    assert "Gateway owns the child hop" in section_flat
+    assert "copy-ready `--view sound-routing-diagnostics`" in section_flat
+    assert "do not re-query the Action" in section_flat
 
 
 def test_exact_hop_bus_comparison_uses_symmetric_volume_projections() -> None:
@@ -297,9 +297,10 @@ def test_exact_hop_bus_comparison_uses_symmetric_volume_projections() -> None:
     )[0]
     section_flat = " ".join(section.split())
 
-    assert "Both exact Bus reads must use the same" in section_flat
-    assert "fixed identity plus `volume_db`" in section_flat
-    assert "never omit `--include volume-db` from the comparison Bus" in section_flat
+    assert "request `volume-db` only on the exact Bus identities" in section_flat
+    assert "first the returned `output_bus` id" in section_flat
+    assert "then the requested comparison Bus path or id" in section_flat
+    assert "Never omit it from the comparison Bus" in section_flat
 
 
 def test_query_relationship_hops_reuse_returned_guids_without_weakening_guards() -> None:
@@ -744,7 +745,7 @@ def test_query_reference_has_a_deterministic_end_and_separate_alarm_hops() -> No
     assert "do not reread a range or invoke the Gateway" in query_flat
     assert "`WAAPI_QUERY_REFERENCE_END` and `WAAPI_OPERATE_REFERENCE_END`" in SKILL
     assert "matching sentinel is the final visible line" in SKILL
-    assert "That Sound projection ends at `output_bus`" in query_flat
+    assert "ends at `output_bus`" in query_flat
     assert "do not add `volume-db` to the Sound hop" in query_flat
     assert "request `volume-db` only on the exact Bus identities" in query_flat
     assert "first the returned `output_bus` id" in query_flat

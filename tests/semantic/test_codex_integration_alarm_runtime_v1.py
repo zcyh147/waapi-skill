@@ -475,11 +475,11 @@ def test_protocol_exposes_six_exact_chain_reads_then_one_standard_transaction(
     )
     assert protocol.steps[3].arguments[1] == ResponseBinding(
         "diag.sound",
-        "/objects/0/activeSource/id",
+        "/objects/0/active_source/id",
     )
     assert protocol.steps[4].arguments[1] == ResponseBinding(
         "diag.sound",
-        "/objects/0/OutputBus/id",
+        "/objects/0/output_bus/id",
     )
     sound_fields = protocol.steps[2].arguments[3::2]
     dead_bus_fields = protocol.steps[4].arguments[3::2]

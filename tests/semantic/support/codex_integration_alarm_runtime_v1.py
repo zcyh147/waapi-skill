@@ -1128,7 +1128,7 @@ def _alarm_protocol(
             "diag.source",
             source=(
                 "--object-id",
-                ResponseBinding("diag.sound", "/objects/0/activeSource/id"),
+                ResponseBinding("diag.sound", "/objects/0/active_source/id"),
             ),
             take=None,
             fields=_DIAGNOSTIC_SOURCE_FIELDS,
@@ -1137,7 +1137,7 @@ def _alarm_protocol(
             "diag.dead_bus",
             source=(
                 "--object-id",
-                ResponseBinding("diag.sound", "/objects/0/OutputBus/id"),
+                ResponseBinding("diag.sound", "/objects/0/output_bus/id"),
             ),
             take=None,
             fields=_DIAGNOSTIC_BUS_FIELDS,

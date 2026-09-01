@@ -130,6 +130,8 @@ def test_every_model_value_and_planning_mechanic_has_one_reviewed_owner() -> Non
         "dependency_order",
         "metadata_scope",
         "native_object_path",
+        "object_identity_shape",
+        "object_name_mutability",
         "property_or_reference_token",
         "request_fragment",
         "revision_arithmetic",

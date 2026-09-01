@@ -16,9 +16,9 @@
     ]
   },
   "source_contracts": {
-    "gateway_parser_sha256": "60892b1c1f15ac9a1874e2803d1b8be52f01b482dba9ea64e0c45481ede7c6fa",
+    "gateway_parser_sha256": "e6f3fe062ee289b152f3afe349da7a8f69cf1d9e686346a933920c5357d99ae3",
     "operation_contract_sha256": "33ab6c9db5e9d3ff9b5ba3b54f6d2be314108076df23f5820b907cc16f41348d",
-    "public_continuation_sha256": "4c9f708b9c98be70b86c7f0215cea9f3afe18f13d4d9da802af1344667f951ce",
+    "public_continuation_sha256": "c5dd9de956bf7b393c2c4b38c80561940d0873f6695acc2e5a635a7ad2bd8ee3",
     "typed_request_surface_sha256": "7cbe0a9ba6d9756c94ecea58bb1b2ac56da242059f17c5cdfdaf768271d133a8"
   },
   "ownership_classes": {
@@ -36,6 +36,8 @@
     "dependency_order": "gateway_derivation",
     "metadata_scope": "gateway_derivation",
     "native_object_path": "gateway_derivation",
+    "object_identity_shape": "gateway_derivation",
+    "object_name_mutability": "gateway_derivation",
     "property_or_reference_token": "live_bound_handle",
     "request_fragment": "gateway_derivation",
     "revision_arithmetic": "gateway_derivation",
