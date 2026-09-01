@@ -10923,7 +10923,154 @@ class CodexGatewayBroker:
             or len(set(expected_order)) != len(expected_order)
         ):
             return tuple(actual)
-        declaration_id_map = dict(zip(actual_order, expected_order, strict=True))
+        declaration_options = {
+            "--new-root-row",
+            "--new-child-row",
+            "--new-row",
+            "--existing-row",
+        }
+
+        def declarations(
+            groups: Sequence[tuple[Any, ...]],
+        ) -> dict[str, tuple[Any, ...]] | None:
+            result: dict[str, tuple[Any, ...]] = {}
+            for group in groups:
+                if group[0] not in declaration_options:
+                    continue
+                declaration_id = group[1]
+                if not isinstance(declaration_id, str) or declaration_id in result:
+                    return None
+                result[declaration_id] = group
+            return result
+
+        expected_declarations = declarations(expected_groups)
+        actual_declarations = declarations(actual_groups)
+        if (
+            expected_declarations is None
+            or actual_declarations is None
+            or set(expected_declarations) != set(expected_order)
+            or set(actual_declarations) != set(actual_order)
+        ):
+            return tuple(actual)
+
+        def declaration_signature(
+            declaration_id: str,
+            declaration_rows: Mapping[str, tuple[Any, ...]],
+            *,
+            expected: bool,
+            stack: frozenset[str] = frozenset(),
+        ) -> tuple[Any, ...] | None:
+            if declaration_id in stack:
+                return None
+            group = declaration_rows.get(declaration_id)
+            if group is None:
+                return None
+            option = group[0]
+            if option == "--existing-row":
+                handle = bound_text(group[2]) if expected else group[2]
+                return (
+                    ("existing", handle)
+                    if isinstance(handle, str) and handle
+                    else None
+                )
+            parent = group[2]
+            if not isinstance(parent, (str, ResponseBinding)):
+                return None
+            if isinstance(parent, str) and parent in declaration_rows:
+                parent_signature = declaration_signature(
+                    parent,
+                    declaration_rows,
+                    expected=expected,
+                    stack=stack | {declaration_id},
+                )
+                if parent_signature is None:
+                    return None
+                parent_identity: tuple[Any, ...] = (
+                    "declaration-parent",
+                    parent_signature,
+                )
+            else:
+                external_parent = bound_text(parent) if expected else parent
+                if not isinstance(external_parent, str) or not external_parent:
+                    return None
+                parent_identity = ("bound-parent", external_parent)
+            name = group[3]
+            kind = group[4]
+            if not isinstance(name, str) or not isinstance(kind, str):
+                return None
+            return ("new", parent_identity, name, kind)
+
+        def signatures(
+            declaration_rows: Mapping[str, tuple[Any, ...]],
+            *,
+            expected: bool,
+        ) -> dict[tuple[Any, ...], str] | None:
+            result: dict[tuple[Any, ...], str] = {}
+            for declaration_id in declaration_rows:
+                signature = declaration_signature(
+                    declaration_id,
+                    declaration_rows,
+                    expected=expected,
+                )
+                if signature is None or signature in result:
+                    return None
+                result[signature] = declaration_id
+            return result
+
+        expected_signatures = signatures(expected_declarations, expected=True)
+        actual_signatures = signatures(actual_declarations, expected=False)
+        if (
+            expected_signatures is None
+            or actual_signatures is None
+            or set(expected_signatures) != set(actual_signatures)
+        ):
+            return tuple(actual)
+        declaration_id_map = {
+            actual_id: expected_signatures[signature]
+            for signature, actual_id in actual_signatures.items()
+        }
+
+        def topological(
+            order: Sequence[str],
+            declaration_rows: Mapping[str, tuple[Any, ...]],
+        ) -> bool:
+            positions = {declaration_id: index for index, declaration_id in enumerate(order)}
+            return all(
+                not (
+                    group[0] in {"--new-child-row", "--new-row"}
+                    and isinstance(group[2], str)
+                    and group[2] in declaration_rows
+                    and positions[group[2]] >= positions[declaration_id]
+                )
+                for declaration_id, group in declaration_rows.items()
+            )
+
+        if not topological(expected_order, expected_declarations) or not topological(
+            actual_order,
+            actual_declarations,
+        ):
+            return tuple(actual)
+
+        def ordered_media_rows(
+            order: Sequence[str],
+            groups: Sequence[tuple[Any, ...]],
+        ) -> tuple[str, ...]:
+            media_ids = {
+                group[1]
+                for group in groups
+                if group[0] == "--media-file"
+                or (
+                    group[0] == "--field"
+                    and group[2] in {"media_file", "inline_wav"}
+                )
+            }
+            return tuple(declaration_id for declaration_id in order if declaration_id in media_ids)
+
+        if tuple(
+            declaration_id_map[declaration_id]
+            for declaration_id in ordered_media_rows(actual_order, actual_groups)
+        ) != ordered_media_rows(expected_order, expected_groups):
+            return tuple(actual)
 
         def canonicalize_declaration_ids(
             group: tuple[Any, ...],

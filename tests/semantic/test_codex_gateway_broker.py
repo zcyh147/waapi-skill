@@ -5425,6 +5425,71 @@ def test_import_batch_group_order_is_transport_but_row_order_is_business_meaning
     ) != step.arguments
 
 
+def test_import_batch_accepts_topological_structure_reordering_but_keeps_media_order() -> None:
+    fixed = (
+        "od1-" + "1" * 32,
+        "--task-authority",
+        "da1-" + "2" * 40,
+        "--expected-revision",
+        "3",
+    )
+    expected_rows = (
+        ("root", "external-parent", "Weather", "actor-mixer", None),
+        ("rain", "root", "Rain", "actor-mixer", None),
+        ("rain-bed", "rain", "Rain_Bed", "sound-sfx", "rain.wav"),
+        ("wind", "root", "Wind", "actor-mixer", None),
+        ("wind-bed", "wind", "Wind_Bed", "sound-sfx", "wind.wav"),
+    )
+
+    def groups(
+        rows: tuple[tuple[str, str, str, str, str | None], ...],
+    ) -> tuple[str, ...]:
+        values: list[str] = []
+        for row_id, parent, name, kind, _media in rows:
+            values.extend(("--row-order", row_id))
+        for row_id, parent, name, kind, _media in rows:
+            values.extend(("--new-row", row_id, parent, name, kind))
+        for row_id, _parent, _name, _kind, media in rows:
+            if media is not None:
+                values.extend(("--media-file", row_id, media))
+        return tuple(values)
+
+    step = ExpectedGatewayStep(
+        name="tx01.declare-batch",
+        subcommand="draft-declare-import-batch",
+        arguments=(*fixed, *groups(expected_rows)),
+    )
+    structure_first = (
+        expected_rows[0],
+        expected_rows[1],
+        expected_rows[3],
+        expected_rows[2],
+        expected_rows[4],
+    )
+    actual = (*fixed, *groups(structure_first))
+    broker = SimpleNamespace(_payloads_by_step={})
+
+    assert CodexGatewayBroker._normalize_business_declaration_fact_order(
+        broker,
+        step,
+        actual,
+    ) == step.arguments
+
+    media_reversed = (
+        expected_rows[0],
+        expected_rows[1],
+        expected_rows[3],
+        expected_rows[4],
+        expected_rows[2],
+    )
+    reversed_actual = (*fixed, *groups(media_reversed))
+    assert CodexGatewayBroker._normalize_business_declaration_fact_order(
+        broker,
+        step,
+        reversed_actual,
+    ) != step.arguments
+
+
 def test_import_batch_accepts_one_exact_derived_sfx_language_per_row() -> None:
     fixed = (
         "od1-" + "1" * 32,

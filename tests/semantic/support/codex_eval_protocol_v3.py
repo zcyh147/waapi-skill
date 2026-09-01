@@ -5027,9 +5027,31 @@ class V3GatewayProtocol:
                 "optional Topic schema steps require explicit allowed prefixes"
             )
         checkpoint_counts = set(self.turn_prefix_counts)
-        for allowed in self.allowed_turn_prefix_counts:
-            checkpoint_counts.update(allowed)
         indexes = {name: index for index, name in enumerate(names)}
+        workflow_operations_indexes = {
+            index
+            for index, step in enumerate(self.steps)
+            if (
+                step.name == "routing.operations"
+                or step.name.startswith("routing.operations.")
+            )
+            and step.subcommand == "operations"
+            and not step.arguments
+        }
+        for maximum, allowed in zip(
+            self.turn_prefix_counts,
+            self.allowed_turn_prefix_counts,
+        ):
+            omitted_routing_choices = set(
+                range(
+                    maximum
+                    - sum(index < maximum for index in workflow_operations_indexes),
+                    maximum + 1,
+                )
+            )
+            checkpoint_counts.update(
+                count for count in allowed if count not in omitted_routing_choices
+            )
         for group in groups:
             if any(
                 indexes[group[0]] + offset in checkpoint_counts

@@ -1695,14 +1695,30 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   before every Sound while the Agent used the natural hierarchy preorder
   parent container then direct Sound. Positional ID mapping therefore rejected
   an otherwise closed declaration before Preview.
-- Prevention: construct hierarchical import requests in one deterministic
-  dependency preorder and compare the resulting parent/child graph plus ordered
-  rows. Allow unique task-local declaration ID spellings through the existing
-  opaque-ID mapping; do not require `row-001` prose, and do not weaken genuine
-  media or dependency ordering. For numeric business fields such as
+- Prevention: compare the resulting parent/child graph rather than forcing one
+  presentation order for structure-only rows. Both parent-then-branch preorder
+  and all-containers-before-media are valid when every parent still precedes
+  its child and the relative order of media-bearing rows is unchanged. Map
+  unique task-local declaration IDs from their recursively closed business
+  identity; do not require `row-001` prose. Continue to reject child-before-
+  parent graphs and reordered media. For numeric business fields such as
   `volume_db`, compare finite decimal value so `-4` and `-4.0` are equivalent;
   field names, integer-only fields, non-finite values, and other business values
   remain exact.
+
+### Optional routing counts are not intermediate turn boundaries
+
+- Evidence: #51 macOS d32381a priority root reached Alarm preparation after the
+  workflow added optional `operations` checkpoints. The valid count choices
+  shifted the same end-of-turn boundary, but protocol construction interpreted
+  one shifted count as cutting through a commutative read group and BLOCKED
+  before Codex.
+- Prevention: when validating whether a commutative group crosses a turn,
+  ignore count variants produced solely by omitting Gateway-marked workflow
+  routing checkpoints. The canonical maximum still owns the real turn
+  boundary; unrelated shorter terminals remain checked. Keep all count variants
+  for Broker/task/archive reconciliation so an omitted routing lookup is still
+  sealed exactly.
 
 ### Ambiguous business kind matters only when the user asserted a type
 

@@ -867,6 +867,48 @@ def test_operations_discovery_is_optional_before_query_first_workflow() -> None:
     assert protocol.optional_initial_operations_discovery is True
 
 
+def test_workflow_operations_choices_do_not_split_commutative_read_group() -> None:
+    base = V3GatewayProtocol(
+        steps=(
+            ExpectedGatewayStep(
+                "diag.operation-schema",
+                "operation-schema",
+                ("object.set",),
+            ),
+            ExpectedGatewayStep(
+                "diag.metadata",
+                "metadata",
+                (
+                    "discover",
+                    "--object-type",
+                    "Action",
+                    "--query",
+                    MetadataQueryArgument("fade time"),
+                    "--limit",
+                    "8",
+                ),
+            ),
+            ExpectedGatewayStep(
+                "tx01.operation-schema",
+                "operation-schema",
+                ("object.setReference",),
+            ),
+        ),
+        turn_prefix_counts=(2, 3),
+        commutative_read_only_step_groups=(
+            ("diag.operation-schema", "diag.metadata"),
+        ),
+    )
+
+    protocol = build_workflow_operations_discovery_protocol(base)
+
+    assert protocol.turn_prefix_counts == (3, 5)
+    assert protocol.allowed_turn_prefix_counts == ((2, 3), (3, 4, 5))
+    assert protocol.commutative_read_only_step_groups == (
+        ("diag.operation-schema", "diag.metadata"),
+    )
+
+
 def test_object_set_composer_keeps_nondefault_request_options_explicit() -> None:
     steps = build_object_set_composer_transaction_steps(
         _object_set_request(
