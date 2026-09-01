@@ -984,10 +984,12 @@ def _weather_import_request(
     weather_root: str,
     weather_bus: str,
 ) -> Mapping[str, Any]:
-    imports: list[dict[str, Any]] = [
-        {"object_path": path, "object_type": object_type}
-        for path, object_type, _parent in _weather_container_specs(weather_root)
-    ]
+    container_specs = _weather_container_specs(weather_root)
+    container_paths = {path for path, _object_type, _parent in container_specs}
+    container_children: dict[str, list[tuple[str, str]]] = {}
+    for path, object_type, parent in container_specs:
+        container_children.setdefault(parent, []).append((path, object_type))
+    media_by_parent: dict[str, list[dict[str, Any]]] = {}
     for target in targets:
         properties = [
             {"name": "IsLoopingEnabled", "value": True},
@@ -1003,7 +1005,12 @@ def _weather_import_request(
             },
             {"name": "Volume", "value": target.volume},
         ]
-        imports.append(
+        parent_path, separator, _name = target.logical_path.rpartition("\\")
+        if not separator or parent_path not in container_paths:
+            raise IntegrationWeatherRuntimeError(
+                "weather media target is not a direct child of a declared container"
+            )
+        media_by_parent.setdefault(parent_path, []).append(
             {
                 "object_path": target.logical_path,
                 "object_type": "Sound SFX",
@@ -1018,6 +1025,21 @@ def _weather_import_request(
                     }
                 ],
             }
+        )
+    imports: list[dict[str, Any]] = []
+
+    def append_container_subtree(path: str, object_type: str) -> None:
+        imports.append({"object_path": path, "object_type": object_type})
+        imports.extend(media_by_parent.pop(path, ()))
+        for child_path, child_type in container_children.get(path, ()):
+            append_container_subtree(child_path, child_type)
+
+    for path, object_type, parent in container_specs:
+        if parent not in container_paths:
+            append_container_subtree(path, object_type)
+    if media_by_parent:
+        raise IntegrationWeatherRuntimeError(
+            "weather import order left media outside the declared hierarchy"
         )
     return MappingProxyType(
         {

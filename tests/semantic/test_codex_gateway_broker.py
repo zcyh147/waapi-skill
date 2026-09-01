@@ -3109,6 +3109,70 @@ def test_broker_can_skip_one_expected_leading_operations_step(
     )
 
 
+def test_broker_accepts_selected_workflow_operations_discovery_steps(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    steps = (
+        ExpectedGatewayStep("routing.operations", "operations"),
+        ExpectedGatewayStep("diag.query", "query-object", ("--exact-id", "one")),
+        ExpectedGatewayStep(
+            "routing.operations.tx01.operation-schema",
+            "operations",
+        ),
+        ExpectedGatewayStep(
+            "tx01.operation-schema",
+            "operation-schema",
+            ("object.setReference",),
+        ),
+        ExpectedGatewayStep("tx01.verify", "verify", ("tx-one",)),
+        ExpectedGatewayStep(
+            "routing.operations.tx02.operation-schema",
+            "operations",
+        ),
+        ExpectedGatewayStep(
+            "tx02.operation-schema",
+            "operation-schema",
+            ("switchContainer.removeAssignment",),
+        ),
+    )
+    selected_operations = {
+        "routing.operations.tx01.operation-schema",
+        "routing.operations.tx02.operation-schema",
+    }
+    commands = (
+        ("query-object", "--exact-id", "one"),
+        ("operations",),
+        ("operation-schema", "object.setReference"),
+        ("verify", "tx-one"),
+        ("operations",),
+        ("operation-schema", "switchContainer.removeAssignment"),
+    )
+    observed: list[list[str]] = []
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=steps,
+        optional_expected_operations_discovery_step_names=tuple(
+            step.name for step in steps if step.name.startswith("routing.operations")
+        ),
+        transport="tcp",
+    ) as broker:
+        for arguments in commands:
+            result = run_model_command(broker, list(arguments))
+            assert result.returncode == 0, result.stderr
+            observed.append(
+                ["python", str(broker.invocation_runner_path), "gateway.py", *arguments]
+            )
+        evidence = broker.evidence()
+        reconciliation = broker.reconcile(observed)
+
+    assert evidence.passed
+    assert reconciliation.passed
+    assert set(evidence.expected_step_names) & {
+        step.name for step in steps if step.name.startswith("routing.operations")
+    } == selected_operations
+
+
 @pytest.mark.parametrize(
     "commands",
     (
@@ -5274,6 +5338,10 @@ def test_import_batch_group_order_is_transport_but_row_order_is_business_meaning
             "--media-file",
             "snow-step-01",
             "snow.wav",
+            "--field",
+            "snow-step-01",
+            "volume_db",
+            "-4.0",
         ),
     )
     reordered = (
@@ -5285,6 +5353,10 @@ def test_import_batch_group_order_is_transport_but_row_order_is_business_meaning
         "--media-file",
         "snow-step-01",
         "snow.wav",
+        "--field",
+        "snow-step-01",
+        "volume_db",
+        "-4",
         "--switch-value",
         "snow",
         "Snow",

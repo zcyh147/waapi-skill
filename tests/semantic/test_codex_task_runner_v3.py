@@ -22,6 +22,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_optional_query_schema_protocol,
     build_optional_query_repair_protocol,
     build_transaction_protocol,
+    build_workflow_operations_discovery_protocol,
     query_object_step,
 )
 from tests.semantic.support.codex_gateway_broker import (
@@ -218,6 +219,7 @@ def test_declared_short_terminal_prefix_is_complete_not_running() -> None:
         allowed_turn_prefix_counts=((2, 3),),
         terminal_prefix_counts=(2, 3),
     )
+    assert protocol.optional_initial_operations_discovery is False
     selected = ("one", "two")
     evidence = SimpleNamespace(
         expected_step_names=selected,
@@ -276,6 +278,47 @@ def test_optional_operations_terminal_accepts_commutative_composer_order() -> No
         terminal_state="COMPLETE",
         commutative_read_only_step_groups=(),
         commutative_composer_setup_step_groups=(("tx01.bind-a", "tx01.bind-b"),),
+    )
+
+    assert task_runner._broker_terminal_protocol_passed(protocol, evidence)
+
+
+def test_workflow_operations_terminal_accepts_any_reviewed_discovery_subset() -> None:
+    base = V3GatewayProtocol(
+        steps=(
+            ExpectedGatewayStep("diag.query", "query-object"),
+            ExpectedGatewayStep(
+                "tx01.operation-schema",
+                "operation-schema",
+                ("object.setReference",),
+            ),
+            ExpectedGatewayStep("tx01.verify", "verify"),
+            ExpectedGatewayStep(
+                "tx02.operation-schema",
+                "operation-schema",
+                ("switchContainer.removeAssignment",),
+            ),
+        ),
+        turn_prefix_counts=(2, 4),
+    )
+    protocol = build_workflow_operations_discovery_protocol(base)
+    selected = tuple(
+        step.name
+        for step in protocol.steps
+        if step.name != "routing.operations"
+    )
+    evidence = SimpleNamespace(
+        expected_step_names=selected,
+        consumed_step_names=selected,
+        records=tuple(
+            SimpleNamespace(step_name=name, succeeded=True) for name in selected
+        ),
+        rejected_records=(),
+        complete=True,
+        passed=True,
+        terminal_state="COMPLETE",
+        commutative_read_only_step_groups=(),
+        commutative_composer_setup_step_groups=(),
     )
 
     assert task_runner._broker_terminal_protocol_passed(protocol, evidence)

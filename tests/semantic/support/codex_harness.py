@@ -3667,12 +3667,12 @@ def gateway_continuation_binding_errors(
                     command
                     for mode, command in compound_parent_candidates
                     if observed_command is not None
-                    and (
-                        observed_command == command
-                        or (
-                            mode == "prefix"
-                            and observed_command.startswith(command + " ")
-                        )
+                    and _business_draft_command_matches(
+                        mode=mode,
+                        expected_command=command,
+                        observed_command=observed_command,
+                        current_record=current_command,
+                        platform_name=active_platform,
                     )
                 }
                 longest_matches = {
@@ -3728,12 +3728,12 @@ def gateway_continuation_binding_errors(
                 command
                 for mode, command in business_candidates
                 if observed_command is not None
-                and (
-                    observed_command == command
-                    or (
-                        mode == "prefix"
-                        and observed_command.startswith(command + " ")
-                    )
+                and _business_draft_command_matches(
+                    mode=mode,
+                    expected_command=command,
+                    observed_command=observed_command,
+                    current_record=current_command,
+                    platform_name=active_platform,
                 )
             }
             longest_matches = {
@@ -3787,6 +3787,49 @@ def gateway_continuation_binding_errors(
                 "from its selected source field"
             )
     return tuple(errors)
+
+
+def _business_draft_command_matches(
+    *,
+    mode: str,
+    expected_command: str,
+    observed_command: str,
+    current_record: CodexCommandRecord | Mapping[str, Any],
+    platform_name: str,
+) -> bool:
+    """Match exact bytes, allowing only the sealed task-local runner expansion."""
+
+    def matches(candidate: str) -> bool:
+        return observed_command == candidate or (
+            mode == "prefix" and observed_command.startswith(candidate + " ")
+        )
+
+    if matches(expected_command):
+        return True
+    if not _is_windows(platform_name):
+        return False
+    try:
+        expected_argv = decode_windows_model_argv(expected_command)
+    except PlatformCommandError:
+        return False
+    observed_argv = _record_field(current_record, "argv", ())
+    if (
+        not isinstance(observed_argv, (list, tuple))
+        or len(expected_argv) < 3
+        or len(observed_argv) < len(expected_argv)
+        or expected_argv[0] != "python"
+        or observed_argv[0] != "python"
+        or not isinstance(observed_argv[1], str)
+        or not task_local_runner_matches_normalized(
+            expected_argv[1],
+            observed_argv[1],
+        )
+    ):
+        return False
+    expanded = encode_windows_model_argv(
+        (expected_argv[0], observed_argv[1], *expected_argv[2:])
+    )
+    return matches(expanded)
 
 
 def _record_field(record: Any, name: str, default: Any = None) -> Any:

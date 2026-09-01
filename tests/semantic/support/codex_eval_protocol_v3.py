@@ -5117,13 +5117,20 @@ class V3GatewayProtocol:
             len(self.steps) < 2
             or self.steps[0].subcommand != "operations"
             or self.steps[0].arguments
-            or self.steps[1].subcommand not in {
+            or not self.allowed_turn_prefix_counts
+        ):
+            return False
+        explicitly_marked_workflow_discovery = (
+            self.steps[0].name == "routing.operations"
+        )
+        schema_discovery = (
+            self.steps[1].subcommand in {
                 "operation-schema",
                 "request-schema",
             }
-            or len(self.steps[1].arguments) != 1
-            or not self.allowed_turn_prefix_counts
-        ):
+            and len(self.steps[1].arguments) == 1
+        )
+        if not explicitly_marked_workflow_discovery and not schema_discovery:
             return False
         return all(
             maximum - 1 in allowed and maximum in allowed
@@ -5136,6 +5143,26 @@ class V3GatewayProtocol:
             len(self.steps) - 1,
             len(self.steps),
         }.issubset(self.terminal_prefix_counts)
+
+    @property
+    def optional_workflow_operations_discovery_step_names(self) -> tuple[str, ...]:
+        """Return explicitly named optional routing checkpoints in one workflow."""
+
+        names = tuple(
+            step.name
+            for step in self.steps
+            if step.name == "routing.operations"
+            or step.name.startswith("routing.operations.")
+        )
+        if not names:
+            return ()
+        by_name = {step.name: step for step in self.steps}
+        if any(
+            by_name[name].subcommand != "operations" or by_name[name].arguments
+            for name in names
+        ):
+            return ()
+        return names
 
 
 @dataclass(frozen=True, slots=True)
@@ -6021,29 +6048,77 @@ def build_operations_discovery_protocol(
     )
 
 
-def build_required_operations_discovery_protocol(
+def build_workflow_operations_discovery_protocol(
     base: V3GatewayProtocol,
 ) -> V3GatewayProtocol:
-    """Require one catalog read before a natural-language workflow protocol."""
+    """Allow one catalog read before an exact natural-language workflow."""
 
     if not isinstance(base, V3GatewayProtocol) or not base.steps:
-        raise V3ProtocolError("required operations discovery requires one protocol")
-    discovery = ExpectedGatewayStep(
-        name="routing.operations",
-        subcommand="operations",
+        raise V3ProtocolError("workflow operations discovery requires one protocol")
+    insertion_positions = {
+        0,
+        *(
+            index
+            for index, step in enumerate(base.steps)
+            if index > 0
+            and step.subcommand in {"operation-schema", "request-schema"}
+        ),
+    }
+    wrapped_steps: list[ExpectedGatewayStep] = []
+    discovery_names: set[str] = set()
+    for index, step in enumerate(base.steps):
+        if index in insertion_positions:
+            discovery_name = (
+                "routing.operations"
+                if index == 0
+                else f"routing.operations.{step.name}"
+            )
+            if discovery_name in discovery_names or any(
+                candidate.name == discovery_name for candidate in base.steps
+            ):
+                raise V3ProtocolError(
+                    "workflow operations discovery step name collides"
+                )
+            discovery_names.add(discovery_name)
+            wrapped_steps.append(
+                ExpectedGatewayStep(
+                    name=discovery_name,
+                    subcommand="operations",
+                )
+            )
+        wrapped_steps.append(step)
+
+    def inserted_before(prefix_count: int) -> int:
+        return sum(position < prefix_count for position in insertion_positions)
+
+    def expanded_prefixes(values: Sequence[int]) -> tuple[int, ...]:
+        return tuple(
+            sorted(
+                {
+                    selected
+                    for value in values
+                    for selected in range(
+                        value,
+                        value + inserted_before(value) + 1,
+                    )
+                }
+            )
+        )
+
+    base_allowed = (
+        base.allowed_turn_prefix_counts
+        or tuple((value,) for value in base.turn_prefix_counts)
     )
-    if any(step.name == discovery.name for step in base.steps):
-        raise V3ProtocolError("required operations discovery step name collides")
+    base_terminal = base.terminal_prefix_counts or (len(base.steps),)
     return V3GatewayProtocol(
-        steps=(discovery, *base.steps),
-        turn_prefix_counts=tuple(value + 1 for value in base.turn_prefix_counts),
+        steps=tuple(wrapped_steps),
+        turn_prefix_counts=tuple(
+            value + inserted_before(value) for value in base.turn_prefix_counts
+        ),
         allowed_turn_prefix_counts=tuple(
-            tuple(value + 1 for value in values)
-            for values in base.allowed_turn_prefix_counts
+            expanded_prefixes(values) for values in base_allowed
         ),
-        terminal_prefix_counts=tuple(
-            value + 1 for value in base.terminal_prefix_counts
-        ),
+        terminal_prefix_counts=expanded_prefixes(base_terminal),
         commutative_read_only_step_groups=base.commutative_read_only_step_groups,
         commutative_composer_setup_step_groups=(
             base.commutative_composer_setup_step_groups

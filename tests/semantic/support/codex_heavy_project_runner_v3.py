@@ -68,7 +68,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_optional_query_schema_protocol,
     build_optional_topic_schema_protocol,
     build_operations_discovery_protocol,
-    build_required_operations_discovery_protocol,
+    build_workflow_operations_discovery_protocol,
     build_transaction_protocol,
     call_step,
     media_pool_business_call_step,
@@ -1526,7 +1526,7 @@ class _CaseObservers:
     ) -> None:
         self.payloads[step.name] = payload
         if (
-            step.name != "routing.operations"
+            not step.name.startswith("routing.operations")
             and self.prepared.observe_payload is not None
         ):
             self.prepared.observe_payload(step, payload)
@@ -4106,7 +4106,7 @@ def _prepare_integration_workflow_case(
             f"integration workflow has no runtime: {workflow_id}"
         )
 
-    protocol, typed_sections = integration_required_operations_protocol_and_plan(
+    protocol, typed_sections = integration_operations_protocol_and_plan(
         unit=unit,
         protocol=prepared.protocol,
         sections=typed_sections,
@@ -4453,7 +4453,7 @@ def _compile_integration_workflow_plan(
     )
 
 
-def integration_required_operations_protocol_and_plan(
+def integration_operations_protocol_and_plan(
     *,
     unit: Any,
     protocol: V3GatewayProtocol,
@@ -4465,7 +4465,7 @@ def integration_required_operations_protocol_and_plan(
         raise HeavyProjectRunnerError(
             "integration operations discovery requires one workflow plan"
         )
-    wrapped = build_required_operations_discovery_protocol(protocol)
+    wrapped = build_workflow_operations_discovery_protocol(protocol)
     static = sections.static_expectation
     live = sections.live_binding
     transactions = tuple(dict(row) for row in static["transactions"])
@@ -4474,13 +4474,36 @@ def integration_required_operations_protocol_and_plan(
         raise HeavyProjectRunnerError(
             "integration operations discovery requires complete workflow topology"
         )
-    routing_step = {
-        "name": "routing.operations",
-        "kind": "checkpoint",
-        "phase": f"{unit.workflow_id}.checkpoint",
-        "transaction_id": None,
-        "api": None,
-    }
+    workflow_by_name = {row["name"]: row for row in workflow_steps}
+    rebuilt_workflow_steps: list[dict[str, Any]] = []
+    for step in wrapped.steps:
+        if step.name in wrapped.optional_workflow_operations_discovery_step_names:
+            rebuilt_workflow_steps.append(
+                {
+                    "name": step.name,
+                    "kind": "checkpoint",
+                    "phase": f"{unit.workflow_id}.checkpoint",
+                    "transaction_id": None,
+                    "api": None,
+                }
+            )
+            continue
+        row = workflow_by_name.pop(step.name, None)
+        if row is None:
+            raise HeavyProjectRunnerError(
+                "integration workflow plan omits a protocol step"
+            )
+        rebuilt_workflow_steps.append(row)
+    if workflow_by_name:
+        trailing = [
+            row for row in workflow_steps if row["name"] in workflow_by_name
+        ]
+        if any(row.get("kind") != "cleanup" for row in trailing):
+            raise HeavyProjectRunnerError(
+                "integration workflow plan contains non-cleanup steps outside "
+                "the protocol"
+            )
+        rebuilt_workflow_steps.extend(trailing)
     diagnostic_evidence = tuple(
         {
             key: value
@@ -4499,7 +4522,7 @@ def integration_required_operations_protocol_and_plan(
     rebuilt = compile_workflow_business_plan_sections(
         workflow_id=str(unit.workflow_id),
         transactions=transactions,
-        workflow_steps=(routing_step, *workflow_steps),
+        workflow_steps=tuple(rebuilt_workflow_steps),
         diagnostic_evidence=diagnostic_evidence,
         live_bindings=dict(live["bindings"]),
         transaction_expectations=transaction_expectations,

@@ -19,7 +19,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_metadata_transaction_protocol,
     build_object_lifecycle_business_transaction_steps,
     build_object_graph_business_transaction_steps,
-    build_required_operations_discovery_protocol,
+    build_workflow_operations_discovery_protocol,
     build_object_metadata_business_transaction_steps,
     build_switch_assignment_business_transaction_steps,
     build_object_set_composer_transaction_steps,
@@ -826,7 +826,7 @@ def test_object_set_rtpc_business_uses_bound_curve_declaration() -> None:
     assert steps[-1].expected_operation_request == request
 
 
-def test_required_operations_discovery_precedes_query_first_workflow() -> None:
+def test_operations_discovery_is_optional_before_query_first_workflow() -> None:
     base = V3GatewayProtocol(
         steps=(
             ExpectedGatewayStep("diag.query", "query-object"),
@@ -835,19 +835,36 @@ def test_required_operations_discovery_precedes_query_first_workflow() -> None:
                 "operation-schema",
                 ("object.setReference",),
             ),
+            ExpectedGatewayStep("tx01.verify", "verify"),
+            ExpectedGatewayStep(
+                "tx02.operation-schema",
+                "operation-schema",
+                ("object.setReference",),
+            ),
         ),
-        turn_prefix_counts=(1, 2),
+        turn_prefix_counts=(2, 4),
     )
 
-    protocol = build_required_operations_discovery_protocol(base)
+    protocol = build_workflow_operations_discovery_protocol(base)
 
     assert [step.subcommand for step in protocol.steps] == [
         "operations",
         "query-object",
+        "operations",
+        "operation-schema",
+        "verify",
+        "operations",
         "operation-schema",
     ]
-    assert protocol.turn_prefix_counts == (2, 3)
-    assert protocol.optional_initial_operations_discovery is False
+    assert protocol.turn_prefix_counts == (4, 7)
+    assert protocol.allowed_turn_prefix_counts == ((2, 3, 4), (4, 5, 6, 7))
+    assert protocol.accepted_terminal_prefixes == (4, 5, 6, 7)
+    assert protocol.optional_workflow_operations_discovery_step_names == (
+        "routing.operations",
+        "routing.operations.tx01.operation-schema",
+        "routing.operations.tx02.operation-schema",
+    )
+    assert protocol.optional_initial_operations_discovery is True
 
 
 def test_object_set_composer_keeps_nondefault_request_options_explicit() -> None:

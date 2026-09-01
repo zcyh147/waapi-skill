@@ -6213,6 +6213,29 @@ def _consumed_heavy_v3_protocol_steps(
         ):
             return ()
         return tuple(by_name[name] for name in selected_step_names)
+    optional_workflow_operations = tuple(
+        getattr(
+            protocol,
+            "optional_workflow_operations_discovery_step_names",
+            (),
+        )
+    )
+    if optional_workflow_operations:
+        if (
+            not isinstance(selected_step_names, list)
+            or len(selected_step_names) != consumed_count
+            or len(selected_step_names) != len(set(selected_step_names))
+        ):
+            return ()
+        by_name = {step.name: step for step in steps}
+        optional_names = set(optional_workflow_operations)
+        if any(name not in by_name for name in selected_step_names):
+            return ()
+        if tuple(
+            name for name in selected_step_names if name not in optional_names
+        ) != tuple(step.name for step in steps if step.name not in optional_names):
+            return ()
+        return tuple(by_name[name] for name in selected_step_names)
     if getattr(protocol, "optional_initial_query_schema", False) or getattr(
         protocol,
         "optional_initial_operations_discovery",

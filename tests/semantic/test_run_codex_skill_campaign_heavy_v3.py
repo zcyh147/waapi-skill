@@ -405,7 +405,7 @@ def test_integration_plan_requires_catalog_before_query_first_protocol() -> None
     )
 
     wrapped, rebuilt = (
-        project_runner.integration_required_operations_protocol_and_plan(
+        project_runner.integration_operations_protocol_and_plan(
             unit=unit,
             protocol=protocol,
             sections=sections,
@@ -3981,6 +3981,40 @@ def test_optional_operations_archive_selects_the_sealed_lane_before_turn_slicing
 
     assert [step.name for step in selected] == selected_names
     assert [step.name for step in selected[:2]] == selected_names[:2]
+
+
+def test_workflow_operations_archive_selects_any_sealed_routing_subset() -> None:
+    protocol = V3GatewayProtocol(
+        steps=(
+            ExpectedGatewayStep("routing.operations", "operations"),
+            ExpectedGatewayStep("diag.query", "query-object"),
+            ExpectedGatewayStep(
+                "routing.operations.tx01.operation-schema",
+                "operations",
+            ),
+            ExpectedGatewayStep(
+                "tx01.operation-schema",
+                "operation-schema",
+                ("object.setReference",),
+            ),
+        ),
+        turn_prefix_counts=(4,),
+        allowed_turn_prefix_counts=((2, 3, 4),),
+        terminal_prefix_counts=(2, 3, 4),
+    )
+    selected_names = [
+        "diag.query",
+        "routing.operations.tx01.operation-schema",
+        "tx01.operation-schema",
+    ]
+
+    selected = campaign._consumed_heavy_v3_protocol_steps(  # noqa: SLF001
+        protocol,
+        len(selected_names),
+        selected_step_names=selected_names,
+    )
+
+    assert [step.name for step in selected] == selected_names
 
 
 def test_soundbank_topic_protocol_selects_finite_stream_for_explicit_stream_case() -> None:

@@ -1597,15 +1597,23 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   the one-time introduction wording to its dedicated Fresh profile instead of
   multiplying that same prose assertion across every API acceptance unit.
 
-### Natural-language routing starts from the Gateway operation catalog
+### Natural-language routing may start from the Gateway operation catalog
 
 - Evidence: #60 r45 Agents invented `ak.wwise.ui.commands.project.save` and
   `ak.wwise.cli.soundbank.generate`, and selected generic `object.set` for a
   single-reference mutation even though exact closed routes already existed.
-- Prevention: require `operations` as the first Gateway command for each new
-  natural-language business task, then copy the catalog's exact selection
-  guidance into `operation-schema` or `request-schema`. Do not select routes
-  from model memory, similar wording, or prior examples.
+  In #51 r5, however, the Alarm workflow legally began with its reviewed
+  `query-object` diagnostic read and was rejected only because the integration
+  wrapper had made `operations` mandatory.
+- Prevention: permit exactly one initial `operations` lookup when the Agent
+  needs routing discovery, or permit the workflow's exact first reviewed step
+  when the Skill already closes that route. After either opening, preserve the
+  same ordered protocol and closed operation identity. A later user turn that
+  confirms one transaction and introduces another operation receives the same
+  optional routing checkpoint immediately before that new operation's schema;
+  it is not limited to command one of the whole task. Repeated discovery at one
+  checkpoint, discovery after its schema, an invented route, or a different
+  first business step remains a semantic failure.
 
 ### Named business options are transport-order independent
 
@@ -1650,6 +1658,78 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   required by `from type Project take 1` and `take 2`, including stable id,
   name, type, project-directory path, and `.wproj` file path. This is fixture
   completeness, not Agent semantic credit.
+
+### Current integration coverage must not hide behind archive test names
+
+- Evidence: #51 r1-r3 reached deterministic pre-Agent blockers in current
+  Weather transaction planning. The matching end-to-end tests existed under
+  `_archive_test_...` names, so pytest never collected them. After those tests
+  were restored, #51 r4 exposed that the shared integration wrapper and the
+  Weapons workflow still used retired protocol seams despite a green broad
+  Non-live run.
+- Prevention: every current public integration workflow has at least one
+  collected constructibility test that builds its complete protocol and
+  validates its workflow plan. An `_archive_test_...` function is historical
+  evidence only and must not be the sole owner of a current path. Before a new
+  Fresh root, use `pytest --collect-only` or a focused run to prove the named
+  current tests are actually collected.
+
+### A running Fresh candidate makes its source worktree immutable
+
+- Evidence: macOS #51 root `imac-integration-a959478-r5` was still active when
+  the next harness repair began in the same source worktree. The root was
+  stopped, frozen, and denied semantic credit; its Windows peer remained valid
+  because it ran from a separate frozen worktree.
+- Prevention: after launching a Fresh root, do not edit, format, commit, switch,
+  or otherwise change that root's source worktree until it seals and all scoped
+  descendants exit. Diagnose from evidence read-only and implement the next
+  candidate in a separate worktree. If drift occurs, stop only the exact
+  campaign process tree, freeze the root, and start a new root from a clean
+  committed candidate.
+
+### Import declaration IDs are opaque but dependency order is semantic
+
+- Evidence: #51 r5 Weather used meaningful task-local IDs such as
+  `weather_interactive`, `rain`, and `rain_bed`. The Broker can safely map those
+  opaque IDs to sealed IDs, but the expected request listed every container
+  before every Sound while the Agent used the natural hierarchy preorder
+  parent container then direct Sound. Positional ID mapping therefore rejected
+  an otherwise closed declaration before Preview.
+- Prevention: construct hierarchical import requests in one deterministic
+  dependency preorder and compare the resulting parent/child graph plus ordered
+  rows. Allow unique task-local declaration ID spellings through the existing
+  opaque-ID mapping; do not require `row-001` prose, and do not weaken genuine
+  media or dependency ordering. For numeric business fields such as
+  `volume_db`, compare finite decimal value so `-4` and `-4.0` are equivalent;
+  field names, integer-only fields, non-finite values, and other business values
+  remain exact.
+
+### Ambiguous business kind matters only when the user asserted a type
+
+- Evidence: #51 Windows r5 Harbor bound the exact Event path and returned the
+  matching name, path, and reflected `Event` type. Because Event is outside the
+  creation-oriented stable kind vocabulary, `business_kind_resolution` was
+  `ambiguous`; the Agent stopped even though the user had not supplied a type
+  to validate and the Gateway continuation explicitly allowed it to continue.
+- Prevention: if the user stated a business type, compare a resolved stable
+  kind and stop on ambiguity. If the user stated no type, exact name/path
+  identity is sufficient and the Agent continues with the bound handle. Keep
+  this rule identical in the compact operate reference and every Gateway-owned
+  object-binding continuation.
+
+### Task-local runner expansion is not parameter reconstruction
+
+- Evidence: #51 Windows r5 Footsteps passed every Broker command through one
+  exact installed task-local runner but Codex expanded
+  `.agents\\skills\\waapi-skill\\scripts\\run.py` to its exact absolute path.
+  The continuation audit alone rejected that command although every Gateway
+  argument and opaque token remained exact.
+- Prevention: only on native Windows, allow the sealed task-local runner token
+  to expand to the Broker-validated absolute installation whose path ends in
+  that exact task-local suffix. Re-encode the expected command with only that
+  runner substitution and retain byte-exact matching for every other quote,
+  token, option, order, and appended business argument. A different runner or
+  general re-quoting still fails.
 
 ## New-root preflight
 

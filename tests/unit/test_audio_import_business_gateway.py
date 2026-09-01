@@ -273,10 +273,12 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
         start_next["object_binding"]["new_target_parent_rule"]
     )
     assert start_next["object_binding"]["import_row_path_rule"] == (
-        "bind_an_explicitly_existing_row_by_exact_guid_or_literal_name_segments; "
-        "otherwise_bind_only_its_exact_existing_immediate_parent; new_row_name_and_"
-        "semantic_kind_belong_to_the_business_declaration; wwise_type_prefixes_and_"
-        "complete_mutation_paths_are_forbidden"
+        "existing_import_row_bind_the_complete_existing_sound_path_including_"
+        "its_final_sound_name; new_import_row_bind_only_its_exact_existing_"
+        "immediate_parent_and_pass_the_final_new_sound_name_once_in_the_"
+        "declaration; never_reuse_a_parent_binding_for_an_existing_row; "
+        "semantic_kind_belongs_to_the_business_declaration; wwise_type_prefixes_"
+        "are_forbidden"
     )
     result_validation = start_next["object_binding"]["result_validation_rule"]
     assert "returned_name_and_path" in result_validation

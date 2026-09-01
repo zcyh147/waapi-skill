@@ -8317,6 +8317,7 @@ class CodexGatewayBroker:
             Mapping[str, Mapping[str, Any]] | None
         ) = None,
         optional_expected_initial_operations_discovery: bool = False,
+        optional_expected_operations_discovery_step_names: Sequence[str] = (),
         optional_initial_operations_discovery_operation: str | None = None,
         optional_initial_query_object_arguments: Sequence[str] | None = None,
         optional_initial_query_schema: bool = False,
@@ -8358,6 +8359,12 @@ class CodexGatewayBroker:
             )
         self.optional_expected_initial_operations_discovery = (
             optional_expected_initial_operations_discovery
+        )
+        self.optional_expected_operations_discovery_step_names = tuple(
+            optional_expected_operations_discovery_step_names
+        )
+        self._optional_expected_operations_discovery_step_names = frozenset(
+            self.optional_expected_operations_discovery_step_names
         )
         if optional_initial_operations_discovery_operation is not None and (
             not isinstance(optional_initial_operations_discovery_operation, str)
@@ -8500,20 +8507,29 @@ class CodexGatewayBroker:
         names = [step.name for step in self.expected_steps]
         if len(names) != len(set(names)):
             raise ValueError("ExpectedGatewayStep names must be unique")
+        if (
+            len(self.optional_expected_operations_discovery_step_names)
+            != len(self._optional_expected_operations_discovery_step_names)
+            or any(name not in names for name in self._optional_expected_operations_discovery_step_names)
+            or any(
+                step.subcommand != "operations" or step.arguments
+                for step in self.expected_steps
+                if step.name in self._optional_expected_operations_discovery_step_names
+            )
+        ):
+            raise ValueError(
+                "optional workflow operations discovery names must identify "
+                "unique empty operations steps"
+            )
         if self.optional_expected_initial_operations_discovery:
             if (
                 len(self.expected_steps) < 2
                 or self.expected_steps[0].subcommand != "operations"
                 or self.expected_steps[0].arguments
-                or self.expected_steps[1].subcommand not in {
-                    "operation-schema",
-                    "request-schema",
-                }
-                or len(self.expected_steps[1].arguments) != 1
             ):
                 raise ValueError(
                     "optional expected operations discovery requires one leading "
-                    "operations step before an exact operation or request schema"
+                    "operations step before the exact workflow"
                 )
         if self.optional_initial_operations_discovery_operation is not None:
             first = self.expected_steps[0]
@@ -9564,6 +9580,14 @@ class CodexGatewayBroker:
                     authenticated=True,
                 )
             try:
+                while (
+                    self._next_step < len(self._execution_steps)
+                    and self._execution_steps[self._next_step].name
+                    in self._optional_expected_operations_discovery_step_names
+                    and resolved.gateway_arguments != ("operations",)
+                ):
+                    self._execution_steps.pop(self._next_step)
+                    self._selected_expected_steps.pop(self._next_step)
                 if (
                     self._next_step == 0
                     and not self._records
@@ -10944,6 +10968,36 @@ class CodexGatewayBroker:
         actual_groups = [
             group for group in canonical_actual_groups if group is not None
         ]
+        expected_fields = {
+            key(group, expected=True): group
+            for group in expected_groups
+            if group[0] == "--field"
+        }
+        normalized_numeric_groups: list[tuple[Any, ...]] = []
+        for group in actual_groups:
+            group_key = key(group, expected=False)
+            expected_group = expected_fields.get(group_key)
+            if (
+                group[0] == "--field"
+                and group[2] == "volume_db"
+                and expected_group is not None
+            ):
+                try:
+                    expected_number = Decimal(str(expected_group[3]))
+                    actual_number = Decimal(str(group[3]))
+                except InvalidOperation:
+                    pass
+                else:
+                    if (
+                        expected_number.is_finite()
+                        and actual_number.is_finite()
+                        and expected_number == actual_number
+                    ):
+                        normalized = list(group)
+                        normalized[3] = expected_group[3]
+                        group = tuple(normalized)
+            normalized_numeric_groups.append(group)
+        actual_groups = normalized_numeric_groups
         if step.allow_explicit_derived_sfx_language:
             expected_language_keys = {
                 ("--field", group[1], "language")

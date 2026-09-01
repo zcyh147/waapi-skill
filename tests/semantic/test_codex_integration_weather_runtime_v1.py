@@ -175,37 +175,34 @@ def test_weather_requests_close_five_sound_action_and_rtpc_requirements(
         weather_bus=bus,
     )
     rows = import_request["arguments"]["imports"]
-    assert rows[:4] == [
-        {
-            "object_path": (
-                r"\Actor-Mixer Hierarchy\Default Work Unit"
-                r"\IntegrationLab\Weather_Interactive"
-            ),
-            "object_type": "ActorMixer",
-        },
-        {
-            "object_path": (
-                r"\Actor-Mixer Hierarchy\Default Work Unit"
-                r"\IntegrationLab\Weather_Interactive\Rain"
-            ),
-            "object_type": "ActorMixer",
-        },
-        {
-            "object_path": (
-                r"\Actor-Mixer Hierarchy\Default Work Unit"
-                r"\IntegrationLab\Weather_Interactive\Wind"
-            ),
-            "object_type": "ActorMixer",
-        },
-        {
-            "object_path": (
-                r"\Actor-Mixer Hierarchy\Default Work Unit"
-                r"\IntegrationLab\Weather_Interactive\Thunder"
-            ),
-            "object_type": "RandomSequenceContainer",
-        },
+    assert [(row["object_path"], row["object_type"]) for row in rows] == [
+        (
+            r"\Actor-Mixer Hierarchy\Default Work Unit"
+            r"\IntegrationLab\Weather_Interactive",
+            "ActorMixer",
+        ),
+        (
+            r"\Actor-Mixer Hierarchy\Default Work Unit"
+            r"\IntegrationLab\Weather_Interactive\Rain",
+            "ActorMixer",
+        ),
+        (targets[0].logical_path, "Sound SFX"),
+        (
+            r"\Actor-Mixer Hierarchy\Default Work Unit"
+            r"\IntegrationLab\Weather_Interactive\Wind",
+            "ActorMixer",
+        ),
+        (targets[1].logical_path, "Sound SFX"),
+        (
+            r"\Actor-Mixer Hierarchy\Default Work Unit"
+            r"\IntegrationLab\Weather_Interactive\Thunder",
+            "RandomSequenceContainer",
+        ),
+        (targets[2].logical_path, "Sound SFX"),
+        (targets[3].logical_path, "Sound SFX"),
+        (targets[4].logical_path, "Sound SFX"),
     ]
-    media_rows = rows[4:]
+    media_rows = [row for row in rows if "audio_file" in row]
     assert len(media_rows) == 5
     assert [row["event"]["path"] for row in media_rows] == [
         target.event_path for target in targets

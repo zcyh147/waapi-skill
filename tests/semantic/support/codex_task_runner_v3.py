@@ -353,6 +353,10 @@ def run_v3_codex_task(
         ),
         optional_expected_initial_operations_discovery=(
             protocol.optional_initial_operations_discovery
+            and not protocol.optional_workflow_operations_discovery_step_names
+        ),
+        optional_expected_operations_discovery_step_names=(
+            protocol.optional_workflow_operations_discovery_step_names
         ),
         expected_wwise_version=version,
         project_modification_policy=project_modification_policy,
@@ -708,6 +712,23 @@ def _broker_terminal_protocol_passed(
         protocol_names = tuple(step.name for step in protocol.steps)
         selected_names = evidence.expected_step_names
         if selected_names not in {protocol_names, protocol_names[1:]}:
+            return False
+        return selected_lane_passed(selected_names)
+    optional_workflow_operations = getattr(
+        protocol,
+        "optional_workflow_operations_discovery_step_names",
+        (),
+    )
+    if optional_workflow_operations:
+        protocol_names = tuple(step.name for step in protocol.steps)
+        optional_names = set(optional_workflow_operations)
+        selected_names = evidence.expected_step_names
+        if (
+            len(selected_names) != len(set(selected_names))
+            or any(name not in protocol_names for name in selected_names)
+            or tuple(name for name in selected_names if name not in optional_names)
+            != tuple(name for name in protocol_names if name not in optional_names)
+        ):
             return False
         return selected_lane_passed(selected_names)
     if protocol.optional_initial_operations_discovery:

@@ -866,6 +866,43 @@ def test_windows_business_draft_prefix_accepts_exact_copy() -> None:
     ) == ()
 
 
+def test_windows_business_draft_prefix_accepts_only_task_local_runner_expansion() -> None:
+    prefix, payload = _windows_business_prefix_fixture()
+    absolute_runner = (
+        r"C:\campaign\agent-workspace\.agents\skills\waapi-skill\scripts\run.py"
+    )
+    expanded = encode_windows_model_argv(
+        (
+            "python",
+            absolute_runner,
+            "gateway.py",
+            "draft-bind-object",
+            "od1-opaque",
+            "--task-authority",
+            "da1-opaque",
+            "--expected-revision",
+            "1",
+        )
+    )
+    command = expanded + " '--object-path-segment' 'Actor-Mixer Hierarchy'"
+
+    assert gateway_continuation_binding_errors(
+        (
+            completed_windows_record(
+                windows_powershell_recording("python initial.py"),
+                payload,
+            ),
+            completed_windows_record(
+                windows_powershell_recording(command),
+                {},
+            ),
+        ),
+        (SimpleNamespace(payload=payload), SimpleNamespace(payload={})),
+        platform_name="nt",
+        windows_powershell_core_host=_WINDOWS_POWERSHELL_CORE_HOST,
+    ) == ()
+
+
 def test_windows_business_draft_prefix_rejects_equivalent_requote() -> None:
     prefix, payload = _windows_business_prefix_fixture()
     reconstructed = (
