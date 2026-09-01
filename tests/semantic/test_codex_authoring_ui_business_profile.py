@@ -11,6 +11,7 @@ import pytest
 from tests.semantic import run_codex_skill_matrix as matrix
 from tests.semantic import run_codex_skill_campaign as campaign
 from tests.semantic.support.codex_authoring_ui_business_agent_runner import (
+    _final_response_reports_preview,
     prepare_authoring_ui_business_runtime,
 )
 from tests.semantic.support.codex_authoring_ui_business_profile import (
@@ -98,6 +99,14 @@ def test_profile_rejects_prompt_level_gateway_mechanics(tmp_path: Path) -> None:
 
     with pytest.raises(AuthoringUiBusinessProfileError, match="prompt"):
         load_authoring_ui_business_profile(path)
+
+
+def test_preview_report_accepts_natural_business_wording_without_command_id() -> None:
+    assert _final_response_reports_preview(
+        "已生成保存当前 Wwise 项目的执行预览，未执行，项目未发生任何更改。",
+        operation="ui.commands.execute",
+        markers=("SaveProject",),
+    )
 
 
 def test_authoring_fixture_shim_reports_host_and_bounded_command_inventory(

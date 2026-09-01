@@ -820,6 +820,9 @@ prevention checks that are expensive to rediscover.
   Preview status clear; ordinary synonyms, translations, word order, and
   omitted implementation nouns do not fail a run. Keep grossly contradictory
   claims visible for review, but never require a model to repeat fixed wording.
+  #60 r48 reconfirmed this boundary when the exact closed SaveProject Preview
+  passed every structural gate but natural Chinese omitted the literal command
+  ID; the reply's explicit “执行预览，未执行，项目未发生任何更改” is sufficient.
 
 ### An unrelated Windows Console is not an offline Fresh conflict
 
