@@ -864,6 +864,11 @@ _CORE_BUSINESS_DEFINITION = {
     "supports_field_discovery": True,
 }
 
+_AUDIO_CONVERT_CORE_BUSINESS_DEFINITION = {
+    **_CORE_BUSINESS_DEFINITION,
+    "requires_sound_subtype": True,
+}
+
 _PROJECT_SETTING_DEFINITION = {
     "family": "project-setting-business",
     "contract_builder": _project_setting_contract,
@@ -1004,6 +1009,10 @@ _BUSINESS_ADAPTERS = {
         operation: _bind_adapter(operation, _CORE_BUSINESS_DEFINITION)
         for operation in core_business_draft_operations()
     },
+    "ak.wwise.core.audio.convert": _bind_adapter(
+        "ak.wwise.core.audio.convert",
+        _AUDIO_CONVERT_CORE_BUSINESS_DEFINITION,
+    ),
     **{
         operation: _bind_adapter(operation, _PROJECT_SETTING_DEFINITION)
         for operation in project_setting_business_operations()

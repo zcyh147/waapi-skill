@@ -744,7 +744,8 @@ def test_audio_convert_core_plan_accepts_bound_objects_names_and_exact_io_root(
                             "path": object_path,
                         }
                     ]
-                }
+                },
+                {"return": [{"id": SOURCE_ID, "@IsVoice": False}]},
             ],
         }
     )
@@ -767,6 +768,10 @@ def test_audio_convert_core_plan_accepts_bound_objects_names_and_exact_io_root(
         client_factory=lambda _url: bind_client,
     )
     assert bind_code == 0, bound
+    assert bound["bound_object"]["business_kind"] == "sound-sfx"
+    assert bound["bound_object"]["business_kind_resolution"]["source"] == (
+        "live_sound_voice_discriminator"
+    )
     object_handle = bound["bound_object"]["handle"]
     declare_client = FakeClient(
         {
