@@ -120,6 +120,35 @@ def test_draft_bind_object_rejects_complete_native_path_before_dispatch() -> Non
 
     assert exc_info.value.code == 2
     assert client_factory_called is False
+
+
+def test_draft_bind_object_rejects_separator_bearing_segment_before_client() -> None:
+    client_factory_called = False
+
+    def client_factory(_url: str) -> FakeClient:
+        nonlocal client_factory_called
+        client_factory_called = True
+        raise AssertionError("invalid business segment must fail before client")
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "draft-bind-object",
+            "od1-" + "1" * 32,
+            "--task-authority",
+            "da1-" + "2" * 40,
+            "--expected-revision",
+            "1",
+            "--object-path-segment",
+            r"\Actor-Mixer Hierarchy\Default Work Unit\Weapons",
+        ],
+        env={},
+        client_factory=client_factory,
+    )
+
+    assert exit_code == 2
+    assert payload["error_code"] == "GatewayInputError"
+    assert "literal name" in payload["message"]
+    assert client_factory_called is False
 EXPECTED_EXCLUDED_FUNCTION_URIS = frozenset(
     {
         "ak.wwise.ui.commands.register",

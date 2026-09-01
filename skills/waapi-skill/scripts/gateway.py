@@ -3347,6 +3347,8 @@ def _execute_gateway_unconstrained(
             preflight_typed_zero_input(args, env=source_env)
         if args.command in {"debug-wal-tree", "debug-validate-call"}:
             preflight_debug_read_input(args, env=source_env)
+        if args.command == "draft-bind-object":
+            preflight_business_object_binding_input(args)
         if args.command in OFFLINE_COMMANDS:
             payload = dispatch_offline_command(args, env=source_env)
             return finish(0 if payload.get("ok") else 2, payload)
@@ -16344,6 +16346,13 @@ def _business_object_path_from_segments(values: Any) -> str:
             "Business object path segments exceed the fixed path byte limit."
         )
     return path
+
+
+def preflight_business_object_binding_input(args: argparse.Namespace) -> None:
+    """Reject malformed business identity input before opening a live client."""
+
+    if args.object_path_segment is not None:
+        _business_object_path_from_segments(args.object_path_segment)
 
 
 @dataclass(frozen=True, slots=True)
