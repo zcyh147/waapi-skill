@@ -3443,6 +3443,65 @@ def completed_command_records(
     return tuple(records)
 
 
+_BUSINESS_DRAFT_NEXT_ACTION_CONTRACT = (
+    "waapi-skill.business-draft-next-action/v1"
+)
+_BUSINESS_DRAFT_COPY_INSTRUCTION_CONTRACT = (
+    "waapi-skill.operation-draft-command-copy-instruction/v1"
+)
+_BUSINESS_DRAFT_PREFIX_COPY_ACTION = (
+    "copy_verbatim_then_append_complete_typed_action_groups"
+)
+
+
+def _business_draft_continuation_candidates(
+    payload: Mapping[str, Any],
+) -> tuple[bool, tuple[tuple[str, str], ...]]:
+    """Return valid exact/prefix copies owned by one business continuation."""
+
+    found_contract = False
+    candidates: set[tuple[str, str]] = set()
+
+    def walk(value: Any, *, inside_business_binding: bool = False) -> None:
+        nonlocal found_contract
+        if isinstance(value, list):
+            for item in value:
+                walk(item, inside_business_binding=inside_business_binding)
+            return
+        if not isinstance(value, Mapping):
+            return
+        current_binding = inside_business_binding or (
+            value.get("contract") == _BUSINESS_DRAFT_NEXT_ACTION_CONTRACT
+        )
+        if value.get("contract") == _BUSINESS_DRAFT_NEXT_ACTION_CONTRACT:
+            found_contract = True
+        if current_binding:
+            instruction = value.get("fixed_argv_prefix_copy_instruction")
+            prefix = value.get("fixed_argv_prefix_copy")
+            if (
+                isinstance(prefix, str)
+                and prefix
+                and isinstance(instruction, Mapping)
+                and instruction.get("contract")
+                == _BUSINESS_DRAFT_COPY_INSTRUCTION_CONTRACT
+                and instruction.get("source_field") == "fixed_argv_prefix_copy"
+                and instruction.get("action") == _BUSINESS_DRAFT_PREFIX_COPY_ACTION
+            ):
+                candidates.add(("prefix", prefix))
+            exact = value.get("copy_command")
+            if (
+                isinstance(exact, str)
+                and exact
+                and value.get("copy_exactly") is True
+            ):
+                candidates.add(("exact", exact))
+        for item in value.values():
+            walk(item, inside_business_binding=current_binding)
+
+    walk(payload)
+    return found_contract, tuple(sorted(candidates))
+
+
 def gateway_continuation_binding_errors(
     command_records: Sequence[CodexCommandRecord | Mapping[str, Any]],
     broker_records: Sequence[Any],
@@ -3470,7 +3529,12 @@ def gateway_continuation_binding_errors(
     for index in range(1, len(broker_records)):
         prior_broker = broker_records[index - 1]
         prior_payload = _record_field(prior_broker, "payload")
-        if not isinstance(prior_payload, Mapping) or "next_command" not in prior_payload:
+        if not isinstance(prior_payload, Mapping):
+            continue
+        business_contract, business_candidates = (
+            _business_draft_continuation_candidates(prior_payload)
+        )
+        if "next_command" not in prior_payload and not business_contract:
             continue
         command_number = index + 1
         if index >= len(command_records) or index - 1 >= len(command_records):
@@ -3484,6 +3548,30 @@ def gateway_continuation_binding_errors(
             errors.append(
                 f"command {command_number}: prior Gateway output does not match Broker evidence"
             )
+            continue
+        if "next_command" not in prior_payload:
+            observed_command, _ = _raw_shell_tool_command(
+                current_command,
+                platform_name=active_platform,
+                windows_powershell_core_host=windows_powershell_core_host,
+            )
+            matches = {
+                command
+                for mode, command in business_candidates
+                if observed_command is not None
+                and (
+                    observed_command == command
+                    or (
+                        mode == "prefix"
+                        and observed_command.startswith(command + " ")
+                    )
+                )
+            }
+            if observed_command is None or len(matches) != 1:
+                errors.append(
+                    f"command {command_number}: Gateway business Draft "
+                    "continuation was not copied from its selected source field"
+                )
             continue
         selected = _selected_gateway_continuation(
             prior_payload.get("next_command"),

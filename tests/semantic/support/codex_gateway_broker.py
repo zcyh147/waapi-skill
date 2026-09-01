@@ -4002,22 +4002,6 @@ _BUSINESS_QUERY_SOURCE_OPTIONS = frozenset(
     }
 )
 _BUSINESS_QUERY_KIND_ALIASES = {"sound": "all-sounds"}
-_BUSINESS_KIND_DISPLAY_ALIASES = {
-    "Actor-Mixer": "actor-mixer",
-    "Blend Container": "blend-container",
-    "Music Playlist Container": "music-playlist-container",
-    "Music Segment": "music-segment",
-    "Music Switch Container": "music-switch-container",
-    "Music Track": "music-track",
-    "Random Container": "random-container",
-    "Sequence Container": "sequence-container",
-    "Sound SFX": "sound-sfx",
-    "Sound Voice": "sound-voice",
-    "Switch Container": "switch-container",
-    "Virtual Folder": "virtual-folder",
-}
-
-
 def _closed_business_literal_equivalent(
     step: ExpectedGatewayStep,
     index: int,
@@ -4031,17 +4015,7 @@ def _closed_business_literal_equivalent(
     prior = step.arguments[index - 1]
     if prior == "--meaning":
         return supplied.casefold() == expected.casefold()
-    if prior == "--kind":
-        return _BUSINESS_KIND_DISPLAY_ALIASES.get(supplied) == expected
-    if prior not in {"--path-segment", "--object-path-segment"}:
-        return False
-    if sum(value == prior for value in step.arguments[:index]) != 1:
-        return False
-    return (
-        not expected.startswith("\\")
-        and supplied == f"\\{expected}"
-        and not supplied.startswith("\\\\")
-    )
+    return False
 
 
 def _normalize_business_query_arguments(

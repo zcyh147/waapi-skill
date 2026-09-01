@@ -13,11 +13,15 @@ from tests.semantic.support.codex_harness import (
     CodexCliTask,
     CodexHarnessConfig,
     WindowsPowerShellCoreHost,
+    gateway_continuation_binding_errors,
     prepare_workspace_skill_install,
     recoverable_preprocess_attempt_indexes,
     semantic_task_developer_instructions,
 )
-from tests.semantic.support.codex_task_runner_v3 import _gateway_candidate_argvs
+from tests.semantic.support.codex_task_runner_v3 import (
+    _gateway_candidate_argvs,
+    _gateway_candidate_records,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -164,14 +168,36 @@ def run_business_agent_unit(
             alternate_skill_sources=(options.skill_source,),
             expected_wwise_version=unit.version,
         )
+        gateway_records = _gateway_candidate_records(
+            result,
+            skill_source=skill_install,
+            alternate_skill_sources=(options.skill_source,),
+            expected_wwise_version=unit.version,
+        )
         reconciliation = broker.reconcile(argvs)
+        continuation_errors = gateway_continuation_binding_errors(
+            gateway_records,
+            broker_evidence.accepted_records,
+            platform_name=(
+                "nt"
+                if options.windows_powershell_core_host is not None
+                else "posix"
+            ),
+            windows_powershell_core_host=(
+                options.windows_powershell_core_host
+            ),
+        )
 
     facts = result.command_facts
     gates = {
         "codex_exit_zero": result.exit_status == 0 and not result.timed_out,
         "fresh_thread": bool(result.thread_id),
         "broker_passed": broker_evidence.passed,
-        "exact_protocol": broker_evidence.passed and reconciliation.passed,
+        "exact_protocol": (
+            broker_evidence.passed
+            and reconciliation.passed
+            and not continuation_errors
+        ),
         "production_skill_read": facts.skill_read
         and set(facts.skill_read_files) == {"SKILL.md", "references/waapi-operate.md"},
         "no_unexpected_commands": _only_expected_business_commands(facts, argvs),

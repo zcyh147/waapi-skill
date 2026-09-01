@@ -100,27 +100,6 @@ from wwise_waapi.operation_composer import (
     ("subcommand", "arguments", "index", "supplied", "expected"),
     (
         (
-            "query-object",
-            ("--path-segment", "Actor-Mixer Hierarchy"),
-            1,
-            r"\Actor-Mixer Hierarchy",
-            "Actor-Mixer Hierarchy",
-        ),
-        (
-            "draft-bind-object",
-            ("--object-path-segment", "Actor-Mixer Hierarchy"),
-            1,
-            r"\Actor-Mixer Hierarchy",
-            "Actor-Mixer Hierarchy",
-        ),
-        (
-            "draft-declare-new",
-            ("--kind", "sound-sfx"),
-            1,
-            "Sound SFX",
-            "sound-sfx",
-        ),
-        (
             "draft-discover-fields",
             ("--meaning", "pitch"),
             1,
@@ -163,6 +142,45 @@ def test_closed_business_literal_equivalence_rejects_native_path_type_prefix() -
         3,
         "<Virtual Folder>Weapons",
         "Weapons",
+    ) is False
+
+
+@pytest.mark.parametrize(
+    ("subcommand", "arguments", "supplied", "expected"),
+    (
+        (
+            "query-object",
+            ("--path-segment", "Actor-Mixer Hierarchy"),
+            r"\Actor-Mixer Hierarchy",
+            "Actor-Mixer Hierarchy",
+        ),
+        (
+            "draft-bind-object",
+            ("--object-path-segment", "Actor-Mixer Hierarchy"),
+            r"\Actor-Mixer Hierarchy",
+            "Actor-Mixer Hierarchy",
+        ),
+        (
+            "draft-declare-new",
+            ("--kind", "sound-sfx"),
+            "Sound SFX",
+            "sound-sfx",
+        ),
+    ),
+)
+def test_closed_business_literal_equivalence_rejects_native_spellings(
+    subcommand: str,
+    arguments: tuple[str, ...],
+    supplied: str,
+    expected: str,
+) -> None:
+    step = ExpectedGatewayStep("step", subcommand, arguments)
+
+    assert broker_module._closed_business_literal_equivalent(
+        step,
+        1,
+        supplied,
+        expected,
     ) is False
 
 

@@ -483,6 +483,130 @@ def test_model_authored_command_without_prior_continuation_is_unchanged() -> Non
     ) == ()
 
 
+def _business_prefix_payload(copy_command: str) -> dict[str, object]:
+    return {
+        "draft": {
+            "next_action_binding": {
+                "contract": "waapi-skill.business-draft-next-action/v1",
+                "shell_tool_timeout_ms": 30_000,
+                "object_binding": {
+                    "by_path_segments": {
+                        "fixed_argv_prefix_copy": copy_command,
+                        "fixed_argv_prefix_copy_instruction": {
+                            "contract": (
+                                "waapi-skill.operation-draft-command-"
+                                "copy-instruction/v1"
+                            ),
+                            "source_field": "fixed_argv_prefix_copy",
+                            "action": (
+                                "copy_verbatim_then_append_complete_"
+                                "typed_action_groups"
+                            ),
+                            "forbidden_transformations": [
+                                "reconstruct",
+                                "shorten",
+                                "normalize",
+                                "substitute_path_segments",
+                                "select_another_field",
+                            ],
+                        },
+                        "append_repeated": [
+                            "--object-path-segment",
+                            "<literal-name>",
+                        ],
+                    }
+                },
+            }
+        }
+    }
+
+
+def test_business_draft_prefix_continuation_binds_exact_copied_bytes() -> None:
+    prefix = (
+        "python '/tmp/Skill Path/scripts/run.py' gateway.py draft-bind-object "
+        "od1-opaque --task-authority da1-opaque --expected-revision 1"
+    )
+    payload = _business_prefix_payload(prefix)
+    current = completed_record(
+        prefix + " --object-path-segment 'Actor-Mixer Hierarchy'",
+        {},
+    )
+
+    assert gateway_continuation_binding_errors(
+        (completed_record("python initial.py", payload), current),
+        (SimpleNamespace(payload=payload), SimpleNamespace(payload={})),
+        platform_name="posix",
+    ) == ()
+
+
+def test_business_draft_prefix_continuation_rejects_equivalent_requote() -> None:
+    prefix = (
+        "python '/tmp/Skill Path/scripts/run.py' gateway.py draft-bind-object "
+        "od1-opaque --task-authority da1-opaque --expected-revision 1"
+    )
+    payload = _business_prefix_payload(prefix)
+    reconstructed = (
+        'python "/tmp/Skill Path/scripts/run.py" gateway.py draft-bind-object '
+        "od1-opaque --task-authority da1-opaque --expected-revision 1 "
+        "--object-path-segment 'Actor-Mixer Hierarchy'"
+    )
+
+    errors = gateway_continuation_binding_errors(
+        (
+            completed_record("python initial.py", payload),
+            completed_record(reconstructed, {}),
+        ),
+        (SimpleNamespace(payload=payload), SimpleNamespace(payload={})),
+        platform_name="posix",
+    )
+
+    assert errors == (
+        "command 2: Gateway business Draft continuation was not copied "
+        "from its selected source field",
+    )
+
+
+def test_windows_business_draft_prefix_rejects_equivalent_requote() -> None:
+    prefix_argv = (
+        "python",
+        TASK_LOCAL_RUNNER_WINDOWS,
+        "gateway.py",
+        "draft-bind-object",
+        "od1-opaque",
+        "--task-authority",
+        "da1-opaque",
+        "--expected-revision",
+        "1",
+    )
+    prefix = encode_windows_model_argv(prefix_argv)
+    payload = _business_prefix_payload(prefix)
+    reconstructed = (
+        prefix.removesuffix("'1'")
+        + "1 '--object-path-segment' 'Actor-Mixer Hierarchy'"
+    )
+
+    errors = gateway_continuation_binding_errors(
+        (
+            completed_windows_record(
+                windows_powershell_recording("python initial.py"),
+                payload,
+            ),
+            completed_windows_record(
+                windows_powershell_recording(reconstructed),
+                {},
+            ),
+        ),
+        (SimpleNamespace(payload=payload), SimpleNamespace(payload={})),
+        platform_name="nt",
+        windows_powershell_core_host=_WINDOWS_POWERSHELL_CORE_HOST,
+    )
+
+    assert errors == (
+        "command 2: Gateway business Draft continuation was not copied "
+        "from its selected source field",
+    )
+
+
 def passing_prompt_audit() -> codex_harness_module.CodexPromptAudit:
     return codex_harness_module.CodexPromptAudit(
         item_count=1,

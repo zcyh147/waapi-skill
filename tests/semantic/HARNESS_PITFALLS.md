@@ -1352,6 +1352,36 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   business declaration, while the Adapter constructs the complete typed Wwise
   path.
 
+### Business spelling equivalence can silently restore the native interface
+
+- Evidence: final #60 Spec review found that the Broker still credited
+  `Sound SFX` as the closed `sound-sfx` kind and a leading Wwise `\\` as the
+  same literal path segment. The resulting Gateway argv could be correct even
+  though the Agent had authored the native display type or path syntax that the
+  deep business interface intentionally removes.
+- Prevention: business-literal equivalence is limited to explicitly reviewed
+  business wording such as case-insensitive field meaning. Native Wwise type
+  labels, separators, angle-bracket type prefixes, wire tokens, scopes, and
+  complete request spellings receive no semantic credit. Test both the
+  production rejection and the Broker oracle; a stricter Gateway beside a
+  permissive oracle is still a false PASS path.
+
+### Argv equivalence is not continuation-copy evidence
+
+- Evidence: final #60 Spec review found that the shared business runner only
+  reconciled normalized argv. An Agent could therefore reconstruct an opaque
+  Draft id, authority, revision, runner path, or shell quoting and still match
+  the expected arguments without proving that it copied the unique
+  Gateway-issued continuation.
+- Prevention: every business runner also binds raw Codex command records to the
+  exact preceding Broker payload. The continuation verifier recursively
+  recognizes `waapi-skill.business-draft-next-action/v1`, selects exactly one
+  copy-ready prefix, and requires those UTF-8 bytes verbatim before any allowed
+  typed suffix. Equivalent re-quoting fails on both POSIX and native Windows.
+  Top-level `next_command` remains an exact whole-command copy. Normalized argv
+  reconciliation still proves semantics, but cannot replace either raw copy
+  proof.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:
