@@ -996,6 +996,157 @@ def test_gateway_rejects_invalid_existing_declaration_before_revision(
     assert inspected.composition["business_session"]["declarations"] == []
 
 
+def test_object_set_discovers_two_business_field_meanings_in_one_revision(
+    tmp_path: Path,
+) -> None:
+    start_code, started = _offline(tmp_path, "draft-start", "object.set")
+    assert start_code == 0, started
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    bind_client = _live_client(
+        tmp_path,
+        {
+            "ak.wwise.core.object.get": [
+                {
+                    "return": [
+                        {
+                            "id": PARENT_ID,
+                            "name": "",
+                            "type": "Action",
+                            "path": (
+                                r"\Events\Default Work Unit\Play_Rain"
+                                r"\[Play - Rain]"
+                            ),
+                        }
+                    ]
+                }
+            ]
+        },
+    )
+    bind_code, bound = gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(tmp_path / "state"),
+            "draft-bind-object",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            "1",
+            "--object-id",
+            PARENT_ID,
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda _url: bind_client,
+    )
+    assert bind_code == 0, bound
+    handle = bound["bound_object"]["handle"]
+    fade = {
+        "name": "FadeTime",
+        "type": "Real64",
+        "display": {"name": "Fade Time", "group": "Action"},
+        "supports": {"unlink": True},
+    }
+    delay = {
+        "name": "Delay",
+        "type": "Real64",
+        "display": {"name": "Delay", "group": "Action"},
+        "supports": {"unlink": True},
+    }
+    discovery_client = _live_client(
+        tmp_path,
+        {
+            "ak.wwise.core.object.getPropertyAndReferenceNames": [
+                {"return": ["FadeTime", "Delay"]},
+                {"return": ["FadeTime", "Delay"]},
+                {"return": ["FadeTime", "Delay"]},
+            ],
+            "ak.wwise.core.object.getPropertyInfo": [
+                fade,
+                delay,
+                fade,
+                delay,
+            ],
+        },
+    )
+
+    discover_code, discovered = gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(tmp_path / "state"),
+            "draft-discover-fields",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            "2",
+            "--object-handle",
+            handle,
+            "--meaning",
+            "Fade Time",
+            "--meaning",
+            "Delay",
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda _url: discovery_client,
+    )
+
+    assert discover_code == 0, discovered
+    assert discovered["meaning_count"] == 2
+    assert discovered["candidate_count"] == 2
+    assert discovered["selection_required"] is False
+    assert [row["meaning"] for row in discovered["meaning_results"]] == [
+        "Fade Time",
+        "Delay",
+    ]
+    assert [
+        row["candidates"][0]["label"]
+        for row in discovered["meaning_results"]
+    ] == ["Fade Time", "Delay"]
+    assert all(
+        row["candidate_count"] == 1
+        for row in discovered["meaning_results"]
+    )
+    rejected_client = _live_client(
+        tmp_path,
+        {
+            "ak.wwise.core.object.getPropertyAndReferenceNames": [
+                {"return": ["FadeTime", "Delay"]}
+            ],
+            "ak.wwise.core.object.getPropertyInfo": [fade, delay],
+        },
+    )
+    rejected_code, rejected = gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(tmp_path / "state"),
+            "draft-discover-fields",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            "3",
+            "--object-handle",
+            handle,
+            "--meaning",
+            "Fade Time",
+            "--meaning",
+            "Missing Field",
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda _url: rejected_client,
+    )
+
+    assert rejected_code == 2, rejected
+    assert "every requested meaning" in rejected["message"]
+    unchanged = OperationDraftStore(tmp_path / "state").inspect(
+        draft_id,
+        task_authority=authority,
+    )
+    assert unchanged.revision == 3
+    assert len(unchanged.composition["business_session"]["handles"]["fields"]) == 2
+
+
 def test_gateway_adds_subordinate_media_without_model_authored_json(
     tmp_path: Path,
 ) -> None:

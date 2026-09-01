@@ -224,7 +224,12 @@ def test_property_draft_discovers_opaque_field_and_materializes_business_value(
         indent=2,
     )
     assert discovered["candidate_count"] == 1
+    assert discovered["meaning_count"] == 1
+    assert discovered["selection_required"] is False
+    assert discovered["meaning_results"][0]["meaning"] == "volume"
+    assert discovered["meaning_results"][0]["candidate_count"] == 1
     candidate = discovered["field_candidates"][0]
+    assert discovered["meaning_results"][0]["candidates"] == [candidate]
     assert candidate["label"] == "Volume"
     assert candidate["field_kind"] == "property"
     assert candidate["value_type"] == "number"

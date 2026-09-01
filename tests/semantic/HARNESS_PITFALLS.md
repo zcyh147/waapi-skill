@@ -1814,6 +1814,21 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   equivalents of native `ActionType`/`Target` and reject conflicting dual
   aliases.
 
+### Draft field discovery is a bounded batch, not one command per meaning
+
+- Evidence: #51 `f0d1945` r10 macOS and native Windows both completed and
+  verified the Weather import transaction, then issued one legitimate
+  `draft-discover-fields` command for the first Action with repeated meanings
+  `Fade Time` and `Delay`. The production parser and live discovery already
+  accepted repeated `--meaning`, but the formal Broker protocol still expected
+  ten legacy single-meaning commands and rejected the batch before Gateway.
+- Prevention: expose `append_repeated` with 1..8 distinct bounded meanings,
+  return ordered `meaning_results` with bounded candidates per input, and make
+  the formal object.set protocol discover all requested fields for one bound
+  object in one Draft revision. Broker and runtime tests must exercise the same
+  repeated-meaning command on both shell families; do not repair this by asking
+  the Agent to split an otherwise closed batch into more commands.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:

@@ -6130,8 +6130,16 @@ def _two_target_object_set_request() -> dict[str, object]:
 def test_object_set_field_discovery_can_follow_its_bound_target_early(
     tmp_path: Path,
 ) -> None:
+    request = _two_target_object_set_request()
+    arguments = request["arguments"]
+    assert isinstance(arguments, dict)
+    objects = arguments["objects"]
+    assert isinstance(objects, list) and isinstance(objects[0], dict)
+    properties = objects[0]["properties"]
+    assert isinstance(properties, list)
+    properties.append({"name": "Delay", "value": 0.25})
     steps = build_object_graph_business_transaction_steps(
-        _two_target_object_set_request(),
+        request,
         label="tx01",
     )
     broker = CodexGatewayBroker(
@@ -6164,6 +6172,7 @@ def test_object_set_field_discovery_can_follow_its_bound_target_early(
         return argument
 
     actual = tuple(resolve(argument) for argument in rebased.arguments)
+    assert actual.count("--meaning") == 2
 
     selected = broker._match_dependency_ready_business_setup_step(  # noqa: SLF001
         (discovery.subcommand, *actual)
@@ -6227,6 +6236,9 @@ def test_object_set_declaration_can_follow_its_ready_bindings_early(
     broker._payloads_by_step[discovery.name] = {  # noqa: SLF001
         "draft": {"draft_id": draft_id, "revision": 3},
         "field_candidates": [{"handle": "bfh1-" + "4" * 32}],
+        "meaning_results": [
+            {"candidates": [{"handle": "bfh1-" + "4" * 32}]}
+        ],
     }
     broker._next_step += 1  # noqa: SLF001
 

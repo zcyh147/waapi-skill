@@ -188,6 +188,15 @@ def object_graph_business_contract_data(
                 "fields": "live_discovered_field_handles",
                 "long_tail_types": "live_discovered_type_handles",
             },
+            "field_discovery": {
+                "subcommand": "draft-discover-fields",
+                "input": "one_to_eight_distinct_user_facing_meanings",
+                "scope": "one_bound_target_or_declared_semantic_kind",
+                "result": (
+                    "one_ordered_meaning_result_with_bounded_candidates_per_input"
+                ),
+                "native_property_or_reference_token": "forbidden",
+            },
             "declaration": {
                 "subcommands": ["draft-declare-existing", "draft-declare-new"],
                 "existing_required_fields": ["object_handle"],

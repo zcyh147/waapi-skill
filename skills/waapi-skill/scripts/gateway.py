@@ -17077,6 +17077,25 @@ def dispatch_business_field_discovery(
 ) -> dict[str, Any]:
     """Bind bounded live candidates without accepting a model-authored token."""
 
+    meanings = tuple(args.meanings)
+    if (
+        not 1 <= len(meanings) <= MAX_METADATA_DISCOVERY_QUERIES
+        or any(
+            not isinstance(value, str)
+            or not value.strip()
+            or value != value.strip()
+            or len(value) > MAX_METADATA_DISCOVERY_QUERY_CHARS
+            for value in meanings
+        )
+        or len({" ".join(value.split()).casefold() for value in meanings})
+        != len(meanings)
+        or sum(len(value) for value in meanings)
+        > MAX_METADATA_DISCOVERY_TOTAL_QUERY_CHARS
+    ):
+        raise GatewayInputError(
+            "Business field meanings must be 1..8 distinct bounded search phrases"
+        )
+
     binding = _open_business_binding(
         args,
         env=env,
@@ -17152,7 +17171,7 @@ def dispatch_business_field_discovery(
     )
     discovery = discover_metadata(
         read_call=read_call,
-        queries=tuple(args.meanings),
+        queries=meanings,
         **discovery_scope,
         limit=MAX_METADATA_DISCOVERY_LIMIT,
     )
@@ -17214,6 +17233,23 @@ def dispatch_business_field_discovery(
         raise GatewayInputError(
             "Live field discovery found no candidate compatible with this operation"
         )
+    missing_meanings = [
+        meaning
+        for meaning in meanings
+        if not any(
+            any(
+                isinstance(matched, str)
+                and " ".join(matched.split()).casefold()
+                == " ".join(meaning.split()).casefold()
+                for matched in candidate.get("matched_queries", [])
+            )
+            for candidate in eligible
+        )
+    ]
+    if missing_meanings:
+        raise GatewayInputError(
+            "Live field discovery found no compatible candidate for every requested meaning"
+        )
 
     captured: list[Any] = []
     rejected: list[Mapping[str, Any]] = []
@@ -17242,6 +17278,21 @@ def dispatch_business_field_discovery(
                     }
                 )
         if not captured:
+            raise rejected_errors[0]
+        captured_tokens = {bound.token for bound in captured}
+        if any(
+            not any(
+                str(candidate.get("name")) in captured_tokens
+                and any(
+                    isinstance(matched, str)
+                    and " ".join(matched.split()).casefold()
+                    == " ".join(meaning.split()).casefold()
+                    for matched in candidate.get("matched_queries", [])
+                )
+                for candidate in eligible
+            )
+            for meaning in meanings
+        ):
             raise rejected_errors[0]
         return current.with_handle_registry(handles)
 
@@ -17290,6 +17341,28 @@ def dispatch_business_field_discovery(
                 "matched_meanings": list(candidate.get("matched_queries", [])),
             }
         )
+    meaning_results: list[dict[str, Any]] = []
+    for meaning in meanings:
+        matching = [
+            candidate
+            for candidate in field_candidates
+            if any(
+                isinstance(matched, str)
+                and " ".join(matched.split()).casefold()
+                == " ".join(meaning.split()).casefold()
+                for matched in candidate["matched_meanings"]
+            )
+        ]
+        meaning_results.append(
+            {
+                "meaning": meaning,
+                "candidates": matching,
+                "candidate_count": len(matching),
+            }
+        )
+    selection_required = any(
+        result["candidate_count"] != 1 for result in meaning_results
+    )
     payload = operation_draft_payload(
         args.command,
         record,
@@ -17304,9 +17377,13 @@ def dispatch_business_field_discovery(
             "project_call": dispatch_call_summary(binding.project_call),
             "field_candidates": field_candidates,
             "candidate_count": len(field_candidates),
+            "meaning_results": meaning_results,
+            "meaning_count": len(meaning_results),
             "rejected_candidate_count": len(rejected),
-            "selection_required": True,
-            "selection_rule": "copy_one_returned_field_candidate.handle",
+            "selection_required": selection_required,
+            "selection_rule": (
+                "copy_exactly_one_candidate.handle_per_requested_meaning"
+            ),
         }
     )
     return payload
@@ -23423,13 +23500,20 @@ def _business_next_action_binding(
             "append": [
                 "--object-handle",
                 "<bound-field-owner-handle>",
-                "--meaning",
-                "<user-facing-field-meaning>",
                 "[--platform <exact-user-requested-platform>]",
             ],
-            "result": "copy_one_returned_field_candidate.handle",
+            "append_repeated": [
+                "--meaning",
+                "<user-facing-field-meaning>",
+            ],
+            "meaning_count": (
+                f"1..{MAX_METADATA_DISCOVERY_QUERIES}_distinct_meanings"
+            ),
+            "result": (
+                "copy_exactly_one_meaning_results[].candidates[].handle_"
+                "per_requested_meaning"
+            ),
             "token_input": "forbidden",
-            "repeat_when_multiple_business_fields_are_requested": True,
         }
         if session is None and roles:
             return {
@@ -24186,9 +24270,14 @@ def _business_next_action_binding(
                 "append": [
                     "--type-handle",
                     "<selected-plugin-type-handle>",
+                ],
+                "append_repeated": [
                     "--meaning",
                     "<user-facing-plugin-property-meaning>",
                 ],
+                "meaning_count": (
+                    f"1..{MAX_METADATA_DISCOVERY_QUERIES}_distinct_meanings"
+                ),
                 "use_only_when": "the_user_requested_plugin_properties",
                 "token_input": "forbidden",
             }
@@ -24269,10 +24358,17 @@ def _business_next_action_binding(
                             "<selected-type-handle>",
                         ],
                     },
-                    "append": [
+                    "append_repeated": [
                         "--meaning",
                         "<user-facing-field-meaning>",
                     ],
+                    "meaning_count": (
+                        f"1..{MAX_METADATA_DISCOVERY_QUERIES}_distinct_meanings"
+                    ),
+                    "result": (
+                        "copy_exactly_one_meaning_results[].candidates[].handle_"
+                        "per_requested_meaning"
+                    ),
                     "token_input": "forbidden",
                 },
                 "type_discovery": {
@@ -24434,10 +24530,13 @@ def _business_next_action_binding(
                     "<selected-type-handle>",
                 ],
             },
-            "append": [
+            "append_repeated": [
                 "--meaning",
                 "<user-facing-field-meaning>",
             ],
+            "meaning_count": (
+                f"1..{MAX_METADATA_DISCOVERY_QUERIES}_distinct_meanings"
+            ),
             "use_only_when": "the_user_requested_custom_properties_or_references",
             "token_input": "forbidden",
         }

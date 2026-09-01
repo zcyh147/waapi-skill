@@ -468,11 +468,12 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
         for step in protocol.steps
         if step.name.startswith("tx02.discover-field-")
     ]
-    assert len(action_disclosures) == 10
+    assert len(action_disclosures) == 5
     assert all(
         step.subcommand == "draft-discover-fields"
         for step in action_disclosures
     )
+    assert all(step.arguments.count("--meaning") == 2 for step in action_disclosures)
     action_declarations = [
         step
         for step in protocol.steps

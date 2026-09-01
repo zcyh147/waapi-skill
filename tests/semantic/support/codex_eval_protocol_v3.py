@@ -1427,6 +1427,7 @@ def _build_object_set_business_transaction_steps(
         properties = row.get("properties", [])
         if not isinstance(properties, list):
             raise V3ProtocolError("object set properties must be an array")
+        pending_names: list[str] = []
         for prop in properties:
             if (
                 not isinstance(prop, Mapping)
@@ -1443,25 +1444,35 @@ def _build_object_set_business_transaction_steps(
             )
             if key in field_handles:
                 continue
-            step_name = f"{label}.discover-field-{len(field_handles) + 1:02d}"
+            pending_names.append(name)
+        if pending_names:
+            step_name = f"{label}.discover-field-{item['index']:02d}"
+            discovery_arguments: list[Any] = [
+                *draft.prefix(),
+                "--object-handle",
+                item["target"],
+            ]
+            for name in pending_names:
+                discovery_arguments.extend(("--meaning", name.casefold()))
             steps.append(
                 ExpectedGatewayStep(
                     name=step_name,
                     subcommand="draft-discover-fields",
-                    arguments=(
-                        *draft.prefix(),
-                        "--object-handle",
-                        item["target"],
-                        "--meaning",
-                        name.casefold(),
-                    ),
+                    arguments=tuple(discovery_arguments),
                 )
             )
             draft.advance(step_name)
-            field_handles[key] = ResponseBinding(
-                step_name,
-                "/field_candidates/0/handle",
-            )
+            for meaning_index, name in enumerate(pending_names):
+                key = (
+                    _business_selector_key(
+                        row["object"], subject="object set"
+                    ),
+                    name,
+                )
+                field_handles[key] = ResponseBinding(
+                    step_name,
+                    f"/meaning_results/{meaning_index}/candidates/0/handle",
+                )
 
     native_kind = {
         "ActorMixer": "actor-mixer",
