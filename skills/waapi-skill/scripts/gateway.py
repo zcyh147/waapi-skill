@@ -21201,6 +21201,52 @@ def _query_business_continuations(
 
     relationships = tuple(getattr(args, "relationships", ()) or ())
     exact_source = args.path is not None or args.object_id is not None
+    if (
+        getattr(args, "business_view", None) == "sound-routing-diagnostics"
+        and len(rows) == 1
+    ):
+        source = rows[0].get("active_source")
+        bus = rows[0].get("output_bus")
+        source_id = source.get("id") if isinstance(source, Mapping) else None
+        bus_id = bus.get("id") if isinstance(bus, Mapping) else None
+        continuations: list[dict[str, Any]] = []
+        if _canonical_guid(source_id):
+            continuations.append(
+                {
+                    "purpose": "read the exact active source file and language",
+                    "source_id": source_id,
+                    "next_command": transaction_next_command(
+                        "query-object",
+                        [
+                            "query-object",
+                            "--exact-id",
+                            source_id,
+                            "--include",
+                            "original-file-path",
+                            "--include",
+                            "source-language",
+                        ],
+                    ),
+                }
+            )
+        if _canonical_guid(bus_id):
+            continuations.append(
+                {
+                    "purpose": "read the exact output Bus volume",
+                    "output_bus_id": bus_id,
+                    "next_command": transaction_next_command(
+                        "query-object",
+                        [
+                            "query-object",
+                            "--exact-id",
+                            bus_id,
+                            "--include",
+                            "volume-db",
+                        ],
+                    ),
+                }
+            )
+        return continuations
     if not relationships and exact_source and len(rows) == 1:
         event_id = rows[0].get("id")
         if rows[0].get("type") == "Event" and _canonical_guid(event_id):

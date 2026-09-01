@@ -146,6 +146,29 @@ def test_heavy_run_config_records_readiness_timeout(tmp_path: Path) -> None:
     assert config["wwise_readiness_timeout_seconds"] == 180.0
 
 
+def test_public_integration_delegates_first_use_prose_to_dedicated_profile(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        matrix,
+        "resolve_codex_binary",
+        lambda _value: Path("/synthetic-host/codex"),
+    )
+
+    options = matrix.parse_args(
+        [
+            "--profile",
+            matrix.INTEGRATION_PROFILE_ID,
+            "--model",
+            "gpt-5.6-terra",
+            "--service-tier",
+            "default",
+        ]
+    )
+
+    assert options.require_first_use_intro is False
+
+
 @pytest.mark.parametrize("forbidden", [("--offline-only",), ("--pair-id", "pair-1")])
 def test_parse_args_rejects_v2_only_filters_for_heavy_profile(
     forbidden: tuple[str, ...],

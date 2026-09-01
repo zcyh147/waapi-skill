@@ -4103,6 +4103,28 @@ def test_query_object_sound_routing_view_owns_projection_and_business_keys(
             "OutputBus",
         ]
     }
+    assert [row["next_command"]["gateway_argv"] for row in payload["continuations"]] == [
+        [
+            "query-object",
+            "--exact-id",
+            active_source["id"],
+            "--include",
+            "original-file-path",
+            "--include",
+            "source-language",
+        ],
+        [
+            "query-object",
+            "--exact-id",
+            output_bus["id"],
+            "--include",
+            "volume-db",
+        ],
+    ]
+    assert all(
+        row["next_command"]["command"] == "query-object"
+        for row in payload["continuations"]
+    )
 
 
 @pytest.mark.parametrize(

@@ -1899,6 +1899,28 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   exact returned fields remain sealed; partial or extra projections remain
   failures.
 
+### Public integration is a Wwise outcome gate, not a repeated prose gate
+
+- Evidence: #61 r16 macOS Weather produced the correct import Preview and
+  passed its exact command/transaction gates, but the runner aborted after turn
+  one because the natural reply omitted the word naming the Skill. The public
+  workflow never reached its later state assertions.
+- Prevention: public `integration` delegates first-use introduction wording to
+  the dedicated semantic profiles, as the 19-case deep-business acceptance
+  already does. It still seals `session_context`, first Gateway use, every
+  command, Preview, execute, and Wwise state oracle; only prose omission stops
+  aborting an otherwise correct multi-turn workflow.
+
+### A Sound routing view should disclose its exact read-only next hops
+
+- Evidence: #61 r16 Alarm returned exact `active_source` and `output_bus` GUIDs,
+  but no continuations. The Agent issued a bare source identity read, which was
+  insufficient for the file/language diagnostic.
+- Prevention: `sound-routing-diagnostics` returns two bounded copy-ready reads:
+  active-source original file plus language, and output-Bus volume. They remain
+  ordinary exact-ID business queries and the oracle still rejects missing,
+  extra, or contradictory fields.
+
 ### Draft field discovery is a bounded batch, not one command per meaning
 
 - Evidence: #51 `f0d1945` r10 macOS and native Windows both completed and

@@ -4302,6 +4302,10 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
             args.wwise_readiness_timeout
         ),
         windows_powershell_core_host=windows_powershell_core_host,
+        # Public integration acceptance grades cross-operation Wwise outcomes.
+        # First-use prose remains a dedicated semantic-profile requirement and
+        # must not abort a correct multi-turn workflow before its state oracle.
+        require_first_use_intro=not is_integration,
     )
 
 
