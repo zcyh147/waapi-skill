@@ -706,6 +706,15 @@ def test_deep_business_summary_accepts_the_same_wrapper_metadata(
     )
 
 
+def test_deep_business_protocol_validation_unwraps_the_component_unit() -> None:
+    component = SimpleNamespace(operation="ui.commands.execute")
+    wrapper = SimpleNamespace(component_unit=component)
+    ordinary = SimpleNamespace(operation="object.setNotes")
+
+    assert campaign._business_agent_protocol_unit(wrapper) is component  # noqa: SLF001
+    assert campaign._business_agent_protocol_unit(ordinary) is ordinary  # noqa: SLF001
+
+
 def test_archived_business_replay_rebinds_check_to_latest_batch_revision(
     tmp_path: Path,
 ) -> None:

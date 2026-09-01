@@ -3264,6 +3264,7 @@ def _validate_business_agent_outcome(
     scenario_root: Path,
     options: CampaignOptions,
 ) -> None:
+    protocol_unit = _business_agent_protocol_unit(expected_unit)
     expected_keys = {
         "contract",
         "scenario_id",
@@ -3345,17 +3346,24 @@ def _validate_business_agent_outcome(
         if profile == AUDIO_IMPORT_BUSINESS_PROFILE_ID:
             _validate_audio_import_business_agent_protocol(
                 broker,
-                expected_unit=expected_unit,
+                expected_unit=protocol_unit,
                 scenario_root=scenario_root,
                 protocol_manifest_revision=options.protocol_manifest_revision,
             )
         else:
             _validate_bound_business_agent_protocol(
                 broker,
-                expected_unit=expected_unit,
+                expected_unit=protocol_unit,
                 profile=profile,
                 scenario_root=scenario_root,
             )
+
+
+def _business_agent_protocol_unit(expected_unit: Any) -> Any:
+    """Return the sealed component unit behind a deep-acceptance wrapper."""
+
+    component = getattr(expected_unit, "component_unit", None)
+    return expected_unit if component is None else component
 
 
 def _validate_audio_import_business_agent_outcome(
