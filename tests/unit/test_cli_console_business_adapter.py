@@ -161,6 +161,7 @@ def test_every_cli_console_lane_has_one_deep_business_entry(
 
 def test_cli_console_schema_discloses_every_closed_scalar_choice() -> None:
     expected = {
+        "soundbank_scope": ["all", "selected"],
         "verbosity": ["normal", "quiet", "verbose"],
         "source_control": ["disabled", "enabled"],
         "wwise_dat": ["omit", "write"],
@@ -182,6 +183,21 @@ def test_cli_console_schema_discloses_every_closed_scalar_choice() -> None:
                     disclosed[field] = choices
 
     assert disclosed == expected
+
+
+def test_generate_soundbank_scope_is_explicit_and_gateway_owned() -> None:
+    contract = cli_console_business_contract_data(
+        "ak.wwise.cli.generateSoundbank",
+        "2025.1",
+    )["declaration"]
+
+    assert "soundbank_scope" in contract["required_fields"]
+    assert contract["input_forms"]["soundbank_scope"] == {
+        "flag": "--value",
+        "arguments": ["soundbank_scope", "<value>"],
+        "repeatable": False,
+        "choices": ["all", "selected"],
+    }
 
 
 @pytest.mark.parametrize(
@@ -206,6 +222,8 @@ def test_every_cli_console_lane_materializes_one_schema_valid_request(
         plan["project_file"] = str(project)
     if operation == "ak.wwise.cli.addNewPlatform":
         plan.update(base_platform="Windows", platform_name="Windows_Test")
+    elif operation == "ak.wwise.cli.generateSoundbank":
+        plan["soundbank_scope"] = "all"
     elif operation == "ak.wwise.cli.dumpObjects":
         plan["output_file"] = str(tmp_path / "对象.txt")
     elif operation == "ak.wwise.cli.tabDelimitedImport":
@@ -379,6 +397,7 @@ def test_cli_console_plan_command_records_only_high_level_business_fields(
             "--task-authority", started["task_authority"],
             "--expected-revision", "1",
             "--value", "project_file", str(client.project_file),
+            "--value", "soundbank_scope", "selected",
             "--item", "soundbanks", "Weather",
             "--item", "platforms", "Windows",
             "--value", "verbosity", "quiet",
@@ -402,6 +421,7 @@ def test_cli_console_plan_command_records_only_high_level_business_fields(
     )
     assert session.settings["cli_console_plan"] == {
         "project_file": str(client.project_file),
+        "soundbank_scope": "selected",
         "soundbanks": ["Weather"],
         "platforms": ["Windows"],
         "verbosity": "quiet",
@@ -461,9 +481,10 @@ def test_cli_console_plan_rejects_collection_above_fixed_ceiling(
             "ak.wwise.cli.generateSoundbank",
             _session(
                 "2025.1",
-                {
-                    "project_file": str(tmp_path / "Project.wproj"),
-                    "soundbanks": [
+                    {
+                        "project_file": str(tmp_path / "Project.wproj"),
+                        "soundbank_scope": "selected",
+                        "soundbanks": [
                         f"Bank_{index}"
                         for index in range(MAX_CLI_CONSOLE_COLLECTION_ITEMS + 1)
                     ],
@@ -508,6 +529,7 @@ def test_cli_console_hostile_windows_business_values_round_trip_as_argv_data() -
     namespace = argparse.Namespace(
         value=[
             ["project_file", project],
+            ["soundbank_scope", "selected"],
             ["external_source_output_directory", output],
             ["verbosity", "quiet"],
         ],
@@ -595,9 +617,10 @@ def test_generate_soundbank_plan_derives_flags_mappings_and_modes(tmp_path) -> N
         "ak.wwise.cli.generateSoundbank",
         _session(
             "2025.1",
-            {
-                "project_file": str(project),
-                "soundbanks": ["Weather", "Music"],
+                {
+                    "project_file": str(project),
+                    "soundbank_scope": "selected",
+                    "soundbanks": ["Weather", "Music"],
                 "platforms": ["Windows", "Mac"],
                 "languages": ["English(US)"],
                 "definition_files": [str(definition)],
@@ -653,9 +676,10 @@ def test_generate_soundbank_keeps_relative_native_output_below_gateway_root(
         "ak.wwise.cli.generateSoundbank",
         _session(
             "2025.1",
-            {
-                "project_file": str(project),
-                "soundbank_directories_by_platform": [
+                {
+                    "project_file": str(project),
+                    "soundbank_scope": "all",
+                    "soundbank_directories_by_platform": [
                     ["Windows", "GeneratedSoundBanks/Windows"],
                 ],
             },
@@ -668,6 +692,44 @@ def test_generate_soundbank_keeps_relative_native_output_below_gateway_root(
     ]
     assert request["arguments"]["io_root"] == str(tmp_path)
     parse_operation_request(request, expected_version="2025.1")
+
+
+def test_generate_soundbank_all_scope_omits_native_bank_selector(tmp_path: Path) -> None:
+    request = materialize_cli_console_business_request(
+        "ak.wwise.cli.generateSoundbank",
+        _session(
+            "2025.1",
+            {
+                "project_file": str(tmp_path / "Project.wproj"),
+                "soundbank_scope": "all",
+            },
+        ),
+    )
+
+    assert "bank" not in request["arguments"]["args"]
+
+
+@pytest.mark.parametrize(
+    "plan",
+    (
+        {"soundbank_scope": "all", "soundbanks": ["Weather"]},
+        {"soundbank_scope": "selected"},
+    ),
+)
+def test_generate_soundbank_scope_rejects_ambiguous_selection(
+    tmp_path: Path,
+    plan: dict[str, object],
+) -> None:
+    with pytest.raises(BusinessDeclarationError) as caught:
+        materialize_cli_console_business_request(
+            "ak.wwise.cli.generateSoundbank",
+            _session(
+                "2025.1",
+                {"project_file": str(tmp_path / "Project.wproj"), **plan},
+            ),
+        )
+
+    assert caught.value.details["field"] == "soundbanks"
 
 
 def test_waapi_server_plan_joins_closed_allow_lists_and_derives_controls(

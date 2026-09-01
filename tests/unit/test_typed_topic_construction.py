@@ -502,6 +502,34 @@ def test_soundbank_topic_schema_exposes_closed_business_shortcuts(
         "match_platform_name": "--match-platform-name <exact-name>",
         "match_soundbank_name": "--match-soundbank-name <exact-name>",
     }
+    encoded = gateway.gateway_stdout_json_encoder(payload).encode(payload)
+    assert len(encoded.encode("utf-8")) <= 8 * 1024
+    assert payload["business_input"]["event_rows"]["rows"] == []
+    assert payload["business_input"]["event_rows"]["catalog_count"] > 0
+    assert payload["business_input"]["exact_entries"]["rows"] == []
+    assert payload["business_input"]["exact_entries"]["catalog_count"] > 0
+    assert payload["continuation"]["advanced_field_catalog"] == (
+        "topic-schema <topic-uri> --catalog"
+    )
+
+
+def test_soundbank_topic_schema_discloses_long_tail_catalog_only_on_request(
+    tmp_path: Path,
+) -> None:
+    code, payload = gateway.execute_gateway(
+        ["topic-schema", "ak.wwise.core.soundbank.generated", "--catalog"],
+        env=_env(tmp_path, "2025.1"),
+        client_factory=lambda url: pytest.fail(f"topic-schema connected to {url}"),
+    )
+
+    assert code == 0, payload
+    business = payload["business_input"]
+    assert len(business["event_rows"]["rows"]) == business["event_rows"][
+        "catalog_count"
+    ]
+    assert len(business["exact_entries"]["rows"]) == business["exact_entries"][
+        "catalog_count"
+    ]
 
 
 def test_soundbank_topic_business_shortcuts_compile_without_handles(

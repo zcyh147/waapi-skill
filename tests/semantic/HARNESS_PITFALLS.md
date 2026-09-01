@@ -1466,6 +1466,39 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   terminal stream record repeats the already bounded matched identity events in
   final `agent_result`. The live event records remain immediate and authoritative;
   the terminal handoff does not broaden fields, counts, or result limits.
+- Follow-up evidence: macOS #60 r44 repeated the real reporting error after the
+  terminal handoff existed: the complete command output contained two event
+  records plus terminal `agent_result.event_count=2`, while the final prose said
+  no event or terminal record was visible. The default SoundBank Topic schema
+  was still about 17 KiB before the stream transcript.
+- Further prevention: the fixed SoundBank shortcuts now receive a compact
+  default `topic-schema`; long-tail row and exact-entry catalogs require the
+  explicit progressive `--catalog` disclosure. For every successful stream,
+  terminal `agent_result` is the sole natural-language and machine-result
+  authority; a positive event count can never be reported as empty.
+
+### Natural discovery inference must follow the public first schema step
+
+- Evidence: macOS #60 r44's Audio Import Agent legally ran one `operations`
+  lookup, but the shared Fresh helper inferred the optional discovery only from
+  `unit.operation`. The import profile stores its route under `scenario.api`, so
+  the Broker rejected the lookup before Gateway dispatch while native Windows
+  passed the same case by skipping discovery.
+- Prevention: after building reviewed steps, derive the optional discovery
+  target from the exact first `operation-schema` or `request-schema` argument
+  when no explicit override exists. Profile dataclass layout is not part of the
+  public business seam.
+
+### “All SoundBanks” must be an explicit business value
+
+- Evidence: #60 r44 exposed both failure branches of an implicit interface.
+  macOS skipped discovery and invented the wrong CLI URI; native Windows found
+  the exact URI, then encoded “all” as a SoundBank literally named `all` because
+  the Gateway represented all banks only by omitting `soundbanks`.
+- Prevention: `ak.wwise.cli.generateSoundbank` requires
+  `soundbank_scope=all|selected`. `all` forbids a selected list and compiles to
+  no native Bank selector; `selected` requires one or more exact names/files.
+  Never make an Agent infer business meaning from a missing optional field.
 
 ### A sealed witness must use the public request's exact business keys
 

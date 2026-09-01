@@ -2065,6 +2065,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     topic_schema.add_argument("api")
     topic_schema.add_argument(
+        "--catalog",
+        action="store_true",
+        help=(
+            "Disclose the complete bounded complex row and exact-entry catalogs; "
+            "the SoundBank-generated shortcut view omits them by default"
+        ),
+    )
+    topic_schema.add_argument(
         "--row",
         help=(
             "Disclose the stable scalar fields for one business event-row "
@@ -8230,6 +8238,9 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 "event_match_field_disclosure": (
                     "topic-schema <topic-uri> --match-group <group>"
                 ),
+                "advanced_field_catalog": (
+                    "topic-schema <topic-uri> --catalog"
+                ),
                 "lifecycle": {
                     "wait-topic": "bounded; unsubscribe",
                     "stream-topic": (
@@ -8242,6 +8253,10 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 selected_entry=args.entry,
                 selected_match_group=args.match_group,
                 selected_row_field_group=args.row_field_group,
+                include_catalog=(
+                    args.catalog
+                    or args.api != SOUNDBANK_GENERATED_TOPIC_URI
+                ),
             ),
         }
         final_payload = attach_gateway_session_context(

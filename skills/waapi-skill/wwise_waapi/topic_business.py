@@ -258,6 +258,7 @@ class TopicBusinessContract:
         selected_entry: str | None = None,
         selected_match_group: str | None = None,
         selected_row_field_group: str | None = None,
+        include_catalog: bool = True,
     ) -> dict[str, Any]:
         """Return bounded native-handle-free field tables for the Gateway."""
 
@@ -322,11 +323,13 @@ class TopicBusinessContract:
                 self.row_fields,
                 selected_row=selected_row,
                 selected_field_group=selected_row_field_group,
+                include_catalog=include_catalog,
             ),
             "exact_entries": _gateway_entry_table(
                 self,
                 self.entry_fields,
                 selected_entry=selected_entry,
+                include_catalog=include_catalog,
             ),
         }
 
@@ -1696,6 +1699,7 @@ def _gateway_row_table(
     *,
     selected_row: str | None,
     selected_field_group: str | None,
+    include_catalog: bool,
 ) -> dict[str, Any]:
     table_rows = [
         [
@@ -1713,7 +1717,10 @@ def _gateway_row_table(
             "field_count",
             "field_digest",
         ],
-        "rows": table_rows,
+        "rows": table_rows if include_catalog else [],
+        "catalog_count": len(table_rows),
+        "catalog_digest": canonical_sha256(table_rows),
+        "catalog_disclosure": "topic-schema <topic-uri> --catalog",
         "field_disclosure": "topic-schema <topic-uri> --row <collection>",
     }
     if selected_row is not None:
@@ -1803,7 +1810,24 @@ def _gateway_entry_table(
     entries: Sequence[TopicBusinessEntryContract],
     *,
     selected_entry: str | None,
+    include_catalog: bool,
 ) -> dict[str, Any]:
+    table_rows = [
+        [
+            entry.token,
+            entry.index_depth,
+            (
+                "choice_on_disclosure"
+                if len(entry.accepted_value_kinds) > 1
+                else "gateway_derived"
+            ),
+            len(entry.object_fields),
+            len(entry.row_fields),
+            "exact-key" if entry._open_object_fields else "closed",
+            "exact-key" if entry._open_row_fields else "closed",
+        ]
+        for entry in entries
+    ]
     payload: dict[str, Any] = {
         "columns": [
             "scope",
@@ -1814,22 +1838,10 @@ def _gateway_entry_table(
             "object_field_mode",
             "row_field_mode",
         ],
-        "rows": [
-            [
-                entry.token,
-                entry.index_depth,
-                (
-                    "choice_on_disclosure"
-                    if len(entry.accepted_value_kinds) > 1
-                    else "gateway_derived"
-                ),
-                len(entry.object_fields),
-                len(entry.row_fields),
-                "exact-key" if entry._open_object_fields else "closed",
-                "exact-key" if entry._open_row_fields else "closed",
-            ]
-            for entry in entries
-        ],
+        "rows": table_rows if include_catalog else [],
+        "catalog_count": len(table_rows),
+        "catalog_digest": canonical_sha256(table_rows),
+        "catalog_disclosure": "topic-schema <topic-uri> --catalog",
         "key_ownership": "exact_user_artifact_or_expression",
         "field_disclosure": "topic-schema <topic-uri> --entry <scope>",
     }

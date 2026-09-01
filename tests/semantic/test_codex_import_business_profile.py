@@ -25,6 +25,9 @@ from tests.semantic.support.codex_import_business_agent_runner import (
     build_preview_only_business_steps,
     prepare_import_business_runtime,
 )
+from tests.semantic.support.codex_business_agent_runner import (
+    business_agent_optional_operations_discovery,
+)
 from tests.semantic.support.codex_prompt_provenance_v3 import serialize_protocol
 from tests.semantic.support.codex_gateway_broker import (
     DraftTypedActionArgument,
@@ -41,6 +44,25 @@ from tests.semantic.support.typed_gateway_input import (
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PROFILE = REPO_ROOT / "tests/semantic/data/audio-import-business/profile.json"
+
+
+def test_import_business_natural_intent_allows_one_exact_operations_lookup() -> None:
+    unit = load_import_business_profile(PROFILE).units[0]
+    steps = build_audio_import_composer_transaction_steps(
+        {
+            "contract": "waapi-skill.operation-request/v1",
+            "version": unit.version,
+            "operation": "audio.import",
+            "arguments": unit.transactions[0]["arguments"],
+        },
+        label="tx01",
+    )
+
+    assert business_agent_optional_operations_discovery(
+        unit,
+        explicit=None,
+        steps=steps,
+    ) == "audio.import"
 
 
 def test_real_gateway_adapter_follows_business_schema_start() -> None:

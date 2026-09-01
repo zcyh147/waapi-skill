@@ -12,6 +12,7 @@ VERSIONS_2022_PLUS = ("2022.1", "2023.1", "2024.1", "2025.1")
 VERSIONS_2023_PLUS = ("2023.1", "2024.1", "2025.1")
 
 CLI_CONSOLE_ENUM_CHOICES: dict[str, tuple[str, ...]] = {
+    "soundbank_scope": ("all", "selected"),
     "verbosity": ("normal", "quiet", "verbose"),
     "source_control": ("disabled", "enabled"),
     "wwise_dat": ("omit", "write"),
@@ -130,7 +131,7 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
     ),
     "ak.wwise.cli.generateSoundbank": _row(
         ALL_VERSIONS,
-        ("project_file",),
+        ("project_file", "soundbank_scope"),
         (
             "soundbanks",
             "platforms",
@@ -166,6 +167,7 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
         ),
         {
             **_COMMON_TYPES,
+            "soundbank_scope": "soundbank_scope",
             "soundbanks": "soundbank_name_or_exact_file_list",
             "platforms": "platform_name_list",
             "languages": "language_name_list",
@@ -442,6 +444,7 @@ _NATIVE_FIELD_OWNERSHIP: dict[str, dict[str, tuple[str, ...]]] = {
     },
     "ak.wwise.cli.generateSoundbank": {
         "project_file": ("project",),
+        "soundbank_scope": (),
         "soundbanks": ("bank",),
         "platforms": ("platform",),
         "languages": ("language",),

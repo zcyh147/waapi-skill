@@ -394,6 +394,14 @@ def test_query_reference_discloses_compact_success_and_explicit_detail() -> None
     assert "never rerun solely for detail" in skill_flat
 
 
+def test_topic_terminal_agent_result_is_authoritative_for_natural_answers() -> None:
+    query_flat = " ".join(QUERY.split())
+
+    assert "terminal `agent_result` is the sole event-result authority" in query_flat
+    assert "never report no events when its `event_count` is positive" in query_flat
+    assert "`topic-schema <topic-uri> --catalog`" in query_flat
+
+
 def test_small_complete_audit_uses_simple_inventory_before_report_rules() -> None:
     query_flat = " ".join(QUERY.split())
 

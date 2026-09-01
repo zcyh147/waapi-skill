@@ -117,6 +117,7 @@ def materialize_cli_console_business_request(
         plan,
         declaration["field_types"],
     )
+    _validate_operation_business_semantics(session, operation, normalized)
     native_args = _native_args(operation, normalized)
     try:
         io_root = _derive_io_root(operation, normalized)
@@ -163,6 +164,31 @@ def _validate_constraints(
                 action="choose only one disclosed alternative",
                 mutually_exclusive=group,
             )
+
+
+def _validate_operation_business_semantics(
+    session: BusinessDeclarationSession,
+    operation: str,
+    plan: Mapping[str, Any],
+) -> None:
+    if operation != "ak.wwise.cli.generateSoundbank":
+        return
+    scope = plan.get("soundbank_scope")
+    has_selected = "soundbanks" in plan
+    if scope == "all" and has_selected:
+        raise _repair(
+            session,
+            "INVALID_ARGUMENT",
+            field="soundbanks",
+            action="omit selected SoundBanks when soundbank_scope is all",
+        )
+    if scope == "selected" and not has_selected:
+        raise _repair(
+            session,
+            "INVALID_ARGUMENT",
+            field="soundbanks",
+            action="provide one or more exact SoundBank names or files",
+        )
 
 
 def _normalize_plan(

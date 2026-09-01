@@ -77,6 +77,7 @@ def cli_console_plan_from_namespace(
         "existing_platform_name",
         "console_verbosity",
         "source_control_policy",
+        "soundbank_scope",
         "wwise_dat_policy",
         "decoded_media_policy",
         "dump_content",

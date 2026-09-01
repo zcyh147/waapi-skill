@@ -108,7 +108,21 @@ def business_agent_optional_operations_discovery(
     if explicit is not None:
         return explicit
     operation = getattr(unit, "operation", None)
-    return operation if isinstance(operation, str) and operation else None
+    if isinstance(operation, str) and operation:
+        return operation
+    if steps:
+        first = steps[0]
+        arguments = getattr(first, "arguments", ())
+        if (
+            getattr(first, "subcommand", None)
+            in {"operation-schema", "request-schema"}
+            and isinstance(arguments, tuple)
+            and len(arguments) == 1
+            and isinstance(arguments[0], str)
+            and arguments[0]
+        ):
+            return arguments[0]
+    return None
 
 
 def run_business_agent_unit(
