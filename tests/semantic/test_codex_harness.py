@@ -2874,6 +2874,144 @@ def test_harness_verify_requires_exactly_one_installed_workspace_skill(tmp_path:
         harness.verify()
 
 
+def test_windows_console_utf8_preflight_sets_and_attests_both_code_pages() -> None:
+    class FakeConsoleApi:
+        def __init__(self) -> None:
+            self.input_code_page = 936
+            self.output_code_page = 936
+            self.calls: list[tuple[str, int]] = []
+
+        def GetConsoleCP(self) -> int:
+            return self.input_code_page
+
+        def GetConsoleOutputCP(self) -> int:
+            return self.output_code_page
+
+        def SetConsoleCP(self, value: int) -> int:
+            self.calls.append(("input", value))
+            self.input_code_page = value
+            return 1
+
+        def SetConsoleOutputCP(self, value: int) -> int:
+            self.calls.append(("output", value))
+            self.output_code_page = value
+            return 1
+
+    console = FakeConsoleApi()
+
+    result = codex_harness_module.enforce_windows_console_utf8(
+        platform_name="nt",
+        console_api=console,
+    )
+
+    assert result == (65001, 65001)
+    assert console.calls == [("input", 65001), ("output", 65001)]
+
+
+def test_windows_console_utf8_preflight_rolls_back_input_when_output_fails() -> None:
+    class FailingConsoleApi:
+        def __init__(self) -> None:
+            self.input_code_page = 936
+            self.calls: list[tuple[str, int]] = []
+
+        def GetConsoleCP(self) -> int:
+            return self.input_code_page
+
+        def GetConsoleOutputCP(self) -> int:
+            return 936
+
+        def SetConsoleCP(self, value: int) -> int:
+            self.calls.append(("input", value))
+            self.input_code_page = value
+            return 1
+
+        def SetConsoleOutputCP(self, value: int) -> int:
+            self.calls.append(("output", value))
+            return 0
+
+    console = FailingConsoleApi()
+
+    with pytest.raises(CodexHarnessError, match="output code page"):
+        codex_harness_module.enforce_windows_console_utf8(
+            platform_name="nt",
+            console_api=console,
+        )
+
+    assert console.input_code_page == 936
+    assert console.calls == [
+        ("input", 65001),
+        ("output", 65001),
+        ("input", 936),
+    ]
+
+
+def test_windows_console_utf8_preflight_fails_closed_on_readback_drift() -> None:
+    class LyingConsoleApi:
+        def GetConsoleCP(self) -> int:
+            return 936
+
+        def GetConsoleOutputCP(self) -> int:
+            return 936
+
+        def SetConsoleCP(self, _value: int) -> int:
+            return 1
+
+        def SetConsoleOutputCP(self, _value: int) -> int:
+            return 1
+
+    with pytest.raises(CodexHarnessError, match="attestation failed"):
+        codex_harness_module.enforce_windows_console_utf8(
+            platform_name="nt",
+            console_api=LyingConsoleApi(),
+        )
+
+
+def test_native_windows_harness_forces_utf8_console_before_pwsh_attestation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    binary = tmp_path / "codex.exe"
+    binary.write_bytes(b"synthetic")
+    binary.chmod(0o755)
+    auth = tmp_path / "auth.json"
+    auth.write_text("{}\n", encoding="utf-8")
+    source = tmp_path / "waapi-skill"
+    source.mkdir()
+    (source / "SKILL.md").write_text("skill\n", encoding="utf-8")
+    workspace = tmp_path / "workspace"
+    prepare_workspace_skill_install(workspace, source, platform_name="nt")
+    harness = CodexCliHarness(
+        CodexHarnessConfig(
+            workspace=workspace,
+            skill_source=source,
+            codex_binary=binary,
+            windows_powershell_core_host=_WINDOWS_POWERSHELL_CORE_HOST,
+            auth_json=auth,
+        )
+    )
+    calls: list[str] = []
+    monkeypatch.setattr(
+        codex_harness_module,
+        "_is_windows",
+        lambda platform_name=None: True,
+    )
+    monkeypatch.setattr(
+        codex_harness_module,
+        "enforce_windows_console_utf8",
+        lambda: calls.append("console") or (65001, 65001),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        codex_harness_module,
+        "discover_windows_powershell_core",
+        lambda **_kwargs: calls.append("pwsh") or _WINDOWS_POWERSHELL_CORE_HOST,
+    )
+
+    harness.verify()
+
+    assert calls == ["console", "pwsh"]
+
+
 def test_native_windows_harness_verify_fails_before_exec_without_attested_pwsh(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -2897,6 +3035,11 @@ def test_native_windows_harness_verify_fails_before_exec_without_attested_pwsh(
         )
     )
     monkeypatch.setattr(codex_harness_module, "_is_windows", lambda platform_name=None: True)
+    monkeypatch.setattr(
+        codex_harness_module,
+        "enforce_windows_console_utf8",
+        lambda: (65001, 65001),
+    )
     monkeypatch.setattr(
         codex_harness_module,
         "discover_windows_powershell_core",
@@ -2933,6 +3076,11 @@ def test_native_windows_harness_binds_and_revalidates_campaign_sealed_pwsh(
         )
     )
     monkeypatch.setattr(codex_harness_module, "_is_windows", lambda platform_name=None: True)
+    monkeypatch.setattr(
+        codex_harness_module,
+        "enforce_windows_console_utf8",
+        lambda: (65001, 65001),
+    )
     monkeypatch.setattr(
         codex_harness_module,
         "discover_windows_powershell_core",

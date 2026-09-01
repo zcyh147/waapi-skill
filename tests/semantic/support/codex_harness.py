@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ctypes
 import hashlib
 import json
 import os
@@ -44,6 +45,7 @@ DEFAULT_MODEL = "gpt-5.6-sol"
 DEFAULT_REASONING_EFFORT = "medium"
 DEFAULT_SERVICE_TIER = "priority"
 DEFAULT_TIMEOUT_SECONDS = 180.0
+WINDOWS_UTF8_CODE_PAGE = 65001
 SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
     "First read SKILL.md once, standalone. "
     "Read now; no pre-read reply/questions. "
@@ -787,6 +789,55 @@ def _is_windows(platform_name: str | None = None) -> bool:
 def _is_windows_platform(platform_name: str | None = None) -> bool:
     active = os.name if platform_name is None else str(platform_name)
     return active == "nt" or active.startswith("win")
+
+
+def enforce_windows_console_utf8(
+    *,
+    platform_name: str | None = None,
+    console_api: Any | None = None,
+) -> tuple[int, int] | None:
+    """Make every child Codex/pwsh console transport inherit UTF-8.
+
+    ``Get-Content -Encoding UTF8`` controls file decoding, not the encoding
+    used when PowerShell writes that text to an attached Windows console.  A
+    native Fresh task can otherwise inherit CP936 and archive mojibake even
+    though the exact read command succeeded.  Set and attest both directions
+    before launching any prompt audit or Codex task; byte-exact read grading
+    remains unchanged.
+    """
+
+    if not _is_windows(platform_name):
+        return None
+    if console_api is None:
+        try:
+            console_api = ctypes.windll.kernel32
+        except AttributeError as exc:  # pragma: no cover - native Windows only.
+            raise CodexHarnessError("Windows console API is unavailable") from exc
+
+    before_input = int(console_api.GetConsoleCP())
+    before_output = int(console_api.GetConsoleOutputCP())
+    if before_input != WINDOWS_UTF8_CODE_PAGE and not console_api.SetConsoleCP(
+        WINDOWS_UTF8_CODE_PAGE
+    ):
+        raise CodexHarnessError(
+            "Windows Fresh campaign could not set console input code page to UTF-8"
+        )
+    if before_output != WINDOWS_UTF8_CODE_PAGE and not console_api.SetConsoleOutputCP(
+        WINDOWS_UTF8_CODE_PAGE
+    ):
+        if before_input != WINDOWS_UTF8_CODE_PAGE:
+            console_api.SetConsoleCP(before_input)
+        raise CodexHarnessError(
+            "Windows Fresh campaign could not set console output code page to UTF-8"
+        )
+
+    current = (int(console_api.GetConsoleCP()), int(console_api.GetConsoleOutputCP()))
+    if current != (WINDOWS_UTF8_CODE_PAGE, WINDOWS_UTF8_CODE_PAGE):
+        raise CodexHarnessError(
+            "Windows Fresh campaign console code-page attestation failed: "
+            f"expected UTF-8/UTF-8, observed {current[0]}/{current[1]}"
+        )
+    return current
 
 
 @dataclass(frozen=True, slots=True)
@@ -1743,6 +1794,7 @@ class CodexCliHarness:
         if not auth.is_file():
             raise CodexHarnessError(f"Codex auth file is missing: {auth}")
         if _is_windows():
+            enforce_windows_console_utf8()
             discovered_host = discover_windows_powershell_core(
                 environment=os.environ,
                 platform_name="nt",
@@ -4882,6 +4934,7 @@ __all__ = [
     "completed_commands",
     "count_invalid_jsonl_lines",
     "discover_codex_binary",
+    "enforce_windows_console_utf8",
     "discover_windows_powershell_core",
     "discover_windows_user_skill_paths",
     "final_agent_message",

@@ -407,7 +407,9 @@ campaign seals its path, version, mode, and SHA-256, forces a profile-free shell
 and uses Broker-owned `python.ps1` / `python3.ps1` relays. Never restore the old
 `.cmd` relay: PowerShell intentionally uses legacy argument passing for batch
 files and can remove structural quotes from Gateway JSON before Broker
-authentication. Skill reads use the exact literal form
+authentication. Before PowerShell attestation or Codex launch, the native
+harness sets and reads back Console input and output code page 65001; a failure
+blocks before the Fresh turn. Skill reads use the exact literal form
 `Get-Content -Raw -Encoding UTF8 <path>` and receive credit only through the
 sealed PowerShell Core wrapper.
 

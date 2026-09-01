@@ -1194,6 +1194,27 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   normalized equality as the credit gate; a sentinel, exit code, or intact
   beginning and end does not prove an unabridged read.
 
+### Windows Console code page can corrupt a complete Skill read
+
+- Evidence: #60 exact candidate `a348da2` returned byte-identical Skill reads
+  in native-Windows r37, but r38 archived the same successful profile-free
+  `Get-Content -Raw -Encoding UTF8` commands with 89 replacement characters.
+  Both affected Agents still built the exact requested SoundBank Previews.
+  The failing `SKILL.md` projection was 45 characters longer than the sealed
+  source, with 22 mojibake replacement regions rather than an omitted slice.
+  An `InteractiveToken` / `Limited` desktop probe then reported Console input
+  and output code page 936 while PowerShell's `$OutputEncoding` was UTF-8.
+- Cause: `-Encoding UTF8` controls how PowerShell reads the file; it does not
+  set the attached Console transport used by every child process. Depending on
+  whether Codex received a pipe or Console path, the same Unicode text could be
+  emitted through CP936 and decoded as UTF-8.
+- Prevention: before PowerShell attestation or any Codex child launch, the
+  native Windows harness sets both Console input and output code pages to
+  65001 through WinAPI and reads both values back. Failure to set or attest
+  them blocks before the Fresh turn. Keep byte-normalized source equality as
+  the Skill-read credit gate; shrinking files, accepting mojibake, or merely
+  setting `$OutputEncoding` does not repair this transport boundary.
+
 ### Optional discovery and Composer setup may still complete out of recipe order
 
 - Evidence: #60 macOS r23 metadata completed its selected optional lane, but

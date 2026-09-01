@@ -752,6 +752,10 @@ PowerShell Core. The Skill requires exact
 `Get-Content -Raw -Encoding UTF8 <path>` reads. Evidence parsing accepts that
 form only from the sealed PowerShell Core wrapper, normalizes line endings, and
 tolerates only the single terminal newline added to otherwise complete text.
+Before PowerShell attestation or Codex launch, the native harness also sets and
+reads back Console input and output code page 65001. This is distinct from
+PowerShell's `$OutputEncoding`: the latter does not prevent an attached CP936
+Console from corrupting Unicode Skill output.
 
 ## Live prerequisites and evidence
 
