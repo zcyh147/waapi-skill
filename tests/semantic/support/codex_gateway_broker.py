@@ -4090,14 +4090,6 @@ def _normalize_business_query_arguments(
             else (option, arguments)
             for option, arguments in parsed["sources"]
         ]
-        if parsed["sources"]:
-            option, arguments = parsed["sources"][0]
-            if (
-                option in {"--path-segment", "--query-path-segment"}
-                and arguments[0].startswith("\\")
-                and not arguments[0].startswith("\\\\")
-            ):
-                parsed["sources"][0] = (option, (arguments[0][1:],))
         parsed["predicates"] = [
             (
                 arguments[0],

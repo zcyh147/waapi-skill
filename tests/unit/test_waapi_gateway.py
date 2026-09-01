@@ -85,6 +85,13 @@ def test_business_object_path_segments_reject_native_type_prefixes(
         waapi_gateway._business_object_path_from_segments(
             ["Actor-Mixer Hierarchy", segment]
         )
+
+
+def test_business_object_path_segments_reject_native_leading_separator() -> None:
+    with pytest.raises(waapi_gateway.GatewayInputError, match="literal name"):
+        waapi_gateway._business_object_path_from_segments(
+            [r"\Actor-Mixer Hierarchy", "Weapons"]
+        )
 EXPECTED_EXCLUDED_FUNCTION_URIS = frozenset(
     {
         "ak.wwise.ui.commands.register",
@@ -3534,7 +3541,7 @@ def test_query_object_builds_exact_wwise_path_from_business_segments(
     )
 
 
-def test_query_object_normalizes_one_root_marker_on_first_business_segment(
+def test_query_object_rejects_root_marker_on_first_business_segment(
     tmp_path: Path,
 ) -> None:
     path = r"\Actor-Mixer Hierarchy\Default Work Unit\Leaf"
@@ -3560,13 +3567,10 @@ def test_query_object_normalizes_one_root_marker_on_first_business_segment(
         client_factory=lambda url: client,
     )
 
-    assert exit_code == 0, payload
-    assert payload["objects"] == [row]
-    assert client.calls[-1] == (
-        "ak.wwise.core.object.get",
-        {"waql": r'from object "\Actor-Mixer Hierarchy\Default Work Unit\Leaf"'},
-        {"return": ["id", "name", "type", "path"]},
-    )
+    assert exit_code == 2
+    assert payload["error_code"] == "GatewayInputError"
+    assert "literal name" in payload["message"]
+    assert not any(call[0] == "ak.wwise.core.object.get" for call in client.calls)
 
 
 @pytest.mark.parametrize(

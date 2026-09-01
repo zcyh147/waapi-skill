@@ -11732,6 +11732,39 @@ def test_broker_compares_business_query_meaning_not_option_group_order(
     assert broker.evidence().passed
 
 
+def test_broker_rejects_native_leading_separator_in_business_query(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    expected = (
+        "--path-segment",
+        "Actor-Mixer Hierarchy",
+        "--relationship",
+        "descendants",
+        "--max-results",
+        "12",
+    )
+    supplied = [
+        "query-object",
+        "--path-segment",
+        r"\Actor-Mixer Hierarchy",
+        "--relationship",
+        "descendants",
+        "--max-results",
+        "12",
+    ]
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(ExpectedGatewayStep("query", "query-object", expected),),
+        transport="tcp",
+    ) as broker:
+        result = run_model_command(broker, supplied)
+
+    assert result.returncode != 0
+    assert not broker.evidence().passed
+
+
 def test_broker_accepts_equivalent_business_query_number_spelling(
     tmp_path: Path,
 ) -> None:

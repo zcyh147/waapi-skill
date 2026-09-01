@@ -566,7 +566,7 @@ def test_business_draft_prefix_continuation_rejects_equivalent_requote() -> None
     )
 
 
-def test_windows_business_draft_prefix_rejects_equivalent_requote() -> None:
+def _windows_business_prefix_fixture() -> tuple[str, dict[str, object]]:
     prefix_argv = (
         "python",
         TASK_LOCAL_RUNNER_WINDOWS,
@@ -579,7 +579,32 @@ def test_windows_business_draft_prefix_rejects_equivalent_requote() -> None:
         "1",
     )
     prefix = encode_windows_model_argv(prefix_argv)
-    payload = _business_prefix_payload(prefix)
+    return prefix, _business_prefix_payload(prefix)
+
+
+def test_windows_business_draft_prefix_accepts_exact_copy() -> None:
+    prefix, payload = _windows_business_prefix_fixture()
+    command = prefix + " '--object-path-segment' 'Actor-Mixer Hierarchy'"
+
+    assert gateway_continuation_binding_errors(
+        (
+            completed_windows_record(
+                windows_powershell_recording("python initial.py"),
+                payload,
+            ),
+            completed_windows_record(
+                windows_powershell_recording(command),
+                {},
+            ),
+        ),
+        (SimpleNamespace(payload=payload), SimpleNamespace(payload={})),
+        platform_name="nt",
+        windows_powershell_core_host=_WINDOWS_POWERSHELL_CORE_HOST,
+    ) == ()
+
+
+def test_windows_business_draft_prefix_rejects_equivalent_requote() -> None:
+    prefix, payload = _windows_business_prefix_fixture()
     reconstructed = (
         prefix.removesuffix("'1'")
         + "1 '--object-path-segment' 'Actor-Mixer Hierarchy'"

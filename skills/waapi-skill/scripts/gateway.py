@@ -16308,15 +16308,7 @@ def _business_object_path_from_segments(values: Any) -> str:
             f"{MAX_BUSINESS_OBJECT_PATH_SEGMENTS} ordered path segments."
         )
     segments: list[str] = []
-    for index, raw_value in enumerate(values):
-        value = raw_value
-        if (
-            index == 0
-            and isinstance(value, str)
-            and value.startswith("\\")
-            and not value.startswith("\\\\")
-        ):
-            value = value[1:]
+    for value in values:
         if (
             not isinstance(value, str)
             or not value
