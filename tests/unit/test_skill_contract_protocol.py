@@ -285,7 +285,8 @@ def test_exact_hop_playback_diagnosis_does_not_repeat_the_action_lookup() -> Non
     )[0]
     section_flat = " ".join(section.split())
 
-    assert "`--relationship event-actions`" in section_flat
+    assert "Resolve the exact Event once" in section_flat
+    assert "copy-ready `event-actions` continuation" in section_flat
     assert "Gateway owns the child hop" in section_flat
     assert "copy-ready `--view sound-routing-diagnostics`" in section_flat
     assert "do not re-query the Action" in section_flat

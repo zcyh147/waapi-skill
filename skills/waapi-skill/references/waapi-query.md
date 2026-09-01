@@ -137,10 +137,10 @@ Each returns its stable `agent_result`; do not rebuild it. Remaining reflected r
 
 ## Exact-hop playback diagnosis
 
-For an exact Event use `--relationship event-actions`; Gateway owns the child
-hop, bound, `action_type`, and `target`. Execute its copy-ready
-`--view sound-routing-diagnostics` continuation exactly; do not re-query the
-Action or hand-build Sound fields.
+Resolve the exact Event once, then execute its copy-ready `event-actions`
+continuation; Gateway owns the child hop, bound, `action_type`, and `target`.
+Execute its copy-ready `--view sound-routing-diagnostics` continuation exactly;
+do not re-query the Action or hand-build Sound fields.
 
 The view returns `override_output`, `active_source`, and ends at `output_bus`;
 do not add `volume-db` to the Sound hop. Read file/language from the exact

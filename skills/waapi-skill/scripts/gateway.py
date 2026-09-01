@@ -21200,6 +21200,26 @@ def _query_business_continuations(
     """Return bounded copy-ready business reads implied by an exact hop."""
 
     relationships = tuple(getattr(args, "relationships", ()) or ())
+    exact_source = args.path is not None or args.object_id is not None
+    if not relationships and exact_source and len(rows) == 1:
+        event_id = rows[0].get("id")
+        if rows[0].get("type") == "Event" and _canonical_guid(event_id):
+            return [
+                {
+                    "purpose": "read the exact Event Action hop",
+                    "source_event_id": event_id,
+                    "next_command": transaction_next_command(
+                        "query-object",
+                        [
+                            "query-object",
+                            "--exact-id",
+                            event_id,
+                            "--relationship",
+                            "event-actions",
+                        ],
+                    ),
+                }
+            ]
     if relationships != ("event-actions",):
         return []
     continuations: list[dict[str, Any]] = []
@@ -21214,7 +21234,7 @@ def _query_business_continuations(
                 "source_action_id": row.get("id"),
                 "target_id": target_id,
                 "next_command": transaction_next_command(
-                    "query-object sound-routing-diagnostics",
+                    "query-object",
                     [
                         "query-object",
                         "--exact-id",

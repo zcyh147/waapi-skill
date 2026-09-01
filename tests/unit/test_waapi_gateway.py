@@ -3985,6 +3985,7 @@ def test_query_object_event_actions_preset_owns_bound_and_projection(
         "--view",
         "sound-routing-diagnostics",
     ]
+    assert continuation["next_command"]["command"] == "query-object"
     assert client.calls[-1] == (
         "ak.wwise.core.object.get",
         {
@@ -3995,6 +3996,51 @@ def test_query_object_event_actions_preset_owns_bound_and_projection(
         },
         {"return": ["id", "name", "type", "path", "ActionType", "Target"]},
     )
+
+
+def test_exact_event_query_returns_copy_ready_event_actions_hop(tmp_path: Path) -> None:
+    event_id = "{11111111-1111-1111-1111-111111111111}"
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": live_info(),
+            "ak.wwise.core.object.get": {
+                "return": [
+                    {
+                        "id": event_id,
+                        "name": "Play_Generator_Alarm",
+                        "type": "Event",
+                        "path": r"\Events\Default Work Unit\Play_Generator_Alarm",
+                    }
+                ]
+            },
+        }
+    )
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "query-object",
+            "--path-segment",
+            "Events",
+            "--path-segment",
+            "Default Work Unit",
+            "--path-segment",
+            "Play_Generator_Alarm",
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 0, payload
+    continuation = payload["continuations"][0]
+    assert continuation["source_event_id"] == event_id
+    assert continuation["next_command"]["command"] == "query-object"
+    assert continuation["next_command"]["gateway_argv"] == [
+        "query-object",
+        "--exact-id",
+        event_id,
+        "--relationship",
+        "event-actions",
+    ]
 
 
 def test_query_object_sound_routing_view_owns_projection_and_business_keys(

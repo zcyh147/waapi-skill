@@ -1827,6 +1827,29 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   exact path/GUID, validates that the live row is a Sound, and cannot be mixed
   with caller-selected fields, predicates, relationships, or result bounds.
 
+### Omitted business platform means Wwise's unlinked value
+
+- Evidence: #61 r13 Weather bound the correct Action and requested the correct
+  `FadeTime`/`Delay` meanings on both hosts, but field binding rejected them
+  with `FIELD_PLATFORM_REQUIRED`. The user intent did not select a platform;
+  Wwise `isPropertyEnabled` nevertheless requires its native platform argument.
+- Prevention: for dependency-bearing properties only, Gateway compiles an
+  omitted business platform to Wwise's null GUID when checking the unlinked
+  value. The issued Field Handle remains platform-omitted, so later mutation
+  semantics are not silently changed to a platform override. Explicit platform
+  handles and mismatch checks remain exact.
+
+### A continuation command label must equal its first Gateway argv token
+
+- Evidence: #61 r13 Windows Alarm produced the correct Sound-routing
+  continuation, but its descriptive `command` label differed from
+  `gateway_argv[0]`. The Broker rejected it as not bound to the sealed runner.
+- Prevention: `transaction_next_command` callers use the exact subcommand as
+  `command`; human purpose belongs in the surrounding payload. Exact Event
+  identity reads now return the copy-ready `event-actions` hop, whose result
+  returns the copy-ready `sound-routing-diagnostics` hop, so the Agent need not
+  reconstruct either query or its result bound.
+
 ### Draft field discovery is a bounded batch, not one command per meaning
 
 - Evidence: #51 `f0d1945` r10 macOS and native Windows both completed and

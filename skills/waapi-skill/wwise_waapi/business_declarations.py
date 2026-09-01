@@ -97,6 +97,7 @@ _CANONICAL_GUID = re.compile(
     r"[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\}$"
 )
 _FIELD_TOKEN = re.compile(r"^[:_a-zA-Z0-9]+$")
+_UNLINKED_PLATFORM_GUID = "{00000000-0000-0000-0000-000000000000}"
 
 TokenBytes = Callable[[int], bytes]
 ReadCall = Callable[
@@ -1023,7 +1024,9 @@ def bind_live_field(
     The Agent supplies the exact token selected from Gateway discovery.  This
     function proves that token in the requested scope, binds the complete
     metadata digest, and performs the dynamic enabled check whenever a
-    dependency-bearing object field is bound for an explicit platform.
+    dependency-bearing object field is bound. An omitted business platform
+    means Wwise's unlinked value and is compiled to the native null-platform
+    GUID only for that check.
     """
 
     if not isinstance(registry, BusinessHandleRegistry):
@@ -1120,13 +1123,9 @@ def bind_live_field(
             action="resolve the exact target object before checking this dependent field",
         )
     if enabled_dependency_fields:
-        if platform is None:
-            raise _error(
-                "FIELD_PLATFORM_REQUIRED",
-                field=token,
-                dependency_fields=enabled_dependency_fields,
-                action="provide the explicit platform for the dynamic enabled check",
-            )
+        enabled_platform = (
+            _UNLINKED_PLATFORM_GUID if platform is None else platform
+        )
         try:
             enabled = parse_is_property_enabled_result(
                 read_call(
@@ -1134,7 +1133,7 @@ def bind_live_field(
                     {
                         "object": normalized_scope,
                         "property": token,
-                        "platform": platform,
+                        "platform": enabled_platform,
                     },
                     {},
                 )
@@ -1255,13 +1254,11 @@ def revalidate_live_field(
             action="resolve an exact target object and issue a new field handle",
         )
     if enabled_dependency_fields:
-        if effective_platform is None:
-            raise _error(
-                "FIELD_PLATFORM_REQUIRED",
-                field=field.token,
-                dependency_fields=enabled_dependency_fields,
-                action="provide the explicit platform for Preview revalidation",
-            )
+        enabled_platform = (
+            _UNLINKED_PLATFORM_GUID
+            if effective_platform is None
+            else effective_platform
+        )
         try:
             enabled = parse_is_property_enabled_result(
                 read_call(
@@ -1269,7 +1266,7 @@ def revalidate_live_field(
                     {
                         "object": field.scope_value,
                         "property": field.token,
-                        "platform": effective_platform,
+                        "platform": enabled_platform,
                     },
                     {},
                 )

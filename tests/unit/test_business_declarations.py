@@ -946,6 +946,51 @@ def test_live_field_binding_returns_exact_candidates_and_disabled_repair(
 
 
 @pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
+def test_dependent_field_uses_unlinked_platform_when_business_platform_is_omitted(
+    version: str,
+) -> None:
+    registry = BusinessHandleRegistry(
+        _context(wwise_version=version, wwise_build=f"{version}.fixture"),
+        token_bytes=lambda size: b"p" * size,
+    )
+    enabled_platforms: list[object] = []
+
+    def read(
+        uri: str,
+        args: dict[str, object],
+        options: dict[str, object],
+    ) -> dict[str, object]:
+        if uri.endswith("getPropertyAndReferenceNames"):
+            return {"return": ["FadeTime"]}
+        if uri.endswith("getPropertyInfo"):
+            return {
+                "name": "FadeTime",
+                "type": "Real32",
+                "dependencies": [{"property": "ActionType"}],
+            }
+        if uri.endswith("isPropertyEnabled"):
+            enabled_platforms.append(args["platform"])
+            return {"return": True}
+        raise AssertionError(uri)
+
+    field = bind_live_field(
+        registry,
+        read_call=read,
+        scope_kind="object",
+        scope_value=OBJECT_ID,
+        token="FadeTime",
+    )
+    revalidated = revalidate_live_field(registry, field, read_call=read)
+
+    assert field.platform is None
+    assert revalidated == field
+    assert enabled_platforms == [
+        "{00000000-0000-0000-0000-000000000000}",
+        "{00000000-0000-0000-0000-000000000000}",
+    ]
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
 def test_live_field_revalidation_detects_metadata_drift_before_preview(
     version: str,
 ) -> None:
