@@ -16,7 +16,7 @@
     ]
   },
   "source_contracts": {
-    "gateway_parser_sha256": "59e41a28cafd02820ec5c239e81e53120a4e491796e6d64dd8380c5a395299e8",
+    "gateway_parser_sha256": "c7b7664b3459cf6d6130dd27a4fb3f87b9fa1e0cc84904c814d5e70506c953ac",
     "operation_contract_sha256": "f687d20d337507d0550fff00214faf73773ae2578e916bef82cc9389d624bad0",
     "public_continuation_sha256": "ec3d7160211bc44c4af82ec52c134610eb18ab48fd3e00341df630d88fcc61ca",
     "typed_request_surface_sha256": "7cbe0a9ba6d9756c94ecea58bb1b2ac56da242059f17c5cdfdaf768271d133a8"

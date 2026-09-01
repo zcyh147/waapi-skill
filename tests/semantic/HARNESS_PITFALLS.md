@@ -1365,6 +1365,13 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   complete request spellings receive no semantic credit. Test both the
   production rejection and the Broker oracle; a stricter Gateway beside a
   permissive oracle is still a false PASS path.
+- Removing a legacy long option is not sufficient while `argparse` accepts
+  option abbreviations: `--object-path` can otherwise resolve to the remaining
+  `--object-path-segment`. The Gateway parser and every nested subparser require
+  complete option names. `draft-bind-object` exposes only exact GUID, repeated
+  literal name segments, or the reviewed typed-name selector; the removed
+  complete-path spelling fails during parsing before client construction or
+  WAAPI dispatch.
 
 ### Argv equivalence is not continuation-copy evidence
 

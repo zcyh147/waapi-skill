@@ -2129,8 +2129,8 @@ def test_broker_projects_every_business_draft_command_to_task_install(
         "shell_tool_timeout_ms": 30_000,
         "object_binding": {
             "by_id": copy_ready_prefix("draft-bind-object", "<draft>"),
-            "by_path": command(
-                "draft-bind-object", "<draft>", "--object-path", "<path>"
+            "by_path_segments": copy_ready_prefix(
+                "draft-bind-object", "<draft>"
             ),
         },
         "field_binding": {

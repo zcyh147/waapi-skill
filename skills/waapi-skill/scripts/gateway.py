@@ -1403,8 +1403,16 @@ def _unsubscribe_event_handler(client: Any, handler: Any) -> Any:
     raise RuntimeError("WAAPI subscription handler cannot be unsubscribed")
 
 
+class _ExactOptionArgumentParser(argparse.ArgumentParser):
+    """Require complete public option names for every nested Gateway command."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        kwargs.setdefault("allow_abbrev", False)
+        super().__init__(*args, **kwargs)
+
+
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
+    parser = _ExactOptionArgumentParser(
         prog="gateway.py",
         description=(
             "Call the manifest-backed WAAPI Skill gateway and print one JSON result, "
@@ -2907,7 +2915,6 @@ def build_parser() -> argparse.ArgumentParser:
     _add_business_draft_binding_arguments(draft_bind_object)
     object_selector = draft_bind_object.add_mutually_exclusive_group(required=True)
     object_selector.add_argument("--object-id")
-    object_selector.add_argument("--object-path")
     object_selector.add_argument("--object-path-segment", action="append")
     object_selector.add_argument(
         "--exact-type-name",
@@ -16494,9 +16501,11 @@ def dispatch_business_object_binding(
             raise GatewayInputError(
                 f"The next business object binding requires --role {expected_role}"
             )
-    object_path = args.object_path
-    if args.object_path_segment is not None:
-        object_path = _business_object_path_from_segments(args.object_path_segment)
+    object_path = (
+        _business_object_path_from_segments(args.object_path_segment)
+        if args.object_path_segment is not None
+        else None
+    )
     exact_type_name: tuple[str, str] | None = None
     if args.exact_type_name is not None:
         try:
@@ -16526,7 +16535,8 @@ def dispatch_business_object_binding(
         }
     else:
         raise GatewayInputError(
-            "Business object binding requires an exact GUID, path, or typed name"
+            "Business object binding requires an exact GUID, literal path "
+            "segments, or typed name"
         )
     raw = binding.read_call(
         OBJECT_GET_URI,
