@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import re
+from pathlib import Path
 
 import pytest
 
@@ -35,12 +37,65 @@ OBJECT_ID = "{11111111-1111-1111-1111-111111111111}"
 BUS_ID = "{22222222-2222-2222-2222-222222222222}"
 METADATA_DIGEST = "a" * 64
 
+EXPECTED_NON_INTRINSIC_NAME_OBJECT_TYPES = {
+    "Action",
+    "Curve",
+    "CustomState",
+    "EffectSlot",
+    "Modifier",
+    "MultiSwitchEntry",
+    "MusicPlaylistItem",
+    "MusicStinger",
+    "MusicTrackSequence",
+    "Panner",
+    "Position",
+    "RTPC",
+    "StateGroupInfo",
+}
+
 
 def test_non_intrinsic_object_name_capabilities_are_centralized() -> None:
-    assert NON_INTRINSIC_NAME_OBJECT_TYPES == {"Action", "EffectSlot"}
+    assert NON_INTRINSIC_NAME_OBJECT_TYPES == EXPECTED_NON_INTRINSIC_NAME_OBJECT_TYPES
     assert object_identity_semantics("Action").name_mode == "derived"
     assert object_identity_semantics("EffectSlot").name_mode == "anonymous_slot"
+    assert object_identity_semantics("RTPC").name_mode == "embedded_value"
+    assert (
+        object_identity_semantics("MusicPlaylistItem").name_mode
+        == "owned_collection_entry"
+    )
     assert object_identity_semantics("Sound").name_mode == "intrinsic"
+
+
+def test_reflected_sample_objects_with_empty_names_are_all_classified() -> None:
+    """The capability table must cover every empty-name public WObject fixture."""
+
+    repository = Path(__file__).resolve().parents[2]
+    empty_name_tags: set[str] = set()
+    pattern = re.compile(r'<([A-Za-z0-9_:-]+) Name=""')
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        for work_unit in (repository / "tests" / "_org" / version).rglob("*.wwu"):
+            empty_name_tags.update(
+                pattern.findall(work_unit.read_text(encoding="utf-8"))
+            )
+
+    reflected_wobjects: set[str] = set()
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        catalog = json.loads(
+            (
+                repository
+                / "skills"
+                / "waapi-skill"
+                / "resources"
+                / "metadata"
+                / version
+                / "object-types.json"
+            ).read_text(encoding="utf-8")
+        )
+        reflected_wobjects.update(
+            row["name"] for row in catalog["types"] if row["type"] == "WObject"
+        )
+
+    assert empty_name_tags & reflected_wobjects == NON_INTRINSIC_NAME_OBJECT_TYPES
 
 
 def _context(**overrides: str) -> BusinessContext:
@@ -376,6 +431,26 @@ def test_live_object_identity_seam_normalizes_real_wwise_shapes(
     assert identity.name == expected_name
     assert identity.object_type == row["type"]
     assert identity.path == row["path"]
+
+
+@pytest.mark.parametrize(
+    "object_type",
+    sorted(EXPECTED_NON_INTRINSIC_NAME_OBJECT_TYPES),
+)
+def test_live_object_identity_accepts_every_reviewed_non_intrinsic_name_type(
+    object_type: str,
+) -> None:
+    identity = normalize_live_object_identity(
+        {
+            "id": OBJECT_ID,
+            "name": "",
+            "type": object_type,
+            "path": rf"\Fixture\[{object_type}]",
+        }
+    )
+
+    assert identity.name == ""
+    assert identity.object_type == object_type
 
 
 @pytest.mark.parametrize(

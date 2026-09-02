@@ -1801,22 +1801,26 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   resolved exactly one live `Action`, but Wwise returned `name: ""` and a
   bracketed path such as `[Play - Rain_Bed]`. The generic handle validator
   rejected the legitimate row before Preview.
-- Generalized audit finding: `EffectSlot` is another legitimate empty-name
-  object, but for a different reason: it is an anonymous owned-list slot rather
-  than an Action-derived display path. An Action-only exception would merely
-  defer the same defect to another API family.
+- Generalized audit finding: this is not limited to `EffectSlot`. Across the
+  five reflected SampleProjects, empty-name public `WObject` rows also include
+  embedded values (`Curve`, `Modifier`, `Panner`, `Position`, `RTPC`) and owned
+  collection entries (`CustomState`, `MultiSwitchEntry`, `MusicPlaylistItem`,
+  `MusicStinger`, `MusicTrackSequence`, `StateGroupInfo`). An Action-only or
+  EffectSlot-only exception merely defers the same defect to another family.
 - Prevention: keep one reviewed object-identity capability table that declares
-  intrinsic, derived, and anonymous-slot name modes. Normalize all live object
-  handles through it; GUID, type, absolute path, uniqueness, handle digest, and
-  Preview-time readback remain exact. Name-dependent operations (`setName`,
-  `object.set` rename, and copy/move collision proof) consult the same capability
-  and fail before Preview for every type without a mutable intrinsic name.
-  Deterministic tests cover both Action and EffectSlot through handle binding,
-  Core reads, rename, bulk rename, copy, and move, so a future special object
-  type must be added once rather than patched operation by operation. Alarm
-  observers accept the Gateway business aliases `action_type`/`target` as exact
-  equivalents of native `ActionType`/`Target` and reject conflicting dual
-  aliases.
+  intrinsic, derived, anonymous-slot, embedded-value, and owned-collection name
+  modes. Normalize all live object handles through it; GUID, type, absolute
+  path, uniqueness, handle digest, and Preview-time readback remain exact.
+  Name-dependent operations (`setName`, `object.set` rename, and copy/move
+  collision proof) consult the same capability and fail before Preview for
+  every type without a mutable intrinsic name. A program-gate audit intersects
+  every committed empty-name work-unit tag with the five reflected WObject
+  catalogs and requires exact coverage by that capability table. The full set
+  is then exercised through handle normalization plus every public name-
+  dependent operation, so a new special object cannot hide until a person
+  notices it in Authoring. Alarm observers accept the Gateway business aliases
+  `action_type`/`target` as exact equivalents of native `ActionType`/`Target`
+  and reject conflicting dual aliases.
 
 ### A diagnostic hop is one business view, not a hand-built field list
 

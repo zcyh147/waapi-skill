@@ -280,7 +280,7 @@ def test_operation_request_schema_digest_owns_only_versioned_machine_contract() 
     assert "selection_guidance" not in contract_2022
     assert "next_step" not in contract_2022
     assert operation_request_schema_digest("object.set", "2022.1") == (
-        "dba9f58d0b292a9350a59dea465659e7834ed770e4a56154d60e00bc80696187"
+        "997c56c07d4f946579c9ec0ee96d9c05d4491105989010b003c7d7e1d02fa02b"
     )
     assert operation_request_schema_digest("object.set", "2025.1") != (
         operation_request_schema_digest("object.set", "2022.1")
@@ -2077,6 +2077,37 @@ def test_request_contract_rejects_unknown_fields_metadata_injection_and_boundari
             r"\Actor-Mixer Hierarchy\Default Work Unit\Weather\[Effect Slot 0]",
             "anonymous_slot",
         ),
+        ("Curve", r"\Fixture\[Curve]", "embedded_value"),
+        ("CustomState", r"\Fixture\[Custom State]", "owned_collection_entry"),
+        ("Modifier", r"\Fixture\[Modifier]", "embedded_value"),
+        (
+            "MultiSwitchEntry",
+            r"\Fixture\[Multi Switch Entry]",
+            "owned_collection_entry",
+        ),
+        (
+            "MusicPlaylistItem",
+            r"\Fixture\[Music Playlist Item]",
+            "owned_collection_entry",
+        ),
+        (
+            "MusicStinger",
+            r"\Fixture\[Music Stinger]",
+            "owned_collection_entry",
+        ),
+        (
+            "MusicTrackSequence",
+            r"\Fixture\[Music Track Sequence]",
+            "owned_collection_entry",
+        ),
+        ("Panner", r"\Fixture\[Panner]", "embedded_value"),
+        ("Position", r"\Fixture\[Position]", "embedded_value"),
+        ("RTPC", r"\Fixture\[RTPC]", "embedded_value"),
+        (
+            "StateGroupInfo",
+            r"\Fixture\[State Group Info]",
+            "owned_collection_entry",
+        ),
     ),
 )
 def test_name_collision_operations_report_the_non_intrinsic_name_boundary(
@@ -2118,7 +2149,24 @@ def test_name_collision_operations_report_the_non_intrinsic_name_boundary(
     assert error.value.details["name_mode"] == name_mode
 
 
-@pytest.mark.parametrize("object_type", ("Action", "EffectSlot"))
+@pytest.mark.parametrize(
+    "object_type",
+    (
+        "Action",
+        "Curve",
+        "CustomState",
+        "EffectSlot",
+        "Modifier",
+        "MultiSwitchEntry",
+        "MusicPlaylistItem",
+        "MusicStinger",
+        "MusicTrackSequence",
+        "Panner",
+        "Position",
+        "RTPC",
+        "StateGroupInfo",
+    ),
+)
 def test_set_name_reports_the_non_intrinsic_name_boundary(object_type: str) -> None:
     target = object_row(
         name="",
@@ -2145,7 +2193,24 @@ def test_set_name_reports_the_non_intrinsic_name_boundary(object_type: str) -> N
     assert error.value.error_code == "DERIVED_OBJECT_NAME_BOUNDARY"
 
 
-@pytest.mark.parametrize("object_type", ("Action", "EffectSlot"))
+@pytest.mark.parametrize(
+    "object_type",
+    (
+        "Action",
+        "Curve",
+        "CustomState",
+        "EffectSlot",
+        "Modifier",
+        "MultiSwitchEntry",
+        "MusicPlaylistItem",
+        "MusicStinger",
+        "MusicTrackSequence",
+        "Panner",
+        "Position",
+        "RTPC",
+        "StateGroupInfo",
+    ),
+)
 def test_object_set_rename_reports_the_non_intrinsic_name_boundary(
     object_type: str,
 ) -> None:

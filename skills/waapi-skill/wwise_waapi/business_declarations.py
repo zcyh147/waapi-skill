@@ -2207,8 +2207,8 @@ def normalize_live_object_identity(row: Any) -> LiveObjectIdentity:
 
     Wwise Authoring objects use canonical GUIDs and absolute object paths.
     Most object types also own a non-empty name. The shared object-identity
-    capability table owns the reviewed exceptions, including derived Action
-    displays and anonymous EffectSlot list entries.
+    capability table owns the reviewed derived, embedded-value, and
+    owned-collection exceptions.
     """
 
     if not isinstance(row, Mapping):

@@ -2385,7 +2385,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         ),
         identity_arguments=("object",),
         constraints=(
-            "object types without a mutable intrinsic name, including derived Actions and anonymous EffectSlots, fail before preview instead of dispatching setName",
+            "object types without a mutable intrinsic name, including derived, embedded-value, and owned-collection objects, fail before preview instead of dispatching setName",
         ),
         selection_guidance=_selection_guidance(
             use_when=("Exactly one existing object receives only a rename.",),
@@ -2742,7 +2742,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "canonical request limit: 262144 bytes including inline Base64 audio",
             "auto_add_to_source_control is explicit and defaults to false",
             "partial results or per-target readback mismatches fail verification",
-            "targets without a mutable intrinsic name, including derived Actions and anonymous EffectSlots, may receive supported fields, references, or notes but cannot supply name",
+            "targets without a mutable intrinsic name, including derived, embedded-value, and owned-collection objects, may receive supported fields, references, or notes but cannot supply name",
         ),
         supported_versions=("2022.1", "2023.1", "2024.1", "2025.1"),
         parent_child_contract=OBJECT_CREATE_SPECIALIZED_CHILD_TYPES_BY_PARENT,
