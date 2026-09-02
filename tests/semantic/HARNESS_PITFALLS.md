@@ -2193,6 +2193,18 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   duplicates, unknown options, missing values, and dependent action order
   strict. Cover both orders and one malformed group in Broker tests.
 
+### Omitted and explicit false defaults need one reviewed equivalence
+
+- Evidence: #60 r52 Windows SoundBank generation supplied per-bank rebuild,
+  clear-cache, and Init-Bank rebuild groups with the exact default `false`;
+  the sealed plan omitted those groups and Broker rejected the otherwise exact
+  request before Gateway.
+- Prevention: for reviewed SoundBank boolean defaults only, discard an actual
+  `false` group when the sealed plan has no matching global option or per-bank
+  handle. Preserve explicit sealed groups and reject `true`, duplicate,
+  malformed, unknown, or differently targeted groups. Test the positive
+  equivalence and a changed-true negative together.
+
 ### The compact router must disambiguate business families exactly
 
 - Evidence: #60 r51 Agents confused connected project save with installed UI

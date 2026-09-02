@@ -85,6 +85,14 @@ from .support.codex_eval_protocol_v3 import (  # pyright: ignore[reportMissingIm
     media_pool_business_call_step,
     typed_read_draft_steps,
 )
+from .support.codex_soundengine_business_profile import (
+    EVENT_ID,
+    EVENT_NAME,
+    GAME_OBJECT_NAME,
+    LISTENER_HANDLE,
+    LISTENER_ID,
+    MONITOR_MESSAGE,
+)
 from wwise_waapi.operation_composer import (
     apply_composer_action,
     composition_projection,
@@ -4538,6 +4546,74 @@ def test_soundbank_generation_plan_preserves_repeated_source_row_order() -> None
     ) == supplied
 
 
+def test_soundbank_generation_plan_ignores_only_unrequested_false_defaults() -> None:
+    fixed = (
+        "od1-draft",
+        "--task-authority",
+        "da1-" + "1" * 40,
+        "--expected-revision",
+        "3",
+    )
+    expected = (
+        *fixed,
+        "--soundbank",
+        "boh1-main",
+        "nonlocalized",
+        "--soundbank",
+        "boh1-gameplay",
+        "nonlocalized",
+        "--platform",
+        "Windows",
+        "--rebuild-soundbanks",
+        "false",
+        "--io-root",
+        r"C:\owned",
+    )
+    supplied = (
+        *fixed,
+        "--soundbank",
+        "boh1-main",
+        "nonlocalized",
+        "--soundbank-rebuild",
+        "boh1-main",
+        "false",
+        "--soundbank",
+        "boh1-gameplay",
+        "nonlocalized",
+        "--soundbank-rebuild",
+        "boh1-gameplay",
+        "false",
+        "--platform",
+        "Windows",
+        "--rebuild-soundbanks",
+        "false",
+        "--clear-audio-file-cache",
+        "false",
+        "--rebuild-init-bank",
+        "false",
+        "--io-root",
+        r"C:\owned",
+    )
+    step = ExpectedGatewayStep(
+        "declare",
+        "draft-declare-soundbank-plan",
+        expected,
+    )
+    broker = object.__new__(CodexGatewayBroker)
+    broker._payloads_by_step = {}  # noqa: SLF001
+
+    assert broker._normalize_soundbank_plan_fact_order(  # noqa: SLF001
+        step,
+        supplied,
+    ) == expected
+    changed = list(supplied)
+    changed[changed.index("--clear-audio-file-cache") + 1] = "true"
+    assert broker._normalize_soundbank_plan_fact_order(  # noqa: SLF001
+        step,
+        tuple(changed),
+    ) != expected
+
+
 def test_soundbank_exact_type_name_witness_normalizes_to_bound_guid() -> None:
     expected = {
         "kind": "exact-type-name",
@@ -6022,6 +6098,69 @@ def test_closed_business_plan_named_argument_order_is_transport(
         step,
         actual,
     ) == step.arguments
+
+
+def test_soundengine_named_argument_order_resolves_the_bound_event_handle(
+    tmp_path: Path,
+) -> None:
+    steps = build_soundengine_business_transaction_steps(
+        version="2022.1",
+        label="tx01",
+        operation="ak.soundengine.executeActionOnEvent",
+        monitor_message=MONITOR_MESSAGE,
+        game_object_name=GAME_OBJECT_NAME,
+        event_id=EVENT_ID,
+        event_name=EVENT_NAME,
+        listener_handle=LISTENER_HANDLE,
+        listener_id=LISTENER_ID,
+    )
+    step = next(
+        item
+        for item in steps
+        if item.subcommand == "draft-declare-soundengine-plan"
+    )
+    draft_id = "od1-" + "1" * 32
+    authority = "da1-" + "2" * 40
+    event_handle = "boh1-" + "3" * 32
+    broker = CodexGatewayBroker(
+        skill_source=make_fake_skill(tmp_path),
+        expected_steps=steps,
+        expected_wwise_version="2022.1",
+    )
+    broker._payloads_by_step = {  # noqa: SLF001
+        "tx01.draft-start": {
+            "draft": {"draft_id": draft_id, "revision": 1},
+            "task_authority": authority,
+        },
+        "tx01.bind-event": {
+            "draft": {"draft_id": draft_id, "revision": 2},
+            "bound_object": {"handle": event_handle},
+        },
+    }
+    actual = (
+        "draft-declare-soundengine-plan",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "2",
+        "--action",
+        "Stop",
+        "--fade-duration-ms",
+        "250",
+        "--fade-curve",
+        "Linear",
+        "--event-handle",
+        event_handle,
+    )
+
+    semantic_hash, execution_arguments = broker._validate_step(  # noqa: SLF001
+        step,
+        actual,
+    )
+
+    assert len(semantic_hash) == 64
+    assert execution_arguments == actual
 
 
 def test_core_plan_group_order_is_transport_not_business_meaning() -> None:

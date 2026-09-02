@@ -11477,6 +11477,34 @@ class CodexGatewayBroker:
             tuple(resolve_expected(value) for value in group)
             for group in expected_groups
         ]
+        default_false_options = {
+            "--soundbank-rebuild",
+            "--rebuild-soundbanks",
+            "--clear-audio-file-cache",
+            "--rebuild-init-bank",
+        }
+
+        def default_identity(group: tuple[Any, ...]) -> tuple[Any, ...]:
+            return (
+                (group[0], group[1])
+                if group[0] == "--soundbank-rebuild"
+                else (group[0],)
+            )
+
+        expected_default_identities = {
+            default_identity(group)
+            for group in resolved_expected
+            if group[0] in default_false_options
+        }
+        actual_groups = [
+            group
+            for group in actual_groups
+            if not (
+                group[0] in default_false_options
+                and group[-1] == "false"
+                and default_identity(group) not in expected_default_identities
+            )
+        ]
         expected_by_option: dict[Any, list[tuple[Any, ...]]] = {}
         actual_by_option: dict[Any, list[tuple[Any, ...]]] = {}
         for group in resolved_expected:
@@ -11553,16 +11581,17 @@ class CodexGatewayBroker:
             *,
             expected: bool,
         ) -> tuple[Any, ...] | None:
-            option = group[0]
-            field = group[1] if len(group) > 1 else None
+            resolved_group = tuple(
+                resolve_expected(value) if expected else value
+                for value in group
+            )
+            option = resolved_group[0]
+            field = resolved_group[1] if len(resolved_group) > 1 else None
             if not isinstance(option, str) or not isinstance(field, str):
                 return None
             if option in {"--value", "--toggle"}:
                 return (option, field)
-            return tuple(
-                resolve_expected(value) if expected else value
-                for value in group
-            )
+            return resolved_group
 
         expected_groups = parse(step.arguments)
         actual_groups = parse(tuple(actual))
