@@ -2235,6 +2235,12 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   `operations` from the public/Fresh protocol, and retain fresh live command
   inventory validation inside the later Gateway-owned plan. Keep catalog-first
   behavior for all other natural-language mutations.
+- The same conflict later repeated for a single `object.setReference`: one Mac
+  Agent chose the correct dedicated schema directly and was rejected by the
+  catalog-first oracle; the next chose broad `object.set` after the forced
+  catalog. Treat the documented one-object rename/notes/property/reference
+  mappings as fixed direct routes too. The Gateway still owns identity,
+  metadata discovery, opaque field handles, Preview, and verification.
 
 ### Broker optional prefixes and archive audit must evolve together
 

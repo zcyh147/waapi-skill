@@ -191,6 +191,7 @@ def run_object_metadata_business_agent_unit(
             transaction_count=lambda _runtime: 1,
             preview_gates=_object_metadata_preview_gates,
             outcome_factory=ObjectMetadataBusinessAgentOutcome,
+            requires_initial_operations_discovery=False,
         ),
     )
 

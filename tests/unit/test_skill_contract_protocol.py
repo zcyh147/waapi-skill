@@ -939,6 +939,7 @@ def test_single_existing_object_edit_uses_its_dedicated_operation_before_object_
     broad_row = "| Larger atomic existing-target batch:"
 
     assert "Existing-root status alone does not select `object.set`" in compact
+    assert "fixed single-edit routes skip `operations`" in compact
     assert dedicated_row in OPERATE
     assert OPERATE.index(dedicated_row) < OPERATE.index(broad_row)
     assert (
