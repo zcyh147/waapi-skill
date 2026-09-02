@@ -10313,7 +10313,13 @@ class CodexGatewayBroker:
         }:
             return step
         actual_values = tuple(str(value) for value in actual)
-        if actual_values.count("--declaration-id") != 1:
+        declaration_count = actual_values.count("--declaration-id")
+        if declaration_count > 1:
+            raise GatewayInvocationError(
+                f"{step.subcommand} accepts exactly one declaration per command; "
+                "copy the next response revision before submitting the next declaration"
+            )
+        if declaration_count != 1:
             raise GatewayInvocationError(
                 "business declaration requires one bounded task-local id"
             )

@@ -6437,6 +6437,11 @@ def test_business_declaration_ids_are_task_local_but_bounded_and_unique(
             second,
             argv("../not-local"),
         )
+    with pytest.raises(GatewayInvocationError, match="exactly one declaration"):
+        broker._bind_task_local_declaration_id(  # noqa: SLF001
+            second,
+            (*argv("first"), "--declaration-id", "second"),
+        )
 
 
 def _read_only_draft_evidence_fixture(

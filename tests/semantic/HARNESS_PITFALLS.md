@@ -1894,17 +1894,37 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   generic `object.set` post-bind reply repeated the complete long-tail Draft
   action catalog and copy policy. r19 proved the first compaction worked (about
   7.4 KiB), then exposed the same leak one phase later: each two-meaning
-  `draft-discover-fields` reply still repeated about 16.6 KiB.
+  `draft-discover-fields` reply still repeated about 16.6 KiB. r20 proved that
+  compaction and then exposed the final common repetition: each successful
+  `draft-declare-existing` reply was still about 13.6 KiB.
 - Prevention: after `object.set` object binding or field discovery, return a
   sub-8-KiB phase-relevant continuation. Binding retains only the just-used
   selector form, field discovery, existing-object declaration, and one exact
   `draft-inspect` escape hatch. Field discovery retains only repeated discovery,
-  existing-object declaration, and that escape hatch. Include the resolved
-  object path directly in the compact binding receipt; new-object,
-  alternate-selector, and unrelated actions remain in `draft-inspect`.
+  existing-object declaration, and that escape hatch. Existing-object
+  declaration retains only the next field discovery, completion candidate, and
+  escape hatch. Include the resolved object path directly in the compact
+  binding receipt; new-object, alternate-selector, and unrelated actions remain
+  in `draft-inspect`. New-object declarations keep their operation-specific
+  media/list continuations and are not forced through the existing-object
+  projection.
   The full capability remains losslessly reachable, but is not repeated after
   every target. Keep a byte-budget regression on the public payload; do not
   treat `response_integrity.complete=true` as proof of model visibility.
+
+### One declaration command owns exactly one task-local declaration
+
+- Evidence: #61 r20 native Windows Weather correctly bound all five Actions and
+  discovered the first pair of Action fields, then appended five
+  `--declaration-id` groups to one `draft-declare-existing` command. The public
+  command is singular and object-scoped Field Handles cannot be reused across
+  other bound objects; the Broker failed closed before Gateway or Wwise.
+- Prevention: the structured `declare_existing` continuation states
+  `exactly_one_declaration_per_command` and requires copying the next response
+  revision before the next declaration. The Broker reports that exact repair
+  instead of an internal task-local-ID failure. Do not silently split or accept
+  a malformed batch: each declaration retains its exact object-scoped handles,
+  revision, Preview ownership, and verification boundary.
 
 ### Closed business includes are equivalent only after exact projection proof
 
