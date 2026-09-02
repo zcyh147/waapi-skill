@@ -101,6 +101,8 @@ from tests.semantic.support.codex_harness import (
     final_agent_message,
     parse_jsonl_events,
     prepare_workspace_skill_install,
+    semantic_skill_bootstrap_developer_instructions,
+    semantic_task_developer_instructions,
     turn_usage,
     workspace_skill_install_path,
 )
@@ -1472,7 +1474,7 @@ def _matrix_options(
     root: Path,
 ) -> matrix.RunnerOptions:
     return matrix.RunnerOptions(
-        profile=matrix.HEAVY_V3_PROFILE_ID,
+        profile=options.profile,
         iteration_root=root,
         suite_path=options.suite_path,
         skill_source=options.skill_source,
@@ -1586,6 +1588,7 @@ def _write_matrix_evidence(
         preflight_state=preflight,
         started_at=started,
         completed_at=completed,
+        profile=options.profile,
     )
     matrix.write_json(root / "run-config.json", run_config)
     matrix.write_json(root / "summary.json", summary)
@@ -1750,6 +1753,7 @@ def _mark_codex_infrastructure_block(
         matrix.write_json(
             prior_turn_root / "codex-facts.json",
             _synthetic_codex_facts(
+                unit=unit,
                 options=options,
                 task_root=task_root,
                 turn_root=prior_turn_root,
@@ -1781,6 +1785,7 @@ def _mark_codex_infrastructure_block(
         )
     )
     failed_facts = _synthetic_codex_facts(
+        unit=unit,
         options=options,
         task_root=task_root,
         turn_root=failed_turn_root,
@@ -5324,6 +5329,7 @@ def test_typed_get_info_campaign_expects_only_the_mandatory_skill_read() -> None
 
 def _synthetic_codex_facts(
     *,
+    unit: Any | None = None,
     options: campaign.CampaignOptions,
     task_root: Path,
     turn_root: Path,
@@ -5349,6 +5355,8 @@ def _synthetic_codex_facts(
         expected_gateway_subcommands=tuple(step.subcommand for step in protocol.steps),
         expected_wwise_version=version,
     )
+    if options.profile in campaign.SEMANTIC_BOOTSTRAP_PROFILE_IDS and unit is None:
+        raise AssertionError("semantic bootstrap fixture requires its profile unit")
     config = CodexHarnessConfig(
         workspace=task_root / "agent-workspace",
         skill_source=options.skill_source,
@@ -5362,6 +5370,26 @@ def _synthetic_codex_facts(
         sandbox_mode="workspace-write",
         allow_output_write=False,
         network_access=True,
+        developer_instructions=(
+            semantic_task_developer_instructions(
+                options.skill_source / "scripts" / "run.py",
+                task_skill_source=(
+                    task_root
+                    / "agent-workspace"
+                    / ".agents"
+                    / "skills"
+                    / "waapi-skill"
+                ),
+                expected_skill_reads=campaign._heavy_v3_expected_skill_reads(unit),
+                base_developer_instructions=(
+                    semantic_skill_bootstrap_developer_instructions(
+                        options.skill_source / "scripts" / "run.py"
+                    )
+                ),
+            )
+            if options.profile in campaign.SEMANTIC_BOOTSTRAP_PROFILE_IDS
+            else ""
+        ),
     )
     command = (
         build_task_exec_command(config, prompt=prompt, writable_dir=turn_root)
@@ -7050,6 +7078,7 @@ def _write_passing_project_outcome(
         matrix.write_json(
             turn_root / "codex-facts.json",
             _synthetic_codex_facts(
+                unit=unit,
                 options=options,
                 task_root=task_root,
                 turn_root=turn_root,
@@ -7791,6 +7820,60 @@ def test_heavy_validator_accepts_typed_profile_query_repair_archive(
         statuses=("PASS",),
         omit_optional_query_schema_unit_ids=("TYP22-GENERIC-OBJECT-QUERY",),
     )
+
+    result = campaign.validate_heavy_v3_child_run(
+        root,
+        expected_units=profile.units,
+        options=options,
+        returncode=0,
+    )
+
+    assert [row["status"] for row in result.observations] == ["PASS"], "\n".join(
+        verdict.reason for verdict in result.phase_verdicts
+    )
+
+
+def test_deep_campaign_scopes_audio_revision_and_accepts_delegated_typed_intro(
+    tmp_path: Path,
+) -> None:
+    from tests.semantic.support.codex_deep_business_acceptance_profile import (
+        load_deep_business_acceptance_profile,
+    )
+
+    profile_path = (
+        Path(__file__).resolve().parent
+        / "data"
+        / "deep-business-acceptance"
+        / "profile.json"
+    )
+    profile = load_deep_business_acceptance_profile(
+        profile_path,
+        unit_ids=("TYP22-GENERIC-OBJECT-QUERY",),
+    )
+    options = replace(
+        _options(tmp_path),
+        profile=campaign.DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID,
+        suite_path=profile_path,
+        protocol_manifest_revision=(
+            campaign._CURRENT_AUDIO_IMPORT_PROTOCOL_REVISION
+        ),
+    )
+    root = tmp_path / "matrix"
+    _write_matrix_evidence(
+        root,
+        options=options,
+        units=profile.units,
+        statuses=("PASS",),
+    )
+    scenario_root = root / "scenarios" / "001-TYP22-GENERIC-OBJECT-QUERY"
+    outcome_path = scenario_root / "outcome.json"
+    case_path = scenario_root / "matrix-case.json"
+    outcome = json.loads(outcome_path.read_text(encoding="utf-8"))
+    outcome["checks"]["first_use_intro"] = "delegated_to_dedicated_profile"
+    matrix_case = json.loads(case_path.read_text(encoding="utf-8"))
+    matrix_case["runner_outcome"] = outcome
+    matrix.write_json(outcome_path, outcome)
+    matrix.write_json(case_path, matrix_case)
 
     result = campaign.validate_heavy_v3_child_run(
         root,

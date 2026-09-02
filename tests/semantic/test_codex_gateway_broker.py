@@ -159,6 +159,40 @@ def test_closed_business_literal_equivalence_rejects_native_path_type_prefix() -
     ) is False
 
 
+def test_query_repair_accepts_the_stable_kind_for_the_exact_live_candidate() -> None:
+    step = ExpectedGatewayStep(
+        name="query-repair.refined-kind",
+        subcommand="query-object",
+        arguments=(
+            "--custom-kind",
+            ResponseBinding(
+                "query-repair.ambiguous-kind",
+                "/agent_result/candidates/0/name",
+            ),
+            "--max-results",
+            "1",
+        ),
+    )
+    payloads = {
+        "query-repair.ambiguous-kind": {
+            "agent_result": {
+                "candidates": [{"name": "MusicSegment"}],
+            }
+        }
+    }
+
+    assert broker_module._normalize_query_repair_stable_kind(  # noqa: SLF001
+        step,
+        ("--kind", "music-segment", "--max-results", "1"),
+        payloads,
+    ) == ("--custom-kind", "MusicSegment", "--max-results", "1")
+    assert broker_module._normalize_query_repair_stable_kind(  # noqa: SLF001
+        step,
+        ("--kind", "music-track", "--max-results", "1"),
+        payloads,
+    ) == ("--kind", "music-track", "--max-results", "1")
+
+
 def test_closed_business_meaning_equivalence_rejects_semantic_negation() -> None:
     step = ExpectedGatewayStep(
         "step",

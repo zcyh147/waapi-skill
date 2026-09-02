@@ -2157,6 +2157,56 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   operations. Keep a fast cross-platform regression for both shapes before
   opening another real root.
 
+### Composite Fresh profiles must preserve component contracts
+
+- Evidence: #60 r51 wrapped typed-input and audio-import units in one 19-unit
+  profile. Raw matrix PASSes became outer BLOCKED results because the wrapper
+  hid component turns and audited dispatch counts, treated the typed runner's
+  reviewed `delegated_to_dedicated_profile` introduction marker as missing,
+  and passed the audio-import protocol revision into unrelated query, Topic,
+  SoundBank, Lua, and Media Pool provenance readers.
+- Prevention: a composite unit proxies every component fact consumed by the
+  runner or archive validator. Scope a component-specific codec or manifest
+  revision by `component_profile_id`; the composite profile id is never a
+  substitute. Add one full child-classification test, then reclassify the
+  frozen raw matrix read-only before opening a new root.
+
+### Archive import replay must preserve rows while allowing transport chunks
+
+- Evidence: #60 r51 legally transported Weather's three complete import rows
+  in one `draft-declare-import-batch`; the canonical archive reconstruction had
+  three one-row commands and rejected the PASS as topology drift.
+- Prevention: replay archived commands through the same Broker row matcher used
+  live. Accept only dependency-ready 1..3-row partitions with unique task-local
+  ids; every sealed row, field, media item, reference, order, and final Preview
+  must still match exactly. Comparing step-name counts cannot prove this and
+  must not replace semantic replay.
+
+### Named business options are groups, not positional arguments
+
+- Evidence: #60 r51 macOS supplied the exact `--notes` and `--object-handle`
+  groups in the opposite order from the sealed compound-Undo witness. Broker
+  rejected the command before Gateway even though the values and effect were
+  identical; Windows happened to choose the canonical order.
+- Prevention: normalize only the reviewed unique named groups for that exact
+  subcommand, then compare their complete values. Keep fixed prefixes,
+  duplicates, unknown options, missing values, and dependent action order
+  strict. Cover both orders and one malformed group in Broker tests.
+
+### The compact router must disambiguate business families exactly
+
+- Evidence: #60 r51 Agents confused connected project save with installed UI
+  `SaveProject`, Game Parameter range with `object.setProperty`, Profiler data
+  capture with a guessed URI, and runtime Event actions with Authoring object
+  edits. A query repair also chose the closed `music-segment` kind after the
+  live candidate proved exact `MusicSegment`, while the oracle demanded the
+  more verbose custom-kind spelling.
+- Prevention: keep copy-ready `selection_guidance` for every reviewed ambiguous
+  family in the compact default `operations` frame. Accept a stable closed kind
+  only when it maps one-to-one to the first exact live candidate; broader,
+  guessed, or mismatched kinds remain rejected. Route guidance is a public
+  Gateway contract and receives size, exact-selection, and negative tests.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:

@@ -1742,6 +1742,95 @@ def _normalize_commutative_option_pairs(
     return step.arguments if expected is not None and observed == expected else actual
 
 
+def _normalize_object_lifecycle_business_argument_order(
+    step: "ExpectedGatewayStep",
+    supplied: Sequence[str],
+) -> tuple[Any, ...]:
+    """Order independent lifecycle options without changing supplied values."""
+
+    actual = tuple(supplied)
+    if step.subcommand != "draft-declare-object-change" or actual == step.arguments:
+        return actual
+    arities = {
+        "--object-handle": 1,
+        "--parent-handle": 1,
+        "--new-name": 1,
+        "--notes": 1,
+        "--name-conflict": 1,
+        "--add-to-source-control": 0,
+        "--no-add-to-source-control": 0,
+        "--check-out-from-source-control": 0,
+        "--no-check-out-from-source-control": 0,
+    }
+    try:
+        prefix_length = next(
+            index
+            for index, value in enumerate(step.arguments)
+            if isinstance(value, str) and value in arities
+        )
+    except StopIteration:
+        return actual
+    if len(actual) < prefix_length:
+        return actual
+
+    def parse(values: Sequence[Any]) -> dict[str, tuple[Any, ...]] | None:
+        groups: dict[str, tuple[Any, ...]] = {}
+        index = prefix_length
+        while index < len(values):
+            option = values[index]
+            arity = arities.get(option) if isinstance(option, str) else None
+            if arity is None or option in groups or index + arity >= len(values):
+                return None
+            groups[option] = tuple(values[index : index + arity + 1])
+            index += arity + 1
+        return groups
+
+    expected = parse(step.arguments)
+    observed = parse(actual)
+    if expected is None or observed is None or set(observed) != set(expected):
+        return actual
+    return (
+        *actual[:prefix_length],
+        *(value for option in expected for value in observed[option]),
+    )
+
+
+def _normalize_query_repair_stable_kind(
+    step: "ExpectedGatewayStep",
+    supplied: Sequence[str],
+    payloads_by_step: Mapping[str, Mapping[str, Any]],
+) -> tuple[str, ...]:
+    """Accept a stable closed kind only when it names the exact live candidate."""
+
+    actual = tuple(supplied)
+    if (
+        step.name != "query-repair.refined-kind"
+        or step.subcommand != "query-object"
+        or len(step.arguments) != 4
+        or actual[:1] != ("--kind",)
+        or actual[2:] != ("--max-results", "1")
+    ):
+        return actual
+    payload = payloads_by_step.get("query-repair.ambiguous-kind")
+    agent_result = payload.get("agent_result") if isinstance(payload, Mapping) else None
+    candidates = (
+        agent_result.get("candidates")
+        if isinstance(agent_result, Mapping)
+        else None
+    )
+    first = candidates[0] if isinstance(candidates, list) and candidates else None
+    exact_name = first.get("name") if isinstance(first, Mapping) else None
+    stable_kinds = {
+        "MusicSegment": "music-segment",
+        "MusicTrack": "music-track",
+        "MusicPlaylistContainer": "music-playlist-container",
+        "MusicSwitchContainer": "music-switch-container",
+    }
+    if not isinstance(exact_name, str) or stable_kinds.get(exact_name) != actual[1]:
+        return actual
+    return ("--custom-kind", exact_name, "--max-results", "1")
+
+
 def _normalize_media_pool_business_argument_order(
     step: "ExpectedGatewayStep",
     supplied: Sequence[str],
@@ -12051,6 +12140,11 @@ class CodexGatewayBroker:
             step,
             validation_arguments,
         )
+        validation_arguments = _normalize_query_repair_stable_kind(
+            step,
+            validation_arguments,
+            self._payloads_by_step,
+        )
         validation_arguments = _normalize_query_object_sound_routing_view(
             step,
             validation_arguments,
@@ -12197,6 +12291,10 @@ class CodexGatewayBroker:
             validation_arguments,
         )
         validation_arguments = self._normalize_business_declaration_fact_order(
+            step,
+            validation_arguments,
+        )
+        validation_arguments = _normalize_object_lifecycle_business_argument_order(
             step,
             validation_arguments,
         )

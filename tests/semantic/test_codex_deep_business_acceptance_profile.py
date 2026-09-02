@@ -17,6 +17,9 @@ from tests.semantic.support.codex_deep_business_acceptance_profile import (
     DeepBusinessAcceptanceProfileError,
     load_deep_business_acceptance_profile,
 )
+from tests.semantic.support.codex_eval_protocol_v3 import (
+    build_debug_control_business_transaction_steps,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -63,6 +66,78 @@ def test_deep_business_acceptance_profile_has_the_targeted_acceptance_behaviors(
     )
     assert by_family["named-dangerous-debug-controls"].unit_id == (
         "DBG21-AUTOMATION-PREVIEW"
+    )
+
+
+def test_deep_business_wrapper_preserves_component_turn_and_dispatch_contracts() -> None:
+    profile = load_deep_business_acceptance_profile(PROFILE)
+    query = next(
+        unit
+        for unit in profile.units
+        if unit.unit_id == "TYP22-GENERIC-OBJECT-QUERY"
+    )
+
+    assert query.turns == query.component_unit.turns
+    assert query.expected_audited_dispatch_count == 2
+
+
+def test_deep_business_campaign_seals_its_audio_import_protocol_revision() -> None:
+    effective = {
+        "selection": {"profile": PROFILE_ID},
+        "harness": {
+            "semantic_tree_sha256": "0" * 64,
+            "protocol_manifest_revision": (
+                campaign._CURRENT_AUDIO_IMPORT_PROTOCOL_REVISION
+            ),
+        },
+    }
+
+    assert campaign._sealed_protocol_manifest_revision(effective) == (
+        campaign._CURRENT_AUDIO_IMPORT_PROTOCOL_REVISION
+    )
+
+
+def test_deep_business_archive_accepts_debug_component_with_one_discovery() -> None:
+    wrapper = load_deep_business_acceptance_profile(
+        PROFILE,
+        unit_ids=("DBG21-AUTOMATION-PREVIEW",),
+    ).units[0]
+    component = wrapper.component_unit
+    steps = build_debug_control_business_transaction_steps(
+        version=component.version,
+        label="tx01",
+        enabled=True,
+    )
+    audited = (
+        ("tx01.operations", "operations"),
+        *((step.name, step.subcommand) for step in steps),
+    )
+    names = [name for name, _subcommand in audited]
+    records = [
+        {
+            "step_name": name,
+            "gateway_arguments": [subcommand],
+            "accepted": True,
+            "authenticated": True,
+            "succeeded": True,
+            "exit_code": 0,
+            "payload": (
+                {"agent_result": {"request": steps[-1].expected_operation_request}}
+                if name == "tx01.preview"
+                else {}
+            ),
+        }
+        for name, subcommand in audited
+    ]
+
+    campaign._validate_bound_business_agent_protocol(  # noqa: SLF001
+        {
+            "expected_step_names": names,
+            "consumed_step_names": names,
+            "records": records,
+        },
+        expected_unit=component,
+        profile=wrapper.component_profile_id,
     )
 
 

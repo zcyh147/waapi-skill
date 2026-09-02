@@ -20,6 +20,10 @@ from tests.semantic.support.codex_compound_undo_business_profile import (
     UNIT_IDS,
     load_compound_undo_business_profile,
 )
+from tests.semantic.support.codex_gateway_broker import (
+    ExpectedGatewayStep,
+    _normalize_object_lifecycle_business_argument_order,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -121,6 +125,55 @@ def test_fresh_runner_allows_only_the_one_initial_operations_discovery(
     assert subcommands[0] == "operations"
     assert subcommands.count("operations") == 1
     assert set(subcommands[1:]) == {step.subcommand for step in steps}
+
+
+def test_object_lifecycle_declaration_named_options_are_transport_order_independent() -> None:
+    step = ExpectedGatewayStep(
+        name="tx01.declare-object-change",
+        subcommand="draft-declare-object-change",
+        arguments=(
+            "draft-id",
+            "--task-authority",
+            "authority",
+            "--expected-revision",
+            "2",
+            "--object-handle",
+            "object-handle",
+            "--notes",
+            "Exterior rain loop",
+        ),
+    )
+
+    assert _normalize_object_lifecycle_business_argument_order(
+        step,
+        (
+            "draft-id",
+            "--task-authority",
+            "authority",
+            "--expected-revision",
+            "2",
+            "--notes",
+            "Exterior rain loop",
+            "--object-handle",
+            "object-handle",
+        ),
+    ) == step.arguments
+    wrong = _normalize_object_lifecycle_business_argument_order(
+        step,
+        (
+            "draft-id",
+            "--task-authority",
+            "authority",
+            "--expected-revision",
+            "2",
+            "--notes",
+            "Wrong",
+            "--object-handle",
+            "object-handle",
+        ),
+    )
+    assert wrong != step.arguments
+    assert "Wrong" in wrong
 
 
 @pytest.mark.parametrize("with_discovery", (False, True))

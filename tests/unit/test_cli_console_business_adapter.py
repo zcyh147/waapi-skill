@@ -583,7 +583,35 @@ def test_operations_catalog_routes_cli_console_intent_to_request_schema(
         "authoring_ui_command_id": {
             "choose": ["operation-schema", "ui.commands.execute"],
             "example": "SaveProject",
+            "use_when": "the user explicitly names an installed Wwise UI command ID",
             "never_substitute": "a similarly named native project API",
+        },
+        "connected_project_save": {
+            "choose": ["request-schema", "ak.wwise.core.project.save"],
+            "use_when": "the user asks to save the connected project without naming a UI command ID",
+            "never_substitute": ["operation-schema", "ui.commands.execute"],
+        },
+        "game_parameter_range": {
+            "choose": ["request-schema", "ak.wwise.core.gameParameter.setRange"],
+            "use_when": "the user asks to set one Game Parameter minimum and maximum",
+            "never_substitute": [
+                "operation-schema",
+                "object.setProperty",
+                "object.set",
+            ],
+        },
+        "profiler_data_capture": {
+            "choose": [
+                "request-schema",
+                "ak.wwise.core.profiler.enableProfilerData",
+            ],
+            "use_when": "the user asks to enable or disable named Profiler capture data",
+            "never_guess_uri": True,
+        },
+        "runtime_event_action": {
+            "choose": ["request-schema", "ak.soundengine.executeActionOnEvent"],
+            "use_when": "the user asks to stop, pause, resume, or break one runtime Event",
+            "never_substitute": ["operation-schema", "object.set"],
         },
         "single_reference_edit": {
             "choose": ["operation-schema", "object.setReference"],

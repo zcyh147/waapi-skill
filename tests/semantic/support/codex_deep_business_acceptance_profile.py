@@ -185,6 +185,19 @@ class DeepBusinessAcceptanceUnit:
         value = getattr(self.component_unit, "base_scenario_id", None)
         return None if value is None else str(value)
 
+    @property
+    def turns(self) -> tuple[Any, ...]:
+        return tuple(getattr(self.component_unit, "turns", ()))
+
+    @property
+    def expected_audited_dispatch_count(self) -> int | None:
+        value = getattr(
+            self.component_unit,
+            "expected_audited_dispatch_count",
+            None,
+        )
+        return None if value is None else int(value)
+
 
 @dataclass(frozen=True, slots=True)
 class DeepBusinessAcceptanceProfile:

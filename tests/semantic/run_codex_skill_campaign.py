@@ -1786,7 +1786,10 @@ def _sealed_protocol_manifest_revision(
     profile = selection.get("profile")
     semantic_sha256 = harness.get("semantic_tree_sha256")
     sealed_revision = harness.get("protocol_manifest_revision")
-    if profile == AUDIO_IMPORT_BUSINESS_PROFILE_ID:
+    if profile in {
+        AUDIO_IMPORT_BUSINESS_PROFILE_ID,
+        matrix.DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID,
+    }:
         if sealed_revision == _CURRENT_AUDIO_IMPORT_PROTOCOL_REVISION:
             return _CURRENT_AUDIO_IMPORT_PROTOCOL_REVISION
         if sealed_revision is not None:
@@ -2150,7 +2153,11 @@ def build_heavy_v3_effective_config(
                         _CURRENT_AUDIO_IMPORT_PROTOCOL_REVISION
                     )
                 }
-                if options.profile == AUDIO_IMPORT_BUSINESS_PROFILE_ID
+                if options.profile
+                in {
+                    AUDIO_IMPORT_BUSINESS_PROFILE_ID,
+                    matrix.DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID,
+                }
                 else {}
             ),
         },
@@ -3366,6 +3373,22 @@ def _business_agent_protocol_unit(expected_unit: Any) -> Any:
     return expected_unit if component is None else component
 
 
+def _protocol_manifest_revision_for_unit(
+    expected_unit: Any,
+    options: CampaignOptions,
+) -> str | None:
+    """Scope the audio protocol codec to the wrapped audio-import component."""
+
+    component_profile = str(
+        getattr(expected_unit, "component_profile_id", options.profile)
+    )
+    return (
+        options.protocol_manifest_revision
+        if component_profile == AUDIO_IMPORT_BUSINESS_PROFILE_ID
+        else None
+    )
+
+
 def _validate_audio_import_business_agent_outcome(
     outcome: Mapping[str, Any],
     *,
@@ -3394,7 +3417,18 @@ def _validate_bound_business_agent_protocol(
 ) -> None:
     """Rebuild one non-import Business Agent protocol from frozen suite facts."""
 
-    if profile == matrix.OBJECT_LIFECYCLE_BUSINESS_PROFILE_ID:
+    if profile == matrix.DEBUG_CONTROL_BUSINESS_PROFILE_ID:
+        from tests.semantic.support.codex_eval_protocol_v3 import (
+            build_debug_control_business_transaction_steps,
+        )
+
+        steps = build_debug_control_business_transaction_steps(
+            version=expected_unit.version,
+            label="tx01",
+            enabled=True,
+        )
+        preview_request = steps[-1].expected_operation_request
+    elif profile == matrix.OBJECT_LIFECYCLE_BUSINESS_PROFILE_ID:
         from tests.semantic.support.codex_object_lifecycle_business_agent_runner import (
             build_preview_only_lifecycle_steps,
         )
@@ -3641,6 +3675,11 @@ def _validate_bound_business_agent_protocol(
     expected_names = tuple(step.name for step in steps)
     audited_steps = tuple(steps)
     optional_discovery_labels = {
+        matrix.DEBUG_CONTROL_BUSINESS_PROFILE_ID: "tx01",
+        matrix.OBJECT_LIFECYCLE_BUSINESS_PROFILE_ID: "tx01",
+        matrix.OBJECT_METADATA_BUSINESS_PROFILE_ID: "tx01",
+        matrix.OBJECT_GRAPH_BUSINESS_PROFILE_ID: "tx01",
+        matrix.SWITCH_ASSIGNMENT_BUSINESS_PROFILE_ID: "tx01",
         matrix.COMPOUND_UNDO_BUSINESS_PROFILE_ID: "tx03",
         matrix.CORE_BUSINESS_PROFILE_ID: "tx01",
         matrix.PROJECT_SETTING_BUSINESS_PROFILE_ID: "tx01",
@@ -3834,54 +3873,106 @@ def _validate_audio_import_business_agent_protocol(
             "audio import business protocol revision is unreviewed"
         )
 
-    expected_names = tuple(step.name for step in steps)
-    consumed_names = broker.get("consumed_step_names")
+    canonical_steps = tuple(steps)
+    observed_expected_names = broker.get("expected_step_names")
+    observed_consumed_names = broker.get("consumed_step_names")
+    records = broker.get("records")
     if (
-        broker.get("expected_step_names") != list(expected_names)
-        or not isinstance(consumed_names, list)
-        or len(consumed_names) != len(expected_names)
-        or len(set(consumed_names)) != len(consumed_names)
-        or set(consumed_names) != set(expected_names)
+        not isinstance(observed_expected_names, list)
+        or not isinstance(observed_consumed_names, list)
+        or observed_consumed_names != observed_expected_names
+        or not observed_expected_names
+        or len(observed_expected_names) != len(set(observed_expected_names))
+        or not isinstance(records, list)
+        or len(records) != len(observed_expected_names)
     ):
         raise CampaignEvidenceError(
             "audio import business sealed Broker topology is inconsistent"
         )
-    records = broker.get("records")
-    if not isinstance(records, list) or len(records) != len(expected_names):
-        raise CampaignEvidenceError(
-            "audio import business sealed Broker records are incomplete"
+    audited_steps = canonical_steps
+    if observed_expected_names[0] == "tx01.operations":
+        audited_steps = (
+            ExpectedGatewayStep(
+                name="tx01.operations",
+                subcommand="operations",
+            ),
+            *audited_steps,
         )
-    by_name: dict[str, Mapping[str, Any]] = {}
-    for record in records:
-        name = record.get("step_name") if isinstance(record, Mapping) else None
-        if not isinstance(name, str) or name in by_name:
-            raise CampaignEvidenceError(
-                "audio import business sealed Broker step identity is invalid"
-            )
-        by_name[name] = record
-    for step in steps:
-        record = by_name.get(step.name)
-        arguments = record.get("gateway_arguments") if record is not None else None
+    replay = CodexGatewayBroker(
+        skill_source=SKILL_ROOT,
+        expected_steps=audited_steps,
+        expected_wwise_version=str(expected_unit.version),
+        project_modification_policy="ask_before_changes",
+        runner_environment={},
+    )
+    for index, record in enumerate(records):
+        arguments = (
+            record.get("gateway_arguments")
+            if isinstance(record, Mapping)
+            else None
+        )
         if (
-            record is None
+            not isinstance(record, Mapping)
             or record.get("accepted") is not True
             or record.get("authenticated") is not True
             or record.get("succeeded") is not True
             or record.get("exit_code") != 0
             or not isinstance(arguments, list)
             or not arguments
-            or arguments[0] != step.subcommand
+            or any(not isinstance(value, str) for value in arguments)
+            or index >= len(replay._execution_steps)  # noqa: SLF001
         ):
             raise CampaignEvidenceError(
                 "audio import business sealed Broker record is not successful"
             )
-        if step.subcommand in {
+        actual = tuple(arguments)
+        replay._next_step = index  # noqa: SLF001
+        replay_step = replay._execution_steps[index]  # noqa: SLF001
+        replay_step = replay._rebase_business_draft_revision(  # noqa: SLF001
+            replay_step
+        )
+        replay_step = replay._bind_task_local_declaration_id(  # noqa: SLF001
+            replay_step,
+            actual,
+        )
+        replay._execution_steps[index] = replay_step  # noqa: SLF001
+        try:
+            replay._validate_step(replay_step, actual)  # noqa: SLF001
+        except GatewayInvocationError as first_error:
+            try:
+                matched = (
+                    replay._match_dependency_ready_draft_batch(actual)  # noqa: SLF001
+                    or replay._match_rebatched_import_rows(actual)  # noqa: SLF001
+                    or replay._match_dependency_ready_draft_action(actual)  # noqa: SLF001
+                    or replay._match_dependency_ready_business_setup_step(  # noqa: SLF001
+                        actual
+                    )
+                )
+            except GatewayInvocationError as exc:
+                raise CampaignEvidenceError(
+                    "audio import business archived command cannot replay: "
+                    f"{exc}"
+                ) from exc
+            if matched is None:
+                raise CampaignEvidenceError(
+                    "audio import business archived command cannot replay: "
+                    f"{first_error}"
+                ) from first_error
+            replay_step = matched[0]
+        if record.get("step_name") != replay_step.name:
+            raise CampaignEvidenceError(
+                "audio import business sealed Broker step identity is invalid"
+            )
+        if replay_step.subcommand in {
             "draft-declare-new",
             "draft-declare-existing",
             "draft-declare-import-batch",
         }:
-            _validate_audio_import_business_declaration_language(step, arguments)
-        if step.subcommand == "preview-from-draft":
+            _validate_audio_import_business_declaration_language(
+                replay_step,
+                arguments,
+            )
+        if replay_step.subcommand == "preview-from-draft":
             payload = record.get("payload")
             agent_result = (
                 payload.get("agent_result")
@@ -3894,13 +3985,32 @@ def _validate_audio_import_business_agent_protocol(
                 else None
             )
             expected_request = _bind_audio_import_request_paths(
-                step.expected_operation_request,
+                replay_step.expected_operation_request,
                 objects=getattr(expected_unit, "objects", ()),
             )
             if request != expected_request:
                 raise CampaignEvidenceError(
                     "audio import business sealed Preview request witness drifted"
                 )
+        payload = record.get("payload")
+        if not isinstance(payload, Mapping):
+            raise CampaignEvidenceError(
+                "audio import business sealed Broker payload is malformed"
+            )
+        replay._payloads_by_step[replay_step.name] = payload  # noqa: SLF001
+        replay._next_step = index + 1  # noqa: SLF001
+
+    replay_names = tuple(
+        step.name for step in replay._execution_steps  # noqa: SLF001
+    )
+    consumed_names = broker.get("consumed_step_names")
+    if (
+        replay_names != tuple(observed_expected_names)
+        or tuple(consumed_names) != replay_names
+    ):
+        raise CampaignEvidenceError(
+            "audio import business sealed Broker topology is inconsistent"
+        )
 
 
 def _validate_audio_import_business_declaration_language(
@@ -4054,7 +4164,10 @@ def _validate_heavy_v3_failure_prompt_plan(
         scenario_root=scenario_root,
         expected_unit=expected_unit,
         expected_sha256=receipt_sha256,
-        protocol_manifest_revision=options.protocol_manifest_revision,
+        protocol_manifest_revision=_protocol_manifest_revision_for_unit(
+            expected_unit,
+            options,
+        ),
     )
 
 
@@ -4294,7 +4407,10 @@ def _validate_heavy_v3_retryable_task_failure(
         expected_sha256=str(
             artifact_sha256[HEAVY_V3_PROMPT_MATERIALIZATION_FILE]
         ),
-        protocol_manifest_revision=options.protocol_manifest_revision,
+        protocol_manifest_revision=_protocol_manifest_revision_for_unit(
+            expected_unit,
+            options,
+        ),
     )
     expected_prompts = prompt_evidence.prompts
     protocol = prompt_evidence.provenance.protocol
@@ -5854,7 +5970,10 @@ def _validate_heavy_v3_task_result(
         scenario_root=scenario_root,
         expected_unit=expected_unit,
         expected_sha256=str(value["prompt_materialization_sha256"]),
-        protocol_manifest_revision=options.protocol_manifest_revision,
+        protocol_manifest_revision=_protocol_manifest_revision_for_unit(
+            expected_unit,
+            options,
+        ),
     )
     protocol = prompt_evidence.provenance.protocol
     is_optional_protocol = bool(protocol.allowed_turn_prefix_counts)
@@ -8176,9 +8295,16 @@ def _validate_heavy_v3_pass_checks(
 
     if checks.get("direct_client_closed") is not True:
         raise CampaignEvidenceError("passing project runner did not close its direct client")
-    if checks.get("first_use_intro") is not True or checks.get(
-        "final_response_nonempty"
-    ) is not True:
+    first_use_intro = checks.get("first_use_intro")
+    delegated_typed_intro = (
+        first_use_intro == "delegated_to_dedicated_profile"
+        and getattr(expected_unit, "component_profile_id", None)
+        == TYPED_INPUT_PROFILE_ID
+    )
+    if (
+        first_use_intro is not True
+        and not delegated_typed_intro
+    ) or checks.get("final_response_nonempty") is not True:
         raise CampaignEvidenceError(
             "passing project checks lack intro or final-response proof"
         )

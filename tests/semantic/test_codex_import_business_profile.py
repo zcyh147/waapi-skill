@@ -726,14 +726,55 @@ def _write_synthetic_agent_evidence(
         )["steps"]
     }
     records = []
-    explicit_sfx_added = False
+    responses: dict[str, dict[str, object]] = {}
+    draft_id = "od1-" + "1" * 32
+    task_authority = "da1-" + "2" * 40
+    revision = 0
+    bound_object_index = 0
     for step in steps:
-        gateway_arguments = [step.subcommand]
-        if step.allow_explicit_derived_sfx_language and not explicit_sfx_added:
-            gateway_arguments.extend(("--field", "language", "SFX"))
-            explicit_sfx_added = True
-        payload = (
-            {
+        gateway_arguments = [
+            step.subcommand,
+            *_render_step_arguments(step, responses),
+        ]
+        if step.subcommand == "draft-start":
+            revision = 1
+            payload = {
+                "draft": {"draft_id": draft_id, "revision": revision},
+                "task_authority": task_authority,
+            }
+        elif step.subcommand == "draft-bind-object":
+            revision += 1
+            bound_object_index += 1
+            payload = {
+                "draft": {"draft_id": draft_id, "revision": revision},
+                "bound_object": {
+                    "handle": "boh1-" + f"{bound_object_index:032x}"
+                },
+            }
+        elif step.subcommand == "draft-bind-field":
+            revision += 1
+            payload = {
+                "draft": {"draft_id": draft_id, "revision": revision},
+                "bound_field": {
+                    "handle": "bfh1-" + f"{revision:032x}"
+                },
+            }
+        elif step.subcommand.startswith("draft-declare"):
+            revision += 1
+            payload = {
+                "draft": {"draft_id": draft_id, "revision": revision}
+            }
+        elif step.subcommand == "draft-business-configure":
+            revision += 1
+            payload = {
+                "draft": {"draft_id": draft_id, "revision": revision}
+            }
+        elif step.subcommand == "draft-check":
+            payload = {
+                "draft": {"draft_id": draft_id, "revision": revision}
+            }
+        elif step.subcommand == "preview-from-draft":
+            payload = {
                 "agent_result": {
                     "request": campaign._bind_audio_import_request_paths(
                         serialized_steps[step.name][
@@ -743,9 +784,9 @@ def _write_synthetic_agent_evidence(
                     )
                 }
             }
-            if step.subcommand == "preview-from-draft"
-            else {}
-        )
+        else:
+            payload = {}
+        responses[step.name] = payload
         records.append(
             {
                 "step_name": step.name,
@@ -790,6 +831,106 @@ def _write_synthetic_agent_evidence(
     ):
         path.write_text(json.dumps(payload), encoding="utf-8")
     return outcome, steps
+
+
+def test_campaign_archive_accepts_one_exact_three_row_import_chunk_after_discovery(
+    tmp_path: Path,
+) -> None:
+    unit = load_import_business_profile(
+        PROFILE,
+        unit_ids=("AIB22-WEATHER-A",),
+    ).units[0]
+    _outcome, steps = _write_synthetic_agent_evidence(
+        tmp_path,
+        unit,
+        thread_id="thread-rebatched",
+    )
+    broker_path = tmp_path / "evidence" / "broker-evidence.json"
+    broker = json.loads(broker_path.read_text(encoding="utf-8"))
+    batch_records = [
+        record
+        for record in broker["records"]
+        if record["step_name"].startswith("tx01.declare-batch")
+    ]
+    assert len(batch_records) == 3
+
+    option_arity = {
+        "--media-directory": 1,
+        "--row-order": 1,
+        "--new-root-row": 4,
+        "--new-child-row": 4,
+        "--new-row": 4,
+        "--existing-row": 2,
+        "--field": 3,
+        "--field-value": 3,
+        "--media-file": 2,
+        "--switch-value": 2,
+        "--event": 4,
+    }
+    merged_groups: list[str] = []
+    media_directory: list[str] | None = None
+    for record in batch_records:
+        values = record["gateway_arguments"]
+        cursor = 6
+        while cursor < len(values):
+            option = values[cursor]
+            width = option_arity[option] + 1
+            group = values[cursor : cursor + width]
+            if option == "--media-directory":
+                if media_directory is None:
+                    media_directory = group
+                else:
+                    assert group == media_directory
+            else:
+                merged_groups.extend(group)
+            cursor += width
+    first_batch = batch_records[0]
+    first_batch["gateway_arguments"] = [
+        *first_batch["gateway_arguments"][:6],
+        *(media_directory or ()),
+        *merged_groups,
+    ]
+    first_batch_revision = first_batch["payload"]["draft"]["revision"]
+    replacement_records = []
+    for record in broker["records"]:
+        if record["step_name"] in {
+            "tx01.declare-batch-02",
+            "tx01.declare-batch-03",
+        }:
+            continue
+        if record["step_name"] in {"tx01.check", "tx01.preview"}:
+            expected_revision_index = record["gateway_arguments"].index(
+                "--expected-revision"
+            )
+            record["gateway_arguments"][expected_revision_index + 1] = str(
+                first_batch_revision
+            )
+        if record["step_name"] == "tx01.check":
+            record["payload"]["draft"]["revision"] = first_batch_revision
+        replacement_records.append(record)
+
+    discovery = {
+        "step_name": "tx01.operations",
+        "gateway_arguments": ["operations"],
+        "accepted": True,
+        "authenticated": True,
+        "succeeded": True,
+        "exit_code": 0,
+        "payload": {},
+    }
+    broker["records"] = [discovery, *replacement_records]
+    broker["expected_step_names"] = [
+        "tx01.operations",
+        *(step.name for step in steps if not step.name.endswith(("-02", "-03"))),
+    ]
+    broker["consumed_step_names"] = list(broker["expected_step_names"])
+
+    campaign._validate_audio_import_business_agent_protocol(  # noqa: SLF001
+        broker,
+        expected_unit=unit,
+        scenario_root=tmp_path,
+        protocol_manifest_revision=campaign._CURRENT_AUDIO_IMPORT_PROTOCOL_REVISION,
+    )
 
 
 def test_campaign_validates_the_profile_specific_agent_outcome(tmp_path: Path) -> None:
