@@ -811,7 +811,6 @@ def test_audio_import_batch_chunks_are_atomic_cumulative_and_compact(
         "append_import_chunk",
         "shell_tool_timeout_ms",
         "then_read_next_response",
-        "precompute_or_increment_revision",
     }
     assert batch["draft"]["next_action_binding"]["required_next_phase"] == (
         "bind_later_row_dependencies_or_append_next_import_chunk_or_use_draft_"

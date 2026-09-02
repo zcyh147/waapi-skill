@@ -24528,7 +24528,6 @@ def _business_next_action_binding(
                 ],
                 "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
                 "then_read_next_response": True,
-                "precompute_or_increment_revision": False,
             }
         return {
             "contract": "waapi-skill.business-draft-next-action/v1",
@@ -26431,7 +26430,6 @@ def operation_draft_payload(
                 "append_import_chunk": append_import_chunk,
                 "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
                 "then_read_next_response": True,
-                "precompute_or_increment_revision": False,
             }
             draft = {
                 key: draft[key]
