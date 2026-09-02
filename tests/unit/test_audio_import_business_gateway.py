@@ -802,7 +802,7 @@ def test_audio_import_batch_chunks_are_atomic_cumulative_and_compact(
         "switch_assignment_count": 1,
     }
     assert "declarations_summary" not in batch["draft"]
-    assert "binding" not in batch["draft"]
+    assert batch["draft"]["binding"]["operation"] == "audio.import"
     assert "business_revision" not in batch["draft"]
     assert set(batch["draft"]["next_action_binding"]) == {
         "contract",

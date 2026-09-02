@@ -26410,16 +26410,8 @@ def operation_draft_payload(
                     "fixed_argv_prefix_copy",
                     "fixed_argv_prefix_copy_instruction",
                     "append_repeated",
-                    "segment_order",
                 )
             }
-            bind_additional_object["use_only_when"] = (
-                "a_later_row_needs_an_unbound_parent_bus_event_parent_or_"
-                "reference_target"
-            )
-            bind_additional_object["result"] = (
-                "copy_the_returned_bound_object.handle"
-            )
             next_action_binding = {
                 "contract": "waapi-skill.business-draft-next-action/v1",
                 "required_next_phase": (
@@ -26437,6 +26429,7 @@ def operation_draft_payload(
                     "draft_id",
                     "lifecycle_state",
                     "revision",
+                    "binding",
                 )
                 if key in draft
             }
