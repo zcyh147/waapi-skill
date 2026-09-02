@@ -4408,7 +4408,7 @@ def build_audio_import_composer_protocol(
         raise V3ProtocolError(
             "audio.import Composer protocol requires one nonterminal preview"
         )
-    return V3GatewayProtocol(
+    return build_protocol_with_bounded_import_chunks(
         steps=tuple(steps),
         turn_prefix_counts=(preview_indexes[0], len(steps)),
         commutative_read_only_step_groups=commutative_groups,
@@ -5212,6 +5212,67 @@ class V3GatewayProtocol:
         return names
 
 
+def build_protocol_with_bounded_import_chunks(
+    *,
+    steps: Sequence[ExpectedGatewayStep],
+    turn_prefix_counts: Sequence[int],
+    commutative_read_only_step_groups: Sequence[Sequence[str]] = (),
+    commutative_composer_setup_step_groups: Sequence[Sequence[str]] = (),
+    optional_topic_schema_step_groups: Sequence[Sequence[str]] = (),
+) -> V3GatewayProtocol:
+    """Build one protocol whose import rows may use any exact 1..3 partition."""
+
+    sealed_steps = tuple(steps)
+    prefixes = tuple(turn_prefix_counts)
+
+    def savings_at(prefix: int) -> int:
+        counts: dict[str, int] = {}
+        for step in sealed_steps[:prefix]:
+            if step.subcommand != "draft-declare-import-batch":
+                continue
+            flow = step.name.split(".declare-batch", 1)[0]
+            counts[flow] = counts.get(flow, 0) + 1
+        return sum(
+            count - math.ceil(count / AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS)
+            for count in counts.values()
+        )
+
+    savings = tuple(savings_at(prefix) for prefix in prefixes)
+    if not any(savings):
+        return V3GatewayProtocol(
+            steps=sealed_steps,
+            turn_prefix_counts=prefixes,
+            commutative_read_only_step_groups=tuple(
+                tuple(group) for group in commutative_read_only_step_groups
+            ),
+            commutative_composer_setup_step_groups=tuple(
+                tuple(group) for group in commutative_composer_setup_step_groups
+            ),
+            optional_topic_schema_step_groups=tuple(
+                tuple(group) for group in optional_topic_schema_step_groups
+            ),
+        )
+    allowed = tuple(
+        tuple(range(maximum - saved, maximum + 1))
+        for maximum, saved in zip(prefixes, savings, strict=True)
+    )
+    return V3GatewayProtocol(
+        steps=sealed_steps,
+        turn_prefix_counts=prefixes,
+        allowed_turn_prefix_counts=allowed,
+        terminal_prefix_counts=allowed[-1],
+        commutative_read_only_step_groups=tuple(
+            tuple(group) for group in commutative_read_only_step_groups
+        ),
+        commutative_composer_setup_step_groups=tuple(
+            tuple(group) for group in commutative_composer_setup_step_groups
+        ),
+        optional_topic_schema_step_groups=tuple(
+            tuple(group) for group in optional_topic_schema_step_groups
+        ),
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class StructuredRefusal:
     error_code: str
@@ -5293,8 +5354,6 @@ def build_transaction_protocol(
 
     steps: list[ExpectedGatewayStep] = []
     prefixes: list[int] = []
-    prefix_rebatch_savings: list[int] = []
-    cumulative_rebatch_savings = 0
     for index, (request, request_equivalence, metadata_meaning) in enumerate(
         zip(normalized, equivalences, metadata_meanings, strict=True),
         start=1,
@@ -5326,7 +5385,6 @@ def build_transaction_protocol(
                 steps.extend(operation_steps)
                 preview_name = f"{label}.preview"
                 prefixes.append(len(steps))
-                prefix_rebatch_savings.append(cumulative_rebatch_savings)
                 show_name = f"{label}.transaction-show"
                 confirm_name = f"{label}.confirm"
                 execute_name = f"{label}.execute"
@@ -5372,7 +5430,6 @@ def build_transaction_protocol(
                     )
                 if index == len(normalized):
                     prefixes.append(len(steps))
-                    prefix_rebatch_savings.append(cumulative_rebatch_savings)
                 continue
             try:
                 contract = request_contract(str(request["version"]), api)
@@ -5598,20 +5655,6 @@ def build_transaction_protocol(
             # already appended above is identical, so retain only their tail.
             steps.extend(construction)
             preview_name = f"{label}.preview"
-            if operation == "audio.import":
-                request_arguments = request.get("arguments")
-                import_rows = (
-                    request_arguments.get("imports")
-                    if isinstance(request_arguments, Mapping)
-                    else None
-                )
-                if not isinstance(import_rows, list) or not import_rows:
-                    raise V3ProtocolError(
-                        "audio.import business protocol requires import rows"
-                    )
-                cumulative_rebatch_savings += len(import_rows) - math.ceil(
-                    len(import_rows) / AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS
-                )
         else:
             raise V3ProtocolError(
                 f"operation {operation!r} has no typed semantic input mode"
@@ -5621,7 +5664,6 @@ def build_transaction_protocol(
         # operation's actual typed construction (which may contain many Draft
         # actions), never from a fixed two-step assumption.
         prefixes.append(len(steps))
-        prefix_rebatch_savings.append(cumulative_rebatch_savings)
         if refusal is not None:
             continue
 
@@ -5672,7 +5714,6 @@ def build_transaction_protocol(
             )
         if index == len(normalized):
             prefixes.append(len(steps))
-            prefix_rebatch_savings.append(cumulative_rebatch_savings)
         else:
             # The next loop appends its schema/preview into this same
             # confirmation turn.  Its prefix is recorded after that append.
@@ -5680,23 +5721,10 @@ def build_transaction_protocol(
 
     if refusal is not None:
         prefixes = [len(steps)]
-        prefix_rebatch_savings = [cumulative_rebatch_savings]
-    if any(prefix_rebatch_savings):
-        allowed = tuple(
-            tuple(range(maximum - savings, maximum + 1))
-            for maximum, savings in zip(
-                prefixes,
-                prefix_rebatch_savings,
-                strict=True,
-            )
-        )
-        return V3GatewayProtocol(
-            tuple(steps),
-            tuple(prefixes),
-            allowed_turn_prefix_counts=allowed,
-            terminal_prefix_counts=allowed[-1],
-        )
-    return V3GatewayProtocol(tuple(steps), tuple(prefixes))
+    return build_protocol_with_bounded_import_chunks(
+        steps=steps,
+        turn_prefix_counts=prefixes,
+    )
 
 
 def build_metadata_transaction_protocol(
@@ -6003,7 +6031,7 @@ def build_metadata_transaction_protocol(
         raise V3ProtocolError(
             "metadata-bound typed transaction has no token-bearing input"
         )
-    return V3GatewayProtocol(
+    return build_protocol_with_bounded_import_chunks(
         steps=tuple(steps),
         turn_prefix_counts=tuple(value + 1 for value in base.turn_prefix_counts),
     )
@@ -6058,7 +6086,7 @@ def build_schema_query_transaction_protocol(
         raise V3ProtocolError(
             "schema-query transaction requires one typed transaction prefix"
         )
-    return V3GatewayProtocol(
+    return build_protocol_with_bounded_import_chunks(
         steps=(query_step, *base.steps),
         turn_prefix_counts=tuple(value + 1 for value in base.turn_prefix_counts),
     )
@@ -6355,7 +6383,7 @@ def build_modification_policy_protocol(
         verify,
         arguments=(ResponseBinding(direct_execute.name, "/transaction_id"),),
     )
-    return V3GatewayProtocol(
+    return build_protocol_with_bounded_import_chunks(
         steps=(
             *construction,
             direct_execute,
@@ -7060,6 +7088,7 @@ __all__ = [
     "build_switch_assignment_business_transaction_steps",
     "build_object_graph_business_transaction_steps",
     "build_object_set_composer_transaction_steps",
+    "build_protocol_with_bounded_import_chunks",
     "build_modification_policy_protocol",
     "build_metadata_transaction_protocol",
     "build_schema_query_transaction_protocol",

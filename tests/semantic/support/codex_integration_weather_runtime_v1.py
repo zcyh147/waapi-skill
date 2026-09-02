@@ -21,6 +21,7 @@ from typing import Any, Callable, Mapping, Sequence
 
 from tests.semantic.support.codex_eval_protocol_v3 import (
     V3GatewayProtocol,
+    build_protocol_with_bounded_import_chunks,
     build_transaction_protocol,
     metadata_candidate_limit,
 )
@@ -1300,9 +1301,9 @@ def _build_metadata_workflow_protocol(
             "tx03.verify",
         )
     )
-    return V3GatewayProtocol(
-        tuple(steps),
-        prefixes,
+    return build_protocol_with_bounded_import_chunks(
+        steps=tuple(steps),
+        turn_prefix_counts=prefixes,
         commutative_read_only_step_groups=tuple(
             (f"{prefix}.operation-schema", f"{prefix}.metadata")
             for prefix, metadata_row in metadata_by_tx.items()

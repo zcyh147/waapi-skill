@@ -435,7 +435,7 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
         for step in protocol.steps
         if step.name.startswith("tx01.declare-batch")
     ]
-    assert len(import_declarations) == 3
+    assert len(import_declarations) == 9
     assert all(
         step.subcommand == "draft-declare-import-batch"
         for step in import_declarations
@@ -445,7 +445,7 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
         for step in protocol.steps
     )
     assert all(
-        step.arguments.count("--row-order") <= 3
+        step.arguments.count("--row-order") == 1
         for step in import_declarations
     )
     assert sum(

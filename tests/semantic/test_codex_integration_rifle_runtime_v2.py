@@ -738,7 +738,11 @@ def test_prepares_exact_gateway_checked_use_existing_batch(
         "tx01.execute",
         "tx01.verify",
     )
-    assert prepared.protocol.turn_prefix_counts == (11, 15)
+    assert prepared.protocol.turn_prefix_counts == (13, 17)
+    assert prepared.protocol.allowed_turn_prefix_counts == (
+        (11, 12, 13),
+        (15, 16, 17),
+    )
     assert prepared.protocol.commutative_read_only_step_groups == ()
     assert prepared.protocol.commutative_composer_setup_step_groups == ()
     assert all(step.subcommand != "metadata" for step in prepared.protocol.steps)
@@ -761,7 +765,7 @@ def test_rifle_business_protocol_preserves_every_exact_import_row(
         for step in prepared.protocol.steps
         if step.name.startswith("tx01.declare-batch")
     ]
-    assert len(declarations) == 2
+    assert len(declarations) == 4
     assert all(
         step.subcommand == "draft-declare-import-batch"
         for step in declarations
@@ -779,10 +783,10 @@ def test_rifle_business_protocol_preserves_every_exact_import_row(
     assert batch_arguments.count("--existing-row") == 4
     assert batch_arguments.count("--row-order") == 4
     assert all(
-        declaration.arguments.count("--row-order") <= 3
+        declaration.arguments.count("--row-order") == 1
         for declaration in declarations
     )
-    assert batch_arguments.count("--media-directory") == 2
+    assert batch_arguments.count("--media-directory") == 4
     assert batch_arguments.count("--media-file") == 4
     media_directories = {
         Path(str(declaration.arguments[index + 1]))

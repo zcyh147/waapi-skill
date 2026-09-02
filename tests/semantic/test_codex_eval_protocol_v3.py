@@ -17,6 +17,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_direct_protocol,
     build_exact_artifact_business_transaction_steps,
     build_metadata_transaction_protocol,
+    build_modification_policy_protocol,
     build_object_lifecycle_business_transaction_steps,
     build_object_graph_business_transaction_steps,
     build_workflow_operations_discovery_protocol,
@@ -1116,6 +1117,34 @@ def test_audio_import_protocol_seals_rows_individually_but_allows_bounded_chunks
     assert protocol.allowed_turn_prefix_counts == tuple(
         tuple(range(maximum - 4, maximum + 1))
         for maximum in protocol.turn_prefix_counts
+    )
+    assert protocol.terminal_prefix_counts == protocol.allowed_turn_prefix_counts[-1]
+
+
+def test_allow_changes_preserves_bounded_audio_import_chunks() -> None:
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "audio.import",
+        "arguments": {
+            "imports": [
+                {
+                    "object_path": (
+                        rf"\Actor-Mixer Hierarchy\Default Work Unit\Layer_{index}"
+                    ),
+                    "object_type": "ActorMixer",
+                }
+                for index in range(1, 7)
+            ]
+        },
+    }
+    base = build_transaction_protocol([request])
+
+    protocol = build_modification_policy_protocol(base, policy="allow_changes")
+
+    maximum = len(protocol.steps)
+    assert protocol.allowed_turn_prefix_counts == (
+        tuple(range(maximum - 4, maximum + 1)),
     )
     assert protocol.terminal_prefix_counts == protocol.allowed_turn_prefix_counts[-1]
 

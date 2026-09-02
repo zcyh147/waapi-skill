@@ -36,6 +36,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     OPERATION_REQUEST_CONTRACT,
     V3GatewayProtocol,
     build_audio_import_composer_transaction_steps,
+    build_protocol_with_bounded_import_chunks,
     build_transaction_protocol,
 )
 from tests.semantic.support.codex_gateway_broker import (
@@ -517,7 +518,7 @@ def prepare_footsteps_integration_runtime(
                 if not step.name.startswith("tx01.")
             ),
         )
-        protocol = V3GatewayProtocol(
+        protocol = build_protocol_with_bounded_import_chunks(
             steps=steps,
             turn_prefix_counts=tuple(
                 next(

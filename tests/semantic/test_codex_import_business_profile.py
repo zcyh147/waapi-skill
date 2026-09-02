@@ -388,16 +388,19 @@ def test_implicit_create_uses_the_planned_parent_instead_of_live_binding_it() ->
     assert all(
         step.subcommand != "draft-business-configure" for step in steps
     )
-    batch = next(
+    batches = tuple(
         step
         for step in steps
         if step.subcommand == "draft-declare-import-batch"
     )
-    assert "sound-sfx" in batch.arguments
-    assert "--new-row" in batch.arguments
-    assert "--new-root-row" not in batch.arguments
-    assert "--new-child-row" not in batch.arguments
-    assert "language" not in batch.arguments
+    batch_arguments = tuple(
+        argument for batch in batches for argument in batch.arguments
+    )
+    assert "sound-sfx" in batch_arguments
+    assert "--new-row" in batch_arguments
+    assert "--new-root-row" not in batch_arguments
+    assert "--new-child-row" not in batch_arguments
+    assert "language" not in batch_arguments
 
 
 def test_existing_target_derives_reimport_while_replace_remains_explicit() -> None:
@@ -473,14 +476,19 @@ def test_use_existing_protocol_binds_live_rows_and_declares_missing_rows() -> No
     bindings = [
         step for step in steps if step.subcommand == "draft-bind-object"
     ]
-    batch = next(
-        step for step in steps if step.subcommand == "draft-declare-import-batch"
-    )
-    assert batch.allow_explicit_derived_sfx_language is True
-    declaration = next(
+    declarations = tuple(
         step
         for step in steps
         if step.subcommand == "draft-declare-import-batch"
+    )
+    assert all(
+        declaration.allow_explicit_derived_sfx_language
+        for declaration in declarations
+    )
+    declaration_arguments = tuple(
+        argument
+        for declaration in declarations
+        for argument in declaration.arguments
     )
 
     assert len(bindings) == 2
@@ -492,8 +500,8 @@ def test_use_existing_protocol_binds_live_rows_and_declares_missing_rows() -> No
         "--object-path-segment",
         "Rifle",
     )
-    assert "--existing-row" in declaration.arguments
-    assert "--new-row" in declaration.arguments
+    assert "--existing-row" in declaration_arguments
+    assert "--new-row" in declaration_arguments
 
 
 def test_profile_filters_preserve_independent_unit_identity() -> None:
