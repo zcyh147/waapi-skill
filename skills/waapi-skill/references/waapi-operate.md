@@ -54,7 +54,7 @@ Public mutation identities are closed to `id`, `path`, `exact-type-name`, `direc
 
 Select the operation whose postcondition and verifier match the request; `operation.selection_guidance` and `interface.selection_guidance` govern. **Media gate:** a request that names Sound/SFX nodes but supplies no media artifact or import intent is a pure object hierarchy and selects `object.create`.
 
-An exact CamelCase Wwise Authoring command ID such as `SaveProject` is not a native URI. Its `operations.routing_precedence` rule selects `ui.commands.execute` and overrides generic connected-project save intent.
+An exact CamelCase Wwise Authoring command ID such as `SaveProject` is not a native URI. It directly selects `operation-schema ui.commands.execute`; screen capture directly selects `operation-schema ui.captureScreen`. Both skip `operations`, and command-ID routing overrides generic connected-project save intent. If a larger request already required the catalog, `operations.routing_precedence` preserves the same choice.
 
 When media import is primary, use one `audio.import` to replace media on existing Sounds or create a Sound in the same batch; `object.set` is never a preliminary schema for that outcome. New target-container hierarchy and same-row Event/Switch outcomes remain in that transaction; never probe `object.create` or a separate assignment first. From 2023.1, `object.set` may carry media only when import is subordinate to broader existing-target work.
 

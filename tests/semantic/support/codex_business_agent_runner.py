@@ -59,6 +59,7 @@ class BusinessAgentRunSpec:
     optional_initial_query_object_arguments: (
         Callable[[Any], Sequence[str]] | None
     ) = None
+    requires_initial_operations_discovery: bool = True
 
 
 def _only_expected_business_commands(
@@ -173,10 +174,15 @@ def run_business_agent_unit(
     evidence.mkdir(parents=True, exist_ok=False)
     skill_install = prepare_workspace_skill_install(workspace, options.skill_source)
     runtime = spec.prepare_runtime(unit, task_root / "runtime")
-    steps = business_agent_required_operations_steps(
-        unit,
-        steps=tuple(spec.build_steps(runtime)),
-        explicit=spec.optional_initial_operations_discovery_operation,
+    built_steps = tuple(spec.build_steps(runtime))
+    steps = (
+        business_agent_required_operations_steps(
+            unit,
+            steps=built_steps,
+            explicit=spec.optional_initial_operations_discovery_operation,
+        )
+        if spec.requires_initial_operations_discovery
+        else built_steps
     )
     optional_operations_discovery = None
     optional_query_arguments = (

@@ -155,6 +155,7 @@ def run_authoring_ui_business_agent_unit(
             transaction_count=lambda _runtime: 1,
             preview_gates=_authoring_ui_preview_gates,
             outcome_factory=AuthoringUiBusinessAgentOutcome,
+            requires_initial_operations_discovery=False,
         ),
     )
 

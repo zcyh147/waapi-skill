@@ -2227,6 +2227,14 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   Skill examples therefore label `request-schema` as accepting only an exact
   user-supplied URI. Broker rejection remains strict and these roots receive no
   PASS credit.
+- Second follow-up: candidate `48766d3` made the precedence visible first and
+  the next Mac probe selected `ui.commands.execute` correctly, but then skipped
+  the still-mandatory catalog hop. That is evidence that more routing prose is
+  the wrong seam. Exact Authoring command IDs and capture intent are closed
+  fixed routes: expose their named operation schemas directly, omit
+  `operations` from the public/Fresh protocol, and retain fresh live command
+  inventory validation inside the later Gateway-owned plan. Keep catalog-first
+  behavior for all other natural-language mutations.
 
 ### Broker optional prefixes and archive audit must evolve together
 

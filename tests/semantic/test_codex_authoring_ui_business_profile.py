@@ -74,7 +74,6 @@ def test_each_unit_compiles_to_one_closed_public_business_preview(
     )
 
     expected = [
-        "operations",
         "operation-schema",
         "draft-start",
         "draft-declare-ui-plan",

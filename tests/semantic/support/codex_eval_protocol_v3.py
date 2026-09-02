@@ -3383,12 +3383,6 @@ def build_authoring_ui_business_transaction_steps(
 
     draft = _BusinessDraftSteps.start(operation=operation, label=label)
     steps = draft.steps
-    steps[:0] = [
-        ExpectedGatewayStep(
-            name=f"{label}.operations",
-            subcommand="operations",
-        )
-    ]
     declaration_name = f"{label}.declare-ui-plan"
     steps.append(
         ExpectedGatewayStep(

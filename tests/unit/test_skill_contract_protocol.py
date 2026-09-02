@@ -860,6 +860,9 @@ def test_operate_business_selection_and_execution_domains_remain_explicit() -> N
     assert "An exact CamelCase Wwise Authoring command ID" in OPERATE
     assert "`operations.routing_precedence`" in OPERATE
     assert "overrides generic connected-project save intent" in OPERATE
+    assert "operation-schema ui.commands.execute" in OPERATE
+    assert "operation-schema ui.captureScreen" in OPERATE
+    assert "skip `operations`" in OPERATE
     assert "Batch size never establishes file-workflow intent" in compact
     assert "When media import is primary" in compact
     assert "replace media on existing Sounds" in compact
