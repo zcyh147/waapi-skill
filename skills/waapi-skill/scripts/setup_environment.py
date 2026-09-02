@@ -16,14 +16,18 @@ try:  # pragma: no cover - import path differs between CLI and tests
         PackagedScriptError,
         SKILL_DIR,
         VENV_DIR,
+        environment_is_ready,
         resolve_packaged_script,
+        write_environment_ready_marker,
     )
 except ImportError:  # pragma: no cover
     from .config import (
         PackagedScriptError,
         SKILL_DIR,
         VENV_DIR,
+        environment_is_ready,
         resolve_packaged_script,
+        write_environment_ready_marker,
     )
 
 
@@ -60,13 +64,18 @@ class SkillEnvironment:
             venv.create(self.venv_dir, with_pip=True)
 
         if not self.requirements_file.exists():
+            write_environment_ready_marker(self.venv_dir, self.skill_dir)
             return True
 
         subprocess.run(
             [str(self.pip_executable), "install", "-r", str(self.requirements_file)],
             check=True,
         )
+        write_environment_ready_marker(self.venv_dir, self.skill_dir)
         return True
+
+    def is_ready(self) -> bool:
+        return environment_is_ready(self.venv_dir, self.skill_dir)
 
     def run(self, script_name: str, args: list[str]) -> int:
         try:
@@ -95,7 +104,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.check:
         print(env.venv_dir)
-        return 0 if env.venv_dir.exists() else 1
+        return 0 if env.is_ready() else 1
 
     if args.run:
         return env.run(args.run, args.args)

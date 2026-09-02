@@ -38,6 +38,7 @@ from tests.destructive.support.sandbox_fixture import (  # pyright: ignore[repor
 from tests.semantic.support.typed_gateway_input import (  # pyright: ignore[reportMissingImports]
     create_object_lifecycle_business_preview,
     create_typed_transaction_preview,
+    prepare_packaged_skill_environment,
     typed_wait_topic_command,
 )
 from tests.semantic.support.codex_harness import (  # pyright: ignore[reportMissingImports]
@@ -261,6 +262,16 @@ def gateway_sandbox_runtime(
         raise AssertionError(
             f"WWISE_VERSION must select one of {SUPPORTED_WWISE_VERSION_KEYS!r}; got {version!r}"
         )
+
+    packaged_env = dict(env)
+    packaged_env.pop(CODEX_GATEWAY_REQUIRED_ENV, None)
+    packaged_env[PYTHON_IO_ENCODING_ENV] = "utf-8:strict"
+    prepare_packaged_skill_environment(
+        python_executable=sys.executable,
+        setup_script=SKILL_ROOT / "scripts" / "setup_environment.py",
+        skill_root=SKILL_ROOT,
+        environment=packaged_env,
+    )
 
     lock = LiveSandboxLock(_safe_lock_root(env))
     sandbox: SandboxProject | None = None

@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import shlex
 from collections.abc import Mapping, Sequence
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -11,6 +12,7 @@ from tests.semantic.support.typed_gateway_input import (
     create_object_lifecycle_business_preview,
     declared_business_object_handle,
     discovered_business_field_handle,
+    prepare_packaged_skill_environment,
 )
 from wwise_waapi.platform_commands import encode_windows_model_argv
 
@@ -253,3 +255,42 @@ def test_discovered_business_field_handle_accepts_reviewed_single_field_projecti
     }
 
     assert discovered_business_field_handle(payload, "volume") == "bfh1-volume"
+
+
+def test_packaged_runtime_preflight_repairs_before_live_ack_window(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    calls: list[list[str]] = []
+    returncodes = iter((1, 0, 0))
+
+    class Result:
+        def __init__(self, returncode: int) -> None:
+            self.returncode = returncode
+            self.stdout = ""
+            self.stderr = ""
+
+    def run(command, **options):
+        assert options["cwd"] == str(tmp_path / "skill")
+        assert options["timeout"] == 300
+        calls.append([str(item) for item in command])
+        return Result(next(returncodes))
+
+    monkeypatch.setattr(
+        "tests.semantic.support.typed_gateway_input.subprocess.run",
+        run,
+    )
+
+    prepare_packaged_skill_environment(
+        python_executable="python-test",
+        setup_script=tmp_path / "skill" / "scripts" / "setup_environment.py",
+        skill_root=tmp_path / "skill",
+        environment={"PATH": "sealed"},
+    )
+
+    assert calls[0][-1] == "--check"
+    assert calls[1] == [
+        "python-test",
+        str(tmp_path / "skill" / "scripts" / "setup_environment.py"),
+    ]
+    assert calls[2][-1] == "--check"

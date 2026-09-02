@@ -543,6 +543,19 @@ prevention checks that are expensive to rediscover.
   bootstrap progress, pip output, and venv-path receipt is redirected to stderr.
   `test_run_bootstrap_if_needed_invokes_setup_when_venv_missing` seals that
   invariant so a clean ordinary real-test worktree cannot prefix Gateway JSON.
+  The reopened #59 Windows 2022.1 Topic root exposed the interrupted form: its
+  15-second subscription-ACK window killed a slower first-run pip install,
+  leaving an existing `.venv` with dependencies but no `waapi-client`. The next
+  root skipped bootstrap on directory existence and failed immediately with
+  `No module named 'waapi'`; both roots were quarantined with unchanged source
+  hash/mtime and zero residual processes.
+- Prevention for partial environments: setup writes an atomic readiness marker
+  only after the exact requirements install succeeds. The marker binds the
+  requirements digest; a missing, stale, malformed, or symlinked marker makes
+  `run.py` repair the environment even when `.venv` already exists. Real Topic
+  fixtures finish and recheck this setup before Wwise startup and before the
+  ACK timer begins. Dependency installation time is therefore never classified
+  as subscription latency.
 
 ### A clean Windows pytest worktree selected the Store Python alias
 

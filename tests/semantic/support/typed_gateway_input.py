@@ -11,7 +11,9 @@ from __future__ import annotations
 import argparse
 import json
 import shlex
+import subprocess
 from collections.abc import Callable, Mapping, Sequence
+from pathlib import Path
 from typing import Any
 
 from tests.semantic.support.codex_eval_protocol_v3 import (
@@ -58,6 +60,63 @@ from wwise_waapi.typed_requests import (
 
 
 GatewayCall = Callable[[Sequence[str]], Mapping[str, Any]]
+
+
+def prepare_packaged_skill_environment(
+    *,
+    python_executable: str | Path,
+    setup_script: str | Path,
+    skill_root: str | Path,
+    environment: Mapping[str, str],
+    timeout_seconds: float = 300,
+) -> None:
+    """Repair and attest the packaged runtime before any live timing window."""
+
+    base = [str(python_executable), str(setup_script)]
+
+    def invoke(arguments: Sequence[str]) -> subprocess.CompletedProcess[str]:
+        try:
+            return subprocess.run(
+                [*base, *arguments],
+                cwd=str(skill_root),
+                env=dict(environment),
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=timeout_seconds,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise AssertionError(
+                "packaged Skill environment preflight exceeded its bounded timeout"
+            ) from exc
+
+    checked = invoke(("--check",))
+    if checked.returncode == 0:
+        return
+    prepared = invoke(())
+    if prepared.returncode != 0:
+        raise AssertionError(
+            "packaged Skill environment setup failed before live startup: "
+            + _bounded_process_result(prepared)
+        )
+    rechecked = invoke(("--check",))
+    if rechecked.returncode != 0:
+        raise AssertionError(
+            "packaged Skill environment remained incomplete after setup: "
+            + _bounded_process_result(rechecked)
+        )
+
+
+def _bounded_process_result(result: subprocess.CompletedProcess[str]) -> str:
+    return (
+        f"exit={result.returncode} "
+        f"stdout_tail={result.stdout[-2000:]!r} "
+        f"stderr_tail={result.stderr[-2000:]!r}"
+    )
 
 
 def declared_business_object_handle(
@@ -946,5 +1005,6 @@ __all__ = [
     "create_typed_transaction_preview",
     "declared_business_object_handle",
     "discovered_business_field_handle",
+    "prepare_packaged_skill_environment",
     "typed_wait_topic_command",
 ]
