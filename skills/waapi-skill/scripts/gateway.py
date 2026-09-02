@@ -22803,18 +22803,19 @@ def _compact_business_binding_continuation(value: Any) -> Any:
     return value
 
 
-def _compact_object_set_post_bind_continuation(
+def _compact_object_set_update_continuation(
     value: Mapping[str, Any],
     *,
+    command: str,
     draft_id: str,
     task_authority: str,
 ) -> dict[str, Any]:
-    """Keep common object.set follow-ups visible after one object binding.
+    """Keep only phase-relevant object.set follow-ups Agent-visible.
 
     The complete capability catalog remains available through one exact
     ``draft-inspect`` continuation. Repeating every long-tail action and copy
-    policy after each target binding can exceed an Agent shell view even though
-    the JSON result itself is complete.
+    policy after each binding or field discovery can exceed an Agent shell view
+    even though the JSON result itself is complete.
     """
 
     object_binding = value.get("object_binding")
@@ -22851,13 +22852,12 @@ def _compact_object_set_post_bind_continuation(
         )
         if key in value
     }
-    if compact_object_binding:
+    if command == "draft-bind-object" and compact_object_binding:
         compact["object_binding"] = compact_object_binding
-    for key in (
-        "field_discovery",
-        "declare_existing",
-        "declare_new",
-    ):
+    common_actions = ["field_discovery", "declare_existing"]
+    if command == "draft-bind-object":
+        common_actions.append("declare_new")
+    for key in common_actions:
         if key in value:
             compact[key] = value[key]
     compact["more_actions"] = {
@@ -26219,9 +26219,13 @@ def operation_draft_payload(
             next_action_binding = _compact_business_binding_continuation(
                 next_action_binding
             )
-            if command == "draft-bind-object" and record.operation == "object.set":
-                next_action_binding = _compact_object_set_post_bind_continuation(
+            if (
+                command in {"draft-bind-object", "draft-discover-fields"}
+                and record.operation == "object.set"
+            ):
+                next_action_binding = _compact_object_set_update_continuation(
                     next_action_binding,
+                    command=command,
                     draft_id=record.draft_id,
                     task_authority=(
                         task_authority or "<task-authority-from-draft-start>"

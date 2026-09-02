@@ -1124,6 +1124,19 @@ def test_object_set_discovers_two_business_field_meanings_in_one_revision(
         row["candidate_count"] == 1
         for row in discovered["meaning_results"]
     )
+    continuation = discovered["draft"]["next_action_binding"]
+    assert set(continuation) == {
+        "contract",
+        "required_next_phase",
+        "field_discovery",
+        "declare_existing",
+        "more_actions",
+        "shell_tool_timeout_ms",
+        "then_read_next_response",
+        "precompute_or_increment_revision",
+    }
+    assert continuation["more_actions"]["fixed_full_argv"][3] == "draft-inspect"
+    assert len(json.dumps(discovered, separators=(",", ":")).encode("utf-8")) < 8_000
     rejected_client = _live_client(
         tmp_path,
         {
