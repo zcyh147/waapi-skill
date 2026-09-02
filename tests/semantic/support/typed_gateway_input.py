@@ -82,33 +82,55 @@ def discovered_business_field_handle(
     payload: Mapping[str, Any],
     meaning: str,
 ) -> str:
-    """Read one object.set Field Handle from its deduplicated meaning row."""
+    """Read one Field Handle from either reviewed public discovery projection."""
 
-    if payload.get("candidate_projection") != (
+    normalized = " ".join(meaning.split()).casefold()
+    projection = payload.get("candidate_projection")
+    if projection == (
         "meaning_results[].candidates_without_duplicate_top_level_rows"
     ):
+        results = payload.get("meaning_results")
+        if not isinstance(results, list):
+            raise AssertionError("business field discovery has no meaning results")
+        matches = [
+            row
+            for row in results
+            if isinstance(row, Mapping)
+            and isinstance(row.get("meaning"), str)
+            and " ".join(str(row["meaning"]).split()).casefold() == normalized
+        ]
+        if len(matches) != 1:
+            raise AssertionError("business field discovery has no exact meaning row")
+        candidates = matches[0].get("candidates")
+        candidate_count = matches[0].get("candidate_count")
+    elif projection is None:
+        raw_candidates = payload.get("field_candidates")
+        if not isinstance(raw_candidates, list):
+            raise AssertionError("business field discovery has no field candidates")
+        candidates = [
+            candidate
+            for candidate in raw_candidates
+            if isinstance(candidate, Mapping)
+            and any(
+                isinstance(matched, str)
+                and " ".join(matched.split()).casefold() == normalized
+                for matched in candidate.get("matched_meanings", [])
+            )
+        ]
+        candidate_count = len(candidates)
+        if payload.get("candidate_count") != len(raw_candidates):
+            raise AssertionError("business field discovery candidate count drifted")
+    else:
         raise AssertionError("business field discovery uses an unknown projection")
-    results = payload.get("meaning_results")
-    if not isinstance(results, list):
-        raise AssertionError("business field discovery has no meaning results")
-    normalized = " ".join(meaning.split()).casefold()
-    matches = [
-        row
-        for row in results
-        if isinstance(row, Mapping)
-        and isinstance(row.get("meaning"), str)
-        and " ".join(str(row["meaning"]).split()).casefold() == normalized
-    ]
-    if len(matches) != 1:
-        raise AssertionError("business field discovery has no exact meaning row")
-    candidates = matches[0].get("candidates")
     if (
-        matches[0].get("candidate_count") != 1
+        candidate_count != 1
         or not isinstance(candidates, list)
         or len(candidates) != 1
         or not isinstance(candidates[0], Mapping)
     ):
-        raise AssertionError("business field meaning does not have exactly one candidate")
+        raise AssertionError(
+            "business field meaning does not have exactly one candidate"
+        )
     handle = candidates[0].get("handle")
     if not isinstance(handle, str) or not handle:
         raise AssertionError("business field candidate has no handle")

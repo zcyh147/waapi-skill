@@ -237,3 +237,19 @@ def test_discovered_business_field_handle_uses_deduplicated_meaning_projection()
             },
             "volume",
         )
+
+
+def test_discovered_business_field_handle_accepts_reviewed_single_field_projection() -> None:
+    payload = {
+        "candidate_count": 1,
+        "selection_required": False,
+        "field_candidates": [
+            {
+                "handle": "bfh1-volume",
+                "label": "Volume",
+                "matched_meanings": ["volume"],
+            }
+        ],
+    }
+
+    assert discovered_business_field_handle(payload, "volume") == "bfh1-volume"

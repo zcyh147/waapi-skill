@@ -2137,9 +2137,12 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   only from the matching compact `declared_object` receipt; internal full Draft
   state is not a public test oracle. For `object.set`, select exactly one handle
   from the requested meaning's single candidate and require the declared
-  deduplicated projection; do not fall back to the removed duplicate list. Keep
-  a fast cross-platform regression for these shapes before opening another real
-  root.
+  deduplicated projection; do not fall back to the removed duplicate list.
+  Other reviewed single-field operations such as `object.setRTPC` retain the
+  top-level `field_candidates` projection, so select exactly one candidate by
+  its `matched_meanings` instead of imposing the `object.set` projection on all
+  operations. Keep a fast cross-platform regression for both shapes before
+  opening another real root.
 
 ## New-root preflight
 
