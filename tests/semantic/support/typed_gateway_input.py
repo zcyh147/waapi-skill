@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shlex
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
@@ -27,6 +28,11 @@ from tests.semantic.support.codex_gateway_broker import (
     TypedRequestFactsArgument,
 )
 from wwise_waapi.operation_composer import typed_action_cli_arguments
+from wwise_waapi.platform_commands import (
+    PlatformCommandError,
+    decode_windows_model_argv,
+    decode_windows_powershell_argv,
+)
 from wwise_waapi.authoring_ui_business_cli import (
     AuthoringUiBusinessCliError,
     add_authoring_ui_command_arguments,
@@ -52,6 +58,26 @@ from wwise_waapi.typed_requests import (
 
 
 GatewayCall = Callable[[Sequence[str]], Mapping[str, Any]]
+
+
+def declared_business_object_handle(
+    payload: Mapping[str, Any],
+    declaration_id: str,
+) -> str:
+    """Read one exact object-graph declaration from its compact public receipt."""
+
+    draft = payload.get("draft")
+    receipt = draft.get("declared_object") if isinstance(draft, Mapping) else None
+    if not isinstance(receipt, Mapping):
+        raise AssertionError("business declaration response has no compact object receipt")
+    if receipt.get("declaration_id") != declaration_id:
+        raise AssertionError("business declaration receipt names a different declaration")
+    handle = receipt.get("result_handle")
+    if not isinstance(handle, str) or not handle:
+        raise AssertionError("business declaration receipt has no result handle")
+    return handle
+
+
 def create_object_lifecycle_business_preview(
     gateway: GatewayCall,
     *,
@@ -428,19 +454,25 @@ def _business_copy_binding_was_used(
     ):
         return False
     for candidate in _mapping_nodes(binding):
-        prefix = candidate.get("fixed_argv_prefix")
-        if (
-            not isinstance(prefix, list)
-            or len(prefix) < 4
-            or prefix[:1] != ["python"]
-            or prefix[2:3] != ["gateway.py"]
-        ):
+        exact = _copy_ready_argv(
+            candidate.get("fixed_full_argv"),
+            candidate.get("copy_command"),
+        )
+        if exact is not None and _gateway_argv_tail(exact) == list(command):
+            return True
+
+        prefix = _copy_ready_argv(
+            candidate.get("fixed_argv_prefix"),
+            candidate.get("fixed_argv_prefix_copy"),
+        )
+        gateway_prefix = _gateway_argv_tail(prefix)
+        if gateway_prefix is None or len(gateway_prefix) > len(command):
             continue
         gateway_prefix = [
             command[index]
             if value == "<task-authority-from-draft-start>"
             else value
-            for index, value in enumerate(prefix[3:])
+            for index, value in enumerate(gateway_prefix)
         ]
         if list(command[: len(gateway_prefix)]) != gateway_prefix:
             continue
@@ -499,6 +531,43 @@ def _business_copy_binding_was_used(
         if _business_binding_suffix_matches(candidate, suffix):
             return True
     return False
+
+
+def _copy_ready_argv(
+    argv_value: Any,
+    copy_value: Any,
+) -> list[str] | None:
+    if isinstance(argv_value, list) and all(
+        isinstance(item, str) for item in argv_value
+    ):
+        return list(argv_value)
+    if not isinstance(copy_value, str) or not copy_value:
+        return None
+    for decoder in (
+        decode_windows_model_argv,
+        decode_windows_powershell_argv,
+    ):
+        try:
+            return list(decoder(copy_value))
+        except PlatformCommandError:
+            pass
+    try:
+        decoded = shlex.split(copy_value)
+    except ValueError:
+        return None
+    return decoded if decoded else None
+
+
+def _gateway_argv_tail(argv: Sequence[str] | None) -> list[str] | None:
+    if (
+        argv is None
+        or len(argv) < 4
+        or argv[0] != "python"
+        or not argv[1]
+        or argv[2] != "gateway.py"
+    ):
+        return None
+    return list(argv[3:])
 
 
 def _exact_artifact_plan_suffix_matches(
@@ -816,5 +885,6 @@ __all__ = [
     "create_object_lifecycle_business_preview",
     "create_object_metadata_business_preview",
     "create_typed_transaction_preview",
+    "declared_business_object_handle",
     "typed_wait_topic_command",
 ]

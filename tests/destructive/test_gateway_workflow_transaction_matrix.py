@@ -56,6 +56,7 @@ from tests.semantic.support.typed_gateway_input import (  # pyright: ignore[repo
     create_object_lifecycle_business_preview,
     create_object_metadata_business_preview,
     create_typed_transaction_preview,
+    declared_business_object_handle,
 )
 from tests.support.host_path_relatives import (  # pyright: ignore[reportMissingImports]  # noqa: E402
     relative_host_path,
@@ -434,20 +435,6 @@ def _bind_business_object(
     bound = payload.get("bound_object")
     assert isinstance(bound, Mapping), payload
     return _required_string(bound, "handle")
-
-
-def _declared_result_handle(payload: Mapping[str, Any], declaration_id: str) -> str:
-    draft = payload.get("draft")
-    assert isinstance(draft, Mapping), payload
-    declarations = draft.get("declarations")
-    assert isinstance(declarations, list), draft
-    matches = [
-        row
-        for row in declarations
-        if isinstance(row, Mapping) and row.get("declaration_id") == declaration_id
-    ]
-    assert len(matches) == 1, declarations
-    return _required_string(matches[0], "result_handle")
 
 
 def _discover_business_type(
@@ -2846,7 +2833,7 @@ def test_object_graph_business_draft_executes_weather_graph_plugin_bulk_set_and_
             ],
             live=False,
         )
-        weather_handle = _declared_result_handle(declared_root, "weather")
+        weather_handle = declared_business_object_handle(declared_root, "weather")
         for declaration_id, name, volume in (
             ("rain", rain_name, "-4"),
             ("wind", wind_name, "-6"),

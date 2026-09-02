@@ -2115,6 +2115,25 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   require explicit `operations --detail`. Do not increase Agent tool-output
   limits to compensate for an unnecessarily broad router response.
 
+### Real-test Adapters must consume compact public Draft receipts
+
+- Evidence: the reopened #78 real 2022.1 gate on candidate `03b96bd` failed
+  identically on macOS and Windows before the affected mutations dispatched.
+  The lifecycle Adapter searched only the retired `fixed_argv_prefix` array,
+  while the public continuation intentionally retained only
+  `fixed_argv_prefix_copy`. The object-graph fixture likewise searched the
+  retired full `draft.declarations` list instead of the exact
+  `draft.declared_object` receipt. Both hosts preserved source hashes and
+  mtimes, quarantined the failed sandboxes, cleaned their processes, and
+  stopped before 2025.1.
+- Prevention: a real-test Adapter decodes the same canonical POSIX or Windows
+  copy field selected by its copy instruction, proves the fixed runner/Gateway
+  envelope, and applies the existing operation-specific suffix validator. An
+  exact copy command must match completely. A new-object result handle comes
+  only from the matching compact `declared_object` receipt; internal full Draft
+  state is not a public test oracle. Keep a fast cross-platform regression for
+  both shapes before opening another real root.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:
