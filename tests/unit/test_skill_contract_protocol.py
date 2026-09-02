@@ -860,6 +860,13 @@ def test_operate_business_selection_and_execution_domains_remain_explicit() -> N
     assert "An exact CamelCase Wwise Authoring command ID" in OPERATE
     assert "`operations.routing_precedence`" in OPERATE
     assert "overrides generic connected-project save intent" in OPERATE
+    assert (
+        "Ordinary save wording such as `save the current project` or "
+        "`保存当前工程` selects `request-schema "
+        "ak.wwise.core.project.save`"
+        in OPERATE
+    )
+    assert "never infer or translate that wording into `SaveProject`" in OPERATE
     assert "operation-schema ui.commands.execute" in OPERATE
     assert "operation-schema ui.captureScreen" in OPERATE
     assert "skip `operations`" in OPERATE
