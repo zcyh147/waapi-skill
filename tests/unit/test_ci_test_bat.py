@@ -339,11 +339,17 @@ def test_program_manifest_is_the_single_ordered_cross_platform_node_source() -> 
     lines = PROGRAM_TEST_MANIFEST.read_text(encoding="utf-8").splitlines()
     nodes = load_program_nodes(PROGRAM_TEST_MANIFEST)
 
-    assert len(nodes) == 175
+    assert len(nodes) == 179
     assert nodes[0] == "tests/unit/test_gateway_session_context.py"
     assert nodes[-1] == "tests/unit/test_single_typed_input_cutover.py"
     assert len(nodes) == len(set(nodes))
     assert "tests/unit/test_typed_gateway_input.py" in nodes
+    assert {
+        "tests/unit/test_script_helpers.py::test_environment_ready_marker_binds_requirements_and_rejects_symlink",
+        "tests/unit/test_script_helpers.py::test_run_bootstrap_repairs_existing_venv_without_ready_marker",
+        "tests/unit/test_script_helpers.py::test_setup_environment_ensure_creates_venv_and_installs",
+        "tests/unit/test_script_helpers.py::test_setup_environment_check_rejects_partial_existing_venv",
+    } <= set(nodes)
     for line in lines:
         if not line or line.startswith("#"):
             continue
