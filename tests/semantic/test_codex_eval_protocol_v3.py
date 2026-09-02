@@ -1919,15 +1919,32 @@ def test_audio_import_protocol_serializes_bound_existing_declarations() -> None:
 
     steps = build_audio_import_composer_transaction_steps(request, label="tx01")
     assert sum(step.subcommand == "draft-bind-object" for step in steps) == 5
-    declaration = next(
+    declarations = [
         step
         for step in steps
         if step.subcommand == "draft-declare-import-batch"
+    ]
+    assert len(declarations) == 2
+    assert sum(
+        declaration.arguments.count("--existing-row")
+        for declaration in declarations
+    ) == 5
+    assert sum(
+        declaration.arguments.count("--row-order")
+        for declaration in declarations
+    ) == 5
+    assert all(
+        declaration.arguments.count("--row-order") <= 3
+        for declaration in declarations
     )
-    assert declaration.arguments.count("--existing-row") == 5
-    assert declaration.arguments.count("--row-order") == 5
-    assert "--expected-declaration-count" not in declaration.arguments
-    assert "--expected-switch-assignment-count" not in declaration.arguments
+    assert all(
+        "--expected-declaration-count" not in declaration.arguments
+        for declaration in declarations
+    )
+    assert all(
+        "--expected-switch-assignment-count" not in declaration.arguments
+        for declaration in declarations
+    )
     assert all(step.subcommand != "draft-apply" for step in steps)
 
 

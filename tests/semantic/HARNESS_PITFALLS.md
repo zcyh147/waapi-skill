@@ -2031,6 +2031,34 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   repeated-meaning command on both shell families; do not repair this by asking
   the Agent to split an otherwise closed batch into more commands.
 
+### A large import stays one Preview but not one unbounded shell command
+
+- Evidence: #61 r23 macOS received a 210-argument Weather import command, but
+  the Agent emitted only 95 arguments and silently omitted three rows and their
+  Events. Broker completeness rejected it before Preview; no Wwise mutation
+  occurred.
+- Prevention: `draft-declare-import-batch` appends 1..3 rows per command to the
+  same offline Draft. Each response supplies the exact next-revision append
+  prefix and the completion check; declaration order and parent references are
+  cumulative across chunks. Only the final `draft-check` materializes one
+  atomic import Preview. Gateway and Broker tests require every requested row,
+  every chunk at or below the bound, cross-chunk parent resolution, and one
+  final operation request. Do not raise shell limits or split the user outcome
+  into separate transactions.
+
+### A declaration receipt must carry the next common construction route
+
+- Evidence: #61 r23 native Windows completed several Action declarations, then
+  bound the next Action from memory because the compact post-declaration
+  response exposed only another declaration, field discovery, and completion.
+  Provenance correctly rejected the unreturned binding command.
+- Prevention: after an `object.set` declaration, return one copy-ready shared
+  `draft-bind-object` prefix plus the closed ID, path-segment, and Event-Action
+  selector forms. The prefix is emitted once rather than duplicated three
+  times, keeping the complete response below the Agent-visible byte budget.
+  This preserves exact-copy provenance while allowing bind-next,
+  discover-next-field, declare-next, or check from the current revision.
+
 ### The default operation router must fit one complete Agent-visible frame
 
 - Evidence: #51 macOS `8fcf481` r11 verified the Weather import transaction,

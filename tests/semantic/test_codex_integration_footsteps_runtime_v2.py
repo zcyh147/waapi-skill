@@ -592,8 +592,8 @@ def test_prepare_seals_baseline_inputs_and_exact_two_transaction_protocol(
         in confirmation_prompt
     )
     assert "逐字保留其中每个反斜杠分隔符" in confirmation_prompt
-    assert prepared.protocol.turn_prefix_counts == (6, 18, 22)
-    assert len(prepared.protocol.steps) == 22
+    assert prepared.protocol.turn_prefix_counts == (7, 19, 23)
+    assert len(prepared.protocol.steps) == 23
     assert [
         (step.name, step.subcommand)
         for step in prepared.protocol.steps[:2]
@@ -635,11 +635,19 @@ def test_prepare_seals_baseline_inputs_and_exact_two_transaction_protocol(
     import_declarations = [
         step
         for step in prepared.protocol.steps
-        if step.name == "tx01.declare-batch"
+        if step.name.startswith("tx01.declare-batch")
     ]
-    assert len(import_declarations) == 1
-    assert import_declarations[0].subcommand == (
-        "draft-declare-import-batch"
+    assert len(import_declarations) == 2
+    assert all(
+        step.subcommand == "draft-declare-import-batch"
+        for step in import_declarations
+    )
+    assert sum(
+        step.arguments.count("--row-order") for step in import_declarations
+    ) == 5
+    assert all(
+        step.arguments.count("--row-order") <= 3
+        for step in import_declarations
     )
     assert all(
         step.subcommand != "draft-apply" for step in prepared.protocol.steps
@@ -698,18 +706,23 @@ def test_prepare_seals_baseline_inputs_and_exact_two_transaction_protocol(
     assert _plain(import_preview_step.expected_operation_request) == (
         expected_import_witness
     )
-    batch_arguments = import_declarations[0].arguments
+    batch_arguments = tuple(
+        argument
+        for declaration in import_declarations
+        for argument in declaration.arguments
+    )
     assert batch_arguments.count("--new-row") == 5
     assert "--new-root-row" not in batch_arguments
     assert "--new-child-row" not in batch_arguments
     assert batch_arguments.count("--row-order") == 5
     assert batch_arguments.count("--switch-value") == 1
-    assert batch_arguments.count("--media-directory") == 1
+    assert batch_arguments.count("--media-directory") == 2
     assert batch_arguments.count("--media-file") == 4
-    media_directory_index = batch_arguments.index("--media-directory")
-    assert batch_arguments[media_directory_index + 1] == (
-        prepared.visible_values["snow_source_directory"]
-    )
+    for index, value in enumerate(batch_arguments):
+        if value == "--media-directory":
+            assert batch_arguments[index + 1] == (
+                prepared.visible_values["snow_source_directory"]
+            )
     for index in range(1, 5):
         assert f"snow_step_{index:02d}.wav" in batch_arguments
     assert "Snow" in batch_arguments
@@ -865,7 +878,7 @@ def test_observer_preserves_exact_terminal_indeterminate_execute(
         },
     )
 
-    assert case.prepared.protocol.turn_prefix_counts == (6, 18, 22)
+    assert case.prepared.protocol.turn_prefix_counts == (7, 19, 23)
     assert case.prepared.operation_requests[0]["arguments"]["imports"][0][
         "switch_assignment"
     ] == "Snow"

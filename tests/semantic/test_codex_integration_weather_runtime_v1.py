@@ -433,21 +433,35 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
     import_declarations = [
         step
         for step in protocol.steps
-        if step.name == "tx01.declare-batch"
+        if step.name.startswith("tx01.declare-batch")
     ]
-    assert len(import_declarations) == 1
-    assert import_declarations[0].subcommand == (
-        "draft-declare-import-batch"
+    assert len(import_declarations) == 3
+    assert all(
+        step.subcommand == "draft-declare-import-batch"
+        for step in import_declarations
     )
     assert not any(
         step.name.startswith("tx01.") and step.subcommand == "draft-bind-field"
         for step in protocol.steps
     )
-    batch_arguments = import_declarations[0].arguments
-    assert batch_arguments.count("--row-order") == 9
-    assert batch_arguments.count("ignore_parent_instance_limit") == 5
-    assert batch_arguments.count("true") >= 5
-    assert "IgnoreParentMaxSoundInstance" not in batch_arguments
+    assert all(
+        step.arguments.count("--row-order") <= 3
+        for step in import_declarations
+    )
+    assert sum(
+        step.arguments.count("--row-order") for step in import_declarations
+    ) == 9
+    assert sum(
+        step.arguments.count("ignore_parent_instance_limit")
+        for step in import_declarations
+    ) == 5
+    assert sum(
+        step.arguments.count("true") for step in import_declarations
+    ) >= 5
+    assert all(
+        "IgnoreParentMaxSoundInstance" not in step.arguments
+        for step in import_declarations
+    )
     action_preview = next(
         step for step in protocol.steps if step.name == "tx02.preview"
     )

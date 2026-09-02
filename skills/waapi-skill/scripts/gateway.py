@@ -250,6 +250,9 @@ from wwise_waapi.business_declaration_state import (  # noqa: E402  # pyright: i
 from wwise_waapi.business_adapters import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     business_adapter,
 )
+from wwise_waapi.audio_import_business_contracts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS,
+)
 from wwise_waapi.cli_console_business_contracts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     CLI_CONSOLE_BUSINESS_OPERATIONS,
     cli_console_business_catalog_rows,
@@ -2352,8 +2355,8 @@ def build_parser() -> argparse.ArgumentParser:
     draft_declare_import_batch = subparsers.add_parser(
         "draft-declare-import-batch",
         help=(
-            "Atomically submit one complete high-level audio import batch "
-            "without native WAAPI rows or JSON shell quoting"
+            "Append one bounded high-level audio import chunk without native "
+            "WAAPI rows or JSON shell quoting"
         ),
     )
     _add_business_draft_binding_arguments(draft_declare_import_batch)
@@ -15069,6 +15072,15 @@ def dispatch_offline_business_draft_update(
             raise GatewayInputError(
                 "Import batch row order must name every supplied declaration exactly once"
             )
+        if len(row_order) > AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS:
+            raise GatewayInputError(
+                "Import batch commands accept at most "
+                f"{AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS} rows; append another "
+                "bounded chunk with the next response revision"
+            )
+        available_parent_ids = {
+            row.declaration_id for row in session.declarations
+        } | set(row_specs)
         for declaration_id, (form, values) in tuple(row_specs.items()):
             if form != "new-auto":
                 continue
@@ -15076,7 +15088,7 @@ def dispatch_offline_business_draft_update(
             row_specs[declaration_id] = (
                 (
                     "new-child"
-                    if parent_reference in row_specs
+                    if parent_reference in available_parent_ids
                     else "new-root"
                 ),
                 (parent_reference, name, kind),
@@ -15589,6 +15601,7 @@ def dispatch_offline_business_draft_update(
         args.command,
         record,
         state_dir=args.state_dir,
+        prior_record=inspected,
         task_authority=args.task_authority,
     )
 
@@ -22822,6 +22835,52 @@ def _compact_object_set_update_continuation(
         if isinstance(object_binding, Mapping)
         else None
     )
+    if command == "draft-declare-existing" and compact_object_binding:
+        complete_object_binding = compact_object_binding
+        by_id = compact_object_binding.get("by_id")
+        by_path = compact_object_binding.get("by_path_segments")
+        by_event = compact_object_binding.get(
+            "event_action_by_event_path_segments"
+        )
+        if all(
+            isinstance(route, Mapping)
+            for route in (by_id, by_path, by_event)
+        ):
+            compact_object_binding = {
+                key: by_id[key]
+                for key in (
+                    "fixed_argv_prefix_copy",
+                    "fixed_argv_prefix_copy_instruction",
+                )
+                if key in by_id
+            }
+            compact_object_binding.update(
+                {
+                    "choose_exactly_one_selector_form": True,
+                    "selector_forms": {
+                        "by_id": by_id.get("append"),
+                        "by_path_segments": {
+                            "append_repeated": by_path.get(
+                                "append_repeated"
+                            ),
+                            "segment_order": by_path.get("segment_order"),
+                        },
+                        "event_action_by_event_path_segments": {
+                            "append_repeated": by_event.get(
+                                "append_repeated"
+                            ),
+                            "segment_order": by_event.get("segment_order"),
+                            "gateway_owned_resolution": by_event.get(
+                                "gateway_owned_resolution"
+                            ),
+                        },
+                    },
+                    "selection_rule": complete_object_binding.get(
+                        "selection_rule"
+                    ),
+                    "result": complete_object_binding.get("result"),
+                }
+            )
     inspect_argv = [
         "python",
         str(GATEWAY_RUNNER_PATH),
@@ -22839,7 +22898,10 @@ def _compact_object_set_update_continuation(
         )
         if key in value
     }
-    if command == "draft-bind-object" and compact_object_binding:
+    if (
+        command in {"draft-bind-object", "draft-declare-existing"}
+        and compact_object_binding
+    ):
         compact["object_binding"] = compact_object_binding
     common_actions = {
         "draft-bind-object": [
@@ -25183,8 +25245,8 @@ def _business_next_action_binding(
         return {
             "contract": "waapi-skill.business-draft-next-action/v1",
             "required_next_phase": (
-                "bind_only_additional_handle_typed_business_values_then_submit_"
-                "one_complete_import_batch"
+                "bind_only_additional_handle_typed_business_values_then_append_"
+                "bounded_import_chunks"
             ),
             "object_binding": audio_object_binding,
             "field_binding": {
@@ -25301,8 +25363,14 @@ def _business_next_action_binding(
                         "copy that directory once and submit one leaf file name per row"
                     ),
                 },
-                "complete_on_first_submission": True,
-                "submit_once": True,
+                "rows_per_command": {
+                    "minimum": 1,
+                    "maximum": AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS,
+                },
+                "repeat_with_next_response_revision": True,
+                "check_only_after": (
+                    "every_user_requested_row_has_been_appended"
+                ),
             },
             "forbidden_inputs": forbidden_inputs,
             "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
@@ -26292,9 +26360,20 @@ def operation_draft_payload(
                 "--expected-revision",
                 str(record.revision),
             ]
+            append_import_chunk = next_action_binding.get(
+                "declare_import_batch"
+            )
+            if not isinstance(append_import_chunk, Mapping):
+                raise GatewayInputError(
+                    "Audio import chunk continuation is unavailable."
+                )
             next_action_binding = {
                 "contract": "waapi-skill.business-draft-next-action/v1",
-                "required_next_phase": "check_complete_business_declaration",
+                "required_next_phase": (
+                    "append_next_import_chunk_or_check_when_all_requested_rows_"
+                    "are_present"
+                ),
+                "append_import_chunk": dict(append_import_chunk),
                 "check": {
                     **operation_draft_prefix_copy_binding(check_argv),
                     "append": [],
@@ -26334,11 +26413,26 @@ def operation_draft_payload(
                 and isinstance(row.get("fields"), Mapping)
                 and "switch_value" in row["fields"]
             )
+            prior_declaration_count = 0
+            if prior_record is not None and prior_record.composition is not None:
+                prior_session = prior_record.composition.get(
+                    "business_session"
+                )
+                if isinstance(prior_session, Mapping):
+                    prior_declarations = prior_session.get("declarations")
+                    if isinstance(prior_declarations, list):
+                        prior_declaration_count = len(prior_declarations)
+            chunk_declaration_count = len(declarations) - prior_declaration_count
+            if not 1 <= chunk_declaration_count <= AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS:
+                raise GatewayInputError(
+                    "Audio import chunk receipt has an invalid declaration count."
+                )
             draft["batch_receipt"] = {
                 "contract": (
                     "waapi-skill.business-declaration-batch-receipt/v1"
                 ),
-                "declaration_count": len(declarations),
+                "chunk_declaration_count": chunk_declaration_count,
+                "cumulative_declaration_count": len(declarations),
                 "switch_assignment_count": switch_assignment_count,
                 "declaration_ids": declaration_ids,
             }

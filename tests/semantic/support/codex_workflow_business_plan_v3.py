@@ -662,9 +662,21 @@ def _matches_transaction_step_sequence(
                 "declare-switch-assignment",
             ]
         if transaction.get("operation") == "audio.import":
-            if prefixes[-1:] != ["declare-batch"]:
+            try:
+                first_batch = prefixes.index("declare-batch")
+            except ValueError:
                 return False
-            setup_prefixes = prefixes[:-1]
+            batch_prefixes = prefixes[first_batch:]
+            expected_batch_prefixes = [
+                "declare-batch",
+                *(
+                    f"declare-batch-{index:02d}"
+                    for index in range(2, len(batch_prefixes) + 1)
+                ),
+            ]
+            if batch_prefixes != expected_batch_prefixes:
+                return False
+            setup_prefixes = prefixes[:first_batch]
             configure_seen = False
             counters = {"bind-object": [], "bind-field": []}
             for prefix in setup_prefixes:

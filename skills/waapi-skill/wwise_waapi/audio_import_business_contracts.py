@@ -8,6 +8,7 @@ from .business_declarations import SUPPORTED_BUSINESS_KINDS, SUPPORTED_WWISE_VER
 
 
 AUDIO_IMPORT_BUSINESS_CONTRACT = "waapi-skill.audio-import-business/v1"
+AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS = 3
 AUDIO_IMPORT_BUSINESS_SETTING_FIELDS = (
     "add_to_source_control",
     "check_out_from_source_control",
@@ -105,8 +106,8 @@ def audio_import_business_contract_data(version: str) -> dict[str, Any]:
             "append_arguments": "forbidden",
             "preview_change_intent": "gateway_inferred_from_checked_business_draft",
             "first_required_phase": (
-                "bind_only_handle_typed_business_objects_then_submit_one_complete_"
-                "import_batch"
+                "bind_only_handle_typed_business_objects_then_append_bounded_import_"
+                "chunks"
             ),
         },
         "field_transport": {
@@ -131,7 +132,13 @@ def audio_import_business_contract_data(version: str) -> dict[str, Any]:
         },
         "declaration_discipline": {
             "task_local_id": "bounded_unique_not_business_data",
-            "known_user_fields": "complete_on_first_submission",
+            "rows_per_command": {
+                "minimum": 1,
+                "maximum": AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS,
+            },
+            "completion": (
+                "append_chunks_until_every_requested_row_is_present_then_check"
+            ),
             "revise_only_for": "correction_or_late_discovered_fact",
             "check_only_after": "all_user_requested_declarations_are_complete",
         },
@@ -152,6 +159,7 @@ def audio_import_business_contract_data(version: str) -> dict[str, Any]:
 
 __all__ = [
     "AUDIO_IMPORT_BUSINESS_COMMANDS",
+    "AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS",
     "AUDIO_IMPORT_BUSINESS_CONTRACT",
     "AUDIO_IMPORT_BUSINESS_DECLARATION_FIELDS",
     "AUDIO_IMPORT_BUSINESS_MODES",

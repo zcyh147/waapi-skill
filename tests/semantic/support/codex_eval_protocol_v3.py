@@ -57,6 +57,9 @@ from wwise_waapi.operation_registry import (
 from wwise_waapi.authoring_ui_business_contracts import (
     authoring_ui_business_contract_data,
 )
+from wwise_waapi.audio_import_business_contracts import (
+    AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS,
+)
 from wwise_waapi.exact_artifact_business_contracts import (
     EXACT_ARTIFACT_BUSINESS_OPERATIONS,
     exact_artifact_business_contract_data,
@@ -1024,117 +1027,143 @@ def build_audio_import_composer_transaction_steps(
         if not existing_target_form:
             planned_by_path[target_path] = declaration_id
 
-    batch_name = f"{label}.declare-batch"
-    batch_arguments: list[Any] = [*draft.prefix()]
-    media_values = [
+    batch_base_name = f"{label}.declare-batch"
+    all_media_values = [
         field_value
         for row in batch_rows
         for field_name, field_value in row["fields"]
         if field_name == "media_file"
     ]
-    media_paths = [
+    all_media_paths = [
         Path(value)
-        for value in media_values
+        for value in all_media_values
         if isinstance(value, str)
     ]
-    shared_media_directory: Path | None = None
+    shared_import_media_directory: Path | None = None
     if (
-        len(media_paths) == len(media_values)
-        and len(media_paths) >= 2
-        and all(path.is_absolute() and path.name for path in media_paths)
-        and len({path.parent for path in media_paths}) == 1
+        len(all_media_paths) == len(all_media_values)
+        and len(all_media_paths) >= 2
+        and all(path.is_absolute() and path.name for path in all_media_paths)
+        and len({path.parent for path in all_media_paths}) == 1
     ):
-        shared_media_directory = media_paths[0].parent
-        batch_arguments.extend(
-            ("--media-directory", str(shared_media_directory))
+        shared_import_media_directory = all_media_paths[0].parent
+    for chunk_offset in range(
+        0,
+        len(batch_rows),
+        AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS,
+    ):
+        chunk_rows = batch_rows[
+            chunk_offset : chunk_offset + AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS
+        ]
+        chunk_number = chunk_offset // AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS + 1
+        batch_name = (
+            batch_base_name
+            if chunk_number == 1
+            else f"{batch_base_name}-{chunk_number:02d}"
         )
-    for row in batch_rows:
-        declaration_id = row["id"]
-        batch_arguments.extend(("--row-order", declaration_id))
-        if row["form"] == "new-root":
+        batch_arguments: list[Any] = [*draft.prefix()]
+        media_values = [
+            field_value
+            for row in chunk_rows
+            for field_name, field_value in row["fields"]
+            if field_name == "media_file"
+        ]
+        media_paths = [
+            Path(value)
+            for value in media_values
+            if isinstance(value, str)
+        ]
+        shared_media_directory = (
+            shared_import_media_directory if media_values else None
+        )
+        if shared_media_directory is None and (
+            len(media_paths) == len(media_values)
+            and len(media_paths) >= 2
+            and all(path.is_absolute() and path.name for path in media_paths)
+            and len({path.parent for path in media_paths}) == 1
+        ):
+            shared_media_directory = media_paths[0].parent
+        if shared_media_directory is not None:
             batch_arguments.extend(
-                (
-                    "--new-row",
-                    declaration_id,
-                    row["target"],
-                    row["name"],
-                    row["kind"],
-                )
+                ("--media-directory", str(shared_media_directory))
             )
-        elif row["form"] == "new-child":
-            batch_arguments.extend(
-                (
-                    "--new-row",
-                    declaration_id,
-                    row["target"],
-                    row["name"],
-                    row["kind"],
-                )
-            )
-        else:
-            batch_arguments.extend(
-                ("--existing-row", declaration_id, row["target"])
-            )
-        for field_name, field_value in row["fields"]:
-            rendered_value = (
-                field_value
-                if isinstance(field_value, ResponseBinding)
-                else value_text(field_value)
-            )
-            if field_name == "switch_value":
-                batch_arguments.extend(
-                    ("--switch-value", declaration_id, rendered_value)
-                )
-            elif (
-                field_name == "media_file"
-                and shared_media_directory is not None
-            ):
+        for row in chunk_rows:
+            declaration_id = row["id"]
+            batch_arguments.extend(("--row-order", declaration_id))
+            if row["form"] in {"new-root", "new-child"}:
                 batch_arguments.extend(
                     (
-                        "--media-file",
+                        "--new-row",
                         declaration_id,
-                        Path(str(rendered_value)).name,
+                        row["target"],
+                        row["name"],
+                        row["kind"],
                     )
                 )
             else:
                 batch_arguments.extend(
-                    ("--field", declaration_id, field_name, rendered_value)
+                    ("--existing-row", declaration_id, row["target"])
                 )
-        for field_handle, field_value in row["field_values"]:
-            batch_arguments.extend(
-                (
-                    "--field-value",
-                    declaration_id,
-                    field_handle,
+            for field_name, field_value in row["fields"]:
+                rendered_value = (
+                    field_value
+                    if isinstance(field_value, ResponseBinding)
+                    else value_text(field_value)
+                )
+                if field_name == "switch_value":
+                    batch_arguments.extend(
+                        ("--switch-value", declaration_id, rendered_value)
+                    )
+                elif (
+                    field_name == "media_file"
+                    and shared_media_directory is not None
+                ):
+                    batch_arguments.extend(
+                        (
+                            "--media-file",
+                            declaration_id,
+                            Path(str(rendered_value)).name,
+                        )
+                    )
+                else:
+                    batch_arguments.extend(
+                        ("--field", declaration_id, field_name, rendered_value)
+                    )
+            for field_handle, field_value in row["field_values"]:
+                batch_arguments.extend(
                     (
-                        field_value
-                        if isinstance(field_value, ResponseBinding)
-                        else value_text(field_value)
-                    ),
+                        "--field-value",
+                        declaration_id,
+                        field_handle,
+                        (
+                            field_value
+                            if isinstance(field_value, ResponseBinding)
+                            else value_text(field_value)
+                        ),
+                    )
                 )
-            )
-        event_arguments = row["event"]
-        if event_arguments:
-            batch_arguments.extend(
-                (
-                    "--event",
-                    declaration_id,
-                    event_arguments[1],
-                    event_arguments[3],
-                    event_arguments[5],
+            event_arguments = row["event"]
+            if event_arguments:
+                batch_arguments.extend(
+                    (
+                        "--event",
+                        declaration_id,
+                        event_arguments[1],
+                        event_arguments[3],
+                        event_arguments[5],
+                    )
                 )
+        steps.append(
+            ExpectedGatewayStep(
+                name=batch_name,
+                subcommand="draft-declare-import-batch",
+                arguments=tuple(batch_arguments),
+                allow_explicit_derived_sfx_language=all(
+                    row["kind"] == "sound-sfx" for row in chunk_rows
+                ),
             )
-    steps.append(
-        ExpectedGatewayStep(
-            name=batch_name,
-            subcommand="draft-declare-import-batch",
-            arguments=tuple(batch_arguments),
-            allow_explicit_derived_sfx_language=all(
-                row["kind"] == "sound-sfx" for row in batch_rows
-            ),
         )
-    )
-    draft.advance(batch_name)
+        draft.advance(batch_name)
 
     # The public business continuation tells a fresh Agent to bind every exact
     # live object before it configures or declares the import batch.  Keep the

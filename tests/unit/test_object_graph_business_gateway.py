@@ -1170,6 +1170,7 @@ def test_object_set_discovers_two_business_field_meanings_in_one_revision(
     assert set(declared_continuation) == {
         "contract",
         "required_next_phase",
+        "object_binding",
         "field_discovery",
         "declare_existing",
         "completion_candidate",
@@ -1183,6 +1184,22 @@ def test_object_set_discovers_two_business_field_meanings_in_one_revision(
     )
     assert declared_continuation["declare_existing"]["cardinality"] == (
         "exactly_one_declaration_per_command"
+    )
+    assert set(declared_continuation["object_binding"]["selector_forms"]) == {
+        "by_id",
+        "by_path_segments",
+        "event_action_by_event_path_segments",
+    }
+    assert set(declared_continuation["object_binding"]) >= {
+        "fixed_argv_prefix_copy",
+        "fixed_argv_prefix_copy_instruction",
+        "choose_exactly_one_selector_form",
+        "selector_forms",
+        "result",
+    }
+    assert declared_continuation["object_binding"]["selection_rule"]
+    assert declared_continuation["object_binding"]["result"] == (
+        "copy_the_returned_bound_object.handle"
     )
     assert len(json.dumps(declared, separators=(",", ":")).encode("utf-8")) < 8_000
     rejected_client = _live_client(
