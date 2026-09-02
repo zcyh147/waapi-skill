@@ -986,9 +986,6 @@ def _weather_import_request(
 ) -> Mapping[str, Any]:
     container_specs = _weather_container_specs(weather_root)
     container_paths = {path for path, _object_type, _parent in container_specs}
-    container_children: dict[str, list[tuple[str, str]]] = {}
-    for path, object_type, parent in container_specs:
-        container_children.setdefault(parent, []).append((path, object_type))
     media_by_parent: dict[str, list[dict[str, Any]]] = {}
     for target in targets:
         properties = [
@@ -1026,17 +1023,16 @@ def _weather_import_request(
                 ],
             }
         )
-    imports: list[dict[str, Any]] = []
-
-    def append_container_subtree(path: str, object_type: str) -> None:
-        imports.append({"object_path": path, "object_type": object_type})
+    # Canonicalize the business request as one topological structure phase
+    # followed by media rows.  Sibling containers are independent and this
+    # order lets every bounded shell chunk remain complete without coupling a
+    # structure-only row to an unrelated media row.
+    imports: list[dict[str, Any]] = [
+        {"object_path": path, "object_type": object_type}
+        for path, object_type, _parent in container_specs
+    ]
+    for path, _object_type, _parent in container_specs:
         imports.extend(media_by_parent.pop(path, ()))
-        for child_path, child_type in container_children.get(path, ()):
-            append_container_subtree(child_path, child_type)
-
-    for path, object_type, parent in container_specs:
-        if parent not in container_paths:
-            append_container_subtree(path, object_type)
     if media_by_parent:
         raise IntegrationWeatherRuntimeError(
             "weather import order left media outside the declared hierarchy"

@@ -186,18 +186,18 @@ def test_weather_requests_close_five_sound_action_and_rtpc_requirements(
             r"\IntegrationLab\Weather_Interactive\Rain",
             "ActorMixer",
         ),
-        (targets[0].logical_path, "Sound SFX"),
         (
             r"\Actor-Mixer Hierarchy\Default Work Unit"
             r"\IntegrationLab\Weather_Interactive\Wind",
             "ActorMixer",
         ),
-        (targets[1].logical_path, "Sound SFX"),
         (
             r"\Actor-Mixer Hierarchy\Default Work Unit"
             r"\IntegrationLab\Weather_Interactive\Thunder",
             "RandomSequenceContainer",
         ),
+        (targets[0].logical_path, "Sound SFX"),
+        (targets[1].logical_path, "Sound SFX"),
         (targets[2].logical_path, "Sound SFX"),
         (targets[3].logical_path, "Sound SFX"),
         (targets[4].logical_path, "Sound SFX"),
