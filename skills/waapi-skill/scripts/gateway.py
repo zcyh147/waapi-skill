@@ -26386,17 +26386,8 @@ def operation_draft_payload(
                     "fixed_argv_prefix_copy_instruction",
                     "rows_per_command",
                     "row_completeness",
-                    "repeat_with_next_response_revision",
-                    "check_only_after",
                 )
             }
-            append_import_chunk["row_syntax"] = (
-                "reuse_the_closed_row_forms_and_fields_from_the_prior_"
-                "declare_import_batch_continuation"
-            )
-            append_import_chunk["cross_chunk_parent_rule"] = (
-                "a_new_row_parent_may_be_one_earlier_declaration_id"
-            )
             raw_object_binding = next_action_binding.get("object_binding")
             by_path_binding = (
                 raw_object_binding.get("by_path_segments")
@@ -26449,8 +26440,6 @@ def operation_draft_payload(
                     "draft_id",
                     "lifecycle_state",
                     "revision",
-                    "binding",
-                    "business_revision",
                 )
                 if key in draft
             }
@@ -26494,11 +26483,6 @@ def operation_draft_payload(
                 "chunk_declaration_count": chunk_declaration_count,
                 "cumulative_declaration_count": len(declarations),
                 "switch_assignment_count": switch_assignment_count,
-                "declaration_ids": declaration_ids,
-            }
-            draft["declarations_summary"] = {
-                "count": len(declarations),
-                "canonical_sha256": canonical_sha256(declarations),
             }
             draft["response_integrity"] = {
                 "complete": True,

@@ -742,7 +742,6 @@ def test_audio_import_batch_chunks_are_atomic_cumulative_and_compact(
         "chunk_declaration_count": 3,
         "cumulative_declaration_count": 3,
         "switch_assignment_count": 1,
-        "declaration_ids": ["snow", "snow-step-01", "snow-step-02"],
     }
     first_next = first["draft"]["next_action_binding"]
     assert first_next["required_next_phase"] == (
@@ -763,13 +762,6 @@ def test_audio_import_batch_chunks_are_atomic_cumulative_and_compact(
     assert first_next["append_import_chunk"]["row_completeness"] == (
         "each_row_must_include_its_media_every_known_requested_field_switch_"
         "assignment_and_event_in_the_same_command; partial_rows_are_forbidden"
-    )
-    assert first_next["append_import_chunk"]["row_syntax"] == (
-        "reuse_the_closed_row_forms_and_fields_from_the_prior_declare_import_"
-        "batch_continuation"
-    )
-    assert first_next["append_import_chunk"]["cross_chunk_parent_rule"] == (
-        "a_new_row_parent_may_be_one_earlier_declaration_id"
     )
 
     second_argv = [
@@ -808,15 +800,10 @@ def test_audio_import_batch_chunks_are_atomic_cumulative_and_compact(
         "chunk_declaration_count": 2,
         "cumulative_declaration_count": 5,
         "switch_assignment_count": 1,
-        "declaration_ids": [
-            "snow",
-            "snow-step-01",
-            "snow-step-02",
-            "snow-step-03",
-            "snow-step-04",
-        ],
     }
-    assert batch["draft"]["declarations_summary"]["count"] == 5
+    assert "declarations_summary" not in batch["draft"]
+    assert "binding" not in batch["draft"]
+    assert "business_revision" not in batch["draft"]
     assert set(batch["draft"]["next_action_binding"]) == {
         "contract",
         "required_next_phase",
