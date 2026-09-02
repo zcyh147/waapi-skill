@@ -5392,10 +5392,6 @@ def test_import_batch_group_order_is_transport_but_row_order_is_business_meaning
         subcommand="draft-declare-import-batch",
         arguments=(
             *fixed,
-            "--expected-declaration-count",
-            "2",
-            "--expected-switch-assignment-count",
-            "1",
             "--media-directory",
             "/tmp/incoming",
             "--row-order",
@@ -5450,12 +5446,8 @@ def test_import_batch_group_order_is_transport_but_row_order_is_business_meaning
         "parent",
         "Snow",
         "random-container",
-        "--expected-switch-assignment-count",
-        "1",
         "--media-directory",
         "/tmp/incoming",
-        "--expected-declaration-count",
-        "2",
     )
     broker = SimpleNamespace(_payloads_by_step={})
 
@@ -5583,10 +5575,6 @@ def test_import_batch_accepts_one_exact_derived_sfx_language_per_row() -> None:
         subcommand="draft-declare-import-batch",
         arguments=(
             *fixed,
-            "--expected-declaration-count",
-            "2",
-            "--expected-switch-assignment-count",
-            "0",
             "--row-order",
             "rifle",
             "--existing-row",

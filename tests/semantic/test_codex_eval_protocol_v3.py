@@ -682,9 +682,8 @@ def test_audio_import_protocol_emits_ordered_business_steps_without_native_rows(
     assert "output_bus" in declaration.arguments
     assert "--event" in declaration.arguments
     assert declaration.arguments.count("--row-order") == 1
-    assert declaration.arguments[declaration.arguments.index(
-        "--expected-declaration-count"
-    ) + 1] == "1"
+    assert "--expected-declaration-count" not in declaration.arguments
+    assert "--expected-switch-assignment-count" not in declaration.arguments
     assert all(step.subcommand != "draft-apply" for step in steps)
     assert next(step for step in steps if step.name == "tx01.preview").subcommand == (
         "preview-from-draft"
@@ -1927,9 +1926,8 @@ def test_audio_import_protocol_serializes_bound_existing_declarations() -> None:
     )
     assert declaration.arguments.count("--existing-row") == 5
     assert declaration.arguments.count("--row-order") == 5
-    assert declaration.arguments[
-        declaration.arguments.index("--expected-declaration-count") + 1
-    ] == "5"
+    assert "--expected-declaration-count" not in declaration.arguments
+    assert "--expected-switch-assignment-count" not in declaration.arguments
     assert all(step.subcommand != "draft-apply" for step in steps)
 
 

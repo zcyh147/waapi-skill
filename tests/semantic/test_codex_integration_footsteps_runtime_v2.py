@@ -714,12 +714,8 @@ def test_prepare_seals_baseline_inputs_and_exact_two_transaction_protocol(
         assert f"snow_step_{index:02d}.wav" in batch_arguments
     assert "Snow" in batch_arguments
     assert "random-container" in batch_arguments
-    assert batch_arguments[
-        batch_arguments.index("--expected-declaration-count") + 1
-    ] == "5"
-    assert batch_arguments[
-        batch_arguments.index("--expected-switch-assignment-count") + 1
-    ] == "1"
+    assert "--expected-declaration-count" not in batch_arguments
+    assert "--expected-switch-assignment-count" not in batch_arguments
     assert "sound-sfx" in batch_arguments
 
 

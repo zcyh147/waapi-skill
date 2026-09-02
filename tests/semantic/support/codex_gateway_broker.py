@@ -11246,8 +11246,6 @@ class CodexGatewayBroker:
         if len(step.arguments) < fixed_count or len(actual) < fixed_count:
             return tuple(actual)
         option_arity = {
-            "--expected-declaration-count": 1,
-            "--expected-switch-assignment-count": 1,
             "--media-directory": 1,
             "--row-order": 1,
             "--new-root-row": 4,
@@ -11292,8 +11290,6 @@ class CodexGatewayBroker:
             if not isinstance(option, str):
                 return None
             if option in {
-                "--expected-declaration-count",
-                "--expected-switch-assignment-count",
                 "--media-directory",
             }:
                 return (option,)
@@ -11486,8 +11482,6 @@ class CodexGatewayBroker:
         ) -> tuple[Any, ...] | None:
             option = group[0]
             if option in {
-                "--expected-declaration-count",
-                "--expected-switch-assignment-count",
                 "--media-directory",
             }:
                 return group

@@ -1926,6 +1926,20 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   a malformed batch: each declaration retains its exact object-scoped handles,
   revision, Preview ownership, and verification boundary.
 
+### Batch counts are derived facts, not Agent-authored checksums
+
+- Evidence: #61 r21 native Windows Weather supplied all nine import rows in the
+  correct order but typed `--expected-declaration-count 8`. The Broker rejected
+  the otherwise complete batch before Preview. Repeating a deterministically
+  countable fact made the interface less reliable without adding authority.
+- Prevention: `draft-declare-import-batch` accepts the closed ordered row set,
+  row facts, media, Events, and Switch assignments only. Gateway derives row and
+  Switch-assignment counts, rejects duplicate/missing row-order identities, and
+  records the derived counts in the batch receipt. Caller-supplied count flags
+  are absent from the parser and structured continuation. The semantic oracle
+  still compares the actual Preview/Wwise outcome with every requested row, so
+  removing the redundant checksum does not turn omission into PASS.
+
 ### Closed business includes are equivalent only after exact projection proof
 
 - Evidence: #61 r15 Alarm reached the exact active AudioFileSource using

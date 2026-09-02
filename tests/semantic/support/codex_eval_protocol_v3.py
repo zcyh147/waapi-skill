@@ -1025,20 +1025,7 @@ def build_audio_import_composer_transaction_steps(
             planned_by_path[target_path] = declaration_id
 
     batch_name = f"{label}.declare-batch"
-    batch_arguments: list[Any] = [
-        *draft.prefix(),
-        "--expected-declaration-count",
-        str(len(batch_rows)),
-        "--expected-switch-assignment-count",
-        str(
-            sum(
-                1
-                for row in batch_rows
-                for field_name, _value in row["fields"]
-                if field_name == "switch_value"
-            )
-        ),
-    ]
+    batch_arguments: list[Any] = [*draft.prefix()]
     media_values = [
         field_value
         for row in batch_rows

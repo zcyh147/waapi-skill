@@ -2358,16 +2358,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_business_draft_binding_arguments(draft_declare_import_batch)
     draft_declare_import_batch.add_argument(
-        "--expected-declaration-count",
-        required=True,
-        type=int,
-    )
-    draft_declare_import_batch.add_argument(
-        "--expected-switch-assignment-count",
-        required=True,
-        type=int,
-    )
-    draft_declare_import_batch.add_argument(
         "--row-order",
         action="append",
         required=True,
@@ -15037,15 +15027,6 @@ def dispatch_offline_business_draft_update(
             raise GatewayInputError(
                 "draft-declare-import-batch is available only for audio.import"
             )
-        if args.expected_declaration_count < 1:
-            raise GatewayInputError(
-                "Expected declaration count must be at least one"
-            )
-        if args.expected_switch_assignment_count < 0:
-            raise GatewayInputError(
-                "Expected Switch assignment count cannot be negative"
-            )
-
         row_specs: dict[str, tuple[str, tuple[str, ...]]] = {}
 
         def add_row(
@@ -15087,10 +15068,6 @@ def dispatch_offline_business_draft_update(
         ):
             raise GatewayInputError(
                 "Import batch row order must name every supplied declaration exactly once"
-            )
-        if args.expected_declaration_count != len(row_order):
-            raise GatewayInputError(
-                "Expected declaration count does not match the complete import batch"
             )
         for declaration_id, (form, values) in tuple(row_specs.items()):
             if form != "new-auto":
@@ -15192,10 +15169,6 @@ def dispatch_offline_business_draft_update(
         if unknown_fact_ids:
             raise GatewayInputError(
                 "Import batch fields reference an unknown declaration id"
-            )
-        if args.expected_switch_assignment_count != len(switch_values):
-            raise GatewayInputError(
-                "Expected Switch assignment count does not match the complete import batch"
             )
 
         def update(
@@ -25246,12 +25219,13 @@ def _business_next_action_binding(
                 **operation_draft_prefix_copy_binding(
                     declare_import_batch_prefix
                 ),
-                "closure": [
-                    "--expected-declaration-count",
-                    "<count-of-all-user-requested-import-rows>",
-                    "--expected-switch-assignment-count",
-                    "<count-of-all-user-requested-switch-assignments>",
-                ],
+                "derived_batch_facts": {
+                    "declaration_count": "Gateway_counts_the_closed_row_set",
+                    "switch_assignment_count": (
+                        "Gateway_counts_rows_with_switch_assignment"
+                    ),
+                    "caller_supplied_counts": "forbidden",
+                },
                 "row_order": [
                     "--row-order",
                     "<declaration-id>",

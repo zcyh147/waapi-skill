@@ -415,12 +415,11 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
     assert batch_action["fixed_argv_prefix_copy_instruction"]["source_field"] == (
         "fixed_argv_prefix_copy"
     )
-    assert batch_action["closure"] == [
-        "--expected-declaration-count",
-        "<count-of-all-user-requested-import-rows>",
-        "--expected-switch-assignment-count",
-        "<count-of-all-user-requested-switch-assignments>",
-    ]
+    assert batch_action["derived_batch_facts"] == {
+        "declaration_count": "Gateway_counts_the_closed_row_set",
+        "switch_assignment_count": "Gateway_counts_rows_with_switch_assignment",
+        "caller_supplied_counts": "forbidden",
+    }
     assert batch_action["complete_on_first_submission"] is True
     assert batch_action["submit_once"] is True
     assert set(batch_action["row_forms"]) == {"new", "existing"}
@@ -688,10 +687,6 @@ def test_audio_import_batch_declaration_is_atomic_complete_and_compact(
         started["task_authority"],
         "--expected-revision",
         "2",
-        "--expected-declaration-count",
-        "5",
-        "--expected-switch-assignment-count",
-        "1",
         "--row-order",
         "snow",
         "--new-row",
@@ -846,10 +841,6 @@ def test_audio_import_batch_count_mismatch_is_atomic(tmp_path: Path) -> None:
         started["task_authority"],
         "--expected-revision",
         "2",
-        "--expected-declaration-count",
-        "1",
-        "--expected-switch-assignment-count",
-        "0",
         "--row-order",
         "rain",
         "--new-root-row",
@@ -877,12 +868,10 @@ def test_audio_import_batch_count_mismatch_is_atomic(tmp_path: Path) -> None:
         started["task_authority"],
         "--expected-revision",
         "2",
-        "--expected-declaration-count",
-        "2",
-        "--expected-switch-assignment-count",
-        "1",
         "--row-order",
         "rain",
+        "--row-order",
+        "missing",
         "--new-root-row",
         "rain",
         bound["bound_object"]["handle"],
@@ -892,7 +881,7 @@ def test_audio_import_batch_count_mismatch_is_atomic(tmp_path: Path) -> None:
 
     assert mismatch_code == 2
     assert mismatch["error_code"] == "GatewayInputError"
-    assert "declaration count" in mismatch["message"].casefold()
+    assert "row order" in mismatch["message"].casefold()
     assert record_path.read_bytes() == before
 
 
