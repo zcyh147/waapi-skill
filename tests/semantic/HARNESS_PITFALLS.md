@@ -2241,6 +2241,15 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   catalog. Treat the documented one-object rename/notes/property/reference
   mappings as fixed direct routes too. The Gateway still owns identity,
   metadata discovery, opaque field handles, Preview, and verification.
+- A later full root showed that “direct” must not mean “reject one exact catalog
+  read”: the Agent issued `operations` and stopped at Broker rejection before
+  choosing anything. Keep the dedicated schema as the default first step while
+  allowing exactly one authenticated catalog prefix bound to that same
+  operation. A different route after the catalog remains a semantic failure.
+- Apply that seam by operation family, not by one case: the next full root
+  repeated the same contradiction for dedicated Notes edits on both hosts.
+  Object lifecycle operations therefore use the same direct-default,
+  exact-catalog-optional protocol as scalar/reference metadata edits.
 
 ### Broker optional prefixes and archive audit must evolve together
 

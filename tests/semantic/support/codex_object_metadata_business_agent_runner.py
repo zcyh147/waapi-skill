@@ -192,6 +192,7 @@ def run_object_metadata_business_agent_unit(
             preview_gates=_object_metadata_preview_gates,
             outcome_factory=ObjectMetadataBusinessAgentOutcome,
             requires_initial_operations_discovery=False,
+            optional_initial_operations_discovery_operation=unit.operation,
         ),
     )
 

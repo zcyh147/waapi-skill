@@ -184,7 +184,11 @@ def run_business_agent_unit(
         if spec.requires_initial_operations_discovery
         else built_steps
     )
-    optional_operations_discovery = None
+    optional_operations_discovery = (
+        spec.optional_initial_operations_discovery_operation
+        if not spec.requires_initial_operations_discovery
+        else None
+    )
     optional_query_arguments = (
         None
         if spec.optional_initial_query_object_arguments is None

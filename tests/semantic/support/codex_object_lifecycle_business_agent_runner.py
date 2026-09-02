@@ -177,6 +177,8 @@ def run_object_lifecycle_business_agent_unit(
             transaction_count=lambda _runtime: 1,
             preview_gates=_object_lifecycle_preview_gates,
             outcome_factory=ObjectLifecycleBusinessAgentOutcome,
+            requires_initial_operations_discovery=False,
+            optional_initial_operations_discovery_operation=unit.operation,
         ),
     )
 
