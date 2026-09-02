@@ -2040,11 +2040,16 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
 - Prevention: `draft-declare-import-batch` appends 1..3 rows per command to the
   same offline Draft. Each response supplies the exact next-revision append
   prefix and the completion check; declaration order and parent references are
-  cumulative across chunks. Only the final `draft-check` materializes one
-  atomic import Preview. Gateway and Broker tests require every requested row,
-  every chunk at or below the bound, cross-chunk parent resolution, and one
-  final operation request. Do not raise shell limits or split the user outcome
-  into separate transactions.
+  cumulative across chunks. The repeat receipt also states that every row is
+  closed in the command that creates it: media, all known requested fields,
+  Switch assignment, and Event cannot be deferred to a later chunk. Only the
+  final `draft-check` materializes one atomic import Preview. Gateway and Broker
+  tests require every requested row, every chunk at or below the bound,
+  cross-chunk parent resolution, and one final operation request. Broker
+  normalization carries task-local declaration-ID equivalence across chunks,
+  so group order and Agent-chosen IDs remain transport while exact parent and
+  field meaning stay sealed. Do not raise shell limits or split the user
+  outcome into separate transactions.
 
 ### A declaration receipt must carry the next common construction route
 

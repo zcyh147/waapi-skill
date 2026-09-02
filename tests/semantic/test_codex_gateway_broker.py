@@ -5449,13 +5449,18 @@ def test_import_batch_group_order_is_transport_but_row_order_is_business_meaning
         "--media-directory",
         "/tmp/incoming",
     )
-    broker = SimpleNamespace(_payloads_by_step={})
+    def normalize(arguments: tuple[str, ...]) -> tuple[str, ...]:
+        broker = SimpleNamespace(
+            _payloads_by_step={},
+            _import_declaration_ids_by_draft={},
+        )
+        return CodexGatewayBroker._normalize_business_declaration_fact_order(
+            broker,
+            step,
+            arguments,
+        )
 
-    assert CodexGatewayBroker._normalize_business_declaration_fact_order(
-        broker,
-        step,
-        reordered,
-    ) == step.arguments
+    assert normalize(reordered) == step.arguments
     renamed = tuple(
         {
             "snow": "container-snow",
@@ -5463,11 +5468,7 @@ def test_import_batch_group_order_is_transport_but_row_order_is_business_meaning
         }.get(value, value)
         for value in reordered
     )
-    assert CodexGatewayBroker._normalize_business_declaration_fact_order(
-        broker,
-        step,
-        renamed,
-    ) == step.arguments
+    assert normalize(renamed) == step.arguments
     wrong_order = list(reordered)
     first = wrong_order.index("snow", len(fixed))
     second = wrong_order.index("snow-step-01", first + 1)
@@ -5475,26 +5476,14 @@ def test_import_batch_group_order_is_transport_but_row_order_is_business_meaning
         wrong_order[second],
         wrong_order[first],
     )
-    assert CodexGatewayBroker._normalize_business_declaration_fact_order(
-        broker,
-        step,
-        tuple(wrong_order),
-    ) == tuple(wrong_order)
+    assert normalize(tuple(wrong_order)) == tuple(wrong_order)
     duplicate = (*reordered, "--switch-value", "snow", "Snow")
-    assert CodexGatewayBroker._normalize_business_declaration_fact_order(
-        broker,
-        step,
-        duplicate,
-    ) == duplicate
+    assert normalize(duplicate) == duplicate
     broken_parent = list(renamed)
     parent_index = broken_parent.index("--new-row") + 2
     assert broken_parent[parent_index] == "container-snow"
     broken_parent[parent_index] = "another-container"
-    assert CodexGatewayBroker._normalize_business_declaration_fact_order(
-        broker,
-        step,
-        tuple(broken_parent),
-    ) != step.arguments
+    assert normalize(tuple(broken_parent)) != step.arguments
 
 
 def test_import_batch_accepts_topological_structure_reordering_but_keeps_media_order() -> None:
@@ -5560,6 +5549,83 @@ def test_import_batch_accepts_topological_structure_reordering_but_keeps_media_o
         step,
         reversed_actual,
     ) != step.arguments
+
+
+def test_import_batch_preserves_task_local_parent_identity_across_chunks() -> None:
+    draft_id = "od1-" + "1" * 32
+    authority = "da1-" + "2" * 40
+    first_fixed = (
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "4",
+    )
+    second_fixed = (*first_fixed[:-1], "5")
+    first = ExpectedGatewayStep(
+        name="tx01.declare-batch",
+        subcommand="draft-declare-import-batch",
+        arguments=(
+            *first_fixed,
+            "--row-order", "row-001",
+            "--row-order", "row-002",
+            "--row-order", "row-003",
+            "--new-row", "row-001", "parent", "Weather", "actor-mixer",
+            "--new-row", "row-002", "row-001", "Rain", "actor-mixer",
+            "--new-row", "row-003", "row-001", "Wind", "actor-mixer",
+        ),
+    )
+    second = ExpectedGatewayStep(
+        name="tx01.declare-batch-02",
+        subcommand="draft-declare-import-batch",
+        arguments=(
+            *second_fixed,
+            "--media-directory", "/tmp/incoming",
+            "--row-order", "row-004",
+            "--row-order", "row-005",
+            "--row-order", "row-006",
+            "--new-row", "row-004", "row-001", "Thunder", "random-container",
+            "--new-row", "row-005", "row-002", "Rain_Bed", "sound-sfx",
+            "--new-row", "row-006", "row-003", "Wind_Bed", "sound-sfx",
+            "--media-file", "row-005", "rain.wav",
+            "--media-file", "row-006", "wind.wav",
+        ),
+    )
+    first_actual = tuple(
+        {
+            "row-001": "weather",
+            "row-002": "rain",
+            "row-003": "wind",
+        }.get(value, value)
+        for value in first.arguments
+    )
+    second_actual = (
+        *second_fixed,
+        "--row-order", "thunder",
+        "--row-order", "rain-bed",
+        "--row-order", "wind-bed",
+        "--new-row", "thunder", "weather", "Thunder", "random-container",
+        "--new-row", "rain-bed", "rain", "Rain_Bed", "sound-sfx",
+        "--new-row", "wind-bed", "wind", "Wind_Bed", "sound-sfx",
+        "--media-file", "rain-bed", "rain.wav",
+        "--media-file", "wind-bed", "wind.wav",
+        "--media-directory", "/tmp/incoming",
+    )
+    broker = SimpleNamespace(
+        _payloads_by_step={},
+        _import_declaration_ids_by_draft={},
+    )
+
+    assert CodexGatewayBroker._normalize_business_declaration_fact_order(
+        broker,
+        first,
+        first_actual,
+    ) == first.arguments
+    assert CodexGatewayBroker._normalize_business_declaration_fact_order(
+        broker,
+        second,
+        second_actual,
+    ) == second.arguments
 
 
 def test_import_batch_accepts_one_exact_derived_sfx_language_per_row() -> None:

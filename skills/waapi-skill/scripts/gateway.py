@@ -25367,6 +25367,11 @@ def _business_next_action_binding(
                     "minimum": 1,
                     "maximum": AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS,
                 },
+                "row_completeness": (
+                    "each_row_must_include_its_media_every_known_requested_field_"
+                    "switch_assignment_and_event_in_the_same_command; partial_"
+                    "rows_are_forbidden"
+                ),
                 "repeat_with_next_response_revision": True,
                 "check_only_after": (
                     "every_user_requested_row_has_been_appended"
@@ -26380,6 +26385,7 @@ def operation_draft_payload(
                     "fixed_argv_prefix_copy",
                     "fixed_argv_prefix_copy_instruction",
                     "rows_per_command",
+                    "row_completeness",
                     "repeat_with_next_response_revision",
                     "check_only_after",
                 )

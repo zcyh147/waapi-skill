@@ -9058,6 +9058,9 @@ class CodexGatewayBroker:
         self._records: list[GatewayBrokerRecord] = []
         self._next_step = 0
         self._payloads_by_step: dict[str, Mapping[str, Any]] = {}
+        self._import_declaration_ids_by_draft: dict[
+            str, dict[str, str]
+        ] = {}
         self._submitted_draft_actions_by_step: dict[
             str, tuple[Mapping[str, Any], ...]
         ] = {}
@@ -11328,6 +11331,17 @@ class CodexGatewayBroker:
             or len(set(expected_order)) != len(expected_order)
         ):
             return tuple(actual)
+        draft_key = str(actual[0])
+        declaration_ids_by_draft = getattr(
+            self,
+            "_import_declaration_ids_by_draft",
+            {},
+        )
+        prior_declaration_id_map = declaration_ids_by_draft.get(
+            draft_key,
+            {},
+        )
+        prior_expected_ids = frozenset(prior_declaration_id_map.values())
         declaration_options = {
             "--new-root-row",
             "--new-child-row",
@@ -11394,6 +11408,24 @@ class CodexGatewayBroker:
                     "declaration-parent",
                     parent_signature,
                 )
+            elif (
+                isinstance(parent, str)
+                and (
+                    (expected and parent in prior_expected_ids)
+                    or (
+                        not expected
+                        and parent in prior_declaration_id_map
+                    )
+                )
+            ):
+                parent_identity = (
+                    "prior-declaration-parent",
+                    (
+                        parent
+                        if expected
+                        else prior_declaration_id_map[parent]
+                    ),
+                )
             else:
                 external_parent = bound_text(parent) if expected else parent
                 if not isinstance(external_parent, str) or not external_parent:
@@ -11434,6 +11466,18 @@ class CodexGatewayBroker:
             actual_id: expected_signatures[signature]
             for signature, actual_id in actual_signatures.items()
         }
+        if any(
+            (
+                actual_id in prior_declaration_id_map
+                and prior_declaration_id_map[actual_id] != expected_id
+            )
+            or (
+                expected_id in prior_expected_ids
+                and prior_declaration_id_map.get(actual_id) != expected_id
+            )
+            for actual_id, expected_id in declaration_id_map.items()
+        ):
+            return tuple(actual)
 
         def topological(
             order: Sequence[str],
@@ -11506,6 +11550,10 @@ class CodexGatewayBroker:
                 if not isinstance(parent_id, str):
                     return None
                 canonical_parent_id = declaration_id_map.get(parent_id)
+                if canonical_parent_id is None:
+                    canonical_parent_id = prior_declaration_id_map.get(
+                        parent_id
+                    )
                 if canonical_parent_id is not None:
                     canonical[2] = canonical_parent_id
             return tuple(canonical)
@@ -11583,6 +11631,11 @@ class CodexGatewayBroker:
         ):
             return tuple(actual)
         actual_by_key = dict(zip(actual_keys, actual_groups, strict=True))
+        declaration_ids_by_draft[draft_key] = {
+            **prior_declaration_id_map,
+            **declaration_id_map,
+        }
+        self._import_declaration_ids_by_draft = declaration_ids_by_draft
         return (
             *tuple(actual[:fixed_count]),
             *(

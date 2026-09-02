@@ -428,6 +428,10 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
         "caller_supplied_counts": "forbidden",
     }
     assert batch_action["rows_per_command"] == {"minimum": 1, "maximum": 3}
+    assert batch_action["row_completeness"] == (
+        "each_row_must_include_its_media_every_known_requested_field_switch_"
+        "assignment_and_event_in_the_same_command; partial_rows_are_forbidden"
+    )
     assert batch_action["repeat_with_next_response_revision"] is True
     assert batch_action["check_only_after"] == (
         "every_user_requested_row_has_been_appended"
@@ -750,6 +754,10 @@ def test_audio_import_batch_chunks_are_atomic_cumulative_and_compact(
         "minimum": 1,
         "maximum": 3,
     }
+    assert first_next["append_import_chunk"]["row_completeness"] == (
+        "each_row_must_include_its_media_every_known_requested_field_switch_"
+        "assignment_and_event_in_the_same_command; partial_rows_are_forbidden"
+    )
     assert first_next["append_import_chunk"]["row_syntax"] == (
         "reuse_the_closed_row_forms_and_fields_from_the_prior_declare_import_"
         "batch_continuation"
