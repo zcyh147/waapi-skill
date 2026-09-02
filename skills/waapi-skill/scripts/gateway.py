@@ -26399,8 +26399,10 @@ def operation_draft_payload(
                 ),
                 "append_import_chunk": append_import_chunk,
                 "check": {
-                    **operation_draft_prefix_copy_binding(check_argv),
-                    "append": [],
+                    "source_field": "draft.next_command",
+                    "use_only_when": (
+                        "every_user_requested_row_has_been_appended"
+                    ),
                 },
                 "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
                 "then_read_next_response": True,

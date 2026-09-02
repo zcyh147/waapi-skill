@@ -815,6 +815,10 @@ def test_audio_import_batch_chunks_are_atomic_cumulative_and_compact(
     assert batch["draft"]["next_action_binding"]["required_next_phase"] == (
         "append_next_import_chunk_or_check_when_all_requested_rows_are_present"
     )
+    assert batch["draft"]["next_action_binding"]["check"] == {
+        "source_field": "draft.next_command",
+        "use_only_when": "every_user_requested_row_has_been_appended",
+    }
     assert batch["draft"]["next_command"]["command"] == "draft-check"
     assert batch["draft"]["next_command"]["copy_exactly"] is True
     assert batch["draft"]["next_command"]["gateway_argv"][:2] == [
