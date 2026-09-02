@@ -155,6 +155,7 @@ tests/unit/test_typed_request_surface_inventory.py
 tests/unit/test_full_surface_release_report.py
 tests/unit/test_interface_depth_inventory.py
 tests/unit/test_typed_request_gateway.py
+tests/unit/test_typed_gateway_input.py
 tests/unit/test_typed_request_core.py
 tests/unit/test_typed_request_complex_core.py
 tests/unit/test_typed_request_complex_gateway.py
