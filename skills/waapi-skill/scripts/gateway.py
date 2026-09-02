@@ -26429,7 +26429,6 @@ def operation_draft_payload(
                 "bind_additional_object_by_path_segments": bind_additional_object,
                 "append_import_chunk": append_import_chunk,
                 "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
-                "then_read_next_response": True,
             }
             draft = {
                 key: draft[key]
