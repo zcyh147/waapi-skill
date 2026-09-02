@@ -593,7 +593,26 @@ def test_operations_catalog_routes_cli_console_intent_to_request_schema(
                 "an exact CamelCase Wwise Authoring command ID named by the "
                 "user is not a generic connected-project action"
             ),
-        }
+        },
+        "single_existing_object_edit": {
+            "choose_by_outcome": {
+                "rename": ["operation-schema", "object.setName"],
+                "notes": ["operation-schema", "object.setNotes"],
+                "scalar_property": [
+                    "operation-schema",
+                    "object.setProperty",
+                ],
+                "reference": [
+                    "operation-schema",
+                    "object.setReference",
+                ],
+            },
+            "takes_precedence_over": ["operation-schema", "object.set"],
+            "rule": (
+                "one existing object's one requested edit uses its dedicated "
+                "route; object.set is only for a larger atomic outcome"
+            ),
+        },
     }
     assert payload["selection_guidance"] == {
         "authoring_ui_command_id": {

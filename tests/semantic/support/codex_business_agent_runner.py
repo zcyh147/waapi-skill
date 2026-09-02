@@ -59,7 +59,7 @@ class BusinessAgentRunSpec:
     optional_initial_query_object_arguments: (
         Callable[[Any], Sequence[str]] | None
     ) = None
-    requires_initial_operations_discovery: bool = True
+    requires_initial_operations_discovery: bool = False
 
 
 def _only_expected_business_commands(
@@ -185,7 +185,11 @@ def run_business_agent_unit(
         else built_steps
     )
     optional_operations_discovery = (
-        spec.optional_initial_operations_discovery_operation
+        business_agent_optional_operations_discovery(
+            unit,
+            explicit=spec.optional_initial_operations_discovery_operation,
+            steps=built_steps,
+        )
         if not spec.requires_initial_operations_discovery
         else None
     )

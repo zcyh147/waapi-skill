@@ -101,6 +101,7 @@ def test_core_business_fresh_runner_allows_one_initial_operation_discovery() -> 
     unit = load_core_business_profile(PROFILE).units[0]
     spec = _core_business_run_spec(unit)
 
+    assert spec.requires_initial_operations_discovery is False
     assert spec.optional_initial_operations_discovery_operation == unit.operation
 
 
