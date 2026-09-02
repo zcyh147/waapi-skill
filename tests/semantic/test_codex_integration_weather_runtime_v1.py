@@ -445,7 +445,7 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
     )
     batch_arguments = import_declarations[0].arguments
     assert batch_arguments.count("--row-order") == 9
-    assert batch_arguments.count("override_parent_instance_limit") == 5
+    assert batch_arguments.count("ignore_parent_instance_limit") == 5
     assert batch_arguments.count("true") >= 5
     assert "IgnoreParentMaxSoundInstance" not in batch_arguments
     action_preview = next(

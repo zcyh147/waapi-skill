@@ -17464,6 +17464,20 @@ def dispatch_business_field_discovery(
             ),
         }
     )
+    if binding.record.operation == "object.set":
+        payload.pop("field_candidates", None)
+        for result in meaning_results:
+            result["candidates"] = [
+                {
+                    key: value
+                    for key, value in candidate.items()
+                    if key != "matched_meanings"
+                }
+                for candidate in result["candidates"]
+            ]
+        payload["candidate_projection"] = (
+            "meaning_results[].candidates_without_duplicate_top_level_rows"
+        )
     return payload
 
 
@@ -25346,7 +25360,7 @@ def _business_next_action_binding(
                 "media_file",
                 "notes",
                 "originals_subfolder",
-                "override_parent_instance_limit",
+                "ignore_parent_instance_limit",
                 "switch_value",
                 "volume_db",
             ],

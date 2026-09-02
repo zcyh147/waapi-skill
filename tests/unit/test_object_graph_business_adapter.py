@@ -174,7 +174,7 @@ def test_object_create_compiles_common_and_bound_fields_without_tokens() -> None
             "loop": "infinite",
             "max_instances": 4,
             "output_bus": bus.handle,
-            "override_parent_instance_limit": True,
+            "ignore_parent_instance_limit": True,
             "volume_db": -4,
         },
     )

@@ -20,7 +20,7 @@ OBJECT_CREATE_BUSINESS_VALUE_TYPES = {
     "max_instances": "integer",
     "notes": "string",
     "output_bus": "reference",
-    "override_parent_instance_limit": "boolean",
+    "ignore_parent_instance_limit": "boolean",
     "volume_db": "number",
 }
 
@@ -212,7 +212,7 @@ def object_graph_business_contract_data(
                     "notes",
                     "object_list",
                     "output_bus",
-                    "override_parent_instance_limit",
+                    "ignore_parent_instance_limit",
                     "platform",
                     "volume_db",
                 ],

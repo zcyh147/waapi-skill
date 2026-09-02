@@ -893,7 +893,7 @@ def test_gateway_compiles_object_create_settings_and_stable_fields(
         "output_bus",
         bus_handle,
         "--field",
-        "override_parent_instance_limit",
+        "ignore_parent_instance_limit",
         "true",
         "--field",
         "volume_db",
@@ -1111,6 +1111,10 @@ def test_object_set_discovers_two_business_field_meanings_in_one_revision(
     assert discover_code == 0, discovered
     assert discovered["meaning_count"] == 2
     assert discovered["candidate_count"] == 2
+    assert "field_candidates" not in discovered
+    assert discovered["candidate_projection"] == (
+        "meaning_results[].candidates_without_duplicate_top_level_rows"
+    )
     assert discovered["selection_required"] is False
     assert [row["meaning"] for row in discovered["meaning_results"]] == [
         "Fade Time",
@@ -1139,7 +1143,7 @@ def test_object_set_discovers_two_business_field_meanings_in_one_revision(
         "exactly_one_declaration_per_command"
     )
     assert continuation["more_actions"]["fixed_full_argv"][3] == "draft-inspect"
-    assert len(json.dumps(discovered, separators=(",", ":")).encode("utf-8")) < 8_000
+    assert len(json.dumps(discovered, separators=(",", ":")).encode("utf-8")) < 7_000
     fade_handle = discovered["meaning_results"][0]["candidates"][0]["handle"]
     delay_handle = discovered["meaning_results"][1]["candidates"][0]["handle"]
     declared_code, declared = _offline(

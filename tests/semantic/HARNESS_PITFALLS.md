@@ -1909,6 +1909,10 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   in `draft-inspect`. New-object declarations keep their operation-specific
   media/list continuations and are not forced through the existing-object
   projection.
+  For `object.set` field discovery, emit each candidate once under its requested
+  `meaning_results` group; do not duplicate the full same candidate again in a
+  top-level list. r22 showed that the duplicate kept real Windows responses at
+  about 8.6 KiB after continuation compaction.
   The full capability remains losslessly reachable, but is not repeated after
   every target. Keep a byte-budget regression on the public payload; do not
   treat `response_integrity.complete=true` as proof of model visibility.
@@ -1940,6 +1944,18 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   are absent from the parser and structured continuation. The semantic oracle
   still compares the actual Preview/Wwise outcome with every requested row, so
   removing the redundant checksum does not turn omission into PASS.
+
+### Stable boolean names must state the requested outcome directly
+
+- Evidence: #61 r22 macOS Weather interpreted
+  `override_parent_instance_limit` as disabling the parent override and supplied
+  `false`, although the user requested that each Sound ignore its parent's
+  instance limit. Broker rejected the contradictory value before Preview.
+- Prevention: the public field is `ignore_parent_instance_limit`; the requested
+  outcome maps directly to `true`, and Gateway compiles the Wwise
+  `IgnoreParentMaxSoundInstance` property plus its enabling dependencies. Remove
+  the ambiguous old field without a compatibility alias so Agents never choose
+  between two spellings of the same behavior.
 
 ### Closed business includes are equivalent only after exact projection proof
 

@@ -102,7 +102,7 @@ def test_new_media_declaration_compiles_all_common_business_fields(
             "volume_db": -4.0,
             "loop": "infinite",
             "max_instances": 3,
-            "override_parent_instance_limit": True,
+            "ignore_parent_instance_limit": True,
             "output_bus": bus,
             "switch_value": "Rain",
             "notes": "steady rain bed",

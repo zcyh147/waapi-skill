@@ -17,7 +17,7 @@
   },
   "source_contracts": {
     "gateway_parser_sha256": "2fff5873025687bfe33ae0a350d14760f5bdbdcbea555d1fd63b6f2f2178d8a0",
-    "operation_contract_sha256": "33ab6c9db5e9d3ff9b5ba3b54f6d2be314108076df23f5820b907cc16f41348d",
+    "operation_contract_sha256": "706cb43352dae98a37ea59534907c72bec4ed6c9baf971fcfea020041f74a9e5",
     "public_continuation_sha256": "c5dd9de956bf7b393c2c4b38c80561940d0873f6695acc2e5a635a7ad2bd8ee3",
     "typed_request_surface_sha256": "7cbe0a9ba6d9756c94ecea58bb1b2ac56da242059f17c5cdfdaf768271d133a8"
   },
@@ -83,7 +83,7 @@
       "owner_issue": null,
       "operations": ["object.create", "object.createPlugin", "object.set", "object.setRTPC"],
       "leaked_mechanics": [],
-      "audit_evidence": "The public object-graph-business/v1 Adapters accept named hierarchy outcomes, plug-in roles, stable business fields, exact user artifacts, references, and RTPC points; bind opaque object, field, plug-in-type, control-input, and output-bus handles; compile exact Wwise types, paths, metadata scope/tokens, dependency order, batch row and Switch-assignment counts, revisions, native requests, and phase-relevant copy-ready continuations into one Preview inside the Gateway. The pre-#78 Composer action vocabulary, caller-supplied batch counts, and normal fallback are removed. #78 retains five-version deterministic and exact macOS/Windows 2022.1 and 2025.1 real-host evidence; repaired-candidate Terra Fresh Agent Weather remains an open release gate rather than inherited evidence."
+      "audit_evidence": "The public object-graph-business/v1 Adapters accept named hierarchy outcomes, plug-in roles, stable business fields including the unambiguous ignore-parent-instance-limit intent, exact user artifacts, references, and RTPC points; bind opaque object, field, plug-in-type, control-input, and output-bus handles; compile exact Wwise types, paths, metadata scope/tokens, dependency order, batch row and Switch-assignment counts, revisions, native requests, and phase-relevant copy-ready continuations into one Preview inside the Gateway. The pre-#78 Composer action vocabulary, ambiguous override-parent field, caller-supplied batch counts, and normal fallback are removed. #78 retains five-version deterministic and exact macOS/Windows 2022.1 and 2025.1 real-host evidence; repaired-candidate Terra Fresh Agent Weather remains an open release gate rather than inherited evidence."
     },
     {
       "id": "named-switch-assignments",

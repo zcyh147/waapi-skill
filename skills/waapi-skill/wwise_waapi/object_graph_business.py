@@ -40,7 +40,7 @@ _CREATE_FIELDS = frozenset(
         "max_instances",
         "notes",
         "output_bus",
-        "override_parent_instance_limit",
+        "ignore_parent_instance_limit",
         "volume_db",
     }
 )
@@ -514,13 +514,13 @@ def _compile_create_fields(
                 {"name": "MaxSoundPerInstance", "value": value},
             ]
         )
-    if "override_parent_instance_limit" in fields:
-        value = fields["override_parent_instance_limit"]
+    if "ignore_parent_instance_limit" in fields:
+        value = fields["ignore_parent_instance_limit"]
         if type(value) is not bool:
             raise _repair(
                 session,
                 "FIELD_VALUE_TYPE_MISMATCH",
-                field="override_parent_instance_limit",
+                field="ignore_parent_instance_limit",
                 action="provide true or false",
             )
         properties.append(

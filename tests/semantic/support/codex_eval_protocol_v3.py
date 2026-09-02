@@ -950,7 +950,7 @@ def build_audio_import_composer_transaction_steps(
         if "IgnoreParentMaxSoundInstance" in property_by_name:
             business_fields.append(
                 (
-                    "override_parent_instance_limit",
+                    "ignore_parent_instance_limit",
                     property_by_name.pop("IgnoreParentMaxSoundInstance"),
                 )
             )
@@ -1898,7 +1898,7 @@ def build_object_graph_business_transaction_steps(
         field_names = {
             "Volume": "volume_db",
             "MaxNumInstances": "max_instances",
-            "OverrideParentMaxNumInstances": "override_parent_instance_limit",
+            "OverrideParentMaxNumInstances": "ignore_parent_instance_limit",
         }
         for native_name, value in property_map.items():
             try:

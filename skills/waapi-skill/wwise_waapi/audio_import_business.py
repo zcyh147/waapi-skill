@@ -515,12 +515,12 @@ def _compile_declaration(
                 {"name": "MaxSoundPerInstance", "value": maximum},
             )
         )
-    if "override_parent_instance_limit" in fields:
-        override_parent = fields["override_parent_instance_limit"]
+    if "ignore_parent_instance_limit" in fields:
+        override_parent = fields["ignore_parent_instance_limit"]
         if type(override_parent) is not bool:
             raise _field_type_repair(
                 session,
-                "override_parent_instance_limit",
+                "ignore_parent_instance_limit",
                 "boolean",
             )
         properties.append(
@@ -573,7 +573,7 @@ def _compile_declaration(
         readable.append(f"音量：{float(fields['volume_db']):g} dB")
     if fields.get("loop") == "infinite":
         readable.append("循环方式：Infinite")
-    if fields.get("override_parent_instance_limit") is True:
+    if fields.get("ignore_parent_instance_limit") is True:
         readable.append("实例上限来源：此对象（忽略父级）")
     if "output_bus" in fields:
         readable.append(f"输出总线：{_resolve_object(session, fields['output_bus']).name}")

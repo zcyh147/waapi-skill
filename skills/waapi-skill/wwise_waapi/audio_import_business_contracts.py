@@ -25,7 +25,7 @@ AUDIO_IMPORT_BUSINESS_VALUE_TYPES = {
     "notes": "string",
     "originals_subfolder": "string",
     "output_bus": "reference",
-    "override_parent_instance_limit": "boolean",
+    "ignore_parent_instance_limit": "boolean",
     "switch_value": "string",
     "volume_db": "number",
 }
