@@ -22854,12 +22854,34 @@ def _compact_object_set_update_continuation(
     }
     if command == "draft-bind-object" and compact_object_binding:
         compact["object_binding"] = compact_object_binding
-    common_actions = ["field_discovery", "declare_existing"]
-    if command == "draft-bind-object":
-        common_actions.append("declare_new")
+    common_actions = {
+        "draft-bind-object": [
+            "field_discovery",
+            "declare_existing",
+            "declare_new",
+        ],
+        "draft-discover-fields": [
+            "field_discovery",
+            "declare_existing",
+        ],
+        "draft-declare-existing": [
+            "field_discovery",
+            "completion_candidate",
+        ],
+    }.get(command, [])
     for key in common_actions:
         if key in value:
-            compact[key] = value[key]
+            action = value[key]
+            if key == "declare_existing" and isinstance(action, Mapping):
+                action = {
+                    **action,
+                    "cardinality": "exactly_one_declaration_per_command",
+                    "repeat_rule": (
+                        "after_each_success_copy_the_next_response_revision_and_"
+                        "submit_the_next_declaration_separately"
+                    ),
+                }
+            compact[key] = action
     compact["more_actions"] = {
         "use_only_when_common_followups_cannot_express_the_user_intent": True,
         **operation_draft_exact_copy_binding(inspect_argv),
@@ -26220,7 +26242,12 @@ def operation_draft_payload(
                 next_action_binding
             )
             if (
-                command in {"draft-bind-object", "draft-discover-fields"}
+                command
+                in {
+                    "draft-bind-object",
+                    "draft-discover-fields",
+                    "draft-declare-existing",
+                }
                 and record.operation == "object.set"
             ):
                 next_action_binding = _compact_object_set_update_continuation(

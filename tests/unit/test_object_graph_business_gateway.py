@@ -1135,8 +1135,48 @@ def test_object_set_discovers_two_business_field_meanings_in_one_revision(
         "then_read_next_response",
         "precompute_or_increment_revision",
     }
+    assert continuation["declare_existing"]["cardinality"] == (
+        "exactly_one_declaration_per_command"
+    )
     assert continuation["more_actions"]["fixed_full_argv"][3] == "draft-inspect"
     assert len(json.dumps(discovered, separators=(",", ":")).encode("utf-8")) < 8_000
+    fade_handle = discovered["meaning_results"][0]["candidates"][0]["handle"]
+    delay_handle = discovered["meaning_results"][1]["candidates"][0]["handle"]
+    declared_code, declared = _offline(
+        tmp_path,
+        "draft-declare-existing",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "3",
+        "--declaration-id",
+        "rain_action",
+        "--object-handle",
+        handle,
+        "--field-value",
+        fade_handle,
+        "0.25",
+        "--field-value",
+        delay_handle,
+        "0",
+    )
+    assert declared_code == 0, declared
+    declared_continuation = declared["draft"]["next_action_binding"]
+    assert set(declared_continuation) == {
+        "contract",
+        "required_next_phase",
+        "field_discovery",
+        "completion_candidate",
+        "more_actions",
+        "shell_tool_timeout_ms",
+        "then_read_next_response",
+        "precompute_or_increment_revision",
+    }
+    assert declared_continuation["more_actions"]["fixed_full_argv"][3] == (
+        "draft-inspect"
+    )
+    assert len(json.dumps(declared, separators=(",", ":")).encode("utf-8")) < 8_000
     rejected_client = _live_client(
         tmp_path,
         {
@@ -1155,7 +1195,7 @@ def test_object_set_discovers_two_business_field_meanings_in_one_revision(
             "--task-authority",
             authority,
             "--expected-revision",
-            "3",
+            "4",
             "--object-handle",
             handle,
             "--meaning",
@@ -1173,8 +1213,9 @@ def test_object_set_discovers_two_business_field_meanings_in_one_revision(
         draft_id,
         task_authority=authority,
     )
-    assert unchanged.revision == 3
+    assert unchanged.revision == 4
     assert len(unchanged.composition["business_session"]["handles"]["fields"]) == 2
+    assert len(unchanged.composition["business_session"]["declarations"]) == 1
 
 
 def test_gateway_adds_subordinate_media_without_model_authored_json(
