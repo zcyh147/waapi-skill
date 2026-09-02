@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from tests.semantic import run_codex_skill_campaign as campaign
 from tests.semantic import run_codex_skill_matrix as matrix
 from tests.semantic.support.codex_object_graph_business_agent_runner import (
@@ -56,6 +58,65 @@ def test_object_graph_permits_only_the_exact_requested_root_preflight(
         "--path-segment",
         "Weather",
     )
+
+
+def test_campaign_audit_accepts_reviewed_exact_root_preflight(
+    tmp_path: Path,
+) -> None:
+    unit = load_object_graph_business_profile(PROFILE).units[0]
+    runtime = prepare_object_graph_business_runtime(unit, tmp_path / "runtime")
+    steps = build_preview_only_object_graph_steps(runtime)
+    preflight_arguments = object_graph_optional_root_preflight(runtime)
+    audited = (
+        ("tx01.operations", ["operations"]),
+        (
+            "tx01.query-object-preflight",
+            ["query-object", *preflight_arguments],
+        ),
+        *(
+            (step.name, [step.subcommand, *step.arguments])
+            for step in steps
+        ),
+    )
+    names = [name for name, _arguments in audited]
+    records = [
+        {
+            "step_name": name,
+            "gateway_arguments": arguments,
+            "accepted": True,
+            "authenticated": True,
+            "succeeded": True,
+            "exit_code": 0,
+            "payload": (
+                {"agent_result": {"request": steps[-1].expected_operation_request}}
+                if name == "tx01.preview"
+                else {}
+            ),
+        }
+        for name, arguments in audited
+    ]
+
+    campaign._validate_bound_business_agent_protocol(  # noqa: SLF001
+        {
+            "expected_step_names": names,
+            "consumed_step_names": names,
+            "records": records,
+        },
+        expected_unit=unit,
+        profile=matrix.OBJECT_GRAPH_BUSINESS_PROFILE_ID,
+    )
+
+    records[1]["gateway_arguments"][-1] = "Unexpected Root"
+    with pytest.raises(campaign.CampaignEvidenceError, match="not successful"):
+        campaign._validate_bound_business_agent_protocol(  # noqa: SLF001
+            {
+                "expected_step_names": names,
+                "consumed_step_names": names,
+                "records": records,
+            },
+            expected_unit=unit,
+            profile=matrix.OBJECT_GRAPH_BUSINESS_PROFILE_ID,
+        )
 
 
 def test_prompt_exposes_business_outcomes_not_gateway_or_native_mechanics() -> None:

@@ -3700,13 +3700,47 @@ def _validate_bound_business_agent_protocol(
             if isinstance(raw_expected_names, list)
             else ()
         )
-        if observed_expected_names == (optional_discovery.name, *expected_names):
-            audited_steps = (optional_discovery, *audited_steps)
-            expected_names = observed_expected_names
-        elif observed_expected_names != expected_names:
+        allowed_prefixes: tuple[tuple[ExpectedGatewayStep, ...], ...] = (
+            (),
+            (optional_discovery,),
+        )
+        if profile == matrix.OBJECT_GRAPH_BUSINESS_PROFILE_ID:
+            from wwise_waapi.builders.common import split_wwise_path
+
+            segments = (
+                *split_wwise_path(str(expected_unit.parent["path"])),
+                str(expected_unit.root_name),
+            )
+            preflight_arguments = tuple(
+                argument
+                for segment in segments
+                for argument in ("--path-segment", segment)
+            )
+            optional_root_preflight = ExpectedGatewayStep(
+                name=f"{label}.query-object-preflight",
+                subcommand="query-object",
+                arguments=preflight_arguments,
+            )
+            allowed_prefixes = (
+                *allowed_prefixes,
+                (optional_root_preflight,),
+                (optional_discovery, optional_root_preflight),
+            )
+        matched_prefix = next(
+            (
+                prefix
+                for prefix in allowed_prefixes
+                if observed_expected_names
+                == (*(step.name for step in prefix), *expected_names)
+            ),
+            None,
+        )
+        if matched_prefix is None:
             raise CampaignEvidenceError(
                 "Business Agent Broker used an unreviewed discovery prefix"
             )
+        audited_steps = (*matched_prefix, *audited_steps)
+        expected_names = observed_expected_names
     consumed_names = broker.get("consumed_step_names")
     records = broker.get("records")
     if (
@@ -3735,6 +3769,10 @@ def _validate_bound_business_agent_protocol(
             or not isinstance(arguments, list)
             or arguments[:1] != [step.subcommand]
             or (step.subcommand == "operations" and arguments != ["operations"])
+            or (
+                step.name.endswith(".query-object-preflight")
+                and arguments != [step.subcommand, *step.arguments]
+            )
         ):
             raise CampaignEvidenceError("bound Business Agent Broker record is not successful")
         if step.subcommand == "preview-from-draft":

@@ -2219,6 +2219,23 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   guessed, or mismatched kinds remain rejected. Route guidance is a public
   Gateway contract and receives size, exact-selection, and negative tests.
 
+### Broker optional prefixes and archive audit must evolve together
+
+- Evidence: #60 macOS r53 first rejected an Object Graph turn that checked the
+  requested root before its schema. A failed-first probe then completed the
+  exact root query and canonical Preview, and the component runner reported
+  PASS, but the outer campaign sealed it BLOCKED as an “unreviewed discovery
+  prefix”. The Broker already allowed exactly one root-specific preflight;
+  only the independent archive auditor still recognized optional `operations`
+  alone.
+- Prevention: whenever a Broker adds a reviewed optional prefix, update the
+  archive reconstruction in the same change. Match only the complete allowed
+  topology: no prefix, `operations`, the exact root query, or `operations`
+  followed by that query. Rebuild the exact path segments from the frozen
+  business unit and reject a changed root, repetition, reordered prefix, or
+  any other discovery. A component `matrix-case.json` PASS is not campaign
+  PASS until the independent archive classification agrees.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:
