@@ -2048,8 +2048,13 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   cross-chunk parent resolution, and one final operation request. Broker
   normalization carries task-local declaration-ID equivalence across chunks,
   so group order and Agent-chosen IDs remain transport while exact parent and
-  field meaning stay sealed. Do not raise shell limits or split the user
-  outcome into separate transactions.
+  field meaning stay sealed. A chunk receipt also retains one compact exact-path
+  binding route: later rows may bind their Bus, Event parent, or other reference
+  dependency between chunks instead of requiring the Agent to predict every
+  future handle before the first structure-only chunk. Once all rows are
+  present, copy `draft.next_command` directly; do not wrap that already-complete
+  copy instruction in a second pseudo-continuation. Do not raise shell limits
+  or split the user outcome into separate transactions.
 
 ### A declaration receipt must carry the next common construction route
 

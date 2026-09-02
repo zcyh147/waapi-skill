@@ -746,10 +746,16 @@ def test_audio_import_batch_chunks_are_atomic_cumulative_and_compact(
     }
     first_next = first["draft"]["next_action_binding"]
     assert first_next["required_next_phase"] == (
-        "append_next_import_chunk_or_check_when_all_requested_rows_are_present"
+        "bind_later_row_dependencies_or_append_next_import_chunk_or_use_draft_"
+        "next_command_when_all_requested_rows_are_present"
     )
     assert "append_import_chunk" in first_next
-    assert "check" in first_next
+    assert first_next["bind_additional_object_by_path_segments"][
+        "append_repeated"
+    ] == [
+        "--object-path-segment",
+        "<one-exact-user-path-segment-without-separators>",
+    ]
     assert first_next["append_import_chunk"]["rows_per_command"] == {
         "minimum": 1,
         "maximum": 3,
@@ -814,19 +820,16 @@ def test_audio_import_batch_chunks_are_atomic_cumulative_and_compact(
     assert set(batch["draft"]["next_action_binding"]) == {
         "contract",
         "required_next_phase",
+        "bind_additional_object_by_path_segments",
         "append_import_chunk",
-        "check",
         "shell_tool_timeout_ms",
         "then_read_next_response",
         "precompute_or_increment_revision",
     }
     assert batch["draft"]["next_action_binding"]["required_next_phase"] == (
-        "append_next_import_chunk_or_check_when_all_requested_rows_are_present"
+        "bind_later_row_dependencies_or_append_next_import_chunk_or_use_draft_"
+        "next_command_when_all_requested_rows_are_present"
     )
-    assert batch["draft"]["next_action_binding"]["check"] == {
-        "source_field": "draft.next_command",
-        "use_only_when": "every_user_requested_row_has_been_appended",
-    }
     assert batch["draft"]["next_command"]["command"] == "draft-check"
     assert batch["draft"]["next_command"]["copy_exactly"] is True
     assert batch["draft"]["next_command"]["gateway_argv"][:2] == [

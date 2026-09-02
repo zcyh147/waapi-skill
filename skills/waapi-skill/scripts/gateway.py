@@ -26397,19 +26397,47 @@ def operation_draft_payload(
             append_import_chunk["cross_chunk_parent_rule"] = (
                 "a_new_row_parent_may_be_one_earlier_declaration_id"
             )
+            raw_object_binding = next_action_binding.get("object_binding")
+            by_path_binding = (
+                raw_object_binding.get("by_path_segments")
+                if isinstance(raw_object_binding, Mapping)
+                else None
+            )
+            if not isinstance(by_path_binding, Mapping):
+                raise GatewayInputError(
+                    "Audio import path binding continuation is unavailable."
+                )
+            compact_path_binding = _compact_business_binding_continuation(
+                by_path_binding
+            )
+            if not isinstance(compact_path_binding, Mapping):  # pragma: no cover
+                raise GatewayInputError(
+                    "Audio import path binding continuation is malformed."
+                )
+            bind_additional_object = {
+                key: compact_path_binding[key]
+                for key in (
+                    "fixed_argv_prefix_copy",
+                    "fixed_argv_prefix_copy_instruction",
+                    "append_repeated",
+                    "segment_order",
+                )
+            }
+            bind_additional_object["use_only_when"] = (
+                "a_later_row_needs_an_unbound_parent_bus_event_parent_or_"
+                "reference_target"
+            )
+            bind_additional_object["result"] = (
+                "copy_the_returned_bound_object.handle"
+            )
             next_action_binding = {
                 "contract": "waapi-skill.business-draft-next-action/v1",
                 "required_next_phase": (
-                    "append_next_import_chunk_or_check_when_all_requested_rows_"
-                    "are_present"
+                    "bind_later_row_dependencies_or_append_next_import_chunk_or_"
+                    "use_draft_next_command_when_all_requested_rows_are_present"
                 ),
+                "bind_additional_object_by_path_segments": bind_additional_object,
                 "append_import_chunk": append_import_chunk,
-                "check": {
-                    "source_field": "draft.next_command",
-                    "use_only_when": (
-                        "every_user_requested_row_has_been_appended"
-                    ),
-                },
                 "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
                 "then_read_next_response": True,
                 "precompute_or_increment_revision": False,
