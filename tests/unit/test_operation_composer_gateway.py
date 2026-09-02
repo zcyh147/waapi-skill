@@ -331,7 +331,7 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
 
     assert len(non_object_set_digests) == 149
     assert canonical_sha256(non_object_set_digests) == (
-        "389e83342037211151dd12c1c2038c554873eb3225f725e9e2086b8df332f965"
+        "8738e801048d6d86dbcb3cf64eef71c7d3c483bd9898595b4d1e5ccfb9779eb3"
     )
     assert {
         version: operation_input_mode("object.set", version)

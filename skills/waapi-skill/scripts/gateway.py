@@ -26367,13 +26367,37 @@ def operation_draft_payload(
                 raise GatewayInputError(
                     "Audio import chunk continuation is unavailable."
                 )
+            compact_append = _compact_business_binding_continuation(
+                append_import_chunk
+            )
+            if not isinstance(compact_append, Mapping):  # pragma: no cover
+                raise GatewayInputError(
+                    "Audio import chunk continuation is malformed."
+                )
+            append_import_chunk = {
+                key: compact_append[key]
+                for key in (
+                    "fixed_argv_prefix_copy",
+                    "fixed_argv_prefix_copy_instruction",
+                    "rows_per_command",
+                    "repeat_with_next_response_revision",
+                    "check_only_after",
+                )
+            }
+            append_import_chunk["row_syntax"] = (
+                "reuse_the_closed_row_forms_and_fields_from_the_prior_"
+                "declare_import_batch_continuation"
+            )
+            append_import_chunk["cross_chunk_parent_rule"] = (
+                "a_new_row_parent_may_be_one_earlier_declaration_id"
+            )
             next_action_binding = {
                 "contract": "waapi-skill.business-draft-next-action/v1",
                 "required_next_phase": (
                     "append_next_import_chunk_or_check_when_all_requested_rows_"
                     "are_present"
                 ),
-                "append_import_chunk": dict(append_import_chunk),
+                "append_import_chunk": append_import_chunk,
                 "check": {
                     **operation_draft_prefix_copy_binding(check_argv),
                     "append": [],

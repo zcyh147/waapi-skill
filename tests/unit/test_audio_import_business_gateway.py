@@ -750,6 +750,13 @@ def test_audio_import_batch_chunks_are_atomic_cumulative_and_compact(
         "minimum": 1,
         "maximum": 3,
     }
+    assert first_next["append_import_chunk"]["row_syntax"] == (
+        "reuse_the_closed_row_forms_and_fields_from_the_prior_declare_import_"
+        "batch_continuation"
+    )
+    assert first_next["append_import_chunk"]["cross_chunk_parent_rule"] == (
+        "a_new_row_parent_may_be_one_earlier_declaration_id"
+    )
 
     second_argv = [
         "draft-declare-import-batch",
