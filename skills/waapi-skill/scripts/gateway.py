@@ -9421,6 +9421,20 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             "status": "ok",
             "command": "operations",
             "offline": True,
+            "routing_precedence": {
+                "exact_authoring_ui_command_id": {
+                    "match_example": "SaveProject",
+                    "choose": ["operation-schema", "ui.commands.execute"],
+                    "takes_precedence_over": [
+                        "request-schema",
+                        "ak.wwise.core.project.save",
+                    ],
+                    "rule": (
+                        "an exact CamelCase Wwise Authoring command ID named "
+                        "by the user is not a generic connected-project action"
+                    ),
+                },
+            },
             "count": len(operations),
             "implemented_count": sum(
                 spec.implemented is True

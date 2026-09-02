@@ -579,6 +579,22 @@ def test_operations_catalog_routes_cli_console_intent_to_request_schema(
     assert "generate SoundBanks" in rows[
         "ak.wwise.cli.generateSoundbank"
     ]["intent"]
+    payload_keys = list(payload)
+    assert payload_keys.index("routing_precedence") < payload_keys.index("operations")
+    assert payload["routing_precedence"] == {
+        "exact_authoring_ui_command_id": {
+            "match_example": "SaveProject",
+            "choose": ["operation-schema", "ui.commands.execute"],
+            "takes_precedence_over": [
+                "request-schema",
+                "ak.wwise.core.project.save",
+            ],
+            "rule": (
+                "an exact CamelCase Wwise Authoring command ID named by the "
+                "user is not a generic connected-project action"
+            ),
+        }
+    }
     assert payload["selection_guidance"] == {
         "authoring_ui_command_id": {
             "choose": ["operation-schema", "ui.commands.execute"],

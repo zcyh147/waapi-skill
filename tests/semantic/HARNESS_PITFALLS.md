@@ -2218,6 +2218,15 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   only when it maps one-to-one to the first exact live candidate; broader,
   guessed, or mismatched kinds remain rejected. Route guidance is a public
   Gateway contract and receives size, exact-selection, and negative tests.
+- Follow-up: #60 r54 independently routed the literal Authoring command ID
+  `SaveProject` to `ak.wwise.core.project.save` on both hosts even though the
+  complete operations payload contained the older unordered guidance. Put an
+  exact-command-ID precedence rule before the operation list and make it
+  explicitly override connected-project save. The same root also produced two
+  host-specific attempts to guess a native URI before `operations`; public
+  Skill examples therefore label `request-schema` as accepting only an exact
+  user-supplied URI. Broker rejection remains strict and these roots receive no
+  PASS credit.
 
 ### Broker optional prefixes and archive audit must evolve together
 

@@ -802,8 +802,13 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     skill_compact = " ".join(SKILL.split())
     assert "`object.set` batches and revalidates its dynamic fields" in skill_compact
     assert "only an explicit unknown dynamic property/reference token needs" in skill_compact
-    assert "A known native URI without a named route" in OPERATE
+    assert "An exact user-supplied native URI without a named route" in OPERATE
     assert "`request-schema <uri>`" in OPERATE
+    assert "never infer a URI from natural-language intent" in OPERATE
+    assert (
+        "request-schema <exact-user-supplied-reflected-function-uri>"
+        in SKILL
+    )
     assert "No schema-to-preview shortcut" in compact
     assert "gateway.py operation-schema <operation-name>" not in OPERATE
     assert "Follow the schema's sole `input_mode`" in OPERATE
@@ -852,6 +857,9 @@ def test_operate_business_selection_and_execution_domains_remain_explicit() -> N
         "`ui.commands.execute`",
     ):
         assert phrase in OPERATE
+    assert "An exact CamelCase Wwise Authoring command ID" in OPERATE
+    assert "`operations.routing_precedence`" in OPERATE
+    assert "overrides generic connected-project save intent" in OPERATE
     assert "Batch size never establishes file-workflow intent" in compact
     assert "When media import is primary" in compact
     assert "replace media on existing Sounds" in compact

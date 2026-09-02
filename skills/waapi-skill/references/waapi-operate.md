@@ -38,7 +38,7 @@ Choose one first transaction-contract branch. Natural language is not an exact o
 | copy/delete/move/rename/notes | Named schema, returned business Draft, role bindings, one complete change. |
 | Any other operation with an explicitly requested unknown dynamic property/reference token | one metadata discovery first, then its named `operation-schema` |
 | A named operation using only closed schema fields and side effects | its named `operation-schema` directly |
-| A known native URI without a named route | `request-schema <uri>` and its sole continuation |
+| An exact user-supplied native URI without a named route | `request-schema <uri>` and its sole continuation; never infer a URI from natural-language intent |
 
 Follow the schema's sole `input_mode`. No schema-to-preview shortcut. The business Adapter owns object paths, native types, metadata scopes, enums, order, batching, and Preview change intent. Complete paths use `by_path_segments`; GUIDs use `by_id`; for an exact reflected URI with a complete caller path, keep it as one `path` selector.
 
@@ -53,6 +53,8 @@ Public mutation identities are closed to `id`, `path`, `exact-type-name`, `direc
 ## Choose by business outcome
 
 Select the operation whose postcondition and verifier match the request; `operation.selection_guidance` and `interface.selection_guidance` govern. **Media gate:** a request that names Sound/SFX nodes but supplies no media artifact or import intent is a pure object hierarchy and selects `object.create`.
+
+An exact CamelCase Wwise Authoring command ID such as `SaveProject` is not a native URI. Its `operations.routing_precedence` rule selects `ui.commands.execute` and overrides generic connected-project save intent.
 
 When media import is primary, use one `audio.import` to replace media on existing Sounds or create a Sound in the same batch; `object.set` is never a preliminary schema for that outcome. New target-container hierarchy and same-row Event/Switch outcomes remain in that transaction; never probe `object.create` or a separate assignment first. From 2023.1, `object.set` may carry media only when import is subordinate to broader existing-target work.
 

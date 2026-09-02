@@ -53,7 +53,7 @@ python scripts/run.py gateway.py capabilities --all-versions --query object.get 
 python scripts/run.py gateway.py describe <uri> --all-versions
 python scripts/run.py gateway.py request-schema ak.wwise.waapi.getFunctions
 python scripts/run.py gateway.py request-schema ak.wwise.waapi.getTopics
-python scripts/run.py gateway.py request-schema <reflected-function-uri>
+python scripts/run.py gateway.py request-schema <exact-user-supplied-reflected-function-uri>
 python scripts/run.py gateway.py query-object --path-segment '<root>' --path-segment '<child>'
 python scripts/run.py gateway.py query-object --kind sound-sfx --include volume-db --max-results 100
 python scripts/run.py gateway.py --version <supported-version> query-schema [--advanced]
