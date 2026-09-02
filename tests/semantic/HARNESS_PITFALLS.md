@@ -2125,14 +2125,21 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   retired full `draft.declarations` list instead of the exact
   `draft.declared_object` receipt. Both hosts preserved source hashes and
   mtimes, quarantined the failed sandboxes, cleaned their processes, and
-  stopped before 2025.1.
+  stopped before 2025.1. The next failed-first roots proved lifecycle on both
+  hosts, then exposed the same stale assumption one phase later: `object.set`
+  field discovery intentionally returns only deduplicated
+  `meaning_results[].candidates`, while the real object-graph Adapter still
+  searched the removed duplicate top-level `field_candidates` list.
 - Prevention: a real-test Adapter decodes the same canonical POSIX or Windows
   copy field selected by its copy instruction, proves the fixed runner/Gateway
   envelope, and applies the existing operation-specific suffix validator. An
   exact copy command must match completely. A new-object result handle comes
   only from the matching compact `declared_object` receipt; internal full Draft
-  state is not a public test oracle. Keep a fast cross-platform regression for
-  both shapes before opening another real root.
+  state is not a public test oracle. For `object.set`, select exactly one handle
+  from the requested meaning's single candidate and require the declared
+  deduplicated projection; do not fall back to the removed duplicate list. Keep
+  a fast cross-platform regression for these shapes before opening another real
+  root.
 
 ## New-root preflight
 

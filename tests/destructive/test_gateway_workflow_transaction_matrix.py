@@ -57,6 +57,7 @@ from tests.semantic.support.typed_gateway_input import (  # pyright: ignore[repo
     create_object_metadata_business_preview,
     create_typed_transaction_preview,
     declared_business_object_handle,
+    discovered_business_field_handle,
 )
 from tests.support.host_path_relatives import (  # pyright: ignore[reportMissingImports]  # noqa: E402
     relative_host_path,
@@ -481,9 +482,7 @@ def _discover_business_field(
         arguments,
         live=True,
     )
-    candidates = payload.get("field_candidates")
-    assert isinstance(candidates, list) and candidates, payload
-    return _required_string(candidates[0], "handle")
+    return discovered_business_field_handle(payload, meaning)
 
 
 def _query_exact_path_id(

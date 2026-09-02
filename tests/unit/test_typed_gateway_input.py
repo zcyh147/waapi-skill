@@ -10,6 +10,7 @@ import pytest
 from tests.semantic.support.typed_gateway_input import (
     create_object_lifecycle_business_preview,
     declared_business_object_handle,
+    discovered_business_field_handle,
 )
 from wwise_waapi.platform_commands import encode_windows_model_argv
 
@@ -206,3 +207,33 @@ def test_declared_business_object_handle_uses_compact_exact_receipt() -> None:
 
     with pytest.raises(AssertionError, match="different declaration"):
         declared_business_object_handle(payload, "rain")
+
+
+def test_discovered_business_field_handle_uses_deduplicated_meaning_projection() -> None:
+    payload = {
+        "candidate_projection": (
+            "meaning_results[].candidates_without_duplicate_top_level_rows"
+        ),
+        "meaning_results": [
+            {
+                "meaning": "volume",
+                "candidate_count": 1,
+                "candidates": [{"handle": "bfh1-volume", "label": "Volume"}],
+            }
+        ],
+    }
+
+    assert discovered_business_field_handle(payload, "volume") == "bfh1-volume"
+
+    with pytest.raises(AssertionError, match="exactly one candidate"):
+        discovered_business_field_handle(
+            {
+                "candidate_projection": (
+                    "meaning_results[].candidates_without_duplicate_top_level_rows"
+                ),
+                "meaning_results": [
+                    {"meaning": "volume", "candidate_count": 0, "candidates": []}
+                ]
+            },
+            "volume",
+        )
