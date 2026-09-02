@@ -174,7 +174,11 @@ from .operation_soundbank import (
     parse_wwise_2021_language_inventory,
     verify_file_proof as verify_soundbank_file_proof,
 )
-from .object_identity_semantics import object_identity_semantics
+from .object_capabilities import (
+    OBJECT_CREATE_SPECIALIZED_CHILD_TYPES_BY_PARENT,
+    object_child_capability,
+    object_identity_semantics,
+)
 from .platform_paths import WWISE_WIRE_PATH_INPUT_AUDIT_CONTRACT
 from .transaction_cleanup import build_transaction_cleanup_spec
 from .versions import SUPPORTED_WWISE_VERSION_KEYS
@@ -391,29 +395,6 @@ IMPORT_REFLECTED_WRITABLE_PARENT_TYPES_BY_VERSION: Mapping[
     str,
     frozenset[str],
 ] = {
-    "2025.1": frozenset({"PropertyContainer"}),
-}
-OBJECT_CREATE_WRITABLE_PARENT_TYPES = frozenset(
-    {
-        "WorkUnit",
-        "Folder",
-        "ActorMixer",
-        "RandomSequenceContainer",
-        "SwitchContainer",
-        "BlendContainer",
-        "MusicSwitchContainer",
-        "MusicRanSeqCntr",
-        "MusicSegment",
-    }
-)
-OBJECT_CREATE_SPECIALIZED_CHILD_TYPES_BY_PARENT: Mapping[
-    str,
-    frozenset[str],
-] = {
-    "StateGroup": frozenset({"State"}),
-    "SwitchGroup": frozenset({"Switch"}),
-}
-OBJECT_CREATE_REFLECTED_PARENT_TYPES_BY_VERSION: Mapping[str, frozenset[str]] = {
     "2025.1": frozenset({"PropertyContainer"}),
 }
 IMPORT_ITEM_REQUIRED_FIELDS: tuple[str, ...] = ()
@@ -4559,7 +4540,10 @@ def _prepare_object_create(
         )
     except ObjectOperationContractError as exc:
         raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
-    _require_specialized_object_tree_relationships(normalized.nodes)
+    _require_specialized_object_tree_relationships(
+        normalized.nodes,
+        version=request.version,
+    )
     type_catalog = _read_object_type_catalog(read)
     canonical_types: dict[str, str] = {}
     resolved_references: dict[str, Any] = {}
@@ -5485,7 +5469,10 @@ def _prepare_object_set(
                 version=request.version,
                 child_types=tuple(root.type for root in children.roots),
             )
-            _require_specialized_object_tree_relationships(children.nodes)
+            _require_specialized_object_tree_relationships(
+                children.nodes,
+                version=request.version,
+            )
         if lists:
             _require_object_list_owner(target)
         target_spec: dict[str, Any] = {
@@ -20371,26 +20358,8 @@ def _require_object_create_writable_parent(
             "object.create parent must expose an absolute live Wwise path.",
             details={"parent": parent.as_dict()},
         )
-    allowed_types = (
-        OBJECT_CREATE_WRITABLE_PARENT_TYPES
-        | frozenset(OBJECT_CREATE_SPECIALIZED_CHILD_TYPES_BY_PARENT)
-        | OBJECT_CREATE_REFLECTED_PARENT_TYPES_BY_VERSION.get(
-            version,
-            frozenset(),
-        )
-    )
-    if object_type not in allowed_types:
-        raise OperationContractError(
-            "INVALID_CREATE_PARENT_TYPE",
-            "object.create parent is not one of the reviewed writable object types.",
-            details={
-                "actual_type": object_type,
-                "allowed_types": sorted(allowed_types),
-                "version": version,
-                "parent": parent.as_dict(),
-            },
-        )
     _require_specialized_object_child_types(
+        version=version,
         parent_type=object_type,
         child_types=child_types,
         details={"parent": parent.as_dict(), "version": version},
@@ -20399,11 +20368,14 @@ def _require_object_create_writable_parent(
 
 def _require_specialized_object_tree_relationships(
     nodes: Sequence[ObjectNodeDescriptor],
+    *,
+    version: str,
 ) -> None:
     for node in nodes:
         if not node.children:
             continue
         _require_specialized_object_child_types(
+            version=version,
             parent_type=node.type,
             child_types=tuple(child.type for child in node.children),
             details={"request_path": node.request_path},
@@ -20412,66 +20384,53 @@ def _require_specialized_object_tree_relationships(
 
 def _require_specialized_object_child_types(
     *,
+    version: str,
     parent_type: Any,
     child_types: Sequence[str],
     details: Mapping[str, Any],
 ) -> None:
-    parent_token = _object_type_token(parent_type)
-    specialized = next(
-        (
-            (name, allowed)
-            for name, allowed in OBJECT_CREATE_SPECIALIZED_CHILD_TYPES_BY_PARENT.items()
-            if _object_type_token(name) == parent_token
-        ),
-        None,
+    capability = object_child_capability(
+        version=version,
+        parent_type=parent_type,
+        child_types=child_types,
     )
-    if specialized is not None:
-        canonical_parent, allowed_child_types = specialized
-        allowed_tokens = {
-            _object_type_token(child_type) for child_type in allowed_child_types
-        }
-        invalid_child_types = sorted(
-            {
-                str(child_type)
-                for child_type in child_types
-                if _object_type_token(child_type) not in allowed_tokens
+    if not capability.writable_parent:
+        raise OperationContractError(
+            "INVALID_CREATE_PARENT_TYPE",
+            "object.create parent is not one of the reviewed writable object types.",
+            details={
+                **dict(details),
+                "actual_type": parent_type,
+                "allowed_types": list(capability.allowed_parent_types),
+                "version": version,
             },
-            key=str.casefold,
         )
-        if invalid_child_types:
-            raise OperationContractError(
-                "INVALID_CREATE_CHILD_TYPE_FOR_PARENT",
-                f"{canonical_parent} accepts only its reviewed Game Sync child type.",
-                details={
-                    **dict(details),
-                    "parent_type": canonical_parent,
-                    "invalid_child_types": invalid_child_types,
-                    "allowed_child_types": sorted(allowed_child_types),
-                },
-            )
-
-    for child_type in child_types:
-        allowed_parent_types = sorted(
-            parent_name
-            for parent_name, allowed_children in (
-                OBJECT_CREATE_SPECIALIZED_CHILD_TYPES_BY_PARENT.items()
-            )
-            if _object_type_token(child_type)
-            in {_object_type_token(item) for item in allowed_children}
+    if not capability.invalid_child_types:
+        return
+    if capability.allowed_child_types:
+        raise OperationContractError(
+            "INVALID_CREATE_CHILD_TYPE_FOR_PARENT",
+            f"{parent_type} accepts only its reviewed Game Sync child type.",
+            details={
+                **dict(details),
+                "parent_type": parent_type,
+                "invalid_child_types": list(capability.invalid_child_types),
+                "allowed_child_types": list(capability.allowed_child_types),
+            },
         )
-        if allowed_parent_types and parent_token not in {
-            _object_type_token(item) for item in allowed_parent_types
-        }:
-            raise OperationContractError(
-                "INVALID_CREATE_PARENT_TYPE_FOR_CHILD",
-                f"{child_type} can be created only under its reviewed Game Sync group type.",
-                details={
-                    **dict(details),
-                    "actual_parent_type": parent_type,
-                    "child_type": child_type,
-                    "allowed_parent_types": allowed_parent_types,
-                },
-            )
+    child_type = capability.invalid_child_types[0]
+    raise OperationContractError(
+        "INVALID_CREATE_PARENT_TYPE_FOR_CHILD",
+        f"{child_type} can be created only under its reviewed Game Sync group type.",
+        details={
+            **dict(details),
+            "actual_parent_type": parent_type,
+            "child_type": child_type,
+            "allowed_parent_types": list(
+                capability.required_parent_types_for(child_type)
+            ),
+        },
+    )
 
 
 def _require_object_list_owner(owner: ResolvedObject) -> None:

@@ -12,6 +12,7 @@ import pytest
 from wwise_waapi.operation_composer import operation_composer_digest
 from wwise_waapi.operation_drafts import OperationDraftStore
 from wwise_waapi.canonical import canonical_sha256
+from wwise_waapi.object_capabilities import NON_INTRINSIC_NAME_OBJECT_TYPES
 
 
 SCRIPT_PATH = (
@@ -1005,6 +1006,159 @@ def test_gateway_rejects_invalid_existing_declaration_before_revision(
 
     assert rejected_code == 2, rejected
     assert rejected["error_code"] == "OBJECT_HANDLE_NOT_AVAILABLE"
+    inspected = OperationDraftStore(tmp_path / "state").inspect(
+        draft_id,
+        task_authority=authority,
+    )
+    assert inspected.revision == revision
+    assert inspected.composition["business_session"]["declarations"] == []
+
+
+@pytest.mark.parametrize(
+    "object_type",
+    sorted(NON_INTRINSIC_NAME_OBJECT_TYPES),
+)
+def test_object_set_rejects_non_intrinsic_rename_at_business_declaration(
+    tmp_path: Path,
+    object_type: str,
+) -> None:
+    start_code, started = _offline(tmp_path, "draft-start", "object.set")
+    assert start_code == 0, started
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    bind_client = _live_client(
+        tmp_path,
+        {
+            "ak.wwise.core.object.get": [
+                {
+                    "return": [
+                        {
+                            "id": PARENT_ID,
+                            "name": "",
+                            "type": object_type,
+                            "path": rf"\Fixture\[{object_type}]",
+                        }
+                    ]
+                }
+            ]
+        },
+    )
+    bind_code, bound = gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(tmp_path / "state"),
+            "draft-bind-object",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            "1",
+            "--object-id",
+            PARENT_ID,
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda _url: bind_client,
+    )
+    assert bind_code == 0, bound
+    revision = bound["draft"]["revision"]
+
+    rejected_code, rejected = _offline(
+        tmp_path,
+        "draft-declare-existing",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        str(revision),
+        "--declaration-id",
+        "target",
+        "--object-handle",
+        bound["bound_object"]["handle"],
+        "--field",
+        "new_name",
+        "Renamed",
+    )
+
+    assert rejected_code == 2, rejected
+    assert rejected["error_code"] == "DERIVED_OBJECT_NAME_BOUNDARY"
+    assert rejected["details"]["repair"]["object_type"] == object_type
+    inspected = OperationDraftStore(tmp_path / "state").inspect(
+        draft_id,
+        task_authority=authority,
+    )
+    assert inspected.revision == revision
+    assert inspected.composition["business_session"]["declarations"] == []
+
+
+@pytest.mark.parametrize(
+    "object_type",
+    sorted(NON_INTRINSIC_NAME_OBJECT_TYPES),
+)
+def test_object_set_rejects_non_container_parent_at_business_declaration(
+    tmp_path: Path,
+    object_type: str,
+) -> None:
+    start_code, started = _offline(tmp_path, "draft-start", "object.set")
+    assert start_code == 0, started
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    bind_client = _live_client(
+        tmp_path,
+        {
+            "ak.wwise.core.object.get": [
+                {
+                    "return": [
+                        {
+                            "id": PARENT_ID,
+                            "name": "",
+                            "type": object_type,
+                            "path": rf"\Fixture\[{object_type}]",
+                        }
+                    ]
+                }
+            ]
+        },
+    )
+    bind_code, bound = gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(tmp_path / "state"),
+            "draft-bind-object",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            "1",
+            "--object-id",
+            PARENT_ID,
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda _url: bind_client,
+    )
+    assert bind_code == 0, bound
+    revision = bound["draft"]["revision"]
+
+    rejected_code, rejected = _offline(
+        tmp_path,
+        "draft-declare-new",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        str(revision),
+        "--declaration-id",
+        "child",
+        "--parent-handle",
+        bound["bound_object"]["handle"],
+        "--name",
+        "Child",
+        "--kind",
+        "sound-sfx",
+    )
+
+    assert rejected_code == 2, rejected
+    assert rejected["error_code"] == "INVALID_CREATE_PARENT_TYPE"
+    assert rejected["details"]["repair"]["actual_type"] == object_type
     inspected = OperationDraftStore(tmp_path / "state").inspect(
         draft_id,
         task_authority=authority,

@@ -30,6 +30,10 @@ from .operation_plugin import (
     MAX_PLUGIN_NOTES_LENGTH,
     MAX_PLUGIN_PROPERTIES,
 )
+from .object_capabilities import (
+    object_child_capability,
+    object_identity_semantics,
+)
 from .operation_registry import parse_operation_request
 
 
@@ -190,19 +194,41 @@ def _validate_specialized_relationship(
     child_type: Any,
 ) -> str | None:
     derived = _derived_game_sync_list(parent_type, child_type)
-    parent_token = _object_type_token(parent_type)
-    child_token = _object_type_token(child_type)
-    special_parent = parent_token in {"stategroup", "switchgroup"}
-    special_child = child_token in {"state", "switch"}
-    if derived is None and (special_parent or special_child):
+    capability = object_child_capability(
+        version=session.context.wwise_version,
+        parent_type=parent_type,
+        child_types=(child_type,),
+    )
+    if not capability.writable_parent:
         raise _repair(
             session,
-            "OBJECT_GRAPH_RELATIONSHIP_INVALID",
-            field="kind",
-            parent_type=str(parent_type),
+            "INVALID_CREATE_PARENT_TYPE",
+            field="parent_handle",
+            actual_type=str(parent_type),
+            allowed_types=list(capability.allowed_parent_types),
+            version=session.context.wwise_version,
+            action="choose one bound Wwise container that can own new children",
+        )
+    if capability.invalid_child_types:
+        if capability.allowed_child_types:
+            raise _repair(
+                session,
+                "INVALID_CREATE_CHILD_TYPE_FOR_PARENT",
+                field="kind",
+                parent_type=str(parent_type),
+                invalid_child_types=list(capability.invalid_child_types),
+                allowed_child_types=list(capability.allowed_child_types),
+                action="choose the reviewed child kind for this Wwise parent",
+            )
+        required_parents = capability.required_parent_types_for(str(child_type))
+        raise _repair(
+            session,
+            "INVALID_CREATE_PARENT_TYPE_FOR_CHILD",
+            field="parent_handle",
+            actual_parent_type=str(parent_type),
             child_type=str(child_type),
-            choices=["StateGroup -> State", "SwitchGroup -> Switch"],
-            action="choose the matching Wwise Game Sync group and value kind",
+            allowed_parent_types=list(required_parents),
+            action="bind the reviewed Wwise parent type for this child kind",
         )
     return derived
 
@@ -1027,6 +1053,21 @@ def _compile_existing_set_fields(
     )
     compiled = _compile_create_fields(session, stable_declaration)
     if "new_name" in fields:
+        semantics = object_identity_semantics(source.object_type)
+        if not semantics.mutable_intrinsic_name:
+            raise _repair(
+                session,
+                "DERIVED_OBJECT_NAME_BOUNDARY",
+                field="new_name",
+                object_type=source.object_type,
+                name_mode=semantics.name_mode,
+                display_identity_source=semantics.display_identity_source,
+                object_handle=source.handle,
+                action=(
+                    "remove new_name and keep only outcomes supported by this "
+                    "bound Wwise object type"
+                ),
+            )
         new_name = fields["new_name"]
         if not isinstance(new_name, str) or not new_name:
             raise _repair(
@@ -1283,12 +1324,10 @@ def _materialize_set(
             declaration,
             allow_object_list=True,
         )
-        parent_token = _object_type_token(parent.object_type)
-        child_token = _object_type_token(node["type"])
         specialized = _validate_specialized_relationship(
             session,
-            parent_type=parent_token,
-            child_type=child_token,
+            parent_type=parent.object_type,
+            child_type=node["type"],
         )
         if specialized is not None and object_list not in {None, specialized}:
             raise _repair(

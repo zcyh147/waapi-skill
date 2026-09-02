@@ -28,7 +28,7 @@ from .builders.metadata import (
 from .canonical import canonical_json_bytes, canonical_sha256, sha256_hex
 from .metadata_discovery import metadata_typed_value_type
 from .identity_limits import MULTI_IDENTITY_READ_MAX_IDS
-from .object_identity_semantics import object_identity_semantics
+from .object_capabilities import object_identity_semantics
 from .metadata_restrictions import (
     MetadataRestrictionError,
     reference_allowed_types,

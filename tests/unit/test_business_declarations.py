@@ -25,7 +25,7 @@ from wwise_waapi.business_declarations import (
     semantic_kind_for_live_type,
     semantic_kinds_for_live_type,
 )
-from wwise_waapi.object_identity_semantics import (
+from wwise_waapi.object_capabilities import (
     NON_INTRINSIC_NAME_OBJECT_TYPES,
     object_identity_semantics,
 )
