@@ -1086,6 +1086,40 @@ def test_operations_discovery_wraps_one_natural_language_business_transaction() 
     assert protocol.steps[1:] == base.steps
 
 
+def test_audio_import_protocol_seals_rows_individually_but_allows_bounded_chunks() -> None:
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "audio.import",
+        "arguments": {
+            "imports": [
+                {
+                    "object_path": (
+                        rf"\Actor-Mixer Hierarchy\Default Work Unit\Layer_{index}"
+                    ),
+                    "object_type": "ActorMixer",
+                }
+                for index in range(1, 7)
+            ]
+        },
+    }
+
+    protocol = build_transaction_protocol([request])
+    batch_steps = tuple(
+        step
+        for step in protocol.steps
+        if step.subcommand == "draft-declare-import-batch"
+    )
+
+    assert len(batch_steps) == 6
+    assert all(step.arguments.count("--row-order") == 1 for step in batch_steps)
+    assert protocol.allowed_turn_prefix_counts == tuple(
+        tuple(range(maximum - 4, maximum + 1))
+        for maximum in protocol.turn_prefix_counts
+    )
+    assert protocol.terminal_prefix_counts == protocol.allowed_turn_prefix_counts[-1]
+
+
 def test_audio_convert_uses_core_business_draft_instead_of_typed_call() -> None:
     request = {
         "contract": "waapi-skill.operation-request/v1",
@@ -1924,7 +1958,7 @@ def test_audio_import_protocol_serializes_bound_existing_declarations() -> None:
         for step in steps
         if step.subcommand == "draft-declare-import-batch"
     ]
-    assert len(declarations) == 2
+    assert len(declarations) == 5
     assert sum(
         declaration.arguments.count("--existing-row")
         for declaration in declarations
@@ -1934,7 +1968,7 @@ def test_audio_import_protocol_serializes_bound_existing_declarations() -> None:
         for declaration in declarations
     ) == 5
     assert all(
-        declaration.arguments.count("--row-order") <= 3
+        declaration.arguments.count("--row-order") == 1
         for declaration in declarations
     )
     assert all(

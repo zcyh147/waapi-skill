@@ -400,6 +400,38 @@ prevention checks that are expensive to rediscover.
   selected encoded field, and test paths containing spaces plus both Windows
   decoders. Never reconstruct the missing global argument by hand.
 
+### Import chunking is transport, not semantic order
+
+- Evidence: #60 r28 macOS submitted the complete Weather import as a legal
+  three-row structure chunk followed by a one-row Thunder chunk. Gateway
+  accepted both, but the Broker rejected the second because its sealed fixture
+  happened to group Thunder with two media rows. Native Windows used another
+  legal three-row partition and reached the exact final Preview.
+- Cause: the oracle sealed arbitrary groups of three declarations instead of
+  the individual import rows. `rows_per_command=1..3` therefore disagreed with
+  the formal protocol even though row identity, fields, dependencies, media
+  order, and final request were unchanged.
+- Prevention: seal one expected step per import row, then let the Broker prove
+  each submitted 1..3-row chunk is one unique dependency-ready partition of
+  the remaining rows. Turn prefixes cover the complete bounded chunk-count
+  range. Duplicate, missing, changed, dependency-early, or media-reordered rows
+  remain rejected before Preview.
+
+### Nested Draft continuations need the task-local runner projection
+
+- Evidence: #60 r28 Windows completed all Weather declarations and generated
+  the exact Preview, but continuation provenance rejected `draft-check`. The
+  compact Draft payload exposed `draft.next_command.model_command` with the
+  frozen candidate path while the Agent correctly invoked its detached
+  task-local Skill path.
+- Cause: Broker projection handled top-level `next_command` and business
+  prefixes, but returned early for an operation-Draft envelope before
+  projecting a standard `next_command` nested inside it.
+- Prevention: recursively project every standard next-command contract inside
+  an operation-Draft with the same strict candidate validation used at the
+  top level. The selected Windows model command must resolve to the fixed
+  task-local runner; malformed or alternate fields still fail closed.
+
 ### Compound Draft topology assumed one terminal per Draft
 
 - Evidence: #83 Fresh `r1` on both hosts blocked before Codex with

@@ -1911,6 +1911,46 @@ def test_broker_projects_only_exact_candidate_continuation_to_task_install(
         )
 
 
+def test_broker_projects_nested_draft_next_command_to_task_install(
+    tmp_path: Path,
+) -> None:
+    candidate_runner = tmp_path / "candidate" / "scripts" / "run.py"
+    candidate_runner.parent.mkdir(parents=True)
+    candidate_runner.write_text("# candidate\n", encoding="utf-8")
+    invocation_runner = (
+        tmp_path
+        / "agent workspace"
+        / ".agents"
+        / "skills"
+        / "waapi-skill"
+        / "scripts"
+        / "run.py"
+    )
+    original = expected_fake_confirmation_next_command(
+        candidate_runner,
+        "tx-draft-nested",
+        platform_name="nt",
+    )
+
+    projected = broker_module._project_model_visible_runner(  # noqa: SLF001
+        {
+            "contract": "waapi-skill.operation-draft/v1",
+            "next_command": original,
+        },
+        candidate_runner=candidate_runner,
+        invocation_runner=invocation_runner,
+        platform_name="nt",
+    )["next_command"]
+
+    assert projected["full_argv"][1] == str(invocation_runner)
+    assert decode_windows_model_argv(projected["model_command"]) == (
+        "python",
+        TASK_LOCAL_RUNNER_WINDOWS,
+        "gateway.py",
+        *projected["gateway_argv"],
+    )
+
+
 @pytest.mark.parametrize("platform_name", ("posix", "nt"))
 def test_broker_projects_draft_action_and_completion_prefixes_to_task_install(
     tmp_path: Path,
@@ -2594,6 +2634,25 @@ elif command == "draft-apply":
             for action in draft_marker["allowed_actions"]
             if action in {"check", "inspect", "cancel", "preview-from-draft"}
         ],
+    }
+elif command == "draft-declare-import-batch":
+    marker_path = state / "draft-marker.json"
+    draft_marker = json.loads(marker_path.read_text(encoding="utf-8"))
+    assert command_arguments[:5] == [
+        draft_marker["draft_id"],
+        "--task-authority",
+        draft_marker["task_authority"],
+        "--expected-revision",
+        str(draft_marker["revision"]),
+    ]
+    draft_marker["revision"] += 1
+    marker_path.write_text(json.dumps(draft_marker), encoding="utf-8")
+    payload["draft"] = {
+        "draft_id": draft_marker["draft_id"],
+        "revision": draft_marker["revision"],
+        "lifecycle_state": "editable",
+        "binding": {"operation": "audio.import", "version": "2022.1"},
+        "current_facts": [],
     }
 elif command == "draft-inspect":
     draft_marker = json.loads(
@@ -4948,22 +5007,132 @@ def test_audio_import_numbered_declarations_remain_strictly_ordered(
     }
 
     steps = build_audio_import_composer_transaction_steps(request, label="tx01")
-    declaration = next(
+    declarations = tuple(
         step
         for step in steps
         if step.subcommand == "draft-declare-import-batch"
     )
+    declaration = declarations[0]
 
     assert declaration.name == "tx01.declare-batch"
     assert [
-        declaration.arguments[index + 1]
-        for index, value in enumerate(declaration.arguments)
+        step.arguments[index + 1]
+        for step in declarations
+        for index, value in enumerate(step.arguments)
         if value == "--row-order"
     ] == ["row-001", "row-002"]
-    assert declaration.arguments.count("--new-row") == 2
-    assert "--new-root-row" not in declaration.arguments
-    assert "--new-child-row" not in declaration.arguments
+    assert sum(step.arguments.count("--new-row") for step in declarations) == 2
+    assert all("--new-root-row" not in step.arguments for step in declarations)
+    assert all("--new-child-row" not in step.arguments for step in declarations)
     assert all(step.subcommand != "draft-apply" for step in steps)
+
+
+def test_audio_import_broker_accepts_equivalent_one_to_three_row_rebatching(
+    tmp_path: Path,
+) -> None:
+    """Import row grouping is transport; six sealed rows remain the oracle."""
+
+    skill = make_fake_skill(tmp_path)
+    draft_id = "od1-" + "1" * 32
+    authority = "da1-" + "2" * 40
+
+    def row_arguments(start: int, stop: int) -> tuple[str, ...]:
+        arguments: list[str] = []
+        for index in range(start, stop):
+            row_id = f"row-{index:03d}"
+            arguments.extend(("--row-order", row_id))
+            arguments.extend(
+                (
+                    "--new-row",
+                    row_id,
+                    "boh1-" + "3" * 32,
+                    f"Layer_{index}",
+                    "actor-mixer",
+                )
+            )
+        return tuple(arguments)
+
+    step_values = [
+        ExpectedGatewayStep("tx01.draft-start", "draft-start", ("audio.import",))
+    ]
+    previous_name = "tx01.draft-start"
+    for index in range(1, 7):
+        name = "tx01.declare-batch" if index == 1 else f"tx01.declare-batch-{index:02d}"
+        step_values.append(
+            ExpectedGatewayStep(
+                name,
+                "draft-declare-import-batch",
+                (
+                    ResponseBinding("tx01.draft-start", "/draft/draft_id"),
+                    "--task-authority",
+                    ResponseBinding("tx01.draft-start", "/task_authority"),
+                    "--expected-revision",
+                    ResponseBinding(previous_name, "/draft/revision"),
+                    *row_arguments(index, index + 1),
+                ),
+            )
+        )
+        previous_name = name
+    steps = tuple(step_values)
+    observed: list[list[str]] = []
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=steps,
+        expected_wwise_version="2022.1",
+        transport="tcp",
+    ) as broker:
+        commands = (
+            ("draft-start", "audio.import"),
+            (
+                "draft-declare-import-batch",
+                draft_id,
+                "--task-authority",
+                authority,
+                "--expected-revision",
+                "1",
+                *row_arguments(1, 4),
+            ),
+            (
+                "draft-declare-import-batch",
+                draft_id,
+                "--task-authority",
+                authority,
+                "--expected-revision",
+                "2",
+                *row_arguments(4, 5),
+            ),
+            (
+                "draft-declare-import-batch",
+                draft_id,
+                "--task-authority",
+                authority,
+                "--expected-revision",
+                "3",
+                *row_arguments(5, 7),
+            ),
+        )
+        for arguments in commands:
+            result = run_model_command(broker, list(arguments))
+            assert result.returncode == 0, result.stderr
+            observed.append(
+                [
+                    "python",
+                    str(broker.invocation_runner_path),
+                    "gateway.py",
+                    *arguments,
+                ]
+            )
+        evidence = broker.evidence()
+        reconciliation = broker.reconcile(observed)
+
+    assert evidence.passed
+    assert reconciliation.passed
+    assert evidence.consumed_step_names == (
+        "tx01.draft-start",
+        "tx01.declare-batch",
+        "tx01.declare-batch-02",
+        "tx01.declare-batch-03",
+    )
 
 
 def test_audio_import_business_protocol_uses_stable_fields_and_strict_revision_order() -> None:
@@ -4999,17 +5168,18 @@ def test_audio_import_business_protocol_uses_stable_fields_and_strict_revision_o
     }
 
     steps = build_audio_import_composer_transaction_steps(request, label="tx01")
-    declaration = next(
+    declarations = tuple(
         step
         for step in steps
         if step.subcommand == "draft-declare-import-batch"
     )
+    declaration = declarations[0]
 
     assert sum(step.subcommand == "draft-bind-field" for step in steps) == 1
-    assert declaration.arguments.count("volume_db") == 2
-    assert declaration.arguments.count("--field-value") == 2
-    assert "--object-type" not in declaration.arguments
-    assert "--object-path" not in declaration.arguments
+    assert sum(step.arguments.count("volume_db") for step in declarations) == 2
+    assert sum(step.arguments.count("--field-value") for step in declarations) == 2
+    assert all("--object-type" not in step.arguments for step in declarations)
+    assert all("--object-path" not in step.arguments for step in declarations)
     assert all(step.subcommand != "draft-apply" for step in steps)
     preview = next(
         step for step in steps if step.subcommand == "preview-from-draft"
@@ -5058,25 +5228,26 @@ def test_audio_import_nested_declaration_binds_compact_parent_receipt() -> None:
     }
 
     steps = build_audio_import_composer_transaction_steps(request, label="tx01")
-    declaration = next(
+    declarations = tuple(
         step
         for step in steps
         if step.subcommand == "draft-declare-import-batch"
     )
     bindings = tuple(
         argument
-        for argument in declaration.arguments
+        for step in declarations
+        for argument in step.arguments
         if isinstance(argument, ResponseBinding)
     )
 
-    new_row_indexes = [
-        index
-        for index, value in enumerate(declaration.arguments)
+    new_rows = [
+        step.arguments[index : index + 5]
+        for step in declarations
+        for index, value in enumerate(step.arguments)
         if value == "--new-row"
     ]
-    assert len(new_row_indexes) == 2
-    child_index = new_row_indexes[1]
-    assert declaration.arguments[child_index + 2] == "row-001"
+    assert len(new_rows) == 2
+    assert new_rows[1][2] == "row-001"
     assert all(
         "/draft/declaration_receipt/" not in binding.pointer
         for binding in bindings

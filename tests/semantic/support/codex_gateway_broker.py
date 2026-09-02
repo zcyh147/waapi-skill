@@ -13,6 +13,7 @@ audit trail writable by the evaluated model.
 from __future__ import annotations
 
 import hashlib
+import itertools
 import json
 import math
 import os
@@ -8020,6 +8021,13 @@ def _project_operation_draft_runner(
             return [project_disclosure_commands(item) for item in nested]
         if not isinstance(nested, Mapping):
             return nested
+        if nested.get("contract") == TRANSACTION_NEXT_COMMAND_CONTRACT:
+            return _project_next_command_runner(
+                nested,
+                candidate_runner=candidate_runner,
+                invocation_runner=invocation_runner,
+                platform_name=platform_name,
+            )
         projected = {
             key: project_disclosure_commands(item)
             for key, item in nested.items()
@@ -10068,6 +10076,8 @@ class CodexGatewayBroker:
                 try:
                     reordered = self._match_dependency_ready_draft_batch(
                         resolved.gateway_arguments,
+                    ) or self._match_rebatched_import_rows(
+                        resolved.gateway_arguments,
                     ) or self._match_dependency_ready_draft_action(
                         resolved.gateway_arguments,
                     )
@@ -10555,6 +10565,323 @@ class CodexGatewayBroker:
             )
         self._execution_steps[self._next_step] = matched_step
         return matched_step, semantic_hash, execution_arguments
+
+    def _match_rebatched_import_rows(
+        self,
+        actual: Sequence[str],
+    ) -> tuple[ExpectedGatewayStep, str, tuple[str, ...]] | None:
+        """Accept a different 1..3-row transport partition of sealed imports.
+
+        Every row and field remains sealed.  Only the command boundary may
+        move, and only when parent dependencies are already present or travel
+        in the same topological chunk.  The remaining rows are repartitioned
+        deterministically so later commands still consume one exact protocol.
+        """
+
+        current = self._execution_steps[self._next_step]
+        if (
+            current.subcommand != "draft-declare-import-batch"
+            or not actual
+            or actual[0] != "draft-declare-import-batch"
+        ):
+            return None
+
+        block_end = self._next_step
+        while (
+            block_end < len(self._execution_steps)
+            and self._execution_steps[block_end].subcommand
+            == "draft-declare-import-batch"
+        ):
+            block_end += 1
+        block = self._execution_steps[self._next_step:block_end]
+        if not block:
+            return None
+
+        option_arity = {
+            "--media-directory": 1,
+            "--row-order": 1,
+            "--new-root-row": 4,
+            "--new-child-row": 4,
+            "--new-row": 4,
+            "--existing-row": 2,
+            "--field": 3,
+            "--field-value": 3,
+            "--media-file": 2,
+            "--switch-value": 2,
+            "--event": 4,
+        }
+
+        def parse_groups(values: Sequence[Any]) -> list[tuple[Any, ...]] | None:
+            groups: list[tuple[Any, ...]] = []
+            cursor = 5
+            while cursor < len(values):
+                option = values[cursor]
+                arity = option_arity.get(option) if isinstance(option, str) else None
+                if arity is None or cursor + arity >= len(values):
+                    return None
+                groups.append(tuple(values[cursor : cursor + arity + 1]))
+                cursor += arity + 1
+            return groups
+
+        def step_rows(
+            step: ExpectedGatewayStep,
+        ) -> list[tuple[str, tuple[tuple[Any, ...], ...], tuple[Any, ...] | None]] | None:
+            groups = parse_groups(step.arguments)
+            if groups is None:
+                return None
+            media_directories = [
+                group for group in groups if group[0] == "--media-directory"
+            ]
+            if len(media_directories) > 1:
+                return None
+            media_directory = media_directories[0] if media_directories else None
+            order = [group[1] for group in groups if group[0] == "--row-order"]
+            if (
+                not order
+                or any(not isinstance(row_id, str) for row_id in order)
+                or len(set(order)) != len(order)
+            ):
+                return None
+            rows: list[
+                tuple[str, tuple[tuple[Any, ...], ...], tuple[Any, ...] | None]
+            ] = []
+            for row_id in order:
+                row_groups = tuple(
+                    group
+                    for group in groups
+                    if group[0] != "--media-directory"
+                    and len(group) >= 2
+                    and group[1] == row_id
+                )
+                declarations = [
+                    group
+                    for group in row_groups
+                    if group[0]
+                    in {
+                        "--new-root-row",
+                        "--new-child-row",
+                        "--new-row",
+                        "--existing-row",
+                    }
+                ]
+                if (
+                    len(declarations) != 1
+                    or sum(group[0] == "--row-order" for group in row_groups) != 1
+                ):
+                    return None
+                row_media_directory = (
+                    media_directory
+                    if any(group[0] == "--media-file" for group in row_groups)
+                    else None
+                )
+                rows.append((row_id, row_groups, row_media_directory))
+            assigned_ids = {
+                group[1]
+                for _row_id, row_groups, _directory in rows
+                for group in row_groups
+            }
+            if any(
+                group[0] != "--media-directory" and group[1] not in assigned_ids
+                for group in groups
+            ):
+                return None
+            return rows
+
+        pool: list[
+            tuple[str, tuple[tuple[Any, ...], ...], tuple[Any, ...] | None]
+        ] = []
+        for sealed_step in block:
+            rows = step_rows(sealed_step)
+            if rows is None:
+                return None
+            pool.extend(rows)
+        all_ids = {row_id for row_id, _groups, _directory in pool}
+        if len(all_ids) != len(pool):
+            return None
+
+        actual_groups = parse_groups(actual[1:])
+        if actual_groups is None:
+            return None
+        actual_order = [
+            group[1] for group in actual_groups if group[0] == "--row-order"
+        ]
+        if not 1 <= len(actual_order) <= 3:
+            return None
+
+        draft_key = str(actual[1]) if len(actual) > 1 else ""
+        prior_map = getattr(self, "_import_declaration_ids_by_draft", {}).get(
+            draft_key,
+            {},
+        )
+        prior_expected_ids = frozenset(prior_map.values())
+
+        def dependencies_ready(indexes: tuple[int, ...]) -> bool:
+            selected_ids = {pool[index][0] for index in indexes}
+            for index in indexes:
+                _row_id, row_groups, _directory = pool[index]
+                declaration = next(
+                    group
+                    for group in row_groups
+                    if group[0]
+                    in {
+                        "--new-root-row",
+                        "--new-child-row",
+                        "--new-row",
+                        "--existing-row",
+                    }
+                )
+                if declaration[0] not in {"--new-child-row", "--new-row"}:
+                    continue
+                parent = declaration[2]
+                if (
+                    isinstance(parent, str)
+                    and parent in all_ids
+                    and parent not in selected_ids
+                    and parent not in prior_expected_ids
+                ):
+                    return False
+            return True
+
+        def arguments_for_rows(
+            prefix: Sequence[Any],
+            rows: Sequence[
+                tuple[str, tuple[tuple[Any, ...], ...], tuple[Any, ...] | None]
+            ],
+        ) -> tuple[Any, ...] | None:
+            directories = {
+                directory for _row_id, _groups, directory in rows if directory
+            }
+            if len(directories) > 1:
+                return None
+            groups: list[Any] = []
+            if directories:
+                groups.extend(next(iter(directories)))
+            for _row_id, row_groups, _directory in rows:
+                for group in row_groups:
+                    groups.extend(group)
+            return (*prefix, *groups)
+
+        initial_maps = {
+            draft: dict(mapping)
+            for draft, mapping in getattr(
+                self,
+                "_import_declaration_ids_by_draft",
+                {},
+            ).items()
+        }
+        matches: list[
+            tuple[
+                tuple[int, ...],
+                ExpectedGatewayStep,
+                str,
+                tuple[str, ...],
+                dict[str, dict[str, str]],
+            ]
+        ] = []
+        for indexes in itertools.combinations(
+            range(len(pool)),
+            len(actual_order),
+        ):
+            if not dependencies_ready(indexes):
+                continue
+            candidate_arguments = arguments_for_rows(
+                current.arguments[:5],
+                [pool[index] for index in indexes],
+            )
+            if candidate_arguments is None:
+                continue
+            candidate = replace(current, arguments=candidate_arguments)
+            self._import_declaration_ids_by_draft = {
+                draft: dict(mapping) for draft, mapping in initial_maps.items()
+            }
+            try:
+                semantic_hash, execution_arguments = self._validate_step(
+                    candidate,
+                    actual,
+                )
+            except GatewayInvocationError:
+                continue
+            matched_maps = {
+                draft: dict(mapping)
+                for draft, mapping in getattr(
+                    self,
+                    "_import_declaration_ids_by_draft",
+                    {},
+                ).items()
+            }
+            matches.append(
+                (
+                    indexes,
+                    candidate,
+                    semantic_hash,
+                    execution_arguments,
+                    matched_maps,
+                )
+            )
+        if not matches:
+            self._import_declaration_ids_by_draft = initial_maps
+            return None
+        if len(matches) != 1:
+            self._import_declaration_ids_by_draft = initial_maps
+            raise GatewayInvocationError(
+                "import chunk matches multiple sealed row subsets"
+            )
+        indexes, matched, semantic_hash, execution_arguments, matched_maps = matches[0]
+        self._import_declaration_ids_by_draft = matched_maps
+
+        selected_indexes = set(indexes)
+        remaining = [
+            row for index, row in enumerate(pool) if index not in selected_indexes
+        ]
+        partitions: list[
+            list[tuple[str, tuple[tuple[Any, ...], ...], tuple[Any, ...] | None]]
+        ] = []
+        cursor = 0
+        while cursor < len(remaining):
+            chunk = remaining[cursor : cursor + 3]
+            while len(chunk) > 1:
+                directories = {
+                    directory
+                    for _row_id, _groups, directory in chunk
+                    if directory
+                }
+                if len(directories) <= 1:
+                    break
+                chunk.pop()
+            if not chunk:
+                raise GatewayInvocationError(
+                    "remaining import rows could not be repartitioned"
+                )
+            partitions.append(chunk)
+            cursor += len(chunk)
+
+        name_match = re.fullmatch(r"(.+\.declare-batch)(?:-(\d{2}))?", current.name)
+        if name_match is None:
+            self._import_declaration_ids_by_draft = initial_maps
+            return None
+        base_name = name_match.group(1)
+        sequence = int(name_match.group(2) or "1")
+        replacement_steps = [matched]
+        previous_name = matched.name
+        for offset, rows in enumerate(partitions, start=1):
+            name = f"{base_name}-{sequence + offset:02d}"
+            prefix = (
+                *current.arguments[:4],
+                ResponseBinding(previous_name, "/draft/revision"),
+            )
+            arguments = arguments_for_rows(prefix, rows)
+            if arguments is None:
+                raise GatewayInvocationError(
+                    "remaining import rows have incompatible media directories"
+                )
+            replacement_steps.append(
+                replace(current, name=name, arguments=arguments)
+            )
+            previous_name = name
+
+        self._execution_steps[self._next_step:block_end] = replacement_steps
+        self._selected_expected_steps[self._next_step:block_end] = replacement_steps
+        return matched, semantic_hash, execution_arguments
 
     def _match_dependency_ready_draft_action(
         self,

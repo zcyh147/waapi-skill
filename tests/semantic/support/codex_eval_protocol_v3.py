@@ -1047,15 +1047,13 @@ def build_audio_import_composer_transaction_steps(
         and len({path.parent for path in all_media_paths}) == 1
     ):
         shared_import_media_directory = all_media_paths[0].parent
-    for chunk_offset in range(
-        0,
-        len(batch_rows),
-        AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS,
-    ):
-        chunk_rows = batch_rows[
-            chunk_offset : chunk_offset + AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS
-        ]
-        chunk_number = chunk_offset // AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS + 1
+    # Seal one row per expected step.  The Broker may then prove that any
+    # submitted 1..3-row command is an exact partition of these row-level
+    # business facts.  Fixing three rows here would accidentally make a
+    # transport boundary part of the semantic oracle.
+    for chunk_offset in range(len(batch_rows)):
+        chunk_rows = batch_rows[chunk_offset : chunk_offset + 1]
+        chunk_number = chunk_offset + 1
         batch_name = (
             batch_base_name
             if chunk_number == 1
@@ -5295,6 +5293,8 @@ def build_transaction_protocol(
 
     steps: list[ExpectedGatewayStep] = []
     prefixes: list[int] = []
+    prefix_rebatch_savings: list[int] = []
+    cumulative_rebatch_savings = 0
     for index, (request, request_equivalence, metadata_meaning) in enumerate(
         zip(normalized, equivalences, metadata_meanings, strict=True),
         start=1,
@@ -5326,6 +5326,7 @@ def build_transaction_protocol(
                 steps.extend(operation_steps)
                 preview_name = f"{label}.preview"
                 prefixes.append(len(steps))
+                prefix_rebatch_savings.append(cumulative_rebatch_savings)
                 show_name = f"{label}.transaction-show"
                 confirm_name = f"{label}.confirm"
                 execute_name = f"{label}.execute"
@@ -5371,6 +5372,7 @@ def build_transaction_protocol(
                     )
                 if index == len(normalized):
                     prefixes.append(len(steps))
+                    prefix_rebatch_savings.append(cumulative_rebatch_savings)
                 continue
             try:
                 contract = request_contract(str(request["version"]), api)
@@ -5596,6 +5598,20 @@ def build_transaction_protocol(
             # already appended above is identical, so retain only their tail.
             steps.extend(construction)
             preview_name = f"{label}.preview"
+            if operation == "audio.import":
+                request_arguments = request.get("arguments")
+                import_rows = (
+                    request_arguments.get("imports")
+                    if isinstance(request_arguments, Mapping)
+                    else None
+                )
+                if not isinstance(import_rows, list) or not import_rows:
+                    raise V3ProtocolError(
+                        "audio.import business protocol requires import rows"
+                    )
+                cumulative_rebatch_savings += len(import_rows) - math.ceil(
+                    len(import_rows) / AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS
+                )
         else:
             raise V3ProtocolError(
                 f"operation {operation!r} has no typed semantic input mode"
@@ -5605,6 +5621,7 @@ def build_transaction_protocol(
         # operation's actual typed construction (which may contain many Draft
         # actions), never from a fixed two-step assumption.
         prefixes.append(len(steps))
+        prefix_rebatch_savings.append(cumulative_rebatch_savings)
         if refusal is not None:
             continue
 
@@ -5655,6 +5672,7 @@ def build_transaction_protocol(
             )
         if index == len(normalized):
             prefixes.append(len(steps))
+            prefix_rebatch_savings.append(cumulative_rebatch_savings)
         else:
             # The next loop appends its schema/preview into this same
             # confirmation turn.  Its prefix is recorded after that append.
@@ -5662,6 +5680,22 @@ def build_transaction_protocol(
 
     if refusal is not None:
         prefixes = [len(steps)]
+        prefix_rebatch_savings = [cumulative_rebatch_savings]
+    if any(prefix_rebatch_savings):
+        allowed = tuple(
+            tuple(range(maximum - savings, maximum + 1))
+            for maximum, savings in zip(
+                prefixes,
+                prefix_rebatch_savings,
+                strict=True,
+            )
+        )
+        return V3GatewayProtocol(
+            tuple(steps),
+            tuple(prefixes),
+            allowed_turn_prefix_counts=allowed,
+            terminal_prefix_counts=allowed[-1],
+        )
     return V3GatewayProtocol(tuple(steps), tuple(prefixes))
 
 
