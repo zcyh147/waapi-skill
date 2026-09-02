@@ -22839,6 +22839,7 @@ def _compact_object_set_update_continuation(
         ],
         "draft-declare-existing": [
             "field_discovery",
+            "declare_existing",
             "completion_candidate",
         ],
     }.get(command, [])

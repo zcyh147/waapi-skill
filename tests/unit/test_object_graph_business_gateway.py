@@ -1167,6 +1167,7 @@ def test_object_set_discovers_two_business_field_meanings_in_one_revision(
         "contract",
         "required_next_phase",
         "field_discovery",
+        "declare_existing",
         "completion_candidate",
         "more_actions",
         "shell_tool_timeout_ms",
@@ -1175,6 +1176,9 @@ def test_object_set_discovers_two_business_field_meanings_in_one_revision(
     }
     assert declared_continuation["more_actions"]["fixed_full_argv"][3] == (
         "draft-inspect"
+    )
+    assert declared_continuation["declare_existing"]["cardinality"] == (
+        "exactly_one_declaration_per_command"
     )
     assert len(json.dumps(declared, separators=(",", ":")).encode("utf-8")) < 8_000
     rejected_client = _live_client(

@@ -1902,8 +1902,9 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   selector form, field discovery, existing-object declaration, and one exact
   `draft-inspect` escape hatch. Field discovery retains only repeated discovery,
   existing-object declaration, and that escape hatch. Existing-object
-  declaration retains only the next field discovery, completion candidate, and
-  escape hatch. Include the resolved object path directly in the compact
+  declaration retains only the next field discovery, an exact one-declaration
+  self-loop, completion candidate, and escape hatch. Include the resolved
+  object path directly in the compact
   binding receipt; new-object, alternate-selector, and unrelated actions remain
   in `draft-inspect`. New-object declarations keep their operation-specific
   media/list continuations and are not forced through the existing-object
