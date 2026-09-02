@@ -4202,6 +4202,80 @@ def _normalize_query_object_business_projection(
     return (*normalized_source, *expected[2:])
 
 
+def _normalize_draft_bind_object_query_identity(
+    step: "ExpectedGatewayStep",
+    supplied_arguments: Sequence[str],
+    payloads_by_step: Mapping[str, Mapping[str, Any]],
+) -> tuple[Any, ...]:
+    """Accept a prior proven object by GUID or its exact returned path.
+
+    Business object binding owns path construction. If a prior bounded query
+    returned the exact GUID and path for one object, repeating that exact path
+    as Gateway path segments is semantically equivalent to copying its GUID.
+    No unqueried path, name-only selector, or alternate object is admitted.
+    """
+
+    actual = tuple(supplied_arguments)
+    if step.subcommand != "draft-bind-object":
+        return actual
+    identity_indexes = tuple(
+        index for index, value in enumerate(step.arguments) if value == "--object-id"
+    )
+    if len(identity_indexes) != 1:
+        return actual
+    identity_index = identity_indexes[0]
+    if identity_index + 1 >= len(step.arguments):
+        return actual
+    expected_identity = step.arguments[identity_index + 1]
+    if isinstance(expected_identity, str):
+        expected_id = expected_identity
+    elif isinstance(expected_identity, ResponseBinding):
+        source = payloads_by_step.get(expected_identity.step)
+        if source is None:
+            return actual
+        value = _json_pointer(source, expected_identity.pointer)
+        if not isinstance(value, str):
+            return actual
+        expected_id = value
+    elif isinstance(expected_identity, ResponseBindingOrExactArgument):
+        source = payloads_by_step.get(expected_identity.binding.step)
+        if source is None:
+            return actual
+        value = _json_pointer(source, expected_identity.binding.pointer)
+        if not isinstance(value, str):
+            return actual
+        expected_id = value
+    else:
+        return actual
+    tail = actual[identity_index:]
+    if (
+        len(tail) < 2
+        or len(tail) % 2
+        or tail[::2] != ("--object-path-segment",) * (len(tail) // 2)
+    ):
+        return actual
+    segments = tuple(tail[1::2])
+    if any(not segment or segment != segment.strip() or "\\" in segment for segment in segments):
+        return actual
+    supplied_path = "\\" + "\\".join(segments)
+    matching_rows = []
+    for payload in payloads_by_step.values():
+        rows = payload.get("objects")
+        if not isinstance(rows, list):
+            continue
+        matching_rows.extend(
+            row
+            for row in rows
+            if isinstance(row, Mapping)
+            and isinstance(row.get("id"), str)
+            and row["id"].casefold() == expected_id.casefold()
+            and row.get("path") == supplied_path
+        )
+    if not matching_rows:
+        return actual
+    return (*actual[:identity_index], "--object-id", expected_id)
+
+
 def _normalize_event_action_draft_binding(
     step: "ExpectedGatewayStep",
     supplied_arguments: Sequence[str],
@@ -11600,6 +11674,11 @@ class CodexGatewayBroker:
         validation_arguments = _normalize_query_object_sound_routing_view(
             step,
             validation_arguments,
+        )
+        validation_arguments = _normalize_draft_bind_object_query_identity(
+            step,
+            validation_arguments,
+            self._payloads_by_step,
         )
         validation_arguments = _normalize_event_action_draft_binding(
             step,

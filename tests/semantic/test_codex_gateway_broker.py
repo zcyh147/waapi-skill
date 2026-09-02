@@ -8022,6 +8022,61 @@ def test_business_query_path_segments_expand_to_complete_legacy_projection() -> 
     assert normalized == ("--path", path, *tail)
 
 
+def test_draft_object_binding_accepts_the_exact_prior_query_path() -> None:
+    object_id = "{33333333-3333-3333-3333-333333333333}"
+    path = r"\Master-Mixer Hierarchy\Default Work Unit\Master Audio Bus\SFX_Machinery"
+    step = ExpectedGatewayStep(
+        "tx01.bind-target",
+        "draft-bind-object",
+        (
+            "od1-" + "1" * 32,
+            "--task-authority",
+            "da1-" + "2" * 40,
+            "--expected-revision",
+            "3",
+            "--object-id",
+            object_id,
+        ),
+    )
+    actual = (
+        *step.arguments[:5],
+        "--object-path-segment",
+        "Master-Mixer Hierarchy",
+        "--object-path-segment",
+        "Default Work Unit",
+        "--object-path-segment",
+        "Master Audio Bus",
+        "--object-path-segment",
+        "SFX_Machinery",
+    )
+
+    normalized = broker_module._normalize_draft_bind_object_query_identity(  # noqa: SLF001
+        step,
+        actual,
+        {
+            "diag.target_bus": {
+                "objects": [
+                    {
+                        "id": object_id,
+                        "name": "SFX_Machinery",
+                        "type": "Bus",
+                        "path": path,
+                    }
+                ]
+            }
+        },
+    )
+
+    assert normalized == step.arguments
+
+    wrong = (*actual[:-1], "Music")
+    assert broker_module._normalize_draft_bind_object_query_identity(  # noqa: SLF001
+        step,
+        wrong,
+        {"diag.target_bus": {"objects": [{"id": object_id, "path": path}]}},
+    ) == wrong
+
+
 def test_event_action_draft_binding_expands_to_direct_child_selector() -> None:
     fixed = (
         "od1-" + "1" * 32,

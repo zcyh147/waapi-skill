@@ -1836,6 +1836,11 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   `id/name/type/path` projection plus native `@Volume`. Normalize both forms to
   the sealed witness before comparison; do not fail a correct Wwise read merely
   because the Agent did not restate Gateway-owned return fields.
+- The same rule applies when a later Draft binds an object already proved by a
+  bounded query: copying its returned GUID and copying the exact returned path
+  as Gateway-owned path segments are equivalent. Normalize the path form to the
+  sealed GUID only when one prior payload contains that exact GUID/path pair;
+  unqueried paths, name-only selectors, and alternate objects remain rejected.
 
 ### Omitted business platform means Wwise's unlinked value
 
@@ -1887,14 +1892,16 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
 
 - Evidence: #61 r15 macOS Weather correctly bound the second Action, but the
   generic `object.set` post-bind reply repeated the complete long-tail Draft
-  action catalog and copy policy. The result declared itself complete, while
-  the Codex command view clipped its text; the Agent safely stopped rather than
-  invent the hidden continuation.
-- Prevention: after `object.set` object binding, return a sub-8-KiB common
-  continuation containing only the just-used selector form, field discovery,
-  existing-object declaration, and one exact `draft-inspect` escape hatch for
-  uncommon actions. Include the resolved object path directly in the compact
-  receipt; new-object and alternate-selector actions remain in `draft-inspect`.
+  action catalog and copy policy. r19 proved the first compaction worked (about
+  7.4 KiB), then exposed the same leak one phase later: each two-meaning
+  `draft-discover-fields` reply still repeated about 16.6 KiB.
+- Prevention: after `object.set` object binding or field discovery, return a
+  sub-8-KiB phase-relevant continuation. Binding retains only the just-used
+  selector form, field discovery, existing-object declaration, and one exact
+  `draft-inspect` escape hatch. Field discovery retains only repeated discovery,
+  existing-object declaration, and that escape hatch. Include the resolved
+  object path directly in the compact binding receipt; new-object,
+  alternate-selector, and unrelated actions remain in `draft-inspect`.
   The full capability remains losslessly reachable, but is not repeated after
   every target. Keep a byte-budget regression on the public payload; do not
   treat `response_integrity.complete=true` as proof of model visibility.
