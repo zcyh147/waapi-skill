@@ -475,6 +475,7 @@ class OperationDraftStore:
         version: str,
         schema_digest: str,
         composer_digest: str | None = None,
+        compound_parent: Mapping[str, Any] | None = None,
         now: datetime | None = None,
     ) -> OperationDraftStart:
         _require_binding(operation, version, schema_digest)
@@ -483,6 +484,10 @@ class OperationDraftStore:
             or not _SHA256_PATTERN.fullmatch(composer_digest)
         ):
             raise ValueError("composer_digest must be a lowercase SHA-256 digest")
+        if compound_parent is not None and composer_digest is None:
+            raise ValueError(
+                "compound_parent requires a current Composer-backed Draft"
+            )
         created_datetime = _utc_datetime(now)
         created_at = _timestamp(created_datetime)
         expires_at = _timestamp(
@@ -534,7 +539,11 @@ class OperationDraftStore:
                     ),
                     composer_digest=composer_digest,
                     composition=(
-                        new_composition(operation, version)
+                        new_composition(
+                            operation,
+                            version,
+                            compound_parent=compound_parent,
+                        )
                         if composer_digest is not None
                         else None
                     ),

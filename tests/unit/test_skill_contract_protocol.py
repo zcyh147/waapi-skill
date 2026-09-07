@@ -870,6 +870,9 @@ def test_operate_business_selection_and_execution_domains_remain_explicit() -> N
     assert "operation-schema ui.commands.execute" in OPERATE
     assert "operation-schema ui.captureScreen" in OPERATE
     assert "skip `operations`" in OPERATE
+    assert "parent-owned `start_child` continuation" in OPERATE
+    assert "never Preview a Compound Undo child independently" in OPERATE
+    assert "`checked_child_argument`" in OPERATE
     assert "Batch size never establishes file-workflow intent" in compact
     assert "When media import is primary" in compact
     assert "replace media on existing Sounds" in compact

@@ -102,7 +102,7 @@ def test_every_undo_lane_uses_one_ordered_business_plan(version: str) -> None:
     )
     assert contract["declaration"]["subcommand"] == "draft-declare-undo-plan"
     assert contract["declaration"]["child_input"] == (
-        "ordered_checked_closed_draft_snapshot"
+        "ordered_parent_owned_checked_closed_draft_snapshot"
     )
     assert contract["legacy_composer_public"] is False
     assert contract["legacy_child_schema_public"] is False

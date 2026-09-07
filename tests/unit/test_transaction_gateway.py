@@ -1757,7 +1757,7 @@ def test_operation_schema_discloses_checked_child_business_contract_offline(
     assert adapter["input_mode"] == "business_declaration"
     assert adapter["declaration"]["subcommand"] == "draft-declare-undo-plan"
     assert adapter["declaration"]["child_input"] == (
-        "ordered_checked_closed_draft_snapshot"
+        "ordered_parent_owned_checked_closed_draft_snapshot"
     )
     assert adapter["legacy_composer_public"] is False
     assert adapter["legacy_child_schema_public"] is False

@@ -78,12 +78,10 @@ def test_unit_checks_children_then_emits_only_parent_preview(tmp_path: Path) -> 
     assert [step.name for step in steps] == [
         "tx03.operation-schema",
         "tx03.draft-start",
-        "tx01.operation-schema",
         "tx01.draft-start",
         "tx01.bind-object",
         "tx01.declare-object-change",
         "tx01.check",
-        "tx02.operation-schema",
         "tx02.draft-start",
         "tx02.bind-object",
         "tx02.declare-object-change",
@@ -112,6 +110,7 @@ def test_fresh_runner_allows_only_the_one_initial_operations_discovery(
     steps = build_preview_only_compound_undo_steps(runtime)
     spec = _compound_undo_business_run_spec()
 
+    assert spec.allow_compound_checked_child_handoff is False
     assert (
         spec.optional_initial_operations_discovery_operation
         == "waapi.undoGroup"

@@ -17,6 +17,7 @@ from typing import Any, Callable, Mapping, Sequence
 from .canonical import canonical_json_bytes, canonical_sha256
 from .business_declaration_state import BusinessDeclarationSession
 from .business_adapters import business_adapter
+from .compound_undo_business import CompoundParentDraftBinding
 from .metadata_discovery import metadata_candidate_limit_contract
 from .operation_registry import (
     audio_import_business_contract,
@@ -1408,10 +1409,26 @@ def _apply_generic_typed_action(
     return candidate, str(action_name)
 
 
-def new_composition(operation: str, version: str) -> dict[str, Any]:
+def new_composition(
+    operation: str,
+    version: str,
+    *,
+    compound_parent: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     if operation_uses_business_declaration(operation, version):
         operation_business_contract(operation, version)
-        return {"contract": OPERATION_COMPOSITION_CONTRACT}
+        composition: dict[str, Any] = {
+            "contract": OPERATION_COMPOSITION_CONTRACT
+        }
+        if compound_parent is not None:
+            composition["compound_parent"] = (
+                CompoundParentDraftBinding.from_dict(compound_parent).as_dict()
+            )
+        return composition
+    if compound_parent is not None:
+        raise OperationComposerError(
+            "Compound Undo children require a Business Declaration Adapter."
+        )
     contract = operation_composer_contract(operation, version)
     if operation.startswith("ak.") or operation in DRAFT_TYPED_OPERATIONS:
         return {
@@ -1638,7 +1655,11 @@ def _normalize_business_composition(
 
     operation_business_contract(operation, version)
     _require_json_object(composition, label="composition")
-    if set(composition) - {"contract", "business_session"}:
+    if set(composition) - {
+        "contract",
+        "business_session",
+        "compound_parent",
+    }:
         raise OperationComposerError(
             f"{operation} business composition fields are invalid."
         )
@@ -1646,9 +1667,18 @@ def _normalize_business_composition(
         raise OperationComposerError(
             "Operation Draft composition contract is invalid."
         )
+    raw_parent = composition.get("compound_parent")
+    parent = (
+        None
+        if raw_parent is None
+        else CompoundParentDraftBinding.from_dict(raw_parent).as_dict()
+    )
     raw_session = composition.get("business_session")
     if raw_session is None:
-        return {"contract": OPERATION_COMPOSITION_CONTRACT}
+        return {
+            "contract": OPERATION_COMPOSITION_CONTRACT,
+            **({"compound_parent": parent} if parent is not None else {}),
+        }
     try:
         session = BusinessDeclarationSession.from_dict(raw_session).as_dict()
     except (TypeError, ValueError) as exc:
@@ -1658,6 +1688,7 @@ def _normalize_business_composition(
     return {
         "contract": OPERATION_COMPOSITION_CONTRACT,
         "business_session": session,
+        **({"compound_parent": parent} if parent is not None else {}),
     }
 
 

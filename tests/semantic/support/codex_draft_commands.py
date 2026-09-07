@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 
+DRAFT_START_SUBCOMMANDS = frozenset({"draft-start", "draft-start-undo-child"})
+
+
 DRAFT_GATEWAY_SUBCOMMANDS = frozenset(
     {
         "draft-start",
+        "draft-start-undo-child",
         "draft-inspect",
         "draft-apply",
         "draft-add-media",
@@ -45,5 +49,6 @@ DRAFT_GATEWAY_SUBCOMMANDS = frozenset(
 
 DRAFT_REVISION_SUBCOMMANDS = DRAFT_GATEWAY_SUBCOMMANDS - {
     "draft-start",
+    "draft-start-undo-child",
     "draft-inspect",
 }

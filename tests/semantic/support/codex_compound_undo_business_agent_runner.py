@@ -220,7 +220,6 @@ def _compound_undo_business_run_spec() -> BusinessAgentRunSpec:
         preview_gates=_compound_undo_preview_gates,
         outcome_factory=CompoundUndoBusinessAgentOutcome,
         optional_initial_operations_discovery_operation="waapi.undoGroup",
-        allow_compound_checked_child_handoff=True,
     )
 
 

@@ -391,7 +391,10 @@ def _continuation_error(
                                 or declaration.get("required_fields")
                                 != ["display_name", "child_drafts"]
                                 or declaration.get("child_input")
-                                != "ordered_checked_closed_draft_snapshot"
+                                != (
+                                    "ordered_parent_owned_checked_closed_"
+                                    "draft_snapshot"
+                                )
                                 or declaration.get("native_request_input")
                                 != "forbidden"
                                 or declaration.get("child_call_handle_input")

@@ -2268,6 +2268,28 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   any other discovery. A component `matrix-case.json` PASS is not campaign
   PASS until the independent archive classification agrees.
 
+### Parent-owned Draft starts must pass the complete Broker flow
+
+- Trigger: Compound Undo now creates its children with
+  `draft-start-undo-child`. Updating the protocol builder and accepted-command
+  list alone left response validation treating only ordinary `draft-start` as
+  an authority-issuing command. A valid first child was rejected after Gateway
+  returned successfully, before the second child or parent Preview.
+- Evidence: `test_broker_completes_parent_owned_children_through_production_gateway`
+  reproduced `only draft-start may disclose the task authority` without starting
+  Codex or Wwise. The repaired test completes both checked children and the one
+  parent Preview through the production Gateway and authenticated Broker using
+  the existing business fixture client.
+- Prevention: classify start commands centrally; resolve each command's exact
+  owning start and read the operation from that start's validated shape. Child
+  starts bind a parent but issue a distinct child identity and authority. Their
+  subsequent receipts belong to the child, not to the parent or latest sibling.
+  Before a Fresh root, run this complete code-level flow as well as the public
+  Gateway checks for parent ownership and forbidden independent child Preview.
+- Current CUB continuations return the next child start or parent completion
+  directly. The current profile uses ordinary exact continuation grading; the
+  older checked-child handoff exception is retained only for historical readers.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:

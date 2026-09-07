@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -349,13 +350,11 @@ def test_compound_undo_steps_check_children_before_one_parent_preview() -> None:
     assert [step.subcommand for step in steps] == [
         "operation-schema",
         "draft-start",
-        "operation-schema",
-        "draft-start",
+        "draft-start-undo-child",
         "draft-bind-object",
         "draft-declare-object-change",
         "draft-check",
-        "operation-schema",
-        "draft-start",
+        "draft-start-undo-child",
         "draft-bind-object",
         "draft-declare-object-change",
         "draft-check",
@@ -381,6 +380,19 @@ def test_compound_undo_steps_check_children_before_one_parent_preview() -> None:
     with pytest.raises(ValueError, match="child Draft must end checked"):
         validate_operation_draft_protocol_steps(
             tuple(step for step in steps if step.name != "tx01.check")
+        )
+
+    child_start = steps[2]
+    wrong_parent = replace(
+        child_start,
+        arguments=(
+            ResponseBinding("tx02.draft-start", "/draft/draft_id"),
+            *child_start.arguments[1:],
+        ),
+    )
+    with pytest.raises(ValueError, match="exact compound parent"):
+        validate_operation_draft_protocol_steps(
+            (*steps[:2], wrong_parent, *steps[3:])
         )
 
 

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hmac
+import re
 from typing import Any, Callable, Mapping, Sequence
 
 from .business_declaration_state import BusinessDeclarationSession
@@ -22,6 +24,51 @@ _SNAPSHOT_FIELDS = {
     "request_sha256",
     "request",
 }
+_DRAFT_ID_PATTERN = re.compile(r"^od1-[0-9a-f]{32}$")
+_TASK_AUTHORITY_PATTERN = re.compile(r"^da1-[0-9a-f]{40}$")
+
+
+@dataclass(frozen=True, slots=True)
+class CompoundParentDraftBinding:
+    """Private link from one checked child back to its owning Undo Draft."""
+
+    draft_id: str
+    task_authority: str
+    expected_revision: int
+
+    @classmethod
+    def from_dict(cls, value: object) -> "CompoundParentDraftBinding":
+        if not isinstance(value, Mapping) or set(value) != {
+            "draft_id",
+            "task_authority",
+            "expected_revision",
+        }:
+            raise ValueError("Compound parent binding is malformed")
+        draft_id = value.get("draft_id")
+        task_authority = value.get("task_authority")
+        expected_revision = value.get("expected_revision")
+        if not isinstance(draft_id, str) or not _DRAFT_ID_PATTERN.fullmatch(
+            draft_id
+        ):
+            raise ValueError("Compound parent draft id is malformed")
+        if not isinstance(
+            task_authority, str
+        ) or not _TASK_AUTHORITY_PATTERN.fullmatch(task_authority):
+            raise ValueError("Compound parent task authority is malformed")
+        if type(expected_revision) is not int or expected_revision < 1:
+            raise ValueError("Compound parent revision is malformed")
+        return cls(
+            draft_id=draft_id,
+            task_authority=task_authority,
+            expected_revision=expected_revision,
+        )
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "draft_id": self.draft_id,
+            "task_authority": self.task_authority,
+            "expected_revision": self.expected_revision,
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,6 +102,8 @@ class CompoundUndoSnapshotScope:
 
     store: Any
     parent_draft_id: str
+    parent_task_authority: str
+    parent_revision: int
     parent_context: BusinessContext
     project_guard: Mapping[str, Any]
     version: str
@@ -79,6 +128,28 @@ def snapshot_checked_compound_undo_children(
         )
         if child_record.draft_id == scope.parent_draft_id:
             raise ValueError("A Compound Undo plan cannot include itself")
+        raw_parent = (
+            child_record.composition.get("compound_parent")
+            if child_record.composition is not None
+            else None
+        )
+        try:
+            parent = CompoundParentDraftBinding.from_dict(raw_parent)
+        except ValueError as exc:
+            raise ValueError(
+                f"Compound Undo child {index} must be parent-owned"
+            ) from exc
+        if (
+            parent.draft_id != scope.parent_draft_id
+            or not hmac.compare_digest(
+                parent.task_authority,
+                scope.parent_task_authority,
+            )
+            or parent.expected_revision != scope.parent_revision
+        ):
+            raise ValueError(
+                f"Compound Undo child {index} belongs to another parent"
+            )
         if not operation_uses_business_declaration(
             child_record.operation,
             child_record.version,
@@ -304,6 +375,7 @@ def _session_repair(
 
 __all__ = [
     "CheckedChildDraftBinding",
+    "CompoundParentDraftBinding",
     "CompoundUndoSnapshotScope",
     "build_compound_undo_child_snapshot",
     "materialize_compound_undo_business_request",

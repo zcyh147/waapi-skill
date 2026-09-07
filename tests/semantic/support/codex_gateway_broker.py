@@ -43,6 +43,7 @@ from tests.semantic.support.codex_filesystem_security import (
 from tests.semantic.support.codex_draft_commands import (
     DRAFT_GATEWAY_SUBCOMMANDS,
     DRAFT_REVISION_SUBCOMMANDS,
+    DRAFT_START_SUBCOMMANDS,
 )
 from wwise_waapi.operation_composer import (
     MAX_TYPED_ACTIONS_PER_APPLY,
@@ -3273,6 +3274,27 @@ def _validate_compound_undo_draft_protocol_steps(
     if parent_start is None:
         raise ValueError("compound Undo declaration names an unknown parent Draft")
 
+    for child_start in starts:
+        if child_start is parent_start:
+            continue
+        arguments = child_start.arguments
+        if (
+            child_start.subcommand != "draft-start-undo-child"
+            or len(arguments) != 7
+            or arguments[0]
+            != ResponseBinding(parent_start_name, "/draft/draft_id")
+            or arguments[1] != "--task-authority"
+            or arguments[2]
+            != ResponseBinding(parent_start_name, "/task_authority")
+            or arguments[3] != "--expected-revision"
+            or arguments[4]
+            != ResponseBinding(parent_start_name, "/draft/revision")
+            or arguments[5] != "--operation"
+        ):
+            raise ValueError(
+                "compound Undo child start must bind its exact compound parent"
+            )
+
     child_start_names: list[str] = []
     arguments = declaration.arguments
     for index, value in enumerate(arguments):
@@ -3309,7 +3331,10 @@ def _validate_compound_undo_draft_protocol_steps(
     for start in starts:
         owned = [start]
         for step in steps:
-            if step.subcommand not in _DRAFT_SUBCOMMANDS or step is start:
+            if (
+                step.subcommand not in _DRAFT_SUBCOMMANDS
+                or step in starts
+            ):
                 continue
             first = step.arguments[0] if step.arguments else None
             if isinstance(first, ResponseBinding) and first.step == start.name:
@@ -3355,7 +3380,11 @@ def validate_operation_draft_protocol_steps(
     draft_steps = tuple(step for step in steps if step.subcommand in _DRAFT_SUBCOMMANDS)
     if not draft_steps:
         return
-    starts = tuple(step for step in draft_steps if step.subcommand == "draft-start")
+    starts = tuple(
+        step
+        for step in draft_steps
+        if step.subcommand in {"draft-start", "draft-start-undo-child"}
+    )
     if len(starts) > 1:
         if any(
             step.subcommand == "draft-declare-undo-plan" for step in draft_steps
@@ -3416,14 +3445,29 @@ def validate_operation_draft_protocol_steps(
     if len(starts) != 1:
         raise ValueError("a typed Draft protocol requires exactly one draft-start step")
     start = starts[0]
-    if (
-        len(start.arguments) != 1
-        or not isinstance(start.arguments[0], str)
-        or not start.arguments[0]
-        or start.arguments[0] != start.arguments[0].strip()
-    ):
-        raise ValueError("draft-start must bind one exact operation name")
-    draft_operation = start.arguments[0]
+    if start.subcommand == "draft-start-undo-child":
+        if (
+            len(start.arguments) != 7
+            or start.arguments[1] != "--task-authority"
+            or start.arguments[3] != "--expected-revision"
+            or start.arguments[5] != "--operation"
+            or not isinstance(start.arguments[6], str)
+            or not start.arguments[6]
+            or start.arguments[6] != start.arguments[6].strip()
+        ):
+            raise ValueError(
+                "draft-start-undo-child must bind one parent and one exact child operation"
+            )
+        draft_operation = start.arguments[6]
+    else:
+        if (
+            len(start.arguments) != 1
+            or not isinstance(start.arguments[0], str)
+            or not start.arguments[0]
+            or start.arguments[0] != start.arguments[0].strip()
+        ):
+            raise ValueError("draft-start must bind one exact operation name")
+        draft_operation = start.arguments[0]
     preceding_schema = next(
         (
             step
@@ -10378,7 +10422,7 @@ class CodexGatewayBroker:
     ) -> ExpectedGatewayStep:
         """Resolve a Draft command to its exact owning draft-start step."""
 
-        if step.subcommand == "draft-start":
+        if step.subcommand in DRAFT_START_SUBCOMMANDS:
             return step
         binding = step.arguments[0] if step.arguments else None
         if (
@@ -10394,7 +10438,7 @@ class CodexGatewayBroker:
                 : self._execution_steps.index(step) + 1
             ]
             if candidate.name == binding.step
-            and candidate.subcommand == "draft-start"
+            and candidate.subcommand in DRAFT_START_SUBCOMMANDS
         )
         if len(matches) != 1:
             raise GatewayInvocationError(
@@ -13450,7 +13494,7 @@ class CodexGatewayBroker:
     ) -> None:
         """Bind every successful Draft response to the reviewed Draft flow."""
 
-        if "task_authority" in payload and step.subcommand != "draft-start":
+        if "task_authority" in payload and step.subcommand not in DRAFT_START_SUBCOMMANDS:
             raise GatewayInvocationError(
                 "only draft-start may disclose the task authority"
             )
@@ -13542,7 +13586,7 @@ class CodexGatewayBroker:
 
         step_index = self._execution_steps.index(step)
         start = self._draft_start_for_step(step)
-        operation = start.arguments[0]
+        operation = self._draft_start_operation(start)
         version = binding.get("version")
         if binding.get("operation") != operation:
             raise GatewayInvocationError(
@@ -13555,7 +13599,7 @@ class CodexGatewayBroker:
                 "Draft response version does not match the sealed Wwise version"
             )
 
-        if step.subcommand == "draft-start":
+        if step.subcommand in DRAFT_START_SUBCOMMANDS:
             authority = payload.get("task_authority")
             if (
                 not isinstance(authority, str)
@@ -13614,6 +13658,15 @@ class CodexGatewayBroker:
                 "Draft response lifecycle state does not follow the reviewed transition"
             )
 
+    @staticmethod
+    def _draft_start_operation(start: ExpectedGatewayStep) -> str:
+        """Read the operation from the validated ordinary or parent-owned start."""
+
+        value = start.arguments[6 if start.subcommand == "draft-start-undo-child" else 0]
+        if not isinstance(value, str):
+            raise GatewayInvocationError("Draft start has no exact operation")
+        return value
+
     def _operation_draft_step_is_read_only(
         self,
         step: ExpectedGatewayStep,
@@ -13621,7 +13674,7 @@ class CodexGatewayBroker:
         """Classify one Draft flow from its exact prior start binding."""
 
         start = self._draft_start_for_step(step)
-        operation = start.arguments[0] if start.arguments else None
+        operation = self._draft_start_operation(start)
         if not isinstance(operation, str) or not operation.startswith("ak."):
             return False
         start_payload = self._payloads_by_step.get(start.name)

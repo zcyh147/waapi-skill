@@ -3466,6 +3466,71 @@ def test_broker_rejects_unsealed_optional_topic_disclosure(tmp_path: Path) -> No
     assert broker.evidence().terminal_state == "FAILED"
 
 
+def test_broker_completes_parent_owned_children_through_production_gateway(
+    tmp_path: Path,
+) -> None:
+    from tests.semantic.support.codex_business_agent_runner import (
+        FIXTURE_ENV,
+        WAAPI_SHIM_ROOT,
+    )
+    from tests.semantic.support.codex_compound_undo_business_agent_runner import (
+        build_preview_only_compound_undo_steps,
+        prepare_compound_undo_business_runtime,
+    )
+    from tests.semantic.support.codex_compound_undo_business_profile import (
+        load_compound_undo_business_profile,
+    )
+
+    root = Path(__file__).resolve().parents[2]
+    unit = load_compound_undo_business_profile(
+        root / "tests/semantic/data/compound-undo-business/profile.json"
+    ).units[0]
+    runtime = prepare_compound_undo_business_runtime(unit, tmp_path / "runtime")
+    steps = build_preview_only_compound_undo_steps(runtime)
+    payloads: dict[str, Mapping[str, object]] = {}
+    with CodexGatewayBroker(
+        skill_source=root / "skills/waapi-skill",
+        expected_steps=steps,
+        expected_wwise_version=unit.version,
+        project_modification_policy="ask_before_changes",
+        runner_environment={
+            **os.environ,
+            "PYTHONPATH": os.pathsep.join(
+                (str(WAAPI_SHIM_ROOT), str(root), str(root / "skills/waapi-skill"))
+            ),
+            FIXTURE_ENV: str(runtime.fixture_path),
+            "WWISE_VERSION": unit.version,
+            "WWISE_WAAPI_HOST": "127.0.0.1",
+            "WWISE_WAAPI_PORT": "31337",
+        },
+        working_root=tmp_path / "broker",
+        transport="tcp",
+    ) as broker:
+        for step in steps:
+            argv = [step.subcommand]
+            for argument in step.arguments:
+                if isinstance(argument, ResponseBinding):
+                    value: object = payloads[argument.step]
+                    for token in argument.pointer.lstrip("/").split("/"):
+                        assert isinstance(value, Mapping)
+                        value = value[token]
+                    argv.append(str(value))
+                else:
+                    assert isinstance(argument, str), argument
+                    argv.append(argument)
+            result = run_model_command(broker, argv)
+            assert result.returncode == 0, (step.name, result.stdout, result.stderr)
+            payloads[step.name] = json.loads(result.stdout[result.stdout.index("{"):])
+
+        evidence = broker.evidence()
+        assert evidence.passed, evidence
+        assert evidence.consumed_step_names == tuple(step.name for step in steps)
+        preview = payloads["tx03.preview"]["agent_result"]
+        assert preview["request"] == steps[-1].expected_operation_request
+        assert [record.step_name for record in evidence.records
+                if record.gateway_arguments[0] == "preview-from-draft"] == ["tx03.preview"]
+
+
 def test_compound_parent_revision_binding_ignores_later_child_draft_receipts(
     tmp_path: Path,
 ) -> None:

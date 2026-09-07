@@ -2340,7 +2340,26 @@ def build_compound_undo_business_transaction_steps(
         if not child_steps or child_steps[-1].subcommand != "preview-from-draft":
             raise V3ProtocolError("compound Undo child protocol lacks Preview terminal")
         child_steps.pop()
-        steps.extend(child_steps)
+        if (
+            len(child_steps) < 2
+            or child_steps[0].subcommand != "operation-schema"
+            or child_steps[1].subcommand != "draft-start"
+        ):
+            raise V3ProtocolError(
+                "compound Undo child protocol lacks its closed business start"
+            )
+        steps.append(
+            ExpectedGatewayStep(
+                name=f"{child_label}.draft-start",
+                subcommand="draft-start-undo-child",
+                arguments=(
+                    *parent.prefix(),
+                    "--operation",
+                    str(request["operation"]),
+                ),
+            )
+        )
+        steps.extend(child_steps[2:])
         checked_child_labels.append(child_label)
 
     declaration_arguments: list[Any] = [

@@ -23,16 +23,24 @@ def _checked_object_child(
     value_flag: str,
     value: str,
     client: ObjectLifecycleClient,
+    parent: tuple[str, str, int] | None = None,
 ) -> tuple[str, str, str, int]:
-    code, started = offline_execute(
-        tmp_path,
-        "--state-dir",
-        str(state_dir),
-        "--version",
-        "2022.1",
-        "draft-start",
-        operation,
+    start_arguments = (
+        (
+            "--state-dir", str(state_dir),
+            "--version", "2022.1",
+            "draft-start", operation,
+        )
+        if parent is None
+        else (
+            "--state-dir", str(state_dir),
+            "draft-start-undo-child", parent[0],
+            "--task-authority", parent[1],
+            "--expected-revision", str(parent[2]),
+            "--operation", operation,
+        )
     )
+    code, started = offline_execute(tmp_path, *start_arguments)
     assert code == 0, started
     draft_id = started["draft"]["draft_id"]
     authority = started["task_authority"]
@@ -77,27 +85,140 @@ def _checked_object_child(
     )
 
 
+def test_parent_owned_compound_child_returns_handoff_and_cannot_preview(
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "state"
+    client = ObjectLifecycleClient()
+    code, parent = offline_execute(
+        tmp_path,
+        "--state-dir", str(state_dir),
+        "--version", "2022.1",
+        "draft-start", "waapi.undoGroup",
+    )
+    assert code == 0, parent
+    parent_id = parent["draft"]["draft_id"]
+    parent_authority = parent["task_authority"]
+    parent_start = parent["draft"]["next_action_binding"]["start_child"]
+    assert "draft-start-undo-child" in parent_start["fixed_argv_prefix_copy"]
+    assert parent_start["append"] == [
+        "--operation <eligible-child-operation>"
+    ]
+    code, child = offline_execute(
+        tmp_path,
+        "--state-dir", str(state_dir),
+        "draft-start-undo-child", parent_id,
+        "--task-authority", parent_authority,
+        "--expected-revision", str(parent["draft"]["revision"]),
+        "--operation", "object.setNotes",
+    )
+    assert code == 0, child
+    child_id = child["draft"]["draft_id"]
+    child_authority = child["task_authority"]
+    code, bound = waapi_gateway.execute_gateway(
+        [
+            "--state-dir", str(state_dir),
+            "draft-bind-object", child_id,
+            "--task-authority", child_authority,
+            "--expected-revision", str(child["draft"]["revision"]),
+            "--object-id", OBJECT_GUID,
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+    assert code == 0, bound
+    code, declared = offline_execute(
+        tmp_path,
+        "--state-dir", str(state_dir),
+        "draft-declare-object-change", child_id,
+        "--task-authority", child_authority,
+        "--expected-revision", str(bound["draft"]["revision"]),
+        "--object-handle", bound["bound_object"]["handle"],
+        "--notes", "Exterior rain loop",
+    )
+    assert code == 0, declared
+    code, checked = waapi_gateway.execute_gateway(
+        [
+            "--state-dir", str(state_dir),
+            "draft-check", child_id,
+            "--task-authority", child_authority,
+            "--expected-revision", str(declared["draft"]["revision"]),
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+    assert code == 0, checked
+    assert "next_command" not in checked
+    assert "preview-from-draft" not in checked["draft"]["allowed_actions"]
+    handoff = checked["draft"]["next_action_binding"]
+    assert handoff["required_next_phase"] == (
+        "return_checked_child_to_compound_parent"
+    )
+    assert handoff["checked_child_argument"] == [
+        "--child-draft",
+        child_id,
+        child_authority,
+    ]
+    assert "draft-start-undo-child" in handoff["start_next_child"][
+        "fixed_argv_prefix_copy"
+    ]
+
+    code, rejected = waapi_gateway.execute_gateway(
+        [
+            "--state-dir", str(state_dir),
+            "preview-from-draft", child_id,
+            "--task-authority", child_authority,
+            "--expected-revision", str(checked["draft"]["revision"]),
+            "--apply",
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+    assert code == 2
+    assert "Compound Undo child" in rejected["message"]
+
+
+def test_compound_undo_rejects_checked_child_not_owned_by_parent(
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "state"
+    client = ObjectLifecycleClient()
+    child = _checked_object_child(
+        tmp_path,
+        state_dir,
+        operation="object.setNotes",
+        value_flag="--notes",
+        value="unlinked",
+        client=client,
+    )
+    code, parent = offline_execute(
+        tmp_path,
+        "--state-dir", str(state_dir),
+        "--version", "2022.1",
+        "draft-start", "waapi.undoGroup",
+    )
+    assert code == 0, parent
+    code, rejected = waapi_gateway.execute_gateway(
+        [
+            "--state-dir", str(state_dir),
+            "draft-declare-undo-plan", parent["draft"]["draft_id"],
+            "--task-authority", parent["task_authority"],
+            "--expected-revision", str(parent["draft"]["revision"]),
+            "--display-name", "Reject unlinked child",
+            "--child-draft", child[0], child[1],
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+    assert code == 2
+    assert "parent-owned" in rejected["message"]
+
+
 def test_public_compound_undo_snapshots_checked_business_children_into_one_preview(
     tmp_path: Path,
 ) -> None:
     state_dir = tmp_path / "state"
     client = ObjectLifecycleClient()
-    notes = _checked_object_child(
-        tmp_path,
-        state_dir,
-        operation="object.setNotes",
-        value_flag="--notes",
-        value="first",
-        client=client,
-    )
-    rename = _checked_object_child(
-        tmp_path,
-        state_dir,
-        operation="object.setName",
-        value_flag="--new-name",
-        value="Second",
-        client=client,
-    )
     code, started = offline_execute(
         tmp_path,
         "--state-dir", str(state_dir),
@@ -107,6 +228,25 @@ def test_public_compound_undo_snapshots_checked_business_children_into_one_previ
     assert code == 0, started
     parent_id = started["draft"]["draft_id"]
     parent_authority = started["task_authority"]
+    parent = (parent_id, parent_authority, started["draft"]["revision"])
+    notes = _checked_object_child(
+        tmp_path,
+        state_dir,
+        operation="object.setNotes",
+        value_flag="--notes",
+        value="first",
+        client=client,
+        parent=parent,
+    )
+    rename = _checked_object_child(
+        tmp_path,
+        state_dir,
+        operation="object.setName",
+        value_flag="--new-name",
+        value="Second",
+        client=client,
+        parent=parent,
+    )
     code, declared = waapi_gateway.execute_gateway(
         [
             "--state-dir", str(state_dir),
@@ -184,13 +324,6 @@ def test_compound_undo_rejects_unchecked_or_stale_child_before_parent_write(
     tmp_path: Path,
 ) -> None:
     state_dir = tmp_path / "state"
-    code, child = offline_execute(
-        tmp_path,
-        "--state-dir", str(state_dir),
-        "--version", "2022.1",
-        "draft-start", "object.setNotes",
-    )
-    assert code == 0, child
     code, parent = offline_execute(
         tmp_path,
         "--state-dir", str(state_dir),
@@ -198,6 +331,15 @@ def test_compound_undo_rejects_unchecked_or_stale_child_before_parent_write(
         "draft-start", "waapi.undoGroup",
     )
     assert code == 0, parent
+    code, child = offline_execute(
+        tmp_path,
+        "--state-dir", str(state_dir),
+        "draft-start-undo-child", parent["draft"]["draft_id"],
+        "--task-authority", parent["task_authority"],
+        "--expected-revision", str(parent["draft"]["revision"]),
+        "--operation", "object.setNotes",
+    )
+    assert code == 0, child
     code, rejected = waapi_gateway.execute_gateway(
         [
             "--state-dir", str(state_dir),
@@ -269,6 +411,7 @@ def test_compound_undo_repair_preserves_hostile_business_values_exactly(
         value_flag="--notes",
         value=hostile_notes,
         client=client,
+        parent=(parent_id, parent_authority, parent_revision),
     )
     code, declared = waapi_gateway.execute_gateway(
         [
@@ -320,6 +463,18 @@ def test_compound_undo_rejects_two_children_that_own_the_same_final_outcome(
 ) -> None:
     state_dir = tmp_path / "state"
     client = ObjectLifecycleClient()
+    code, parent = offline_execute(
+        tmp_path,
+        "--state-dir", str(state_dir),
+        "--version", "2022.1",
+        "draft-start", "waapi.undoGroup",
+    )
+    assert code == 0, parent
+    parent_binding = (
+        parent["draft"]["draft_id"],
+        parent["task_authority"],
+        parent["draft"]["revision"],
+    )
     first = _checked_object_child(
         tmp_path,
         state_dir,
@@ -327,6 +482,7 @@ def test_compound_undo_rejects_two_children_that_own_the_same_final_outcome(
         value_flag="--notes",
         value="first",
         client=client,
+        parent=parent_binding,
     )
     second = _checked_object_child(
         tmp_path,
@@ -335,14 +491,8 @@ def test_compound_undo_rejects_two_children_that_own_the_same_final_outcome(
         value_flag="--notes",
         value="second",
         client=client,
+        parent=parent_binding,
     )
-    code, parent = offline_execute(
-        tmp_path,
-        "--state-dir", str(state_dir),
-        "--version", "2022.1",
-        "draft-start", "waapi.undoGroup",
-    )
-    assert code == 0, parent
     code, declared = waapi_gateway.execute_gateway(
         [
             "--state-dir", str(state_dir),
@@ -395,6 +545,18 @@ def test_compound_undo_rejects_child_changed_after_check_before_parent_snapshot(
 ) -> None:
     state_dir = tmp_path / "state"
     client = ObjectLifecycleClient()
+    code, parent = offline_execute(
+        tmp_path,
+        "--state-dir", str(state_dir),
+        "--version", "2022.1",
+        "draft-start", "waapi.undoGroup",
+    )
+    assert code == 0, parent
+    parent_binding = (
+        parent["draft"]["draft_id"],
+        parent["task_authority"],
+        parent["draft"]["revision"],
+    )
     child_id, child_authority, _object_handle, checked_revision = (
         _checked_object_child(
             tmp_path,
@@ -403,6 +565,7 @@ def test_compound_undo_rejects_child_changed_after_check_before_parent_snapshot(
             value_flag="--notes",
             value="first",
             client=client,
+            parent=parent_binding,
         )
     )
     code, cancelled = offline_execute(
@@ -417,17 +580,6 @@ def test_compound_undo_rejects_child_changed_after_check_before_parent_snapshot(
         str(checked_revision),
     )
     assert code == 0, cancelled
-    code, parent = offline_execute(
-        tmp_path,
-        "--state-dir",
-        str(state_dir),
-        "--version",
-        "2022.1",
-        "draft-start",
-        "waapi.undoGroup",
-    )
-    assert code == 0, parent
-
     code, rejected = waapi_gateway.execute_gateway(
         [
             "--state-dir",
@@ -464,6 +616,18 @@ def test_parent_snapshot_is_unchanged_when_checked_child_is_revised_later(
 ) -> None:
     state_dir = tmp_path / "state"
     client = ObjectLifecycleClient()
+    code, parent = offline_execute(
+        tmp_path,
+        "--state-dir", str(state_dir),
+        "--version", "2022.1",
+        "draft-start", "waapi.undoGroup",
+    )
+    assert code == 0, parent
+    parent_binding = (
+        parent["draft"]["draft_id"],
+        parent["task_authority"],
+        parent["draft"]["revision"],
+    )
     child_id, child_authority, _object_handle, checked_revision = (
         _checked_object_child(
             tmp_path,
@@ -472,18 +636,9 @@ def test_parent_snapshot_is_unchanged_when_checked_child_is_revised_later(
             value_flag="--notes",
             value="snapshotted",
             client=client,
+            parent=parent_binding,
         )
     )
-    code, parent = offline_execute(
-        tmp_path,
-        "--state-dir",
-        str(state_dir),
-        "--version",
-        "2022.1",
-        "draft-start",
-        "waapi.undoGroup",
-    )
-    assert code == 0, parent
     code, declared = waapi_gateway.execute_gateway(
         [
             "--state-dir",

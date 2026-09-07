@@ -54,8 +54,12 @@ def test_public_undo_schema_discloses_only_checked_business_draft_input(
     adapter = payload["business_adapter"]
     assert adapter["declaration"]["subcommand"] == "draft-declare-undo-plan"
     assert adapter["declaration"]["child_input"] == (
-        "ordered_checked_closed_draft_snapshot"
+        "ordered_parent_owned_checked_closed_draft_snapshot"
     )
+    assert adapter["declaration"]["child_start"]["subcommand"] == (
+        "draft-start-undo-child"
+    )
+    assert adapter["declaration"]["child_start"]["preview"] == "forbidden"
     assert adapter["declaration"]["native_request_input"] == "forbidden"
     assert adapter["declaration"]["child_call_handle_input"] == "forbidden"
     assert adapter["declaration"]["action_ordering_grammar"] == "forbidden"

@@ -44,7 +44,16 @@ def compound_undo_business_contract_data(version: str) -> dict[str, Any]:
             "settings_field": "undo_plan",
             "submit_once": True,
             "required_fields": ["display_name", "child_drafts"],
-            "child_input": "ordered_checked_closed_draft_snapshot",
+            "child_input": (
+                "ordered_parent_owned_checked_closed_draft_snapshot"
+            ),
+            "child_start": {
+                "subcommand": "draft-start-undo-child",
+                "caller_input": "one eligible child operation name",
+                "parent_binding": "gateway_owned_copy_ready_prefix",
+                "checked_handoff": "returns_to_parent",
+                "preview": "forbidden",
+            },
             "child_count": {"minimum": 1, "maximum": UNDO_GROUP_MAX_CALLS},
             "display_name": {
                 "minimum_characters": 1,
@@ -67,12 +76,13 @@ def compound_undo_business_contract_data(version: str) -> dict[str, Any]:
         },
         "responsibility_split": {
             "agent": (
-                "choose_the_display_name_and_user_requested_business_sequence_"
-                "of_already_checked_closed_child_drafts"
+                "choose_the_display_name_child_business_operations_and_user_"
+                "requested_business_sequence"
             ),
             "gateway": (
-                "snapshot_child_requests_derive_schema_bindings_fixed_native_"
-                "phase_dependency_order_revisions_and_one_preview"
+                "own_parent_child_handoffs_snapshot_child_requests_derive_"
+                "schema_bindings_fixed_native_phase_dependency_order_"
+                "revisions_and_one_parent_preview"
             ),
         },
         "gateway_derivations": [

@@ -230,6 +230,7 @@ from wwise_waapi.typed_operations import (  # noqa: E402  # pyright: ignore[repo
     DRAFT_TYPED_OPERATIONS,
     INLINE_OPERATIONS,
     TypedOperationInputError,
+    compound_business_child_operations,
     draft_operation_request_contract,
     inline_operation_contract,
     materialize_inline_operation_request,
@@ -446,6 +447,7 @@ from wwise_waapi.debug_business_cli import (  # noqa: E402  # pyright: ignore[re
 )
 from wwise_waapi.compound_undo_business import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     CheckedChildDraftBinding,
+    CompoundParentDraftBinding,
     CompoundUndoSnapshotScope,
     snapshot_checked_compound_undo_children,
 )
@@ -543,6 +545,7 @@ OFFLINE_COMMANDS = frozenset(
         "config-show",
         "config-set",
         "draft-start",
+        "draft-start-undo-child",
         "draft-apply",
         "draft-add-media",
         "draft-business-configure",
@@ -2272,6 +2275,20 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     draft_start.add_argument("operation")
+
+    draft_start_undo_child = subparsers.add_parser(
+        "draft-start-undo-child",
+        help=(
+            "Start one parent-owned Business Draft child without exposing an "
+            "independent child Preview"
+        ),
+    )
+    draft_start_undo_child.add_argument("draft_id")
+    draft_start_undo_child.add_argument("--task-authority", required=True)
+    draft_start_undo_child.add_argument(
+        "--expected-revision", required=True, type=int
+    )
+    draft_start_undo_child.add_argument("--operation", required=True)
 
     draft_apply = subparsers.add_parser(
         "draft-apply",
@@ -9006,6 +9023,67 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             response["continuation"]
         )
         return response
+    if args.command == "draft-start-undo-child":
+        store = OperationDraftStore(
+            resolve_transaction_state_directory(args, env=env)
+        )
+        parent = store.inspect(
+            args.draft_id,
+            task_authority=args.task_authority,
+        )
+        if parent.operation != "waapi.undoGroup":
+            raise GatewayInputError(
+                "Compound Undo children require one waapi.undoGroup parent Draft"
+            )
+        if parent.state is not OperationDraftState.EDITABLE:
+            raise GatewayInputError(
+                "Compound Undo parent Draft is no longer editable"
+            )
+        if parent.revision != args.expected_revision:
+            raise GatewayInputError(
+                "Compound Undo parent revision changed; inspect it before starting a child"
+            )
+        parent_session = (
+            parent.composition.get("business_session")
+            if parent.composition is not None
+            else None
+        )
+        if parent.check is not None or parent_session is not None:
+            raise GatewayInputError(
+                "Compound Undo parent already owns a declared plan"
+            )
+        if args.operation not in compound_business_child_operations(
+            parent.version
+        ):
+            raise GatewayInputError(
+                f"{args.operation} is not an eligible closed Compound Undo child "
+                f"for Wwise {parent.version}"
+            )
+        started = store.start(
+            operation=args.operation,
+            version=parent.version,
+            schema_digest=operation_draft_schema_digest(
+                args.operation,
+                parent.version,
+            ),
+            composer_digest=operation_composer_digest(
+                args.operation,
+                parent.version,
+            ),
+            compound_parent=CompoundParentDraftBinding(
+                draft_id=parent.draft_id,
+                task_authority=args.task_authority,
+                expected_revision=parent.revision,
+            ).as_dict(),
+        )
+        payload = operation_draft_payload(
+            args.command,
+            started.record,
+            state_dir=args.state_dir,
+            task_authority=started.task_authority,
+        )
+        payload["task_authority"] = started.task_authority
+        return payload
     if args.command == "draft-start":
         request_version = resolve_operation_schema_version(args, env=env)
         if request_version is None:
@@ -14903,6 +14981,7 @@ def dispatch_operation_draft_check(
         record,
         offline=False,
         state_dir=args.state_dir,
+        task_authority=args.task_authority,
     )
     payload.update(
         {
@@ -14912,6 +14991,11 @@ def dispatch_operation_draft_check(
             "project_call": dispatch_call_summary(project_call),
         }
     )
+    if (
+        record.composition is not None
+        and record.composition.get("compound_parent") is not None
+    ):
+        return payload
     preview_arguments = [
         "preview-from-draft",
         record.draft_id,
@@ -16386,6 +16470,8 @@ def dispatch_business_compound_undo_plan(
             CompoundUndoSnapshotScope(
                 store=binding.store,
                 parent_draft_id=binding.record.draft_id,
+                parent_task_authority=args.task_authority,
+                parent_revision=binding.record.revision,
                 parent_context=binding.context,
                 project_guard=current_project_guard,
                 version=detected_version,
@@ -17788,6 +17874,14 @@ def dispatch_operation_draft_preview(
         args.draft_id,
         task_authority=args.task_authority,
     )
+    if (
+        inspected.composition is not None
+        and inspected.composition.get("compound_parent") is not None
+    ):
+        raise GatewayInputError(
+            "Compound Undo child Drafts return to their parent and cannot be "
+            "previewed independently"
+        )
     schema_digest = operation_draft_schema_digest(
         inspected.operation, inspected.version
     )
@@ -23140,6 +23234,66 @@ def _business_next_action_binding(
     )
     adapter = business_adapter(record.operation)
     if record.check is not None:
+        raw_compound_parent = (
+            record.composition.get("compound_parent")
+            if record.composition is not None
+            else None
+        )
+        if raw_compound_parent is not None:
+            parent = CompoundParentDraftBinding.from_dict(
+                raw_compound_parent
+            )
+            start_next_child = [
+                *base,
+                "draft-start-undo-child",
+                parent.draft_id,
+                "--task-authority",
+                parent.task_authority,
+                "--expected-revision",
+                str(parent.expected_revision),
+            ]
+            finish_parent = [
+                *base,
+                "draft-declare-undo-plan",
+                parent.draft_id,
+                "--task-authority",
+                parent.task_authority,
+                "--expected-revision",
+                str(parent.expected_revision),
+            ]
+            return {
+                "contract": "waapi-skill.business-draft-next-action/v1",
+                "required_next_phase": (
+                    "return_checked_child_to_compound_parent"
+                ),
+                "checked_child_argument": [
+                    "--child-draft",
+                    record.draft_id,
+                    authority,
+                ],
+                "start_next_child": {
+                    **operation_draft_prefix_copy_binding(
+                        start_next_child
+                    ),
+                    "append": ["--operation <eligible-child-operation>"],
+                    "eligible_operations": sorted(
+                        compound_business_child_operations(record.version)
+                    ),
+                },
+                "finish_parent": {
+                    **operation_draft_prefix_copy_binding(finish_parent),
+                    "append": [
+                        "--display-name <user-facing-Wwise-Undo-step-name>",
+                        "each checked_child_argument in exact user-requested order",
+                    ],
+                },
+                "child_preview": "forbidden",
+                "decision_rule": (
+                    "start_next_child_when_a_requested_child_outcome_remains; "
+                    "otherwise_finish_parent_with_every_checked_child_argument"
+                ),
+                "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+            }
         preview = [*base, "preview-from-draft", *binding]
         if not adapter.auto_apply_preview:
             preview.append("--apply")
@@ -24040,9 +24194,29 @@ def _business_next_action_binding(
                     "append": [],
                 },
             }
+        start_child_prefix = [
+            *base,
+            "draft-start-undo-child",
+            record.draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            str(record.revision),
+        ]
         return {
             **shared,
             "required_next_phase": "declare_ordered_checked_child_business_drafts",
+            "start_child": {
+                **operation_draft_prefix_copy_binding(start_child_prefix),
+                "append": ["--operation <eligible-child-operation>"],
+                "eligible_operations": sorted(
+                    compound_business_child_operations(record.version)
+                ),
+                "result": (
+                    "complete_the_returned_child_business_draft_until_its_"
+                    "compound_handoff;_never_preview_the_child"
+                ),
+            },
             "declaration": {
                 **operation_draft_prefix_copy_binding(
                     declare_undo_plan_prefix,
@@ -27010,7 +27184,16 @@ def operation_draft_payload(
                 "completion_candidate": completion_candidate,
                 **next_action_binding,
             }
-        if not (command == "draft-check" and record.check is not None):
+        checked_compound_child = (
+            command == "draft-check"
+            and record.check is not None
+            and record.composition is not None
+            and record.composition.get("compound_parent") is not None
+        )
+        if (
+            not (command == "draft-check" and record.check is not None)
+            or checked_compound_child
+        ):
             priority_keys = (
                 "contract",
                 "required_next_phase",
@@ -27031,7 +27214,11 @@ def operation_draft_payload(
                 },
             }
             draft["next_action_binding"] = next_action_binding
-        if command in {"draft-start", "draft-apply"}:
+        if command in {
+            "draft-start",
+            "draft-start-undo-child",
+            "draft-apply",
+        }:
             agent_control = {
                 "terminal": False,
                 "required_outcome_before_reply": (

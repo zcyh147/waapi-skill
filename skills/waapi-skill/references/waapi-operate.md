@@ -79,6 +79,8 @@ If root type is unproven, first exact-query the unchanged root. Then open `opera
 | Heterogeneous allowlisted Undo step | `waapi.undoGroup` | wrapping one batch operation |
 | Known installed GUI command without semantic route | `ui.commands.execute` | dedicated-route shortcut |
 
+For `waapi.undoGroup`, follow its parent-owned `start_child` continuation. Complete each returned child through `draft-check`; never Preview a Compound Undo child independently. Copy every `checked_child_argument`, then start the next child or finish the parent with all arguments in requested order.
+
 For one Bank's complete desired final inclusion set, use one `soundbank.setInclusions` `replace` transaction. Omitted rows are removed without being named individually; every other Bank remains outside that transaction. Do not split that final-state request into `add` and `remove` transactions.
 
 Batch size never establishes file-workflow intent. If explicit table workflow lacks a caller-owned TSV, ask for it. Saved inclusions plus generation are two ordered transactions.
