@@ -996,6 +996,14 @@ def test_operate_uses_one_bank_scoped_replace_for_a_complete_inclusion_post_stat
     )
 
 
+def test_natural_language_cli_soundbank_generation_uses_gateway_route_catalog() -> None:
+    compact = " ".join(OPERATE.split())
+
+    assert "CLI SoundBank generation runs compact `operations`" in compact
+    assert "routing_precedence.explicit_cli_soundbank_generation.choose" in compact
+    assert "`request-schema ak.wwise.cli.generateSoundbank`" in compact
+
+
 def test_operate_metadata_and_import_prose_only_rules_are_preserved() -> None:
     compact = " ".join(OPERATE.split())
     for phrase in (
@@ -1039,14 +1047,14 @@ def test_operate_cli_and_console_routes_use_only_the_deep_business_plan() -> Non
     assert "`request-schema <exact-uri>`" in compact
     for phrase in (
         "`draft-declare-cli-console-plan`",
-        "`--value` for one scalar",
-        "`--item` for each member",
-        "`--mapping` for each named platform/value association",
+        "`--value` per scalar",
+        "`--item` per member",
+        "`--mapping` per platform/value pair",
         "`--toggle <field> enable|disable`",
         "Never type native CLI option names",
-        "The Gateway owns version availability",
-        "Model-supplied global, pre-build, post-build",
-        "Wwise 2022 external-source partial-success boundary",
+        "The Gateway owns versions",
+        "model-supplied global/pre-build/post-build",
+        "Wwise 2022 external-source partial success",
         "disconnect or continued reachability never authorizes replay",
         "result-schema-only evidence is not a reopened-project business oracle",
     ):

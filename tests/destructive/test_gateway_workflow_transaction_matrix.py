@@ -365,7 +365,7 @@ def _checked_object_lifecycle_child(
 ) -> _BusinessDraft:
     assert operation in {"object.setName", "object.setNotes"}
     draft = _start_business_draft(runtime, operation)
-    object_handle = _bind_business_object(
+    _bind_business_object(
         runtime,
         draft,
         object_id=object_id,
@@ -375,7 +375,7 @@ def _checked_object_lifecycle_child(
         runtime,
         draft,
         "draft-declare-object-change",
-        ["--object-handle", object_handle, flag, value],
+        [flag, value],
         live=False,
     )
     _update_business_draft(runtime, draft, "draft-check", live=True)

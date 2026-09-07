@@ -2456,12 +2456,10 @@ def build_parser() -> argparse.ArgumentParser:
         "draft-declare-object-change",
         help=(
             "Declare one simple existing-object business outcome using only "
-            "opaque handles and operation-specific scalar facts"
+            "operation-specific scalar facts; bound object roles stay inside the Draft"
         ),
     )
     _add_business_draft_binding_arguments(draft_declare_object_change)
-    draft_declare_object_change.add_argument("--object-handle", required=True)
-    draft_declare_object_change.add_argument("--parent-handle")
     draft_declare_object_change.add_argument("--new-name")
     draft_declare_object_change.add_argument("--notes")
     draft_declare_object_change.add_argument(
@@ -9500,6 +9498,26 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             "command": "operations",
             "offline": True,
             "routing_precedence": {
+                "explicit_cli_soundbank_generation": {
+                    "match_terms": [
+                        "WwiseConsole",
+                        "CLI",
+                        "command-line",
+                        "命令行",
+                    ],
+                    "choose": [
+                        "request-schema",
+                        "ak.wwise.cli.generateSoundbank",
+                    ],
+                    "takes_precedence_over": [
+                        "operation-schema",
+                        "soundbank.generate",
+                    ],
+                    "rule": (
+                        "explicit command-line SoundBank generation uses the "
+                        "exact reflected CLI URI"
+                    ),
+                },
                 "exact_authoring_ui_command_id": {
                     "match_example": "SaveProject",
                     "choose": ["operation-schema", "ui.commands.execute"],
@@ -15595,10 +15613,23 @@ def dispatch_offline_business_draft_update(
 
         event_type = "declaration.added"
     elif args.command == "draft-declare-object-change":
+        lifecycle_contract = adapter.contract(inspected.version)
+        lifecycle_roles = list(lifecycle_contract["binding"]["roles"])
+        lifecycle_handles = _object_lifecycle_handles_by_role(
+            session,
+            lifecycle_roles,
+        )
+        missing_roles = [
+            role for role in lifecycle_roles if role not in lifecycle_handles
+        ]
+        if missing_roles:
+            raise GatewayInputError(
+                "Bind every disclosed object-lifecycle role before declaration: "
+                + ", ".join(missing_roles)
+            )
         fields = {
             name: value
             for name, value in (
-                ("parent_handle", args.parent_handle),
                 ("new_name", args.new_name),
                 ("notes", args.notes),
                 ("name_conflict", args.name_conflict),
@@ -15610,13 +15641,15 @@ def dispatch_offline_business_draft_update(
             )
             if value is not None
         }
+        if "parent" in lifecycle_handles:
+            fields["parent_handle"] = lifecycle_handles["parent"]
 
         def update(
             current: BusinessDeclarationSession,
         ) -> BusinessDeclarationSession:
             candidate = current.with_existing_declaration(
                 declaration_id="change",
-                target=ExistingObjectTarget(args.object_handle),
+                target=ExistingObjectTarget(lifecycle_handles["object"]),
                 fields=fields,
             )
             adapter.materialize(candidate)
@@ -23204,6 +23237,31 @@ def _operation_draft_facts_summary(current_facts: list[Any]) -> dict[str, Any]:
     }
 
 
+def _object_lifecycle_handles_by_role(
+    session: BusinessDeclarationSession,
+    roles: Sequence[str],
+) -> dict[str, str]:
+    """Return Draft-owned lifecycle handles without exposing them as inputs."""
+
+    object_rows = session.handles.as_dict()["objects"]
+    handles_by_role = {
+        row["role"]: row["handle"]
+        for row in object_rows
+        if isinstance(row, Mapping)
+        and isinstance(row.get("role"), str)
+        and isinstance(row.get("handle"), str)
+    }
+    if (
+        len(roles) == 1
+        and len(object_rows) == 1
+        and roles[0] not in handles_by_role
+        and isinstance(object_rows[0], Mapping)
+        and isinstance(object_rows[0].get("handle"), str)
+    ):
+        handles_by_role[roles[0]] = object_rows[0]["handle"]
+    return handles_by_role
+
+
 def _business_next_action_binding(
     record: OperationDraftRecord,
     *,
@@ -23526,6 +23584,25 @@ def _business_next_action_binding(
         }
     if adapter.family == "object-lifecycle":
         roles = list(business_contract["binding"]["roles"])
+
+        def lifecycle_object_binding(next_role: str) -> dict[str, Any]:
+            result = (
+                role_object_binding(next_role)
+                if len(roles) > 1
+                else dict(object_binding)
+            )
+            result["result"] = (
+                "gateway_stores_the_bound_role;_do_not_copy_the_handle_into_"
+                "the_declaration"
+            )
+            result["role_assignment"] = (
+                "the_Gateway-owned_route_fixes_the_role_and_the_Draft_keeps_"
+                "the_returned_handle"
+                if len(roles) > 1
+                else "the_Draft_keeps_the_single_returned_handle"
+            )
+            return result
+
         shared = {
             "contract": "waapi-skill.business-draft-next-action/v1",
             "responsibility_split": {
@@ -23539,6 +23616,8 @@ def _business_next_action_binding(
                 *forbidden_inputs,
                 "native_request",
                 "native_object_identity",
+                "object_handle",
+                "parent_handle",
                 "request_fragment",
             ],
             "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
@@ -23549,28 +23628,9 @@ def _business_next_action_binding(
             return {
                 **shared,
                 "required_next_phase": "bind_next_object_lifecycle_role",
-                "object_binding": (
-                    role_object_binding(roles[0])
-                    if len(roles) > 1
-                    else object_binding
-                ),
+                "object_binding": lifecycle_object_binding(roles[0]),
             }
-        object_rows = session.handles.as_dict()["objects"]
-        handles_by_role = {
-            row["role"]: row["handle"]
-            for row in object_rows
-            if isinstance(row, Mapping)
-            and isinstance(row.get("role"), str)
-            and isinstance(row.get("handle"), str)
-        }
-        if (
-            len(roles) == 1
-            and len(object_rows) == 1
-            and roles[0] not in handles_by_role
-            and isinstance(object_rows[0], Mapping)
-            and isinstance(object_rows[0].get("handle"), str)
-        ):
-            handles_by_role[roles[0]] = object_rows[0]["handle"]
+        handles_by_role = _object_lifecycle_handles_by_role(session, roles)
         if session.declarations:
             return {
                 **shared,
@@ -23588,20 +23648,9 @@ def _business_next_action_binding(
             return {
                 **shared,
                 "required_next_phase": "bind_next_object_lifecycle_role",
-                "object_binding": (
-                    role_object_binding(next_role)
-                    if len(roles) > 1
-                    else object_binding
-                ),
+                "object_binding": lifecycle_object_binding(next_role),
             }
-        declaration_append = [
-            "--object-handle",
-            handles_by_role["object"],
-        ]
-        if "parent" in roles:
-            declaration_append.extend(
-                ["--parent-handle", handles_by_role["parent"]]
-            )
+        declaration_append: list[str] = []
         if record.operation == "object.setName":
             declaration_append.extend(["--new-name", "<exact-new-name>"])
         elif record.operation == "object.setNotes":
@@ -23628,7 +23677,7 @@ def _business_next_action_binding(
                     ),
                 ),
                 "append": declaration_append,
-                "opaque_handles_preinserted": True,
+                "opaque_handles_inferred_from_bound_roles": True,
                 "submit_once": True,
             },
         }

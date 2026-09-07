@@ -1477,7 +1477,7 @@ def test_bulk_object_set_uses_existing_and_child_business_declarations() -> None
                 "auto_add_to_source_control": False,
                 "auto_check_out_to_source_control": True,
             },
-            {"--parent-handle", "--name-conflict", "--no-add-to-source-control", "--check-out-from-source-control"},
+            {"--name-conflict", "--no-add-to-source-control", "--check-out-from-source-control"},
         ),
         (
             "object.delete",
@@ -1494,7 +1494,7 @@ def test_bulk_object_set_uses_existing_and_child_business_declarations() -> None
                 "parent": {"kind": "path", "value": r"\Actor-Mixer Hierarchy\Destination"},
                 "on_name_conflict": "fail",
             },
-            {"--parent-handle", "--name-conflict"},
+            {"--name-conflict"},
         ),
         (
             "object.setName",
@@ -1526,6 +1526,8 @@ def test_object_lifecycle_protocol_uses_business_declarations(
     )
 
     assert expected_flags.issubset(set(declaration.arguments))
+    assert "--object-handle" not in declaration.arguments
+    assert "--parent-handle" not in declaration.arguments
     assert [step.subcommand for step in steps][-3:] == [
         "draft-declare-object-change",
         "draft-check",

@@ -34,8 +34,10 @@ def _require_business_fields(
     contract = object_lifecycle_business_contract_data(operation, version)[
         "declaration"
     ]
-    required = set(contract["required_fields"]) - {"object_handle"}
-    optional = set(contract["optional_fields"]) - {"object_handle"}
+    required = set(contract["required_fields"])
+    if operation in {"object.copy", "object.move"}:
+        required.add("parent_handle")
+    optional = set(contract["optional_fields"])
     actual = set(fields)
     missing = sorted(required - actual)
     unexpected = sorted(actual - required - optional)

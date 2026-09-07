@@ -720,35 +720,6 @@
     {
       "model_values": [
         {
-          "name": "object_handle",
-          "path": [
-            "declaration",
-            "object_handle"
-          ],
-          "required": true,
-          "schema_sha256": "851e72276c5991cce6777b332ef35c7c9668b5d789851c6fee5f61e0a2eb422c",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "live_bound_handle"
-        },
-        {
-          "name": "notes",
-          "path": [
-            "declaration",
-            "notes"
-          ],
-          "required": true,
-          "schema_sha256": "e82f266ab0eeb0b8098ca6aeb8279e89e8a44e861d1a9609b4544adf4b1435f2",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        }
-      ],
-      "sha256": "3c058e2982b12bb2ae256c584deab1e6682d0e1b8fc051b841da77977fd33ddd"
-    },
-    {
-      "model_values": [
-        {
           "name": "script_file",
           "path": [
             "declaration",
@@ -774,6 +745,47 @@
         }
       ],
       "sha256": "49f8dbd003ce549687d191be12c431ee6db39e011451800787f9806ccddd3880"
+    },
+    {
+      "model_values": [
+        {
+          "name": "name_conflict",
+          "path": [
+            "declaration",
+            "name_conflict"
+          ],
+          "required": false,
+          "schema_sha256": "04a764f0a94dcff17b07d0b2dfd055f2fb8a2ca4ef6614239dfeb2ce8a61bbec",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "add_to_source_control",
+          "path": [
+            "declaration",
+            "add_to_source_control"
+          ],
+          "required": false,
+          "schema_sha256": "cb9bf6f43106975339a40708abd85603fb921d8176b8e62622a76d9f8126d0e2",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "check_out_from_source_control",
+          "path": [
+            "declaration",
+            "check_out_from_source_control"
+          ],
+          "required": false,
+          "schema_sha256": "7611c96d289f6fb6c573115321283ad9fa846dece126033fa27fc64aa0460790",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        }
+      ],
+      "sha256": "4add4733502f577c459a77a31ab76022d3e7ce94d2aa42e671f36aee4694fbbc"
     },
     {
       "model_values": [],
@@ -1064,17 +1076,22 @@
     {
       "model_values": [
         {
-          "name": "object_handle",
+          "name": "notes",
           "path": [
             "declaration",
-            "object_handle"
+            "notes"
           ],
           "required": true,
-          "schema_sha256": "851e72276c5991cce6777b332ef35c7c9668b5d789851c6fee5f61e0a2eb422c",
+          "schema_sha256": "e82f266ab0eeb0b8098ca6aeb8279e89e8a44e861d1a9609b4544adf4b1435f2",
           "shape": "scalar",
           "transport_ownership": "gateway_derivation",
-          "value_ownership": "live_bound_handle"
-        },
+          "value_ownership": "stable_business_declaration"
+        }
+      ],
+      "sha256": "6eea28d389302d78b43ad5c9ccbbc18305b75a49f1761843985dfdcd6f285a31"
+    },
+    {
+      "model_values": [
         {
           "name": "new_name",
           "path": [
@@ -1088,7 +1105,7 @@
           "value_ownership": "stable_business_declaration"
         }
       ],
-      "sha256": "62b5cbaee40cb8b9ee0a00fe9bcb48188301bc441b373c9fb753fbce68f973d6"
+      "sha256": "6f0fbd3d5b5a3334bc7273b81c7cae14e8871f097516a33662844c28cd266365"
     },
     {
       "model_values": [
@@ -1584,6 +1601,23 @@
     {
       "model_values": [
         {
+          "name": "name_conflict",
+          "path": [
+            "declaration",
+            "name_conflict"
+          ],
+          "required": false,
+          "schema_sha256": "04a764f0a94dcff17b07d0b2dfd055f2fb8a2ca4ef6614239dfeb2ce8a61bbec",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        }
+      ],
+      "sha256": "8f4b1d4bd81048c47d3904aacb2c8515f0a8fab2bd41978b0407ab9574b9cbf7"
+    },
+    {
+      "model_values": [
+        {
           "name": "script_file",
           "path": [
             "declaration",
@@ -1609,23 +1643,6 @@
         }
       ],
       "sha256": "90de14852292ad44e66e2b6502fa9f28653474f5055f14eca051e37948816f83"
-    },
-    {
-      "model_values": [
-        {
-          "name": "object_handle",
-          "path": [
-            "declaration",
-            "object_handle"
-          ],
-          "required": true,
-          "schema_sha256": "851e72276c5991cce6777b332ef35c7c9668b5d789851c6fee5f61e0a2eb422c",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "live_bound_handle"
-        }
-      ],
-      "sha256": "98738edc167f8f45493c51077eeeb945fe76e5d0c2f76326d2377cfaeb4db8b9"
     },
     {
       "model_values": [
@@ -1667,59 +1684,6 @@
         }
       ],
       "sha256": "9c4b4b6f188b84b75573691d2a9cca021084ac8ef4231751d25f032f1060bf46"
-    },
-    {
-      "model_values": [
-        {
-          "name": "object_handle",
-          "path": [
-            "declaration",
-            "object_handle"
-          ],
-          "required": true,
-          "schema_sha256": "851e72276c5991cce6777b332ef35c7c9668b5d789851c6fee5f61e0a2eb422c",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "live_bound_handle"
-        },
-        {
-          "name": "parent_handle",
-          "path": [
-            "declaration",
-            "parent_handle"
-          ],
-          "required": true,
-          "schema_sha256": "3bd0b18557a5a5a35412548c6965602d01cc4a1db6a72f2230be6ffbd922217e",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "live_bound_handle"
-        },
-        {
-          "name": "name_conflict",
-          "path": [
-            "declaration",
-            "name_conflict"
-          ],
-          "required": false,
-          "schema_sha256": "04a764f0a94dcff17b07d0b2dfd055f2fb8a2ca4ef6614239dfeb2ce8a61bbec",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "check_out_from_source_control",
-          "path": [
-            "declaration",
-            "check_out_from_source_control"
-          ],
-          "required": false,
-          "schema_sha256": "7611c96d289f6fb6c573115321283ad9fa846dece126033fa27fc64aa0460790",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        }
-      ],
-      "sha256": "9fca6fffa8797e04628989aadf8f3cd93b18b4147ab1a8f7da2396063354d928"
     },
     {
       "model_values": [
@@ -1785,6 +1749,23 @@
         }
       ],
       "sha256": "a454803a11289dcc1c12a68b011d696ce3774a9d371b0733fb44a2a6d9005324"
+    },
+    {
+      "model_values": [
+        {
+          "name": "check_out_from_source_control",
+          "path": [
+            "declaration",
+            "check_out_from_source_control"
+          ],
+          "required": false,
+          "schema_sha256": "7611c96d289f6fb6c573115321283ad9fa846dece126033fa27fc64aa0460790",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        }
+      ],
+      "sha256": "b5717d2c2881ac3435907bcc9008d0845cf1f2a74ae3941e2135fba2f8e795a6"
     },
     {
       "model_values": [
@@ -2549,35 +2530,6 @@
     {
       "model_values": [
         {
-          "name": "object_handle",
-          "path": [
-            "declaration",
-            "object_handle"
-          ],
-          "required": true,
-          "schema_sha256": "851e72276c5991cce6777b332ef35c7c9668b5d789851c6fee5f61e0a2eb422c",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "live_bound_handle"
-        },
-        {
-          "name": "check_out_from_source_control",
-          "path": [
-            "declaration",
-            "check_out_from_source_control"
-          ],
-          "required": false,
-          "schema_sha256": "7611c96d289f6fb6c573115321283ad9fa846dece126033fa27fc64aa0460790",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        }
-      ],
-      "sha256": "bc080127557ddc18b327d40e5efe5f19f0ce2d2fbd8e60b6d26346cf9b0d2c2f"
-    },
-    {
-      "model_values": [
-        {
           "name": "registered_command_keys",
           "path": [
             "ui_plan",
@@ -2765,71 +2717,6 @@
         }
       ],
       "sha256": "c9b7e27e00552a1f08030f2c638f40b4ef56ae2871703402b8c77ea908e06513"
-    },
-    {
-      "model_values": [
-        {
-          "name": "object_handle",
-          "path": [
-            "declaration",
-            "object_handle"
-          ],
-          "required": true,
-          "schema_sha256": "851e72276c5991cce6777b332ef35c7c9668b5d789851c6fee5f61e0a2eb422c",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "live_bound_handle"
-        },
-        {
-          "name": "parent_handle",
-          "path": [
-            "declaration",
-            "parent_handle"
-          ],
-          "required": true,
-          "schema_sha256": "3bd0b18557a5a5a35412548c6965602d01cc4a1db6a72f2230be6ffbd922217e",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "live_bound_handle"
-        },
-        {
-          "name": "name_conflict",
-          "path": [
-            "declaration",
-            "name_conflict"
-          ],
-          "required": false,
-          "schema_sha256": "04a764f0a94dcff17b07d0b2dfd055f2fb8a2ca4ef6614239dfeb2ce8a61bbec",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "add_to_source_control",
-          "path": [
-            "declaration",
-            "add_to_source_control"
-          ],
-          "required": false,
-          "schema_sha256": "cb9bf6f43106975339a40708abd85603fb921d8176b8e62622a76d9f8126d0e2",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "check_out_from_source_control",
-          "path": [
-            "declaration",
-            "check_out_from_source_control"
-          ],
-          "required": false,
-          "schema_sha256": "7611c96d289f6fb6c573115321283ad9fa846dece126033fa27fc64aa0460790",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        }
-      ],
-      "sha256": "cf44fbb042bee05fdc79b1eed828e620fb6802a591cfbeac950b932b2b7e6961"
     },
     {
       "model_values": [
@@ -3207,30 +3094,6 @@
     {
       "model_values": [
         {
-          "name": "object_handle",
-          "path": [
-            "declaration",
-            "object_handle"
-          ],
-          "required": true,
-          "schema_sha256": "851e72276c5991cce6777b332ef35c7c9668b5d789851c6fee5f61e0a2eb422c",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "live_bound_handle"
-        },
-        {
-          "name": "parent_handle",
-          "path": [
-            "declaration",
-            "parent_handle"
-          ],
-          "required": true,
-          "schema_sha256": "3bd0b18557a5a5a35412548c6965602d01cc4a1db6a72f2230be6ffbd922217e",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "live_bound_handle"
-        },
-        {
           "name": "name_conflict",
           "path": [
             "declaration",
@@ -3241,9 +3104,21 @@
           "shape": "scalar",
           "transport_ownership": "gateway_derivation",
           "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "check_out_from_source_control",
+          "path": [
+            "declaration",
+            "check_out_from_source_control"
+          ],
+          "required": false,
+          "schema_sha256": "7611c96d289f6fb6c573115321283ad9fa846dece126033fa27fc64aa0460790",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
         }
       ],
-      "sha256": "e8c12e07f4df11ab6ca3d06a299ae89e38bcb01908d3769dd499ef44ab0a84e2"
+      "sha256": "ed2ce78cb14339548cbb338306a30b36b28c4c25665911a1a9e0ea79bbb05c35"
     },
     {
       "model_values": [
@@ -153924,7 +153799,7 @@
     "contract": "waapi-skill.typed-request-surface/v1",
     "total_lanes": 824
   },
-  "inventory_sha256": "d4605ce6d3c38e46bf7ccfc728128fd3a3ae09d54d8b84f83dc71440fc8ac32a",
+  "inventory_sha256": "3367959415042fa06d45e60d765a1e5f7ca69098bc55f39b18cad9f20e6fe3c6",
   "mechanic_owners": {
     "ambiguous_continuation_selection": "gateway_derivation",
     "batch_layout": "gateway_derivation",
@@ -154667,7 +154542,7 @@
       "version": "2021.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -154700,7 +154575,7 @@
       "version": "2021.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "draft",
       "continuation_commands": [
@@ -154733,7 +154608,7 @@
       "version": "2021.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -154766,7 +154641,7 @@
       "version": "2021.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -154799,7 +154674,7 @@
       "version": "2021.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "draft",
       "continuation_commands": [
@@ -154832,7 +154707,7 @@
       "version": "2021.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -154865,7 +154740,7 @@
       "version": "2021.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -154898,7 +154773,7 @@
       "version": "2021.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -154931,7 +154806,7 @@
       "version": "2021.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -154964,7 +154839,7 @@
       "version": "2021.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -154997,7 +154872,7 @@
       "version": "2021.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -158932,7 +158807,7 @@
       "version": "2022.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -158965,7 +158840,7 @@
       "version": "2022.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "draft",
       "continuation_commands": [
@@ -158998,7 +158873,7 @@
       "version": "2022.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -159031,7 +158906,7 @@
       "version": "2022.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -159064,7 +158939,7 @@
       "version": "2022.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "draft",
       "continuation_commands": [
@@ -159097,7 +158972,7 @@
       "version": "2022.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -159130,7 +159005,7 @@
       "version": "2022.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -159163,7 +159038,7 @@
       "version": "2022.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -159196,7 +159071,7 @@
       "version": "2022.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -159229,7 +159104,7 @@
       "version": "2022.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -159262,7 +159137,7 @@
       "version": "2022.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -159295,7 +159170,7 @@
       "version": "2022.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -163798,7 +163673,7 @@
       "version": "2023.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -163831,7 +163706,7 @@
       "version": "2023.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "draft",
       "continuation_commands": [
@@ -163864,7 +163739,7 @@
       "version": "2023.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -163897,7 +163772,7 @@
       "version": "2023.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -163963,7 +163838,7 @@
       "version": "2023.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "draft",
       "continuation_commands": [
@@ -163996,7 +163871,7 @@
       "version": "2023.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -164029,7 +163904,7 @@
       "version": "2023.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -164062,7 +163937,7 @@
       "version": "2023.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -164095,7 +163970,7 @@
       "version": "2023.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -164128,7 +164003,7 @@
       "version": "2023.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -164161,7 +164036,7 @@
       "version": "2023.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -164194,7 +164069,7 @@
       "version": "2023.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -164260,7 +164135,7 @@
       "version": "2023.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "draft",
       "continuation_commands": [
@@ -164293,7 +164168,7 @@
       "version": "2023.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -169824,7 +169699,7 @@
       "version": "2024.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -169857,7 +169732,7 @@
       "version": "2024.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "draft",
       "continuation_commands": [
@@ -169890,7 +169765,7 @@
       "version": "2024.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -169923,7 +169798,7 @@
       "version": "2024.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -169989,7 +169864,7 @@
       "version": "2024.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "draft",
       "continuation_commands": [
@@ -170022,7 +169897,7 @@
       "version": "2024.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -170055,7 +169930,7 @@
       "version": "2024.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -170088,7 +169963,7 @@
       "version": "2024.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -170121,7 +169996,7 @@
       "version": "2024.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -170154,7 +170029,7 @@
       "version": "2024.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -170187,7 +170062,7 @@
       "version": "2024.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -170220,7 +170095,7 @@
       "version": "2024.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -170286,7 +170161,7 @@
       "version": "2024.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "draft",
       "continuation_commands": [
@@ -170319,7 +170194,7 @@
       "version": "2024.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -175917,7 +175792,7 @@
       "version": "2025.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -175950,7 +175825,7 @@
       "version": "2025.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "draft",
       "continuation_commands": [
@@ -175983,7 +175858,7 @@
       "version": "2025.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -176016,7 +175891,7 @@
       "version": "2025.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -176082,7 +175957,7 @@
       "version": "2025.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "draft",
       "continuation_commands": [
@@ -176115,7 +175990,7 @@
       "version": "2025.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -176148,7 +176023,7 @@
       "version": "2025.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -176181,7 +176056,7 @@
       "version": "2025.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -176214,7 +176089,7 @@
       "version": "2025.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -176247,7 +176122,7 @@
       "version": "2025.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -176280,7 +176155,7 @@
       "version": "2025.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -176313,7 +176188,7 @@
       "version": "2025.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -176379,7 +176254,7 @@
       "version": "2025.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "draft",
       "continuation_commands": [
@@ -176412,7 +176287,7 @@
       "version": "2025.1"
     },
     {
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts.",
       "classification": "generic-cli-console",
       "construction_shape": "inline",
       "continuation_commands": [
@@ -182467,10 +182342,10 @@
       "version": "2025.1"
     },
     {
-      "argument_contract_sha256": "e8c12e07f4df11ab6ca3d06a299ae89e38bcb01908d3769dd499ef44ab0a84e2",
-      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; preinsert every opaque handle into the sole copy-ready declaration continuation; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
+      "argument_contract_sha256": "8f4b1d4bd81048c47d3904aacb2c8515f0a8fab2bd41978b0407ab9574b9cbf7",
+      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; keep every opaque handle inside the Draft so declaration accepts only scalar business values; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
       "classification": "named-object-lifecycle",
-      "contract_sha256": "bb252b1bffeca9d66332b9399f716c0b2de08567e9115525f8b378ab1446e633",
+      "contract_sha256": "141a3d9a43912cce3444333fabc024ce1def47ba9c920d1fc807501264278b7f",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -182494,10 +182369,10 @@
       "version": "2021.1"
     },
     {
-      "argument_contract_sha256": "e8c12e07f4df11ab6ca3d06a299ae89e38bcb01908d3769dd499ef44ab0a84e2",
-      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; preinsert every opaque handle into the sole copy-ready declaration continuation; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
+      "argument_contract_sha256": "8f4b1d4bd81048c47d3904aacb2c8515f0a8fab2bd41978b0407ab9574b9cbf7",
+      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; keep every opaque handle inside the Draft so declaration accepts only scalar business values; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
       "classification": "named-object-lifecycle",
-      "contract_sha256": "ec38c789fc9842affed5c1034719ac508c5d257c7997b18071f2cc440d934f3b",
+      "contract_sha256": "0435dccb8109abea5f8ee7b785a6e3143f687da3052a9a7d34774048f992a995",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -182521,10 +182396,10 @@
       "version": "2022.1"
     },
     {
-      "argument_contract_sha256": "cf44fbb042bee05fdc79b1eed828e620fb6802a591cfbeac950b932b2b7e6961",
-      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; preinsert every opaque handle into the sole copy-ready declaration continuation; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
+      "argument_contract_sha256": "4add4733502f577c459a77a31ab76022d3e7ce94d2aa42e671f36aee4694fbbc",
+      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; keep every opaque handle inside the Draft so declaration accepts only scalar business values; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
       "classification": "named-object-lifecycle",
-      "contract_sha256": "7a864c28c0abef55698dba85f51834fe665675df2e2d9f7734a90c2500e1b45c",
+      "contract_sha256": "210ad66b99c747683719ba1b75774a1f5a6475eb388d49446f06514686a751c2",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -182548,10 +182423,10 @@
       "version": "2023.1"
     },
     {
-      "argument_contract_sha256": "cf44fbb042bee05fdc79b1eed828e620fb6802a591cfbeac950b932b2b7e6961",
-      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; preinsert every opaque handle into the sole copy-ready declaration continuation; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
+      "argument_contract_sha256": "4add4733502f577c459a77a31ab76022d3e7ce94d2aa42e671f36aee4694fbbc",
+      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; keep every opaque handle inside the Draft so declaration accepts only scalar business values; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
       "classification": "named-object-lifecycle",
-      "contract_sha256": "c0c8b79d31db64377b1224784b3e7c8f26d425c09a38f64f860c752000457639",
+      "contract_sha256": "7f4b3c514aebccb2eb717008ddbde5f959d7f75126ab729b9f6b6ced167e0b8d",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -182575,10 +182450,10 @@
       "version": "2024.1"
     },
     {
-      "argument_contract_sha256": "cf44fbb042bee05fdc79b1eed828e620fb6802a591cfbeac950b932b2b7e6961",
-      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; preinsert every opaque handle into the sole copy-ready declaration continuation; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
+      "argument_contract_sha256": "4add4733502f577c459a77a31ab76022d3e7ce94d2aa42e671f36aee4694fbbc",
+      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; keep every opaque handle inside the Draft so declaration accepts only scalar business values; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
       "classification": "named-object-lifecycle",
-      "contract_sha256": "aa94f1cdbde65afdac1428edc2f5293037f943079b6f3f0d8e561eeb45fe8ad6",
+      "contract_sha256": "38dc452335db846a2a2fec7b302fdfb4b9090ec4e3830799faf339a572a87b69",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -182845,10 +182720,10 @@
       "version": "2025.1"
     },
     {
-      "argument_contract_sha256": "98738edc167f8f45493c51077eeeb945fe76e5d0c2f76326d2377cfaeb4db8b9",
-      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; preinsert every opaque handle into the sole copy-ready declaration continuation; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
+      "argument_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; keep every opaque handle inside the Draft so declaration accepts only scalar business values; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
       "classification": "named-object-lifecycle",
-      "contract_sha256": "bd118badbb73ea4c1ee2895cc86078e43601273201fcce3abfe9ded64e5929d5",
+      "contract_sha256": "9623de751ddd59d506ee39f11e1cac350bd02ae2dfe70e8dfc712d9cf9842637",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -182872,10 +182747,10 @@
       "version": "2021.1"
     },
     {
-      "argument_contract_sha256": "98738edc167f8f45493c51077eeeb945fe76e5d0c2f76326d2377cfaeb4db8b9",
-      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; preinsert every opaque handle into the sole copy-ready declaration continuation; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
+      "argument_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; keep every opaque handle inside the Draft so declaration accepts only scalar business values; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
       "classification": "named-object-lifecycle",
-      "contract_sha256": "a7078551e811748047b4fde859956389cd0ab866ad65505155291e4302409d51",
+      "contract_sha256": "ae418c2ab45fce1d1326ca4a32a3e9ae629208f65b93deaa51e8abf03d278d2e",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -182899,10 +182774,10 @@
       "version": "2022.1"
     },
     {
-      "argument_contract_sha256": "bc080127557ddc18b327d40e5efe5f19f0ce2d2fbd8e60b6d26346cf9b0d2c2f",
-      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; preinsert every opaque handle into the sole copy-ready declaration continuation; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
+      "argument_contract_sha256": "b5717d2c2881ac3435907bcc9008d0845cf1f2a74ae3941e2135fba2f8e795a6",
+      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; keep every opaque handle inside the Draft so declaration accepts only scalar business values; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
       "classification": "named-object-lifecycle",
-      "contract_sha256": "969084f4476ed63f402651ea0fa2e9aeae40d1ad24addcf9d11dce91e2cabe64",
+      "contract_sha256": "1f5e15ecba37fc3cb64a9c3655f941b4addf1a59e216334e5ac06e6ce739be77",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -182926,10 +182801,10 @@
       "version": "2023.1"
     },
     {
-      "argument_contract_sha256": "bc080127557ddc18b327d40e5efe5f19f0ce2d2fbd8e60b6d26346cf9b0d2c2f",
-      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; preinsert every opaque handle into the sole copy-ready declaration continuation; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
+      "argument_contract_sha256": "b5717d2c2881ac3435907bcc9008d0845cf1f2a74ae3941e2135fba2f8e795a6",
+      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; keep every opaque handle inside the Draft so declaration accepts only scalar business values; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
       "classification": "named-object-lifecycle",
-      "contract_sha256": "10ccc98ad264d5afe23d84b96ed2d5acb5c8f8c68651fec0730ccb579b1810bb",
+      "contract_sha256": "5604f2bbfc49da81991fa75f4fc605d64728a2f1e6198afea65f614dce97641b",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -182953,10 +182828,10 @@
       "version": "2024.1"
     },
     {
-      "argument_contract_sha256": "bc080127557ddc18b327d40e5efe5f19f0ce2d2fbd8e60b6d26346cf9b0d2c2f",
-      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; preinsert every opaque handle into the sole copy-ready declaration continuation; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
+      "argument_contract_sha256": "b5717d2c2881ac3435907bcc9008d0845cf1f2a74ae3941e2135fba2f8e795a6",
+      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; keep every opaque handle inside the Draft so declaration accepts only scalar business values; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
       "classification": "named-object-lifecycle",
-      "contract_sha256": "f913d6f688fd84a7e3edd620e97394d33527c1f0dd5c5972fac57595a13db1a2",
+      "contract_sha256": "22339eec45db0676a0ee8ea5952abdd3666a9f45e0bf2a7cab0851e77646effd",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -182980,10 +182855,10 @@
       "version": "2025.1"
     },
     {
-      "argument_contract_sha256": "e8c12e07f4df11ab6ca3d06a299ae89e38bcb01908d3769dd499ef44ab0a84e2",
-      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; preinsert every opaque handle into the sole copy-ready declaration continuation; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
+      "argument_contract_sha256": "8f4b1d4bd81048c47d3904aacb2c8515f0a8fab2bd41978b0407ab9574b9cbf7",
+      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; keep every opaque handle inside the Draft so declaration accepts only scalar business values; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
       "classification": "named-object-lifecycle",
-      "contract_sha256": "675f6a70136e37f66f0e64f5117ec69499ebe43cd74e5e764c39cadfb8a2ea2d",
+      "contract_sha256": "b3663ea9923b65817e2cb9a6c45b114342c5e0013263c40dd80c2640fb9c0669",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -183007,10 +182882,10 @@
       "version": "2021.1"
     },
     {
-      "argument_contract_sha256": "e8c12e07f4df11ab6ca3d06a299ae89e38bcb01908d3769dd499ef44ab0a84e2",
-      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; preinsert every opaque handle into the sole copy-ready declaration continuation; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
+      "argument_contract_sha256": "8f4b1d4bd81048c47d3904aacb2c8515f0a8fab2bd41978b0407ab9574b9cbf7",
+      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; keep every opaque handle inside the Draft so declaration accepts only scalar business values; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
       "classification": "named-object-lifecycle",
-      "contract_sha256": "f032c646734889670db292994dc74fa65f68c0b9334ce21bead9c47ef506e6b7",
+      "contract_sha256": "98054a21049d6513b1819a5d9113888d901337dbe96c0c3ee555be82cca68e54",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -183034,10 +182909,10 @@
       "version": "2022.1"
     },
     {
-      "argument_contract_sha256": "9fca6fffa8797e04628989aadf8f3cd93b18b4147ab1a8f7da2396063354d928",
-      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; preinsert every opaque handle into the sole copy-ready declaration continuation; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
+      "argument_contract_sha256": "ed2ce78cb14339548cbb338306a30b36b28c4c25665911a1a9e0ea79bbb05c35",
+      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; keep every opaque handle inside the Draft so declaration accepts only scalar business values; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
       "classification": "named-object-lifecycle",
-      "contract_sha256": "fa3ad7eb8c2fcd0519096020cea069d177396ad2c6f2f727367b62fe58890b66",
+      "contract_sha256": "d9b245366e952cc80213ebf8ceb0321860cb0e1cb526fbe2db610185a6afd91d",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -183061,10 +182936,10 @@
       "version": "2023.1"
     },
     {
-      "argument_contract_sha256": "9fca6fffa8797e04628989aadf8f3cd93b18b4147ab1a8f7da2396063354d928",
-      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; preinsert every opaque handle into the sole copy-ready declaration continuation; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
+      "argument_contract_sha256": "ed2ce78cb14339548cbb338306a30b36b28c4c25665911a1a9e0ea79bbb05c35",
+      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; keep every opaque handle inside the Draft so declaration accepts only scalar business values; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
       "classification": "named-object-lifecycle",
-      "contract_sha256": "678987e70cfd09baec10826722949ba235b903107192e69c9884b42565e2764b",
+      "contract_sha256": "e50b801b53d49fd74ae518a7f3d85c9e832f6bbad240106c07fffcb67ad46ab6",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -183088,10 +182963,10 @@
       "version": "2024.1"
     },
     {
-      "argument_contract_sha256": "9fca6fffa8797e04628989aadf8f3cd93b18b4147ab1a8f7da2396063354d928",
-      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; preinsert every opaque handle into the sole copy-ready declaration continuation; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
+      "argument_contract_sha256": "ed2ce78cb14339548cbb338306a30b36b28c4c25665911a1a9e0ea79bbb05c35",
+      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; keep every opaque handle inside the Draft so declaration accepts only scalar business values; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
       "classification": "named-object-lifecycle",
-      "contract_sha256": "b2ea6586512c1dbe73e8be9797dbc837a5ddb8cffa302e5f765c1ee3a2535484",
+      "contract_sha256": "c002b1518c62e33d3ee0571d12d2dcb9c3850c86a32815f2aa6b91b7260b7c50",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -183304,10 +183179,10 @@
       "version": "2025.1"
     },
     {
-      "argument_contract_sha256": "62b5cbaee40cb8b9ee0a00fe9bcb48188301bc441b373c9fb753fbce68f973d6",
-      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; preinsert every opaque handle into the sole copy-ready declaration continuation; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
+      "argument_contract_sha256": "6f0fbd3d5b5a3334bc7273b81c7cae14e8871f097516a33662844c28cd266365",
+      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; keep every opaque handle inside the Draft so declaration accepts only scalar business values; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
       "classification": "named-object-lifecycle",
-      "contract_sha256": "cb621df4928a5df3fa261e2266ec4e5319a4d6f3c1890840e55b6e7f9238807e",
+      "contract_sha256": "a0ec0a2b9a25f3b32285b88995d1a7c8258f06873a728ac434ad89249e2ecce4",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -183331,10 +183206,10 @@
       "version": "2021.1"
     },
     {
-      "argument_contract_sha256": "62b5cbaee40cb8b9ee0a00fe9bcb48188301bc441b373c9fb753fbce68f973d6",
-      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; preinsert every opaque handle into the sole copy-ready declaration continuation; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
+      "argument_contract_sha256": "6f0fbd3d5b5a3334bc7273b81c7cae14e8871f097516a33662844c28cd266365",
+      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; keep every opaque handle inside the Draft so declaration accepts only scalar business values; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
       "classification": "named-object-lifecycle",
-      "contract_sha256": "39f68e03a697f62dc7fe95c888bcabb10112e0e0ff55c8ac96469f39afddbb4b",
+      "contract_sha256": "779cbbe4472c3629f632ada70e64a8cca41e3003d4eedbdf802865765d9f10a8",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -183358,10 +183233,10 @@
       "version": "2022.1"
     },
     {
-      "argument_contract_sha256": "62b5cbaee40cb8b9ee0a00fe9bcb48188301bc441b373c9fb753fbce68f973d6",
-      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; preinsert every opaque handle into the sole copy-ready declaration continuation; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
+      "argument_contract_sha256": "6f0fbd3d5b5a3334bc7273b81c7cae14e8871f097516a33662844c28cd266365",
+      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; keep every opaque handle inside the Draft so declaration accepts only scalar business values; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
       "classification": "named-object-lifecycle",
-      "contract_sha256": "b0113c26984411fc42b85e2e00cb5c3f39e4859b97f4cdb9a1bac2a4018ee12a",
+      "contract_sha256": "343bd6cf1fb87426f045e14a4169598f342b3af0bc5612aa58bd3d19fdd2b41c",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -183385,10 +183260,10 @@
       "version": "2023.1"
     },
     {
-      "argument_contract_sha256": "62b5cbaee40cb8b9ee0a00fe9bcb48188301bc441b373c9fb753fbce68f973d6",
-      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; preinsert every opaque handle into the sole copy-ready declaration continuation; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
+      "argument_contract_sha256": "6f0fbd3d5b5a3334bc7273b81c7cae14e8871f097516a33662844c28cd266365",
+      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; keep every opaque handle inside the Draft so declaration accepts only scalar business values; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
       "classification": "named-object-lifecycle",
-      "contract_sha256": "7acdebd91aa3986ae27cf7632ce9f3910fd006dad758437c0a9e914f9acfd72a",
+      "contract_sha256": "adb85391fab51ddc4d482e2a7de4b49ef58a92d3fd63f850c891b16a5564de7b",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -183412,10 +183287,10 @@
       "version": "2024.1"
     },
     {
-      "argument_contract_sha256": "62b5cbaee40cb8b9ee0a00fe9bcb48188301bc441b373c9fb753fbce68f973d6",
-      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; preinsert every opaque handle into the sole copy-ready declaration continuation; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
+      "argument_contract_sha256": "6f0fbd3d5b5a3334bc7273b81c7cae14e8871f097516a33662844c28cd266365",
+      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; keep every opaque handle inside the Draft so declaration accepts only scalar business values; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
       "classification": "named-object-lifecycle",
-      "contract_sha256": "48147f38b6f7a0afe1dcd07428610e0795de1ff1ebbe776e0de4c251db0436e7",
+      "contract_sha256": "d4743e8473f167990b7e06cbce60f12e7fe4f68c324d756016710c92f82a627d",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -183439,10 +183314,10 @@
       "version": "2025.1"
     },
     {
-      "argument_contract_sha256": "3c058e2982b12bb2ae256c584deab1e6682d0e1b8fc051b841da77977fd33ddd",
-      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; preinsert every opaque handle into the sole copy-ready declaration continuation; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
+      "argument_contract_sha256": "6eea28d389302d78b43ad5c9ccbbc18305b75a49f1761843985dfdcd6f285a31",
+      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; keep every opaque handle inside the Draft so declaration accepts only scalar business values; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
       "classification": "named-object-lifecycle",
-      "contract_sha256": "ae23bfc1a0ac67f8ac3101c8189fbe40e316b9138098f1d5958e93701421674a",
+      "contract_sha256": "e7b97435cb5fccbe64a408b20242bd45bf1ed320266c5ca5e6b230d3be0fb8b4",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -183466,10 +183341,10 @@
       "version": "2021.1"
     },
     {
-      "argument_contract_sha256": "3c058e2982b12bb2ae256c584deab1e6682d0e1b8fc051b841da77977fd33ddd",
-      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; preinsert every opaque handle into the sole copy-ready declaration continuation; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
+      "argument_contract_sha256": "6eea28d389302d78b43ad5c9ccbbc18305b75a49f1761843985dfdcd6f285a31",
+      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; keep every opaque handle inside the Draft so declaration accepts only scalar business values; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
       "classification": "named-object-lifecycle",
-      "contract_sha256": "307333e177741db068cdda825f36fb668cbeabb26dcd4cf6391bb1e1a96738ce",
+      "contract_sha256": "b4637a27a716cfbe8df941beb9292a837db3ee4c9c1eb7301a46bfe57bcd91d7",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -183493,10 +183368,10 @@
       "version": "2022.1"
     },
     {
-      "argument_contract_sha256": "3c058e2982b12bb2ae256c584deab1e6682d0e1b8fc051b841da77977fd33ddd",
-      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; preinsert every opaque handle into the sole copy-ready declaration continuation; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
+      "argument_contract_sha256": "6eea28d389302d78b43ad5c9ccbbc18305b75a49f1761843985dfdcd6f285a31",
+      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; keep every opaque handle inside the Draft so declaration accepts only scalar business values; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
       "classification": "named-object-lifecycle",
-      "contract_sha256": "6688292ee3e025273baf03147c894980051af820313d9b449c8620cf10d49c90",
+      "contract_sha256": "189b6ce87380a5edee8429bb85eacc211a287ca5a127567bebf0f8e6b9d4bd8b",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -183520,10 +183395,10 @@
       "version": "2023.1"
     },
     {
-      "argument_contract_sha256": "3c058e2982b12bb2ae256c584deab1e6682d0e1b8fc051b841da77977fd33ddd",
-      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; preinsert every opaque handle into the sole copy-ready declaration continuation; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
+      "argument_contract_sha256": "6eea28d389302d78b43ad5c9ccbbc18305b75a49f1761843985dfdcd6f285a31",
+      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; keep every opaque handle inside the Draft so declaration accepts only scalar business values; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
       "classification": "named-object-lifecycle",
-      "contract_sha256": "6078eaf8a4cefe9b9994cf31ba972b4245c991f6e9f0a51854a87576b106701b",
+      "contract_sha256": "ee9357c230251ba61617d0c67bfd1cab25631a5b03c92c65b223f9d1d9dd1b20",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -183547,10 +183422,10 @@
       "version": "2024.1"
     },
     {
-      "argument_contract_sha256": "3c058e2982b12bb2ae256c584deab1e6682d0e1b8fc051b841da77977fd33ddd",
-      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; preinsert every opaque handle into the sole copy-ready declaration continuation; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
+      "argument_contract_sha256": "6eea28d389302d78b43ad5c9ccbbc18305b75a49f1761843985dfdcd6f285a31",
+      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; keep every opaque handle inside the Draft so declaration accepts only scalar business values; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence.",
       "classification": "named-object-lifecycle",
-      "contract_sha256": "ccbd66085708412ed2ee9639d5b9de13fcc2a52dcee6e350bf78d7a876386fef",
+      "contract_sha256": "52358ccf9e77bbed6e64aef2e1932451c31114de256e88692ef3b8b1a54dc223",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -185528,8 +185403,8 @@
     "stable_business_declaration": "A prompt-derived business value remains visible in the public request."
   },
   "source_contracts": {
-    "gateway_parser_sha256": "768e310eb79d123aab8901367846fb69772cbc0aea2747019bc5492763b32aea",
-    "operation_contract_sha256": "47e7e0a651e4925694a97c11eeb6e60e04148be327d4f2daabdadd844e7ccb75",
+    "gateway_parser_sha256": "35bddbfd4118c6ded9242528e2146d373269bf0a6cbe74a4ffd1dc44e9e20e35",
+    "operation_contract_sha256": "4cf3b55c5bdb8ff959c4f95be9fae92dfe42d6fa842b81536b3717ff9fb5fc08",
     "public_continuation_sha256": "c5dd9de956bf7b393c2c4b38c80561940d0873f6695acc2e5a635a7ad2bd8ee3",
     "typed_request_surface_sha256": "7cbe0a9ba6d9756c94ecea58bb1b2ac56da242059f17c5cdfdaf768271d133a8"
   },

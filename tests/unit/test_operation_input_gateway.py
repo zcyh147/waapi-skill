@@ -782,10 +782,9 @@ def test_object_set_name_schema_exposes_only_closed_business_input(
     ]
     assert adapter["declaration"] == {
         "subcommand": "draft-declare-object-change",
-        "required_fields": ["object_handle", "new_name"],
+        "required_fields": ["new_name"],
         "optional_fields": [],
         "field_types": {
-            "object_handle": "bound_object_handle",
             "new_name": "string",
         },
     }
@@ -891,7 +890,7 @@ def test_object_set_name_draft_start_returns_only_business_continuation(
     assert binding["required_next_phase"] == "bind_next_object_lifecycle_role"
     assert binding["business_contract"]["operation"] == "object.setName"
     assert binding["object_binding"]["result"] == (
-        "copy_the_returned_bound_object.handle"
+        "gateway_stores_the_bound_role;_do_not_copy_the_handle_into_the_declaration"
     )
     assert binding["object_binding"]["use_only_for"] == ["object"]
     assert "draft-apply" not in json.dumps(binding)
@@ -1107,8 +1106,6 @@ def test_object_set_name_business_draft_binds_declares_and_materializes(
         authority,
         "--expected-revision",
         "2",
-        "--object-handle",
-        handle,
         "--new-name",
         "新名称 & Rain",
     )
@@ -1127,8 +1124,6 @@ def test_object_set_name_business_draft_binds_declares_and_materializes(
         authority,
         "--expected-revision",
         "2",
-        "--object-handle",
-        handle,
         "--new-name",
         "stale overwrite",
     )
@@ -1210,13 +1205,13 @@ def test_object_set_name_business_draft_binds_declares_and_materializes(
     (
         (
             "object.copy",
-            ("--parent-handle", "<parent>", "--name-conflict", "rename"),
+            ("--name-conflict", "rename"),
             "copied-guid-under-parent",
         ),
         ("object.delete", (), "guid-absent"),
         (
             "object.move",
-            ("--parent-handle", "<parent>", "--name-conflict", "rename"),
+            ("--name-conflict", "rename"),
             "moved-guid-under-parent",
         ),
         (
@@ -1306,35 +1301,24 @@ def test_every_object_lifecycle_adapter_reaches_immutable_preview_with_its_verif
         )
     expected_declaration_append = {
         "object.copy": [
-            "--object-handle",
-            object_handle,
-            "--parent-handle",
-            parent_handle,
             "[--name-conflict fail|rename]",
         ],
-        "object.delete": ["--object-handle", object_handle],
+        "object.delete": [],
         "object.move": [
-            "--object-handle",
-            object_handle,
-            "--parent-handle",
-            parent_handle,
             "[--name-conflict fail|rename]",
         ],
         "object.setName": [
-            "--object-handle",
-            object_handle,
             "--new-name",
             "<exact-new-name>",
         ],
         "object.setNotes": [
-            "--object-handle",
-            object_handle,
             "--notes",
             "<exact-notes>",
         ],
     }[operation]
     declaration_binding = bound["draft"]["next_action_binding"]["declaration"]
     assert declaration_binding["append"] == expected_declaration_append
+    assert declaration_binding["opaque_handles_inferred_from_bound_roles"] is True
     assert "append_fields" not in declaration_binding
     rendered_tail = tuple(
         parent_handle if value == "<parent>" else value
@@ -1350,8 +1334,6 @@ def test_every_object_lifecycle_adapter_reaches_immutable_preview_with_its_verif
         authority,
         "--expected-revision",
         str(bound["draft"]["revision"]),
-        "--object-handle",
-        object_handle,
         *rendered_tail,
     )
     assert declare_code == 0, declared
@@ -1452,8 +1434,6 @@ def test_object_lifecycle_draft_check_rejects_stale_bound_identity(
         authority,
         "--expected-revision",
         str(bound["draft"]["revision"]),
-        "--object-handle",
-        bound["bound_object"]["handle"],
         "--notes",
         "after",
     )

@@ -16,8 +16,8 @@
     ]
   },
   "source_contracts": {
-    "gateway_parser_sha256": "768e310eb79d123aab8901367846fb69772cbc0aea2747019bc5492763b32aea",
-    "operation_contract_sha256": "47e7e0a651e4925694a97c11eeb6e60e04148be327d4f2daabdadd844e7ccb75",
+    "gateway_parser_sha256": "35bddbfd4118c6ded9242528e2146d373269bf0a6cbe74a4ffd1dc44e9e20e35",
+    "operation_contract_sha256": "4cf3b55c5bdb8ff959c4f95be9fae92dfe42d6fa842b81536b3717ff9fb5fc08",
     "public_continuation_sha256": "c5dd9de956bf7b393c2c4b38c80561940d0873f6695acc2e5a635a7ad2bd8ee3",
     "typed_request_surface_sha256": "7cbe0a9ba6d9756c94ecea58bb1b2ac56da242059f17c5cdfdaf768271d133a8"
   },
@@ -67,7 +67,7 @@
       "owner_issue": null,
       "operations": ["object.copy", "object.delete", "object.move", "object.setName", "object.setNotes"],
       "leaked_mechanics": [],
-      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; preinsert every opaque handle into the sole copy-ready declaration continuation; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence."
+      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; keep every opaque handle inside the Draft so declaration accepts only scalar business values; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence."
     },
     {
       "id": "named-object-metadata-fields",
@@ -197,7 +197,7 @@
       "owner_issue": null,
       "match": {"uri_prefixes": ["ak.wwise.cli.", "ak.wwise.console."]},
       "leaked_mechanics": [],
-      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts."
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts."
     },
     {
       "id": "generic-host-ui-debug-waapi",

@@ -1753,8 +1753,6 @@ def _normalize_object_lifecycle_business_argument_order(
     if step.subcommand != "draft-declare-object-change" or actual == step.arguments:
         return actual
     arities = {
-        "--object-handle": 1,
-        "--parent-handle": 1,
         "--new-name": 1,
         "--notes": 1,
         "--name-conflict": 1,

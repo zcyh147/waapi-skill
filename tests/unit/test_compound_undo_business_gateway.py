@@ -59,15 +59,13 @@ def _checked_object_child(
     object_handle = bound["bound_object"]["handle"]
     declaration_binding = bound["draft"]["next_action_binding"]["declaration"]
     assert declaration_binding["append"] == [
-        "--object-handle",
-        object_handle,
         value_flag,
         {
             "--notes": "<exact-notes>",
             "--new-name": "<exact-new-name>",
         }[value_flag],
     ]
-    assert declaration_binding["opaque_handles_preinserted"] is True
+    assert declaration_binding["opaque_handles_inferred_from_bound_roles"] is True
     assert "append_fields" not in declaration_binding
     code, declared = offline_execute(
         tmp_path,
@@ -75,7 +73,6 @@ def _checked_object_child(
         "draft-declare-object-change", draft_id,
         "--task-authority", authority,
         "--expected-revision", str(bound["draft"]["revision"]),
-        "--object-handle", object_handle,
         value_flag, value,
     )
     assert code == 0, declared
@@ -146,7 +143,6 @@ def test_parent_owned_compound_child_returns_handoff_and_cannot_preview(
         "draft-declare-object-change", child_id,
         "--task-authority", child_authority,
         "--expected-revision", str(bound["draft"]["revision"]),
-        "--object-handle", bound["bound_object"]["handle"],
         "--notes", "Exterior rain loop",
     )
     assert code == 0, declared

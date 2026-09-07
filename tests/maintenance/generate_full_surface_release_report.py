@@ -408,6 +408,56 @@ def _continuation_error(
                                 or not contract.get("gateway_derivations")
                             ):
                                 return "business declaration Adapter is incomplete"
+                        elif operation in {
+                            "object.copy",
+                            "object.delete",
+                            "object.move",
+                            "object.setName",
+                            "object.setNotes",
+                        }:
+                            binding = contract.get("binding")
+                            declared_fields = tuple(
+                                (
+                                    *declaration.get("required_fields", ()),
+                                    *declaration.get("optional_fields", ()),
+                                    *declaration.get("field_types", {}).keys(),
+                                )
+                            ) if isinstance(declaration, Mapping) else ()
+                            expected_roles = (
+                                ["object", "parent"]
+                                if operation in {"object.copy", "object.move"}
+                                else ["object"]
+                            )
+                            if (
+                                not isinstance(binding, Mapping)
+                                or binding.get("roles") != expected_roles
+                                or binding.get("result")
+                                != (
+                                    "gateway_stores_the_bound_role;_no_handle_is_a_"
+                                    "declaration_input"
+                                )
+                                or not isinstance(declaration, Mapping)
+                                or declaration.get("subcommand")
+                                != "draft-declare-object-change"
+                                or not isinstance(
+                                    declaration.get("required_fields"),
+                                    list,
+                                )
+                                or not isinstance(
+                                    declaration.get("optional_fields"),
+                                    list,
+                                )
+                                or not isinstance(
+                                    declaration.get("field_types"),
+                                    Mapping,
+                                )
+                                or {"object_handle", "parent_handle"}
+                                & set(declared_fields)
+                                or contract.get("legacy_inline_typed_public")
+                                is not False
+                                or not contract.get("gateway_derivations")
+                            ):
+                                return "business declaration Adapter is incomplete"
                         elif (
                             not isinstance(declaration, Mapping)
                             or not declaration.get("required_fields")

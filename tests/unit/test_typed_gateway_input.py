@@ -116,8 +116,6 @@ def test_real_gateway_adapter_follows_compact_copy_ready_business_continuations(
                         "declaration": _copy_ready(
                             next_prefix,
                             append=(
-                                "--object-handle",
-                                "<bound-object-handle>",
                                 "--new-name",
                                 "<new-name>",
                             ),

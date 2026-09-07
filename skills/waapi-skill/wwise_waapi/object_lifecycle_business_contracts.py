@@ -14,54 +14,47 @@ OBJECT_LIFECYCLE_BUSINESS_CONTRACT = (
 
 _DECLARATIONS: dict[str, dict[str, Any]] = {
     "object.copy": {
-        "required_fields": ["object_handle", "parent_handle"],
+        "required_fields": [],
         "optional_fields": [
             "name_conflict",
             "add_to_source_control",
             "check_out_from_source_control",
         ],
         "field_types": {
-            "object_handle": "bound_object_handle",
-            "parent_handle": "bound_object_handle",
             "name_conflict": "fail_or_rename",
             "add_to_source_control": "boolean",
             "check_out_from_source_control": "boolean",
         },
     },
     "object.delete": {
-        "required_fields": ["object_handle"],
+        "required_fields": [],
         "optional_fields": ["check_out_from_source_control"],
         "field_types": {
-            "object_handle": "bound_object_handle",
             "check_out_from_source_control": "boolean",
         },
     },
     "object.move": {
-        "required_fields": ["object_handle", "parent_handle"],
+        "required_fields": [],
         "optional_fields": [
             "name_conflict",
             "check_out_from_source_control",
         ],
         "field_types": {
-            "object_handle": "bound_object_handle",
-            "parent_handle": "bound_object_handle",
             "name_conflict": "fail_or_rename",
             "check_out_from_source_control": "boolean",
         },
     },
     "object.setName": {
-        "required_fields": ["object_handle", "new_name"],
+        "required_fields": ["new_name"],
         "optional_fields": [],
         "field_types": {
-            "object_handle": "bound_object_handle",
             "new_name": "string",
         },
     },
     "object.setNotes": {
-        "required_fields": ["object_handle", "notes"],
+        "required_fields": ["notes"],
         "optional_fields": [],
         "field_types": {
-            "object_handle": "bound_object_handle",
             "notes": "string",
         },
     },
@@ -110,7 +103,7 @@ def object_lifecycle_business_contract_data(
             if operation in {"object.copy", "object.move"}
             else ["object"],
             "role_required": operation in {"object.copy", "object.move"},
-            "result": "copy_the_returned_bound_object_handle",
+            "result": "gateway_stores_the_bound_role;_no_handle_is_a_declaration_input",
         },
         "declaration": {
             "subcommand": "draft-declare-object-change",

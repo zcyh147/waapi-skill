@@ -582,6 +582,21 @@ def test_operations_catalog_routes_cli_console_intent_to_request_schema(
     payload_keys = list(payload)
     assert payload_keys.index("routing_precedence") < payload_keys.index("operations")
     assert payload["routing_precedence"] == {
+        "explicit_cli_soundbank_generation": {
+            "match_terms": ["WwiseConsole", "CLI", "command-line", "命令行"],
+            "choose": [
+                "request-schema",
+                "ak.wwise.cli.generateSoundbank",
+            ],
+            "takes_precedence_over": [
+                "operation-schema",
+                "soundbank.generate",
+            ],
+            "rule": (
+                "explicit command-line SoundBank generation uses the exact "
+                "reflected CLI URI"
+            ),
+        },
         "exact_authoring_ui_command_id": {
             "match_example": "SaveProject",
             "choose": ["operation-schema", "ui.commands.execute"],

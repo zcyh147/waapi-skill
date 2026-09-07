@@ -136,10 +136,10 @@ def test_object_lifecycle_declaration_named_options_are_transport_order_independ
             "authority",
             "--expected-revision",
             "2",
-            "--object-handle",
-            "object-handle",
-            "--notes",
-            "Exterior rain loop",
+            "--name-conflict",
+            "rename",
+            "--no-add-to-source-control",
+            "--check-out-from-source-control",
         ),
     )
 
@@ -151,10 +151,10 @@ def test_object_lifecycle_declaration_named_options_are_transport_order_independ
             "authority",
             "--expected-revision",
             "2",
-            "--notes",
-            "Exterior rain loop",
-            "--object-handle",
-            "object-handle",
+            "--check-out-from-source-control",
+            "--no-add-to-source-control",
+            "--name-conflict",
+            "rename",
         ),
     ) == step.arguments
     wrong = _normalize_object_lifecycle_business_argument_order(
@@ -165,14 +165,14 @@ def test_object_lifecycle_declaration_named_options_are_transport_order_independ
             "authority",
             "--expected-revision",
             "2",
-            "--notes",
-            "Wrong",
-            "--object-handle",
-            "object-handle",
+            "--check-out-from-source-control",
+            "--no-add-to-source-control",
+            "--name-conflict",
+            "fail",
         ),
     )
     assert wrong != step.arguments
-    assert "Wrong" in wrong
+    assert "fail" in wrong
 
 
 @pytest.mark.parametrize("with_discovery", (False, True))

@@ -1653,7 +1653,6 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
     assert "typed_operation" not in schema
     assert schema["business_adapter"]["operation"] == "object.setNotes"
     assert schema["business_adapter"]["declaration"]["required_fields"] == [
-        "object_handle",
         "notes",
     ]
 

@@ -2193,28 +2193,26 @@ def build_object_lifecycle_business_transaction_steps(
             selector,
             step_name=step_name,
             error_subject="object lifecycle business",
+            role=(
+                role
+                if operation in {"object.copy", "object.move"}
+                else None
+            ),
         )
 
     object_selector = canonical_arguments.get("object")
     if not isinstance(object_selector, Mapping):
         raise V3ProtocolError("object lifecycle business request lacks object identity")
-    object_handle = bind_object(object_selector, role="object")
-    parent_handle: ResponseBinding | None = None
+    bind_object(object_selector, role="object")
     if operation in {"object.copy", "object.move"}:
         parent_selector = canonical_arguments.get("parent")
         if not isinstance(parent_selector, Mapping):
             raise V3ProtocolError(
                 "object lifecycle business request lacks parent identity"
             )
-        parent_handle = bind_object(parent_selector, role="parent")
+        bind_object(parent_selector, role="parent")
 
-    declaration_arguments: list[Any] = [
-        *draft.prefix(),
-        "--object-handle",
-        object_handle,
-    ]
-    if parent_handle is not None:
-        declaration_arguments.extend(("--parent-handle", parent_handle))
+    declaration_arguments: list[Any] = [*draft.prefix()]
     value = canonical_arguments.get("value")
     if operation == "object.setName":
         declaration_arguments.extend(("--new-name", str(value)))

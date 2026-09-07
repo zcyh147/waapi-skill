@@ -3363,7 +3363,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                 "The user asks to persistently change the SoundBank's saved inclusion rows.",
             ),
             choose_instead=(
-                ("waapi.call", "explicit CLI generation intent selects the versioned ak.wwise.cli.generateSoundbank route"),
+                ("request-schema ak.wwise.cli.generateSoundbank", "explicit CLI generation intent selects the exact reflected CLI route"),
                 ("wait-topic or stream-topic", "the request is observation-only"),
                 ("soundbank.setInclusions", "the requested outcome is a persistent inclusion edit"),
             ),
