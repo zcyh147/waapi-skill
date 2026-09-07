@@ -1255,8 +1255,9 @@ def test_every_object_lifecycle_adapter_reaches_immutable_preview_with_its_verif
     if operation in {"object.copy", "object.move"}:
         initial_binding = started["draft"]["next_action_binding"]["object_binding"]
         assert initial_binding["next_role"] == "object"
-        assert initial_binding["by_id"]["fixed_argv_prefix_copy"].endswith(
-            " --role object"
+        initial_copy = initial_binding["by_id"]["fixed_argv_prefix_copy"]
+        assert initial_copy.endswith(" --role object") or initial_copy.endswith(
+            " '--role' 'object'"
         )
 
     def bind(
@@ -1294,8 +1295,9 @@ def test_every_object_lifecycle_adapter_reaches_immutable_preview_with_its_verif
     if operation in {"object.copy", "object.move"}:
         next_binding = bound["draft"]["next_action_binding"]["object_binding"]
         assert next_binding["next_role"] == "parent"
-        assert next_binding["by_id"]["fixed_argv_prefix_copy"].endswith(
-            " --role parent"
+        next_copy = next_binding["by_id"]["fixed_argv_prefix_copy"]
+        assert next_copy.endswith(" --role parent") or next_copy.endswith(
+            " '--role' 'parent'"
         )
         parent_handle, bound = bind(
             PARENT_GUID,

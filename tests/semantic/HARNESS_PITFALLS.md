@@ -2317,6 +2317,19 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   this through the public Gateway response by requiring one sole continuation
   source, then run the prior Windows failure set before another full root.
 
+### Assert argv structure, not one host's rendered shell text
+
+- Trigger: the exact `acce343` Windows Program gate failed only because a new
+  object-lifecycle regression asserted that a copy-ready prefix ended with the
+  POSIX text `--role object`. The canonical Windows model command correctly
+  rendered the same two argv tokens as `'--role' 'object'`.
+- Prevention: tests for Gateway-owned command meaning must inspect structured
+  argv when that field is retained, or accept the exact supported rendering of
+  each host family when compact projection intentionally retains only the copy
+  string. Never treat POSIX quoting as the cross-platform command contract.
+- Classification: this is a test assertion defect. It grants no Windows
+  product failure and still requires the corrected full Windows Program gate.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:
