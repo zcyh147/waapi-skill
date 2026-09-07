@@ -888,7 +888,7 @@ def test_object_set_name_draft_start_returns_only_business_continuation(
 
     assert code == 0, started
     binding = started["draft"]["next_action_binding"]
-    assert binding["required_next_phase"] == "bind_existing_business_object"
+    assert binding["required_next_phase"] == "bind_next_object_lifecycle_role"
     assert binding["business_contract"]["operation"] == "object.setName"
     assert binding["object_binding"]["result"] == (
         "copy_the_returned_bound_object.handle"
@@ -1252,7 +1252,19 @@ def test_every_object_lifecycle_adapter_reaches_immutable_preview_with_its_verif
     authority = started["task_authority"]
     client = ObjectLifecycleClient()
 
-    def bind(object_id: str, expected_revision: int) -> tuple[str, dict[str, Any]]:
+    if operation in {"object.copy", "object.move"}:
+        initial_binding = started["draft"]["next_action_binding"]["object_binding"]
+        assert initial_binding["next_role"] == "object"
+        assert initial_binding["by_id"]["fixed_argv_prefix_copy"].endswith(
+            " --role object"
+        )
+
+    def bind(
+        object_id: str,
+        expected_revision: int,
+        *,
+        role: str | None = None,
+    ) -> tuple[str, dict[str, Any]]:
         bind_code, payload = waapi_gateway.execute_gateway(
             [
                 "--state-dir",
@@ -1263,6 +1275,7 @@ def test_every_object_lifecycle_adapter_reaches_immutable_preview_with_its_verif
                 authority,
                 "--expected-revision",
                 str(expected_revision),
+                *(("--role", role) if role is not None else ()),
                 "--object-id",
                 object_id,
             ],
@@ -1272,10 +1285,55 @@ def test_every_object_lifecycle_adapter_reaches_immutable_preview_with_its_verif
         assert bind_code == 0, payload
         return payload["bound_object"]["handle"], payload
 
-    object_handle, bound = bind(OBJECT_GUID, started["draft"]["revision"])
+    object_handle, bound = bind(
+        OBJECT_GUID,
+        started["draft"]["revision"],
+        role="object" if operation in {"object.copy", "object.move"} else None,
+    )
     parent_handle: str | None = None
     if operation in {"object.copy", "object.move"}:
-        parent_handle, bound = bind(PARENT_GUID, bound["draft"]["revision"])
+        next_binding = bound["draft"]["next_action_binding"]["object_binding"]
+        assert next_binding["next_role"] == "parent"
+        assert next_binding["by_id"]["fixed_argv_prefix_copy"].endswith(
+            " --role parent"
+        )
+        parent_handle, bound = bind(
+            PARENT_GUID,
+            bound["draft"]["revision"],
+            role="parent",
+        )
+    expected_declaration_append = {
+        "object.copy": [
+            "--object-handle",
+            object_handle,
+            "--parent-handle",
+            parent_handle,
+            "[--name-conflict fail|rename]",
+        ],
+        "object.delete": ["--object-handle", object_handle],
+        "object.move": [
+            "--object-handle",
+            object_handle,
+            "--parent-handle",
+            parent_handle,
+            "[--name-conflict fail|rename]",
+        ],
+        "object.setName": [
+            "--object-handle",
+            object_handle,
+            "--new-name",
+            "<exact-new-name>",
+        ],
+        "object.setNotes": [
+            "--object-handle",
+            object_handle,
+            "--notes",
+            "<exact-notes>",
+        ],
+    }[operation]
+    declaration_binding = bound["draft"]["next_action_binding"]["declaration"]
+    assert declaration_binding["append"] == expected_declaration_append
+    assert "append_fields" not in declaration_binding
     rendered_tail = tuple(
         parent_handle if value == "<parent>" else value
         for value in declaration_tail

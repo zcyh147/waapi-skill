@@ -23524,6 +23524,114 @@ def _business_next_action_binding(
                 "the_same_named_declaration_field"
             ),
         }
+    if adapter.family == "object-lifecycle":
+        roles = list(business_contract["binding"]["roles"])
+        shared = {
+            "contract": "waapi-skill.business-draft-next-action/v1",
+            "responsibility_split": {
+                "agent": "natural_language_to_closed_object_lifecycle_outcome",
+                "gateway": (
+                    "bound_objects_and_business_values_to_exact_waapi_preview"
+                ),
+            },
+            "business_contract": business_contract,
+            "forbidden_inputs": [
+                *forbidden_inputs,
+                "native_request",
+                "native_object_identity",
+                "request_fragment",
+            ],
+            "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+            "then_read_next_response": True,
+            "precompute_or_increment_revision": False,
+        }
+        if session is None:
+            return {
+                **shared,
+                "required_next_phase": "bind_next_object_lifecycle_role",
+                "object_binding": (
+                    role_object_binding(roles[0])
+                    if len(roles) > 1
+                    else object_binding
+                ),
+            }
+        object_rows = session.handles.as_dict()["objects"]
+        handles_by_role = {
+            row["role"]: row["handle"]
+            for row in object_rows
+            if isinstance(row, Mapping)
+            and isinstance(row.get("role"), str)
+            and isinstance(row.get("handle"), str)
+        }
+        if (
+            len(roles) == 1
+            and len(object_rows) == 1
+            and roles[0] not in handles_by_role
+            and isinstance(object_rows[0], Mapping)
+            and isinstance(object_rows[0].get("handle"), str)
+        ):
+            handles_by_role[roles[0]] = object_rows[0]["handle"]
+        if session.declarations:
+            return {
+                **shared,
+                "required_next_phase": "check_complete_business_declaration",
+                "check": {
+                    **operation_draft_prefix_copy_binding(check),
+                    "append": [],
+                },
+            }
+        next_role = next(
+            (role for role in roles if role not in handles_by_role),
+            None,
+        )
+        if next_role is not None:
+            return {
+                **shared,
+                "required_next_phase": "bind_next_object_lifecycle_role",
+                "object_binding": (
+                    role_object_binding(next_role)
+                    if len(roles) > 1
+                    else object_binding
+                ),
+            }
+        declaration_append = [
+            "--object-handle",
+            handles_by_role["object"],
+        ]
+        if "parent" in roles:
+            declaration_append.extend(
+                ["--parent-handle", handles_by_role["parent"]]
+            )
+        if record.operation == "object.setName":
+            declaration_append.extend(["--new-name", "<exact-new-name>"])
+        elif record.operation == "object.setNotes":
+            declaration_append.extend(["--notes", "<exact-notes>"])
+        optional_fields = business_contract["declaration"]["optional_fields"]
+        if "name_conflict" in optional_fields:
+            declaration_append.append("[--name-conflict fail|rename]")
+        if "add_to_source_control" in optional_fields:
+            declaration_append.append(
+                "[--add-to-source-control|--no-add-to-source-control]"
+            )
+        if "check_out_from_source_control" in optional_fields:
+            declaration_append.append(
+                "[--check-out-from-source-control|--no-check-out-from-source-control]"
+            )
+        return {
+            **shared,
+            "required_next_phase": "declare_complete_object_change",
+            "declaration": {
+                **operation_draft_prefix_copy_binding(
+                    declare_object_change_prefix,
+                    append_action=(
+                        "copy_verbatim_then_append_only_the_disclosed_business_values"
+                    ),
+                ),
+                "append": declaration_append,
+                "opaque_handles_preinserted": True,
+                "submit_once": True,
+            },
+        }
     if adapter.family == "soundengine-control-business":
         roles = business_contract["binding"].get(
             "required_roles",

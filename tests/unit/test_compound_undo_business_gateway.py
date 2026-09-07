@@ -56,13 +56,26 @@ def _checked_object_child(
         client_factory=lambda _url: client,
     )
     assert code == 0, bound
+    object_handle = bound["bound_object"]["handle"]
+    declaration_binding = bound["draft"]["next_action_binding"]["declaration"]
+    assert declaration_binding["append"] == [
+        "--object-handle",
+        object_handle,
+        value_flag,
+        {
+            "--notes": "<exact-notes>",
+            "--new-name": "<exact-new-name>",
+        }[value_flag],
+    ]
+    assert declaration_binding["opaque_handles_preinserted"] is True
+    assert "append_fields" not in declaration_binding
     code, declared = offline_execute(
         tmp_path,
         "--state-dir", str(state_dir),
         "draft-declare-object-change", draft_id,
         "--task-authority", authority,
         "--expected-revision", str(bound["draft"]["revision"]),
-        "--object-handle", bound["bound_object"]["handle"],
+        "--object-handle", object_handle,
         value_flag, value,
     )
     assert code == 0, declared

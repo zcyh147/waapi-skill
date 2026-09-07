@@ -109,6 +109,7 @@ def object_lifecycle_business_contract_data(
             "roles": ["object", "parent"]
             if operation in {"object.copy", "object.move"}
             else ["object"],
+            "role_required": operation in {"object.copy", "object.move"},
             "result": "copy_the_returned_bound_object_handle",
         },
         "declaration": {

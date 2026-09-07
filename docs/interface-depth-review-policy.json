@@ -17,7 +17,7 @@
   },
   "source_contracts": {
     "gateway_parser_sha256": "768e310eb79d123aab8901367846fb69772cbc0aea2747019bc5492763b32aea",
-    "operation_contract_sha256": "f70092e2926074126976475ab6282a23dade39e96ae32c689975105dae541f5d",
+    "operation_contract_sha256": "47e7e0a651e4925694a97c11eeb6e60e04148be327d4f2daabdadd844e7ccb75",
     "public_continuation_sha256": "c5dd9de956bf7b393c2c4b38c80561940d0873f6695acc2e5a635a7ad2bd8ee3",
     "typed_request_surface_sha256": "7cbe0a9ba6d9756c94ecea58bb1b2ac56da242059f17c5cdfdaf768271d133a8"
   },
@@ -67,7 +67,7 @@
       "owner_issue": null,
       "operations": ["object.copy", "object.delete", "object.move", "object.setName", "object.setNotes"],
       "leaked_mechanics": [],
-      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence."
+      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; preinsert every opaque handle into the sole copy-ready declaration continuation; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence."
     },
     {
       "id": "named-object-metadata-fields",
