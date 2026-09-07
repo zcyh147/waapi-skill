@@ -8545,6 +8545,105 @@ def test_draft_object_binding_accepts_the_exact_prior_query_path() -> None:
     ) == wrong
 
 
+def test_single_object_binding_accepts_only_the_redundant_exact_object_role() -> None:
+    fixed = (
+        "od1-" + "1" * 32,
+        "--task-authority",
+        "da1-" + "2" * 40,
+        "--expected-revision",
+        "1",
+    )
+    step = ExpectedGatewayStep(
+        "tx01.bind-object",
+        "draft-bind-object",
+        (*fixed, "--object-id", "{33333333-3333-3333-3333-333333333333}"),
+    )
+    redundant = (
+        *fixed,
+        "--role",
+        "object",
+        "--object-id",
+        "{33333333-3333-3333-3333-333333333333}",
+    )
+
+    assert broker_module._normalize_redundant_single_role_object_binding(  # noqa: SLF001
+        step,
+        redundant,
+    ) == step.arguments
+
+    wrong_role = (*redundant[:6], "parent", *redundant[7:])
+    assert broker_module._normalize_redundant_single_role_object_binding(  # noqa: SLF001
+        step,
+        wrong_role,
+    ) == wrong_role
+
+
+def test_broker_treats_redundant_single_object_role_as_transport_only(
+    tmp_path: Path,
+) -> None:
+    protocol = build_transaction_protocol(
+        (
+            {
+                "contract": "waapi-skill.operation-request/v1",
+                "version": "2022.1",
+                "operation": "object.setReference",
+                "arguments": {
+                    "object": {
+                        "kind": "id",
+                        "value": "{33333333-3333-3333-3333-333333333333}",
+                    },
+                    "reference": "OutputBus",
+                    "target": None,
+                },
+            },
+        )
+    )
+    step = next(
+        candidate
+        for candidate in protocol.steps
+        if candidate.subcommand == "draft-bind-object"
+    )
+    broker = CodexGatewayBroker(
+        skill_source=tmp_path / "waapi-skill",
+        expected_steps=protocol.steps,
+    )
+    draft_id = "od1-" + "1" * 32
+    authority = "da1-" + "2" * 40
+    broker._payloads_by_step = {  # noqa: SLF001
+        "tx01.draft-start": {
+            "draft": {"draft_id": draft_id, "revision": 1},
+            "task_authority": authority,
+        }
+    }
+    fixed = (
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "1",
+    )
+    identity = tuple(str(value) for value in step.arguments[5:])
+    exact_hash, _ = broker._validate_step(  # noqa: SLF001
+        step,
+        ("draft-bind-object", *fixed, *identity),
+    )
+    redundant = (
+        "draft-bind-object",
+        *fixed,
+        "--role",
+        "object",
+        *identity,
+    )
+
+    redundant_hash, execution_arguments = broker._validate_step(  # noqa: SLF001
+        step,
+        redundant,
+    )
+
+    assert redundant_hash == exact_hash
+    assert execution_arguments == redundant
+
+
 def test_event_action_draft_binding_expands_to_direct_child_selector() -> None:
     fixed = (
         "od1-" + "1" * 32,

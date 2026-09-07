@@ -4408,6 +4408,31 @@ def _normalize_draft_bind_object_query_identity(
     return (*actual[:identity_index], "--object-id", expected_id)
 
 
+def _normalize_redundant_single_role_object_binding(
+    step: "ExpectedGatewayStep",
+    supplied_arguments: Sequence[str],
+) -> tuple[Any, ...]:
+    """Ignore only an exact redundant role on a single-object binding.
+
+    Multi-role Drafts retain their required Gateway-owned role.  For a Draft
+    whose sealed protocol has no role flag, spelling the sole role as
+    ``object`` changes neither target identity nor business meaning.
+    """
+
+    actual = tuple(supplied_arguments)
+    if step.subcommand != "draft-bind-object" or "--role" in step.arguments:
+        return actual
+    role_indexes = tuple(
+        index for index, value in enumerate(actual) if value == "--role"
+    )
+    if len(role_indexes) != 1:
+        return actual
+    role_index = role_indexes[0]
+    if role_index + 1 >= len(actual) or actual[role_index + 1] != "object":
+        return actual
+    return (*actual[:role_index], *actual[role_index + 2 :])
+
+
 def _normalize_event_action_draft_binding(
     step: "ExpectedGatewayStep",
     supplied_arguments: Sequence[str],
@@ -12217,6 +12242,10 @@ class CodexGatewayBroker:
             self._payloads_by_step,
         )
         validation_arguments = _normalize_query_object_sound_routing_view(
+            step,
+            validation_arguments,
+        )
+        validation_arguments = _normalize_redundant_single_role_object_binding(
             step,
             validation_arguments,
         )
