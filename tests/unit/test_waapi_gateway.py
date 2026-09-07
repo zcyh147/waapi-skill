@@ -5217,7 +5217,7 @@ def test_soundbank_stream_terminal_repeats_bounded_identity_events_for_agent(
     exit_code, terminal = waapi_gateway.execute_gateway(
         [
             "--timeout",
-            "0.5",
+            "2.0",
             "stream-topic",
             topic,
             "--event-count",

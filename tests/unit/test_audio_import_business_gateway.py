@@ -1211,31 +1211,20 @@ def test_structure_declaration_reaches_live_check_and_persists_readable_preview(
         "对象：Variants",
         "类型：Random Container",
     ]
-    assert checked["draft"]["next_action_binding"]["required_next_phase"] == (
-        "preview_from_checked_business_draft"
-    )
-    checked_copy = checked["draft"]["next_action_binding"]
-    assert checked_copy["copy_exactly"] is True
-    assert checked_copy["copy_instruction"] == {
-        "contract": "waapi-skill.operation-draft-command-copy-instruction/v1",
-        "source_field": "copy_command",
-        "action": "copy_and_execute_verbatim_once",
-        "forbidden_transformations": [
-            "reconstruct",
-            "shorten",
-            "normalize",
-            "substitute_path_segments",
-            "select_another_field",
-        ],
-        "opaque_token_guard": {
-            "task_authority": {
-                "prefix": "da1-",
-                "hex_characters_after_prefix": 40,
-                "truncate_to_32_hex_characters": "invalid",
-            }
-        },
+    assert "next_action_binding" not in checked["draft"]
+    assert checked["draft"]["construction_state"] == {
+        "draft_complete": True,
+        "preview_created": False,
+        "required_next_phase": "preview-from-draft",
+        "sole_continuation_source": "/next_command",
     }
+    assert "copy_command" not in json.dumps(checked["draft"])
+    assert "fixed_argv_prefix_copy" not in json.dumps(checked["draft"])
     assert checked["next_command"]["gateway_argv"][0] == "preview-from-draft"
+    assert checked["next_command"]["copy_instruction"]["source_field"] in {
+        "model_command",
+        "shell_command",
+    }
     assert "--apply" not in checked["next_command"]["gateway_argv"]
     record = OperationDraftStore(tmp_path / "state").inspect(
         draft_id,

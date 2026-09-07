@@ -26809,13 +26809,31 @@ def operation_draft_payload(
                 "projection": "business_declaration_receipt_and_continuation",
                 "compact_projection_is_not_truncation": True,
             }
-        draft["next_action_binding"] = next_action_binding
-        draft["agent_control"] = {
-            "terminal": False,
-            "required_outcome_before_reply": "preview_or_structured_refusal",
-            "next": "follow_next_action_binding",
-            "reply_or_claim_preview_now": "invalid",
-        }
+        checked_compound_child = (
+            command == "draft-check"
+            and record.check is not None
+            and record.composition.get("compound_parent") is not None
+        )
+        checked_business_preview = (
+            command == "draft-check"
+            and record.check is not None
+            and not checked_compound_child
+        )
+        if checked_business_preview:
+            draft["construction_state"] = {
+                "draft_complete": True,
+                "preview_created": False,
+                "required_next_phase": "preview-from-draft",
+                "sole_continuation_source": "/next_command",
+            }
+        else:
+            draft["next_action_binding"] = next_action_binding
+            draft["agent_control"] = {
+                "terminal": False,
+                "required_outcome_before_reply": "preview_or_structured_refusal",
+                "next": "follow_next_action_binding",
+                "reply_or_claim_preview_now": "invalid",
+            }
         return {
             "contract": GATEWAY_RESULT_CONTRACT,
             "ok": True,

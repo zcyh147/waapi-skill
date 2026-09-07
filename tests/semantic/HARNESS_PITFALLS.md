@@ -1524,6 +1524,13 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   explicit progressive `--catalog` disclosure. For every successful stream,
   terminal `agent_result` is the sole natural-language and machine-result
   authority; a positive event count can never be reported as empty.
+- Test-harness boundary: a fake stream that deliberately publishes fewer
+  events than its requested ceiling completes through its finite timeout. A
+  0.5-second unit-test window intermittently processed only one of two queued
+  identity events under a loaded full Non-live run, then passed immediately in
+  isolation. Use a small but scheduling-tolerant finite window (currently two
+  seconds) for that timeout-path assertion; do not repeatedly rerun the whole
+  gate and hope the shorter race disappears.
 
 ### Natural discovery inference must follow the public first schema step
 
@@ -2289,6 +2296,26 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
 - Current CUB continuations return the next child start or parent completion
   directly. The current profile uses ordinary exact continuation grading; the
   older checked-child handoff exception is retained only for historical readers.
+
+### One checked Draft response must not expose two executable continuations
+
+- Trigger: native-Windows #60 root `iwin-m60-042bbe2-r67-deep19` passed 11 of
+  19 units and failed eight otherwise successful Preview workflows at
+  `exact_protocol`. The corresponding macOS root passed 19/19. Windows Codex
+  intermittently copied the checked Draft's nested absolute `copy_command`
+  instead of the top-level short `next_command.model_command`; both resolved to
+  the same authenticated Broker argv and created the correct Preview.
+- Cause: the product response exposed both continuations at once, and each
+  independently said to copy its selected source field exactly. The Agent had
+  to choose between two equivalent executable interfaces even though only the
+  top-level continuation was the oracle's canonical choice. This is a shallow
+  Gateway seam, not a Wwise, Task Scheduler, Broker, or shell-quoting failure.
+- Prevention: after an ordinary Business Draft passes `draft-check`, omit its
+  nested executable continuation and expose only the top-level
+  `next_command`. A parent-owned Compound Undo child is the narrow exception:
+  it has no independent Preview and retains only its parent handoff. Regress
+  this through the public Gateway response by requiring one sole continuation
+  source, then run the prior Windows failure set before another full root.
 
 ## New-root preflight
 

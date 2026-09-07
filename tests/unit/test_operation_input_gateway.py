@@ -1169,9 +1169,11 @@ def test_object_set_name_business_draft_binds_declares_and_materializes(
     )
     assert check_code == 0, json.dumps(checked, ensure_ascii=False)
     assert checked["draft"]["check"]["status"] == "passed"
-    assert "--apply" not in checked["draft"]["next_action_binding"][
-        "fixed_full_argv"
-    ]
+    assert "next_action_binding" not in checked["draft"]
+    assert checked["draft"]["construction_state"][
+        "sole_continuation_source"
+    ] == "/next_command"
+    assert "--apply" not in checked["next_command"]["gateway_argv"]
     preview_live = preview_client()
     preview_code, previewed = waapi_gateway.execute_gateway(
         [
@@ -1310,9 +1312,11 @@ def test_every_object_lifecycle_adapter_reaches_immutable_preview_with_its_verif
     )
     assert check_code == 0, json.dumps(checked, ensure_ascii=False)
     assert checked["draft"]["check"]["status"] == "passed"
-    assert "--apply" not in checked["draft"]["next_action_binding"][
-        "fixed_full_argv"
-    ]
+    assert "next_action_binding" not in checked["draft"]
+    assert checked["draft"]["construction_state"][
+        "sole_continuation_source"
+    ] == "/next_command"
+    assert "--apply" not in checked["next_command"]["gateway_argv"]
 
     preview_code, previewed = waapi_gateway.execute_gateway(
         [
