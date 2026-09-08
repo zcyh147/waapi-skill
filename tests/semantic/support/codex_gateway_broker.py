@@ -12212,7 +12212,7 @@ class CodexGatewayBroker:
             draft_key = str(actual_values[0])
             prior_media_directories = {
                 arguments[index + 1]
-                for record in self._records
+                for record in getattr(self, "_records", ())
                 if record.succeeded
                 and (arguments := record.gateway_arguments)
                 and arguments[0] == "draft-declare-import-batch"
