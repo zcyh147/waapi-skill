@@ -2350,6 +2350,40 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   after repair use a new root. Do not rerun Wwise merely to hide the archive
   defect or promote the live matrix result to Campaign credit.
 
+### Closed query discovery must agree with the packaged Skill
+
+- Trigger: #51 candidate `4b15cd4` rejected `query-schema` before the first
+  Alarm or Weapons object query even though the packaged query reference
+  explicitly permits that bounded schema read before constructing a closed
+  business query. The command never reached Wwise and the workflow received no
+  semantic result.
+- Cause: the older integration protocol encoded only its direct-query lane;
+  the Broker therefore treated one legitimate read-only discovery step as an
+  unexpected command. A separate Alarm failure similarly used one exact-ID
+  readback of the already diagnosed Sound before mutation.
+- Prevention: model these reads as individually named optional workflow steps.
+  The Broker may select each at most once, requires its exact reviewed argv,
+  keeps every mandatory query and mutation step, and seals the selected names
+  for independent archive replay. Never permit an arbitrary query-schema or
+  query-object command merely because it is read-only.
+
+### Integration observers must consume semantic import batches
+
+- Trigger: #51 `INT25-FOOTSTEPS` submitted all five reviewed import rows in two
+  legal chunks of three and two. The Broker authenticated both chunks and
+  `draft-check` sealed five complete declarations including the Snow switch
+  assignment, but the trusted observer still expected five one-row transport
+  calls and rejected the following check as out of order.
+- Cause: the Broker correctly treats a 1..3-row chunk boundary as transport,
+  while the workflow observer compared raw step positions rather than the
+  canonical declaration set and semantic lifecycle milestones.
+- Prevention: let the observer advance across only the remaining contiguous
+  import-declaration slots when the exact Broker-selected `draft-check` arrives.
+  Require at least `ceil(expected_rows / 3)` chunks, retain the maximum of one
+  chunk per expected row, and keep execute/verify cardinality plus the final
+  real-Wwise business oracle exact. A missing switch assignment, row, or media
+  binding remains a semantic failure and cannot be excused as rebatching.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:

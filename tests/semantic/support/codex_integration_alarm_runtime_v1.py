@@ -924,6 +924,35 @@ class _AlarmFixtureSession:
     ) -> None:
         """Validate every agent-visible diagnostic row against the sealed graph."""
 
+        if step.name == "revalidation.sound":
+            before = self._require_before()
+            objects = payload.get("objects")
+            sound = before.by_key()["sound"]
+            if (
+                step.subcommand != "query-object"
+                or payload.get("ok") is not True
+                or payload.get("command") != "query-object"
+                or payload.get("count") != 1
+                or not isinstance(objects, list)
+                or len(objects) != 1
+                or not isinstance(objects[0], Mapping)
+                or {
+                    "id": objects[0].get("id"),
+                    "name": objects[0].get("name"),
+                    "type": objects[0].get("type"),
+                    "path": objects[0].get("path"),
+                }
+                != {
+                    "id": sound.object_id,
+                    "name": sound.name,
+                    "type": sound.object_type,
+                    "path": sound.path,
+                }
+            ):
+                raise AlarmIntegrationRuntimeError(
+                    "optional Alarm Sound revalidation differs from the diagnosed identity"
+                )
+            return
         if not step.name.startswith("diag."):
             return
         before = self._require_before()
@@ -1176,8 +1205,18 @@ def _alarm_protocol(
         ),
         schema_first=True,
     )
-    steps = (*diagnostic_steps, *transaction.steps)
+    revalidation = ExpectedGatewayStep(
+        name="revalidation.sound",
+        subcommand="query-object",
+        arguments=(
+            "--exact-id",
+            ResponseBinding("diag.sound", "/objects/0/id"),
+        ),
+    )
+    steps = (*diagnostic_steps, revalidation, *transaction.steps)
     diagnostic_count = len(diagnostic_steps)
+    preview_count = diagnostic_count + transaction.turn_prefix_counts[0]
+    complete_count = diagnostic_count + transaction.turn_prefix_counts[1]
     return V3GatewayProtocol(
         steps=steps,
         commutative_read_only_step_groups=(
@@ -1185,9 +1224,15 @@ def _alarm_protocol(
         ),
         turn_prefix_counts=(
             diagnostic_count,
-            diagnostic_count + transaction.turn_prefix_counts[0],
-            diagnostic_count + transaction.turn_prefix_counts[1],
+            preview_count + 1,
+            complete_count + 1,
         ),
+        allowed_turn_prefix_counts=(
+            (diagnostic_count,),
+            (preview_count, preview_count + 1),
+            (complete_count, complete_count + 1),
+        ),
+        terminal_prefix_counts=(complete_count, complete_count + 1),
     )
 
 

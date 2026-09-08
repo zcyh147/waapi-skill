@@ -5222,6 +5222,54 @@ class V3GatewayProtocol:
             return ()
         return names
 
+    @property
+    def optional_workflow_query_schema_step_names(self) -> tuple[str, ...]:
+        """Return the one reviewed optional schema read before a workflow query."""
+
+        names = tuple(
+            step.name
+            for step in self.steps
+            if step.name == "routing.query-schema"
+        )
+        if not names:
+            return ()
+        index = next(
+            index
+            for index, step in enumerate(self.steps)
+            if step.name == names[0]
+        )
+        if (
+            len(names) != 1
+            or self.steps[index].subcommand != "query-schema"
+            or self.steps[index].arguments
+            or index + 1 >= len(self.steps)
+            or self.steps[index + 1].subcommand != "query-object"
+            or any(
+                step.name
+                not in self.optional_workflow_operations_discovery_step_names
+                for step in self.steps[:index]
+            )
+        ):
+            return ()
+        return names
+
+    @property
+    def optional_workflow_revalidation_step_names(self) -> tuple[str, ...]:
+        """Return reviewed optional exact readbacks before a workflow change."""
+
+        names = tuple(
+            step.name
+            for step in self.steps
+            if step.name.startswith("revalidation.")
+        )
+        if any(
+            step.subcommand != "query-object" or not step.arguments
+            for step in self.steps
+            if step.name in names
+        ):
+            return ()
+        return names
+
 
 def build_protocol_with_bounded_import_chunks(
     *,
@@ -6249,6 +6297,45 @@ def build_workflow_operations_discovery_protocol(
     )
 
 
+def build_workflow_query_schema_discovery_protocol(
+    base: V3GatewayProtocol,
+) -> V3GatewayProtocol:
+    """Allow one ordinary schema read before a multi-turn closed query workflow."""
+
+    if (
+        not isinstance(base, V3GatewayProtocol)
+        or not base.steps
+        or base.steps[0].subcommand != "query-object"
+    ):
+        raise V3ProtocolError(
+            "workflow query-schema discovery requires a query-first protocol"
+        )
+    discovery = query_schema_step("routing.query-schema")
+    base_allowed = (
+        base.allowed_turn_prefix_counts
+        or tuple((value,) for value in base.turn_prefix_counts)
+    )
+    allowed = tuple(
+        tuple(sorted({item for value in values for item in (value, value + 1)}))
+        for values in base_allowed
+    )
+    base_terminal = base.terminal_prefix_counts or (len(base.steps),)
+    terminal = tuple(
+        sorted({item for value in base_terminal for item in (value, value + 1)})
+    )
+    return V3GatewayProtocol(
+        steps=(discovery, *base.steps),
+        turn_prefix_counts=tuple(value + 1 for value in base.turn_prefix_counts),
+        allowed_turn_prefix_counts=allowed,
+        terminal_prefix_counts=terminal,
+        commutative_read_only_step_groups=base.commutative_read_only_step_groups,
+        commutative_composer_setup_step_groups=(
+            base.commutative_composer_setup_step_groups
+        ),
+        optional_topic_schema_step_groups=base.optional_topic_schema_step_groups,
+    )
+
+
 def build_optional_topic_schema_protocol(
     steps: Sequence[ExpectedGatewayStep],
 ) -> V3GatewayProtocol:
@@ -7099,6 +7186,8 @@ __all__ = [
     "build_switch_assignment_business_transaction_steps",
     "build_object_graph_business_transaction_steps",
     "build_object_set_composer_transaction_steps",
+    "build_workflow_operations_discovery_protocol",
+    "build_workflow_query_schema_discovery_protocol",
     "build_protocol_with_bounded_import_chunks",
     "build_modification_policy_protocol",
     "build_metadata_transaction_protocol",

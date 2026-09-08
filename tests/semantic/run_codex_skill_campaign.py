@@ -6377,7 +6377,25 @@ def _consumed_heavy_v3_protocol_steps(
             (),
         )
     )
-    if optional_workflow_operations:
+    optional_workflow_query_schema = tuple(
+        getattr(
+            protocol,
+            "optional_workflow_query_schema_step_names",
+            (),
+        )
+    )
+    optional_workflow_revalidation = tuple(
+        getattr(
+            protocol,
+            "optional_workflow_revalidation_step_names",
+            (),
+        )
+    )
+    if (
+        optional_workflow_operations
+        or optional_workflow_query_schema
+        or optional_workflow_revalidation
+    ):
         if (
             not isinstance(selected_step_names, list)
             or not 0 <= consumed_count <= len(selected_step_names)
@@ -6385,7 +6403,11 @@ def _consumed_heavy_v3_protocol_steps(
         ):
             return ()
         by_name = {step.name: step for step in steps}
-        optional_names = set(optional_workflow_operations)
+        optional_names = {
+            *optional_workflow_operations,
+            *optional_workflow_query_schema,
+            *optional_workflow_revalidation,
+        }
         if any(name not in by_name for name in selected_step_names):
             return ()
         if tuple(

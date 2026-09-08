@@ -414,10 +414,30 @@ def test_integration_plan_requires_catalog_before_query_first_protocol() -> None
         )
     )
 
-    assert wrapped.steps[0].name == "routing.operations"
-    assert wrapped.steps[0].subcommand == "operations"
+    assert [step.name for step in wrapped.steps[:5]] == [
+        "routing.operations",
+        "routing.query-schema",
+        "diag.search",
+        "routing.operations.tx01.operation-schema",
+        "tx01.operation-schema",
+    ]
+    assert wrapped.optional_workflow_query_schema_step_names == (
+        "routing.query-schema",
+    )
+    assert wrapped.allowed_turn_prefix_counts == (
+        (1, 2, 3),
+        (3, 4, 5, 6),
+        (7, 8, 9, 10),
+    )
     assert rebuilt.static_expectation["workflow_steps"][0] == {
         "name": "routing.operations",
+        "kind": "checkpoint",
+        "phase": f"{unit.workflow_id}.checkpoint",
+        "transaction_id": None,
+        "api": None,
+    }
+    assert rebuilt.static_expectation["workflow_steps"][1] == {
+        "name": "routing.query-schema",
         "kind": "checkpoint",
         "phase": f"{unit.workflow_id}.checkpoint",
         "transaction_id": None,
@@ -4026,7 +4046,13 @@ def test_workflow_operations_archive_keeps_the_sealed_lane_for_earlier_turns() -
     protocol = V3GatewayProtocol(
         steps=(
             ExpectedGatewayStep("routing.operations", "operations"),
+            ExpectedGatewayStep("routing.query-schema", "query-schema"),
             ExpectedGatewayStep("diag.query", "query-object"),
+            ExpectedGatewayStep(
+                "revalidation.sound",
+                "query-object",
+                ("--exact-id", "sound"),
+            ),
             ExpectedGatewayStep(
                 "tx01.operation-schema",
                 "operation-schema",
@@ -4034,9 +4060,9 @@ def test_workflow_operations_archive_keeps_the_sealed_lane_for_earlier_turns() -
             ),
             ExpectedGatewayStep("tx01.finish", "status"),
         ),
-        turn_prefix_counts=(2, 4),
-        allowed_turn_prefix_counts=((1, 2), (3, 4)),
-        terminal_prefix_counts=(3, 4),
+        turn_prefix_counts=(3, 6),
+        allowed_turn_prefix_counts=((1, 2, 3), (3, 4, 5, 6)),
+        terminal_prefix_counts=(3, 4, 5, 6),
     )
     selected_names = [
         "diag.query",

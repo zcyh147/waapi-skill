@@ -23,6 +23,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_optional_query_repair_protocol,
     build_transaction_protocol,
     build_workflow_operations_discovery_protocol,
+    build_workflow_query_schema_discovery_protocol,
     query_object_step,
 )
 from tests.semantic.support.codex_gateway_broker import (
@@ -306,6 +307,56 @@ def test_workflow_operations_terminal_accepts_any_reviewed_discovery_subset() ->
         step.name
         for step in protocol.steps
         if step.name != "routing.operations"
+    )
+    evidence = SimpleNamespace(
+        expected_step_names=selected,
+        consumed_step_names=selected,
+        records=tuple(
+            SimpleNamespace(step_name=name, succeeded=True) for name in selected
+        ),
+        rejected_records=(),
+        complete=True,
+        passed=True,
+        terminal_state="COMPLETE",
+        commutative_read_only_step_groups=(),
+        commutative_composer_setup_step_groups=(),
+    )
+
+    assert task_runner._broker_terminal_protocol_passed(protocol, evidence)
+
+
+def test_workflow_terminal_accepts_reviewed_query_and_revalidation_subset() -> None:
+    base = V3GatewayProtocol(
+        steps=(
+            ExpectedGatewayStep("diag.query", "query-object"),
+            ExpectedGatewayStep(
+                "revalidation.sound",
+                "query-object",
+                ("--exact-id", "sound"),
+            ),
+            ExpectedGatewayStep(
+                "tx01.operation-schema",
+                "operation-schema",
+                ("object.setReference",),
+            ),
+            ExpectedGatewayStep("tx01.verify", "verify"),
+        ),
+        turn_prefix_counts=(1, 3, 4),
+        allowed_turn_prefix_counts=((1,), (2, 3), (3, 4)),
+        terminal_prefix_counts=(3, 4),
+    )
+    protocol = build_workflow_operations_discovery_protocol(
+        build_workflow_query_schema_discovery_protocol(base)
+    )
+    selected = tuple(
+        step.name
+        for step in protocol.steps
+        if step.name
+        not in {
+            *protocol.optional_workflow_operations_discovery_step_names,
+            *protocol.optional_workflow_query_schema_step_names,
+            *protocol.optional_workflow_revalidation_step_names,
+        }
     )
     evidence = SimpleNamespace(
         expected_step_names=selected,

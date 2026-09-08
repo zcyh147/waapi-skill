@@ -735,6 +735,7 @@ class _FootstepsSession:
         self.before: FootstepsSnapshot | None = None
         self.protocol: V3GatewayProtocol | None = None
         self.observed_steps: list[str] = []
+        self._observed_protocol_cursor = 0
         self._cleaned = False
         self._finalized = False
         self._checkpoint_verified = False
@@ -873,8 +874,37 @@ class _FootstepsSession:
                 "Footsteps observer received an invalid step or payload"
             )
         expected_names = tuple(row.name for row in protocol.steps)
-        position = len(self.observed_steps)
-        if position >= len(expected_names) or step.name != expected_names[position]:
+        position = self._observed_protocol_cursor
+        if position < len(expected_names) and step.name == expected_names[position]:
+            next_protocol_cursor = position + 1
+        elif step.name == "tx01.check":
+            check_index = expected_names.index("tx01.check")
+            skipped = expected_names[position:check_index]
+            expected_batch_count = sum(
+                name.startswith("tx01.declare-batch")
+                for name in expected_names[:check_index]
+            )
+            observed_batch_count = sum(
+                name.startswith("tx01.declare-batch")
+                for name in self.observed_steps
+            )
+            if (
+                not skipped
+                or any(
+                    not name.startswith("tx01.declare-batch-")
+                    for name in skipped
+                )
+                or not (
+                    (expected_batch_count + 2) // 3
+                    <= observed_batch_count
+                    <= expected_batch_count
+                )
+            ):
+                raise FootstepsIntegrationRuntimeError(
+                    "Footsteps gateway steps were duplicated or observed out of order"
+                )
+            next_protocol_cursor = check_index + 1
+        else:
             raise FootstepsIntegrationRuntimeError(
                 "Footsteps gateway steps were duplicated or observed out of order"
             )
@@ -902,6 +932,7 @@ class _FootstepsSession:
             raise FootstepsIntegrationRuntimeError(
                 f"{step.name} did not return a successful gateway payload"
             )
+        self._observed_protocol_cursor = next_protocol_cursor
         self.observed_steps.append(step.name)
         if terminal_indeterminate:
             return
@@ -1868,7 +1899,7 @@ class _FootstepsSession:
             "two_transaction_sequence_exact",
             final
             and self._checkpoint_verified
-            and tuple(self.observed_steps) == expected_steps
+            and self._observed_protocol_cursor == len(expected_steps)
             and self.observed_steps.count("tx01.execute") == 1
             and self.observed_steps.count("tx02.execute") == 1
             and self.observed_steps.count("tx01.verify") == 1

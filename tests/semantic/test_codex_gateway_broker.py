@@ -3306,6 +3306,76 @@ def test_broker_accepts_selected_workflow_operations_discovery_steps(
 @pytest.mark.parametrize(
     "commands",
     (
+        (
+            ("query-schema",),
+            ("query-object", "--exact-id", "one"),
+            ("query-object", "--exact-id", "sound"),
+            ("operation-schema", "object.setReference"),
+        ),
+        (
+            ("query-object", "--exact-id", "one"),
+            ("operation-schema", "object.setReference"),
+        ),
+    ),
+    ids=("schema-first", "direct-query"),
+)
+def test_broker_accepts_reviewed_optional_workflow_reads(
+    tmp_path: Path,
+    commands: tuple[tuple[str, ...], ...],
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    steps = (
+        ExpectedGatewayStep("routing.operations", "operations"),
+        ExpectedGatewayStep("routing.query-schema", "query-schema"),
+        ExpectedGatewayStep("diag.query", "query-object", ("--exact-id", "one")),
+        ExpectedGatewayStep(
+            "revalidation.sound",
+            "query-object",
+            ("--exact-id", "sound"),
+        ),
+        ExpectedGatewayStep(
+            "routing.operations.tx01.operation-schema",
+            "operations",
+        ),
+        ExpectedGatewayStep(
+            "tx01.operation-schema",
+            "operation-schema",
+            ("object.setReference",),
+        ),
+    )
+    observed: list[list[str]] = []
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=steps,
+        optional_expected_operations_discovery_step_names=(
+            "routing.operations",
+            "routing.operations.tx01.operation-schema",
+        ),
+        optional_expected_workflow_read_step_names=(
+            "routing.query-schema",
+            "revalidation.sound",
+        ),
+        transport="tcp",
+    ) as broker:
+        for arguments in commands:
+            result = run_model_command(broker, list(arguments))
+            assert result.returncode == 0, result.stderr
+            observed.append(
+                ["python", str(broker.invocation_runner_path), "gateway.py", *arguments]
+            )
+        evidence = broker.evidence()
+        reconciliation = broker.reconcile(observed)
+
+    assert evidence.passed
+    assert reconciliation.passed
+    assert ("routing.query-schema" in evidence.expected_step_names) is (
+        commands[0] == ("query-schema",)
+    )
+
+
+@pytest.mark.parametrize(
+    "commands",
+    (
         (("operations",), ("operations",)),
         (("operation-schema", "waapi.undoGroup"), ("operations",)),
         (("operation-schema", "waapi.notUndoGroup"),),
@@ -5333,6 +5403,108 @@ def test_audio_import_broker_accepts_equivalent_one_to_three_row_rebatching(
         "tx01.declare-batch-02",
         "tx01.declare-batch-03",
     )
+
+
+def test_audio_import_rebatch_accepts_task_local_parent_and_child_ids(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    draft_id = "od1-" + "1" * 32
+    authority = "da1-" + "2" * 40
+    parent_handle = "boh1-" + "3" * 32
+    media_directory = "/tmp/incoming"
+    row_specs = (
+        ("row-001", parent_handle, "Snow", "random-container", None),
+        ("row-002", "row-001", "Snow_Step_01", "sound-sfx", "snow_01.wav"),
+        ("row-003", "row-001", "Snow_Step_02", "sound-sfx", "snow_02.wav"),
+        ("row-004", "row-001", "Snow_Step_03", "sound-sfx", "snow_03.wav"),
+        ("row-005", "row-001", "Snow_Step_04", "sound-sfx", "snow_04.wav"),
+    )
+    steps: list[ExpectedGatewayStep] = [
+        ExpectedGatewayStep("tx01.draft-start", "draft-start", ("audio.import",))
+    ]
+    previous = "tx01.draft-start"
+    for index, (row_id, parent, name, kind, media) in enumerate(row_specs, start=1):
+        step_name = (
+            "tx01.declare-batch"
+            if index == 1
+            else f"tx01.declare-batch-{index:02d}"
+        )
+        groups: list[str | ResponseBinding] = []
+        if media is not None:
+            groups.extend(("--media-directory", media_directory))
+        groups.extend(("--row-order", row_id))
+        groups.extend(("--new-row", row_id, parent, name, kind))
+        if index == 1:
+            groups.extend(("--switch-value", row_id, "Snow"))
+        if media is not None:
+            groups.extend(("--media-file", row_id, media))
+        steps.append(
+            ExpectedGatewayStep(
+                step_name,
+                "draft-declare-import-batch",
+                (
+                    ResponseBinding("tx01.draft-start", "/draft/draft_id"),
+                    "--task-authority",
+                    ResponseBinding("tx01.draft-start", "/task_authority"),
+                    "--expected-revision",
+                    ResponseBinding(previous, "/draft/revision"),
+                    *groups,
+                ),
+            )
+        )
+        previous = step_name
+
+    first_three = (
+        "draft-declare-import-batch",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "1",
+        "--media-directory",
+        media_directory,
+        "--new-row",
+        "snow",
+        parent_handle,
+        "Snow",
+        "random-container",
+        "--switch-value",
+        "snow",
+        "Snow",
+        "--new-row",
+        "snow_step_01",
+        "snow",
+        "Snow_Step_01",
+        "sound-sfx",
+        "--media-file",
+        "snow_step_01",
+        "snow_01.wav",
+        "--new-row",
+        "snow_step_02",
+        "snow",
+        "Snow_Step_02",
+        "sound-sfx",
+        "--media-file",
+        "snow_step_02",
+        "snow_02.wav",
+        "--row-order",
+        "snow",
+        "--row-order",
+        "snow_step_01",
+        "--row-order",
+        "snow_step_02",
+    )
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=tuple(steps),
+        expected_wwise_version="2022.1",
+        transport="tcp",
+    ) as broker:
+        assert run_model_command(broker, ["draft-start", "audio.import"]).returncode == 0
+        result = run_model_command(broker, list(first_three))
+
+    assert result.returncode == 0, result.stderr
 
 
 def test_audio_import_business_protocol_uses_stable_fields_and_strict_revision_order() -> None:

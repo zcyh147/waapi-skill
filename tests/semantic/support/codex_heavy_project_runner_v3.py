@@ -69,6 +69,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_optional_topic_schema_protocol,
     build_operations_discovery_protocol,
     build_workflow_operations_discovery_protocol,
+    build_workflow_query_schema_discovery_protocol,
     build_transaction_protocol,
     call_step,
     media_pool_business_call_step,
@@ -1527,6 +1528,7 @@ class _CaseObservers:
         self.payloads[step.name] = payload
         if (
             not step.name.startswith("routing.operations")
+            and step.name != "routing.query-schema"
             and self.prepared.observe_payload is not None
         ):
             self.prepared.observe_payload(step, payload)
@@ -4459,13 +4461,18 @@ def integration_operations_protocol_and_plan(
     protocol: V3GatewayProtocol,
     sections: WorkflowBusinessPlanSections,
 ) -> tuple[V3GatewayProtocol, WorkflowBusinessPlanSections]:
-    """Bind one required catalog read into a complete integration plan."""
+    """Bind reviewed optional discovery reads into a complete integration plan."""
 
     if not isinstance(sections, WorkflowBusinessPlanSections):
         raise HeavyProjectRunnerError(
             "integration operations discovery requires one workflow plan"
         )
-    wrapped = build_workflow_operations_discovery_protocol(protocol)
+    query_ready = (
+        build_workflow_query_schema_discovery_protocol(protocol)
+        if unit.workflow_id in _INTEGRATION_QUERY_FIRST_WORKFLOW_IDS
+        else protocol
+    )
+    wrapped = build_workflow_operations_discovery_protocol(query_ready)
     static = sections.static_expectation
     live = sections.live_binding
     transactions = tuple(dict(row) for row in static["transactions"])
@@ -4477,7 +4484,10 @@ def integration_operations_protocol_and_plan(
     workflow_by_name = {row["name"]: row for row in workflow_steps}
     rebuilt_workflow_steps: list[dict[str, Any]] = []
     for step in wrapped.steps:
-        if step.name in wrapped.optional_workflow_operations_discovery_step_names:
+        if step.name in {
+            *wrapped.optional_workflow_operations_discovery_step_names,
+            *wrapped.optional_workflow_query_schema_step_names,
+        }:
             rebuilt_workflow_steps.append(
                 {
                     "name": step.name,

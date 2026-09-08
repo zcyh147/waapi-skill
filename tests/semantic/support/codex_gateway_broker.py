@@ -8937,6 +8937,7 @@ class CodexGatewayBroker:
         ) = None,
         optional_expected_initial_operations_discovery: bool = False,
         optional_expected_operations_discovery_step_names: Sequence[str] = (),
+        optional_expected_workflow_read_step_names: Sequence[str] = (),
         optional_initial_operations_discovery_operation: str | None = None,
         optional_initial_query_object_arguments: Sequence[str] | None = None,
         optional_initial_query_schema: bool = False,
@@ -8984,6 +8985,12 @@ class CodexGatewayBroker:
         )
         self._optional_expected_operations_discovery_step_names = frozenset(
             self.optional_expected_operations_discovery_step_names
+        )
+        self.optional_expected_workflow_read_step_names = tuple(
+            optional_expected_workflow_read_step_names
+        )
+        self._optional_expected_workflow_read_step_names = frozenset(
+            self.optional_expected_workflow_read_step_names
         )
         if optional_initial_operations_discovery_operation is not None and (
             not isinstance(optional_initial_operations_discovery_operation, str)
@@ -9139,6 +9146,23 @@ class CodexGatewayBroker:
             raise ValueError(
                 "optional workflow operations discovery names must identify "
                 "unique empty operations steps"
+            )
+        if (
+            len(self.optional_expected_workflow_read_step_names)
+            != len(self._optional_expected_workflow_read_step_names)
+            or any(
+                name not in names
+                for name in self._optional_expected_workflow_read_step_names
+            )
+            or any(
+                step.subcommand not in {"query-schema", "query-object"}
+                for step in self.expected_steps
+                if step.name in self._optional_expected_workflow_read_step_names
+            )
+        ):
+            raise ValueError(
+                "optional workflow read names must identify unique query-schema "
+                "or query-object steps"
             )
         if self.optional_expected_initial_operations_discovery:
             if (
@@ -10202,11 +10226,19 @@ class CodexGatewayBroker:
                     authenticated=True,
                 )
             try:
+                optional_workflow_discovery_names = {
+                    *self._optional_expected_operations_discovery_step_names,
+                    *self._optional_expected_workflow_read_step_names,
+                }
                 while (
                     self._next_step < len(self._execution_steps)
                     and self._execution_steps[self._next_step].name
-                    in self._optional_expected_operations_discovery_step_names
-                    and resolved.gateway_arguments != ("operations",)
+                    in optional_workflow_discovery_names
+                    and resolved.gateway_arguments
+                    != (
+                        self._execution_steps[self._next_step].subcommand,
+                        *self._execution_steps[self._next_step].arguments,
+                    )
                 ):
                     self._execution_steps.pop(self._next_step)
                     self._selected_expected_steps.pop(self._next_step)

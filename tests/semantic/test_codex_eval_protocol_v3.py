@@ -22,6 +22,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_object_lifecycle_business_transaction_steps,
     build_object_graph_business_transaction_steps,
     build_workflow_operations_discovery_protocol,
+    build_workflow_query_schema_discovery_protocol,
     build_object_metadata_business_transaction_steps,
     build_switch_assignment_business_transaction_steps,
     build_object_set_composer_transaction_steps,
@@ -877,6 +878,36 @@ def test_operations_discovery_is_optional_before_query_first_workflow() -> None:
         "routing.operations.tx02.operation-schema",
     )
     assert protocol.optional_initial_operations_discovery is True
+
+
+def test_query_schema_discovery_is_optional_before_multi_turn_workflow() -> None:
+    base = V3GatewayProtocol(
+        steps=(
+            ExpectedGatewayStep("diag.query", "query-object"),
+            ExpectedGatewayStep(
+                "tx01.operation-schema",
+                "operation-schema",
+                ("object.setReference",),
+            ),
+            ExpectedGatewayStep("tx01.verify", "verify"),
+        ),
+        turn_prefix_counts=(1, 2, 3),
+    )
+
+    protocol = build_workflow_query_schema_discovery_protocol(base)
+
+    assert [step.subcommand for step in protocol.steps] == [
+        "query-schema",
+        "query-object",
+        "operation-schema",
+        "verify",
+    ]
+    assert protocol.turn_prefix_counts == (2, 3, 4)
+    assert protocol.allowed_turn_prefix_counts == ((1, 2), (2, 3), (3, 4))
+    assert protocol.accepted_terminal_prefixes == (3, 4)
+    assert protocol.optional_workflow_query_schema_step_names == (
+        "routing.query-schema",
+    )
 
 
 def test_workflow_operations_choices_do_not_split_commutative_read_group() -> None:

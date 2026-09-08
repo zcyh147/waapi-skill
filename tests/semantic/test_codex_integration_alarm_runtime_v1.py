@@ -437,13 +437,14 @@ def test_prepare_builds_exact_alarm_chain_and_frozen_runner_seam(
     assert "backend" not in {field.name for field in dataclasses.fields(prepared)}
 
 
-def test_protocol_exposes_six_exact_chain_reads_then_one_standard_transaction(
+def test_protocol_exposes_six_chain_reads_optional_revalidation_and_transaction(
     tmp_path: Path,
 ) -> None:
     prepared, _fake = _prepared(tmp_path)
     protocol = prepared.protocol
 
-    assert protocol.turn_prefix_counts == (6, 14, 18)
+    assert protocol.turn_prefix_counts == (6, 15, 19)
+    assert protocol.allowed_turn_prefix_counts == ((6,), (14, 15), (18, 19))
     assert tuple(step.name for step in protocol.steps[:6]) == (
         "diag.event",
         "diag.action",
@@ -461,6 +462,15 @@ def test_protocol_exposes_six_exact_chain_reads_then_one_standard_transaction(
     assert all(
         "--take" not in step.arguments
         for step in protocol.steps[2:6]
+    )
+    assert protocol.steps[6].name == "revalidation.sound"
+    assert protocol.steps[6].subcommand == "query-object"
+    assert protocol.steps[6].arguments == (
+        "--exact-id",
+        ResponseBinding("diag.sound", "/objects/0/id"),
+    )
+    assert protocol.optional_workflow_revalidation_step_names == (
+        "revalidation.sound",
     )
     assert protocol.steps[1].arguments[1] == ResponseBindingOrExactArgument(
         binding=ResponseBinding("diag.event", "/objects/0/id"),
@@ -501,7 +511,7 @@ def test_protocol_exposes_six_exact_chain_reads_then_one_standard_transaction(
         "path",
         "@Volume",
     )
-    assert tuple(step.subcommand for step in protocol.steps[6:]) == (
+    assert tuple(step.subcommand for step in protocol.steps[7:]) == (
         "operation-schema",
         "draft-start",
         "draft-bind-object",
@@ -515,17 +525,17 @@ def test_protocol_exposes_six_exact_chain_reads_then_one_standard_transaction(
         "execute",
         "verify",
     )
-    discovery = protocol.steps[9]
+    discovery = protocol.steps[10]
     sound_id = prepared.before_snapshot.by_key()["sound"].object_id
-    source_binding = protocol.steps[8]
+    source_binding = protocol.steps[9]
     assert source_binding.arguments[-2:] == ("--object-id", sound_id)
     assert "--meaning" in discovery.arguments
     assert discovery.arguments[discovery.arguments.index("--meaning") + 1] == "output bus"
     assert "--token" not in discovery.arguments
     target_id = prepared.before_snapshot.by_key()["target_bus"].object_id
-    target_binding = protocol.steps[10]
+    target_binding = protocol.steps[11]
     assert target_binding.arguments[-2:] == ("--object-id", target_id)
-    preview = protocol.steps[13]
+    preview = protocol.steps[14]
     assert preview.expected_operation_request == prepared.operation_request
     assert [row.api for row in prepared.expected_dispatches] == [
         "ak.wwise.core.object.setReference",
@@ -692,6 +702,25 @@ def test_diagnostic_payload_observer_rejects_wrong_chain_identity(
                 "objects": [wrong_sound],
             },
         )
+
+
+def test_optional_sound_revalidation_accepts_only_the_diagnosed_identity(
+    tmp_path: Path,
+) -> None:
+    prepared, _fake = _prepared(tmp_path)
+    sound = _payload_row(prepared.before_snapshot.by_key()["sound"])
+    payload = {
+        "ok": True,
+        "command": "query-object",
+        "count": 1,
+        "objects": [sound],
+    }
+
+    prepared.observe_payload(prepared.protocol.steps[6], payload)
+
+    changed = {**payload, "objects": [{**sound, "path": sound["path"] + "_Wrong"}]}
+    with pytest.raises(AlarmIntegrationRuntimeError, match="revalidation differs"):
+        prepared.observe_payload(prepared.protocol.steps[6], changed)
 
 
 def test_diagnosis_and_preview_turns_prove_zero_project_delta(

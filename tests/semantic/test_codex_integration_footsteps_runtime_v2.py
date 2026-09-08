@@ -953,6 +953,63 @@ def test_weak_import_verification_continues_to_external_business_oracle(
     case.prepared.cleanup().assert_passed()
 
 
+def test_observer_accepts_broker_proven_three_row_import_rebatching(
+    tmp_path: Path,
+) -> None:
+    case = _case(tmp_path)
+    skipped = {
+        "tx01.declare-batch-03",
+        "tx01.declare-batch-04",
+        "tx01.declare-batch-05",
+    }
+    for step in case.prepared.protocol.steps:
+        if step.name in skipped:
+            continue
+        if step.name == "tx01.execute":
+            case.fake.apply_import(case.prepared.operation_requests[0])
+        elif step.name == "tx02.execute":
+            case.fake.apply_remove(case.prepared.operation_requests[1])
+        case.prepared.observe_payload(
+            step,
+            {"ok": True, "command": step.subcommand},
+        )
+
+    verification = case.prepared.verify_final()
+
+    assert verification.passed, verification.failures
+    assert verification.assertions["two_transaction_sequence_exact"] is True
+    case.prepared.cleanup().assert_passed()
+
+
+def test_observer_rejects_impossible_single_chunk_for_five_import_rows(
+    tmp_path: Path,
+) -> None:
+    case = _case(tmp_path)
+    steps = case.prepared.protocol.steps
+    first_batch_index = next(
+        index
+        for index, step in enumerate(steps)
+        if step.name == "tx01.declare-batch"
+    )
+    check = next(step for step in steps if step.name == "tx01.check")
+    for step in steps[: first_batch_index + 1]:
+        case.prepared.observe_payload(
+            step,
+            {"ok": True, "command": step.subcommand},
+        )
+
+    with pytest.raises(
+        FootstepsIntegrationRuntimeError,
+        match="duplicated or observed out of order",
+    ):
+        case.prepared.observe_payload(
+            check,
+            {"ok": True, "command": check.subcommand},
+        )
+
+    case.prepared.cleanup().assert_passed()
+
+
 @pytest.mark.parametrize(
     ("field", "bad_value"),
     (

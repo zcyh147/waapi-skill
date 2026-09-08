@@ -358,6 +358,10 @@ def run_v3_codex_task(
         optional_expected_operations_discovery_step_names=(
             protocol.optional_workflow_operations_discovery_step_names
         ),
+        optional_expected_workflow_read_step_names=(
+            protocol.optional_workflow_query_schema_step_names
+            + protocol.optional_workflow_revalidation_step_names
+        ),
         expected_wwise_version=version,
         project_modification_policy=project_modification_policy,
         runner_environment=runner_environment,
@@ -719,9 +723,27 @@ def _broker_terminal_protocol_passed(
         "optional_workflow_operations_discovery_step_names",
         (),
     )
-    if optional_workflow_operations:
+    optional_workflow_query_schema = getattr(
+        protocol,
+        "optional_workflow_query_schema_step_names",
+        (),
+    )
+    optional_workflow_revalidation = getattr(
+        protocol,
+        "optional_workflow_revalidation_step_names",
+        (),
+    )
+    if (
+        optional_workflow_operations
+        or optional_workflow_query_schema
+        or optional_workflow_revalidation
+    ):
         protocol_names = tuple(step.name for step in protocol.steps)
-        optional_names = set(optional_workflow_operations)
+        optional_names = {
+            *optional_workflow_operations,
+            *optional_workflow_query_schema,
+            *optional_workflow_revalidation,
+        }
         selected_names = evidence.expected_step_names
         if (
             len(selected_names) != len(set(selected_names))
