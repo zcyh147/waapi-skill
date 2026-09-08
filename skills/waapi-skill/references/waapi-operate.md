@@ -28,6 +28,8 @@ Do not call `operations`, `operation-schema`, or `request-schema` first. Without
 
 For a prior-query subset, finish the selected-subset identity gate first: exact-ID read back every selected GUID and match name/type/path. These bounded read-only checks precede the transaction contract and never replace schema/metadata.
 
+A prior exact diagnostic identity is not a selected subset: reuse its GUID; do not query it again. Gateway binding revalidates it.
+
 A new natural-language change starts with one compact `operations` lookup; only its returned route selects the first transaction contract. An exact user operation/URI skips it.
 
 | Request | First transaction-contract sequence |
@@ -48,7 +50,7 @@ Table imports start `operation-schema audio.importTabDelimited`; dynamic columns
 
 `construction_state.complete:false` and compact action receipts are complete JSON. Follow `next_command_decision`; only an exact `business_value_pointer` authorizes it. A business Draft instead follows its returned required phase and completion candidate. Copy handles into the same named role. Corrections reuse the draft; never `draft-apply --action check`.
 
-Public mutation identities are closed to `id`, `path`, `exact-type-name`, `direct-child`, and `scoped-name`. A complete caller path stays intact. After an exact relationship/path read returns canonical `id`/`name`/`type`/`path`, reuse its GUID as an `id` selector for a later object/target; never switch to path/name or retype its Wwise path. Gateway revalidates it. A bound object's resolved `business_kind` is the version-stable type comparison; do not reject it because the raw reflected `type` uses a version-specific Wwise class name. If the user stated a business type and `business_kind_resolution.status` is `ambiguous`, stop with its candidates instead of guessing from the reflected class. If the user stated no type and the returned name/path match, continue with the bound handle exactly as the Gateway result says. Zero/multiple/truncated results do not identify a target. Raw WAQL never becomes mutation identity.
+Public mutation identities are closed to `id`, `path`, `exact-type-name`, `direct-child`, and `scoped-name`. A complete caller path stays intact. After an exact relationship/path read returns canonical `id`/`name`/`type`/`path`, reuse its GUID as an `id` selector for a later object/target; never switch to path/name or retype its Wwise path. Gateway revalidates it. Compare a bound object by version-stable `business_kind`, not raw version-specific `type`. A stated ambiguous business type stops with candidates; with no stated type, matching live name/path continues with the returned handle. Zero/multiple/truncated results do not identify a target. Raw WAQL never becomes mutation identity.
 
 ## Choose by business outcome
 
@@ -113,7 +115,7 @@ Omit every optional business field the user did not explicitly supply; defaults,
 - Bind the exact existing parent/target once. For import rows, copy every complete path segment literally, including `<Type>Name`; never remove or translate its angle-bracket type prefix. New objects declare parent handle, name, and semantic kind; existing objects declare their handle.
 - For new hierarchy, declare each requested container once as a structure-only descendant; children may use its planned handle.
 - Use `originals_subfolder` only when the user explicitly supplies it; never infer it.
-- `audio_file`: supplied absolute path only; no relative/traversal or relocation.
+- `media_directory` and `audio_file` are opaque caller paths: copy them intact; never derive either from campaign/workspace cwd. Absolute only; no traversal or relocation.
 - For an import Event, bind its exact parent, then provide Event name and business Action in the same Preview.
 - Wwise Pitch is cents: `1 semitone = 100 cents`.
 

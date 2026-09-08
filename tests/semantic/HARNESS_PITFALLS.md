@@ -2916,6 +2916,22 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   executable Preview is visible. This does not combine transactions or infer a
   new item; it makes the existing ordered-work completion criterion explicit.
 
+### Fresh Windows shell calls inherit cwd instead of reconstructing it
+
+- Trigger: a targeted native-Windows integration root completed several valid
+  Gateway commands, then two later Agent shell calls each failed twice before
+  PowerShell with `CreateProcessAsUserW failed: 267`. The sealed stderr showed
+  that the attempted cwd had prepended an older campaign root to the current
+  absolute `skills\waapi-skill-workspace\...\agent-workspace` path. Both real
+  task workspaces were valid at task creation; the duplicated path never
+  existed, so neither command reached the Broker, Gateway, or Wwise.
+- Prevention: the Fresh bootstrap says `Omit workdir/cwd`.
+  Every Gateway command already uses the task-local Skill locator, so an Agent
+  must inherit the campaign-owned process cwd rather than copying, shortening,
+  or joining an absolute scenario path into a shell-tool field. Retain the one
+  identical 267 replay boundary; a second failure still freezes the root and
+  is never repaired or resumed in place.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:

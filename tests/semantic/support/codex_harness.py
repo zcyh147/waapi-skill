@@ -51,7 +51,7 @@ SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
     "Read now; no pre-read reply/questions. "
     "copy source_field/fixed_argv_prefix_copy verbatim; keep quotes/runner; never reconstruct; "
     "opaque IDs/handles/tokens/digests. draft-apply: 1 argv/fact; batch=6; "
-    "final=remaining; all facts. Business rows obey returned max. "
+    "final=remaining; all facts. Rows obey returned max. "
     "Composer: one action/call. "
     "allowed_action_argv owns TYPE; not Real64/int16. unapplied "
     "ancestor deferred_fact; execute_after=all_pending_ancestor_facts_in_response_"
@@ -76,7 +76,7 @@ SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
     "Draft same turn; no progress reply. "
     "draft-check!=Preview. Preview-now: finish schema/metadata/Preview now; "
     "only execution waits for confirmation. next_command unless "
-    "requires_later_user_message. Keep cwd."
+    "requires_later_user_message. Omit workdir/cwd."
 )
 
 

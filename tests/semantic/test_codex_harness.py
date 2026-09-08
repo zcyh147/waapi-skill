@@ -2165,13 +2165,13 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "keep quotes/runner" in instructions
     assert "fixed_argv_prefix" in instructions
     assert "never reconstruct" in instructions
-    assert "Keep cwd" in instructions
+    assert "Omit workdir/cwd" in instructions
     assert "Read now; no pre-read reply/questions" in instructions
     assert "draft-apply: 1 argv/fact" in instructions
     assert "all facts" in instructions
     assert "batch=6" in instructions
     assert "final=remaining" in instructions
-    assert "Business rows obey returned max" in instructions
+    assert "Rows obey returned max" in instructions
     assert "Composer: one action/call" in instructions
     assert "allowed_action_argv owns TYPE" in instructions
     assert "not Real64/int16" in instructions

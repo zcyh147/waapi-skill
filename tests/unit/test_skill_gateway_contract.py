@@ -304,6 +304,17 @@ def test_media_gate_routes_pure_sound_hierarchies_to_object_create() -> None:
     assert "is a pure object hierarchy and selects `object.create`" in operate
 
 
+def test_operate_lane_reuses_exact_diagnostics_and_preserves_media_paths() -> None:
+    operate = (SKILL_ROOT / "references" / "waapi-operate.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "prior exact diagnostic identity is not a selected subset" in operate
+    assert "reuse its GUID; do not query it again" in operate
+    assert "`media_directory` and `audio_file` are opaque caller paths" in operate
+    assert "never derive either from campaign/workspace cwd" in operate
+
+
 def test_normal_change_prose_stays_business_facing() -> None:
     skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
     operate = (SKILL_ROOT / "references" / "waapi-operate.md").read_text(

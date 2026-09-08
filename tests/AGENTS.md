@@ -371,6 +371,10 @@ classify the root.
 The unelevated Codex runner may transiently report
 `CreateProcessAsUserW failed: 267` for an invalid working directory before
 PowerShell starts, even after earlier commands in the same task succeeded. The
+formal semantic bootstrap requires every model shell call to omit an explicit
+`workdir`/`cwd` and inherit the exact task workspace; a model-reconstructed
+Windows campaign path can be drive-qualified yet still duplicate an older
+campaign root before process creation. The
 Skill permits exactly one identical replay of that complete shell command, and
 the harness credits it only through `recoverable_preprocess_attempt_indexes`;
 this is process-launch recovery inside one task, not a Gateway or campaign-root
