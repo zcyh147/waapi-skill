@@ -888,8 +888,8 @@ class _WeaponsSession:
                                 {
                                     "name": "OutputBus",
                                     "target": {
-                                        "kind": "path",
-                                        "value": visible["weapons_bus_path"],
+                                        "kind": "id",
+                                        "value": objects["weapons_bus"].object_id,
                                     },
                                 }
                             ],
@@ -911,8 +911,8 @@ class _WeaponsSession:
                                 {
                                     "name": "OutputBus",
                                     "target": {
-                                        "kind": "path",
-                                        "value": visible["weapons_bus_path"],
+                                        "kind": "id",
+                                        "value": objects["weapons_bus"].object_id,
                                     },
                                 }
                             ],

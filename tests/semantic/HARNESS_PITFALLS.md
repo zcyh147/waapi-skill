@@ -2706,6 +2706,35 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   Any successful Gateway command, changed retry, third attempt, non-267 error,
   or model-side write remains ordinary semantic evidence and is not erased.
 
+### A sealed query ceiling is required capacity, not exact user intent
+
+- Trigger: macOS Weapons on candidate `87d9f4a` issued the exact reviewed
+  scoped business query with the same predicate and three output fields, but
+  selected the public Gateway ceiling `--max-results 1000` instead of the
+  fixture's minimum required capacity `6`. The Broker rejected it before the
+  live runtime could validate the returned objects.
+- Prevention: compare business-query option groups by meaning and accept a
+  supplied positive ceiling from the sealed required capacity through the
+  public Gateway maximum of 1000. A smaller ceiling can truncate required
+  candidates and remains a semantic mismatch. The live workflow observer must
+  still require the exact reviewed object set and reject every extra row, so a
+  larger bound never weakens scope or grants false PASS credit.
+
+### A verified relationship GUID outranks hidden binding qualifiers
+
+- Trigger: native-Windows Weapons completed the scoped audit and both exact-ID
+  Bus readbacks, then correctly reused the returned Weapons Bus GUID while
+  building the repair Draft. The old fixture still required undisclosed
+  `--role reference --exact-type-name Bus` qualifiers, so the Broker rejected
+  the exact object before Preview even though the public continuation exposes
+  a generic exact-ID binding for `output_bus`.
+- Prevention: once a reviewed relationship hop has been exact-ID read back,
+  build the expected business request with that canonical GUID. Keep the
+  original path as the user-visible rule and verify the queried GUID's full
+  path/type independently. A role-free bound-object handle is intentionally
+  valid for generic object-graph reference fields; reserve Gateway-owned role
+  prefixes for adapters whose public contract requires named roles.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:

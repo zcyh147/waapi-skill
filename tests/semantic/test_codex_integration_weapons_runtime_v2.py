@@ -936,7 +936,7 @@ def test_weapons_business_draft_keeps_canonical_volume_field(
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])
-def test_business_draft_binds_one_exact_reviewed_output_bus(
+def test_business_draft_reuses_the_exact_queried_output_bus_id(
     tmp_path: Path,
     version: str,
 ) -> None:
@@ -948,17 +948,10 @@ def test_business_draft_binds_one_exact_reviewed_output_bus(
     ]
     assert len(reference_bindings) == 1
     binding = reference_bindings[0]
-    expected_segments = tuple(
-        segment
-        for segment in prepared.visible_values["weapons_bus_path"].split("\\")
-        if segment
+    assert binding.arguments[5:] == (
+        "--object-id",
+        prepared.before_snapshot.objects_by_role()["weapons_bus"].object_id,
     )
-    actual_segments = tuple(
-        binding.arguments[index + 1]
-        for index, value in enumerate(binding.arguments[:-1])
-        if value == "--object-path-segment"
-    )
-    assert actual_segments == expected_segments
 
     declarations = [
         step

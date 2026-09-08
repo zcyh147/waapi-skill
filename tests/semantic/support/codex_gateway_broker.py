@@ -4668,6 +4668,22 @@ def _normalize_business_query_arguments(
 
     supplied = parse(tuple(str(value) for value in supplied_arguments))
     expected = parse(tuple(str(value) for value in expected_arguments))
+    supplied_ceiling = supplied["single"].get("--max-results")
+    expected_ceiling = expected["single"].get("--max-results")
+    if supplied_ceiling is not None and expected_ceiling is not None:
+        try:
+            supplied_limit = int(supplied_ceiling[0])
+            expected_limit = int(expected_ceiling[0])
+        except (TypeError, ValueError, IndexError):
+            pass
+        else:
+            # The sealed value is the minimum row capacity needed by the
+            # scenario, not a user-visible answer. A larger Gateway-bounded
+            # ceiling cannot truncate required rows; the live observer still
+            # rejects extras outside the reviewed scope. Keep a smaller value
+            # semantic because it could hide a required candidate.
+            if 1 <= expected_limit <= supplied_limit <= 1000:
+                supplied["single"]["--max-results"] = expected_ceiling
     numeric_predicates = {"volume-db-at-most", "volume-db-at-least"}
     supplied_predicates = []
     for name, value in supplied["predicates"]:

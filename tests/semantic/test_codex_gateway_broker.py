@@ -13432,6 +13432,82 @@ def test_broker_compares_business_query_meaning_not_option_group_order(
     assert broker.evidence().passed
 
 
+def test_broker_accepts_a_larger_bounded_business_query_result_ceiling(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    expected = (
+        "--path-segment",
+        "Actor-Mixer Hierarchy",
+        "--relationship",
+        "descendants",
+        "--predicate",
+        "kind-is",
+        "all-sounds",
+        "--max-results",
+        "6",
+        "--include",
+        "notes",
+        "--include",
+        "volume-db",
+        "--include",
+        "output-bus",
+    )
+    supplied = [
+        "query-object",
+        "--path-segment",
+        "Actor-Mixer Hierarchy",
+        "--relationship",
+        "descendants",
+        "--predicate",
+        "kind-is",
+        "all-sounds",
+        "--include",
+        "output-bus",
+        "--include",
+        "volume-db",
+        "--include",
+        "notes",
+        "--max-results",
+        "1000",
+    ]
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(ExpectedGatewayStep("query", "query-object", expected),),
+        transport="tcp",
+    ) as broker:
+        result = run_model_command(broker, supplied)
+
+    assert result.returncode == 0
+    assert broker.evidence().passed
+
+
+def test_broker_rejects_a_business_query_ceiling_below_the_required_rows(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    expected = (
+        "--kind",
+        "all-sounds",
+        "--max-results",
+        "6",
+    )
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(ExpectedGatewayStep("query", "query-object", expected),),
+        transport="tcp",
+    ) as broker:
+        result = run_model_command(
+            broker,
+            ["query-object", "--kind", "all-sounds", "--max-results", "5"],
+        )
+
+    assert result.returncode != 0
+    assert broker.evidence().passed is False
+
+
 def test_broker_rejects_native_leading_separator_in_business_query(
     tmp_path: Path,
 ) -> None:
