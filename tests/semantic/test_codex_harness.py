@@ -2199,7 +2199,8 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "selector kind/value separate" in instructions
     assert "opaque IDs/handles/tokens/digests" in instructions
     assert "Import type=Sound SFX" in instructions
-    assert "query type=Sound" in instructions
+    assert "Sound query=all-sounds" in instructions
+    assert "query type=Sound" not in instructions
     assert "Events:" in instructions
     assert "parents first" in instructions
     assert "New path=>parent" in instructions

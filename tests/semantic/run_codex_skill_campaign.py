@@ -5701,11 +5701,8 @@ def _heavy_v3_expected_skill_reads(
                 "query-first integration reference schedule requires exactly three turns"
             )
         lane_schedule = (
-            (
-                "references/waapi-query.md",
-                "references/waapi-operate.md",
-            ),
-            (),
+            ("references/waapi-query.md",),
+            ("references/waapi-operate.md",),
             (),
         )
     else:

@@ -2709,6 +2709,30 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   safety/command-size boundary merely to compensate for conflicting harness
   guidance.
 
+### Retired native type hints must not override business query kinds
+
+- Trigger: native-Windows Weapons read the current business query schema but
+  submitted `--predicate kind-is Sound`, following the test-only legacy hint
+  `query type=Sound`. The public contract accepts lowercase business kinds and
+  uses `all-sounds` for every Sound, so the Broker correctly rejected the
+  native reflected type spelling before Gateway dispatch.
+- Prevention: the semantic bootstrap names `Sound query=all-sounds` and no
+  longer teaches the retired native query type. Exact Wwise type spellings may
+  remain only where a current import or metadata continuation explicitly owns
+  them; they must not compete with Gateway-published business vocabularies.
+
+### Query-first workflows load the operate lane only when mutation begins
+
+- Trigger: native-Windows INT25 Alarm completed all six read-only diagnostic
+  queries correctly and read only `SKILL.md` plus `waapi-query.md`. The old
+  harness schedule nevertheless demanded `waapi-operate.md` in turn 1 and
+  failed `skill_reads_exact`, contradicting the Skill rule that read-only work
+  must not preload the operate lane.
+- Prevention: Alarm and Weapons use a three-turn cross-lane schedule: turn 1
+  reads `SKILL.md` plus `waapi-query.md`, turn 2 reads `waapi-operate.md` when
+  the user requests the mutation, and turn 3 reads nothing. Seal the same
+  schedule in both campaign grading and project-runner task instructions.
+
 ### Two exhausted Windows 267 launches after only the Skill read are BLOCKED
 
 - Trigger: native-Windows Weapons read `SKILL.md`, then the identical required

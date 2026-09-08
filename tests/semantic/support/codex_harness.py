@@ -67,7 +67,7 @@ SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
     "Else path=>path; no exact-type-name; reread pre-schema; one query/hop; no merge. "
     "enum/const exact. typed_operation: copy gateway_argv_prefix incl --apply; "
     "selector kind/value separate. "
-    "Import type=Sound SFX; query type=Sound. Events: parents first. "
+    "Import type=Sound SFX; Sound query=all-sounds. Events: parents first. "
     "New path=>parent; name=>declaration only. "
     "POSIX path: single-quote; keep backslashes; one arg/child. "
     "Files absolute; no traversal. "

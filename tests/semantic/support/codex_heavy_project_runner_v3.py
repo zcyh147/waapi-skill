@@ -3911,11 +3911,8 @@ _INTEGRATION_QUERY_FIRST_WORKFLOW_IDS = frozenset(
     {"alarm_diagnose_and_repair", "weapons_query_guided_batch_cleanup"}
 )
 _QUERY_MUTATION_TURN_REFERENCE_SCHEDULE = (
-    (
-        "references/waapi-query.md",
-        "references/waapi-operate.md",
-    ),
-    (),
+    ("references/waapi-query.md",),
+    ("references/waapi-operate.md",),
     (),
 )
 
