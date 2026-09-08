@@ -2719,6 +2719,9 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   candidates and remains a semantic mismatch. The live workflow observer must
   still require the exact reviewed object set and reject every extra row, so a
   larger bound never weakens scope or grants false PASS credit.
+- An exact GUID source is already cardinality-bounded to one object. Treat an
+  explicit `--max-results 1` as equivalent to omitting that redundant ceiling;
+  retain strict rejection for every other added ceiling or non-exact source.
 
 ### A verified relationship GUID outranks hidden binding qualifiers
 

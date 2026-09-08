@@ -4282,6 +4282,33 @@ def _normalize_query_object_sound_routing_view(
     return ("--object-id", actual[1], *expected_tail)
 
 
+def _normalize_query_object_exact_id_unit_ceiling(
+    step: "ExpectedGatewayStep",
+    supplied_arguments: Sequence[str],
+) -> tuple[Any, ...]:
+    """Ignore an explicit one-row ceiling on an already exact GUID source."""
+
+    actual = tuple(supplied_arguments)
+    expected = tuple(step.arguments)
+    if (
+        step.subcommand != "query-object"
+        or len(expected) != 2
+        or expected[0] != "--exact-id"
+        or len(actual) != 4
+    ):
+        return actual
+    pairs = tuple(zip(actual[::2], actual[1::2], strict=True))
+    if len({option for option, _value in pairs}) != 2:
+        return actual
+    values = dict(pairs)
+    if (
+        values.get("--exact-id") == expected[1]
+        and values.get("--max-results") == "1"
+    ):
+        return expected
+    return actual
+
+
 def _normalize_query_object_business_projection(
     step: "ExpectedGatewayStep",
     supplied_arguments: Sequence[str],
@@ -12633,6 +12660,10 @@ class CodexGatewayBroker:
             validation_arguments,
         )
         validation_arguments = _normalize_query_object_business_projection(
+            step,
+            validation_arguments,
+        )
+        validation_arguments = _normalize_query_object_exact_id_unit_ceiling(
             step,
             validation_arguments,
         )

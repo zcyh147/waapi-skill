@@ -13483,6 +13483,60 @@ def test_broker_accepts_a_larger_bounded_business_query_result_ceiling(
     assert broker.evidence().passed
 
 
+def test_broker_accepts_an_explicit_unit_ceiling_for_an_exact_id_query(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    object_id = "{11111111-1111-1111-1111-111111111111}"
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(
+            ExpectedGatewayStep(
+                "query",
+                "query-object",
+                ("--exact-id", object_id),
+            ),
+        ),
+        transport="tcp",
+    ) as broker:
+        result = run_model_command(
+            broker,
+            ["query-object", "--exact-id", object_id, "--max-results", "1"],
+        )
+
+    assert result.returncode == 0
+    assert broker.evidence().passed
+
+
+@pytest.mark.parametrize("ceiling", ("2", "1000"))
+def test_broker_rejects_other_explicit_ceilings_for_an_exact_id_query(
+    tmp_path: Path,
+    ceiling: str,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    object_id = "{11111111-1111-1111-1111-111111111111}"
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(
+            ExpectedGatewayStep(
+                "query",
+                "query-object",
+                ("--exact-id", object_id),
+            ),
+        ),
+        transport="tcp",
+    ) as broker:
+        result = run_model_command(
+            broker,
+            ["query-object", "--exact-id", object_id, "--max-results", ceiling],
+        )
+
+    assert result.returncode != 0
+    assert broker.evidence().passed is False
+
+
 def test_broker_rejects_a_business_query_ceiling_below_the_required_rows(
     tmp_path: Path,
 ) -> None:
