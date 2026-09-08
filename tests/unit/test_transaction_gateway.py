@@ -4414,7 +4414,12 @@ def test_large_successful_execute_is_bounded_but_journal_and_verify_stay_exact(
         client=FakeClient(
             {
                 "ak.wwise.core.getInfo": [live_info()],
-                "ak.wwise.core.getProjectInfo": [project()],
+                "ak.wwise.core.getProjectInfo": [
+                    {
+                        **project(),
+                        "directories": {"cache": "x" * 13_000},
+                    }
+                ],
                 "ak.wwise.core.object.get": [{"return": [created_row()]}],
             }
         ),
@@ -4425,6 +4430,14 @@ def test_large_successful_execute_is_bounded_but_journal_and_verify_stay_exact(
     assert verify_payload["agent_result"]["transaction_id"] == transaction[
         "transaction_id"
     ]
+    assert verify_payload["stdout_projection"]["detail_level"] == (
+        "digest-verification-evidence"
+    )
+    assert verify_payload["stdout_projection"][
+        "full_verification_evidence_in_stdout"
+    ] is False
+    assert "result" not in verify_payload["project_call"]
+    assert waapi_gateway.gateway_json_document_size(verify_payload) < 12_000
     assert list(verify_payload)[-1] == "agent_result"
 
 

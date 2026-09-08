@@ -671,6 +671,7 @@ TRANSACTION_ROLE_VALIDATION_SUMMARY_CONTRACT = (
 # Projection is intentionally delayed until transport cleanup succeeds.
 TRANSACTION_VERIFY_SUCCESS_STDOUT_BUDGET_BYTES = 24 * 1024
 TRANSACTION_VERIFY_SUCCESS_ENVELOPE_RESERVE_BYTES = 2 * 1024
+TRANSACTION_VERIFY_AGENT_VIEW_TARGET_BYTES = 12 * 1024
 TRANSACTION_VERIFY_SUCCESS_SUMMARY_CONTRACT = (
     "waapi-skill.transaction-verify-success-summary/v1"
 )
@@ -22328,9 +22329,12 @@ def project_successful_transaction_verify_payload(
             projection["projected_payload_bytes"] = observed
         return gateway_json_document_size(projected)
 
-    if stabilize_size() > fixed_limit:
+    if stabilize_size() > TRANSACTION_VERIFY_AGENT_VIEW_TARGET_BYTES:
         projected.pop("agent_result", None)
         projected["verification"] = verification_summary
+        project_call = projected.get("project_call")
+        if isinstance(project_call, Mapping):
+            projected["project_call"] = dispatch_call_summary(project_call)
         projection["detail_level"] = "digest-verification-evidence"
         projection["full_verification_evidence_in_stdout"] = False
 

@@ -2504,6 +2504,13 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   The semantic Broker must decode that sole copy field, prove its candidate
   runner and exact argv, then project it to the task-local Skill runner; it
   must not require the deliberately omitted duplicate array.
+- The same limit applies after a successful transaction. Windows Weather later
+  verified all five Action edits but stopped because the default verify reply
+  was about 17.8 KB and repeated full `getProjectInfo` directories/platforms.
+  Successful verify replies therefore default to the persisted verification
+  digest plus a dispatch-call summary/evidence path, while preserving the exact
+  final `agent_result`. Full assertions, readbacks, and ProjectInfo remain in
+  durable evidence; failure and indeterminate replies are not compacted.
 
 ### Public integration delegates first-use prose to its dedicated profile
 
