@@ -8492,16 +8492,48 @@ def _project_operation_draft_runner(
                     ),
                     None,
                 )
-                if argv_key is None or nested.get("copy_command") != _draft_copy_command(
-                    nested[argv_key],
-                    platform_name=platform_name,
+                compact_copy_only = argv_key is None
+                source_argv = nested.get(argv_key) if argv_key is not None else None
+                if compact_copy_only and isinstance(
+                    nested.get("copy_command"), str
+                ):
+                    try:
+                        source_argv = _decode_draft_copy_command(
+                            nested["copy_command"],
+                            platform_name=platform_name,
+                        )
+                    except (PlatformCommandError, ValueError):
+                        source_argv = None
+                if (
+                    not isinstance(source_argv, list)
+                    or len(source_argv) < 4
+                    or source_argv[:3]
+                    != ["python", expected_candidate, "gateway.py"]
+                    or nested.get("copy_command")
+                    != _draft_copy_command(
+                        source_argv,
+                        platform_name=platform_name,
+                    )
                 ):
                     raise GatewayInvocationError(
                         "Gateway business Draft continuation command representation "
                         "is not exact"
                     )
+                if compact_copy_only:
+                    projected_count += 1
                 projected["copy_command"] = _draft_copy_command(
-                    projected[argv_key],
+                    [
+                        "python",
+                        (
+                            TASK_LOCAL_RUNNER_WINDOWS
+                            if compact_copy_only and platform_name == "nt"
+                            else TASK_LOCAL_RUNNER_POSIX
+                            if compact_copy_only
+                            else str(invocation_runner)
+                        ),
+                        "gateway.py",
+                        *source_argv[3:],
+                    ],
                     platform_name=platform_name,
                 )
             if "fixed_argv_prefix_copy" in nested:

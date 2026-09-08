@@ -307,6 +307,17 @@ def test_business_draft_runner_projects_a_compact_copy_only_prefix(
                 ),
             },
         },
+        "recovery": {
+            "copy_command": broker_module._draft_copy_command(  # noqa: SLF001
+                argv,
+                platform_name=platform_name,
+            ),
+            "copy_exactly": True,
+            "copy_instruction": {
+                "source_field": "copy_command",
+                "action": "copy_and_execute_verbatim_once",
+            },
+        },
     }
 
     projected = broker_module._project_operation_draft_runner(  # noqa: SLF001
@@ -326,6 +337,16 @@ def test_business_draft_runner_projects_a_compact_copy_only_prefix(
         else TASK_LOCAL_RUNNER_POSIX
     )
     assert "fixed_argv_prefix" not in projected["route"]
+    projected_recovery_argv = broker_module._decode_draft_copy_command(  # noqa: SLF001
+        projected["recovery"]["copy_command"],
+        platform_name=platform_name,
+    )
+    assert projected_recovery_argv[1] == (
+        TASK_LOCAL_RUNNER_WINDOWS
+        if platform_name == "nt"
+        else TASK_LOCAL_RUNNER_POSIX
+    )
+    assert "fixed_full_argv" not in projected["recovery"]
 
     tampered = json.loads(json.dumps(binding))
     tampered_argv = [*argv]

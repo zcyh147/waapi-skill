@@ -2501,6 +2501,9 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   route. Keep the one copy-ready command named by its copy instruction and omit
   duplicate `fixed_full_argv` arrays. A focused regression caps this receipt
   below 6 KB; durable Draft state and `draft-inspect` retain the full surface.
+  The semantic Broker must decode that sole copy field, prove its candidate
+  runner and exact argv, then project it to the task-local Skill runner; it
+  must not require the deliberately omitted duplicate array.
 
 ### Public integration delegates first-use prose to its dedicated profile
 
