@@ -190,12 +190,21 @@ def test_object_binding_returns_version_stable_business_kind(
         "object_binding",
         "field_discovery",
         "declare_existing",
+        "declare_existing_batch",
+        "existing_target_count_decision",
         "more_actions",
         "shell_tool_timeout_ms",
         "then_read_next_response",
         "precompute_or_increment_revision",
     }
     assert "fixed_full_argv" not in continuation["more_actions"]
+    assert continuation["existing_target_count_decision"] == {
+        "three_or_more_requested": (
+            "bind_every_requested_existing_target_before_any_field_discovery_"
+            "or_declaration_then_use_declare_existing_batch"
+        ),
+        "one_or_two_requested": "use_the_individual_discover_and_declare_routes",
+    }
     assert "draft-inspect" in continuation["more_actions"]["copy_command"]
     assert len(json.dumps(payload, separators=(",", ":")).encode("utf-8")) < 8_000
 

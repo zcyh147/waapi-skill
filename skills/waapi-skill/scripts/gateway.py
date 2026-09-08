@@ -23384,6 +23384,7 @@ def _compact_object_set_update_continuation(
         for key in (
             "contract",
             "required_next_phase",
+            "existing_target_count_decision",
         )
         if key in value
     }
@@ -23421,6 +23422,17 @@ def _compact_object_set_update_continuation(
                         "after_each_success_copy_the_next_response_revision_and_"
                         "submit_the_next_declaration_separately"
                     ),
+                }
+            elif key == "declare_existing_batch" and isinstance(action, Mapping):
+                action = {
+                    name: action[name]
+                    for name in (
+                        "fixed_argv_prefix_copy",
+                        "fixed_argv_prefix_copy_instruction",
+                        "append_repeated",
+                        "precondition",
+                    )
+                    if name in action
                 }
             compact[key] = action
     compact["more_actions"] = {
@@ -25588,6 +25600,16 @@ def _business_next_action_binding(
                 and len(session.handles.as_dict()["objects"])
                 >= 3
             )
+            if not session.declarations:
+                result["existing_target_count_decision"] = {
+                    "three_or_more_requested": (
+                        "bind_every_requested_existing_target_before_any_field_"
+                        "discovery_or_declaration_then_use_declare_existing_batch"
+                    ),
+                    "one_or_two_requested": (
+                        "use_the_individual_discover_and_declare_routes"
+                    ),
+                }
             if batch_ready:
                 result["required_next_phase"] = (
                     "bind_remaining_targets_or_declare_all_ready_existing_"
@@ -25595,7 +25617,7 @@ def _business_next_action_binding(
                 )
                 result.pop("field_discovery", None)
                 result.pop("declare_existing", None)
-            else:
+            elif session.declarations:
                 result.pop("declare_existing_batch", None)
             return result
         shared = {
