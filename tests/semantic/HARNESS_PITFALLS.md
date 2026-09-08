@@ -2464,6 +2464,16 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   verify the stored authority digest, and materialize from that durable session.
   The precomputed offline request is only a fallback when no durable Draft is
   available; it must not override richer sealed state.
+- Import contraction and dependency-ready Draft setup ordering can occur in the
+  same successful workflow. Candidate `ddd3832` completed macOS Weather with a
+  legal three-call import partition, then configured five Action targets in
+  bind/discover/declare order per target instead of the canonical all-bind,
+  all-discover, all-declare order. Live Broker and matrix grading accepted both
+  transformations, but Campaign archive replay tested them as mutually
+  exclusive and downgraded the PASS. Archive replay must first prove the closed
+  canonical import subset, then validate the consumed order with the same
+  dependency-ready step matcher while retaining the full canonical import row
+  pool for exact rebatching.
 
 ### Metadata meanings are bounded natural language, not magic phrases
 

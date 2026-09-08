@@ -4839,6 +4839,38 @@ def _steps_in_consumed_order(
     return tuple(rebound)
 
 
+def _contracted_protocol_linearization_is_valid(
+    canonical_steps: Sequence[Any],
+    execution_names: Sequence[str],
+    *,
+    commutative_read_only_step_groups: Sequence[Sequence[str]],
+    commutative_composer_setup_step_groups: Sequence[Sequence[str]],
+) -> bool:
+    """Combine closed import chunk contraction with legal setup ordering."""
+
+    canonical = tuple(canonical_steps)
+    selected_name_set = set(execution_names)
+    selected_canonical = tuple(
+        step for step in canonical if step.name in selected_name_set
+    )
+    selected_names = tuple(step.name for step in selected_canonical)
+    return (
+        len(canonical) != len(selected_canonical)
+        and len(selected_names) == len(tuple(execution_names))
+        and _selected_workflow_step_names_are_closed(
+            SimpleNamespace(steps=canonical),
+            selected_names,
+            optional_names=set(),
+        )
+        and gateway_step_sequence_matches(
+            selected_names,
+            execution_names,
+            commutative_read_only_step_groups,
+            commutative_composer_setup_step_groups,
+        )
+    )
+
+
 def _build_heavy_v3_broker_replay(
     *,
     skill_source: Path,
@@ -4870,13 +4902,13 @@ def _build_heavy_v3_broker_replay(
         commutative_read_only_step_groups,
         commutative_composer_setup_step_groups,
     )
-    import_contraction = (
-        not ordinary_linearization
-        and _selected_workflow_step_names_are_closed(
-            SimpleNamespace(steps=canonical),
-            execution_names,
-            optional_names=set(),
-        )
+    import_contraction = _contracted_protocol_linearization_is_valid(
+        canonical,
+        execution_names,
+        commutative_read_only_step_groups=commutative_read_only_step_groups,
+        commutative_composer_setup_step_groups=(
+            commutative_composer_setup_step_groups
+        ),
     )
     if not ordinary_linearization and not import_contraction:
         raise CampaignEvidenceError(
@@ -4959,6 +4991,7 @@ def _build_heavy_v3_broker_replay(
     # Offline replay never starts the Broker.  Its Draft payload validator must
     # follow the archived dependency-valid order and its rebound revision chain.
     replay._execution_steps = list(replay_execution)  # noqa: SLF001
+    replay._archive_dynamic_linearization = import_contraction  # noqa: SLF001
     return replay
 
 
@@ -6577,6 +6610,80 @@ def _prepare_heavy_v3_replay_step(
     return replay_step
 
 
+def _select_heavy_v3_replay_step(
+    replay: CodexGatewayBroker,
+    *,
+    index: int,
+    expected_step: ExpectedGatewayStep,
+    actual_arguments: Sequence[str],
+    label: str,
+) -> tuple[ExpectedGatewayStep, str | None, tuple[str, ...] | None]:
+    """Select one archived step through the same safe order rules as live."""
+
+    if getattr(replay, "_archive_dynamic_linearization", False):
+        replay._next_step = index  # noqa: SLF001
+        replay_step = replay._execution_steps[index]  # noqa: SLF001
+        replay_step = replay._rebase_business_draft_revision(  # noqa: SLF001
+            replay_step
+        )
+        replay_step = replay._bind_task_local_declaration_id(  # noqa: SLF001
+            replay_step,
+            actual_arguments,
+        )
+        replay._execution_steps[index] = replay_step  # noqa: SLF001
+        try:
+            semantic_hash, execution_arguments = replay._validate_step(  # noqa: SLF001
+                replay_step,
+                actual_arguments,
+            )
+        except GatewayInvocationError as first_error:
+            try:
+                matched = (
+                    replay._match_dependency_ready_draft_batch(  # noqa: SLF001
+                        actual_arguments
+                    )
+                    or replay._match_rebatched_import_rows(  # noqa: SLF001
+                        actual_arguments
+                    )
+                    or replay._match_dependency_ready_draft_action(  # noqa: SLF001
+                        actual_arguments
+                    )
+                    or replay._match_dependency_ready_business_setup_step(  # noqa: SLF001
+                        actual_arguments
+                    )
+                    or replay._match_commutative_read_only_step(  # noqa: SLF001
+                        actual_arguments
+                    )
+                )
+            except GatewayInvocationError as exc:
+                raise CampaignEvidenceError(
+                    f"{label} dynamic replay cannot select {expected_step.name}: {exc}"
+                ) from exc
+            if matched is None:
+                raise CampaignEvidenceError(
+                    f"{label} dynamic replay cannot select {expected_step.name}: "
+                    f"{first_error}"
+                ) from first_error
+            replay_step, semantic_hash, execution_arguments = matched
+        if replay_step.name != expected_step.name:
+            raise CampaignEvidenceError(
+                f"{label} dynamic replay selected {replay_step.name} instead of "
+                f"{expected_step.name}"
+            )
+        return replay_step, semantic_hash, execution_arguments
+    return (
+        _prepare_heavy_v3_replay_step(
+            replay,
+            index=index,
+            expected_step=expected_step,
+            actual_arguments=actual_arguments,
+            label=label,
+        ),
+        None,
+        None,
+    )
+
+
 def _validate_heavy_v3_broker_records(
     records: Sequence[Any],
     *,
@@ -6695,30 +6802,35 @@ def _validate_heavy_v3_broker_records(
                 invocation_skill_source=invocation_skill_source,
                 shim_directory=task_root / "broker" / "bin",
             )
-            replay_step = _prepare_heavy_v3_replay_step(
+            (
+                replay_step,
+                semantic_sha,
+                execution_arguments,
+            ) = _select_heavy_v3_replay_step(
                 replay,
                 index=index - 1,
                 expected_step=step,
                 actual_arguments=resolved.gateway_arguments,
                 label=label,
             )
-            try:
-                semantic_sha, execution_arguments = replay._validate_step(  # noqa: SLF001
-                    replay_step,
-                    resolved.gateway_arguments,
-                )
-            except GatewayInvocationError:
-                rebound = (
-                    replay._match_dependency_ready_draft_batch(  # noqa: SLF001
+            if semantic_sha is None or execution_arguments is None:
+                try:
+                    semantic_sha, execution_arguments = replay._validate_step(  # noqa: SLF001
+                        replay_step,
                         resolved.gateway_arguments,
                     )
-                    or replay._match_rebatched_import_rows(  # noqa: SLF001
-                        resolved.gateway_arguments,
+                except GatewayInvocationError:
+                    rebound = (
+                        replay._match_dependency_ready_draft_batch(  # noqa: SLF001
+                            resolved.gateway_arguments,
+                        )
+                        or replay._match_rebatched_import_rows(  # noqa: SLF001
+                            resolved.gateway_arguments,
+                        )
                     )
-                )
-                if rebound is None:
-                    raise
-                replay_step, semantic_sha, execution_arguments = rebound
+                    if rebound is None:
+                        raise
+                    replay_step, semantic_sha, execution_arguments = rebound
             step = replay_step
         except Exception as exc:
             raise CampaignEvidenceError(

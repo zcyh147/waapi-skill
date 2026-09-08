@@ -1109,6 +1109,51 @@ def test_archived_broker_replay_rejects_undeclared_composer_interruption() -> No
         )
 
 
+def test_archive_accepts_import_contraction_plus_dependency_ready_setup_order() -> None:
+    canonical = tuple(
+        ExpectedGatewayStep(
+            f"tx01.declare-batch{suffix}",
+            "draft-declare-import-batch",
+        )
+        for suffix in ("", "-02", "-03", "-04")
+    ) + tuple(
+        ExpectedGatewayStep(name, subcommand)
+        for name, subcommand in (
+            ("tx02.bind-target-01-01", "draft-bind-object"),
+            ("tx02.bind-target-02-02", "draft-bind-object"),
+            ("tx02.discover-field-01", "draft-discover-fields"),
+            ("tx02.discover-field-02", "draft-discover-fields"),
+            ("tx02.declare-existing-01", "draft-declare-existing"),
+            ("tx02.declare-existing-02", "draft-declare-existing"),
+            ("tx02.check", "draft-check"),
+        )
+    )
+    observed_names = (
+        "tx01.declare-batch",
+        "tx01.declare-batch-02",
+        "tx02.bind-target-01-01",
+        "tx02.discover-field-01",
+        "tx02.declare-existing-01",
+        "tx02.bind-target-02-02",
+        "tx02.discover-field-02",
+        "tx02.declare-existing-02",
+        "tx02.check",
+    )
+
+    assert campaign._contracted_protocol_linearization_is_valid(
+        canonical,
+        observed_names,
+        commutative_read_only_step_groups=(),
+        commutative_composer_setup_step_groups=(),
+    )
+    assert not campaign._contracted_protocol_linearization_is_valid(
+        canonical,
+        observed_names[:-1],
+        commutative_read_only_step_groups=(),
+        commutative_composer_setup_step_groups=(),
+    )
+
+
 def test_archived_draft_action_preserves_submitted_json_spelling() -> None:
     action = campaign._archived_draft_action(
         (
