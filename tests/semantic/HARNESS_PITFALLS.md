@@ -2580,6 +2580,21 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   discovery: `Volume` must select the exact `Volume` token rather than forcing
   clarification merely because lexical retrieval also found `OutputBusVolume`.
 
+### A Codex unified-exec spawn failure is infrastructure, not a semantic miss
+
+- Trigger: macOS candidate `9855c37` completed the Skill read and two accepted
+  Gateway commands, then Codex failed to create the next `/bin/bash` process
+  with `No such file or directory (os error 2)`. The copied command, Broker
+  shim, Skill interpreter, working directory, and `/bin/bash` all still existed;
+  no request reached the Broker or Wwise for that step.
+- Classification: freeze that root without replay. Do not weaken a command-count
+  or business Oracle, and do not change Skill routing or prompt wording to make
+  an Agent compensate for a process that never started.
+- Recovery: verify the sealed evidence and source-project hash, remove the
+  one-shot launcher, prove there is no scoped Wwise/Fresh owner, and use a new
+  campaign root. If the same spawn boundary repeats, stop and diagnose the
+  Codex/launch environment before spending another semantic turn.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:
