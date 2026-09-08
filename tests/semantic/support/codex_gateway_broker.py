@@ -11755,8 +11755,17 @@ class CodexGatewayBroker:
                 actual_group[0] != "--field-meaning-value"
                 or expected_key[2] not in {"fadetime", "delay"}
                 or not isinstance(actual_value, str)
-                or not isinstance(expected_group[3], str)
             ):
+                return actual_value
+            expected_value = expected_group[3]
+            expected_values = (
+                expected_value.values
+                if isinstance(expected_value, ExactArgumentAlternatives)
+                else (expected_value,)
+                if isinstance(expected_value, str)
+                else ()
+            )
+            if not expected_values:
                 return actual_value
             matched = re.fullmatch(
                 r"([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)\s*"
@@ -11774,8 +11783,9 @@ class CodexGatewayBroker:
                     "milliseconds",
                 }:
                     value /= Decimal(1000)
-                if value == Decimal(expected_group[3]):
-                    return expected_group[3]
+                for candidate in expected_values:
+                    if value == Decimal(candidate):
+                        return candidate
             except InvalidOperation:
                 return actual_value
             return actual_value

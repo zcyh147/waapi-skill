@@ -13769,6 +13769,52 @@ def test_object_set_batch_normalizes_fact_order_and_field_meaning_spelling(
     assert normalized == step.arguments
 
 
+def test_object_set_batch_normalizes_zero_seconds_to_one_sealed_numeric_spelling(
+    tmp_path: Path,
+) -> None:
+    step = ExpectedGatewayStep(
+        "tx01.declare-existing-batch",
+        "draft-declare-existing-batch",
+        (
+            "draft-id",
+            "--task-authority",
+            "authority",
+            "--expected-revision",
+            "6",
+            "--row-order",
+            "rain",
+            "--row",
+            "rain",
+            "rain-handle",
+            "--field-meaning-value",
+            "rain",
+            "Delay",
+            ExactArgumentAlternatives(("0", "0.0")),
+        ),
+    )
+    actual = (
+        *step.arguments[:5],
+        "--row",
+        "rain",
+        "rain-handle",
+        "--field-meaning-value",
+        "rain",
+        "Delay",
+        "0 seconds",
+        "--row-order",
+        "rain",
+    )
+    broker = object.__new__(CodexGatewayBroker)
+
+    normalized = broker._normalize_business_declaration_fact_order(  # noqa: SLF001
+        step,
+        actual,
+    )
+
+    assert normalized[:-1] == step.arguments[:-1]
+    assert normalized[-1] in step.arguments[-1].values
+
+
 @pytest.mark.parametrize("read_schema", (False, True))
 def test_broker_accepts_one_optional_initial_query_schema(
     tmp_path: Path,
