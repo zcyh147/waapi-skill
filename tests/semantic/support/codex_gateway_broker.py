@@ -9397,6 +9397,7 @@ class CodexGatewayBroker:
         self._active_process_done = threading.Event()
         self._active_process_done.set()
         self._records: list[GatewayBrokerRecord] = []
+        self._replayed_successful_gateway_arguments: list[tuple[str, ...]] = []
         self._next_step = 0
         self._payloads_by_step: dict[str, Mapping[str, Any]] = {}
         self._import_declaration_ids_by_draft: dict[
@@ -12237,13 +12238,23 @@ class CodexGatewayBroker:
             )
         ):
             draft_key = str(actual_values[0])
+            replayed_arguments = getattr(
+                self,
+                "_replayed_successful_gateway_arguments",
+                (),
+            )
             prior_media_directories = {
                 arguments[index + 1]
-                for record in getattr(self, "_records", ())
-                if record.succeeded
-                and (arguments := record.gateway_arguments)
+                for arguments in (
+                    *(
+                        record.gateway_arguments
+                        for record in getattr(self, "_records", ())
+                        if record.succeeded
+                    ),
+                    *replayed_arguments,
+                )
+                if len(arguments) > 1
                 and arguments[0] == "draft-declare-import-batch"
-                and len(arguments) > 1
                 and arguments[1] == draft_key
                 for index, value in enumerate(arguments[:-1])
                 if value == "--media-directory"
@@ -15111,6 +15122,19 @@ class CodexGatewayBroker:
         )
         self._append_record_locked(record)
         return {"exit_code": response_exit, "stdout": "", "stderr": response_stderr}
+
+    def _remember_replayed_successful_gateway_arguments(
+        self,
+        gateway_arguments: Sequence[str],
+    ) -> None:
+        """Retain only the prior argv state needed by archive normalization."""
+
+        values = tuple(gateway_arguments)
+        if not values or any(not isinstance(value, str) for value in values):
+            raise GatewayInvocationError(
+                "replayed successful Gateway arguments must be non-empty strings"
+            )
+        self._replayed_successful_gateway_arguments.append(values)
 
     def _append_record_locked(self, record: GatewayBrokerRecord) -> GatewayBrokerRecord:
         numbered = replace(record, sequence=len(self._records) + 1)

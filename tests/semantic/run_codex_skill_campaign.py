@@ -7003,6 +7003,9 @@ def _validate_heavy_v3_broker_records(
             replay._submitted_draft_actions_by_step[step.name] = (  # noqa: SLF001
                 submitted_draft_actions
             )
+        replay._remember_replayed_successful_gateway_arguments(  # noqa: SLF001
+            resolved.gateway_arguments
+        )
         replay._payloads_by_step[step.name] = payload  # noqa: SLF001
         replay._next_step = index  # noqa: SLF001
 

@@ -5563,6 +5563,83 @@ def test_audio_import_rebatch_accepts_task_local_parent_and_child_ids(
     assert evidence.passed
 
 
+def test_archive_replay_reuses_the_prior_sealed_import_media_directory() -> None:
+    fixed_first = (
+        "od1-draft",
+        "--task-authority",
+        "da1-authority",
+        "--expected-revision",
+        "1",
+    )
+    fixed_second = (*fixed_first[:-1], "2")
+    media_directory = "/tmp/incoming"
+    first = ExpectedGatewayStep(
+        "tx01.declare-batch",
+        "draft-declare-import-batch",
+        (
+            *fixed_first,
+            "--media-directory",
+            media_directory,
+            "--row-order",
+            "close",
+            "--existing-row",
+            "close",
+            "boh1-close",
+            "--media-file",
+            "close",
+            "close.wav",
+        ),
+    )
+    second = ExpectedGatewayStep(
+        "tx01.declare-batch-02",
+        "draft-declare-import-batch",
+        (
+            *fixed_second,
+            "--media-directory",
+            media_directory,
+            "--row-order",
+            "distant",
+            "--existing-row",
+            "distant",
+            "boh1-distant",
+            "--media-file",
+            "distant",
+            "distant.wav",
+        ),
+    )
+    second_without_directory = (
+        "draft-declare-import-batch",
+        *fixed_second,
+        "--row-order",
+        "distant",
+        "--existing-row",
+        "distant",
+        "boh1-distant",
+        "--media-file",
+        "distant",
+        "distant.wav",
+    )
+    broker = object.__new__(CodexGatewayBroker)
+    broker._records = []  # noqa: SLF001
+    broker._replayed_successful_gateway_arguments = []  # noqa: SLF001
+    broker._payloads_by_step = {}  # noqa: SLF001
+
+    assert broker._normalize_import_batch_fact_order(  # noqa: SLF001
+        second,
+        second_without_directory[1:],
+    ) == second_without_directory[1:]
+
+    broker._remember_replayed_successful_gateway_arguments(  # noqa: SLF001
+        (first.subcommand, *first.arguments)
+    )
+    normalized = broker._normalize_import_batch_fact_order(  # noqa: SLF001
+        second,
+        second_without_directory[1:],
+    )
+
+    assert normalized == second.arguments
+
+
 def test_audio_import_business_protocol_uses_stable_fields_and_strict_revision_order() -> None:
     request = {
         "contract": "waapi-skill.operation-request/v1",
