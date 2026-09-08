@@ -582,6 +582,27 @@ def test_operations_catalog_routes_cli_console_intent_to_request_schema(
     payload_keys = list(payload)
     assert payload_keys.index("routing_precedence") < payload_keys.index("operations")
     assert payload["routing_precedence"] == {
+        "primary_media_import": {
+            "match_terms": [
+                "import media",
+                "reimport media",
+                "replace existing media",
+                "replace media source",
+                "导入媒体",
+                "重新导入",
+                "替换媒体",
+            ],
+            "choose": ["operation-schema", "audio.import"],
+            "takes_precedence_over": [
+                "operation-schema",
+                "object.set",
+            ],
+            "rule": (
+                "a primary media import, reimport, or media replacement uses "
+                "audio.import even when it also updates properties, "
+                "references, Events, or Switch assignments"
+            ),
+        },
         "explicit_cli_soundbank_generation": {
             "match_terms": ["WwiseConsole", "CLI", "command-line", "命令行"],
             "choose": [
@@ -630,6 +651,17 @@ def test_operations_catalog_routes_cli_console_intent_to_request_schema(
         },
     }
     assert payload["selection_guidance"] == {
+        "primary_media_import": {
+            "choose": ["operation-schema", "audio.import"],
+            "use_when": (
+                "the requested primary outcome imports, reimports, or "
+                "replaces audio media"
+            ),
+            "never_substitute": [
+                "operation-schema",
+                "object.set",
+            ],
+        },
         "authoring_ui_command_id": {
             "choose": ["operation-schema", "ui.commands.execute"],
             "example": "SaveProject",

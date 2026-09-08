@@ -2733,6 +2733,19 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   the user requests the mutation, and turn 3 reads nothing. Seal the same
   schedule in both campaign grading and project-runner task instructions.
 
+### Primary media replacement must not route through a generic object edit
+
+- Trigger: native-Windows INT22 Rifle read the compact operation catalog, then
+  selected `object.set` for a request whose primary outcome was reimporting
+  four audio files and adding one imported Sound. The Broker correctly rejected
+  the wrong operation before Gateway or Wwise dispatch; the matching 2025.1
+  unit selected `audio.import` and passed.
+- Prevention: the Gateway-owned compact router gives primary media import,
+  reimport, and media-source replacement an explicit `audio.import` precedence
+  over `object.set` and `object.create`, even when the same import also carries
+  properties, references, Events, or Switch assignments. Do not weaken the
+  Broker to accept a generic object edit or repair this only in test prompts.
+
 ### Two exhausted Windows 267 launches after only the Skill read are BLOCKED
 
 - Trigger: native-Windows Weapons read `SKILL.md`, then the identical required
