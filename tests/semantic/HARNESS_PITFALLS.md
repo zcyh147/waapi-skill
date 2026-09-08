@@ -225,6 +225,19 @@ prevention checks that are expensive to rediscover.
   creation. Put the Skill-local Python plus exact campaign arguments directly
   in `ProgramArguments`; do not move the wrapper elsewhere and treat that as a
   semantic retry.
+- A headless Wwise/Wine child can request Desktop, Documents, or Microphone
+  access while macOS attributes that request to the LaunchAgent's Skill-local
+  Python. TCC remembers each service separately, so one approved prompt does
+  not authorize the others. Do not grant Full Disk Access. Reuse one fixed
+  detached candidate-worktree path outside `Documents` and keep its
+  `skills/waapi-skill/.venv/bin/python` pathname stable. Put every immutable
+  campaign root below that worktree's required `skills/waapi-skill-workspace`
+  directory; an external evidence root is rejected by the campaign boundary.
+  Once the operator has approved each actually requested service, those
+  decisions persist across campaign roots. Changing the Homebrew Python binary
+  may legitimately require new decisions. Never advance the fixed worktree
+  while one of its Fresh or verify-only runs is active, and retain the worktree
+  for as long as its sealed evidence is needed.
 
 ### A macOS verify-only replay can discover a different Codex binary
 
