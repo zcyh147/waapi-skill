@@ -2839,6 +2839,22 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   the readiness timeout. Wwise Authoring UI launches and Wwise 2023.1+
   Console launches retain their normal audio environment.
 
+### Stable existing-object nouns must not masquerade as ambiguous Wwise types
+
+- Trigger: native-Windows INT25 Harbor bound the exact user-supplied Event
+  path successfully, but the universal binding reply returned
+  `business_kind_resolution.status=ambiguous` with no candidates because
+  `Event` is not a creatable Semantic Kind. The Agent correctly obeyed the
+  ambiguity stop rule after five accepted commands, before Preview or
+  mutation, although the live identity was already an exact Event.
+- Prevention: existing-object binding separately recognizes reflected classes
+  whose names are stable business nouns across all supported versions. Event,
+  Aux Bus, and SoundBank therefore return `event`, `aux-bus`, and `soundbank`
+  with `source=stable_live_type`. Keep ambiguous wire classes such as `Sound`
+  and `RandomSequenceContainer` on their live discriminator paths; do not make
+  every reflected class a business type and do not weaken the Agent's genuine
+  ambiguity stop rule.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:

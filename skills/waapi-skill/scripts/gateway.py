@@ -416,6 +416,7 @@ from wwise_waapi.business_declarations import (  # noqa: E402  # pyright: ignore
     resolve_semantic_kind,
     semantic_kind_for_live_type,
     semantic_kinds_for_live_type,
+    stable_bound_business_kind_for_live_type,
 )
 from wwise_waapi.soundbank_business_cli import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     SoundBankBusinessCliError,
@@ -17265,6 +17266,13 @@ def dispatch_business_object_binding(
     ):
         business_kind = args.role
         business_kind_source = "closed_role_exact_type_selector"
+    if business_kind is None:
+        business_kind = stable_bound_business_kind_for_live_type(
+            str(row["type"]),
+            version=detected_version,
+        )
+        if business_kind is not None:
+            business_kind_source = "stable_live_type"
     captured: list[Any] = []
 
     def bind(current: BusinessDeclarationSession) -> BusinessDeclarationSession:

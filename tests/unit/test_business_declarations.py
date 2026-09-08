@@ -24,6 +24,7 @@ from wwise_waapi.business_declarations import (
     resolve_semantic_kind,
     semantic_kind_for_live_type,
     semantic_kinds_for_live_type,
+    stable_bound_business_kind_for_live_type,
 )
 from wwise_waapi.object_capabilities import (
     NON_INTRINSIC_NAME_OBJECT_TYPES,
@@ -188,6 +189,26 @@ def test_live_reflected_type_maps_back_to_one_unambiguous_business_kind() -> Non
         "RandomSequenceContainer",
         version="2025.1",
     ) == ("random-container", "sequence-container")
+
+
+@pytest.mark.parametrize(
+    ("live_type", "business_kind"),
+    [
+        ("Event", "event"),
+        ("AuxBus", "aux-bus"),
+        ("SoundBank", "soundbank"),
+        ("Sound", None),
+        ("RandomSequenceContainer", None),
+    ],
+)
+def test_stable_bound_business_kind_covers_only_unambiguous_existing_types(
+    live_type: str,
+    business_kind: str | None,
+) -> None:
+    assert stable_bound_business_kind_for_live_type(
+        live_type,
+        version="2025.1",
+    ) == business_kind
 
 
 def test_new_descendant_uses_parent_handle_name_and_kind_only() -> None:

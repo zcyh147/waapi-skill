@@ -355,6 +355,16 @@ _DISPLAY_KIND_ALIASES = {
     row[0]: stable_name for stable_name, row in _BASE_KIND_ROWS.items()
 }
 
+# Existing-object binding needs a stable comparison name even when the object
+# is not one of the creatable Semantic Kinds above. Keep this table deliberately
+# narrow: rows belong here only when the reflected class is itself a stable
+# business noun across every supported version.
+_STABLE_BOUND_BUSINESS_KINDS_BY_LIVE_TYPE = {
+    "auxbus": "aux-bus",
+    "event": "event",
+    "soundbank": "soundbank",
+}
+
 
 def resolve_semantic_kind(name: str, *, version: str) -> SemanticKind:
     """Resolve one stable kind or its unambiguous Wwise display spelling."""
@@ -441,6 +451,25 @@ def semantic_kind_for_live_type(
 
     matches = semantic_kinds_for_live_type(object_type, version=version)
     return matches[0] if len(matches) == 1 else None
+
+
+def stable_bound_business_kind_for_live_type(
+    object_type: str,
+    *,
+    version: str,
+) -> str | None:
+    """Return one stable business noun for a non-Semantic existing object."""
+
+    if version not in SUPPORTED_WWISE_VERSIONS:
+        raise _error(
+            "WWISE_VERSION_UNSUPPORTED",
+            field="version",
+            choices=SUPPORTED_WWISE_VERSIONS,
+            action="choose one supported Wwise version",
+        )
+    if not isinstance(object_type, str) or not object_type.strip():
+        raise ValueError("object_type must be non-empty text")
+    return _STABLE_BOUND_BUSINESS_KINDS_BY_LIVE_TYPE.get(_type_token(object_type))
 
 
 def business_repair(
@@ -2275,4 +2304,5 @@ __all__ = [
     "resolve_semantic_kind",
     "semantic_kind_for_live_type",
     "semantic_kinds_for_live_type",
+    "stable_bound_business_kind_for_live_type",
 ]

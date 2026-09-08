@@ -946,6 +946,13 @@ def test_business_inclusion_plan_checks_and_seals_one_immutable_preview(
         path=r"\Events\Default Work Unit\Play_Harbor",
         role="inclusion_object",
     )
+    assert inclusion["bound_object"]["business_kind"] == "event"
+    assert inclusion["bound_object"]["business_kind_resolution"] == {
+        "status": "resolved",
+        "candidates": [],
+        "reflected_type": "Event",
+        "source": "stable_live_type",
+    }
     code, declared = _declare_plan(
         tmp_path,
         "draft-declare-soundbank-plan",
