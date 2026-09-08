@@ -11002,22 +11002,48 @@ class CodexGatewayBroker:
         deterministically so later commands still consume one exact protocol.
         """
 
-        current = self._execution_steps[self._next_step]
-        if (
-            current.subcommand != "draft-declare-import-batch"
-            or not actual
-            or actual[0] != "draft-declare-import-batch"
-        ):
+        if not actual or actual[0] != "draft-declare-import-batch":
             return None
 
-        block_end = self._next_step
+        block_start = self._next_step
+        current = self._execution_steps[block_start]
+        if current.subcommand != "draft-declare-import-batch":
+            current_match = _BUSINESS_DRAFT_SETUP_STEP_RE.fullmatch(
+                current.name
+            )
+            if current_match is None:
+                return None
+            prefix = current_match.group("prefix")
+            while block_start < len(self._execution_steps):
+                candidate_match = _BUSINESS_DRAFT_SETUP_STEP_RE.fullmatch(
+                    self._execution_steps[block_start].name
+                )
+                if (
+                    candidate_match is None
+                    or candidate_match.group("prefix") != prefix
+                ):
+                    break
+                block_start += 1
+            if (
+                block_start >= len(self._execution_steps)
+                or self._execution_steps[block_start].subcommand
+                != "draft-declare-import-batch"
+                or not self._execution_steps[block_start].name.startswith(
+                    f"{prefix}.declare-batch"
+                )
+            ):
+                return None
+            current = self._execution_steps[block_start]
+        current = self._rebase_business_draft_revision(current)
+
+        block_end = block_start
         while (
             block_end < len(self._execution_steps)
             and self._execution_steps[block_end].subcommand
             == "draft-declare-import-batch"
         ):
             block_end += 1
-        block = self._execution_steps[self._next_step:block_end]
+        block = self._execution_steps[block_start:block_end]
         if not block:
             return None
 
@@ -11303,8 +11329,10 @@ class CodexGatewayBroker:
             )
             previous_name = name
 
-        self._execution_steps[self._next_step:block_end] = replacement_steps
-        self._selected_expected_steps[self._next_step:block_end] = replacement_steps
+        pending_setup = self._execution_steps[self._next_step:block_start]
+        reordered = [matched, *pending_setup, *replacement_steps[1:]]
+        self._execution_steps[self._next_step:block_end] = reordered
+        self._selected_expected_steps[self._next_step:block_end] = reordered
         return matched, semantic_hash, execution_arguments
 
     def _match_dependency_ready_draft_action(

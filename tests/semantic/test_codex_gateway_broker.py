@@ -6918,6 +6918,90 @@ def test_business_draft_setup_broker_selects_unique_binding_and_configuration(
     assert declaration.arguments[4].step == previous.name
 
 
+def test_audio_import_broker_accepts_ready_rows_before_later_event_binding(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "audio.import",
+        "arguments": {
+            "imports": [
+                {
+                    "object_path": (
+                        r"\Actor-Mixer Hierarchy\Default Work Unit\Weather"
+                    ),
+                    "object_type": "ActorMixer",
+                },
+                {
+                    "object_path": (
+                        r"\Actor-Mixer Hierarchy\Default Work Unit"
+                        r"\Weather\Rain"
+                    ),
+                    "object_type": "Sound SFX",
+                    "audio_file": native_absolute_test_path(
+                        "inputs",
+                        "rain.wav",
+                    ),
+                    "import_language": "SFX",
+                    "event": {
+                        "path": r"\Events\Default Work Unit\Play_Rain",
+                        "action": "Play",
+                    },
+                },
+            ],
+        },
+    }
+    steps = build_audio_import_composer_transaction_steps(request, label="tx01")
+    broker = CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=steps,
+        expected_wwise_version="2022.1",
+    )
+    draft_id = "od1-" + "1" * 32
+    authority = "da1-" + "2" * 40
+    start = next(step for step in steps if step.name == "tx01.draft-start")
+    parent = next(step for step in steps if step.name == "tx01.bind-object.001")
+    event_parent = next(
+        step for step in steps if step.name == "tx01.bind-object.002"
+    )
+    first_row = next(step for step in steps if step.name == "tx01.declare-batch")
+    parent_handle = "boh1-" + "3" * 32
+    broker._payloads_by_step[start.name] = {  # noqa: SLF001
+        "task_authority": authority,
+        "draft": {"draft_id": draft_id, "revision": 1},
+    }
+    broker._payloads_by_step[parent.name] = {  # noqa: SLF001
+        "bound_object": {"handle": parent_handle},
+        "draft": {"draft_id": draft_id, "revision": 2},
+    }
+    broker._next_step = broker._execution_steps.index(event_parent)  # noqa: SLF001
+
+    selected = broker._match_rebatched_import_rows(  # noqa: SLF001
+        (
+            "draft-declare-import-batch",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            "2",
+            "--row-order",
+            "weather",
+            "--new-row",
+            "weather",
+            parent_handle,
+            "Weather",
+            "actor-mixer",
+        )
+    )
+
+    assert selected is not None
+    assert selected[0].name == first_row.name
+    assert broker._execution_steps[broker._next_step].name == first_row.name  # noqa: SLF001
+    assert broker._execution_steps[broker._next_step + 1].name == event_parent.name  # noqa: SLF001
+
+
 def _two_target_object_set_request() -> dict[str, object]:
     return {
         "contract": "waapi-skill.operation-request/v1",

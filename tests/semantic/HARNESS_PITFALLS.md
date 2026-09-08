@@ -1353,6 +1353,36 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   commit. Never interpret downstream semantic or file-integrity failures from
   that root as independent product defects.
 
+### Concurrent Windows controllers must not share one candidate checkout
+
+- Trigger: #51 Windows retry root `iwin-integration-1fc1daf-r29-retry5` was
+  running from `waapi-skills-clean-00cbd87` when another continuation checked
+  that same worktree out at `b5f3209`. The next read-only Weapons turn made no
+  file edits and produced the correct Wwise audit, but the campaign correctly
+  detected the changed Skill tree and failed `no_files_changed`. The exact task
+  and its six root-owned descendants were stopped; unrelated Codex App
+  processes were left alive.
+- Prevention: SSH launchers may use a shared repository only to fetch a sealed
+  bundle and supply the existing Skill-local interpreter and ignored live
+  config. Materialize each formal campaign candidate in a new uniquely named
+  detached Git worktree, run the campaign and Skill source from that worktree,
+  and never let another controller check it out. A successful preflight on a
+  shared mutable checkout is not an immutability guarantee.
+
+### Dependency-ready import rows may precede unrelated later bindings
+
+- Trigger: #51 Windows Weather bound the new hierarchy parent and output Bus,
+  then submitted the first three container rows before binding the Event parent
+  needed only by later Sound rows. The public Draft contract permits that
+  dependency-safe ordering, but the Broker required every object binding before
+  any declaration and rejected the valid first chunk before Gateway dispatch.
+- Prevention: keep every sealed row, handle, field, and topological dependency
+  exact, while allowing a 1..3-row import chunk to move ahead of still-pending
+  setup bindings when that chunk resolves without them. Reinsert unmatched
+  setup and row steps into the remaining protocol and rebase each next Draft
+  revision from the latest successful receipt. Do not turn an arbitrary
+  bind-before-declare linearization into a semantic requirement.
+
 ### A reported GUID must not be parsed as a Volume value
 
 - Evidence: #60 native-Windows r30 returned the exact four requested Sound
