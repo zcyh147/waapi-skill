@@ -2330,6 +2330,26 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
 - Classification: this is a test assertion defect. It grants no Windows
   product failure and still requires the corrected full Windows Program gate.
 
+### Multi-turn integration PASS must remain independently recomputable
+
+- Trigger: #51 roots `imac-integration-4b15cd4-r1` and
+  `iwin-integration-4b15cd4-r1` each completed `INT25-HARBOR` as a three-turn
+  matrix PASS with both mutations verified, exact SoundBank artifacts, source
+  integrity, and cleanup. The outer Campaign nevertheless sealed the unit
+  BLOCKED because archived `gateway_count_exact` and `no_other_commands` were
+  present but could not be recomputed from raw evidence.
+- Cause: the archive did seal the complete selected step names and per-turn raw
+  command evidence. The independent Campaign reconstructor nevertheless passed
+  each earlier turn's partial prefix count while selecting that complete lane,
+  then incorrectly required the two lengths to be equal. It therefore selected
+  an empty protocol for the earlier turns and could not recompute their command
+  gates.
+- Prevention: validate the complete sealed lane once and permit each monotonic
+  earlier prefix to slice it, while retaining exact-name, uniqueness, mandatory
+  step, count, and tamper checks. Freeze both affected roots without replay;
+  after repair use a new root. Do not rerun Wwise merely to hide the archive
+  defect or promote the live matrix result to Campaign credit.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:

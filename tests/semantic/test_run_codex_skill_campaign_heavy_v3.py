@@ -4022,6 +4022,38 @@ def test_workflow_operations_archive_selects_any_sealed_routing_subset() -> None
     assert [step.name for step in selected] == selected_names
 
 
+def test_workflow_operations_archive_keeps_the_sealed_lane_for_earlier_turns() -> None:
+    protocol = V3GatewayProtocol(
+        steps=(
+            ExpectedGatewayStep("routing.operations", "operations"),
+            ExpectedGatewayStep("diag.query", "query-object"),
+            ExpectedGatewayStep(
+                "tx01.operation-schema",
+                "operation-schema",
+                ("object.setReference",),
+            ),
+            ExpectedGatewayStep("tx01.finish", "status"),
+        ),
+        turn_prefix_counts=(2, 4),
+        allowed_turn_prefix_counts=((1, 2), (3, 4)),
+        terminal_prefix_counts=(3, 4),
+    )
+    selected_names = [
+        "diag.query",
+        "tx01.operation-schema",
+        "tx01.finish",
+    ]
+
+    selected = campaign._consumed_heavy_v3_protocol_steps(  # noqa: SLF001
+        protocol,
+        1,
+        selected_step_names=selected_names,
+    )
+
+    assert [step.name for step in selected] == selected_names
+    assert [step.name for step in selected[:1]] == ["diag.query"]
+
+
 def test_soundbank_topic_protocol_selects_finite_stream_for_explicit_stream_case() -> None:
     steps = soundbank_topic_protocol_steps(
         scenario_id="O22-SB-GENERATED-03",

@@ -6380,7 +6380,7 @@ def _consumed_heavy_v3_protocol_steps(
     if optional_workflow_operations:
         if (
             not isinstance(selected_step_names, list)
-            or len(selected_step_names) != consumed_count
+            or not 0 <= consumed_count <= len(selected_step_names)
             or len(selected_step_names) != len(set(selected_step_names))
         ):
             return ()
