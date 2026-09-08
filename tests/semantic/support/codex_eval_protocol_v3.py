@@ -5074,6 +5074,16 @@ class V3GatewayProtocol:
             and step.subcommand == "operations"
             and not step.arguments
         }
+        workflow_query_schema_indexes = {
+            index
+            for index, step in enumerate(self.steps)
+            if step.name == "routing.query-schema"
+            and step.subcommand == "query-schema"
+            and not step.arguments
+        }
+        optional_routing_indexes = (
+            workflow_operations_indexes | workflow_query_schema_indexes
+        )
         for maximum, allowed in zip(
             self.turn_prefix_counts,
             self.allowed_turn_prefix_counts,
@@ -5081,7 +5091,7 @@ class V3GatewayProtocol:
             omitted_routing_choices = set(
                 range(
                     maximum
-                    - sum(index < maximum for index in workflow_operations_indexes),
+                    - sum(index < maximum for index in optional_routing_indexes),
                     maximum + 1,
                 )
             )

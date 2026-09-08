@@ -19,8 +19,10 @@ from tests.semantic.support.codex_business_oracle_plan_v3 import (
 from tests.semantic.support import codex_task_runner_v3 as task_runner
 from tests.semantic.support.codex_eval_protocol_v3 import (
     V3GatewayProtocol,
+    build_audio_import_composer_transaction_steps,
     build_optional_query_schema_protocol,
     build_optional_query_repair_protocol,
+    build_protocol_with_bounded_import_chunks,
     build_transaction_protocol,
     build_workflow_operations_discovery_protocol,
     build_workflow_query_schema_discovery_protocol,
@@ -373,6 +375,79 @@ def test_workflow_terminal_accepts_reviewed_query_and_revalidation_subset() -> N
     )
 
     assert task_runner._broker_terminal_protocol_passed(protocol, evidence)
+
+
+def test_workflow_terminal_accepts_broker_proven_import_rebatching() -> None:
+    steps = build_audio_import_composer_transaction_steps(
+        {
+            "contract": "waapi-skill.operation-request/v1",
+            "version": "2022.1",
+            "operation": "audio.import",
+            "arguments": {
+                "imports": [
+                    {
+                        "object_path": (
+                            "\\Actor-Mixer Hierarchy\\Default Work Unit"
+                            f"\\<Sound SFX>Sound_{index}"
+                        ),
+                        "audio_file": f"/tmp/sound-{index}.wav",
+                        "object_type": "Sound SFX",
+                        "import_language": "SFX",
+                    }
+                    for index in range(1, 7)
+                ]
+            },
+        },
+        label="tx01",
+    )
+    base = build_protocol_with_bounded_import_chunks(
+        steps=steps,
+        turn_prefix_counts=(len(steps),),
+    )
+    protocol = build_workflow_operations_discovery_protocol(base)
+    declaration_names = tuple(
+        step.name
+        for step in protocol.steps
+        if step.subcommand == "draft-declare-import-batch"
+    )
+    selected = tuple(
+        step.name
+        for step in protocol.steps
+        if step.subcommand != "draft-declare-import-batch"
+        or step.name in declaration_names[:2]
+    )
+    evidence = SimpleNamespace(
+        expected_step_names=selected,
+        consumed_step_names=selected,
+        records=tuple(
+            SimpleNamespace(step_name=name, succeeded=True) for name in selected
+        ),
+        rejected_records=(),
+        complete=True,
+        passed=True,
+        terminal_state="COMPLETE",
+        commutative_read_only_step_groups=(),
+        commutative_composer_setup_step_groups=(),
+    )
+
+    assert task_runner._broker_terminal_protocol_passed(protocol, evidence)
+
+    for invalid_declarations in (
+        declaration_names[:1],
+        (declaration_names[0], declaration_names[2]),
+    ):
+        invalid = tuple(
+            step.name
+            for step in protocol.steps
+            if step.subcommand != "draft-declare-import-batch"
+            or step.name in invalid_declarations
+        )
+        evidence.expected_step_names = invalid
+        evidence.consumed_step_names = invalid
+        evidence.records = tuple(
+            SimpleNamespace(step_name=name, succeeded=True) for name in invalid
+        )
+        assert not task_runner._broker_terminal_protocol_passed(protocol, evidence)
 
 
 def test_common_grade_ignores_one_identical_windows_preprocess_failure() -> None:

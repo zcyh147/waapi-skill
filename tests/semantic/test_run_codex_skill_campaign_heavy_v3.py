@@ -55,6 +55,7 @@ from tests.semantic.support.codex_campaign_runner import (
 )
 from tests.semantic.support.codex_eval_protocol_v3 import (
     V3GatewayProtocol,
+    build_audio_import_composer_transaction_steps,
     build_audio_import_composer_protocol,
     build_direct_protocol,
     build_metadata_transaction_protocol,
@@ -62,7 +63,9 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_optional_query_repair_protocol,
     build_optional_query_schema_protocol,
     build_optional_topic_schema_protocol,
+    build_protocol_with_bounded_import_chunks,
     build_transaction_protocol,
+    build_workflow_operations_discovery_protocol,
     query_object_step,
     topic_schema_step,
     wait_topic_step,
@@ -4078,6 +4081,70 @@ def test_workflow_operations_archive_keeps_the_sealed_lane_for_earlier_turns() -
 
     assert [step.name for step in selected] == selected_names
     assert [step.name for step in selected[:1]] == ["diag.query"]
+
+
+def test_workflow_archive_replays_from_full_import_policy_after_rebatching(
+    tmp_path: Path,
+) -> None:
+    steps = build_audio_import_composer_transaction_steps(
+        {
+            "contract": "waapi-skill.operation-request/v1",
+            "version": "2022.1",
+            "operation": "audio.import",
+            "arguments": {
+                "imports": [
+                    {
+                        "object_path": (
+                            "\\Actor-Mixer Hierarchy\\Default Work Unit"
+                            f"\\<Sound SFX>Archive_{index}"
+                        ),
+                        "audio_file": f"/tmp/archive-{index}.wav",
+                        "object_type": "Sound SFX",
+                        "import_language": "SFX",
+                    }
+                    for index in range(1, 7)
+                ]
+            },
+        },
+        label="tx01",
+    )
+    protocol = build_workflow_operations_discovery_protocol(
+        build_protocol_with_bounded_import_chunks(
+            steps=steps,
+            turn_prefix_counts=(len(steps),),
+        )
+    )
+    declaration_names = tuple(
+        step.name
+        for step in protocol.steps
+        if step.subcommand == "draft-declare-import-batch"
+    )
+    selected_names = [
+        step.name
+        for step in protocol.steps
+        if step.subcommand != "draft-declare-import-batch"
+        or step.name in declaration_names[:2]
+    ]
+
+    selected_steps = campaign._consumed_heavy_v3_protocol_steps(  # noqa: SLF001
+        protocol,
+        len(selected_names),
+        selected_step_names=selected_names,
+    )
+    options = _options(tmp_path)
+    replay = campaign._build_heavy_v3_broker_replay(  # noqa: SLF001
+        skill_source=options.skill_source,
+        invocation_skill_source=options.skill_source,
+        canonical_steps=protocol.steps,
+        execution_steps=selected_steps,
+        commutative_read_only_step_groups=(),
+        commutative_composer_setup_step_groups=(),
+        expected_wwise_version="2022.1",
+        project_modification_policy="ask_before_changes",
+    )
+
+    assert [step.name for step in selected_steps] == selected_names
+    assert len(replay._execution_steps) == len(protocol.steps)  # noqa: SLF001
 
 
 def test_soundbank_topic_protocol_selects_finite_stream_for_explicit_stream_case() -> None:

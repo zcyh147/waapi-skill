@@ -259,6 +259,7 @@ from tests.semantic.support.codex_prompt_asset_reads_v3 import (  # noqa: E402
 )
 from tests.semantic.support.codex_task_runner_v3 import (  # noqa: E402
     _normalize_turn_reference_schedule,
+    _selected_workflow_step_names_are_closed,
 )
 from tests.semantic.support.codex_harness import (  # noqa: E402
     CodexGatewayErrorExpectation,
@@ -4863,15 +4864,25 @@ def _build_heavy_v3_broker_replay(
     execution = tuple(execution_steps)
     canonical_names = tuple(step.name for step in canonical)
     execution_names = tuple(step.name for step in execution)
-    if not gateway_step_sequence_matches(
+    ordinary_linearization = gateway_step_sequence_matches(
         canonical_names,
         execution_names,
         commutative_read_only_step_groups,
         commutative_composer_setup_step_groups,
-    ):
+    )
+    import_contraction = (
+        not ordinary_linearization
+        and _selected_workflow_step_names_are_closed(
+            SimpleNamespace(steps=canonical),
+            execution_names,
+            optional_names=set(),
+        )
+    )
+    if not ordinary_linearization and not import_contraction:
         raise CampaignEvidenceError(
             "archived broker uses an undeclared protocol linearization"
         )
+    replay_execution = canonical if import_contraction else execution
 
     present_names = set(canonical_names)
     replay_read_only_groups = tuple(
@@ -4891,7 +4902,7 @@ def _build_heavy_v3_broker_replay(
             replay_setup_groups.append(present_prefix)
 
     offline_replay_preview_requests: dict[str, Mapping[str, Any]] = {}
-    for start_index, step in enumerate(execution):
+    for start_index, step in enumerate(replay_execution):
         if (
             step.subcommand != "draft-start"
             or not step.arguments
@@ -4907,23 +4918,23 @@ def _build_heavy_v3_broker_replay(
         next_start_index = next(
             (
                 index
-                for index in range(start_index + 1, len(execution))
-                if execution[index].subcommand == "draft-start"
+                for index in range(start_index + 1, len(replay_execution))
+                if replay_execution[index].subcommand == "draft-start"
             ),
-            len(execution),
+            len(replay_execution),
         )
         preview_index = next(
             (
                 index
                 for index in range(start_index + 1, next_start_index)
-                if execution[index].subcommand == "preview-from-draft"
+                if replay_execution[index].subcommand == "preview-from-draft"
             ),
             None,
         )
         if preview_index is None:
             continue
         segment = V3GatewayProtocol(
-            steps=execution[start_index : preview_index + 1],
+            steps=replay_execution[start_index : preview_index + 1],
             turn_prefix_counts=(preview_index - start_index + 1,),
         )
         for pointer, request in materialize_typed_transaction_protocol_requests(
@@ -4947,7 +4958,7 @@ def _build_heavy_v3_broker_replay(
     )
     # Offline replay never starts the Broker.  Its Draft payload validator must
     # follow the archived dependency-valid order and its rebound revision chain.
-    replay._execution_steps = list(execution)  # noqa: SLF001
+    replay._execution_steps = list(replay_execution)  # noqa: SLF001
     return replay
 
 
@@ -6275,10 +6286,38 @@ def _validate_heavy_v3_broker_result(
     )
     if value.get("runner_path") != str(expected_runner):
         raise CampaignEvidenceError("passing heavy broker runner path is misbound")
+    workflow_optional_names = {
+        *getattr(
+            protocol,
+            "optional_workflow_operations_discovery_step_names",
+            (),
+        ),
+        *getattr(
+            protocol,
+            "optional_workflow_query_schema_step_names",
+            (),
+        ),
+        *getattr(
+            protocol,
+            "optional_workflow_revalidation_step_names",
+            (),
+        ),
+    }
+    selected_name_set = set(expected_names)
+    canonical_policy_steps = (
+        tuple(
+            step
+            for step in protocol.steps
+            if step.name not in workflow_optional_names
+            or step.name in selected_name_set
+        )
+        if workflow_optional_names
+        else protocol_steps[:consumed_count]
+    )
     _validate_heavy_v3_broker_records(
         records,
         task_root=task_root,
-        canonical_steps=protocol_steps[:consumed_count],
+        canonical_steps=canonical_policy_steps,
         steps=_steps_in_consumed_order(
             protocol_steps[:consumed_count],
             consumed_names,
@@ -6411,11 +6450,11 @@ def _consumed_heavy_v3_protocol_steps(
             *optional_workflow_query_schema,
             *optional_workflow_revalidation,
         }
-        if any(name not in by_name for name in selected_step_names):
-            return ()
-        if tuple(
-            name for name in selected_step_names if name not in optional_names
-        ) != tuple(step.name for step in steps if step.name not in optional_names):
+        if not _selected_workflow_step_names_are_closed(
+            protocol,
+            selected_step_names,
+            optional_names=optional_names,
+        ):
             return ()
         return tuple(by_name[name] for name in selected_step_names)
     if getattr(protocol, "optional_initial_query_schema", False) or getattr(
@@ -6669,8 +6708,13 @@ def _validate_heavy_v3_broker_records(
                     resolved.gateway_arguments,
                 )
             except GatewayInvocationError:
-                rebound = replay._match_dependency_ready_draft_batch(  # noqa: SLF001
-                    resolved.gateway_arguments,
+                rebound = (
+                    replay._match_dependency_ready_draft_batch(  # noqa: SLF001
+                        resolved.gateway_arguments,
+                    )
+                    or replay._match_rebatched_import_rows(  # noqa: SLF001
+                        resolved.gateway_arguments,
+                    )
                 )
                 if rebound is None:
                     raise

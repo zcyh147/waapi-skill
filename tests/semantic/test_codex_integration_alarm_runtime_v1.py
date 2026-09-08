@@ -32,6 +32,10 @@ from tests.semantic.support.codex_gateway_broker import (
     ResponseBinding,
     ResponseBindingOrExactArgument,
 )
+from tests.semantic.support.codex_eval_protocol_v3 import (
+    build_workflow_operations_discovery_protocol,
+    build_workflow_query_schema_discovery_protocol,
+)
 
 
 DATA_ROOT = (
@@ -542,6 +546,29 @@ def test_protocol_exposes_six_chain_reads_optional_revalidation_and_transaction(
     ]
     assert [row.count for row in prepared.expected_dispatches] == [1]
     assert len(prepared.oracle_requirements) == 9
+
+
+def test_alarm_discovery_wrappers_keep_commutative_reads_inside_turn_one(
+    tmp_path: Path,
+) -> None:
+    prepared, _fake = _prepared(tmp_path)
+
+    wrapped = build_workflow_operations_discovery_protocol(
+        build_workflow_query_schema_discovery_protocol(prepared.protocol)
+    )
+
+    first_turn_minimum = min(wrapped.allowed_turn_prefix_counts[0])
+    optional_routing = {
+        *wrapped.optional_workflow_operations_discovery_step_names,
+        *wrapped.optional_workflow_query_schema_step_names,
+    }
+    selected_without_routing = tuple(
+        step for step in wrapped.steps if step.name not in optional_routing
+    )
+    first_turn_names = {
+        step.name for step in selected_without_routing[:first_turn_minimum]
+    }
+    assert set(wrapped.commutative_read_only_step_groups[0]) <= first_turn_names
 
 
 def test_operation_request_is_bound_to_live_sound_and_target_bus_ids(

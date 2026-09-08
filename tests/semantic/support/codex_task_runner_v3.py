@@ -659,6 +659,64 @@ def run_v3_codex_task(
     return run
 
 
+def _selected_workflow_step_names_are_closed(
+    protocol: Any,
+    selected_names: Sequence[str],
+    *,
+    optional_names: set[str],
+) -> bool:
+    """Validate optional routing plus Broker-proven 1..3-row import chunks."""
+
+    protocol_names = tuple(step.name for step in protocol.steps)
+    by_name = {step.name: step for step in protocol.steps}
+    if (
+        len(selected_names) != len(set(selected_names))
+        or any(name not in by_name for name in selected_names)
+        or tuple(protocol_names.index(name) for name in selected_names)
+        != tuple(sorted(protocol_names.index(name) for name in selected_names))
+    ):
+        return False
+    selected_required = tuple(
+        name for name in selected_names if name not in optional_names
+    )
+    selected_cursor = 0
+    protocol_cursor = 0
+    while protocol_cursor < len(protocol.steps):
+        step = protocol.steps[protocol_cursor]
+        if step.name in optional_names:
+            protocol_cursor += 1
+            continue
+        if step.subcommand != "draft-declare-import-batch":
+            if (
+                selected_cursor >= len(selected_required)
+                or selected_required[selected_cursor] != step.name
+            ):
+                return False
+            selected_cursor += 1
+            protocol_cursor += 1
+            continue
+        block: list[str] = []
+        while (
+            protocol_cursor < len(protocol.steps)
+            and protocol.steps[protocol_cursor].subcommand
+            == "draft-declare-import-batch"
+        ):
+            block.append(protocol.steps[protocol_cursor].name)
+            protocol_cursor += 1
+        selected_count = 0
+        while (
+            selected_cursor + selected_count < len(selected_required)
+            and selected_count < len(block)
+            and selected_required[selected_cursor + selected_count]
+            == block[selected_count]
+        ):
+            selected_count += 1
+        if not (len(block) + 2) // 3 <= selected_count <= len(block):
+            return False
+        selected_cursor += selected_count
+    return selected_cursor == len(selected_required)
+
+
 def _broker_terminal_protocol_passed(
     protocol: V3GatewayProtocol,
     evidence: GatewayBrokerEvidence,
@@ -738,18 +796,16 @@ def _broker_terminal_protocol_passed(
         or optional_workflow_query_schema
         or optional_workflow_revalidation
     ):
-        protocol_names = tuple(step.name for step in protocol.steps)
         optional_names = {
             *optional_workflow_operations,
             *optional_workflow_query_schema,
             *optional_workflow_revalidation,
         }
         selected_names = evidence.expected_step_names
-        if (
-            len(selected_names) != len(set(selected_names))
-            or any(name not in protocol_names for name in selected_names)
-            or tuple(name for name in selected_names if name not in optional_names)
-            != tuple(name for name in protocol_names if name not in optional_names)
+        if not _selected_workflow_step_names_are_closed(
+            protocol,
+            selected_names,
+            optional_names=optional_names,
         ):
             return False
         return selected_lane_passed(selected_names)

@@ -2429,6 +2429,34 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   a narrower path merely because the requested Bank files happen to land below
   it.
 
+### Optional routing reads must not become false turn boundaries
+
+- Trigger: #51 candidate `c4cecfd` prepared the complete Alarm fixture, then
+  stopped before Codex because adding optional `routing.query-schema` made its
+  shorter allowed prefix numerically land inside the three-read commutative
+  diagnostic group.
+- Cause: protocol validation already discounted omitted `routing.operations`
+  rows when deciding whether a group crossed a turn, but did not apply the same
+  rule to the equally explicit optional workflow `routing.query-schema` row.
+- Prevention: classify both named routing rows as optional insertions when
+  deriving real checkpoints. Preserve the complete diagnostic group in the
+  selected lane and retain the ordinary rejection for a genuine turn boundary
+  inside that group.
+
+### Archive replay must retain all canonical rows behind a merged import call
+
+- Trigger: the same macOS root completed `INT22-WEATHER` with all real-Wwise
+  business assertions passing. Its Broker combined nine canonical import rows
+  into three legal 1..3-row declarations, but terminal grading compared the
+  selected names against an uncontracted workflow and wrote
+  `protocol_terminal_passed=false`; Campaign therefore downgraded the PASS.
+- Prevention: accept only a prefix contraction of each contiguous import
+  declaration block, with `ceil(row_count/3)..row_count` calls, while keeping
+  every non-import and selected optional step exact. Independent archive replay
+  starts from the full canonical row policy and re-applies the same Broker
+  rebatching matcher to the sealed commands. Never validate a merged command
+  from only its first row or trust a terminal count without the full row pool.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:
