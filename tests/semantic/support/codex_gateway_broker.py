@@ -13,6 +13,7 @@ audit trail writable by the evaluated model.
 from __future__ import annotations
 
 import hashlib
+import hmac
 import itertools
 import json
 import math
@@ -57,7 +58,11 @@ from wwise_waapi.operation_composer import (
     parse_typed_action_cli_argument_sequence,
     typed_action_cli_arguments,
 )
-from wwise_waapi.operation_drafts import OperationDraftStore
+from wwise_waapi.operation_drafts import (
+    OperationDraftStore,
+    load_operation_draft_archive_records,
+    operation_draft_authority_digest,
+)
 from wwise_waapi.business_declaration_state import BusinessDeclarationSession
 from wwise_waapi.business_adapters import (
     business_adapter,
@@ -14115,7 +14120,14 @@ class CodexGatewayBroker:
             offline_request = self._offline_replay_preview_requests.get(
                 preview_step.name
             )
-            if offline_request is not None:
+            durable_state_directory = (
+                self._state_directory or self._existing_state_directory
+            )
+            durable_business_replay = (
+                (self.skill_source / "wwise_waapi").is_dir()
+                and durable_state_directory is not None
+            )
+            if offline_request is not None and not durable_business_replay:
                 if _normalize_audio_import_request_named_fields(
                     offline_request
                 ) != _normalize_audio_import_request_named_fields(
@@ -14125,7 +14137,7 @@ class CodexGatewayBroker:
                         "Offline business request replay differs from its sealed witness"
                     )
                 return offline_request
-            if (self.skill_source / "wwise_waapi").is_dir():
+            if durable_business_replay:
                 start_payload = self._payloads_by_step.get(start.name)
                 start_draft = (
                     start_payload.get("draft")
@@ -14147,17 +14159,47 @@ class CodexGatewayBroker:
                         "Business request replay is missing its durable Draft binding"
                     )
                 try:
-                    state_directory = (
-                        self._state_directory or self._existing_state_directory
+                    archive_replay = (
+                        self._runner_environment == {}
+                        and self._existing_state_directory is not None
                     )
-                    if state_directory is None:
-                        raise GatewayBrokerError(
-                            "offline replay has no sealed Draft state directory"
+                    if archive_replay:
+                        records_directory = (
+                            durable_state_directory
+                            / "operation-drafts-v1"
+                            / "records"
                         )
-                    record = OperationDraftStore(state_directory).inspect(
-                        draft_id,
-                        task_authority=authority,
-                    )
+                        archive_draft_ids = tuple(
+                            sorted(
+                                path.stem
+                                for path in records_directory.iterdir()
+                                if path.name.endswith(".json")
+                            )
+                        )
+                        archive_records = load_operation_draft_archive_records(
+                            durable_state_directory,
+                            archive_draft_ids,
+                            allow_cleaned_file_evidence=True,
+                        )
+                        record = archive_records.get(draft_id)
+                        if record is None:
+                            raise GatewayInvocationError(
+                                "Archived business Draft record is missing"
+                            )
+                        if not hmac.compare_digest(
+                            record.authority_digest,
+                            operation_draft_authority_digest(authority),
+                        ):
+                            raise GatewayInvocationError(
+                                "Archived business Draft authority is invalid"
+                            )
+                    else:
+                        record = OperationDraftStore(
+                            durable_state_directory
+                        ).inspect(
+                            draft_id,
+                            task_authority=authority,
+                        )
                     raw_session = (
                         record.composition.get("business_session")
                         if isinstance(record.composition, Mapping)
@@ -14168,7 +14210,7 @@ class CodexGatewayBroker:
                     replayed = adapter.materialize(
                         session,
                         allow_cleaned_file_evidence=(
-                            self._runner_environment == {}
+                            archive_replay
                             and adapter.supports_cleaned_file_evidence
                         ),
                     )

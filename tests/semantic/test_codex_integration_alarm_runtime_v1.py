@@ -29,6 +29,7 @@ from tests.semantic.support.codex_integration_workflows_v1 import (
 )
 from tests.semantic.support.codex_gateway_broker import (
     ExactArgumentAlternatives,
+    MetadataQueryArgument,
     ResponseBinding,
     ResponseBindingOrExactArgument,
 )
@@ -534,7 +535,8 @@ def test_protocol_exposes_six_chain_reads_optional_revalidation_and_transaction(
     source_binding = protocol.steps[9]
     assert source_binding.arguments[-2:] == ("--object-id", sound_id)
     assert "--meaning" in discovery.arguments
-    assert discovery.arguments[discovery.arguments.index("--meaning") + 1] == "output bus"
+    meaning = discovery.arguments[discovery.arguments.index("--meaning") + 1]
+    assert meaning == MetadataQueryArgument("output bus")
     assert "--token" not in discovery.arguments
     target_id = prepared.before_snapshot.by_key()["target_bus"].object_id
     target_binding = protocol.steps[11]

@@ -7705,6 +7705,10 @@ def test_raw_core_durable_replay_selects_the_exact_api_adapter(
         skill_source=skill,
         expected_steps=steps,
         expected_wwise_version="2025.1",
+        runner_environment={},
+        offline_replay_preview_requests={
+            preview.name: {"operation": "stale-offline-request"}
+        },
     )
     broker._state_directory = state  # noqa: SLF001
     broker._payloads_by_step[start.name] = {  # noqa: SLF001
@@ -7716,6 +7720,98 @@ def test_raw_core_durable_replay_selects_the_exact_api_adapter(
         preview
     ) == expected
     assert selected == ["ak.wwise.core.project.save"]
+
+
+def test_offline_archive_business_replay_uses_cleaned_file_codec(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    steps = build_core_business_transaction_steps(
+        api="ak.wwise.core.project.save",
+        version="2025.1",
+        label="tx01",
+    )
+    start = next(step for step in steps if step.subcommand == "draft-start")
+    preview = next(
+        step for step in steps if step.subcommand == "preview-from-draft"
+    )
+    expected = preview.expected_operation_request
+    assert expected is not None
+    skill = make_fake_skill(tmp_path)
+    (skill / "wwise_waapi").mkdir()
+    state = (tmp_path / "state").resolve()
+    state.mkdir()
+    authority = "da1-" + "2" * 40
+    draft_id = "od1-" + "1" * 32
+    records = state / "operation-drafts-v1" / "records"
+    records.mkdir(parents=True)
+    (records / f"{draft_id}.json").write_text("{}\n", encoding="utf-8")
+    observed: dict[str, Any] = {}
+    session = SimpleNamespace(
+        handles=SimpleNamespace(as_dict=lambda: {"objects": []})
+    )
+
+    def load_archive(
+        supplied_state: Path,
+        draft_ids: tuple[str, ...],
+        *,
+        allow_cleaned_file_evidence: bool,
+    ) -> dict[str, SimpleNamespace]:
+        observed.update(
+            state=supplied_state,
+            draft_ids=draft_ids,
+            allow_cleaned_file_evidence=allow_cleaned_file_evidence,
+        )
+        return {
+            draft_id: SimpleNamespace(
+                authority_digest=broker_module.operation_draft_authority_digest(
+                    authority
+                ),
+                composition={"business_session": {}},
+            )
+        }
+
+    monkeypatch.setattr(
+        broker_module,
+        "load_operation_draft_archive_records",
+        load_archive,
+    )
+    monkeypatch.setattr(
+        broker_module.BusinessDeclarationSession,
+        "from_dict",
+        lambda _value: session,
+    )
+    monkeypatch.setattr(
+        broker_module,
+        "business_adapter",
+        lambda _operation: SimpleNamespace(
+            supports_cleaned_file_evidence=True,
+            materialize=lambda *_args, **_kwargs: expected,
+        ),
+    )
+    broker = CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=steps,
+        expected_wwise_version="2025.1",
+        runner_environment={},
+        existing_state_directory=state,
+        offline_replay_preview_requests={
+            preview.name: {"operation": "stale-offline-request"}
+        },
+    )
+    broker._payloads_by_step[start.name] = {  # noqa: SLF001
+        "task_authority": authority,
+        "draft": {"draft_id": draft_id},
+    }
+
+    assert broker._replay_expected_operation_draft_request(  # noqa: SLF001
+        preview
+    ) == expected
+    assert observed == {
+        "state": state,
+        "draft_ids": (draft_id,),
+        "allow_cleaned_file_evidence": True,
+    }
 
 
 def test_object_set_durable_replay_accepts_bound_ids_and_omitted_fail_default(

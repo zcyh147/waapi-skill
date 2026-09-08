@@ -2456,6 +2456,26 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   starts from the full canonical row policy and re-applies the same Broker
   rebatching matcher to the sealed commands. Never validate a merged command
   from only its first row or trust a terminal count without the full row pool.
+- A passing scenario removes its owned input WAVs during cleanup. Replaying the
+  sealed Draft through the live Store parser then fails before authority or
+  request comparison because live parsing correctly requires those files to
+  exist. Archive verification must enumerate the complete sealed Draft-record
+  set, use the read-only archive codec with cleaned-file evidence enabled,
+  verify the stored authority digest, and materialize from that durable session.
+  The precomputed offline request is only a fallback when no durable Draft is
+  available; it must not override richer sealed state.
+
+### Metadata meanings are bounded natural language, not magic phrases
+
+- Trigger: macOS #51 Alarm diagnosed the exact broken Sound and target Bus, but
+  wrote `Sound output bus` where the protocol had frozen the phrase
+  `output bus`. The Broker rejected the semantically equivalent lookup before
+  Gateway discovery.
+- Prevention: represent `draft-discover-fields --meaning` with the existing
+  bounded natural-language argument contract. Mutation authority still comes
+  only from the returned live field handle, exact token/kind/scope validation,
+  checked Draft, and canonical Preview. Do not require one English phrase when
+  the public Gateway deliberately owns synonym resolution.
 
 ## New-root preflight
 

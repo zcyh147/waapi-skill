@@ -3945,7 +3945,7 @@ def build_object_metadata_business_transaction_steps(
         "--object-handle",
         source_handle,
         "--meaning",
-        discovery_meaning,
+        MetadataQueryArgument(discovery_meaning),
     ]
     if "platform" in arguments:
         discover_arguments.extend(("--platform", str(arguments["platform"])))
