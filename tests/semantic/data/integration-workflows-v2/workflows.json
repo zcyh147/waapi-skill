@@ -906,7 +906,7 @@
         {
           "index": 1,
           "kind": "audit_request",
-          "prompt": "请只读检查 {weapons_audit_root_path} 下面的 Sound：名称没有使用 RFL_ 前缀、输出没有指向 {weapons_bus_path}、音量高于 0 dB，或者 Notes 中没有 release-ready 的对象都列出来。对清单中出现的每个不同输出总线，再分别核对它的完整路径和类型后报告。请逐项说明对象路径和违反了哪些规则；范围外的同名对象不要算进去，这一轮不要修改工程。",
+          "prompt": "请只读检查 {weapons_audit_root_path} 下面的 Sound，最多返回 6 个 Sound。这个审计范围路径是完整的不透明业务值，请逐字保留这个审计范围路径的各段名称，不要替换层级根的写法。名称没有使用 RFL_ 前缀、输出没有指向 {weapons_bus_path}、音量高于 0 dB，或者 Notes 中没有 release-ready 的对象都列出来。对清单中出现的每个不同输出总线，再分别核对它的完整路径和类型后报告。请逐项说明对象路径和违反了哪些规则；范围外的同名对象不要算进去，这一轮不要修改工程。",
           "confirms_transaction": null,
           "expects_preview_transaction": null
         },

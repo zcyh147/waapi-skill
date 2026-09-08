@@ -28,7 +28,7 @@ Do not call `operations`, `operation-schema`, or `request-schema` first. Without
 
 For a prior-query subset, finish the selected-subset identity gate first: exact-ID read back every selected GUID and match name/type/path. These bounded read-only checks precede the transaction contract and never replace schema/metadata.
 
-Choose one first transaction-contract branch. Natural language is not an exact operation; use a supplied name or run compact `operations` once and copy its `next_command`.
+A new natural-language change starts with one compact `operations` lookup; only its returned route selects the first transaction contract. An exact user operation/URI skips it.
 
 | Request | First transaction-contract sequence |
 |---|---|
@@ -151,7 +151,7 @@ For every later phase, execute only the field named by `next_command.copy_instru
 - executed-unverified runs verify only;
 - a verify-only request never executes.
 
-The confirmation token binds the exact stored Preview. Never reconstruct/substitute it or run `confirm --help`. For ordered multi-transaction work, continue only after the prior item reaches terminal verification. Never infer, add, combine, or reorder an item. Each later intended change still creates its own executable preview; completing one does not turn the next one into a design-only preview.
+The confirmation token binds the exact stored Preview. Never reconstruct/substitute it or run `confirm --help`. For ordered multi-transaction work, after the prior item reaches terminal verification, a successful `verify` immediately starts the next already-requested transaction in the same turn and stops only when its executable Preview is visible. Never infer, add, combine, reorder, or turn later items design-only.
 
 ## Terminal states
 

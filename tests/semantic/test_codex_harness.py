@@ -2185,7 +2185,8 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "all dynamic tokens pre-draft" in instructions
     assert "single existing=>--object GUID" in instructions
     assert "--object-type only new/imported/plural" in instructions
-    assert "reread pre-schema" in instructions
+    assert "subset reread only" in instructions
+    assert "no exact-type-name; reread pre-schema" not in instructions
     assert "path=>by_path_segments one arg/segment" in instructions
     assert "SoundBank=>role_route" in instructions
     assert "exact bank=>soundbank.by_exact_name" in instructions

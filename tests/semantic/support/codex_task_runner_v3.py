@@ -27,6 +27,7 @@ from tests.semantic.support.codex_gateway_broker import (
     TrustedSubscriptionAckSpec,
     TrustedStepObserver,
     TrustedStepPreObserver,
+    business_draft_setup_step_prefix,
     gateway_step_sequence_matches,
 )
 from tests.semantic.support.codex_gateway_contracts import (
@@ -677,32 +678,27 @@ def _selected_workflow_step_names_are_closed(
 ) -> bool:
     """Validate optional routing plus Broker-proven 1..3-row import chunks."""
 
-    protocol_names = tuple(step.name for step in protocol.steps)
     by_name = {step.name: step for step in protocol.steps}
     if (
         len(selected_names) != len(set(selected_names))
         or any(name not in by_name for name in selected_names)
-        or tuple(protocol_names.index(name) for name in selected_names)
-        != tuple(sorted(protocol_names.index(name) for name in selected_names))
     ):
         return False
-    selected_required = tuple(
-        name for name in selected_names if name not in optional_names
-    )
-    selected_cursor = 0
+    selected_set = set(selected_names)
+    canonical_selected: list[str] = []
+    rebatched_regions: list[tuple[int, tuple[str, ...], tuple[str, ...]]] = []
     protocol_cursor = 0
     while protocol_cursor < len(protocol.steps):
         step = protocol.steps[protocol_cursor]
         if step.name in optional_names:
+            if step.name in selected_set:
+                canonical_selected.append(step.name)
             protocol_cursor += 1
             continue
         if step.subcommand != "draft-declare-import-batch":
-            if (
-                selected_cursor >= len(selected_required)
-                or selected_required[selected_cursor] != step.name
-            ):
+            if step.name not in selected_set:
                 return False
-            selected_cursor += 1
+            canonical_selected.append(step.name)
             protocol_cursor += 1
             continue
         block: list[str] = []
@@ -713,18 +709,49 @@ def _selected_workflow_step_names_are_closed(
         ):
             block.append(protocol.steps[protocol_cursor].name)
             protocol_cursor += 1
-        selected_count = 0
-        while (
-            selected_cursor + selected_count < len(selected_required)
-            and selected_count < len(block)
-            and selected_required[selected_cursor + selected_count]
-            == block[selected_count]
-        ):
-            selected_count += 1
+        selected_block = tuple(name for name in block if name in selected_set)
+        selected_count = len(selected_block)
         if not (len(block) + 2) // 3 <= selected_count <= len(block):
             return False
-        selected_cursor += selected_count
-    return selected_cursor == len(selected_required)
+        if selected_block != tuple(block[:selected_count]):
+            return False
+
+        transaction_prefix = step.name.split(".", 1)[0]
+        setup_start = len(canonical_selected)
+        while setup_start > 0:
+            setup_name = canonical_selected[setup_start - 1]
+            if business_draft_setup_step_prefix(setup_name) != transaction_prefix:
+                break
+            setup_start -= 1
+        setup_names = tuple(canonical_selected[setup_start:])
+        region_start = setup_start
+        canonical_selected.extend(selected_block)
+        if setup_names:
+            rebatched_regions.append(
+                (region_start, setup_names, selected_block)
+            )
+
+    if set(canonical_selected) != selected_set:
+        return False
+
+    normalized = list(selected_names)
+    for start, setup_names, declaration_names in rebatched_regions:
+        canonical_region = (*setup_names, *declaration_names)
+        width = len(canonical_region)
+        actual_region = tuple(normalized[start : start + width])
+        allowed_regions = {
+            (
+                *setup_names[:split],
+                declaration_names[0],
+                *setup_names[split:],
+                *declaration_names[1:],
+            )
+            for split in range(len(setup_names) + 1)
+        }
+        if actual_region not in allowed_regions:
+            continue
+        normalized[start : start + width] = canonical_region
+    return tuple(normalized) == tuple(canonical_selected)
 
 
 def _broker_terminal_protocol_passed(

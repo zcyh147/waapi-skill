@@ -2508,6 +2508,13 @@ _BUSINESS_DRAFT_SETUP_STEP_RE = re.compile(
     r"bind-(?:target|reference)-\d{2}-\d{2}|discover-field-\d{2}|"
     r"declare-(?:(?:new|existing)-\d{2}|existing-batch))$"
 )
+
+
+def business_draft_setup_step_prefix(step_name: str) -> str | None:
+    """Return the sealed transaction prefix for a dependency-ready setup step."""
+
+    match = _BUSINESS_DRAFT_SETUP_STEP_RE.fullmatch(step_name)
+    return match.group("prefix") if match is not None else None
 _BUSINESS_DRAFT_REVISION_SUBCOMMANDS = DRAFT_REVISION_SUBCOMMANDS - {
     "draft-apply",
     "draft-cancel",

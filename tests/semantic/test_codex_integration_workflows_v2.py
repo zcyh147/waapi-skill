@@ -252,6 +252,8 @@ def test_prompts_are_natural_and_encode_the_three_business_acceptance_cases() ->
     assert footsteps.fixture.parameters["structure_row"]["switch_assignment"] == "Snow"
 
     assert "这一轮不要修改工程" in audit.turns[0].prompt
+    assert "最多返回 6 个 Sound" in audit.turns[0].prompt
+    assert "逐字保留这个审计范围路径" in audit.turns[0].prompt
     assert "Legacy_Rifle_Reference 和 RFL_Intentional_Hot 是有意保留的例外" in audit.turns[1].prompt
     assert audit.fixture.parameters["identity_readback"] == "exact_id_before_preview"
     assert len(audit.fixture.parameters["selected_corrections"]) == 3

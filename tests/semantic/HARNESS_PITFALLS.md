@@ -2868,6 +2868,54 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   every reflected class a business type and do not weaken the Agent's genuine
   ambiguity stop rule.
 
+### Final classification must preserve Broker-proven import rebatching
+
+- Trigger: macOS Weather completed all three transactions, every turn gate,
+  the independent business oracle, and a 41-command terminal Broker protocol.
+  The matrix recorded PASS, but campaign sealing downgraded it to BLOCKED
+  because the final validator restored the original linear setup order instead
+  of the Broker-selected dependency-ready order.
+- Prevention: terminal validation accepts only the same sealed 1–3-row import
+  partitions already authenticated by the Broker, including one first chunk
+  before the remaining same-transaction setup bindings. Every non-optional
+  step, row, confirmation, execute, and verify remains required and ordered;
+  this is not permission to reorder arbitrary transaction phases.
+
+### Selected-subset readback shorthand must not invite diagnostic rereads
+
+- Trigger: three Alarm tasks completed the six reviewed Event-to-Bus diagnostic
+  reads, then repeated the exact Sound query before opening the correction
+  schema. The Broker rejected the seventh request before Gateway/Wwise. The
+  Fresh-only bootstrap phrase `reread pre-schema` had erased the production
+  condition that readback applies only after the user selects a subset from
+  multiple candidates.
+- Prevention: keep the full condition in the Skill and use only the compact
+  `subset reread only` reminder in the sealed developer instruction. A single
+  exact diagnostic hop is already identified and is not a mutation-subset
+  selection.
+
+### Import rebatching never waives row completeness
+
+- Trigger: native-Windows Footsteps combined the Snow parent and two child
+  Sounds into one valid-size import chunk but omitted the parent's requested
+  `switch_value=Snow`. The fallback diagnostic reported only an argument-count
+  mismatch after semantic rebatching found no exact sealed match.
+- Prevention: retain the Gateway continuation's `row_completeness` rule: every
+  known field, event, media item, and Switch assignment travels with its row.
+  Rebatching may change only command boundaries around the same sealed rows; it
+  never supplies a missing business value or grants PASS to a partial row.
+
+### Ordered workflows advance to the next Preview after verification
+
+- Trigger: Windows Weather and Harbor correctly previewed, confirmed, executed,
+  and verified an earlier transaction, then replied while the same user request
+  still contained a later ordered transaction. The Broker remained at a valid
+  partial prefix, so Wwise state was correct but the workflow was incomplete.
+- Prevention: after terminal `verify`, immediately start the next
+  already-requested transaction in the same turn and stop only when its
+  executable Preview is visible. This does not combine transactions or infer a
+  new item; it makes the existing ordered-work completion criterion explicit.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:

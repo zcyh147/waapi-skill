@@ -785,7 +785,12 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "selected-subset identity gate" in OPERATE
     assert "exact-ID read back every selected" in OPERATE
     assert "These bounded read-only checks precede the transaction contract" in OPERATE
-    assert "first transaction-contract branch" in OPERATE
+    assert "first transaction contract" in OPERATE
+    assert (
+        "A new natural-language change starts with one compact `operations` "
+        "lookup; only its returned route selects the first transaction contract"
+        in compact
+    )
     assert "explicitly requested unknown dynamic property/reference token" in OPERATE
     assert "one metadata discovery first, then its named `operation-schema`" in OPERATE
     assert "A named operation using only closed schema fields and side effects" in OPERATE
@@ -829,14 +834,9 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "there is no caller-authored request document" in OPERATE
     assert "Public mutation identities are closed" in OPERATE
     assert "`exact-type-name`" in OPERATE
-    assert (
-        "Each later intended change still creates its own executable preview"
-        in OPERATE
-    )
-    assert (
-        "does not turn the next one into a design-only preview"
-        in OPERATE
-    )
+    assert "next already-requested transaction" in OPERATE
+    assert "its executable Preview is visible" in OPERATE
+    assert "turn later items design-only" in OPERATE
 
 
 def test_operate_business_selection_and_execution_domains_remain_explicit() -> None:
@@ -1113,7 +1113,12 @@ def test_operate_policy_and_gateway_owned_continuation_are_closed() -> None:
     assert "a status/check request stops after `transaction-show`" in compact
     assert "a verify-only request never executes" in compact
     assert "after the prior item reaches terminal verification" in compact
-    assert "Never infer, add, combine, or reorder an item" in compact
+    assert (
+        "a successful `verify` immediately starts the next already-requested "
+        "transaction in the same turn and stops only when its executable Preview "
+        "is visible"
+    ) in compact
+    assert "Never infer, add, combine, reorder, or turn later items design-only" in compact
     assert (
         "Even when the same request names later independent changes, run no more "
         "Gateway commands in that turn"

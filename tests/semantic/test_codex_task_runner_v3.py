@@ -450,6 +450,82 @@ def test_workflow_terminal_accepts_broker_proven_import_rebatching() -> None:
         assert not task_runner._broker_terminal_protocol_passed(protocol, evidence)
 
 
+def test_workflow_terminal_accepts_rebatch_before_dependency_ready_setup() -> None:
+    steps = tuple(
+        SimpleNamespace(name=name, subcommand=subcommand, arguments=())
+        for name, subcommand in (
+            ("routing.operations", "operations"),
+            ("tx01.operation-schema", "operation-schema"),
+            ("tx01.draft-start", "draft-start"),
+            ("tx01.bind-object.001", "draft-bind-object"),
+            ("tx01.bind-object.002", "draft-bind-object"),
+            ("tx01.bind-object.003", "draft-bind-object"),
+            *(
+                (
+                    "tx01.declare-batch"
+                    if index == 1
+                    else f"tx01.declare-batch-{index:02d}",
+                    "draft-declare-import-batch",
+                )
+                for index in range(1, 10)
+            ),
+            ("tx01.check", "draft-check"),
+            ("tx01.preview", "preview-from-draft"),
+            ("tx01.verify", "verify"),
+            ("routing.operations.tx02.operation-schema", "operations"),
+            ("tx02.operation-schema", "operation-schema"),
+            ("tx02.verify", "verify"),
+        )
+    )
+    selected = (
+        "routing.operations",
+        "tx01.operation-schema",
+        "tx01.draft-start",
+        "tx01.bind-object.001",
+        "tx01.bind-object.002",
+        "tx01.declare-batch",
+        "tx01.bind-object.003",
+        "tx01.declare-batch-02",
+        "tx01.declare-batch-03",
+        "tx01.check",
+        "tx01.preview",
+        "tx01.verify",
+        "tx02.operation-schema",
+        "tx02.verify",
+    )
+    protocol = SimpleNamespace(
+        steps=steps,
+        accepted_terminal_prefixes=(len(selected),),
+        optional_query_schema_step_names=(),
+        optional_initial_query_schema=False,
+        optional_initial_operations_discovery=False,
+        optional_workflow_operations_discovery_step_names=(
+            "routing.operations",
+            "routing.operations.tx02.operation-schema",
+        ),
+        optional_workflow_query_schema_step_names=(),
+        optional_workflow_revalidation_step_names=(),
+        optional_topic_schema_step_groups=(),
+        commutative_read_only_step_groups=(),
+        commutative_composer_setup_step_groups=(),
+    )
+    evidence = SimpleNamespace(
+        expected_step_names=selected,
+        consumed_step_names=selected,
+        records=tuple(
+            SimpleNamespace(step_name=name, succeeded=True) for name in selected
+        ),
+        rejected_records=(),
+        complete=True,
+        passed=True,
+        terminal_state="COMPLETE",
+        commutative_read_only_step_groups=(),
+        commutative_composer_setup_step_groups=(),
+    )
+
+    assert task_runner._broker_terminal_protocol_passed(protocol, evidence)
+
+
 def test_common_grade_ignores_one_identical_windows_preprocess_failure() -> None:
     result = _result(turn=1, gateway_count=2)
     successful = result.command_facts.command_records[0]
