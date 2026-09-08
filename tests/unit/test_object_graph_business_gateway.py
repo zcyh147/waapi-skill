@@ -53,6 +53,24 @@ class FakeClient:
         return None
 
 
+class MetadataFakeClient(FakeClient):
+    def __init__(
+        self,
+        responses: Mapping[str, Sequence[Any]],
+        metadata_by_name: Mapping[str, Mapping[str, Any]],
+    ) -> None:
+        super().__init__(responses)
+        self.metadata_by_name = dict(metadata_by_name)
+
+    def call(self, uri: str, args: Any = None, options: Any = None) -> Any:
+        if uri == "ak.wwise.core.object.getPropertyAndReferenceNames":
+            return {"return": list(self.metadata_by_name)}
+        if uri == "ak.wwise.core.object.getPropertyInfo":
+            assert isinstance(args, Mapping)
+            return self.metadata_by_name[str(args["property"])]
+        return super().call(uri, args, options)
+
+
 def _env(tmp_path: Path) -> dict[str, str]:
     config = tmp_path / "config.json"
     config.write_text(
@@ -1469,15 +1487,21 @@ def test_object_set_batch_declares_meanings_with_per_object_metadata_revalidatio
         "display": {"name": "Delay", "group": "Action"},
         "supports": {"unlink": True},
     }
-    batch_client = _live_client(
-        tmp_path,
+    delayed_resume = {
+        "name": "PauseDelayedResumeAction",
+        "type": "Boolean",
+        "display": {"name": "Pause Delayed Resume Action", "group": "Action"},
+        "supports": {"unlink": True},
+    }
+    batch_client = MetadataFakeClient(
         {
-            "ak.wwise.core.object.getPropertyAndReferenceNames": [
-                {"return": ["FadeTime", "Delay"]} for _ in range(12)
-            ],
-            "ak.wwise.core.object.getPropertyInfo": [
-                item for _ in range(6) for item in (fade, delay)
-            ],
+            "ak.wwise.core.getInfo": [_info()],
+            "ak.wwise.core.getProjectInfo": [_project(tmp_path)],
+        },
+        {
+            "FadeTime": fade,
+            "Delay": delay,
+            "PauseDelayedResumeAction": delayed_resume,
         },
     )
     batch_code, batch = gateway.execute_gateway(
@@ -1508,7 +1532,7 @@ def test_object_set_batch_declares_meanings_with_per_object_metadata_revalidatio
             "--field-meaning-value",
             "rain",
             "Fade Time",
-            "0.25",
+            "0.25 seconds",
             "--field-meaning-value",
             "rain",
             "Delay",
@@ -1559,6 +1583,12 @@ def test_object_set_batch_declares_meanings_with_per_object_metadata_revalidatio
         PARENT_ID,
         SECOND_ACTION_ID,
         THIRD_ACTION_ID,
+    }
+    tokens = {field["handle"]: field["token"] for field in fields}
+    rain_values = session["declarations"][0]["fields"]["field_values"]
+    assert {tokens[handle]: value for handle, value in rain_values.items()} == {
+        "FadeTime": 0.25,
+        "Delay": 0.0,
     }
 
 

@@ -11746,6 +11746,40 @@ class CodexGatewayBroker:
             return tuple(actual)
         actual_by_key = dict(zip(actual_keys, actual_groups, strict=True))
         expected_by_key = dict(zip(expected_keys, expected_groups, strict=True))
+
+        def normalized_business_value(expected_key: tuple[str, ...]) -> Any:
+            actual_group = actual_by_key[expected_key]
+            expected_group = expected_by_key[expected_key]
+            actual_value = actual_group[3]
+            if (
+                actual_group[0] != "--field-meaning-value"
+                or expected_key[2] not in {"fadetime", "delay"}
+                or not isinstance(actual_value, str)
+                or not isinstance(expected_group[3], str)
+            ):
+                return actual_value
+            matched = re.fullmatch(
+                r"([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)\s*"
+                r"(ms|millisecond|milliseconds|s|sec|secs|second|seconds|秒)",
+                actual_value.strip(),
+                flags=re.IGNORECASE,
+            )
+            if matched is None:
+                return actual_value
+            try:
+                value = Decimal(matched.group(1))
+                if matched.group(2).casefold() in {
+                    "ms",
+                    "millisecond",
+                    "milliseconds",
+                }:
+                    value /= Decimal(1000)
+                if value == Decimal(expected_group[3]):
+                    return expected_group[3]
+            except InvalidOperation:
+                return actual_value
+            return actual_value
+
         return (
             *tuple(actual[:fixed_count]),
             *(
@@ -11756,7 +11790,7 @@ class CodexGatewayBroker:
                         actual_by_key[expected_key][0],
                         actual_by_key[expected_key][1],
                         expected_by_key[expected_key][2],
-                        actual_by_key[expected_key][3],
+                        normalized_business_value(expected_key),
                     )
                     if actual_by_key[expected_key][0]
                     == "--field-meaning-value"

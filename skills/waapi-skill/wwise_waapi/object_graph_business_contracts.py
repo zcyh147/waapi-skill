@@ -206,6 +206,12 @@ def object_graph_business_contract_data(
                 "existing_batch": {
                     "maximum_rows": 8,
                     "field_input": "user_facing_meaning_and_business_value",
+                    "business_quantities": {
+                        "action_time": {
+                            "accepted_units": ["seconds", "milliseconds"],
+                            "canonical_unit": "seconds",
+                        }
+                    },
                     "metadata_revalidation": "each_exact_bound_object",
                     "atomic_revision": True,
                 },

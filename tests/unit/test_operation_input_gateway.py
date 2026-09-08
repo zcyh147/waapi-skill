@@ -677,6 +677,12 @@ def test_normal_object_set_schema_and_detail_expose_only_business_input(
         "draft-declare-existing-batch",
         "draft-declare-new",
     ]
+    assert adapter["declaration"]["existing_batch"]["business_quantities"] == {
+        "action_time": {
+            "accepted_units": ["seconds", "milliseconds"],
+            "canonical_unit": "seconds",
+        }
+    }
     encoded = json.dumps(schema)
     for native_term in (
         "registry_fragments",

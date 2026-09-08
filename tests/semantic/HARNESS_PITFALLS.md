@@ -2568,6 +2568,14 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   `Fade Time` are one meaning here), while keeping row identity and business
   values exact. Otherwise the harness rejects a command the public Gateway is
   designed to accept.
+  Live lexical discovery can return both an exact field and weaker related
+  candidates (for example `Delay` and a delayed-resume option). The batch seam
+  must prefer one unique normalized exact token/display-name match; it must not
+  fail merely because bounded retrieval also returned a weaker candidate.
+  Time-valued Action fields accept explicit seconds or milliseconds as business
+  quantities and normalize them before field-range validation. The Broker may
+  equate such units only to the same sealed numeric value; object identity,
+  field identity, and the resulting seconds value remain exact.
 
 ## New-root preflight
 

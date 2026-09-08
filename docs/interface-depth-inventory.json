@@ -153799,7 +153799,7 @@
     "contract": "waapi-skill.typed-request-surface/v1",
     "total_lanes": 824
   },
-  "inventory_sha256": "1b05603da69419b76b3be78d694e91ecef683fce34601c4096102e462c88a864",
+  "inventory_sha256": "2cbc24460eec2d574a9faad00a1f57db79d199ab9616cdb23e09e8b364670b06",
   "mechanic_owners": {
     "ambiguous_continuation_selection": "gateway_derivation",
     "batch_layout": "gateway_derivation",
@@ -182993,7 +182993,7 @@
       "argument_contract_sha256": "8d659d069444675b4102be7b4ffb7035bb3aa6d648d4c6c4bf21d7e43843c1cd",
       "audit_evidence": "The public object-graph-business/v1 Adapters accept named hierarchy outcomes, plug-in roles, stable business fields including the unambiguous ignore-parent-instance-limit intent, exact user artifacts, references, and RTPC points; bind opaque object, field, plug-in-type, control-input, and output-bus handles; compile exact Wwise types, paths, metadata scope/tokens, dependency order, batch row and Switch-assignment counts, revisions, native requests, and phase-relevant copy-ready continuations into one Preview inside the Gateway. The pre-#78 Composer action vocabulary, ambiguous override-parent field, caller-supplied batch counts, and normal fallback are removed. #78 retains five-version deterministic and exact macOS/Windows 2022.1 and 2025.1 real-host evidence; repaired-candidate Terra Fresh Agent Weather remains an open release gate rather than inherited evidence.",
       "classification": "named-object-creation-graph",
-      "contract_sha256": "bd1cac542d67a2ea752c800dfa161c7b044d9d828c1f2161f2f21df9332edcff",
+      "contract_sha256": "023e0259a6135b3902b42f514011aba667ed2c0f474537ebc810bde6762ca548",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -183020,7 +183020,7 @@
       "argument_contract_sha256": "8d659d069444675b4102be7b4ffb7035bb3aa6d648d4c6c4bf21d7e43843c1cd",
       "audit_evidence": "The public object-graph-business/v1 Adapters accept named hierarchy outcomes, plug-in roles, stable business fields including the unambiguous ignore-parent-instance-limit intent, exact user artifacts, references, and RTPC points; bind opaque object, field, plug-in-type, control-input, and output-bus handles; compile exact Wwise types, paths, metadata scope/tokens, dependency order, batch row and Switch-assignment counts, revisions, native requests, and phase-relevant copy-ready continuations into one Preview inside the Gateway. The pre-#78 Composer action vocabulary, ambiguous override-parent field, caller-supplied batch counts, and normal fallback are removed. #78 retains five-version deterministic and exact macOS/Windows 2022.1 and 2025.1 real-host evidence; repaired-candidate Terra Fresh Agent Weather remains an open release gate rather than inherited evidence.",
       "classification": "named-object-creation-graph",
-      "contract_sha256": "8d50f6f9292a3ba9af174a4b848cd8d29170fb74d935aeebc0aa23e67a0f920e",
+      "contract_sha256": "aad685a0d58b2c1aae41dfb2eaa05be03aaec076bb19ce5fbaf141880ea508f6",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -183047,7 +183047,7 @@
       "argument_contract_sha256": "8d659d069444675b4102be7b4ffb7035bb3aa6d648d4c6c4bf21d7e43843c1cd",
       "audit_evidence": "The public object-graph-business/v1 Adapters accept named hierarchy outcomes, plug-in roles, stable business fields including the unambiguous ignore-parent-instance-limit intent, exact user artifacts, references, and RTPC points; bind opaque object, field, plug-in-type, control-input, and output-bus handles; compile exact Wwise types, paths, metadata scope/tokens, dependency order, batch row and Switch-assignment counts, revisions, native requests, and phase-relevant copy-ready continuations into one Preview inside the Gateway. The pre-#78 Composer action vocabulary, ambiguous override-parent field, caller-supplied batch counts, and normal fallback are removed. #78 retains five-version deterministic and exact macOS/Windows 2022.1 and 2025.1 real-host evidence; repaired-candidate Terra Fresh Agent Weather remains an open release gate rather than inherited evidence.",
       "classification": "named-object-creation-graph",
-      "contract_sha256": "6ca6f61b19e501d27f252beb3d0d10befa2b15bcd7ebcabe801c4aea4aa9d78c",
+      "contract_sha256": "65ff17398ea18fec9286e18c3e5a71d5c65cd4460c21a114eb555285a26aa973",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -183074,7 +183074,7 @@
       "argument_contract_sha256": "8d659d069444675b4102be7b4ffb7035bb3aa6d648d4c6c4bf21d7e43843c1cd",
       "audit_evidence": "The public object-graph-business/v1 Adapters accept named hierarchy outcomes, plug-in roles, stable business fields including the unambiguous ignore-parent-instance-limit intent, exact user artifacts, references, and RTPC points; bind opaque object, field, plug-in-type, control-input, and output-bus handles; compile exact Wwise types, paths, metadata scope/tokens, dependency order, batch row and Switch-assignment counts, revisions, native requests, and phase-relevant copy-ready continuations into one Preview inside the Gateway. The pre-#78 Composer action vocabulary, ambiguous override-parent field, caller-supplied batch counts, and normal fallback are removed. #78 retains five-version deterministic and exact macOS/Windows 2022.1 and 2025.1 real-host evidence; repaired-candidate Terra Fresh Agent Weather remains an open release gate rather than inherited evidence.",
       "classification": "named-object-creation-graph",
-      "contract_sha256": "4b836d1c2ae7e8f14efba4a643bbe3a50d933baa17e4cf860dd5c25ff5bd7ab5",
+      "contract_sha256": "9ad48ee4513ea416e476a0761110a88863cd1135dbdf9901cfa30b8d7f63d254",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -185404,7 +185404,7 @@
   },
   "source_contracts": {
     "gateway_parser_sha256": "ca00ffa07e9eeffb6905726ed8a2378488c9343cff76ad3b72002a7a11180409",
-    "operation_contract_sha256": "ce75a8dc65a06d8d040a939ab61728677995c6664ef74e43dd25b817456b24ef",
+    "operation_contract_sha256": "cd076ac9c4be3028bc5dec6b5d42f34352a879f23d965ab7ad6843966dc282e5",
     "public_continuation_sha256": "c5dd9de956bf7b393c2c4b38c80561940d0873f6695acc2e5a635a7ad2bd8ee3",
     "typed_request_surface_sha256": "7cbe0a9ba6d9756c94ecea58bb1b2ac56da242059f17c5cdfdaf768271d133a8"
   },

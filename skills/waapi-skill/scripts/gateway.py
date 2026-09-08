@@ -404,6 +404,7 @@ from wwise_waapi.business_declarations import (  # noqa: E402  # pyright: ignore
     BusinessContext,
     BusinessDeclarationError,
     BusinessHandleRegistry,
+    BoundFieldHandle,
     ExistingObjectTarget,
     NewDescendantTarget,
     bind_live_field,
@@ -15109,6 +15110,31 @@ def _parse_business_value(value_type: str, raw: str, *, field: str) -> Any:
     raise GatewayInputError(f"{field} has an unsupported business value type")
 
 
+def _parse_bound_field_business_value(
+    bound: BoundFieldHandle,
+    raw: str,
+    *,
+    field: str,
+) -> Any:
+    """Parse one live field value, retaining only reviewed business units."""
+
+    if bound.value_type == "number" and bound.token in {"FadeTime", "Delay"}:
+        matched = re.fullmatch(
+            r"([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)\s*"
+            r"(ms|millisecond|milliseconds|s|sec|secs|second|seconds|秒)",
+            raw.strip(),
+            flags=re.IGNORECASE,
+        )
+        if matched is not None:
+            value = float(matched.group(1))
+            if matched.group(2).casefold() in {"ms", "millisecond", "milliseconds"}:
+                value /= 1000.0
+            if not math.isfinite(value):
+                raise GatewayInputError(f"{field} requires a finite time value")
+            return value
+    return _parse_business_value(bound.value_type, raw, field=field)
+
+
 def _parse_audio_import_business_fields(
     session: BusinessDeclarationSession,
     pairs: Sequence[Sequence[str]],
@@ -17889,6 +17915,34 @@ def dispatch_business_existing_batch(
                             )
                         ):
                             matches.append(discovered)
+                    exact_matches: list[Mapping[str, Any]] = []
+                    for discovered in matches:
+                        metadata = discovered.get("metadata")
+                        display = (
+                            metadata.get("display")
+                            if isinstance(metadata, Mapping)
+                            else None
+                        )
+                        labels = [discovered.get("name")]
+                        if isinstance(display, Mapping):
+                            labels.append(display.get("name"))
+                        if any(
+                            isinstance(label, str)
+                            and "".join(
+                                character
+                                for character in label.casefold()
+                                if character.isalnum()
+                            )
+                            == "".join(
+                                character
+                                for character in meaning.casefold()
+                                if character.isalnum()
+                            )
+                            for label in labels
+                        ):
+                            exact_matches.append(discovered)
+                    if len(exact_matches) == 1:
+                        matches = exact_matches
                     if len(matches) != 1:
                         raise GatewayInputError(
                             "Each object-set batch field meaning must resolve to exactly one compatible live field"
@@ -17904,8 +17958,8 @@ def dispatch_business_existing_batch(
                         raise GatewayInputError(
                             "Distinct object-set batch meanings cannot select the same live field"
                         )
-                    dynamic[bound.handle] = _parse_business_value(
-                        bound.value_type,
+                    dynamic[bound.handle] = _parse_bound_field_business_value(
+                        bound,
                         raw_value,
                         field=meaning,
                     )
