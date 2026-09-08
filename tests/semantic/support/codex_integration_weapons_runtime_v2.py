@@ -44,6 +44,7 @@ from tests.semantic.support.codex_integration_paths_v2 import (
     IntegrationOriginalPathError,
     localize_copied_original_path,
 )
+from wwise_waapi.builders.common import split_wwise_path
 
 
 WEAPONS_WORKFLOW_ID = "weapons_query_guided_batch_cleanup"
@@ -153,8 +154,8 @@ _AUDIT_RETURN_FIELDS = (
     "name",
     "type",
     "path",
-    "OutputBus",
-    "@Volume",
+    "output_bus",
+    "volume_db",
     "notes",
 )
 _IDENTITY_RETURN_FIELDS = ("id", "name", "type", "path")
@@ -1305,9 +1306,11 @@ class _WeaponsSession:
                 )
             _wwise_path(row.get("path"), f"{role} path")
             _text(row.get("name"), f"{role} name")
-            _number(row.get("@Volume"), f"{role} Volume")
+            _number(row.get("volume_db"), f"{role} Volume")
             _text(row.get("notes"), f"{role} notes")
-            bus_id = _identity(row.get("OutputBus"), f"{role} OutputBus").casefold()
+            bus_id = _identity(
+                row.get("output_bus"), f"{role} OutputBus"
+            ).casefold()
             if bus_id not in ordered_bus_ids:
                 ordered_bus_ids.append(bus_id)
             rows_by_role[role] = MappingProxyType(dict(row))
@@ -1336,8 +1339,8 @@ class _WeaponsSession:
                 "Weapons OutputBus hop ran before the scoped audit"
             )
         if (
-            len(step.arguments) < 2
-            or step.arguments[0] != "--object-id"
+            len(step.arguments) != 2
+            or step.arguments[0] != "--exact-id"
             or not isinstance(step.arguments[1], str)
         ):
             raise WeaponsIntegrationRuntimeError(
@@ -1425,7 +1428,7 @@ class _WeaponsSession:
             if not _text(row.get("name"), f"{role} name").startswith("RFL_"):
                 rules.append("name_prefix")
             output_bus_id = _identity(
-                row.get("OutputBus"), f"{role} OutputBus"
+                row.get("output_bus"), f"{role} OutputBus"
             ).casefold()
             output_bus_path = self.output_bus_paths.get(output_bus_id)
             if output_bus_path is None:
@@ -1434,7 +1437,7 @@ class _WeaponsSession:
                 )
             if output_bus_path != target_path:
                 rules.append("output_bus_path")
-            if _number(row.get("@Volume"), f"{role} Volume") > 0.0:
+            if _number(row.get("volume_db"), f"{role} Volume") > 0.0:
                 rules.append("volume")
             if "release-ready" not in _text(row.get("notes"), f"{role} notes"):
                 rules.append("notes")
@@ -1667,24 +1670,29 @@ class _WeaponsSession:
 
 
 def _audit_query_step(root_path: str) -> ExpectedGatewayStep:
-    # The natural prompt explicitly asks for every Sound below this sealed
-    # fixture subtree, so the Skill correctly selects its explicit
-    # ``--all-results`` route.  The runner independently rejects more than
-    # ``_AUDIT_TAKE`` rows before granting any business-oracle credit.
-    arguments: list[Any] = [
-        "--path",
-        root_path,
-        "--select",
-        "descendants",
-        "--where",
-        "type",
-        "=",
-        "string",
-        "Sound",
-        "--all-results",
-    ]
-    for field in _AUDIT_RETURN_FIELDS:
-        arguments.extend(("--return-field", field))
+    # The fixed fixture contains six Sounds. The public business query owns
+    # native WAQL/type/projection construction; the runner still rejects any
+    # row outside the exact closed set.
+    arguments: list[Any] = []
+    for segment in split_wwise_path(root_path):
+        arguments.extend(("--path-segment", segment))
+    arguments.extend(
+        (
+            "--relationship",
+            "descendants",
+            "--predicate",
+            "kind-is",
+            "all-sounds",
+            "--max-results",
+            str(len(_IN_SCOPE_SOUND_ROLES)),
+            "--include",
+            "notes",
+            "--include",
+            "volume-db",
+            "--include",
+            "output-bus",
+        )
+    )
     return ExpectedGatewayStep(
         name="audit.scope",
         subcommand="query-object",
@@ -1733,14 +1741,11 @@ def _output_bus_readback_steps(
 ) -> tuple[ExpectedGatewayStep, ...]:
     steps: list[ExpectedGatewayStep] = []
     for index, state in enumerate(_distinct_output_bus_states(snapshot), start=1):
-        arguments: list[str] = ["--object-id", state.object_id]
-        for field in _IDENTITY_RETURN_FIELDS:
-            arguments.extend(("--return-field", field))
         steps.append(
             ExpectedGatewayStep(
                 name=f"{_OUTPUT_BUS_STEP_PREFIX}{index:02d}",
                 subcommand="query-object",
-                arguments=tuple(arguments),
+                arguments=("--exact-id", state.object_id),
             )
         )
     return tuple(steps)
@@ -1754,13 +1759,10 @@ def _identity_readback_step(
         raise WeaponsIntegrationRuntimeError(
             f"Weapons identity readback role is not selected: {role}"
         )
-    arguments: list[str] = ["--object-id", state.object_id]
-    for field in _IDENTITY_RETURN_FIELDS:
-        arguments.extend(("--return-field", field))
     return ExpectedGatewayStep(
         name=f"identity.{role}",
         subcommand="query-object",
-        arguments=tuple(arguments),
+        arguments=("--exact-id", state.object_id),
     )
 
 

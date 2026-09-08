@@ -186,24 +186,31 @@ def _protocol(unit: WorkflowUnit) -> V3GatewayProtocol:
     query = ExpectedGatewayStep(
         name="audit.scope",
         subcommand="query-object",
-        arguments=("--path", r"\Actor-Mixer Hierarchy\Audit"),
+        arguments=(
+            "--path-segment",
+            "Actor-Mixer Hierarchy",
+            "--path-segment",
+            "Audit",
+            "--relationship",
+            "descendants",
+            "--predicate",
+            "kind-is",
+            "all-sounds",
+            "--max-results",
+            "6",
+            "--include",
+            "notes",
+            "--include",
+            "volume-db",
+            "--include",
+            "output-bus",
+        ),
     )
     output_bus_steps = tuple(
         ExpectedGatewayStep(
             name=f"relationship.output_bus.{index:02d}",
             subcommand="query-object",
-            arguments=(
-                "--object-id",
-                object_id,
-                "--return-field",
-                "id",
-                "--return-field",
-                "name",
-                "--return-field",
-                "type",
-                "--return-field",
-                "path",
-            ),
+            arguments=("--exact-id", object_id),
         )
         for index, object_id in enumerate((GUID_4, GUID_5), start=1)
     )
@@ -211,18 +218,7 @@ def _protocol(unit: WorkflowUnit) -> V3GatewayProtocol:
         ExpectedGatewayStep(
             name=f"identity.{role}",
             subcommand="query-object",
-            arguments=(
-                "--object-id",
-                object_id,
-                "--return-field",
-                "id",
-                "--return-field",
-                "name",
-                "--return-field",
-                "type",
-                "--return-field",
-                "path",
-            ),
+            arguments=("--exact-id", object_id),
         )
         for role, object_id in zip(
             ("audit_close", "audit_tail", "audit_mechanical"),

@@ -43,6 +43,7 @@ from tests.semantic.support.codex_prompt_provenance_v3 import (
     deserialize_protocol,
     serialize_protocol,
 )
+from wwise_waapi.builders.common import split_wwise_path
 from wwise_waapi.builders.metadata import (
     GET_PROPERTY_AND_REFERENCE_NAMES_URI,
     GET_PROPERTY_INFO_URI,
@@ -383,24 +384,24 @@ class FakeWeaponsWaapi:
                 }
         raise AssertionError(f"unexpected fake WAAPI call: {uri} {args} {options}")
 
+    def audit_row(self, role: str) -> Mapping[str, Any]:
+        row = self.rows[self.roles[role].casefold()]
+        return {
+            "id": copy.deepcopy(row["id"]),
+            "name": copy.deepcopy(row["name"]),
+            "type": copy.deepcopy(row["type"]),
+            "path": copy.deepcopy(row["path"]),
+            "output_bus": copy.deepcopy(row["OutputBus"]),
+            "volume_db": copy.deepcopy(row["@Volume"]),
+            "notes": copy.deepcopy(row["notes"]),
+        }
+
     def audit_payload(self) -> Mapping[str, Any]:
-        fields = (
-            "id", "name", "type", "path", "parent", "@Volume", "notes",
-            "OutputBus", "activeSource",
-        )
         return {
             "ok": True,
             "command": "query-object",
             "count": len(IN_SCOPE),
-            "objects": [
-                {
-                    field: copy.deepcopy(
-                        self.rows[self.roles[role].casefold()].get(field)
-                    )
-                    for field in fields
-                }
-                for role in IN_SCOPE
-            ],
+            "objects": [self.audit_row(role) for role in IN_SCOPE],
         }
 
     def identity_payload(self, role: str) -> Mapping[str, Any]:
@@ -831,33 +832,28 @@ def test_prepares_scoped_complete_query_and_one_strict_batch(
     assert declarations[0].arguments.count("--field") == 6
     audit = prepared.protocol.steps[0]
     assert audit.subcommand == "query-object"
-    assert audit.arguments[:4] == (
-        "--path",
-        prepared.visible_values["weapons_audit_root_path"],
-        "--select",
-        "descendants",
+    audit_path_arguments = tuple(
+        item
+        for segment in split_wwise_path(
+            prepared.visible_values["weapons_audit_root_path"]
+        )
+        for item in ("--path-segment", segment)
     )
-    assert audit.arguments[4:] == (
-        "--where",
-        "type",
-        "=",
-        "string",
-        "Sound",
-        "--all-results",
-        "--return-field",
-        "id",
-        "--return-field",
-        "name",
-        "--return-field",
-        "type",
-        "--return-field",
-        "path",
-        "--return-field",
-        "OutputBus",
-        "--return-field",
-        "@Volume",
-        "--return-field",
+    assert audit.arguments == (
+        *audit_path_arguments,
+        "--relationship",
+        "descendants",
+        "--predicate",
+        "kind-is",
+        "all-sounds",
+        "--max-results",
+        "6",
+        "--include",
         "notes",
+        "--include",
+        "volume-db",
+        "--include",
+        "output-bus",
     )
     before = prepared.before_snapshot.objects_by_role()
     expected_bus_ids = (
@@ -869,16 +865,8 @@ def test_prepares_scoped_complete_query_and_one_strict_batch(
     ):
         assert step.subcommand == "query-object"
         assert step.arguments == (
-            "--object-id",
+            "--exact-id",
             object_id,
-            "--return-field",
-            "id",
-            "--return-field",
-            "name",
-            "--return-field",
-            "type",
-            "--return-field",
-            "path",
         )
     for step, role in zip(
         prepared.protocol.steps[3:6],
@@ -887,16 +875,8 @@ def test_prepares_scoped_complete_query_and_one_strict_batch(
     ):
         assert step.subcommand == "query-object"
         assert step.arguments == (
-            "--object-id",
+            "--exact-id",
             before[role].object_id,
-            "--return-field",
-            "id",
-            "--return-field",
-            "name",
-            "--return-field",
-            "type",
-            "--return-field",
-            "path",
         )
     request = _plain(prepared.operation_request)
     assert request["contract"] == "waapi-skill.operation-request/v1"
@@ -1303,9 +1283,7 @@ def test_oracle_detects_protected_state_drift(
 def test_audit_payload_fails_closed_on_scope_escape(tmp_path: Path) -> None:
     prepared, fake, _runtime = _prepared(tmp_path)
     payload = copy.deepcopy(fake.audit_payload())
-    payload["objects"].append(
-        copy.deepcopy(fake.rows[fake.roles["audit_out_of_scope"].casefold()])
-    )
+    payload["objects"].append(fake.audit_row("audit_out_of_scope"))
 
     with pytest.raises(WeaponsIntegrationRuntimeError, match="escaped"):
         prepared.observe_payload(prepared.protocol.steps[0], payload)
@@ -1314,7 +1292,7 @@ def test_audit_payload_fails_closed_on_scope_escape(tmp_path: Path) -> None:
 def test_audit_payload_fails_closed_on_unreviewed_output_bus(tmp_path: Path) -> None:
     prepared, fake, _runtime = _prepared(tmp_path)
     payload = copy.deepcopy(fake.audit_payload())
-    payload["objects"][0]["OutputBus"] = {"id": _guid("unreviewed-bus")}
+    payload["objects"][0]["output_bus"] = {"id": _guid("unreviewed-bus")}
 
     with pytest.raises(WeaponsIntegrationRuntimeError, match="distinct OutputBus set"):
         prepared.observe_payload(prepared.protocol.steps[0], payload)

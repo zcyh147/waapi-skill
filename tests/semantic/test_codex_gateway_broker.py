@@ -74,6 +74,7 @@ from .support.codex_gateway_contracts import (
 )
 from .support.codex_eval_protocol_v3 import (  # pyright: ignore[reportMissingImports]
     CompoundUndoChildExpectation,
+    V3GatewayProtocol,
     build_audio_convert_business_transaction_steps,
     build_audio_import_composer_transaction_steps,
     build_compound_undo_business_transaction_steps,
@@ -13992,6 +13993,33 @@ def test_broker_rejects_commutative_query_pair_outside_closed_identity_shape(
             expected_steps=(broad, exact),
             commutative_read_only_step_groups=(("broad", "exact"),),
         )
+
+
+def test_protocol_accepts_current_exact_id_queries_as_commutative_reads() -> None:
+    steps = tuple(
+        ExpectedGatewayStep(
+            f"exact.{index}",
+            "query-object",
+            ("--exact-id", object_id),
+        )
+        for index, object_id in enumerate(
+            (
+                "{11111111-1111-1111-1111-111111111111}",
+                "{22222222-2222-2222-2222-222222222222}",
+            ),
+            start=1,
+        )
+    )
+
+    protocol = V3GatewayProtocol(
+        steps,
+        (2,),
+        commutative_read_only_step_groups=(("exact.1", "exact.2"),),
+    )
+
+    assert protocol.commutative_read_only_step_groups == (
+        ("exact.1", "exact.2"),
+    )
 
 
 def test_broker_commutative_pair_still_rejects_duplicates_and_preview_races(

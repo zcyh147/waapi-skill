@@ -2340,6 +2340,16 @@ def _is_closed_exact_identity_query_step(
 
     arguments = step.arguments
     if (
+        step.subcommand == "query-object"
+        and len(arguments) == 2
+        and arguments[0] == "--exact-id"
+    ):
+        identity = arguments[1]
+        if isinstance(identity, ResponseBinding):
+            source_index = indexes.get(identity.step)
+            return source_index is not None and source_index < group_start_index
+        return isinstance(identity, str) and bool(identity)
+    if (
         step.subcommand != "query-object"
         or len(arguments) < 4
         or len(arguments) % 2 != 0

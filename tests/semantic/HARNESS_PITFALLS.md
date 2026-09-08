@@ -2655,6 +2655,24 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   retain the strict Broker and business Oracle rather than teaching the
   harness to complete the Agent's intent.
 
+### Query-guided integration protocols must use the current business query seam
+
+- Trigger: exact candidate `ee3d318` reached the Weapons audit on both hosts,
+  and each Fresh Agent copied the current `query-schema` route: repeated
+  `--path-segment`, `--relationship descendants`, `--predicate kind-is
+  all-sounds`, a bounded `--max-results`, and business `--include` values.
+  The Broker rejected it because the Weapons fixture still sealed retired
+  `--path`, `--select`, `--where`, `--all-results`, and `--return-field`
+  arguments. No Gateway or Wwise dispatch occurred.
+- Prevention: query-guided workflow protocols must seal the same public query
+  contract that the packaged Skill teaches. Identity fields are the default;
+  use `--exact-id` for GUID readback, and observe Gateway projections such as
+  `output_bus` and `volume_db` rather than native `OutputBus` and `@Volume`.
+  Keep the hidden runtime's exact scope, distinct relationship hops, candidate
+  rules, and final mutation Oracle unchanged. Update synthetic harness mirrors
+  with the production runtime so an old test helper cannot normalize the
+  retired flags back into acceptance.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:
