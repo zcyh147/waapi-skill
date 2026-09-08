@@ -23384,10 +23384,13 @@ def _compact_object_set_update_continuation(
         for key in (
             "contract",
             "required_next_phase",
-            "existing_target_count_decision",
         )
         if key in value
     }
+    if command == "draft-bind-object" and "existing_target_count_decision" in value:
+        compact["existing_target_count_decision"] = value[
+            "existing_target_count_decision"
+        ]
     if (
         command in {"draft-bind-object", "draft-declare-existing"}
         and compact_object_binding
