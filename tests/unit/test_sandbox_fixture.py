@@ -120,6 +120,29 @@ def base_env(console: Path, project: Path, sandbox_root: Path) -> dict[str, str]
     }
 
 
+@pytest.mark.parametrize(
+    ("platform_name", "version", "expected"),
+    [
+        ("darwin", "2022.1", "version=n;winecoreaudio.drv="),
+        ("darwin", "2023.1", "version=n;winecoreaudio.drv=b"),
+        ("darwin", "2025.1", "version=n;winecoreaudio.drv=b"),
+        ("win32", "2022.1", "version=n;winecoreaudio.drv=b"),
+    ],
+)
+def test_headless_console_audio_environment_is_scoped_to_macos_2022(
+    platform_name: str,
+    version: str,
+    expected: str,
+) -> None:
+    prepared = sandbox_fixture.prepare_headless_console_environment(
+        {"WINEDLLOVERRIDES": "version=n;winecoreaudio.drv=b"},
+        version=version,
+        platform_name=platform_name,
+    )
+
+    assert prepared["WINEDLLOVERRIDES"] == expected
+
+
 class FakeProcess:
     pid = 4242
 
@@ -391,6 +414,7 @@ def test_launch_uses_sandbox_project_and_records_command(monkeypatch: pytest.Mon
     console = make_console(tmp_path)
     source_project = make_sample_project(tmp_path / "source")
     env = base_env(console, source_project, tmp_path / "sandbox-root")
+    monkeypatch.setattr(sandbox_fixture.sys, "platform", "darwin")
     env["WINEPREFIX"] = str(tmp_path / "caller-prefix-must-be-ignored")
     sandbox = prepare_sample_project_sandbox(env)
     seen_project_paths: list[Path] = []
@@ -459,6 +483,7 @@ def test_launch_uses_sandbox_project_and_records_command(monkeypatch: pytest.Mon
     assert sandbox.metadata.identity_verified is True
     assert sandbox.metadata.wine_prefix_path == str(sandbox.wine_prefix_path)
     assert lifecycle.launch_env["WINEPREFIX"] == str(sandbox.wine_prefix_path)
+    assert lifecycle.launch_env["WINEDLLOVERRIDES"] == "winecoreaudio.drv="
     assert sandbox.metadata.process_cleanup_result == "cleaned"
     assert seen_project_paths == [sandbox.sandbox_project]
     cleanup_sandbox(sandbox)

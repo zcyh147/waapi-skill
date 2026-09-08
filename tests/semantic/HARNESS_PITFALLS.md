@@ -2822,6 +2822,23 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   valid for generic object-graph reference fields; reserve Gateway-owned role
   prefixes for adapters whose public contract requires named roles.
 
+### macOS Wwise 2022 headless runs must not initialize Wine CoreAudio
+
+- Trigger: repeated Wwise 2022.1 smoke and Fresh launches reached
+  `*** Loading Project ***` but never opened WAAPI, even with a 600-second
+  readiness bound. A process sample located the wait inside
+  `AudioDeviceCreateIOProcID`. The same host, shared CrossOver bottle, fixture
+  lifecycle, and audio-device state launched Wwise 2023.1 and 2025.1 in about
+  eight seconds, ruling out a general project-path or CoreAudio outage.
+- Prevention: the shared sandbox lifecycle adds
+  `WINEDLLOVERRIDES=winecoreaudio.drv=` only to macOS Wwise 2022.1
+  WwiseConsole child environments, preserving unrelated Wine overrides.
+  Headless WAAPI validation has no audible-output acceptance, so it must not
+  initialize or hold the user's hardware device. Do not change the macOS
+  default output, edit the shared bottle, restart CoreAudio, or merely raise
+  the readiness timeout. Wwise Authoring UI launches and Wwise 2023.1+
+  Console launches retain their normal audio environment.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:

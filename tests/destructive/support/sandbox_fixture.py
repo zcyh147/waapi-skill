@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 import shutil
+import sys
 import tempfile
 import time
 import uuid
@@ -58,10 +59,37 @@ _WINDOWS_LOCK_RETRY_SECONDS = 0.05
 _WINDOWS_LOCK_VIOLATION = 33
 _PORT_RELEASE_TIMEOUT_SECONDS = 15.0
 _PORT_RELEASE_POLL_SECONDS = 0.1
+_MACOS_WWISE_2022_VERSION = "2022.1"
+_WINE_COREAUDIO_OVERRIDE = "winecoreaudio.drv="
 
 
 class SandboxFixtureError(RuntimeError):
     """Raised when a sandbox copy would be unsafe or incomplete."""
+
+
+def prepare_headless_console_environment(
+    environment: Mapping[str, str],
+    *,
+    version: str,
+    platform_name: str | None = None,
+) -> dict[str, str]:
+    """Isolate the macOS Wwise 2022 Console from its hanging audio driver."""
+
+    prepared = dict(environment)
+    current_platform = sys.platform if platform_name is None else platform_name
+    if current_platform != "darwin" or version != _MACOS_WWISE_2022_VERSION:
+        return prepared
+
+    existing = prepared.get("WINEDLLOVERRIDES", "")
+    retained = [
+        item.strip()
+        for item in existing.split(";")
+        if item.strip()
+        and not item.strip().casefold().startswith("winecoreaudio.drv=")
+    ]
+    retained.append(_WINE_COREAUDIO_OVERRIDE)
+    prepared["WINEDLLOVERRIDES"] = ";".join(retained)
+    return prepared
 
 
 def wait_for_port_release(
@@ -456,6 +484,10 @@ def launch_sandboxed_wwise(
     contract = require_destructive_environment(env_map)
     if contract.active_destructive_project != sandbox.sandbox_project.resolve(strict=False):
         raise SandboxFixtureError("destructive environment did not select the sandbox project")
+    env_map = prepare_headless_console_environment(
+        env_map,
+        version=contract.version,
+    )
 
     launch_cwd = sandbox.sandbox_root.resolve(strict=True)
     lifecycle = HeadlessLifecycle(
