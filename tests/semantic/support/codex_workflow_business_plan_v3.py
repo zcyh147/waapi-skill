@@ -629,7 +629,7 @@ def _matches_transaction_step_sequence(
                     phase = 1
                     continue
                 if re.fullmatch(
-                    r"declare-(?:existing-[0-9]{2}|child-[0-9]{2}(?:-[0-9]{2})+)",
+                    r"declare-(?:existing-(?:[0-9]{2}|batch)|child-[0-9]{2}(?:-[0-9]{2})+)",
                     prefix,
                 ):
                     phase = 2

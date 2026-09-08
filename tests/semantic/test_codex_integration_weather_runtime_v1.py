@@ -482,22 +482,14 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
         for step in protocol.steps
         if step.name.startswith("tx02.discover-field-")
     ]
-    assert len(action_disclosures) == 5
-    assert all(
-        step.subcommand == "draft-discover-fields"
-        for step in action_disclosures
-    )
-    assert all(step.arguments.count("--meaning") == 2 for step in action_disclosures)
+    assert action_disclosures == []
     action_declarations = [
         step
         for step in protocol.steps
         if step.name.startswith("tx02.declare-existing-")
     ]
-    assert len(action_declarations) == 5
-    assert all(
-        step.subcommand == "draft-declare-existing"
-        for step in action_declarations
-    )
+    assert len(action_declarations) == 1
+    assert action_declarations[0].subcommand == "draft-declare-existing-batch"
     assert not any(
         step.subcommand == "draft-apply" and step.name.startswith("tx02.")
         for step in protocol.steps
@@ -514,7 +506,8 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
         ),
     )
     assert first_binding[-len(expected_selector) :] == expected_selector
-    assert action_declarations[0].arguments.count("--field-value") == 2
+    assert action_declarations[0].arguments.count("--row") == 5
+    assert action_declarations[0].arguments.count("--field-meaning-value") == 10
     assert not any(
         step.subcommand == "preview" and step.name.startswith("tx02.")
         for step in protocol.steps

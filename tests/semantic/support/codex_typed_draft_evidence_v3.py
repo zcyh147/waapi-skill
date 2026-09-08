@@ -73,6 +73,7 @@ _BUSINESS_DRAFT_EVENT_OPTIONS = {
         {"declaration.added", "declaration.revised"}
     ),
     "draft-declare-existing": frozenset({"declaration.added"}),
+    "draft-declare-existing-batch": frozenset({"declaration.batch-added"}),
     "draft-declare-field-change": frozenset({"declaration.added"}),
     "draft-declare-new": frozenset({"declaration.added"}),
     "draft-declare-object-change": frozenset({"declaration.added"}),

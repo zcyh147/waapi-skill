@@ -2541,6 +2541,24 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   and verify `Get-ScheduledTask ... .Principal.RunLevel`; the XML may omit the
   element because LeastPrivilege is the schema default.
 
+### Do not make the Agent repeat object-scoped metadata plumbing
+
+- Trigger: native-Windows Weather bound all five Action objects, discovered
+  `FadeTime` and `Delay` for the first Action, then reasonably tried to reuse
+  those opaque handles for the other same-type Actions. The Broker rejected the
+  command because each handle is intentionally sealed to one exact object GUID.
+- Boundary: object-scoped handles must not be made class-scoped merely because
+  several current objects share a reflected type. Plug-ins, custom properties,
+  enablement dependencies, platforms, and inherited state can make otherwise
+  similar objects expose different live metadata.
+- Prevention: for three or more ready existing targets, use the Gateway-owned
+  `draft-declare-existing-batch` seam. The Agent supplies only bounded
+  task-local row IDs, bound object handles, stable business fields, and
+  user-facing field meaning/value pairs. The Gateway resolves and revalidates
+  every meaning against every exact object, creates separate scoped handles,
+  materializes the whole request, and commits one atomic Draft revision. Keep
+  the individual discover/declare lane for small or dependency-bearing graphs.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:

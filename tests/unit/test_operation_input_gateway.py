@@ -674,6 +674,7 @@ def test_normal_object_set_schema_and_detail_expose_only_business_input(
     assert adapter["legacy_shallow_composer_public"] is False
     assert adapter["declaration"]["subcommands"] == [
         "draft-declare-existing",
+        "draft-declare-existing-batch",
         "draft-declare-new",
     ]
     encoded = json.dumps(schema)

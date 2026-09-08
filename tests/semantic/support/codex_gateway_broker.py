@@ -2496,7 +2496,7 @@ _NUMBERED_DRAFT_ACTION_STEP_RE = re.compile(r"^(?P<prefix>.+\.action\.)\d{3}$")
 _BUSINESS_DRAFT_SETUP_STEP_RE = re.compile(
     r"^(?P<prefix>.+)\.(?:configure|bind-(?:object|field)\.\d{3}|"
     r"bind-(?:target|reference)-\d{2}-\d{2}|discover-field-\d{2}|"
-    r"declare-(?:new|existing)-\d{2})$"
+    r"declare-(?:(?:new|existing)-\d{2}|existing-batch))$"
 )
 _BUSINESS_DRAFT_REVISION_SUBCOMMANDS = DRAFT_REVISION_SUBCOMMANDS - {
     "draft-apply",
@@ -10608,6 +10608,88 @@ class CodexGatewayBroker:
     ) -> ExpectedGatewayStep:
         """Accept one bounded unique declaration label without making it business data."""
 
+        if step.subcommand == "draft-declare-existing-batch":
+            actual_values = tuple(str(value) for value in actual)
+
+            def option_rows(
+                values: Sequence[Any], option: str, arity: int
+            ) -> list[tuple[Any, ...]]:
+                rows: list[tuple[Any, ...]] = []
+                for index, value in enumerate(values):
+                    if value == option and index + arity < len(values):
+                        rows.append(tuple(values[index + 1 : index + arity + 1]))
+                return rows
+
+            actual_rows = option_rows(actual_values, "--row", 2)
+            expected_rows = option_rows(step.arguments, "--row", 2)
+            if not actual_rows or len(actual_rows) != len(expected_rows):
+                raise GatewayInvocationError(
+                    "business batch requires every bounded task-local row"
+                )
+            actual_ids = [str(row[0]) for row in actual_rows]
+            if (
+                len(actual_ids) != len(set(actual_ids))
+                or any(
+                    _TASK_LOCAL_DECLARATION_ID_RE.fullmatch(value) is None
+                    for value in actual_ids
+                )
+            ):
+                raise GatewayInvocationError(
+                    "business batch task-local ids must be bounded and unique"
+                )
+
+            def bound_text(value: Any) -> str | None:
+                if isinstance(value, str):
+                    return value
+                if not isinstance(value, ResponseBinding):
+                    return None
+                source = self._payloads_by_step.get(value.step)
+                if source is None:
+                    return None
+                try:
+                    resolved = _json_pointer(source, value.pointer)
+                except (GatewayInvocationError, KeyError, TypeError, ValueError):
+                    return None
+                return str(resolved) if isinstance(resolved, str) else None
+
+            actual_by_handle = {str(row[1]): str(row[0]) for row in actual_rows}
+            expected_to_actual: dict[str, str] = {}
+            for expected_id, expected_handle in expected_rows:
+                resolved_handle = bound_text(expected_handle)
+                if not isinstance(expected_id, str) or resolved_handle is None:
+                    raise GatewayInvocationError(
+                        "sealed business batch row binding is invalid"
+                    )
+                actual_id = actual_by_handle.get(resolved_handle)
+                if actual_id is None:
+                    raise GatewayInvocationError(
+                        "business batch row does not match its exact bound object"
+                    )
+                expected_to_actual[expected_id] = actual_id
+            arguments = list(step.arguments)
+            declaration_options = {
+                "--row-order": 1,
+                "--row": 2,
+                "--field": 3,
+                "--field-meaning-value": 3,
+            }
+            cursor = 5
+            while cursor < len(arguments):
+                option = arguments[cursor]
+                arity = declaration_options.get(option)
+                if arity is None or cursor + arity >= len(arguments):
+                    raise GatewayInvocationError(
+                        "sealed business batch declaration shape is invalid"
+                    )
+                expected_id = arguments[cursor + 1]
+                if not isinstance(expected_id, str) or expected_id not in expected_to_actual:
+                    raise GatewayInvocationError(
+                        "sealed business batch declaration id is invalid"
+                    )
+                arguments[cursor + 1] = expected_to_actual[expected_id]
+                cursor += arity + 1
+            return replace(step, arguments=tuple(arguments))
+
         if step.subcommand not in {
             "draft-declare-new",
             "draft-declare-existing",
@@ -11484,6 +11566,12 @@ class CodexGatewayBroker:
                 step,
                 actual,
             )
+        if step.subcommand == "draft-declare-existing-batch":
+            return CodexGatewayBroker._normalize_existing_batch_fact_order(
+                self,
+                step,
+                actual,
+            )
         if step.subcommand == "draft-declare-soundbank-plan":
             return CodexGatewayBroker._normalize_soundbank_plan_fact_order(
                 self,
@@ -11578,6 +11666,70 @@ class CodexGatewayBroker:
                 actual_groups.remove(derived_language)
         expected_keys = [key(group, expected=True) for group in expected_groups]
         actual_keys = [key(group, expected=False) for group in actual_groups]
+        if (
+            any(item is None for item in (*expected_keys, *actual_keys))
+            or len(set(expected_keys)) != len(expected_keys)
+            or len(set(actual_keys)) != len(actual_keys)
+            or set(expected_keys) != set(actual_keys)
+        ):
+            return tuple(actual)
+        actual_by_key = dict(zip(actual_keys, actual_groups, strict=True))
+        return (
+            *tuple(actual[:fixed_count]),
+            *(
+                token
+                for expected_key in expected_keys
+                for token in actual_by_key[expected_key]
+            ),
+        )
+
+    def _normalize_existing_batch_fact_order(
+        self,
+        step: ExpectedGatewayStep,
+        actual: Sequence[str],
+    ) -> tuple[str, ...]:
+        """Canonicalize independent object-set batch rows and field facts."""
+
+        fixed_count = 5
+        arities = {
+            "--row-order": 1,
+            "--row": 2,
+            "--field": 3,
+            "--field-meaning-value": 3,
+        }
+
+        def parse(values: Sequence[Any]) -> list[tuple[Any, ...]] | None:
+            groups: list[tuple[Any, ...]] = []
+            cursor = fixed_count
+            while cursor < len(values):
+                option = values[cursor]
+                arity = arities.get(option) if isinstance(option, str) else None
+                if arity is None or cursor + arity >= len(values):
+                    return None
+                groups.append(tuple(values[cursor : cursor + arity + 1]))
+                cursor += arity + 1
+            return groups
+
+        def key(group: tuple[Any, ...]) -> tuple[str, ...] | None:
+            option = group[0]
+            declaration_id = group[1]
+            if not isinstance(option, str) or not isinstance(declaration_id, str):
+                return None
+            if option in {"--field", "--field-meaning-value"}:
+                field = group[2]
+                return (
+                    (option, declaration_id, field)
+                    if isinstance(field, str)
+                    else None
+                )
+            return (option, declaration_id)
+
+        expected_groups = parse(step.arguments)
+        actual_groups = parse(actual)
+        if expected_groups is None or actual_groups is None:
+            return tuple(actual)
+        expected_keys = [key(group) for group in expected_groups]
+        actual_keys = [key(group) for group in actual_groups]
         if (
             any(item is None for item in (*expected_keys, *actual_keys))
             or len(set(expected_keys)) != len(expected_keys)

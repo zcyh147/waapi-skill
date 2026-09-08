@@ -35,6 +35,7 @@ SPEC.loader.exec_module(gateway)
 PROJECT_ID = "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"
 PARENT_ID = "{11111111-1111-1111-1111-111111111111}"
 CONTROL_ID = "{22222222-2222-2222-2222-222222222222}"
+SECOND_ACTION_ID = "{33333333-3333-3333-3333-333333333333}"
 
 
 class FakeClient:
@@ -186,9 +187,10 @@ def test_object_binding_returns_version_stable_business_kind(
         "contract",
         "required_next_phase",
         "object_binding",
-        "field_discovery",
-        "declare_existing",
-        "more_actions",
+            "field_discovery",
+            "declare_existing",
+            "declare_existing_batch",
+            "more_actions",
         "shell_tool_timeout_ms",
         "then_read_next_response",
         "precompute_or_increment_revision",
@@ -1391,6 +1393,144 @@ def test_object_set_discovers_two_business_field_meanings_in_one_revision(
     assert unchanged.revision == 4
     assert len(unchanged.composition["business_session"]["handles"]["fields"]) == 2
     assert len(unchanged.composition["business_session"]["declarations"]) == 1
+
+
+def test_object_set_batch_declares_meanings_with_per_object_metadata_revalidation(
+    tmp_path: Path,
+) -> None:
+    start_code, started = _offline(tmp_path, "draft-start", "object.set")
+    assert start_code == 0, started
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    handles: list[str] = []
+    for revision, object_id, name in (
+        (1, PARENT_ID, "Play_Rain"),
+        (2, SECOND_ACTION_ID, "Play_Wind"),
+    ):
+        bind_client = _live_client(
+            tmp_path,
+            {
+                "ak.wwise.core.object.get": [
+                    {
+                        "return": [
+                            {
+                                "id": object_id,
+                                "name": "",
+                                "type": "Action",
+                                "path": rf"\Events\Default Work Unit\{name}\[Play]",
+                            }
+                        ]
+                    }
+                ]
+            },
+        )
+        bind_code, bound = gateway.execute_gateway(
+            [
+                "--state-dir",
+                str(tmp_path / "state"),
+                "draft-bind-object",
+                draft_id,
+                "--task-authority",
+                authority,
+                "--expected-revision",
+                str(revision),
+                "--object-id",
+                object_id,
+            ],
+            env=_env(tmp_path),
+            client_factory=lambda _url, client=bind_client: client,
+        )
+        assert bind_code == 0, bound
+        handles.append(bound["bound_object"]["handle"])
+
+    fade = {
+        "name": "FadeTime",
+        "type": "Real64",
+        "display": {"name": "Fade Time", "group": "Action"},
+        "supports": {"unlink": True},
+    }
+    delay = {
+        "name": "Delay",
+        "type": "Real64",
+        "display": {"name": "Delay", "group": "Action"},
+        "supports": {"unlink": True},
+    }
+    batch_client = _live_client(
+        tmp_path,
+        {
+            "ak.wwise.core.object.getPropertyAndReferenceNames": [
+                {"return": ["FadeTime", "Delay"]} for _ in range(8)
+            ],
+            "ak.wwise.core.object.getPropertyInfo": [
+                item for _ in range(4) for item in (fade, delay)
+            ],
+        },
+    )
+    batch_code, batch = gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(tmp_path / "state"),
+            "draft-declare-existing-batch",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            "3",
+            "--row-order",
+            "rain",
+            "--row-order",
+            "wind",
+            "--row",
+            "rain",
+            handles[0],
+            "--row",
+            "wind",
+            handles[1],
+            "--field-meaning-value",
+            "rain",
+            "Fade Time",
+            "0.25",
+            "--field-meaning-value",
+            "rain",
+            "Delay",
+            "0",
+            "--field-meaning-value",
+            "wind",
+            "Fade Time",
+            "0.4",
+            "--field-meaning-value",
+            "wind",
+            "Delay",
+            "0.1",
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda _url: batch_client,
+    )
+
+    assert batch_code == 0, json.dumps(batch, ensure_ascii=False)
+    assert batch["batch_receipt"] == {
+        "row_count": 2,
+        "field_count": 4,
+        "metadata_scope": "each_exact_bound_object",
+        "applied_atomically": True,
+    }
+    assert batch["draft"]["revision"] == 4
+    assert len(json.dumps(batch, separators=(",", ":")).encode("utf-8")) < 7_000
+    stored = OperationDraftStore(tmp_path / "state").inspect(
+        draft_id,
+        task_authority=authority,
+    )
+    session = stored.composition["business_session"]
+    assert [row["declaration_id"] for row in session["declarations"]] == [
+        "rain",
+        "wind",
+    ]
+    fields = session["handles"]["fields"]
+    assert len(fields) == 4
+    assert {field["scope_value"] for field in fields} == {
+        PARENT_ID,
+        SECOND_ACTION_ID,
+    }
 
 
 def test_gateway_adds_subordinate_media_without_model_authored_json(

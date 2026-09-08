@@ -1436,7 +1436,12 @@ def _build_object_set_business_transaction_steps(
             }
         )
 
-    for item in prepared:
+    use_existing_batch = len(prepared) >= 3 and all(
+        not item["row"].get("children") for item in prepared
+    )
+    individual_prepared = () if use_existing_batch else prepared
+
+    for item in individual_prepared:
         row = item["row"]
         properties = row.get("properties", [])
         if not isinstance(properties, list):
@@ -1578,7 +1583,69 @@ def _build_object_set_business_transaction_steps(
                 step_suffix=f"{step_suffix}-{nested_index:02d}",
             )
 
-    for item in prepared:
+    if use_existing_batch:
+        batch_name = f"{label}.declare-existing-batch"
+        batch_arguments: list[Any] = [*draft.prefix()]
+        for item in prepared:
+            declaration_id = f"target-{item['index']:02d}"
+            batch_arguments.extend(("--row-order", declaration_id))
+        for item in prepared:
+            row = item["row"]
+            declaration_id = f"target-{item['index']:02d}"
+            batch_arguments.extend(
+                ("--row", declaration_id, item["target"])
+            )
+            if "name" in row:
+                batch_arguments.extend(
+                    ("--field", declaration_id, "new_name", row["name"])
+                )
+            if "notes" in row:
+                batch_arguments.extend(
+                    (
+                        "--field",
+                        declaration_id,
+                        "notes",
+                        _business_scalar_cli_value(
+                            row["notes"], subject="object set"
+                        ),
+                    )
+                )
+            for prop in row.get("properties", []):
+                name = str(prop["name"])
+                value = _business_scalar_cli_value(
+                    prop.get("value"), subject="object set"
+                )
+                if name == "Volume":
+                    batch_arguments.extend(
+                        ("--field", declaration_id, "volume_db", value)
+                    )
+                else:
+                    batch_arguments.extend(
+                        (
+                            "--field-meaning-value",
+                            declaration_id,
+                            name,
+                            value,
+                        )
+                    )
+            for name, target_handle in item["references"]:
+                if name != "OutputBus" or target_handle is None:
+                    raise V3ProtocolError(
+                        "object set reference requires one bound output bus"
+                    )
+                batch_arguments.extend(
+                    ("--field", declaration_id, "output_bus", target_handle)
+                )
+        steps.append(
+            ExpectedGatewayStep(
+                name=batch_name,
+                subcommand="draft-declare-existing-batch",
+                arguments=tuple(batch_arguments),
+            )
+        )
+        draft.advance(batch_name)
+
+    for item in individual_prepared:
         row = item["row"]
         declaration_id = f"target-{item['index']:02d}"
         arguments_out: list[Any] = [

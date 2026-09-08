@@ -1374,6 +1374,7 @@ def _workflow_plan_steps(
         "draft-declare-rtpc": "operation_compose",
         "draft-declare-new": "operation_compose",
         "draft-declare-existing": "operation_compose",
+        "draft-declare-existing-batch": "operation_compose",
         "draft-declare-ui-plan": "operation_compose",
         "draft-add-ui-command": "operation_compose",
         "draft-revise-declaration": "operation_compose",

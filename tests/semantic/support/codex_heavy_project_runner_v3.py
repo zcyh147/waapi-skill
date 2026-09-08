@@ -4278,6 +4278,7 @@ def _compile_integration_workflow_plan(
         "draft-declare-import-batch": "operation_compose",
         "draft-declare-new": "operation_compose",
         "draft-declare-existing": "operation_compose",
+        "draft-declare-existing-batch": "operation_compose",
         "draft-revise-declaration": "operation_compose",
         "draft-remove-declaration": "operation_compose",
         "draft-check": "operation_compose_check",

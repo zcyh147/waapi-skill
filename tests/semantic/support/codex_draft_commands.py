@@ -19,6 +19,7 @@ DRAFT_GATEWAY_SUBCOMMANDS = frozenset(
         "draft-declare-import-batch",
         "draft-clear-object-list",
         "draft-declare-existing",
+        "draft-declare-existing-batch",
         "draft-declare-field-change",
         "draft-declare-new",
         "draft-declare-object-change",

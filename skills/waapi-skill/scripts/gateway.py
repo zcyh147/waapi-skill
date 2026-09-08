@@ -592,6 +592,7 @@ PROJECT_IDENTITY_FIELDS = ("id", "name", "path")
 EXPANDING_QUERY_SELECTS = frozenset({"descendants", "ancestors", "referencesTo", "children"})
 MAX_GATEWAY_RESULT_JSON_BYTES = 1024 * 1024
 MAX_METADATA_DISCOVERY_GATEWAY_RESULT_BYTES = 32 * 1024
+OBJECT_SET_BUSINESS_BATCH_MAX_ROWS = 8
 MAX_TOPIC_SCHEMA_GATEWAY_RESULT_BYTES = 32 * 1024
 TOPIC_STREAM_EVENT_OUTPUT_LIMIT_BYTES = MAX_GATEWAY_RESULT_JSON_BYTES
 TOPIC_STREAM_TOTAL_OUTPUT_LIMIT_BYTES = (
@@ -2901,6 +2902,39 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_business_declaration_arguments(draft_declare_existing)
     draft_declare_existing.add_argument("--object-handle", required=True)
+
+    draft_declare_existing_batch = subparsers.add_parser(
+        "draft-declare-existing-batch",
+        help=(
+            "Atomically declare bounded changes to several exact existing "
+            "objects while the Gateway resolves and revalidates each field meaning"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_declare_existing_batch)
+    draft_declare_existing_batch.add_argument(
+        "--row-order", action="append", required=True, metavar="DECLARATION_ID"
+    )
+    draft_declare_existing_batch.add_argument(
+        "--row",
+        action="append",
+        nargs=2,
+        required=True,
+        metavar=("DECLARATION_ID", "OBJECT_HANDLE"),
+    )
+    draft_declare_existing_batch.add_argument(
+        "--field",
+        action="append",
+        nargs=3,
+        default=[],
+        metavar=("DECLARATION_ID", "STABLE_FIELD", "VALUE"),
+    )
+    draft_declare_existing_batch.add_argument(
+        "--field-meaning-value",
+        action="append",
+        nargs=3,
+        default=[],
+        metavar=("DECLARATION_ID", "FIELD_MEANING", "VALUE"),
+    )
 
     draft_add_media = subparsers.add_parser(
         "draft-add-media",
@@ -12835,6 +12869,16 @@ def dispatch_command(
             dispatcher=dispatcher,
             common=common,
         )
+    if args.command == "draft-declare-existing-batch":
+        return dispatch_business_existing_batch(
+            args,
+            env=env,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+        )
     if args.command == "draft-discover-types":
         return dispatch_business_type_discovery(
             args,
@@ -17706,6 +17750,225 @@ def dispatch_business_field_discovery(
         payload["candidate_projection"] = (
             "meaning_results[].candidates_without_duplicate_top_level_rows"
         )
+    return payload
+
+
+def dispatch_business_existing_batch(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Declare a bounded object.set batch from meanings, with exact-scope checks."""
+
+    binding = _open_business_binding(
+        args,
+        env=env,
+        connection=connection,
+        detected_version=detected_version,
+        live_info=live_info,
+        dispatcher=dispatcher,
+    )
+    if binding.record.operation != "object.set":
+        raise GatewayInputError(
+            "draft-declare-existing-batch is available only for object.set"
+        )
+    raw_session = (
+        binding.record.composition.get("business_session")
+        if binding.record.composition is not None
+        else None
+    )
+    if raw_session is None:
+        raise GatewayInputError("Bind every exact target before declaring the batch")
+    session = BusinessDeclarationSession.from_dict(raw_session)
+    if binding.context != session.context:
+        raise OperationDraftBindingDrift(
+            "Live project or Wwise build differs from the business declaration binding."
+        )
+
+    row_order = list(args.row_order)
+    rows: dict[str, str] = {}
+    for declaration_id, object_handle in args.row:
+        if declaration_id in rows:
+            raise GatewayInputError(
+                f"Object-set batch declaration id {declaration_id!r} was supplied twice"
+            )
+        rows[declaration_id] = object_handle
+    if (
+        not 1 <= len(row_order) <= OBJECT_SET_BUSINESS_BATCH_MAX_ROWS
+        or len(row_order) != len(set(row_order))
+        or set(row_order) != set(rows)
+    ):
+        raise GatewayInputError(
+            "Object-set batch row order must name each of 1..8 supplied rows exactly once"
+        )
+
+    stable_by_id: dict[str, list[tuple[str, str]]] = {}
+    for declaration_id, field_name, value in args.field:
+        stable_by_id.setdefault(declaration_id, []).append((field_name, value))
+    meanings_by_id: dict[str, list[tuple[str, str]]] = {}
+    for declaration_id, meaning, value in args.field_meaning_value:
+        meanings_by_id.setdefault(declaration_id, []).append((meaning, value))
+    if (set(stable_by_id) | set(meanings_by_id)) - set(rows):
+        raise GatewayInputError(
+            "Object-set batch fields reference an unknown declaration id"
+        )
+    if any(
+        declaration_id not in stable_by_id and declaration_id not in meanings_by_id
+        for declaration_id in row_order
+    ):
+        raise GatewayInputError("Every object-set batch row requires one business outcome")
+    for declaration_id, pairs in meanings_by_id.items():
+        meanings = [meaning for meaning, _value in pairs]
+        normalized = [" ".join(meaning.split()).casefold() for meaning in meanings]
+        if (
+            not 1 <= len(meanings) <= MAX_METADATA_DISCOVERY_QUERIES
+            or any(
+                not meaning.strip()
+                or meaning != meaning.strip()
+                or len(meaning) > MAX_METADATA_DISCOVERY_QUERY_CHARS
+                for meaning in meanings
+            )
+            or len(normalized) != len(set(normalized))
+            or sum(len(meaning) for meaning in meanings)
+            > MAX_METADATA_DISCOVERY_TOTAL_QUERY_CHARS
+        ):
+            raise GatewayInputError(
+                f"Object-set batch row {declaration_id!r} requires 1..8 distinct bounded field meanings"
+            )
+
+    read_call = metadata_cached_read_call(
+        binding.read_call,
+        connection=connection,
+        version=detected_version,
+        live_info=live_info,
+        project=binding.project,
+        state_dir=binding.state_dir,
+    )
+    field_count = sum(len(pairs) for pairs in meanings_by_id.values())
+    adapter = business_adapter(binding.record.operation)
+
+    def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
+        handles = BusinessHandleRegistry.from_dict(current.handles.as_dict())
+        dynamic_by_id: dict[str, dict[str, Any]] = {}
+        for declaration_id in row_order:
+            object_handle = rows[declaration_id]
+            source = handles.resolve_object(object_handle)
+            meaning_pairs = meanings_by_id.get(declaration_id, [])
+            dynamic: dict[str, Any] = {}
+            if meaning_pairs:
+                discovery = discover_metadata(
+                    read_call=read_call,
+                    queries=[meaning for meaning, _value in meaning_pairs],
+                    object=source.object_id,
+                    limit=MAX_METADATA_DISCOVERY_LIMIT,
+                )
+                for meaning, raw_value in meaning_pairs:
+                    normalized_meaning = " ".join(meaning.split()).casefold()
+                    matches: list[Mapping[str, Any]] = []
+                    for discovered in discovery.candidates:
+                        metadata = discovered.get("metadata")
+                        kind = discovered.get("kind")
+                        value_type = (
+                            metadata_typed_value_type(str(metadata.get("type", "")))
+                            if isinstance(metadata, Mapping)
+                            else None
+                        )
+                        matched_queries = discovered.get("matched_queries", [])
+                        if (
+                            ((kind == "property" and value_type is not None) or kind == "reference")
+                            and any(
+                                isinstance(item, str)
+                                and " ".join(item.split()).casefold()
+                                == normalized_meaning
+                                for item in matched_queries
+                            )
+                        ):
+                            matches.append(discovered)
+                    if len(matches) != 1:
+                        raise GatewayInputError(
+                            "Each object-set batch field meaning must resolve to exactly one compatible live field"
+                        )
+                    bound = bind_live_field(
+                        handles,
+                        read_call=read_call,
+                        scope_kind="object",
+                        scope_value=source.object_id,
+                        token=str(matches[0]["name"]),
+                    )
+                    if bound.handle in dynamic:
+                        raise GatewayInputError(
+                            "Distinct object-set batch meanings cannot select the same live field"
+                        )
+                    dynamic[bound.handle] = _parse_business_value(
+                        bound.value_type,
+                        raw_value,
+                        field=meaning,
+                    )
+            dynamic_by_id[declaration_id] = dynamic
+        candidate_session = (
+            current.with_handle_registry(handles)
+            if field_count
+            else current
+        )
+        for declaration_id in row_order:
+            object_handle = rows[declaration_id]
+            fields = _parse_object_graph_business_fields(
+                candidate_session,
+                binding.record.operation,
+                stable_by_id.get(declaration_id, []),
+            )
+            dynamic = dynamic_by_id[declaration_id]
+            if dynamic:
+                fields["field_values"] = dynamic
+            candidate_session = candidate_session.with_existing_declaration(
+                declaration_id=declaration_id,
+                target=ExistingObjectTarget(object_handle),
+                fields=fields,
+            )
+        adapter.materialize(candidate_session)
+        return candidate_session
+
+    record = binding.store.apply_business_update(
+        args.draft_id,
+        task_authority=args.task_authority,
+        expected_revision=args.expected_revision,
+        schema_digest=operation_draft_schema_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        composer_digest=operation_composer_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        context=binding.context,
+        update=update,
+        event_type="declaration.batch-added",
+    )
+    payload = operation_draft_payload(
+        args.command,
+        record,
+        offline=False,
+        state_dir=args.state_dir,
+        task_authority=args.task_authority,
+    )
+    payload.update(
+        {
+            "endpoint": dict(common["endpoint"]),
+            "detected_version": detected_version,
+            "project_call": dispatch_call_summary(binding.project_call),
+            "batch_receipt": {
+                "row_count": len(row_order),
+                "field_count": field_count,
+                "metadata_scope": "each_exact_bound_object",
+                "applied_atomically": True,
+            },
+        }
+    )
     return payload
 
 
@@ -23133,6 +23396,7 @@ def _compact_object_set_update_continuation(
         "draft-bind-object": [
             "field_discovery",
             "declare_existing",
+            "declare_existing_batch",
             "declare_new",
         ],
         "draft-discover-fields": [
@@ -23140,6 +23404,9 @@ def _compact_object_set_update_continuation(
             "declare_existing",
         ],
         "draft-declare-existing": [
+            "completion_candidate",
+        ],
+        "draft-declare-existing-batch": [
             "completion_candidate",
         ],
     }.get(command, [])
@@ -23371,6 +23638,11 @@ def _business_next_action_binding(
     configure_prefix = [*base, "draft-business-configure", *binding]
     declare_new_prefix = [*base, "draft-declare-new", *binding]
     declare_existing_prefix = [*base, "draft-declare-existing", *binding]
+    declare_existing_batch_prefix = [
+        *base,
+        "draft-declare-existing-batch",
+        *binding,
+    ]
     declare_import_batch_prefix = [
         *base,
         "draft-declare-import-batch",
@@ -25201,6 +25473,44 @@ def _business_next_action_binding(
                         "[--field-value <bound-field-handle> <business-value>]...",
                     ],
                 },
+                "declare_existing_batch": {
+                    **operation_draft_prefix_copy_binding(
+                        declare_existing_batch_prefix
+                    ),
+                    "append_repeated": {
+                        "row_order": ["--row-order", "<task-local-id>"],
+                        "row": [
+                            "--row",
+                            "<same-task-local-id>",
+                            "<bound-existing-target-handle>",
+                        ],
+                        "stable_field": [
+                            "--field",
+                            "<same-task-local-id>",
+                            "<stable-business-field>",
+                            "<business-value>",
+                        ],
+                        "dynamic_field": [
+                            "--field-meaning-value",
+                            "<same-task-local-id>",
+                            "<user-facing-field-meaning>",
+                            "<business-value>",
+                        ],
+                    },
+                    "maximum_rows": OBJECT_SET_BUSINESS_BATCH_MAX_ROWS,
+                    "gateway_owned_behavior": (
+                        "resolve_and_revalidate_each_field_for_each_exact_object_"
+                        "then_apply_one_atomic_draft_revision"
+                    ),
+                    "precondition": (
+                        "bind_every_requested_existing_target_before_starting_"
+                        "this_single_batch"
+                    ),
+                    "use_when": (
+                        "all_requested_existing_targets_are_bound_and_two_or_"
+                        "more_outcomes_remain"
+                    ),
+                },
                 "declare_new": {
                     **operation_draft_prefix_copy_binding(declare_new_prefix),
                     "append": [
@@ -26703,6 +27013,7 @@ def operation_draft_payload(
                     "draft-discover-types",
                 }
                 or adapter.accepts_update_command(command)
+                or command == "draft-declare-existing-batch"
             )
         )
         if compact_business_update:
@@ -26734,11 +27045,11 @@ def operation_draft_payload(
                 next_action_binding
             )
             if (
-                command
-                in {
+                command in {
                     "draft-bind-object",
                     "draft-discover-fields",
                     "draft-declare-existing",
+                    "draft-declare-existing-batch",
                 }
                 and record.operation == "object.set"
             ):

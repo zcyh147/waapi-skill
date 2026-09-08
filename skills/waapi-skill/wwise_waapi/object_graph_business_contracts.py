@@ -198,7 +198,17 @@ def object_graph_business_contract_data(
                 "native_property_or_reference_token": "forbidden",
             },
             "declaration": {
-                "subcommands": ["draft-declare-existing", "draft-declare-new"],
+                "subcommands": [
+                    "draft-declare-existing",
+                    "draft-declare-existing-batch",
+                    "draft-declare-new",
+                ],
+                "existing_batch": {
+                    "maximum_rows": 8,
+                    "field_input": "user_facing_meaning_and_business_value",
+                    "metadata_revalidation": "each_exact_bound_object",
+                    "atomic_revision": True,
+                },
                 "existing_required_fields": ["object_handle"],
                 "new_required_fields": ["parent_handle", "name", "kind"],
                 "optional_fields": [
