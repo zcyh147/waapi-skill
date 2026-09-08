@@ -2487,6 +2487,21 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   checked Draft, and canonical Preview. Do not require one English phrase when
   the public Gateway deliberately owns synonym resolution.
 
+### Complete Gateway JSON can still overflow the Agent's tool view
+
+- Trigger: repeated native-Windows Weather runs stopped partway through the
+  five-Action `object.set` Draft. The last Gateway receipt was valid and
+  explicitly reported `response_integrity.complete=true` and
+  `truncated=false`, but long Windows campaign paths made the repeated
+  continuation large enough that the model-facing shell view was clipped; the
+  Agent then correctly stopped and reported a truncated response.
+- Prevention: compact public continuations by workflow phase, not only by JSON
+  validity. After one existing-object declaration, expose only the next object
+  binding, the completion candidate, and the explicit `draft-inspect` recovery
+  route. Keep the one copy-ready command named by its copy instruction and omit
+  duplicate `fixed_full_argv` arrays. A focused regression caps this receipt
+  below 6 KB; durable Draft state and `draft-inspect` retain the full surface.
+
 ### Public integration delegates first-use prose to its dedicated profile
 
 - Trigger: #51 candidate `ba0e4a5` produced a real-Wwise PASS for macOS Alarm,

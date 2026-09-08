@@ -193,7 +193,8 @@ def test_object_binding_returns_version_stable_business_kind(
         "then_read_next_response",
         "precompute_or_increment_revision",
     }
-    assert continuation["more_actions"]["fixed_full_argv"][3] == "draft-inspect"
+    assert "fixed_full_argv" not in continuation["more_actions"]
+    assert "draft-inspect" in continuation["more_actions"]["copy_command"]
     assert len(json.dumps(payload, separators=(",", ":")).encode("utf-8")) < 8_000
 
 
@@ -1296,7 +1297,8 @@ def test_object_set_discovers_two_business_field_meanings_in_one_revision(
     assert continuation["declare_existing"]["cardinality"] == (
         "exactly_one_declaration_per_command"
     )
-    assert continuation["more_actions"]["fixed_full_argv"][3] == "draft-inspect"
+    assert "fixed_full_argv" not in json.dumps(continuation)
+    assert "draft-inspect" in continuation["more_actions"]["copy_command"]
     assert len(json.dumps(discovered, separators=(",", ":")).encode("utf-8")) < 7_000
     fade_handle = discovered["meaning_results"][0]["candidates"][0]["handle"]
     delay_handle = discovered["meaning_results"][1]["candidates"][0]["handle"]
@@ -1325,20 +1327,14 @@ def test_object_set_discovers_two_business_field_meanings_in_one_revision(
         "contract",
         "required_next_phase",
         "object_binding",
-        "field_discovery",
-        "declare_existing",
         "completion_candidate",
         "more_actions",
         "shell_tool_timeout_ms",
         "then_read_next_response",
         "precompute_or_increment_revision",
     }
-    assert declared_continuation["more_actions"]["fixed_full_argv"][3] == (
-        "draft-inspect"
-    )
-    assert declared_continuation["declare_existing"]["cardinality"] == (
-        "exactly_one_declaration_per_command"
-    )
+    assert "fixed_full_argv" not in json.dumps(declared_continuation)
+    assert "draft-inspect" in declared_continuation["more_actions"]["copy_command"]
     assert set(declared_continuation["object_binding"]["selector_forms"]) == {
         "by_id",
         "by_path_segments",
@@ -1355,7 +1351,7 @@ def test_object_set_discovers_two_business_field_meanings_in_one_revision(
     assert declared_continuation["object_binding"]["result"] == (
         "copy_the_returned_bound_object.handle"
     )
-    assert len(json.dumps(declared, separators=(",", ":")).encode("utf-8")) < 8_000
+    assert len(json.dumps(declared, separators=(",", ":")).encode("utf-8")) < 6_000
     rejected_client = _live_client(
         tmp_path,
         {
@@ -1455,7 +1451,8 @@ def test_gateway_adds_subordinate_media_without_model_authored_json(
         ],
     }
     assert "configure" not in set_next
-    assert set_next["more_actions"]["fixed_full_argv"][3] == "draft-inspect"
+    assert "fixed_full_argv" not in set_next["more_actions"]
+    assert "draft-inspect" in set_next["more_actions"]["copy_command"]
     inspect_code, inspected = _offline(
         tmp_path,
         "draft-inspect",

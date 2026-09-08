@@ -23015,7 +23015,7 @@ def _compact_business_binding_continuation(value: Any) -> Any:
         return {
             str(key): _compact_business_binding_continuation(nested)
             for key, nested in value.items()
-            if key != "fixed_argv_prefix"
+            if key not in {"fixed_argv_prefix", "fixed_full_argv"}
         }
     if isinstance(value, list):
         return [
@@ -23136,8 +23136,6 @@ def _compact_object_set_update_continuation(
             "declare_existing",
         ],
         "draft-declare-existing": [
-            "field_discovery",
-            "declare_existing",
             "completion_candidate",
         ],
     }.get(command, [])
@@ -23156,7 +23154,9 @@ def _compact_object_set_update_continuation(
             compact[key] = action
     compact["more_actions"] = {
         "use_only_when_common_followups_cannot_express_the_user_intent": True,
-        **operation_draft_exact_copy_binding(inspect_argv),
+        **_compact_business_binding_continuation(
+            operation_draft_exact_copy_binding(inspect_argv)
+        ),
     }
     for key in (
         "shell_tool_timeout_ms",
