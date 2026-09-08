@@ -36,6 +36,7 @@ PROJECT_ID = "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"
 PARENT_ID = "{11111111-1111-1111-1111-111111111111}"
 CONTROL_ID = "{22222222-2222-2222-2222-222222222222}"
 SECOND_ACTION_ID = "{33333333-3333-3333-3333-333333333333}"
+THIRD_ACTION_ID = "{44444444-4444-4444-4444-444444444444}"
 
 
 class FakeClient:
@@ -187,10 +188,9 @@ def test_object_binding_returns_version_stable_business_kind(
         "contract",
         "required_next_phase",
         "object_binding",
-            "field_discovery",
-            "declare_existing",
-            "declare_existing_batch",
-            "more_actions",
+        "field_discovery",
+        "declare_existing",
+        "more_actions",
         "shell_tool_timeout_ms",
         "then_read_next_response",
         "precompute_or_increment_revision",
@@ -1406,6 +1406,7 @@ def test_object_set_batch_declares_meanings_with_per_object_metadata_revalidatio
     for revision, object_id, name in (
         (1, PARENT_ID, "Play_Rain"),
         (2, SECOND_ACTION_ID, "Play_Wind"),
+        (3, THIRD_ACTION_ID, "Play_Thunder"),
     ):
         bind_client = _live_client(
             tmp_path,
@@ -1442,6 +1443,10 @@ def test_object_set_batch_declares_meanings_with_per_object_metadata_revalidatio
         )
         assert bind_code == 0, bound
         handles.append(bound["bound_object"]["handle"])
+    continuation = bound["draft"]["next_action_binding"]
+    assert "declare_existing_batch" in continuation
+    assert "field_discovery" not in continuation
+    assert "declare_existing" not in continuation
 
     fade = {
         "name": "FadeTime",
@@ -1459,10 +1464,10 @@ def test_object_set_batch_declares_meanings_with_per_object_metadata_revalidatio
         tmp_path,
         {
             "ak.wwise.core.object.getPropertyAndReferenceNames": [
-                {"return": ["FadeTime", "Delay"]} for _ in range(8)
+                {"return": ["FadeTime", "Delay"]} for _ in range(12)
             ],
             "ak.wwise.core.object.getPropertyInfo": [
-                item for _ in range(4) for item in (fade, delay)
+                item for _ in range(6) for item in (fade, delay)
             ],
         },
     )
@@ -1475,17 +1480,22 @@ def test_object_set_batch_declares_meanings_with_per_object_metadata_revalidatio
             "--task-authority",
             authority,
             "--expected-revision",
-            "3",
+            "4",
             "--row-order",
             "rain",
             "--row-order",
             "wind",
+            "--row-order",
+            "thunder",
             "--row",
             "rain",
             handles[0],
             "--row",
             "wind",
             handles[1],
+            "--row",
+            "thunder",
+            handles[2],
             "--field-meaning-value",
             "rain",
             "Fade Time",
@@ -1502,6 +1512,14 @@ def test_object_set_batch_declares_meanings_with_per_object_metadata_revalidatio
             "wind",
             "Delay",
             "0.1",
+            "--field-meaning-value",
+            "thunder",
+            "Fade Time",
+            "0.05",
+            "--field-meaning-value",
+            "thunder",
+            "Delay",
+            "0",
         ],
         env=_env(tmp_path),
         client_factory=lambda _url: batch_client,
@@ -1509,12 +1527,12 @@ def test_object_set_batch_declares_meanings_with_per_object_metadata_revalidatio
 
     assert batch_code == 0, json.dumps(batch, ensure_ascii=False)
     assert batch["batch_receipt"] == {
-        "row_count": 2,
-        "field_count": 4,
+        "row_count": 3,
+        "field_count": 6,
         "metadata_scope": "each_exact_bound_object",
         "applied_atomically": True,
     }
-    assert batch["draft"]["revision"] == 4
+    assert batch["draft"]["revision"] == 5
     assert len(json.dumps(batch, separators=(",", ":")).encode("utf-8")) < 7_000
     stored = OperationDraftStore(tmp_path / "state").inspect(
         draft_id,
@@ -1524,12 +1542,14 @@ def test_object_set_batch_declares_meanings_with_per_object_metadata_revalidatio
     assert [row["declaration_id"] for row in session["declarations"]] == [
         "rain",
         "wind",
+        "thunder",
     ]
     fields = session["handles"]["fields"]
-    assert len(fields) == 4
+    assert len(fields) == 6
     assert {field["scope_value"] for field in fields} == {
         PARENT_ID,
         SECOND_ACTION_ID,
+        THIRD_ACTION_ID,
     }
 
 

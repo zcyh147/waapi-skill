@@ -25409,7 +25409,7 @@ def _business_next_action_binding(
                 "then_read_next_response": True,
                 "precompute_or_increment_revision": False,
             }
-            return {
+            result = {
                 **shared,
                 "required_next_phase": (
                     "declare_remaining_object_outcomes_or_check_complete_batch"
@@ -25583,6 +25583,21 @@ def _business_next_action_binding(
                     ),
                 },
             }
+            batch_ready = (
+                not session.declarations
+                and len(session.handles.as_dict()["objects"])
+                >= 3
+            )
+            if batch_ready:
+                result["required_next_phase"] = (
+                    "bind_remaining_targets_or_declare_all_ready_existing_"
+                    "targets_as_one_batch"
+                )
+                result.pop("field_discovery", None)
+                result.pop("declare_existing", None)
+            else:
+                result.pop("declare_existing_batch", None)
+            return result
         shared = {
             "contract": "waapi-skill.business-draft-next-action/v1",
             "responsibility_split": {

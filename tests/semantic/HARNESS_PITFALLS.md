@@ -2558,6 +2558,11 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   every meaning against every exact object, creates separate scoped handles,
   materializes the whole request, and commits one atomic Draft revision. Keep
   the individual discover/declare lane for small or dependency-bearing graphs.
+  Once three existing targets are bound and no declaration has started, the
+  compact continuation must remove the competing per-object discovery and
+  declaration branches: expose only continued target binding or the atomic
+  batch. Merely adding a preferred batch beside the old route still lets a
+  reasonable Agent select the obsolete sequence and fail before dispatch.
 
 ## New-root preflight
 
