@@ -8332,6 +8332,19 @@ def _revalidate_modification_policy_natural_behavior(
         )
 
 
+def _accepts_delegated_first_use_intro(
+    expected_unit: Any,
+    first_use_intro: Any,
+) -> bool:
+    """Accept the sealed delegation marker only for reviewed profile units."""
+
+    return first_use_intro == "delegated_to_dedicated_profile" and (
+        getattr(expected_unit, "component_profile_id", None)
+        == TYPED_INPUT_PROFILE_ID
+        or getattr(expected_unit, "delegates_first_use_intro", False) is True
+    )
+
+
 def _validate_heavy_v3_pass_checks(
     checks: Mapping[str, Any],
     *,
@@ -8403,14 +8416,13 @@ def _validate_heavy_v3_pass_checks(
     if checks.get("direct_client_closed") is not True:
         raise CampaignEvidenceError("passing project runner did not close its direct client")
     first_use_intro = checks.get("first_use_intro")
-    delegated_typed_intro = (
-        first_use_intro == "delegated_to_dedicated_profile"
-        and getattr(expected_unit, "component_profile_id", None)
-        == TYPED_INPUT_PROFILE_ID
+    delegated_intro = _accepts_delegated_first_use_intro(
+        expected_unit,
+        first_use_intro,
     )
     if (
         first_use_intro is not True
-        and not delegated_typed_intro
+        and not delegated_intro
     ) or checks.get("final_response_nonempty") is not True:
         raise CampaignEvidenceError(
             "passing project checks lack intro or final-response proof"

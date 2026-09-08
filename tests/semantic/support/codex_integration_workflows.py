@@ -156,6 +156,12 @@ class IntegrationWorkflowUnit:
     def user_turn_count(self) -> int:
         return len(self.turns)
 
+    @property
+    def delegates_first_use_intro(self) -> bool:
+        """Public integration grades business outcomes, not intro wording."""
+
+        return True
+
 
 @dataclass(frozen=True, slots=True)
 class IntegrationProfile:

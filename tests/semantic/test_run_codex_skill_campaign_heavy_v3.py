@@ -8012,6 +8012,20 @@ def test_deep_campaign_scopes_audio_revision_and_accepts_delegated_typed_intro(
     )
 
 
+def test_public_integration_unit_accepts_its_delegated_intro_marker() -> None:
+    unit = SimpleNamespace(delegates_first_use_intro=True)
+
+    assert campaign._accepts_delegated_first_use_intro(
+        unit,
+        "delegated_to_dedicated_profile",
+    )
+    assert not campaign._accepts_delegated_first_use_intro(unit, True)
+    assert not campaign._accepts_delegated_first_use_intro(
+        SimpleNamespace(delegates_first_use_intro=False),
+        "delegated_to_dedicated_profile",
+    )
+
+
 def test_heavy_validator_recomputes_derived_command_facts_from_sealed_events(
     tmp_path: Path,
 ) -> None:

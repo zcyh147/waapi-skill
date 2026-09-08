@@ -259,6 +259,10 @@ def test_filters_keep_public_version_major_order(profile) -> None:
     assert version_only.source_digests == profile.source_digests
 
 
+def test_public_integration_units_delegate_first_use_intro(profile) -> None:
+    assert all(unit.delegates_first_use_intro for unit in profile.units)
+
+
 def test_component_source_digests_are_namespaced_and_include_baselines(
     profile,
 ) -> None:

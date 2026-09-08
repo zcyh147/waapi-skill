@@ -2477,6 +2477,35 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   checked Draft, and canonical Preview. Do not require one English phrase when
   the public Gateway deliberately owns synonym resolution.
 
+### Public integration delegates first-use prose to its dedicated profile
+
+- Trigger: #51 candidate `ba0e4a5` produced a real-Wwise PASS for macOS Alarm,
+  including a non-empty final response and every business assertion, but the
+  outer Campaign changed it to BLOCKED for allegedly missing intro proof.
+- Cause: the public `integration` matrix intentionally writes the reviewed
+  `delegated_to_dedicated_profile` marker because first-use wording is tested
+  by its dedicated semantic profile. Its composed public units did not retain
+  that delegation policy, while the archive validator recognized the marker
+  only for direct typed-input units.
+- Prevention: make the delegation an explicit immutable property of public
+  integration units and accept the marker only for a unit that declares that
+  property (or the existing typed-input component). Keep the final-response
+  and complete business-oracle checks unchanged.
+
+### Windows desktop preflight must be locale- and schema-default-safe
+
+- Trigger: a valid Chinese Windows desktop was falsely reported inactive when
+  an SSH preflight searched localized `query user` output for the English word
+  `Active`. A replacement Scheduled Task check then mistook an omitted
+  `<RunLevel>` XML element for elevated execution even though the registered
+  principal reported `Limited`.
+- Prevention: prove an interactive desktop from the logged-in user's Explorer
+  process with a nonzero `SessionId`; do not parse localized status labels.
+  Pass `Interactive` to the PowerShell ScheduledTasks enum and verify that the
+  exported task resolves to `InteractiveToken`. Pass `Limited` for `RunLevel`
+  and verify `Get-ScheduledTask ... .Principal.RunLevel`; the XML may omit the
+  element because LeastPrivilege is the schema default.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:
