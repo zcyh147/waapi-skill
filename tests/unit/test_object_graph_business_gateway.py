@@ -677,29 +677,25 @@ def test_gateway_builds_rtpc_curve_from_bound_business_facts(tmp_path: Path) -> 
         "discover_rtpc_property_for_bound_object"
     )
 
-    discover_client = _live_client(
-        tmp_path,
+    volume_metadata = {
+        "name": "Volume",
+        "type": "Real32",
+        "display": {"name": "Voice Volume", "group": "General"},
+        "restriction": {"type": "range", "min": -200, "max": 200},
+        "supports": {"rtpc": "Additive", "unlink": True},
+    }
+    discover_client = MetadataFakeClient(
         {
-            "ak.wwise.core.object.getPropertyAndReferenceNames": [
-                {"return": ["Volume"]},
-                {"return": ["Volume"]},
-            ],
-            "ak.wwise.core.object.getPropertyInfo": [
-                {
-                    "name": "Volume",
-                    "type": "Real32",
-                    "display": {"name": "Volume", "group": "General"},
-                    "restriction": {"type": "range", "min": -200, "max": 200},
-                    "supports": {"rtpc": "Additive", "unlink": True},
-                },
-                {
-                    "name": "Volume",
-                    "type": "Real32",
-                    "display": {"name": "Volume", "group": "General"},
-                    "restriction": {"type": "range", "min": -200, "max": 200},
-                    "supports": {"rtpc": "Additive", "unlink": True},
-                },
-            ],
+            "ak.wwise.core.getInfo": [_info()],
+            "ak.wwise.core.getProjectInfo": [_project(tmp_path)],
+        },
+        {
+            "Volume": volume_metadata,
+            "OutputBusVolume": {
+                **volume_metadata,
+                "name": "OutputBusVolume",
+                "display": {"name": "Output Bus Volume", "group": "General"},
+            },
         },
     )
     discover_code, discovered = gateway.execute_gateway(
@@ -721,6 +717,8 @@ def test_gateway_builds_rtpc_curve_from_bound_business_facts(tmp_path: Path) -> 
         client_factory=lambda _url: discover_client,
     )
     assert discover_code == 0, discovered
+    assert discovered["candidate_count"] == 1
+    assert discovered["field_candidates"][0]["label"] == "Voice Volume"
     field_handle = discovered["field_candidates"][0]["handle"]
     assert discovered["draft"]["response_integrity"] == {
         "complete": True,

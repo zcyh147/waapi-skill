@@ -17441,6 +17441,35 @@ def dispatch_business_field_binding(
     return payload
 
 
+def _normalized_business_field_meaning(value: str) -> str:
+    return "".join(
+        character for character in value.casefold() if character.isalnum()
+    )
+
+
+def _unique_exact_business_field_candidates(
+    candidates: Sequence[Mapping[str, Any]],
+    meaning: str,
+) -> list[Mapping[str, Any]]:
+    """Return one exact live token/display match, or no preferred candidate."""
+
+    normalized_meaning = _normalized_business_field_meaning(meaning)
+    exact: list[Mapping[str, Any]] = []
+    for candidate in candidates:
+        metadata = candidate.get("metadata")
+        display = metadata.get("display") if isinstance(metadata, Mapping) else None
+        labels = [candidate.get("name")]
+        if isinstance(display, Mapping):
+            labels.append(display.get("name"))
+        if any(
+            isinstance(label, str)
+            and _normalized_business_field_meaning(label) == normalized_meaning
+            for label in labels
+        ):
+            exact.append(candidate)
+    return exact if len(exact) == 1 else []
+
+
 def dispatch_business_field_discovery(
     args: argparse.Namespace,
     *,
@@ -17626,6 +17655,23 @@ def dispatch_business_field_discovery(
         raise GatewayInputError(
             "Live field discovery found no compatible candidate for every requested meaning"
         )
+    narrowed: list[Mapping[str, Any]] = []
+    for meaning in meanings:
+        matching = [
+            candidate
+            for candidate in eligible
+            if any(
+                isinstance(matched, str)
+                and " ".join(matched.split()).casefold()
+                == " ".join(meaning.split()).casefold()
+                for matched in candidate.get("matched_queries", [])
+            )
+        ]
+        preferred = _unique_exact_business_field_candidates(matching, meaning)
+        for candidate in preferred or matching:
+            if candidate not in narrowed:
+                narrowed.append(candidate)
+    eligible = narrowed
 
     captured: list[Any] = []
     rejected: list[Mapping[str, Any]] = []
@@ -17915,33 +17961,11 @@ def dispatch_business_existing_batch(
                             )
                         ):
                             matches.append(discovered)
-                    exact_matches: list[Mapping[str, Any]] = []
-                    for discovered in matches:
-                        metadata = discovered.get("metadata")
-                        display = (
-                            metadata.get("display")
-                            if isinstance(metadata, Mapping)
-                            else None
-                        )
-                        labels = [discovered.get("name")]
-                        if isinstance(display, Mapping):
-                            labels.append(display.get("name"))
-                        if any(
-                            isinstance(label, str)
-                            and "".join(
-                                character
-                                for character in label.casefold()
-                                if character.isalnum()
-                            )
-                            == "".join(
-                                character
-                                for character in meaning.casefold()
-                                if character.isalnum()
-                            )
-                            for label in labels
-                        ):
-                            exact_matches.append(discovered)
-                    if len(exact_matches) == 1:
+                    exact_matches = _unique_exact_business_field_candidates(
+                        matches,
+                        meaning,
+                    )
+                    if exact_matches:
                         matches = exact_matches
                     if len(matches) != 1:
                         raise GatewayInputError(

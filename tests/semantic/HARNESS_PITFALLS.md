@@ -2576,6 +2576,9 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   quantities and normalize them before field-range validation. The Broker may
   equate such units only to the same sealed numeric value; object identity,
   field identity, and the resulting seconds value remain exact.
+  Apply the same unique exact-token/display preference to ordinary live field
+  discovery: `Volume` must select the exact `Volume` token rather than forcing
+  clarification merely because lexical retrieval also found `OutputBusVolume`.
 
 ## New-root preflight
 
