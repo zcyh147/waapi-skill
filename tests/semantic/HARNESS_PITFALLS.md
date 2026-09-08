@@ -2540,6 +2540,13 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   exported task resolves to `InteractiveToken`. Pass `Limited` for `RunLevel`
   and verify `Get-ScheduledTask ... .Principal.RunLevel`; the XML may omit the
   element because LeastPrivilege is the schema default.
+- An OpenSSH session can report `USERDOMAIN=WORKGROUP` even when the desktop
+  account is a local machine principal such as `MACHINE\\user`. Building
+  `-UserId` from `$env:USERDOMAIN\\$env:USERNAME` then fails SID resolution
+  before the task is registered. Read the active desktop principal from
+  `Win32_ComputerSystem.UserName`, require an Explorer process in that user's
+  nonzero session, and register that exact principal. Never fall back to the
+  SSH environment identity when those values differ.
 
 ### Do not make the Agent repeat object-scoped metadata plumbing
 
@@ -2594,6 +2601,46 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   one-shot launcher, prove there is no scoped Wwise/Fresh owner, and use a new
   campaign root. If the same spawn boundary repeats, stop and diagnose the
   Codex/launch environment before spending another semantic turn.
+
+### Integration runtime oracles must track the current business transport
+
+- Trigger: public `integration` candidate `282164b` reached valid deep
+  Composer traffic, but the legacy Weapons runtime still required three
+  `draft-declare-existing` calls and blocked before Codex because the current
+  protocol correctly contains one `draft-declare-existing-batch`. Rifle then
+  accepted two legal 1..3-row import chunks in the Broker, but its independent
+  runtime observer compared those two transport calls with the original four
+  one-row step names and changed a successful `draft-check` into exit 125.
+- Prevention: runtime topology assertions must name the current public
+  business seam. An observer downstream of the Broker must apply the same
+  bounded transport equivalence as the Broker; it may not reimpose an older
+  row-per-call layout. Keep negative tests for impossible one-call packing,
+  duplicates, out-of-order lifecycle steps, identity drift, and value drift.
+- Preflight: before another public integration root, run the complete fake
+  Rifle, Footsteps, and Weapons runtime modules, not only the Program gate.
+  The Program gate intentionally excludes `tests/semantic`, so a green Program
+  result cannot prove these campaign-owned observers are current.
+
+### Do not disguise an omitted high-level business fact as harness recovery
+
+- Trigger: in Windows `iwin-integration-282164b-r22-full`, Footsteps declared
+  the new Snow container but omitted the prompt-requested
+  `--switch-value <row> Snow` group. The continuation already exposed that
+  exact stable field and
+  said every row must carry every known requested field; the Broker rejected
+  the incomplete row before Gateway or Wwise dispatch. Mac completed the same
+  unit on the same candidate.
+- Boundary: this is the Agent-owned natural-language-to-closed-business-facts
+  step, not native WAAPI construction. Do not leak the hidden Oracle's missing
+  value through a Broker correction, accept a partial row as equivalent, or
+  weaken the final assignment assertion. A fresh failure remains an ordinary
+  semantic FAIL; use the normal failure-first rerun after deterministic shared
+  causes are repaired.
+- The same rule applies when an Agent ignores a newer sole continuation or
+  omits a requested read projection while the other host passes the identical
+  case. First prove the continuation is complete with program tests. If it is,
+  retain the strict Broker and business Oracle rather than teaching the
+  harness to complete the Agent's intent.
 
 ## New-root preflight
 

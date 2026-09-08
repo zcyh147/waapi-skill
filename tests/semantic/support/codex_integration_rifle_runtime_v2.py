@@ -41,8 +41,6 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
 )
 from tests.semantic.support.codex_gateway_broker import (
     ExpectedGatewayStep,
-    gateway_step_prefix_matches,
-    gateway_step_sequence_matches,
 )
 from tests.semantic.support.codex_integration_workflows_v2 import (
     BaselineManifest,
@@ -747,6 +745,7 @@ class _RifleSession:
         self.before: RifleSnapshot | None = None
         self.protocol: V3GatewayProtocol | None = None
         self.observed_steps: list[str] = []
+        self._observed_protocol_cursor = 0
         self._cleaned = False
         self._finalized = False
 
@@ -857,13 +856,37 @@ class _RifleSession:
                 "Rifle observer received an invalid step or payload"
             )
         expected_names = tuple(row.name for row in protocol.steps)
-        candidate = (*self.observed_steps, step.name)
-        if not gateway_step_prefix_matches(
-            expected_names,
-            candidate,
-            protocol.commutative_read_only_step_groups,
-            protocol.commutative_composer_setup_step_groups,
-        ):
+        position = self._observed_protocol_cursor
+        if position < len(expected_names) and step.name == expected_names[position]:
+            next_protocol_cursor = position + 1
+        elif step.name == "tx01.check":
+            check_index = expected_names.index("tx01.check")
+            skipped = expected_names[position:check_index]
+            expected_batch_count = sum(
+                name.startswith("tx01.declare-batch")
+                for name in expected_names[:check_index]
+            )
+            observed_batch_count = sum(
+                name.startswith("tx01.declare-batch")
+                for name in self.observed_steps
+            )
+            if (
+                not skipped
+                or any(
+                    not name.startswith("tx01.declare-batch-")
+                    for name in skipped
+                )
+                or not (
+                    math.ceil(expected_batch_count / 3)
+                    <= observed_batch_count
+                    <= expected_batch_count
+                )
+            ):
+                raise RifleIntegrationRuntimeError(
+                    "Rifle gateway steps were duplicated or observed out of order"
+                )
+            next_protocol_cursor = check_index + 1
+        else:
             raise RifleIntegrationRuntimeError(
                 "Rifle gateway steps were duplicated or observed out of order"
             )
@@ -877,6 +900,7 @@ class _RifleSession:
                 raise RifleIntegrationRuntimeError(
                     f"{step.name} did not return a successful gateway payload"
                 )
+        self._observed_protocol_cursor = next_protocol_cursor
         self.observed_steps.append(step.name)
         if step.name == "tx01.preview":
             verification = self.verify_turn(1)
@@ -1655,20 +1679,7 @@ class _RifleSession:
         )
         record(
             "single_import_transaction",
-            gateway_step_sequence_matches(
-                expected_steps,
-                tuple(self.observed_steps),
-                (
-                    self.protocol.commutative_read_only_step_groups
-                    if self.protocol is not None
-                    else ()
-                ),
-                (
-                    self.protocol.commutative_composer_setup_step_groups
-                    if self.protocol is not None
-                    else ()
-                ),
-            )
+            self._observed_protocol_cursor == len(expected_steps)
             and self.observed_steps.count("tx01.execute") == 1
             and self.observed_steps.count("tx01.verify") == 1,
             "the exact one-transaction broker protocol was not fully observed",

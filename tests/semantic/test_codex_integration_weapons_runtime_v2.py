@@ -793,7 +793,7 @@ def test_prepares_scoped_complete_query_and_one_strict_batch(
         "tx01.operation-schema",
         "tx01.draft-start",
     )
-    assert prepared.protocol.turn_prefix_counts == (3, 17, 21)
+    assert prepared.protocol.turn_prefix_counts == (3, 15, 19)
     assert prepared.protocol.commutative_read_only_step_groups == (
         (
             "relationship.output_bus.01",
@@ -802,7 +802,7 @@ def test_prepares_scoped_complete_query_and_one_strict_batch(
     )
     serialized = serialize_protocol(prepared.protocol)
     assert deserialize_protocol(serialized) == prepared.protocol
-    business_steps = prepared.protocol.steps[7:17]
+    business_steps = prepared.protocol.steps[7:15]
     assert business_steps[0].subcommand == "draft-start"
     assert [step.subcommand for step in business_steps[-2:]] == [
         "draft-check",
@@ -821,12 +821,14 @@ def test_prepares_scoped_complete_query_and_one_strict_batch(
         "tx01.bind-target-03-04",
     ]
     declarations = [
-        step for step in business_steps if step.subcommand == "draft-declare-existing"
+        step
+        for step in business_steps
+        if step.subcommand == "draft-declare-existing-batch"
     ]
-    assert len(declarations) == 3
-    assert declarations[0].arguments.count("--field") == 3
-    assert declarations[1].arguments.count("--field") == 1
-    assert declarations[2].arguments.count("--field") == 2
+    assert len(declarations) == 1
+    assert declarations[0].arguments.count("--row-order") == 3
+    assert declarations[0].arguments.count("--row") == 3
+    assert declarations[0].arguments.count("--field") == 6
     audit = prepared.protocol.steps[0]
     assert audit.subcommand == "query-object"
     assert audit.arguments[:4] == (
@@ -923,12 +925,15 @@ def test_weapons_business_draft_keeps_canonical_volume_field(
     declaration = next(
         step
         for step in prepared.protocol.steps
-        if step.name == "tx01.declare-existing-02"
+        if step.name == "tx01.declare-existing-batch"
     )
 
-    assert ("--field", "volume_db") in tuple(
-        zip(declaration.arguments, declaration.arguments[1:])
-    )
+    volume_group = declaration.arguments[
+        declaration.arguments.index("volume_db") - 2 :
+        declaration.arguments.index("volume_db") + 2
+    ]
+    assert volume_group[:3] == ("--field", "target-02", "volume_db")
+    assert volume_group[3].values == ("-3", "-3.0")
     assert "@Volume" not in declaration.arguments
 
 
@@ -960,17 +965,14 @@ def test_business_draft_binds_one_exact_reviewed_output_bus(
     declarations = [
         step
         for step in prepared.protocol.steps
-        if step.subcommand == "draft-declare-existing"
+        if step.subcommand == "draft-declare-existing-batch"
     ]
+    assert len(declarations) == 1
+    arguments = declarations[0].arguments
     output_bus_bindings = [
-        argument
-        for declaration in declarations
-        for index, argument in enumerate(declaration.arguments)
-        if index >= 2
-        and declaration.arguments[index - 2 : index] == (
-            "--field",
-            "output_bus",
-        )
+        arguments[index + 3]
+        for index, argument in enumerate(arguments[:-3])
+        if argument == "--field" and arguments[index + 2] == "output_bus"
     ]
     assert len(output_bus_bindings) == 2
     assert output_bus_bindings[0] == output_bus_bindings[1]

@@ -981,6 +981,50 @@ def test_rifle_observer_and_final_oracle_accept_canonical_setup(
     prepared.cleanup().assert_passed()
 
 
+def test_rifle_observer_accepts_a_legal_two_chunk_import_rebatch(
+    tmp_path: Path,
+) -> None:
+    prepared, fake, _runtime = _prepared(tmp_path)
+    steps = prepared.protocol.steps
+    first_declaration = next(
+        index
+        for index, step in enumerate(steps)
+        if step.name.startswith("tx01.declare-batch")
+    )
+    declaration_steps = tuple(
+        step for step in steps if step.name.startswith("tx01.declare-batch")
+    )
+    check = next(step for step in steps if step.name == "tx01.check")
+
+    for step in steps[:first_declaration]:
+        prepared.observe_payload(
+            step,
+            {"ok": True, "command": step.subcommand},
+        )
+    for step in declaration_steps[:2]:
+        prepared.observe_payload(
+            step,
+            {"ok": True, "command": step.subcommand},
+        )
+
+    prepared.observe_payload(
+        check,
+        {"ok": True, "command": check.subcommand},
+    )
+    for step in steps[steps.index(check) + 1 :]:
+        if step.name == "tx01.execute":
+            fake.apply_import(prepared.operation_request)
+        prepared.observe_payload(
+            step,
+            {"ok": True, "command": step.subcommand},
+        )
+
+    verification = prepared.verify_final()
+    verification.assert_passed()
+    assert verification.assertions["single_import_transaction"] is True
+    prepared.cleanup().assert_passed()
+
+
 def test_rifle_observer_rejects_duplicate_or_incomplete_setup(
     tmp_path: Path,
 ) -> None:

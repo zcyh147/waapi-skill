@@ -630,9 +630,13 @@ class _WeaponsSession:
                 for step in protocol.steps[6:]
             ) < 4
             or sum(
+                step.subcommand == "draft-declare-existing-batch"
+                for step in protocol.steps[6:]
+            ) != 1
+            or any(
                 step.subcommand == "draft-declare-existing"
                 for step in protocol.steps[6:]
-            ) != 3
+            )
             or transaction_names[-6:]
             != (
                 "tx01.check",
