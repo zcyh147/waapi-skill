@@ -6933,6 +6933,7 @@ def _normalize_bound_business_reference_paths(
     *,
     path_to_id: Mapping[str, str],
     type_name_to_id: Mapping[tuple[str, str], str] | None = None,
+    direct_child_to_id: Mapping[tuple[str, str], str] | None = None,
 ) -> Any:
     """Replace exact live-bound business identities with their sealed GUIDs."""
 
@@ -6972,11 +6973,28 @@ def _normalize_bound_business_reference_paths(
                 "kind": "id",
                 "value": type_name_to_id[(value["type"], value["name"])],
             }
+        parent = value.get("parent")
+        if (
+            set(value) == {"kind", "parent", "type"}
+            and value.get("kind") == "direct-child"
+            and isinstance(parent, Mapping)
+            and set(parent) == {"kind", "value"}
+            and parent.get("kind") == "path"
+            and isinstance(parent.get("value"), str)
+            and isinstance(value.get("type"), str)
+            and direct_child_to_id is not None
+            and (parent["value"], value["type"]) in direct_child_to_id
+        ):
+            return {
+                "kind": "id",
+                "value": direct_child_to_id[(parent["value"], value["type"])],
+            }
         return {
             str(key): _normalize_bound_business_reference_paths(
                 nested,
                 path_to_id=path_to_id,
                 type_name_to_id=type_name_to_id,
+                direct_child_to_id=direct_child_to_id,
             )
             for key, nested in value.items()
         }
@@ -6986,6 +7004,7 @@ def _normalize_bound_business_reference_paths(
                 nested,
                 path_to_id=path_to_id,
                 type_name_to_id=type_name_to_id,
+                direct_child_to_id=direct_child_to_id,
             )
             for nested in value
         ]
@@ -7126,6 +7145,39 @@ def _object_operation_json_equal(actual: Any, expected: Any) -> bool:
                 if key not in ignored_right
             )
         if isinstance(right, list):
+            if path and path[-1] in {"properties", "references"}:
+                left_by_name = (
+                    {
+                        item["name"]: item
+                        for item in left
+                        if isinstance(item, Mapping)
+                        and isinstance(item.get("name"), str)
+                        and item["name"]
+                    }
+                    if isinstance(left, list)
+                    else {}
+                )
+                right_by_name = {
+                    item["name"]: item
+                    for item in right
+                    if isinstance(item, Mapping)
+                    and isinstance(item.get("name"), str)
+                    and item["name"]
+                }
+                if (
+                    isinstance(left, list)
+                    and len(left_by_name) == len(left)
+                    and len(right_by_name) == len(right)
+                    and set(left_by_name) == set(right_by_name)
+                ):
+                    return all(
+                        compare(
+                            left_by_name[name],
+                            item,
+                            (*path, name),
+                        )
+                        for name, item in right_by_name.items()
+                    )
             return (
                 isinstance(left, list)
                 and len(left) == len(right)
@@ -14120,10 +14172,36 @@ class CodexGatewayBroker:
                     for key, object_ids in type_name_rows.items()
                     if len(object_ids) == 1
                 }
+                direct_child_rows: dict[tuple[str, str], set[str]] = {}
+                for row in handle_rows:
+                    if not isinstance(row, Mapping):
+                        continue
+                    object_type = row.get("object_type")
+                    object_path = row.get("path")
+                    object_id = row.get("object_id")
+                    if not all(
+                        isinstance(item, str)
+                        for item in (object_type, object_path, object_id)
+                    ):
+                        continue
+                    parent_path, separator, _child_segment = object_path.rpartition(
+                        "\\"
+                    )
+                    if not separator or not parent_path:
+                        continue
+                    direct_child_rows.setdefault(
+                        (parent_path, object_type), set()
+                    ).add(object_id)
+                direct_child_to_id = {
+                    key: next(iter(object_ids))
+                    for key, object_ids in direct_child_rows.items()
+                    if len(object_ids) == 1
+                }
                 bound_witness = _normalize_bound_business_reference_paths(
                     preview_step.expected_operation_request,
                     path_to_id=path_to_id,
                     type_name_to_id=type_name_to_id,
+                    direct_child_to_id=direct_child_to_id,
                 )
                 normalized_replayed = _normalize_audio_import_request_named_fields(
                     replayed

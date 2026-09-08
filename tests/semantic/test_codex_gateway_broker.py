@@ -4700,6 +4700,31 @@ def test_soundbank_exact_type_name_witness_normalizes_to_bound_guid() -> None:
     }
 
 
+def test_unnamed_direct_child_witness_normalizes_to_unique_bound_guid() -> None:
+    expected = {
+        "kind": "direct-child",
+        "parent": {
+            "kind": "path",
+            "value": r"\Events\Default Work Unit\Weather\Play_Rain",
+        },
+        "type": "Action",
+    }
+
+    assert broker_module._normalize_bound_business_reference_paths(  # noqa: SLF001
+        expected,
+        path_to_id={},
+        direct_child_to_id={
+            (
+                r"\Events\Default Work Unit\Weather\Play_Rain",
+                "Action",
+            ): "{00000000-0000-0000-0000-000000000001}",
+        },
+    ) == {
+        "kind": "id",
+        "value": "{00000000-0000-0000-0000-000000000001}",
+    }
+
+
 def _archive_test_object_set_protocol_batches_independent_targets_through_public_gateway(
     tmp_path: Path,
 ) -> None:
@@ -6794,6 +6819,28 @@ def test_business_draft_normalizes_live_bound_ids_to_reviewed_paths(
     assert broker_module._object_operation_json_equal(  # noqa: SLF001
         normalized,
         request,
+    )
+
+
+def test_object_operation_equivalence_ignores_unique_property_order_only() -> None:
+    expected = _two_target_object_set_request()
+    expected_row = expected["arguments"]["objects"][0]
+    expected_row["properties"] = [
+        {"name": "FadeTime", "value": 0.4},
+        {"name": "Delay", "value": 0.1},
+    ]
+    actual = json.loads(json.dumps(expected))
+    actual["arguments"]["objects"][0]["properties"].reverse()
+
+    assert broker_module._object_operation_json_equal(  # noqa: SLF001
+        actual,
+        expected,
+    )
+
+    actual["arguments"]["objects"][0]["properties"][0]["value"] = 0.2
+    assert not broker_module._object_operation_json_equal(  # noqa: SLF001
+        actual,
+        expected,
     )
 
 
