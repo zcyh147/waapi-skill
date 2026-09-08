@@ -533,6 +533,10 @@ def test_soundbank_draft_derives_type_for_one_exact_name_without_a_separate_quer
         "unspecified": "omit",
         "infer_defaults": False,
     }
+    assert next_action["declaration"]["append"][-1] == (
+        "--io-root <exact-caller-owned-authority-root-containing-project-cache-"
+        "and-all-generated-output-not-the-final-output-directory>"
+    )
     binding = next_action["object_binding"]
     assert binding["direct_query_before_binding"] == "forbidden"
     exact_name = binding["role_routes"]["soundbank"]["by_exact_name"]

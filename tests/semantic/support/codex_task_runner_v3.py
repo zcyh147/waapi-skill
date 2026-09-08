@@ -963,7 +963,7 @@ def _normalize_turn_reference_schedule(
             )
         normalized_rows: list[tuple[str, ...]] = []
         seen: set[str] = set()
-        for raw_row in turn_reference_schedule:
+        for turn_index, raw_row in enumerate(turn_reference_schedule, start=1):
             if isinstance(raw_row, (str, bytes)):
                 raise V3TaskRunnerError(
                     "turn_reference_schedule rows must be reference sequences"
@@ -974,9 +974,11 @@ def _normalize_turn_reference_schedule(
                 raise V3TaskRunnerError(
                     "turn_reference_schedule rows must be reference sequences"
                 ) from exc
-            if len(row) > 1:
+            max_references = 2 if turn_index == 1 else 1
+            if len(row) > max_references:
                 raise V3TaskRunnerError(
-                    "each Codex turn may read at most one waapi lane reference"
+                    "turn 1 may read at most two reviewed lane references; "
+                    "later turns may read at most one"
                 )
             for reference in row:
                 if (
@@ -993,9 +995,9 @@ def _normalize_turn_reference_schedule(
                 seen.add(reference)
             normalized_rows.append(row)
         reference_rows = tuple(normalized_rows)
-        if reference_rows[0] != (required_reference,):
+        if not reference_rows[0] or reference_rows[0][0] != required_reference:
             raise V3TaskRunnerError(
-                "turn 1 must read the required_reference lane"
+                "turn 1 must begin with the required_reference lane"
             )
     return (
         ("SKILL.md", *reference_rows[0]),

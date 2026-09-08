@@ -506,15 +506,22 @@ def test_reference_schedule_preserves_default_and_allows_alarm_lane_transition()
         prompt_count=3,
         required_reference="references/waapi-query.md",
         turn_reference_schedule=(
-            ("references/waapi-query.md",),
-            ("references/waapi-operate.md",),
+            (
+                "references/waapi-query.md",
+                "references/waapi-operate.md",
+            ),
+            (),
             (),
         ),
     )
 
     assert alarm_schedule == (
-        ("SKILL.md", "references/waapi-query.md"),
-        ("references/waapi-operate.md",),
+        (
+            "SKILL.md",
+            "references/waapi-query.md",
+            "references/waapi-operate.md",
+        ),
+        (),
         (),
     )
     for turn_index, expected_reads in enumerate(alarm_schedule, start=1):
@@ -569,11 +576,11 @@ def test_reference_schedule_allows_reviewed_skill_only_first_turn() -> None:
         ("references/waapi-query.md", (), ()),
         ((None,), (), ()),
         (
+            ("references/waapi-query.md",),
             (
-                "references/waapi-query.md",
                 "references/waapi-operate.md",
+                "references/waapi-topics.md",
             ),
-            (),
             (),
         ),
         (

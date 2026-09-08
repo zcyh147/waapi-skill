@@ -3910,9 +3910,12 @@ _INTEGRATION_WORKFLOW_IDS = frozenset(
 _INTEGRATION_QUERY_FIRST_WORKFLOW_IDS = frozenset(
     {"alarm_diagnose_and_repair", "weapons_query_guided_batch_cleanup"}
 )
-_ALARM_TURN_REFERENCE_SCHEDULE = (
-    ("references/waapi-query.md",),
-    ("references/waapi-operate.md",),
+_QUERY_MUTATION_TURN_REFERENCE_SCHEDULE = (
+    (
+        "references/waapi-query.md",
+        "references/waapi-operate.md",
+    ),
+    (),
     (),
 )
 
@@ -4135,7 +4138,7 @@ def _prepare_integration_workflow_case(
             )
         ),
         turn_reference_schedule=(
-            _ALARM_TURN_REFERENCE_SCHEDULE
+            _QUERY_MUTATION_TURN_REFERENCE_SCHEDULE
             if workflow_id in _INTEGRATION_QUERY_FIRST_WORKFLOW_IDS
             else None
         ),

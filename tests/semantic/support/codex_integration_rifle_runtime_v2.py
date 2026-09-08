@@ -489,6 +489,10 @@ def prepare_rifle_integration_runtime(
         steps = build_audio_import_composer_transaction_steps(
             operation_request,
             label="tx01",
+            existing_target_paths=frozenset(
+                before.objects_by_role()[role].path
+                for role in _EXISTING_SOUND_ROLES
+            ),
         )
         protocol = build_protocol_with_bounded_import_chunks(
             steps=steps,

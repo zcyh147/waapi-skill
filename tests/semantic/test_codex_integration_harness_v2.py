@@ -360,8 +360,11 @@ def _archive_test_project_runner_wires_each_v2_runtime_and_manifest(
     }
     if workflow_id == "weapons_query_guided_batch_cleanup":
         assert prepared.turn_reference_schedule == (
-            ("references/waapi-query.md",),
-            ("references/waapi-operate.md",),
+            (
+                "references/waapi-query.md",
+                "references/waapi-operate.md",
+            ),
+            (),
             (),
         )
         assert prepared.protocol.optional_workflow_query_schema_step_names == (
@@ -421,8 +424,12 @@ def test_project_runner_rejects_v2_unit_without_bound_manifest(
             "weapons_query_guided_batch_cleanup",
             ("request", "confirmation", "confirmation"),
             (
-                ("SKILL.md", "references/waapi-query.md"),
-                ("references/waapi-operate.md",),
+                (
+                    "SKILL.md",
+                    "references/waapi-query.md",
+                    "references/waapi-operate.md",
+                ),
+                (),
                 (),
             ),
         ),

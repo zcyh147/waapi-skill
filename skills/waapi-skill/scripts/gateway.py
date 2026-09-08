@@ -24890,7 +24890,8 @@ def _business_next_action_binding(
                 "[--rebuild-soundbanks true|false]",
                 "[--clear-audio-file-cache true|false]",
                 "[--rebuild-init-bank true|false]",
-                "--io-root <exact-isolated-output-root>",
+                "--io-root <exact-caller-owned-authority-root-containing-project-cache-"
+                "and-all-generated-output-not-the-final-output-directory>",
             ],
             "soundbank.convertExternalSources": [
                 "--source <exact-wsources-file> <project-platform-name> <exact-output-root>",

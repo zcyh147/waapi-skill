@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import re
 import uuid
 from pathlib import Path
 from types import SimpleNamespace
@@ -746,6 +747,27 @@ def test_prepares_exact_gateway_checked_use_existing_batch(
     assert prepared.protocol.commutative_read_only_step_groups == ()
     assert prepared.protocol.commutative_composer_setup_step_groups == ()
     assert all(step.subcommand != "metadata" for step in prepared.protocol.steps)
+    target_bindings = [
+        step
+        for step in prepared.protocol.steps
+        if step.name.startswith("tx01.bind-object.")
+    ][:4]
+
+    def bound_path(step: Any) -> str:
+        arguments = tuple(step.arguments)
+        segments = [
+            str(arguments[index + 1])
+            for index, argument in enumerate(arguments[:-1])
+            if argument == "--object-path-segment"
+        ]
+        return "\\" + "\\".join(segments)
+
+    normalized_paths = [
+        re.sub(r"(?<=\\)<[^<>\\]+>", "", str(row["object_path"]))
+        for row in rows
+    ]
+    assert [bound_path(step) for step in target_bindings[:3]] == normalized_paths[:3]
+    assert bound_path(target_bindings[3]) == normalized_paths[3].rpartition("\\")[0]
     assert prepared.expected_dispatches[0].api == IMPORT_API
     assert prepared.expected_dispatches[0].count == 1
     assert len(prepared.before_snapshot.objects) == 10
@@ -780,7 +802,13 @@ def test_rifle_business_protocol_preserves_every_exact_import_row(
         for declaration in declarations
         for argument in declaration.arguments
     )
-    assert batch_arguments.count("--existing-row") == 4
+    assert batch_arguments.count("--existing-row") == 3
+    assert batch_arguments.count("--new-row") == 1
+    new_row_index = batch_arguments.index("--new-row")
+    assert batch_arguments[new_row_index + 3 : new_row_index + 5] == (
+        "Rifle_Distant",
+        "sound-sfx",
+    )
     assert batch_arguments.count("--row-order") == 4
     assert all(
         declaration.arguments.count("--row-order") == 1

@@ -2384,6 +2384,51 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   real-Wwise business oracle exact. A missing switch assignment, row, or media
   binding remains a semantic failure and cannot be excused as rebatching.
 
+### `useExisting` protocols must distinguish absent import targets
+
+- Trigger: #51 Rifle Fresh units followed the Gateway continuation and bound
+  the existing Rifle parent before declaring the requested new
+  `Rifle_Distant` Sound. The integration protocol instead demanded a bind of
+  the complete absent `Rifle_Distant` path, so the Broker rejected the correct
+  command before Gateway or Wwise dispatch.
+- Cause: the workflow supplied an `audio.import` request with native
+  `useExisting` mode but did not pass its already-sealed pre-state existence
+  set to the Composer protocol builder. Without that set the builder must
+  conservatively classify every row as an existing target, including the one
+  object the fixture explicitly proves absent.
+- Prevention: derive `existing_target_paths` from the trusted before-snapshot,
+  never from model output. Require each existing row to bind its complete path
+  and each absent row to bind only its existing parent, then declare the new
+  business name and kind. Regress both forms before another Fresh root; do not
+  weaken an exact path bind globally.
+
+### A reviewed query-then-mutate workflow may load both finite lanes up front
+
+- Trigger: #51 `INT25-ALARM` completed the correct diagnosis, exact-ID
+  revalidation, Preview, execution, and real-Wwise verification, but failed
+  only because it read the already-required `waapi-operate.md` beside
+  `waapi-query.md` on turn 1 instead of waiting until turn 2.
+- Prevention: for the closed three-turn integration workflows that necessarily
+  query and then mutate, schedule those two reviewed references together on
+  turn 1. Keep the exact task-local paths, read-before-Gateway ordering,
+  one-read-per-reference rule, and prohibition on every other file. This is a
+  finite workflow-specific schedule, not permission to preload arbitrary Skill
+  documentation or reread a lane later.
+
+### File authority roots are not final output directories
+
+- Trigger: #51 `INT22-HARBOR` copied the workflow's final SoundBank output
+  directory into `soundbank.generate --io-root`; the intended authority was
+  the higher caller-owned root containing the sandbox project, cache, and all
+  generated output. The sibling 2025.1 unit selected that authority and passed.
+- Cause: the Gateway continuation described `--io-root` as an "isolated output
+  root", which made the containment boundary sound like the final destination.
+- Prevention: describe this field as the caller-owned authority root that
+  contains project, cache, and every generated output, explicitly excluding the
+  final output directory. Keep path containment validation exact; do not accept
+  a narrower path merely because the requested Bank files happen to land below
+  it.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:

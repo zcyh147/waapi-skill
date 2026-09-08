@@ -235,8 +235,12 @@ def test_alarm_uses_reviewed_cross_lane_reference_schedule() -> None:
         "references/waapi-query.md"
     )
     assert campaign._heavy_v3_expected_skill_reads(alarm) == (
-        ("SKILL.md", "references/waapi-query.md"),
-        ("references/waapi-operate.md",),
+        (
+            "SKILL.md",
+            "references/waapi-query.md",
+            "references/waapi-operate.md",
+        ),
+        (),
         (),
     )
 
@@ -295,8 +299,11 @@ def test_project_runner_wires_alarm_cross_lane_reference_schedule(
 
     assert prepared.required_reference == "references/waapi-query.md"
     assert prepared.turn_reference_schedule == (
-        ("references/waapi-query.md",),
-        ("references/waapi-operate.md",),
+        (
+            "references/waapi-query.md",
+            "references/waapi-operate.md",
+        ),
+        (),
         (),
     )
     assert prepared.protocol.optional_workflow_query_schema_step_names == (
