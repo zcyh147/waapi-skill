@@ -1387,7 +1387,7 @@ def test_other_typed_profile_object_metadata_lanes_are_exact(
     )
 
 
-def test_typed_profile_set03_uses_business_draft_field_discovery(
+def test_typed_profile_set03_uses_gateway_owned_batch_field_meanings(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     scenario = _scenario(
@@ -1415,11 +1415,16 @@ def test_typed_profile_set03_uses_business_draft_field_discovery(
         "operation-schema",
         "draft-start",
     ]
-    assert any(
-        step.subcommand == "draft-discover-fields" for step in protocol.steps
+    declarations = tuple(
+        step
+        for step in protocol.steps
+        if step.subcommand == "draft-declare-existing-batch"
     )
-    assert any(
-        step.subcommand == "draft-declare-existing" for step in protocol.steps
+    assert len(declarations) == 1
+    assert declarations[0].arguments.count("--field-meaning-value") == 3
+    assert all(
+        step.subcommand not in {"draft-discover-fields", "draft-declare-existing"}
+        for step in protocol.steps
     )
     assert all(step.subcommand != "metadata" for step in protocol.steps)
 
