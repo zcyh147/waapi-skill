@@ -431,6 +431,16 @@ def run_v3_codex_task(
                         )
                         infrastructure_error = exc
                         break
+                    if _exhausted_windows_267_after_only_skill_read(
+                        result,
+                        broker_evidence=broker.evidence(),
+                        previous_broker_prefix=previous_prefix,
+                    ):
+                        raise V3CommandLifecycleError(
+                            "native Windows exhausted its one permitted identical "
+                            "CreateProcessAsUserW 267 retry after only the sealed "
+                            "Skill read; no Gateway or Wwise command ran"
+                        )
                     results.append(result)
                     turn_gateway = _gateway_candidate_argvs(
                         result,
@@ -1113,6 +1123,55 @@ def _gateway_candidate_argvs(
         if runner is not None:
             candidates.append((argv[0], runner, *argv[2:]))
     return tuple(candidates)
+
+
+def _exhausted_windows_267_after_only_skill_read(
+    result: CodexRunResult,
+    *,
+    broker_evidence: GatewayBrokerEvidence,
+    previous_broker_prefix: int,
+) -> bool:
+    """Recognize one exact post-Skill Windows process-launch exhaustion.
+
+    This narrow shape contains no semantic Gateway evidence: the Skill read
+    succeeded, one later PowerShell command failed to start twice with the
+    permitted identical 267 retry, and nothing reached the Broker or Wwise.
+    """
+
+    facts = result.command_facts
+    records = tuple(facts.command_records)
+    if (
+        previous_broker_prefix != 0
+        or broker_evidence.records
+        or broker_evidence.consumed_step_names
+        or facts.skill_read is not True
+        or facts.skill_read_files != ("SKILL.md",)
+        or facts.gateway_commands
+        or facts.gateway_attempt_commands
+        or result.collab_call_count != 0
+        or result.file_change_count != 0
+        or len(records) != 3
+    ):
+        return False
+    first, first_failure, second_failure = records
+    return (
+        getattr(first, "status", "") == "completed"
+        and getattr(first, "exit_code", None) == 0
+        and getattr(first_failure, "command", "")
+        == getattr(second_failure, "command", "")
+        and getattr(first_failure, "argv", ())
+        == getattr(second_failure, "argv", ())
+        and all(
+            getattr(record, "status", "") == "failed"
+            and getattr(record, "exit_code", None) == -1
+            and getattr(record, "parser_kind", "") == "windows-pwsh-command"
+            and not getattr(record, "parse_error", "")
+            and not getattr(record, "has_shell_operators", False)
+            and "CreateProcessAsUserW failed: 267"
+            in getattr(record, "aggregated_output", "")
+            for record in (first_failure, second_failure)
+        )
+    )
 
 
 def _gateway_candidate_records(

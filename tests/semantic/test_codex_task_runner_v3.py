@@ -489,6 +489,61 @@ def test_common_grade_ignores_one_identical_windows_preprocess_failure() -> None
     assert all(gates.values())
 
 
+def test_exhausted_windows_267_after_only_skill_read_is_infrastructure() -> None:
+    skill_read = SimpleNamespace(
+        command="read-skill",
+        status="completed",
+        exit_code=0,
+        parser_kind="windows-pwsh-command",
+        argv=("Get-Content", "-Raw", "-Encoding", "UTF8", "SKILL.md"),
+        aggregated_output="skill",
+    )
+    failed_reference = SimpleNamespace(
+        command="read-query-reference",
+        status="failed",
+        exit_code=-1,
+        parse_error="",
+        has_shell_operators=False,
+        parser_kind="windows-pwsh-command",
+        argv=(
+            "Get-Content",
+            "-Raw",
+            "-Encoding",
+            "UTF8",
+            r".agents\skills\waapi-skill\references\waapi-query.md",
+        ),
+        aggregated_output=(
+            "execution error: Io(windows sandbox: "
+            "CreateProcessAsUserW failed: 267)"
+        ),
+    )
+    result = SimpleNamespace(
+        command_facts=SimpleNamespace(
+            skill_read=True,
+            skill_read_files=("SKILL.md",),
+            gateway_commands=(),
+            gateway_attempt_commands=(),
+            command_records=(skill_read, failed_reference, failed_reference),
+        ),
+        collab_call_count=0,
+        file_change_count=0,
+    )
+    broker_evidence = SimpleNamespace(records=(), consumed_step_names=())
+
+    assert task_runner._exhausted_windows_267_after_only_skill_read(
+        result,
+        broker_evidence=broker_evidence,
+        previous_broker_prefix=0,
+    )
+
+    broker_evidence.records = (SimpleNamespace(succeeded=True),)
+    assert not task_runner._exhausted_windows_267_after_only_skill_read(
+        result,
+        broker_evidence=broker_evidence,
+        previous_broker_prefix=0,
+    )
+
+
 def test_task_reconciliation_rejects_equivalent_requoted_continuation() -> None:
     full_argv = (
         "python",

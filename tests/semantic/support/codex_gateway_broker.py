@@ -12183,8 +12183,36 @@ class CodexGatewayBroker:
                 ) if isinstance(handle, str) else None
             return (option, declaration_id)
 
+        actual_values = tuple(actual)
         expected_groups = parse(step.arguments)
-        actual_groups = parse(tuple(actual))
+        actual_groups = parse(actual_values)
+        if (
+            actual_groups is not None
+            and any(group[0] == "--media-file" for group in actual_groups)
+            and not any(
+                group[0] == "--media-directory" for group in actual_groups
+            )
+        ):
+            draft_key = str(actual_values[0])
+            prior_media_directories = {
+                arguments[index + 1]
+                for record in self._records
+                if record.succeeded
+                and (arguments := record.gateway_arguments)
+                and arguments[0] == "draft-declare-import-batch"
+                and len(arguments) > 1
+                and arguments[1] == draft_key
+                for index, value in enumerate(arguments[:-1])
+                if value == "--media-directory"
+            }
+            if len(prior_media_directories) == 1:
+                actual_values = (
+                    *actual_values[:fixed_count],
+                    "--media-directory",
+                    next(iter(prior_media_directories)),
+                    *actual_values[fixed_count:],
+                )
+                actual_groups = parse(actual_values)
         if expected_groups is None or actual_groups is None:
             return tuple(actual)
         expected_order = [
@@ -12505,7 +12533,7 @@ class CodexGatewayBroker:
         }
         self._import_declaration_ids_by_draft = declaration_ids_by_draft
         return (
-            *tuple(actual[:fixed_count]),
+            *actual_values[:fixed_count],
             *(
                 token
                 for expected_key in expected_keys

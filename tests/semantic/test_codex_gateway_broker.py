@@ -5524,9 +5524,43 @@ def test_audio_import_rebatch_accepts_task_local_parent_and_child_ids(
         transport="tcp",
     ) as broker:
         assert run_model_command(broker, ["draft-start", "audio.import"]).returncode == 0
-        result = run_model_command(broker, list(first_three))
+        first_result = run_model_command(broker, list(first_three))
+        second_result = run_model_command(
+            broker,
+            [
+                "draft-declare-import-batch",
+                draft_id,
+                "--task-authority",
+                authority,
+                "--expected-revision",
+                "2",
+                "--new-row",
+                "snow_step_03",
+                "snow",
+                "Snow_Step_03",
+                "sound-sfx",
+                "--media-file",
+                "snow_step_03",
+                "snow_03.wav",
+                "--new-row",
+                "snow_step_04",
+                "snow",
+                "Snow_Step_04",
+                "sound-sfx",
+                "--media-file",
+                "snow_step_04",
+                "snow_04.wav",
+                "--row-order",
+                "snow_step_03",
+                "--row-order",
+                "snow_step_04",
+            ],
+        )
+        evidence = broker.evidence()
 
-    assert result.returncode == 0, result.stderr
+    assert first_result.returncode == 0, first_result.stderr
+    assert second_result.returncode == 0, second_result.stderr
+    assert evidence.passed
 
 
 def test_audio_import_business_protocol_uses_stable_fields_and_strict_revision_order() -> None:

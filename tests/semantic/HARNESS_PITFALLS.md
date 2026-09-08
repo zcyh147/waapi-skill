@@ -2547,6 +2547,11 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   `Win32_ComputerSystem.UserName`, require an Explorer process in that user's
   nonzero session, and register that exact principal. Never fall back to the
   SSH environment identity when those values differ.
+- `Get-CimInstance Win32_Process` rows do not expose `.GetOwner()` as an
+  instance method. Use `Get-Process explorer` for the nonzero interactive
+  SessionId proof; if owner metadata is genuinely needed, call
+  `Invoke-CimMethod -MethodName GetOwner` explicitly. A preflight exception
+  before task registration spends no Fresh unit and must be fixed before retry.
 
 ### Do not make the Agent repeat object-scoped metadata plumbing
 
@@ -2672,6 +2677,34 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   rules, and final mutation Oracle unchanged. Update synthetic harness mirrors
   with the production runtime so an old test helper cannot normalize the
   retired flags back into acceptance.
+
+### Reuse one sealed import media directory across later chunks
+
+- Trigger: macOS Rifle sent three existing media rows with one absolute source
+  directory, then sent the fourth row's leaf file name in the next chunk. The
+  old interface required the Agent to repeat the same directory and rejected
+  the otherwise closed row before Gateway dispatch.
+- Prevention: `draft-declare-import-batch` retains no caller-owned implicit
+  global, but it may derive a later omitted directory when every prior media
+  declaration in that exact Draft has one unique parent directory. No prior
+  media directory or more than one prior directory remains an atomic
+  `GatewayInputError`. The semantic Broker recognizes only the same unique
+  directory already present in successful commands for that exact Draft; it
+  never supplies a hidden Oracle value or changes the command sent to Gateway.
+
+### Two exhausted Windows 267 launches after only the Skill read are BLOCKED
+
+- Trigger: native-Windows Weapons read `SKILL.md`, then the identical required
+  query-reference command failed twice before PowerShell started with
+  `CreateProcessAsUserW failed: 267`; the malformed diagnostic cwd omitted the
+  separator after `C:\Git_Repos`. There were zero Broker records, zero Gateway
+  calls, zero Wwise dispatches, and no file changes.
+- Prevention: retain the one identical retry rule. Classify as infrastructure
+  only for the exact three-command shape: one successful sealed Skill read,
+  two identical failed PowerShell-Core launches, no prior Broker prefix, and
+  no collaboration or writes. Archive/freeze it as BLOCKED without replay.
+  Any successful Gateway command, changed retry, third attempt, non-267 error,
+  or model-side write remains ordinary semantic evidence and is not erased.
 
 ## New-root preflight
 

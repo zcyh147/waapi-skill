@@ -563,6 +563,24 @@ def test_weapons_business_protocol_compiles_as_one_complete_workflow_transaction
     assert transaction_steps[-6]["kind"] == "operation_compose_check"
     assert transaction_steps[-5]["kind"] == "preview"
 
+    wrapped, rebuilt = project_runner.integration_operations_protocol_and_plan(
+        unit=unit,
+        protocol=prepared.protocol,
+        sections=sections,
+    )
+    assert wrapped.steps[0].name == "routing.operations"
+    assert wrapped.steps[1].name == "routing.query-schema"
+    assert rebuilt.static_expectation["workflow_id"] == unit.workflow_id
+    CodexGatewayBroker(
+        skill_source=(
+            Path(__file__).resolve().parents[2] / "skills" / "waapi-skill"
+        ),
+        expected_steps=wrapped.steps,
+        commutative_read_only_step_groups=(
+            wrapped.commutative_read_only_step_groups
+        ),
+    )
+
 
 def _typed_action_broker(
     prepared: Any,

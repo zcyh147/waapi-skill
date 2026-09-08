@@ -733,6 +733,39 @@ def test_audio_import_batch_chunks_are_atomic_cumulative_and_compact(
             )
         )
 
+    record_path = (
+        tmp_path
+        / "state"
+        / "operation-drafts-v1"
+        / "records"
+        / f"{started['draft']['draft_id']}.json"
+    )
+    before_missing_directory = record_path.read_bytes()
+    missing_code, missing = _offline(
+        tmp_path,
+        "draft-declare-import-batch",
+        started["draft"]["draft_id"],
+        "--task-authority",
+        started["task_authority"],
+        "--expected-revision",
+        "2",
+        "--row-order",
+        "missing-directory",
+        "--new-row",
+        "missing-directory",
+        parent_handle,
+        "Missing_Directory",
+        "sound-sfx",
+        "--media-file",
+        "missing-directory",
+        media_files[0].name,
+    )
+
+    assert missing_code == 2
+    assert missing["error_code"] == "GatewayInputError"
+    assert "exactly one media directory" in missing["message"]
+    assert record_path.read_bytes() == before_missing_directory
+
     first_code, first = _offline(tmp_path, *batch_argv)
 
     assert first_code == 0, first
@@ -846,6 +879,58 @@ def test_audio_import_batch_chunks_are_atomic_cumulative_and_compact(
         row["fields"]["media_file"]
         for row in session["declarations"][1:]
     ] == [str(path) for path in media_files]
+
+    alternate_directory = tmp_path / "alternate"
+    alternate_directory.mkdir()
+    alternate_media = alternate_directory / "alternate.wav"
+    alternate_media.write_bytes(b"RIFF-alternate")
+    alternate_code, alternate = _offline(
+        tmp_path,
+        "draft-declare-import-batch",
+        started["draft"]["draft_id"],
+        "--task-authority",
+        started["task_authority"],
+        "--expected-revision",
+        "4",
+        "--media-directory",
+        str(alternate_directory),
+        "--row-order",
+        "alternate",
+        "--new-row",
+        "alternate",
+        parent_handle,
+        "Alternate",
+        "sound-sfx",
+        "--media-file",
+        "alternate",
+        alternate_media.name,
+    )
+    assert alternate_code == 0, alternate
+
+    before_ambiguous_directory = record_path.read_bytes()
+    ambiguous_code, ambiguous = _offline(
+        tmp_path,
+        "draft-declare-import-batch",
+        started["draft"]["draft_id"],
+        "--task-authority",
+        started["task_authority"],
+        "--expected-revision",
+        "5",
+        "--row-order",
+        "ambiguous",
+        "--new-row",
+        "ambiguous",
+        parent_handle,
+        "Ambiguous",
+        "sound-sfx",
+        "--media-file",
+        "ambiguous",
+        "ambiguous.wav",
+    )
+    assert ambiguous_code == 2
+    assert ambiguous["error_code"] == "GatewayInputError"
+    assert "exactly one media directory" in ambiguous["message"]
+    assert record_path.read_bytes() == before_ambiguous_directory
 
 
 def test_audio_import_batch_count_mismatch_is_atomic(tmp_path: Path) -> None:
