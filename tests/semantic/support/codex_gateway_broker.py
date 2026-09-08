@@ -11717,11 +11717,18 @@ class CodexGatewayBroker:
                 return None
             if option in {"--field", "--field-meaning-value"}:
                 field = group[2]
-                return (
-                    (option, declaration_id, field)
-                    if isinstance(field, str)
-                    else None
+                if not isinstance(field, str):
+                    return None
+                field_key = (
+                    "".join(
+                        character
+                        for character in field.casefold()
+                        if character.isalnum()
+                    )
+                    if option == "--field-meaning-value"
+                    else field
                 )
+                return (option, declaration_id, field_key)
             return (option, declaration_id)
 
         expected_groups = parse(step.arguments)
@@ -11738,12 +11745,23 @@ class CodexGatewayBroker:
         ):
             return tuple(actual)
         actual_by_key = dict(zip(actual_keys, actual_groups, strict=True))
+        expected_by_key = dict(zip(expected_keys, expected_groups, strict=True))
         return (
             *tuple(actual[:fixed_count]),
             *(
                 token
                 for expected_key in expected_keys
-                for token in actual_by_key[expected_key]
+                for token in (
+                    (
+                        actual_by_key[expected_key][0],
+                        actual_by_key[expected_key][1],
+                        expected_by_key[expected_key][2],
+                        actual_by_key[expected_key][3],
+                    )
+                    if actual_by_key[expected_key][0]
+                    == "--field-meaning-value"
+                    else actual_by_key[expected_key]
+                )
             ),
         )
 

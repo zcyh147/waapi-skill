@@ -13706,6 +13706,69 @@ def test_broker_does_not_treat_sound_sfx_as_all_sounds(
     assert broker.evidence().passed is False
 
 
+def test_object_set_batch_normalizes_fact_order_and_field_meaning_spelling(
+    tmp_path: Path,
+) -> None:
+    step = ExpectedGatewayStep(
+        "tx01.declare-existing-batch",
+        "draft-declare-existing-batch",
+        (
+            "draft-id",
+            "--task-authority",
+            "authority",
+            "--expected-revision",
+            "6",
+            "--row-order",
+            "rain",
+            "--row-order",
+            "wind",
+            "--row",
+            "rain",
+            "rain-handle",
+            "--field-meaning-value",
+            "rain",
+            "FadeTime",
+            "0.25",
+            "--row",
+            "wind",
+            "wind-handle",
+            "--field-meaning-value",
+            "wind",
+            "FadeTime",
+            "0.4",
+        ),
+    )
+    actual = (
+        *step.arguments[:5],
+        "--row",
+        "rain",
+        "rain-handle",
+        "--field-meaning-value",
+        "rain",
+        "Fade Time",
+        "0.25",
+        "--row",
+        "wind",
+        "wind-handle",
+        "--field-meaning-value",
+        "wind",
+        "Fade Time",
+        "0.4",
+        "--row-order",
+        "rain",
+        "--row-order",
+        "wind",
+    )
+    broker = object.__new__(CodexGatewayBroker)
+
+    normalized = broker._normalize_business_declaration_fact_order(  # noqa: SLF001
+        step,
+        actual,
+    )
+
+    assert normalized == step.arguments
+
+
 @pytest.mark.parametrize("read_schema", (False, True))
 def test_broker_accepts_one_optional_initial_query_schema(
     tmp_path: Path,

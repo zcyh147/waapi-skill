@@ -2563,6 +2563,11 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   declaration branches: expose only continued target binding or the atomic
   batch. Merely adding a preferred batch beside the old route still lets a
   reasonable Agent select the obsolete sequence and fail before dispatch.
+  The Broker must also compare `--field-meaning-value` by the same bounded
+  user-facing meaning normalization as live discovery (`FadeTime` and
+  `Fade Time` are one meaning here), while keeping row identity and business
+  values exact. Otherwise the harness rejects a command the public Gateway is
+  designed to accept.
 
 ## New-root preflight
 
