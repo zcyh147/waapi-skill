@@ -2696,6 +2696,19 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   next record. Otherwise a live PASS can be downgraded to BLOCKED merely
   because the independent replay forgot the earlier directory-bearing chunk.
 
+### Typed-fact batch guidance must not override business row limits
+
+- Trigger: native-Windows Weather copied all six requested import rows into
+  one `draft-declare-import-batch`. The returned business continuation limits
+  that atomic command to three rows, but the test-only developer instruction
+  ambiguously said `batch_size=6` for generic typed Composer facts.
+- Prevention: scope the six-fact rule explicitly to typed `draft-apply`
+  actions. Business declarations must follow the maximum in their current
+  Gateway continuation and must never inherit a generic typed-fact batch size.
+  Keep the production audio-import row bound unchanged; do not widen a public
+  safety/command-size boundary merely to compensate for conflicting harness
+  guidance.
+
 ### Two exhausted Windows 267 launches after only the Skill read are BLOCKED
 
 - Trigger: native-Windows Weapons read `SKILL.md`, then the identical required

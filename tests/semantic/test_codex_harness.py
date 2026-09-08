@@ -2167,10 +2167,11 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "never reconstruct" in instructions
     assert "Keep cwd" in instructions
     assert "Read now; no pre-read reply/questions" in instructions
-    assert "Typed facts: one argv/fact" in instructions
-    assert "every prompt field/item/map/bool" in instructions
-    assert "batch_size=6" in instructions
+    assert "draft-apply: 1 argv/fact" in instructions
+    assert "all facts" in instructions
+    assert "batch=6" in instructions
     assert "final=remaining" in instructions
+    assert "Business rows obey returned max" in instructions
     assert "Composer: one action/call" in instructions
     assert "allowed_action_argv owns TYPE" in instructions
     assert "not Real64/int16" in instructions
@@ -2208,7 +2209,6 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "one arg/child" in instructions
     assert "Files absolute; no traversal" in instructions
     assert "scalars first" in instructions
-    assert "every prompt field/item/map/bool" in instructions
     assert "Top facts first; exhaust tree" in instructions
     assert "More=>ancestor_next_item_source" in instructions
     assert "none=>completion_candidate.copy_command incl task_authority" in instructions
