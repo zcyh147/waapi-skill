@@ -313,6 +313,8 @@ def test_operate_lane_reuses_exact_diagnostics_and_preserves_media_paths() -> No
     assert "reuse its GUID; do not query it again" in operate
     assert "`media_directory` and `audio_file` are opaque caller paths" in operate
     assert "never derive either from campaign/workspace cwd" in operate
+    assert "Three or more existing targets: bind every target first" in operate
+    assert "then use `declare_existing_batch`; do not run field discovery" in operate
 
 
 def test_normal_change_prose_stays_business_facing() -> None:

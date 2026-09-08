@@ -2932,6 +2932,19 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   identical 267 replay boundary; a second failure still freezes the root and
   is never repaired or resumed in place.
 
+### Multi-target object edits bind the complete batch before field work
+
+- Trigger: after verifying Weather import, a Fresh Agent opened the five-Action
+  `object.set` transaction and bound all five exact Actions, but then rebuilt a
+  stale single-object `draft-discover-fields` command. The current Gateway
+  continuation had already selected the three-or-more-target batch branch, so
+  the Broker rejected that extra command before dispatch.
+- Prevention: for three or more existing targets, bind every target first and
+  use only `declare_existing_batch`; that batch resolves each high-level field
+  meaning against each bound object. Individual field discovery/declaration is
+  reserved for one or two targets. Never carry an earlier Draft action across
+  a later revision whose complete continuation selected another branch.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:
