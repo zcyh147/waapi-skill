@@ -2691,6 +2691,10 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   `GatewayInputError`. The semantic Broker recognizes only the same unique
   directory already present in successful commands for that exact Draft; it
   never supplies a hidden Oracle value or changes the command sent to Gateway.
+- The sealed campaign replay is stateful too: after fully authenticating each
+  archived successful command, retain its Gateway argv before validating the
+  next record. Otherwise a live PASS can be downgraded to BLOCKED merely
+  because the independent replay forgot the earlier directory-bearing chunk.
 
 ### Two exhausted Windows 267 launches after only the Skill read are BLOCKED
 
