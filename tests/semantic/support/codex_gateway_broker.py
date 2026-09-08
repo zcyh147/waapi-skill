@@ -6329,6 +6329,17 @@ def _validate_metadata_discover_query_arguments(
     )
     if not query_specs:
         return None
+    if step.subcommand == "draft-discover-fields":
+        if (
+            len(query_specs) != 1
+            or "--meaning" not in step.arguments
+            or step.arguments.index(query_specs[0])
+            != step.arguments.index("--meaning") + 1
+        ):
+            raise GatewayInvocationError(
+                "Draft field discovery must bind one bounded meaning argument"
+            )
+        return None
     if step.subcommand != "metadata" or step.arguments[0] != "discover":
         raise GatewayInvocationError(
             "MetadataQueryArgument is valid only for metadata discover"
@@ -12621,8 +12632,26 @@ class CodexGatewayBroker:
                         )
                     semantic_values.append(expected.expected)
                 elif isinstance(expected, MetadataQueryArgument):
-                    raise GatewayInvocationError(
-                        "metadata query slot escaped its closed discover validator"
+                    if (
+                        step.subcommand != "draft-discover-fields"
+                        or index < 1
+                        or step.arguments[index - 1] != "--meaning"
+                        or not supplied
+                        or supplied != supplied.strip()
+                        or len(supplied) > expected.maximum_chars
+                        or any(
+                            ord(character) < 32 or ord(character) == 127
+                            for character in supplied
+                        )
+                    ):
+                        raise GatewayInvocationError(
+                            "metadata query slot escaped its bounded natural-language validator"
+                        )
+                    semantic_values.append(
+                        {
+                            "bounded_metadata_meaning": supplied,
+                            "maximum_chars": expected.maximum_chars,
+                        }
                     )
                 elif isinstance(expected, BoundedIntegerArgument):
                     if not re.fullmatch(r"0|[1-9][0-9]*", supplied):
