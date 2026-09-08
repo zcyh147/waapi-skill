@@ -771,8 +771,6 @@ def test_audio_import_batch_chunks_are_atomic_cumulative_and_compact(
         started["task_authority"],
         "--expected-revision",
         "3",
-        "--media-directory",
-        str(tmp_path),
     ]
     for index, path in enumerate(media_files[2:], start=3):
         declaration_id = f"snow-step-{index:02d}"
@@ -902,6 +900,31 @@ def test_audio_import_batch_count_mismatch_is_atomic(tmp_path: Path) -> None:
         / f"{started['draft']['draft_id']}.json"
     )
     before = record_path.read_bytes()
+
+    missing_directory_code, missing_directory = _offline(
+        tmp_path,
+        "draft-declare-import-batch",
+        started["draft"]["draft_id"],
+        "--task-authority",
+        started["task_authority"],
+        "--expected-revision",
+        "2",
+        "--row-order",
+        "rain",
+        "--new-root-row",
+        "rain",
+        bound["bound_object"]["handle"],
+        "Rain",
+        "sound-sfx",
+        "--media-file",
+        "rain",
+        "rain.wav",
+    )
+
+    assert missing_directory_code == 2
+    assert missing_directory["error_code"] == "GatewayInputError"
+    assert "media directory" in missing_directory["message"].casefold()
+    assert record_path.read_bytes() == before
 
     traversal_code, traversal = _offline(
         tmp_path,

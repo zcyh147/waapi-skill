@@ -15370,17 +15370,26 @@ def dispatch_offline_business_draft_update(
             fields_by_id.setdefault(declaration_id, []).append(
                 (field_name, value)
             )
+        resolved_media_directory: Path | None = None
         if args.media_file and args.media_directory is None:
-            raise GatewayInputError(
-                "Import batch media files require one absolute media directory"
-            )
+            prior_media_directories = {
+                Path(str(row.fields["media_file"])).parent
+                for row in session.declarations
+                if "media_file" in row.fields
+            }
+            if len(prior_media_directories) != 1:
+                raise GatewayInputError(
+                    "Import batch media files require one absolute media directory "
+                    "unless this Draft already has exactly one media directory"
+                )
+            resolved_media_directory = next(iter(prior_media_directories))
         if args.media_directory is not None and not args.media_file:
             raise GatewayInputError(
                 "Import batch media directory requires at least one media file"
             )
         media_file_ids: set[str] = set()
-        if args.media_directory is not None:
-            media_directory = Path(args.media_directory)
+        if args.media_file:
+            media_directory = resolved_media_directory or Path(args.media_directory)
             if (
                 not media_directory.is_absolute()
                 or ".." in media_directory.parts
@@ -26218,7 +26227,9 @@ def _business_next_action_binding(
                     ],
                     "rule": (
                         "when two or more requested media files share a directory, "
-                        "copy that directory once and submit one leaf file name per row"
+                        "copy that directory once and submit one leaf file name per row; "
+                        "later chunks may omit the directory only while every prior "
+                        "media row in this Draft has that same sole directory"
                     ),
                 },
                 "rows_per_command": {
