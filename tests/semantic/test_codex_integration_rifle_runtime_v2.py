@@ -996,7 +996,17 @@ def test_rifle_observer_accepts_a_legal_two_chunk_import_rebatch(
     )
     check = next(step for step in steps if step.name == "tx01.check")
 
-    for step in steps[:first_declaration]:
+    setup_steps = (
+        steps[0],
+        steps[1],
+        steps[5],
+        steps[2],
+        steps[3],
+        steps[4],
+        steps[6],
+    )
+    assert set(setup_steps) == set(steps[:first_declaration])
+    for step in setup_steps:
         prepared.observe_payload(
             step,
             {"ok": True, "command": step.subcommand},

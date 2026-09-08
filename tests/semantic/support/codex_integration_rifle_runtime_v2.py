@@ -41,6 +41,8 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
 )
 from tests.semantic.support.codex_gateway_broker import (
     ExpectedGatewayStep,
+    gateway_step_prefix_matches,
+    gateway_step_sequence_matches,
 )
 from tests.semantic.support.codex_integration_workflows_v2 import (
     BaselineManifest,
@@ -51,6 +53,9 @@ from tests.semantic.support.codex_integration_fixture_tree_v2 import (
 from tests.semantic.support.codex_integration_paths_v2 import (
     IntegrationOriginalPathError,
     localize_copied_original_path,
+)
+from wwise_waapi.audio_import_business_contracts import (
+    AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS,
 )
 from wwise_waapi.builders.metadata import (
     GET_PROPERTY_AND_REFERENCE_NAMES_URI,
@@ -87,6 +92,44 @@ _RTPC_SNAPSHOT_FIELDS = (
     "@ControlInput",
     "@Curve",
 )
+
+
+def _rifle_expected_names_for_observed(
+    protocol: V3GatewayProtocol,
+    observed_names: Sequence[str],
+) -> tuple[str, ...]:
+    """Project the canonical protocol onto one Broker-legal import rebatch."""
+
+    expected_names = tuple(step.name for step in protocol.steps)
+    batch_names = tuple(
+        step.name
+        for step in protocol.steps
+        if step.subcommand == "draft-declare-import-batch"
+    )
+    if not batch_names:
+        return expected_names
+    last_batch_index = expected_names.index(batch_names[-1])
+    later_names = set(expected_names[last_batch_index + 1 :])
+    if not any(name in later_names for name in observed_names):
+        return expected_names
+    selected_batch_names = tuple(
+        name for name in observed_names if name in batch_names
+    )
+    if (
+        selected_batch_names != batch_names[: len(selected_batch_names)]
+        or not (
+            math.ceil(
+                len(batch_names) / AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS
+            )
+            <= len(selected_batch_names)
+            <= len(batch_names)
+        )
+    ):
+        return ()
+    omitted = set(batch_names[len(selected_batch_names) :])
+    return tuple(name for name in expected_names if name not in omitted)
+
+
 _NEW_SOUND_STATE_FIELDS = (
     "parent",
     "notes",
@@ -745,7 +788,6 @@ class _RifleSession:
         self.before: RifleSnapshot | None = None
         self.protocol: V3GatewayProtocol | None = None
         self.observed_steps: list[str] = []
-        self._observed_protocol_cursor = 0
         self._cleaned = False
         self._finalized = False
 
@@ -855,38 +897,14 @@ class _RifleSession:
             raise RifleIntegrationRuntimeError(
                 "Rifle observer received an invalid step or payload"
             )
-        expected_names = tuple(row.name for row in protocol.steps)
-        position = self._observed_protocol_cursor
-        if position < len(expected_names) and step.name == expected_names[position]:
-            next_protocol_cursor = position + 1
-        elif step.name == "tx01.check":
-            check_index = expected_names.index("tx01.check")
-            skipped = expected_names[position:check_index]
-            expected_batch_count = sum(
-                name.startswith("tx01.declare-batch")
-                for name in expected_names[:check_index]
-            )
-            observed_batch_count = sum(
-                name.startswith("tx01.declare-batch")
-                for name in self.observed_steps
-            )
-            if (
-                not skipped
-                or any(
-                    not name.startswith("tx01.declare-batch-")
-                    for name in skipped
-                )
-                or not (
-                    math.ceil(expected_batch_count / 3)
-                    <= observed_batch_count
-                    <= expected_batch_count
-                )
-            ):
-                raise RifleIntegrationRuntimeError(
-                    "Rifle gateway steps were duplicated or observed out of order"
-                )
-            next_protocol_cursor = check_index + 1
-        else:
+        candidate = (*self.observed_steps, step.name)
+        expected_names = _rifle_expected_names_for_observed(protocol, candidate)
+        if not expected_names or not gateway_step_prefix_matches(
+            expected_names,
+            candidate,
+            protocol.commutative_read_only_step_groups,
+            protocol.commutative_composer_setup_step_groups,
+        ):
             raise RifleIntegrationRuntimeError(
                 "Rifle gateway steps were duplicated or observed out of order"
             )
@@ -900,7 +918,6 @@ class _RifleSession:
                 raise RifleIntegrationRuntimeError(
                     f"{step.name} did not return a successful gateway payload"
                 )
-        self._observed_protocol_cursor = next_protocol_cursor
         self.observed_steps.append(step.name)
         if step.name == "tx01.preview":
             verification = self.verify_turn(1)
@@ -1679,7 +1696,25 @@ class _RifleSession:
         )
         record(
             "single_import_transaction",
-            self._observed_protocol_cursor == len(expected_steps)
+            gateway_step_sequence_matches(
+                _rifle_expected_names_for_observed(
+                    self.protocol,
+                    tuple(self.observed_steps),
+                )
+                if self.protocol is not None
+                else (),
+                tuple(self.observed_steps),
+                (
+                    self.protocol.commutative_read_only_step_groups
+                    if self.protocol is not None
+                    else ()
+                ),
+                (
+                    self.protocol.commutative_composer_setup_step_groups
+                    if self.protocol is not None
+                    else ()
+                ),
+            )
             and self.observed_steps.count("tx01.execute") == 1
             and self.observed_steps.count("tx01.verify") == 1,
             "the exact one-transaction broker protocol was not fully observed",

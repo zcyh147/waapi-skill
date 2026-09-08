@@ -2614,12 +2614,25 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
 - Prevention: runtime topology assertions must name the current public
   business seam. An observer downstream of the Broker must apply the same
   bounded transport equivalence as the Broker; it may not reimpose an older
-  row-per-call layout. Keep negative tests for impossible one-call packing,
-  duplicates, out-of-order lifecycle steps, identity drift, and value drift.
+  row-per-call layout. That projection must preserve the Broker's independent
+  setup ordering at the same time: accepting a contracted import batch must
+  not accidentally make `draft-bind-object` calls sequential when their
+  response bindings permit another order. Keep one regression that combines
+  both a legal setup permutation and a legal 1..3-row rebatch through final
+  verification, plus negatives for impossible one-call packing, duplicates,
+  out-of-order lifecycle steps, identity drift, and value drift.
 - Preflight: before another public integration root, run the complete fake
   Rifle, Footsteps, and Weapons runtime modules, not only the Program gate.
   The Program gate intentionally excludes `tests/semantic`, so a green Program
   result cannot prove these campaign-owned observers are current.
+
+- Invalid diagnostic roots: macOS
+  `imac-integration-7d69aa5-r24-retry4` and native-Windows
+  `iwin-integration-7d69aa5-r23-retry3` overlapped the follow-up observer
+  repair and therefore receive no Fresh PASS credit. The Mac root was stopped
+  at the next sealed boundary; the Windows task finished its three selected
+  diagnostics and was removed with zero scoped processes. Never promote their
+  raw unit outcomes into the next frozen candidate.
 
 ### Do not disguise an omitted high-level business fact as harness recovery
 
