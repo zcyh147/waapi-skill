@@ -7,7 +7,7 @@ description: Use for every Wwise/WAAPI setup, read, topic, or change. Read only 
 
 Automate Wwise through the packaged gateway. Use no inline Python or direct `WaapiClient`.
 
-Read the injected `SKILL.md` exactly once as the sole first shell action in a fresh task. A successful read is complete; a second `SKILL.md` read is forbidden. Never combine it with `pwd`, `git`, `rg`, `ls`, `find`, `printf`, a user-file read, or a gateway command; finish before the next command.
+Read the injected `SKILL.md` exactly once as the sole first shell action in a fresh task. A successful read is complete; a second `SKILL.md` read is forbidden. Never combine it with `pwd`, `git`, `rg`, `ls`, `find`, `printf` or another action.
 
 Versions: `2021.1`, `2022.1`, `2023.1`, `2024.1`, and `2025.1`.
 
@@ -24,7 +24,7 @@ announce early, split facts, use memory, or format a status table. Say
 
 Use the task's first required Gateway command. For a pure explanation, use one
 offline `config-show`; never open a live connection only for the introduction.
-Repeat only on request or changed facts. Keep any exact machine answer in a
+Repeat only on request or changed facts; keep exact machine answers in a
 separate progress update.
 
 ## Entry rules
@@ -39,7 +39,7 @@ separate progress update.
 
 ## Fixed gateway commands
 
-Below, replace `scripts/run.py` with the injected absolute path.
+Use the injected absolute `scripts/run.py`.
 
 ```bash
 python scripts/run.py gateway.py status
@@ -72,7 +72,7 @@ python scripts/run.py gateway.py operation-schema waapi.undoGroup
 python scripts/run.py gateway.py --version 2022.1 operation-schema object.copy
 ```
 
-Register a runtime Game Object with `request-schema ak.soundengine.registerGameObj`; unregister through its matching schema; never `object.create`.
+Register a runtime Game Object with `request-schema ak.soundengine.registerGameObj`; unregister via its schema, never `object.create`.
 
 `status` is the sole Gateway-owned `getInfo` route for connection/version/project. Do not use `request-schema` or `typed-zero-call` instead. It needs only this `SKILL.md`; do not read the setup or query reference. Treat the named `getInfo` result's `processId` as the requested live process identity; finish from that Gateway evidence without a system process lookup.
 
@@ -91,23 +91,24 @@ default say “这次使用默认的 10 秒等待时间”.
 
 Select `stream-topic` only for explicit persistent intent: stream, continuous,
 persistent, 实时逐条, 流式, 持续, 一直监听, or 不要收到后退出. It keeps one
-subscription, flushes matched events, requires an `--event-count <1..64>`
-ceiling, and may have a finite gateway-global timeout. Before every wait/stream,
+subscription, flushes matched events, requires an `--event-count <1..64>` ceiling, and
+may have a gateway-global timeout. Before every wait/stream,
 run `topic-schema` and copy its digest and opaque `tvc1-*` handles. For
 `choice_on_disclosure`, run `field_disclosure` first and use only typed `*-as`;
 never guess untyped. Event size, count, cumulative bytes, and buffering are bounded; the
 terminal record includes the completion and unsubscribe result.
 
-For `ak.wwise.waapi.getFunctions`/`getTopics`, run `request-schema` and follow its sole typed continuation. Do not run `describe` or `capabilities` first. Any failure stops.
+For `ak.wwise.waapi.getFunctions`/`getTopics`, run `request-schema` and follow its sole typed continuation. Do not run `describe` or `capabilities` first.
 
-For five-version totals, read coverage then run exactly `capabilities --all-versions --summary-only`; it includes every route count. Row filters omit `--summary-only`. The list defaults to at most 50 compact rows; `--limit 0` requests all and `--detail` is diagnostic. A user-literal URI uses `request-schema`. For any other new natural-language change/Preview without an exact Gateway operation or URI, run one `operations` lookup and copy its route/guidance; never synthesize one or choose from memory/examples. Then use `operation-schema` for a name or `request-schema` for a URI. Reserve `operations --detail` for an explicit full-catalog audit.
+For five-version totals, read coverage then run exactly `capabilities --all-versions --summary-only`; it includes every route count. Row filters omit `--summary-only`. The list defaults to at most 50 compact rows; `--limit 0` requests all and `--detail` is diagnostic. A user-literal URI uses `request-schema`. For another natural-language change/Preview without an exact Gateway operation or URI, run one `operations` lookup and copy its route/guidance; never synthesize one or choose from memory/examples. Then use `operation-schema` for a name or `request-schema` for a URI. Use `operations --detail` only for an explicit full-catalog audit.
 
-For five-version totals, coverage, exclusions, or matrix proof, read `references/waapi-coverage.md` once after `SKILL.md` and before the summary; combine both. Program tests are not live-Wwise verification.
+For totals, coverage, exclusions, or matrix proof, read `references/waapi-coverage.md` once after `SKILL.md` and before the summary. Program tests are not live-Wwise verification.
 
 Object discovery starts with closed `query-schema`; use its bounded advanced
 contract only when needed. An advanced one-row response never certifies uniqueness.
 Before mutation, show candidates and exact-ID verify the chosen GUID/name/type/path.
 The same applies to a mutation subset selected from multiple business-declaration or advanced results; relationship-GUID read hops are exempt.
+For `mutation_selection`, run nothing now. If the user later selects candidates to mutate, copy each selected command before reading operate or choosing an operation.
 Generic `call` is forbidden; obey `QUERY_OBJECT_REQUIRED`,
 `FIXED_COMMAND_REQUIRED`, and `WAIT_TOPIC_REQUIRED`.
 
@@ -123,8 +124,7 @@ never rerun solely for detail.
 
 ### Setup lane
 
-Use setup for connection, version, host/port, saved config, or instance identity.
-`status` covers current status/version/project/process identity: after `SKILL.md`, run `status` directly and do not read `waapi-setup.md`. Read setup only for saved connection/config changes.
+Use setup for connection/config. `status` covers current status/version/project/process identity: after `SKILL.md`, run `status` directly and do not read `waapi-setup.md`. Read setup only for saved changes.
 
 Read: `references/waapi-setup.md`
 
@@ -133,6 +133,8 @@ Read: `references/waapi-setup.md`
 Use query for selection, object/hierarchy/property/project reads, discovery, and topics.
 
 Classify the requested action, not background wording. A request to listen for, wait for, or report a SoundBank generation notification is query-only. It never authorizes `soundbank.generate`, an operation-schema lookup, or mutation.
+
+A diagnosis-only turn reads only `waapi-query.md`; it must not preload `waapi-operate.md`.
 
 Classify the complete read-only task before its first hop. If it needs multiple or relationship hops, fully read `references/waapi-query.md` before any Gateway command; an exact path/GUID first hop does not make the whole task a complete fast route.
 
@@ -177,7 +179,7 @@ Conditional read for a closed transaction: `references/waapi-operate.md`
 
 ## Runner and packaged runtime
 
-The gateway loads versioned manifest, semantic, WAQL, and deferred resources. Use `describe <uri> --full-schema` only when needed. `waapi-coverage.md` owns counts/evidence, never live proof.
+Loads versioned manifest, semantic, WAQL, and deferred resources. Use `describe <uri> --full-schema` only when needed. `waapi-coverage.md` owns counts/evidence, never live proof.
 
 ## Boundaries
 

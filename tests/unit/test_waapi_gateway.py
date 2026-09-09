@@ -4043,6 +4043,65 @@ def test_exact_event_query_returns_copy_ready_event_actions_hop(tmp_path: Path) 
     ]
 
 
+def test_multi_object_query_returns_conditional_selected_subset_readbacks(
+    tmp_path: Path,
+) -> None:
+    rows = [
+        {
+            "id": "{11111111-1111-1111-1111-111111111111}",
+            "name": "RFL_Close",
+            "type": "Sound",
+            "path": r"\Actor-Mixer Hierarchy\Default Work Unit\RFL_Close",
+        },
+        {
+            "id": "{22222222-2222-2222-2222-222222222222}",
+            "name": "RFL_Tail",
+            "type": "Sound",
+            "path": r"\Actor-Mixer Hierarchy\Default Work Unit\RFL_Tail",
+        },
+    ]
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": live_info(),
+            "ak.wwise.core.object.get": {"return": rows},
+        }
+    )
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "query-object",
+            "--kind",
+            "all-sounds",
+            "--max-results",
+            "2",
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 0, payload
+    selection = payload["mutation_selection"]
+    assert selection["activation"] == "later_user_selects_returned_candidates"
+    assert selection["current_turn_action"] == "none"
+    assert selection["required_before"] == [
+        "read_operate_reference",
+        "choose_operation",
+    ]
+    assert [candidate["id"] for candidate in selection["candidates"]] == [
+        row["id"] for row in rows
+    ]
+    for candidate, row in zip(selection["candidates"], rows, strict=True):
+        assert candidate["expected_identity"] == {
+            key: row[key] for key in ("name", "type", "path")
+        }
+        assert shlex.split(candidate["copy_command"])[-3:] == [
+            "query-object",
+            "--exact-id",
+            row["id"],
+        ]
+    assert payload["agent_result"] == rows
+
+
 def test_query_object_sound_routing_view_owns_projection_and_business_keys(
     tmp_path: Path,
 ) -> None:

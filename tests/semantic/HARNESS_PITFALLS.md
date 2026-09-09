@@ -2904,6 +2904,26 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   `subset reread only` reminder in the sealed developer instruction. A single
   exact diagnostic hop is already identified and is not a mutation-subset
   selection.
+- Follow-up: a later Weapons task made the opposite error: after the user
+  selected three rows from a six-row audit, it read the operate lane and ran
+  `operations` before any exact-ID readback. Successful 2–8-row query replies
+  now return a bounded `mutation_selection` record with one host-correct
+  copy command and expected name/type/path per candidate. Those commands are
+  dormant in the read-only turn; after a later selection, copy only the chosen
+  rows before reading operate or choosing the mutation operation.
+
+### A diagnosis turn does not preload a possible future repair lane
+
+- Trigger: complete Alarm and Weapons read-only diagnostics returned the exact
+  Wwise objects and correct business conclusions, but the Fresh Agents also
+  read `waapi-operate.md` before the user had requested any change. The public
+  integration gate correctly preserved the useful Wwise evidence but rejected
+  the turn's lane-read schedule.
+- Prevention: the entry Skill states the concrete diagnosis boundary beside
+  query routing: read only `waapi-query.md` for that turn, even when a later
+  user might request repair. Keep the operate read for the later change turn;
+  do not weaken the exact one-read-per-reference audit merely because the
+  premature read had no Wwise side effect.
 
 ### Import rebatching never waives row completeness
 
@@ -3003,6 +3023,11 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
 - Prevention: classify this as BLOCKED, freeze the root, and start only a new
   root after the CLI/service preflight is healthy. Do not replay the blocked
   root or count its pending units as failures.
+- A Codex stream may emit `item.completed` with `item.type=error` after repeated
+  TLS/WebSocket reconnect failures. That error carrier is not an Agent action.
+  When no non-error item, command, file change, collaboration call, or Agent
+  message exists, classify the transport failure as infrastructure BLOCKED;
+  once any real Agent item exists, retain normal semantic grading.
 
 ## New-root preflight
 

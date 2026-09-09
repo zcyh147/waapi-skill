@@ -373,7 +373,13 @@ def test_broad_query_subset_mutations_require_exact_id_readback() -> None:
     assert "Never reread unselected rows" in section_flat
     assert "relationship read hops are exempt" in section_flat
     assert "mutation subset selected from multiple business-declaration or advanced results" in SKILL
+    assert "`mutation_selection`" in SKILL
     assert "relationship-GUID read hops are exempt" in SKILL
+
+
+def test_query_only_diagnosis_never_preloads_the_future_operate_lane() -> None:
+    assert "A diagnosis-only turn reads only `waapi-query.md`" in SKILL
+    assert "must not preload `waapi-operate.md`" in SKILL
 
 
 def test_query_reference_discloses_compact_success_and_explicit_detail() -> None:

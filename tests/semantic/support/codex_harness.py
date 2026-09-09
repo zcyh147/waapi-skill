@@ -3233,6 +3233,7 @@ def classify_codex_infrastructure_failure(
     agent_item_event_count = sum(
         event.get("type") in {"item.started", "item.completed"}
         and isinstance(event.get("item"), Mapping)
+        and event["item"].get("type") != "error"
         for event in events
     )
     if agent_item_event_count:

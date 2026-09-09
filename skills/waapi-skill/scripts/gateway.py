@@ -793,6 +793,7 @@ MAX_ORIGINAL_FILE_PATH_CANDIDATES = 64
 MAX_ORIGINAL_FILE_PATH_BYTES = 1024
 MAX_ORIGINAL_FILE_REFERENCE_PATH_BYTES = 512
 MAX_BUSINESS_OBJECT_PATH_SEGMENTS = 64
+MAX_QUERY_MUTATION_SELECTION_CANDIDATES = 8
 _METADATA_SESSION_CACHE = SessionMetadataCache()
 MAX_ORIGINAL_FILE_REFERENCE_DETAILS_PER_CANDIDATE = 4
 MAX_ORIGINAL_FILE_REFERENCE_DETAILS = (
@@ -13747,6 +13748,11 @@ def dispatch_command(
             business_rows = (
                 _project_query_business_rows(args, rows) if result.get("ok") else []
             )
+            mutation_selection = (
+                _query_mutation_selection(args, business_rows)
+                if result.get("ok")
+                else None
+            )
             return {
                 "ok": bool(result.get("ok")),
                 "status": "ok" if result.get("ok") else "error",
@@ -13764,6 +13770,11 @@ def dispatch_command(
                     len(rows) == maximum_rows if result.get("ok") else None
                 ),
                 "objects": business_rows if result.get("ok") else None,
+                **(
+                    {"mutation_selection": mutation_selection}
+                    if mutation_selection is not None
+                    else {}
+                ),
                 "agent_result": business_rows if result.get("ok") else None,
             }
         if original_file_reference_match_requested(args):
@@ -13848,6 +13859,11 @@ def dispatch_command(
             if result.get("ok")
             else []
         )
+        mutation_selection = (
+            _query_mutation_selection(args, business_rows)
+            if result.get("ok")
+            else None
+        )
         return {
             "ok": bool(result.get("ok")),
             "status": "ok" if result.get("ok") else "error",
@@ -13858,6 +13874,11 @@ def dispatch_command(
             "count": len(rows) if result.get("ok") else None,
             "objects": business_rows if result.get("ok") else None,
             **({"continuations": continuations} if continuations else {}),
+            **(
+                {"mutation_selection": mutation_selection}
+                if mutation_selection is not None
+                else {}
+            ),
             "agent_result": business_rows if result.get("ok") else None,
         }
     if args.command == "metadata":
@@ -21815,6 +21836,73 @@ def _project_query_business_rows(
     return projected
 
 
+def _query_mutation_selection(
+    args: argparse.Namespace,
+    rows: Sequence[Mapping[str, Any]],
+) -> dict[str, Any] | None:
+    """Expose conditional exact-ID readbacks for a later selected mutation subset."""
+
+    if not 2 <= len(rows) <= MAX_QUERY_MUTATION_SELECTION_CANDIDATES:
+        return None
+    relationships = tuple(getattr(args, "relationships", ()) or ())
+    if (
+        relationships == ("event-actions",)
+        or getattr(args, "business_view", None) is not None
+    ):
+        return None
+
+    candidates: list[dict[str, Any]] = []
+    for row in rows:
+        object_id = row.get("id")
+        name = row.get("name")
+        object_type = row.get("type")
+        path = row.get("path")
+        if (
+            not _canonical_guid(object_id)
+            or not isinstance(name, str)
+            or not name
+            or not isinstance(object_type, str)
+            or not object_type
+            or not _canonical_wwise_path(path)
+        ):
+            return None
+        candidates.append(
+            {
+                "id": object_id,
+                "expected_identity": {
+                    "name": name,
+                    "type": object_type,
+                    "path": path,
+                },
+                "copy_command": operation_draft_copy_command(
+                    [
+                        "python",
+                        str(GATEWAY_RUNNER_PATH),
+                        "gateway.py",
+                        "query-object",
+                        "--exact-id",
+                        object_id,
+                    ]
+                ),
+            }
+        )
+    return {
+        "contract": "waapi-skill.query-mutation-selection/v1",
+        "activation": "later_user_selects_returned_candidates",
+        "current_turn_action": "none",
+        "required_before": [
+            "read_operate_reference",
+            "choose_operation",
+        ],
+        "instruction": (
+            "After a later user selects any returned candidate for mutation, "
+            "execute only each selected candidate's copy_command once and "
+            "match its exact name, type, and path before entering the operate lane."
+        ),
+        "candidates": candidates,
+    }
+
+
 def _query_business_continuations(
     args: argparse.Namespace,
     rows: Sequence[Mapping[str, Any]],
@@ -22077,6 +22165,7 @@ def project_successful_query_object_payload(
         "limit_reached",
         "objects",
         "continuations",
+        "mutation_selection",
     )
     projected = {key: payload[key] for key in compact_keys if key in payload}
     if "agent_result" in payload:

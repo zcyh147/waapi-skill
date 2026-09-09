@@ -5417,6 +5417,30 @@ def test_explicit_pre_action_cli_errors_are_infrastructure_without_turn_failed(
     assert failure.agent_item_event_count == 0
 
 
+def test_transport_error_item_does_not_masquerade_as_agent_action() -> None:
+    message = (
+        "stream disconnected before completion: tls handshake eof; "
+        "error sending request for url"
+    )
+    events = [
+        {"type": "thread.started", "thread_id": "thread-1"},
+        {"type": "turn.started"},
+        {"type": "error", "message": message},
+        {
+            "type": "item.completed",
+            "item": {"id": "error-1", "type": "error", "message": message},
+        },
+        {"type": "turn.failed", "error": {"message": message}},
+    ]
+
+    failure = classify_codex_infrastructure_failure(events)
+
+    assert failure is not None
+    assert failure.category == "service_unavailable"
+    assert failure.turn_failed is True
+    assert failure.agent_item_event_count == 0
+
+
 def test_turn_failure_after_agent_action_remains_a_semantic_skill_failure() -> None:
     message = "You've hit your usage limit after the model already acted."
     events = [
