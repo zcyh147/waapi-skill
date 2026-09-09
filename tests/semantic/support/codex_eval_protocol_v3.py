@@ -5144,9 +5144,17 @@ class V3GatewayProtocol:
         workflow_query_schema_indexes = {
             index
             for index, step in enumerate(self.steps)
-            if step.name == "routing.query-schema"
-            and step.subcommand == "query-schema"
-            and not step.arguments
+            if step.subcommand == "query-schema"
+            and (
+                (
+                    step.name == "routing.query-schema"
+                    and not step.arguments
+                )
+                or (
+                    step.name == "routing.query-schema.advanced"
+                    and step.arguments == ("--advanced",)
+                )
+            )
         }
         optional_routing_indexes = (
             workflow_operations_indexes | workflow_query_schema_indexes
@@ -5301,12 +5309,15 @@ class V3GatewayProtocol:
 
     @property
     def optional_workflow_query_schema_step_names(self) -> tuple[str, ...]:
-        """Return the one reviewed optional schema read before a workflow query."""
+        """Return reviewed optional schema reads before a workflow query."""
 
         names = tuple(
             step.name
             for step in self.steps
-            if step.name == "routing.query-schema"
+            if step.name in {
+                "routing.query-schema",
+                "routing.query-schema.advanced",
+            }
         )
         if not names:
             return ()
@@ -5316,11 +5327,26 @@ class V3GatewayProtocol:
             if step.name == names[0]
         )
         if (
-            len(names) != 1
+            names
+            not in {
+                ("routing.query-schema",),
+                (
+                    "routing.query-schema",
+                    "routing.query-schema.advanced",
+                ),
+            }
             or self.steps[index].subcommand != "query-schema"
             or self.steps[index].arguments
-            or index + 1 >= len(self.steps)
-            or self.steps[index + 1].subcommand != "query-object"
+            or any(
+                step.subcommand != "query-schema"
+                for step in self.steps[index : index + len(names)]
+            )
+            or (
+                len(names) == 2
+                and self.steps[index + 1].arguments != ("--advanced",)
+            )
+            or index + len(names) >= len(self.steps)
+            or self.steps[index + len(names)].subcommand != "query-object"
             or any(
                 step.name
                 not in self.optional_workflow_operations_discovery_step_names
@@ -6377,7 +6403,7 @@ def build_workflow_operations_discovery_protocol(
 def build_workflow_query_schema_discovery_protocol(
     base: V3GatewayProtocol,
 ) -> V3GatewayProtocol:
-    """Allow one ordinary schema read before a multi-turn closed query workflow."""
+    """Allow ordinary and advanced schema reads before a closed query workflow."""
 
     if (
         not isinstance(base, V3GatewayProtocol)
@@ -6387,22 +6413,45 @@ def build_workflow_query_schema_discovery_protocol(
         raise V3ProtocolError(
             "workflow query-schema discovery requires a query-first protocol"
         )
-    discovery = query_schema_step("routing.query-schema")
+    discoveries = (
+        query_schema_step("routing.query-schema"),
+        ExpectedGatewayStep(
+            name="routing.query-schema.advanced",
+            subcommand="query-schema",
+            arguments=("--advanced",),
+        ),
+    )
     base_allowed = (
         base.allowed_turn_prefix_counts
         or tuple((value,) for value in base.turn_prefix_counts)
     )
     allowed = tuple(
-        tuple(sorted({item for value in values for item in (value, value + 1)}))
+        tuple(
+            sorted(
+                {
+                    item
+                    for value in values
+                    for item in range(value, value + len(discoveries) + 1)
+                }
+            )
+        )
         for values in base_allowed
     )
     base_terminal = base.terminal_prefix_counts or (len(base.steps),)
     terminal = tuple(
-        sorted({item for value in base_terminal for item in (value, value + 1)})
+        sorted(
+            {
+                item
+                for value in base_terminal
+                for item in range(value, value + len(discoveries) + 1)
+            }
+        )
     )
     return V3GatewayProtocol(
-        steps=(discovery, *base.steps),
-        turn_prefix_counts=tuple(value + 1 for value in base.turn_prefix_counts),
+        steps=(*discoveries, *base.steps),
+        turn_prefix_counts=tuple(
+            value + len(discoveries) for value in base.turn_prefix_counts
+        ),
         allowed_turn_prefix_counts=allowed,
         terminal_prefix_counts=terminal,
         commutative_read_only_step_groups=base.commutative_read_only_step_groups,

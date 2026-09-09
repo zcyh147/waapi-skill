@@ -3335,11 +3335,24 @@ def test_broker_accepts_selected_workflow_operations_discovery_steps(
             ("operation-schema", "object.setReference"),
         ),
         (
+            ("query-schema", "--advanced"),
+            ("query-object", "--exact-id", "one"),
+            ("query-object", "--exact-id", "sound"),
+            ("operation-schema", "object.setReference"),
+        ),
+        (
+            ("query-schema",),
+            ("query-schema", "--advanced"),
+            ("query-object", "--exact-id", "one"),
+            ("query-object", "--exact-id", "sound"),
+            ("operation-schema", "object.setReference"),
+        ),
+        (
             ("query-object", "--exact-id", "one"),
             ("operation-schema", "object.setReference"),
         ),
     ),
-    ids=("schema-first", "direct-query"),
+    ids=("schema-first", "advanced-first", "both-schemas", "direct-query"),
 )
 def test_broker_accepts_reviewed_optional_workflow_reads(
     tmp_path: Path,
@@ -3349,6 +3362,11 @@ def test_broker_accepts_reviewed_optional_workflow_reads(
     steps = (
         ExpectedGatewayStep("routing.operations", "operations"),
         ExpectedGatewayStep("routing.query-schema", "query-schema"),
+        ExpectedGatewayStep(
+            "routing.query-schema.advanced",
+            "query-schema",
+            ("--advanced",),
+        ),
         ExpectedGatewayStep("diag.query", "query-object", ("--exact-id", "one")),
         ExpectedGatewayStep(
             "revalidation.sound",
@@ -3375,6 +3393,7 @@ def test_broker_accepts_reviewed_optional_workflow_reads(
         ),
         optional_expected_workflow_read_step_names=(
             "routing.query-schema",
+            "routing.query-schema.advanced",
             "revalidation.sound",
         ),
         transport="tcp",
@@ -3390,8 +3409,12 @@ def test_broker_accepts_reviewed_optional_workflow_reads(
 
     assert evidence.passed
     assert reconciliation.passed
-    assert ("routing.query-schema" in evidence.expected_step_names) is (
-        commands[0] == ("query-schema",)
+    expected_names = set(evidence.expected_step_names)
+    assert ("routing.query-schema" in expected_names) is (
+        ("query-schema",) in commands
+    )
+    assert ("routing.query-schema.advanced" in expected_names) is (
+        ("query-schema", "--advanced") in commands
     )
 
 

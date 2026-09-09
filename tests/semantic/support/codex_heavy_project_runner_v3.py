@@ -1528,7 +1528,10 @@ class _CaseObservers:
         self.payloads[step.name] = payload
         if (
             not step.name.startswith("routing.operations")
-            and step.name != "routing.query-schema"
+            and step.name not in {
+                "routing.query-schema",
+                "routing.query-schema.advanced",
+            }
             and self.prepared.observe_payload is not None
         ):
             self.prepared.observe_payload(step, payload)

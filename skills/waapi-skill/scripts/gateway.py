@@ -21918,10 +21918,24 @@ def _query_mutation_selection(
             "read_operate_reference",
             "choose_operation",
         ],
+        "later_selection_gate": {
+            "execute": "each_selected_candidate.copy_command_exactly_once",
+            "validate": "returned_name_type_and_path_equal_expected_identity",
+            "unselected_candidates": "do_not_execute",
+            "must_complete_before": [
+                "read_operate_reference",
+                "operations",
+                "operation_schema",
+                "draft_start",
+            ],
+            "skipping_is_invalid": True,
+        },
         "instruction": (
-            "After a later user selects any returned candidate for mutation, "
-            "execute only each selected candidate's copy_command once and "
-            "match its exact name, type, and path before entering the operate lane."
+            "On the later turn where the user selects returned candidates for "
+            "mutation, the first Gateway actions must execute only each selected "
+            "candidate's copy_command once and match its exact name, type, and "
+            "path. Do not read the operate reference, list operations, request an "
+            "operation schema, or start a Draft until this gate is complete."
         ),
         "candidates": candidates,
     }
@@ -26254,6 +26268,17 @@ def _business_next_action_binding(
                 "output_bus_or_custom_reference",
                 "event_parent_for_every_row_requesting_an_event",
             ],
+            "never_bind": [
+                "switch_group",
+                "switch_value",
+                "preservation_only_object",
+            ],
+            "literal_transport": {
+                "switch_value": (
+                    "copy_the_exact_user_value_into_--switch-value; "
+                    "never_call_draft-bind-object_for_it"
+                ),
+            },
             "event_row": (
                 "include_--event_in_that_rows_same_chunk; omission_is_not_deferred"
             ),

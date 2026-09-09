@@ -304,10 +304,12 @@ def test_project_runner_wires_alarm_cross_lane_reference_schedule(
     )
     assert prepared.protocol.optional_workflow_query_schema_step_names == (
         "routing.query-schema",
+        "routing.query-schema.advanced",
     )
-    assert tuple(step.name for step in prepared.protocol.steps[:3]) == (
+    assert tuple(step.name for step in prepared.protocol.steps[:4]) == (
         "routing.operations",
         "routing.query-schema",
+        "routing.query-schema.advanced",
         "alarm.diagnosis",
     )
     assert prepared.expected_dispatches == (

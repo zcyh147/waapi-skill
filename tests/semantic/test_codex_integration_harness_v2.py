@@ -362,9 +362,11 @@ def _archive_test_project_runner_wires_each_v2_runtime_and_manifest(
         )
         assert prepared.protocol.optional_workflow_query_schema_step_names == (
             "routing.query-schema",
+            "routing.query-schema.advanced",
         )
         assert prepared.protocol.steps[0].name == "routing.operations"
         assert prepared.protocol.steps[1].name == "routing.query-schema"
+        assert prepared.protocol.steps[2].name == "routing.query-schema.advanced"
     else:
         assert prepared.turn_reference_schedule is None
 

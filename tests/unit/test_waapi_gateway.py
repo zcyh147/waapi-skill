@@ -4087,6 +4087,20 @@ def test_multi_object_query_returns_conditional_selected_subset_readbacks(
         "read_operate_reference",
         "choose_operation",
     ]
+    assert selection["later_selection_gate"] == {
+        "execute": "each_selected_candidate.copy_command_exactly_once",
+        "validate": "returned_name_type_and_path_equal_expected_identity",
+        "unselected_candidates": "do_not_execute",
+        "must_complete_before": [
+            "read_operate_reference",
+            "operations",
+            "operation_schema",
+            "draft_start",
+        ],
+        "skipping_is_invalid": True,
+    }
+    assert "the first Gateway actions must" in selection["instruction"]
+    assert "Do not read the operate reference" in selection["instruction"]
     assert [candidate["id"] for candidate in selection["candidates"]] == [
         row["id"] for row in rows
     ]

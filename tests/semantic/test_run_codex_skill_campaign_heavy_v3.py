@@ -418,20 +418,22 @@ def test_integration_plan_requires_catalog_before_query_first_protocol() -> None
         )
     )
 
-    assert [step.name for step in wrapped.steps[:5]] == [
+    assert [step.name for step in wrapped.steps[:6]] == [
         "routing.operations",
         "routing.query-schema",
+        "routing.query-schema.advanced",
         "diag.search",
         "routing.operations.tx01.operation-schema",
         "tx01.operation-schema",
     ]
     assert wrapped.optional_workflow_query_schema_step_names == (
         "routing.query-schema",
+        "routing.query-schema.advanced",
     )
     assert wrapped.allowed_turn_prefix_counts == (
-        (1, 2, 3),
-        (3, 4, 5, 6),
-        (7, 8, 9, 10),
+        (1, 2, 3, 4),
+        (3, 4, 5, 6, 7),
+        (7, 8, 9, 10, 11),
     )
     assert rebuilt.static_expectation["workflow_steps"][0] == {
         "name": "routing.operations",
@@ -442,6 +444,13 @@ def test_integration_plan_requires_catalog_before_query_first_protocol() -> None
     }
     assert rebuilt.static_expectation["workflow_steps"][1] == {
         "name": "routing.query-schema",
+        "kind": "checkpoint",
+        "phase": f"{unit.workflow_id}.checkpoint",
+        "transaction_id": None,
+        "api": None,
+    }
+    assert rebuilt.static_expectation["workflow_steps"][2] == {
+        "name": "routing.query-schema.advanced",
         "kind": "checkpoint",
         "phase": f"{unit.workflow_id}.checkpoint",
         "transaction_id": None,

@@ -3146,6 +3146,44 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   message exists, classify the transport failure as infrastructure BLOCKED;
   once any real Agent item exists, retain normal semantic grading.
 
+### Query-first workflows may inspect either packaged query schema
+
+- Trigger: macOS integration `INT22-WEAPONS` at candidate `41ab455` started
+  with the legitimate read-only `query-schema --advanced` disclosure. The
+  workflow protocol allowed only the ordinary schema disclosure, so the Broker
+  rejected the first command before Gateway or Wwise even though the Skill
+  explicitly supports that progressive read lane.
+- Prevention: query-first workflow protocols expose both ordinary and advanced
+  query-schema reads as ordered, independently optional checkpoints. They may
+  be omitted, used individually, or used together before the fixed query; no
+  schema read changes the mutation identity or grants dispatch credit.
+
+### Import dependency closure must name literal-only Switch values
+
+- Trigger: native-Windows `INT25-FOOTSTEPS` at candidate `41ab455` correctly
+  bound the import parent, then tried to bind the prompt-visible `Snow` Switch
+  value as a Wwise object. The Gateway continuation already forbade that role,
+  but its broad dependency-closure wording still made the unnecessary bind
+  look plausible. The Broker rejected it before Wwise.
+- Prevention: the import continuation repeats the exact never-bind roles at
+  the dependency closure and declares Switch values literal transport: copy
+  the user's exact value into `--switch-value`; never call
+  `draft-bind-object` for it. Do not weaken the Broker by accepting an unused
+  binding.
+
+### A later selected mutation subset starts with exact-ID readback
+
+- Trigger: native-Windows `INT25-WEAPONS` at candidate `41ab455` returned a
+  correct audit list and copy-ready exact-ID commands, but the next turn skipped
+  those selected-object readbacks and requested `operation-schema` directly.
+  The Broker rejected the unsafe transition before Draft or Wwise.
+- Prevention: the query response carries a salient later-selection gate. On
+  the turn where the user selects candidates, each selected candidate's
+  `copy_command` is the first Gateway action and its name/type/path must match.
+  Reading the operate reference, listing operations, requesting a schema, or
+  starting a Draft is invalid until the gate completes. Unselected candidates
+  remain unread and untouched.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:

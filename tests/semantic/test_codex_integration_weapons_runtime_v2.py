@@ -570,6 +570,7 @@ def test_weapons_business_protocol_compiles_as_one_complete_workflow_transaction
     )
     assert wrapped.steps[0].name == "routing.operations"
     assert wrapped.steps[1].name == "routing.query-schema"
+    assert wrapped.steps[2].name == "routing.query-schema.advanced"
     assert rebuilt.static_expectation["workflow_id"] == unit.workflow_id
     CodexGatewayBroker(
         skill_source=(

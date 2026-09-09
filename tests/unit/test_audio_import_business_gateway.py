@@ -439,6 +439,17 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
             "output_bus_or_custom_reference",
             "event_parent_for_every_row_requesting_an_event",
         ],
+        "never_bind": [
+            "switch_group",
+            "switch_value",
+            "preservation_only_object",
+        ],
+        "literal_transport": {
+            "switch_value": (
+                "copy_the_exact_user_value_into_--switch-value; "
+                "never_call_draft-bind-object_for_it"
+            ),
+        },
         "event_row": (
             "include_--event_in_that_rows_same_chunk; omission_is_not_deferred"
         ),
