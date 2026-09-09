@@ -67,6 +67,9 @@ from tests.semantic.support.codex_typed_draft_evidence_v3 import (
     classify_composer_failure_stage,
     validate_typed_draft_evidence,
 )
+from wwise_waapi.audio_import_business_contracts import (
+    AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS,
+)
 
 
 TASK_RESULT_CONTRACT = "waapi-skill.codex-semantic-task-result/v5"
@@ -716,7 +719,10 @@ def _selected_workflow_step_names_are_closed(
             protocol_cursor += 1
         selected_block = tuple(name for name in block if name in selected_set)
         selected_count = len(selected_block)
-        if not (len(block) + 2) // 3 <= selected_count <= len(block):
+        minimum_chunks = (
+            len(block) + AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS - 1
+        ) // AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS
+        if not minimum_chunks <= selected_count <= len(block):
             return False
         if selected_block != tuple(block[:selected_count]):
             return False

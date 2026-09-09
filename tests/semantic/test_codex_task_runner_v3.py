@@ -414,7 +414,7 @@ def test_workflow_terminal_accepts_broker_proven_import_rebatching() -> None:
         step.name
         for step in protocol.steps
         if step.subcommand != "draft-declare-import-batch"
-        or step.name in declaration_names[:2]
+        or step.name in declaration_names[:1]
     )
     evidence = SimpleNamespace(
         expected_step_names=selected,
@@ -433,7 +433,7 @@ def test_workflow_terminal_accepts_broker_proven_import_rebatching() -> None:
     assert task_runner._broker_terminal_protocol_passed(protocol, evidence)
 
     for invalid_declarations in (
-        declaration_names[:1],
+        (),
         (declaration_names[0], declaration_names[2]),
     ):
         invalid = tuple(
@@ -486,7 +486,6 @@ def test_workflow_terminal_accepts_rebatch_before_dependency_ready_setup() -> No
         "tx01.declare-batch",
         "tx01.bind-object.003",
         "tx01.declare-batch-02",
-        "tx01.declare-batch-03",
         "tx01.check",
         "tx01.preview",
         "tx01.verify",

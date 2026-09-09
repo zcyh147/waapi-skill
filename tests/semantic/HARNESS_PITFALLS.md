@@ -3045,6 +3045,13 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   remaining-row repartitioning, and retain a direct one-command six-row Broker
   regression. A contract assertion alone cannot prove the Fresh transport
   accepts the advertised width.
+- Downstream boundary: candidate `8b8d375` then proved the Broker and Gateway
+  accepted the larger chunks, but macOS r57 campaign classification and the
+  native-Windows r46 Footsteps runtime observer still computed minimum chunks
+  with a literal divisor of three. Use the same production-owned maximum in
+  terminal-protocol classification and operation-specific observers too.
+  Regression coverage must prove nine sealed rows may finish in two chunks,
+  five Footsteps rows may finish in one, and zero submitted chunks still fail.
 
 ### Ordered workflows advance to the next Preview after verification
 

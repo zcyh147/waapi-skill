@@ -53,6 +53,9 @@ from tests.semantic.support.codex_integration_paths_v2 import (
     IntegrationOriginalPathError,
     localize_copied_original_path,
 )
+from wwise_waapi.audio_import_business_contracts import (
+    AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS,
+)
 
 
 FOOTSTEPS_WORKFLOW_ID = "footsteps_snow_assignment_maintenance"
@@ -895,7 +898,12 @@ class _FootstepsSession:
                     for name in skipped
                 )
                 or not (
-                    (expected_batch_count + 2) // 3
+                    (
+                        expected_batch_count
+                        + AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS
+                        - 1
+                    )
+                    // AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS
                     <= observed_batch_count
                     <= expected_batch_count
                 )

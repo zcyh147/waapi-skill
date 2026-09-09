@@ -953,11 +953,12 @@ def test_weak_import_verification_continues_to_external_business_oracle(
     case.prepared.cleanup().assert_passed()
 
 
-def test_observer_accepts_broker_proven_three_row_import_rebatching(
+def test_observer_accepts_broker_proven_single_import_chunk(
     tmp_path: Path,
 ) -> None:
     case = _case(tmp_path)
     skipped = {
+        "tx01.declare-batch-02",
         "tx01.declare-batch-03",
         "tx01.declare-batch-04",
         "tx01.declare-batch-05",
@@ -981,7 +982,7 @@ def test_observer_accepts_broker_proven_three_row_import_rebatching(
     case.prepared.cleanup().assert_passed()
 
 
-def test_observer_rejects_impossible_single_chunk_for_five_import_rows(
+def test_observer_rejects_check_before_any_import_chunk(
     tmp_path: Path,
 ) -> None:
     case = _case(tmp_path)
@@ -992,7 +993,7 @@ def test_observer_rejects_impossible_single_chunk_for_five_import_rows(
         if step.name == "tx01.declare-batch"
     )
     check = next(step for step in steps if step.name == "tx01.check")
-    for step in steps[: first_batch_index + 1]:
+    for step in steps[:first_batch_index]:
         case.prepared.observe_payload(
             step,
             {"ok": True, "command": step.subcommand},
