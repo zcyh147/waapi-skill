@@ -7346,6 +7346,97 @@ def test_business_declaration_ids_are_task_local_but_bounded_and_unique(
         )
 
 
+def test_business_batch_row_binding_accepts_handle_and_local_id_in_either_order(
+) -> None:
+    first_handle = "boh1-" + "3" * 32
+    second_handle = "boh1-" + "4" * 32
+    step = ExpectedGatewayStep(
+        "tx01.declare-existing-batch",
+        "draft-declare-existing-batch",
+        (
+            "draft-id",
+            "--task-authority",
+            "authority",
+            "--expected-revision",
+            "3",
+            "--row-order",
+            "first",
+            "--row-order",
+            "second",
+            "--row",
+            "first",
+            ResponseBinding("tx01.bind-first", "/bound_object/handle"),
+            "--row",
+            "second",
+            ResponseBinding("tx01.bind-second", "/bound_object/handle"),
+            "--field",
+            "first",
+            "notes",
+            "one",
+            "--field",
+            "second",
+            "notes",
+            "two",
+        ),
+    )
+    broker = object.__new__(CodexGatewayBroker)
+    broker._payloads_by_step = {  # noqa: SLF001
+        "tx01.bind-first": {"bound_object": {"handle": first_handle}},
+        "tx01.bind-second": {"bound_object": {"handle": second_handle}},
+    }
+
+    rebound = broker._bind_task_local_declaration_id(  # noqa: SLF001
+        step,
+        (
+            *step.arguments[:5],
+            "--row-order",
+            "rain",
+            "--row-order",
+            "wind",
+            "--row",
+            first_handle,
+            "rain",
+            "--row",
+            second_handle,
+            "wind",
+            "--field",
+            "rain",
+            "notes",
+            "one",
+            "--field",
+            "wind",
+            "notes",
+            "two",
+        ),
+    )
+
+    assert rebound.arguments == (
+        "draft-id",
+        "--task-authority",
+        "authority",
+        "--expected-revision",
+        "3",
+        "--row-order",
+        "rain",
+        "--row-order",
+        "wind",
+        "--row",
+        ResponseBinding("tx01.bind-first", "/bound_object/handle"),
+        "rain",
+        "--row",
+        ResponseBinding("tx01.bind-second", "/bound_object/handle"),
+        "wind",
+        "--field",
+        "rain",
+        "notes",
+        "one",
+        "--field",
+        "wind",
+        "notes",
+        "two",
+    )
+
+
 def _read_only_draft_evidence_fixture(
     tmp_path: Path,
 ) -> tuple[

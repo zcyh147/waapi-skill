@@ -3184,6 +3184,41 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   starting a Draft is invalid until the gate completes. Unselected candidates
   remain unread and untouched.
 
+### A required Draft phase must not expose a competing later action
+
+- Trigger: native-Windows `INT22-WEATHER` at candidate `a67559c` bound the
+  RTPC owner, then used the simultaneously disclosed object-binding route for
+  the Control Input before the required property discovery. The Broker rejected
+  the safe-but-out-of-order action before Wwise.
+- Prevention: when `object.setRTPC` requires property discovery, return only the
+  copy-ready discovery action. Disclose the Control Input binding after that
+  read completes. A single required phase must not advertise a later sibling
+  action and then punish the Agent for selecting it.
+
+### Distinct opaque types should absorb harmless positional reversal
+
+- Trigger: macOS `INT25-WEATHER` at candidate `a67559c` supplied every correct
+  five-Action business fact but placed each `boh1-...` object handle before its
+  task-local row id. The old two-value `--row` parser and Broker required only
+  the opposite spelling, so Preview stopped before Wwise.
+- Prevention: the Gateway and Broker recognize the exact `boh1-<32 hex>`
+  contract and deterministically normalize either `(row id, object handle)` or
+  `(object handle, row id)`. Unknown, duplicated, mismatched, or unbound values
+  still fail closed; this tolerance does not broaden the selected object set or
+  business outcome.
+
+### Task-local POSIX continuations should not repeat a campaign-length path
+
+- Trigger: macOS `INT25-WEAPONS` at candidate `a67559c` copied confirmation
+  correctly, then removed the `waapi-skills-stable` segment from the following
+  absolute execute command. The Broker rejected the nonexistent runner before
+  execution, leaving the source and sandbox unchanged.
+- Prevention: when the packaged runner is exactly the Fresh task-local
+  `.agents/skills/waapi-skill/scripts/run.py` beneath the current workspace,
+  emit that short relative path as the selected POSIX shell command while
+  retaining the absolute `full_argv` for audit. Other installations keep the
+  absolute command. Continue inheriting the campaign cwd and never set workdir.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:

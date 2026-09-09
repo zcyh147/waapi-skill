@@ -2525,6 +2525,7 @@ _BUSINESS_DRAFT_REVISION_SUBCOMMANDS = DRAFT_REVISION_SUBCOMMANDS - {
 _TASK_LOCAL_DECLARATION_ID_RE = re.compile(
     r"^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$"
 )
+_BOUND_OBJECT_HANDLE_RE = re.compile(r"^boh1-[0-9a-f]{32}$")
 _MAX_REQUIRED_FOLLOWUP_FACTS = 64
 _MAX_REQUIRED_FOLLOWUP_BYTES = 32 * 1024
 
@@ -10745,6 +10746,18 @@ class CodexGatewayBroker:
                 raise GatewayInvocationError(
                     "business batch requires every bounded task-local row"
                 )
+            handle_first_rows: set[str] = set()
+            normalized_actual_rows = []
+            for first, second in actual_rows:
+                if (
+                    _BOUND_OBJECT_HANDLE_RE.fullmatch(str(first)) is not None
+                    and _BOUND_OBJECT_HANDLE_RE.fullmatch(str(second)) is None
+                ):
+                    handle_first_rows.add(str(first))
+                    normalized_actual_rows.append((second, first))
+                else:
+                    normalized_actual_rows.append((first, second))
+            actual_rows = normalized_actual_rows
             actual_ids = [str(row[0]) for row in actual_rows]
             if (
                 len(actual_ids) != len(set(actual_ids))
@@ -10805,7 +10818,17 @@ class CodexGatewayBroker:
                     raise GatewayInvocationError(
                         "sealed business batch declaration id is invalid"
                     )
-                arguments[cursor + 1] = expected_to_actual[expected_id]
+                actual_id = expected_to_actual[expected_id]
+                if option == "--row":
+                    expected_handle = arguments[cursor + 2]
+                    resolved_handle = bound_text(expected_handle)
+                    if resolved_handle in handle_first_rows:
+                        arguments[cursor + 1] = expected_handle
+                        arguments[cursor + 2] = actual_id
+                    else:
+                        arguments[cursor + 1] = actual_id
+                else:
+                    arguments[cursor + 1] = actual_id
                 cursor += arity + 1
             return replace(step, arguments=tuple(arguments))
 

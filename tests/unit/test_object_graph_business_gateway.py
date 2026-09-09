@@ -673,9 +673,11 @@ def test_gateway_builds_rtpc_curve_from_bound_business_facts(tmp_path: Path) -> 
     )
     assert owner_code == 0, owner
     owner_handle = owner["bound_object"]["handle"]
-    assert owner["draft"]["next_action_binding"]["required_next_phase"] == (
+    owner_next = owner["draft"]["next_action_binding"]
+    assert owner_next["required_next_phase"] == (
         "discover_rtpc_property_for_bound_object"
     )
+    assert "object_binding" not in owner_next
 
     volume_metadata = {
         "name": "Volume",
@@ -1423,8 +1425,10 @@ def test_object_set_discovers_two_business_field_meanings_in_one_revision(
     assert len(unchanged.composition["business_session"]["declarations"]) == 1
 
 
+@pytest.mark.parametrize("swapped_row_values", (False, True))
 def test_object_set_batch_declares_meanings_with_per_object_metadata_revalidation(
     tmp_path: Path,
+    swapped_row_values: bool,
 ) -> None:
     start_code, started = _offline(tmp_path, "draft-start", "object.set")
     assert start_code == 0, started
@@ -1475,6 +1479,13 @@ def test_object_set_batch_declares_meanings_with_per_object_metadata_revalidatio
     assert "declare_existing_batch" in continuation
     assert "field_discovery" not in continuation
     assert "declare_existing" not in continuation
+    assert continuation["declare_existing_batch"]["row_value_orders"] == [
+        "task_local_id_then_bound_object_handle",
+        "bound_object_handle_then_task_local_id",
+    ]
+    assert continuation["declare_existing_batch"]["gateway_disambiguation"] == (
+        "the_exact_boh1_object_handle_contract_identifies_the_handle"
+    )
 
     fade = {
         "name": "FadeTime",
@@ -1505,6 +1516,17 @@ def test_object_set_batch_declares_meanings_with_per_object_metadata_revalidatio
             "PauseDelayedResumeAction": delayed_resume,
         },
     )
+    row_arguments = [
+        value
+        for declaration_id, handle in zip(
+            ("rain", "wind", "thunder"), handles, strict=True
+        )
+        for value in (
+            "--row",
+            handle if swapped_row_values else declaration_id,
+            declaration_id if swapped_row_values else handle,
+        )
+    ]
     batch_code, batch = gateway.execute_gateway(
         [
             "--state-dir",
@@ -1521,15 +1543,7 @@ def test_object_set_batch_declares_meanings_with_per_object_metadata_revalidatio
             "wind",
             "--row-order",
             "thunder",
-            "--row",
-            "rain",
-            handles[0],
-            "--row",
-            "wind",
-            handles[1],
-            "--row",
-            "thunder",
-            handles[2],
+            *row_arguments,
             "--field-meaning-value",
             "rain",
             "Fade Time",

@@ -2255,6 +2255,32 @@ def test_transaction_next_command_quotes_posix_shell_arguments_without_reconstru
     assert tuple(payload)[-2:] == ("copy_instruction", "shell_command")
 
 
+def test_transaction_next_command_uses_short_task_local_posix_runner(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    runner = (
+        tmp_path / ".agents" / "skills" / "waapi-skill" / "scripts" / "run.py"
+    )
+    monkeypatch.setattr(waapi_gateway, "os", type("PosixOS", (), {"name": "posix"})())
+    monkeypatch.setattr(waapi_gateway, "GATEWAY_RUNNER_PATH", runner)
+
+    payload = waapi_gateway.transaction_next_command(
+        "execute",
+        ["execute", "tx1-task-local"],
+    )
+
+    assert payload["full_argv"][1] == str(runner)
+    assert payload["shell_command"] == (
+        "python .agents/skills/waapi-skill/scripts/run.py "
+        "gateway.py execute tx1-task-local"
+    )
+    selected = shlex.split(payload["shell_command"])
+    assert (tmp_path / selected[1]).resolve() == runner.resolve()
+    assert payload["copy_instruction"]["source_field"] == "shell_command"
+
+
 def test_transaction_next_command_adds_one_short_copy_source_on_windows(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

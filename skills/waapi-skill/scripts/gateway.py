@@ -17930,7 +17930,13 @@ def dispatch_business_existing_batch(
 
     row_order = list(args.row_order)
     rows: dict[str, str] = {}
-    for declaration_id, object_handle in args.row:
+    for first, second in args.row:
+        first_is_handle = re.fullmatch(r"boh1-[0-9a-f]{32}", first) is not None
+        second_is_handle = re.fullmatch(r"boh1-[0-9a-f]{32}", second) is not None
+        if first_is_handle and not second_is_handle:
+            declaration_id, object_handle = second, first
+        else:
+            declaration_id, object_handle = first, second
         if declaration_id in rows:
             raise GatewayInputError(
                 f"Object-set batch declaration id {declaration_id!r} was supplied twice"
@@ -23394,7 +23400,24 @@ def transaction_next_command(
             model_command = None
     else:
         payload["shell_family"] = "posix-sh"
-        shell_command = shlex.join(full_argv)
+        copy_argv = full_argv
+        try:
+            relative_runner = Path(str(GATEWAY_RUNNER_PATH)).resolve(
+                strict=False
+            ).relative_to(Path.cwd().resolve(strict=False))
+        except (OSError, ValueError):
+            relative_runner = None
+        if (
+            relative_runner is not None
+            and relative_runner.as_posix()
+            == ".agents/skills/waapi-skill/scripts/run.py"
+        ):
+            copy_argv = [
+                full_argv[0],
+                relative_runner.as_posix(),
+                *full_argv[2:],
+            ]
+        shell_command = shlex.join(copy_argv)
     if model_command is not None:
         payload["shell_command"] = shell_command
         payload["model_shell_family"] = WINDOWS_MODEL_COMMAND_FAMILY
@@ -23659,6 +23682,8 @@ def _compact_object_set_update_continuation(
                         "fixed_argv_prefix_copy",
                         "fixed_argv_prefix_copy_instruction",
                         "append_repeated",
+                        "row_value_orders",
+                        "gateway_disambiguation",
                         "precondition",
                     )
                     if name in action
@@ -25766,6 +25791,13 @@ def _business_next_action_binding(
                             "<business-value>",
                         ],
                     },
+                    "row_value_orders": [
+                        "task_local_id_then_bound_object_handle",
+                        "bound_object_handle_then_task_local_id",
+                    ],
+                    "gateway_disambiguation": (
+                        "the_exact_boh1_object_handle_contract_identifies_the_handle"
+                    ),
                     "maximum_rows": OBJECT_SET_BUSINESS_BATCH_MAX_ROWS,
                     "gateway_owned_behavior": (
                         "resolve_and_revalidate_each_field_for_each_exact_object_"
@@ -26108,7 +26140,6 @@ def _business_next_action_binding(
                     **shared,
                     "required_next_phase": "discover_rtpc_property_for_bound_object",
                     "field_discovery": discovery,
-                    "object_binding": object_binding,
                 }
             if len(bound_objects) < 2:
                 return {
