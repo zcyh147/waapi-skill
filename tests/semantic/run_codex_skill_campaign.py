@@ -260,6 +260,7 @@ from tests.semantic.support.codex_prompt_asset_reads_v3 import (  # noqa: E402
 from tests.semantic.support.codex_task_runner_v3 import (  # noqa: E402
     _normalize_turn_reference_schedule,
     _selected_workflow_step_names_are_closed,
+    _skill_reads_pass_gate,
 )
 from tests.semantic.support.codex_harness import (  # noqa: E402
     CodexGatewayErrorExpectation,
@@ -7530,8 +7531,10 @@ def _validate_heavy_v3_codex_facts(
         ),
         "one_target_skill": prompt_audit.get("passed") is True,
         "no_collaboration": value.get("collab_call_count") == 0,
-        "skill_reads_exact": (
-            read_files == expected_reads and len(allowed_reads) == len(read_files)
+        "skill_reads_exact": _skill_reads_pass_gate(
+            expected_reads=expected_reads,
+            read_files=read_files,
+            allowed_reads=allowed_reads,
         ),
         "read_prefix_exact": (
             tuple(

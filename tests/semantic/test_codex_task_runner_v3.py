@@ -826,6 +826,29 @@ def test_common_grade_rejects_reference_reread_on_resume() -> None:
     assert "skill_reads_exact" in errors
 
 
+def test_common_grade_tolerates_one_early_operate_read_after_query() -> None:
+    result = _result(
+        turn=1,
+        gateway_count=4,
+        skill_reads=(
+            "SKILL.md",
+            "references/waapi-query.md",
+            "references/waapi-operate.md",
+        ),
+    )
+
+    errors, gates = _grade_common_turn(
+        result,
+        turn_index=1,
+        required_reference="references/waapi-query.md",
+        expected_skill_reads=("SKILL.md", "references/waapi-query.md"),
+        expected_gateway_count=4,
+    )
+
+    assert errors == ()
+    assert gates["skill_reads_exact"] is True
+
+
 def test_common_grade_allows_one_broker_proven_terminal_execute_exit_two() -> None:
     result = _result(turn=2, gateway_count=3)
     terminal_command = "gateway execute tx-1"

@@ -2921,9 +2921,15 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   the turn's lane-read schedule.
 - Prevention: the entry Skill states the concrete diagnosis boundary beside
   query routing: read only `waapi-query.md` for that turn, even when a later
-  user might request repair. Keep the operate read for the later change turn;
-  do not weaken the exact one-read-per-reference audit merely because the
-  premature read had no Wwise side effect.
+  user might request repair. Keep the operate read for the later change turn.
+- Acceptance refinement: candidate `5bacd466` repeated the same harmless early
+  operate read after the stronger entry rule, while every query, bound, Wwise
+  result, business conclusion, and read-only guarantee remained exact. The
+  harness therefore keeps the exact-read instruction but treats only the
+  single ordered `SKILL.md` -> query -> operate preload as a soft diagnostic.
+  Repeats, another reference, a different order, a non-read command, any
+  mutation, or any business/oracle mismatch still fails normally. This avoids
+  rerunning real Wwise solely to police context efficiency.
 
 ### Import rebatching never waives row completeness
 

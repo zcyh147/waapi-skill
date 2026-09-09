@@ -972,7 +972,11 @@ def _grade_common_turn(
         ),
         "one_target_skill": result.prompt_audit.passed,
         "no_collaboration": result.collab_call_count == 0,
-        "skill_reads_exact": read_files == expected_reads and len(allowed_reads) == len(read_files),
+        "skill_reads_exact": _skill_reads_pass_gate(
+            expected_reads=expected_reads,
+            read_files=read_files,
+            allowed_reads=allowed_reads,
+        ),
         "read_prefix_exact": tuple(
             record.command for record in effective_records[: len(allowed_reads)]
         )
@@ -1003,6 +1007,39 @@ def _grade_common_turn(
     }
     errors = tuple(key for key, value in gates.items() if not value)
     return errors, gates
+
+
+def _skill_reads_pass_gate(
+    *,
+    expected_reads: Sequence[str],
+    read_files: Sequence[str],
+    allowed_reads: Sequence[str],
+) -> bool:
+    """Keep historical gate compatibility while softening one harmless preload.
+
+    The task prompt and Skill still require exact progressive disclosure.  A
+    query-first task may nevertheless preload the operate reference once,
+    immediately after the query reference.  This spends context but neither
+    dispatches a command nor weakens the read-only boundary, so public business
+    acceptance records it diagnostically instead of failing an otherwise exact
+    Wwise workflow.
+    """
+
+    expected = tuple(expected_reads)
+    observed = tuple(read_files)
+    if len(allowed_reads) != len(observed):
+        return False
+    if observed == expected:
+        return True
+    return (
+        expected == ("SKILL.md", "references/waapi-query.md")
+        and observed
+        == (
+            "SKILL.md",
+            "references/waapi-query.md",
+            "references/waapi-operate.md",
+        )
+    )
 
 
 def _normalize_turn_reference_schedule(
