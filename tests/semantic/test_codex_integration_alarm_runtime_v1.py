@@ -337,6 +337,13 @@ def _unit(version: str = "2022.1"):
     )
 
 
+def test_repair_prompt_names_the_exact_diagnosed_target_bus() -> None:
+    repair = _unit().turns[1]
+
+    assert "SFX_Machinery" in repair.prompt
+    assert "应急总线" not in repair.prompt
+
+
 def _paths(tmp_path: Path) -> SimpleNamespace:
     scenario_root = tmp_path / "scenario"
     asset_root = scenario_root / "assets"

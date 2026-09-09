@@ -367,7 +367,7 @@
         {
           "index": 2,
           "kind": "change_request",
-          "prompt": "诊断结果清楚了，我要修复这个路由。请只把链路中确认的 Sound 输出总线改为刚才的应急总线，Event、Action、AudioSource 和 Sound 的其他属性保持不变；这是要实际执行的修改，但先给我看预览并等我确认。",
+          "prompt": "诊断结果清楚了，我要修复这个路由。请只把链路中确认的 Sound 输出总线改为刚才确认的预期总线 SFX_Machinery，Event、Action、AudioSource 和 Sound 的其他属性保持不变；这是要实际执行的修改，但先给我看预览并等我确认。",
           "confirms_transaction": null,
           "expects_preview_transaction": 1
         },

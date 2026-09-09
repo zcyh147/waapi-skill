@@ -519,6 +519,9 @@ DEFAULT_HOST = "127.0.0.1"
 DEFAULT_TIMEOUT = 10.0
 DEFAULT_METADATA_DISCOVERY_TIMEOUT = 30.0
 DEFAULT_TRANSACTION_TIMEOUT = 150.0
+DRAFT_METADATA_DISCOVERY_COMMANDS = frozenset(
+    {"draft-bind-field", "draft-discover-fields", "draft-discover-types"}
+)
 PROJECT_TRANSITION_SETTLE_POLL_SECONDS = 0.1
 TRANSPORT_CLEANUP_GRACE_SECONDS = 0.05
 UNBOUNDED_TOPIC_CLEANUP_TIMEOUT_SECONDS = 1.0
@@ -10520,7 +10523,11 @@ def resolve_connection(args: argparse.Namespace, *, env: Mapping[str, str]) -> G
                     and getattr(args, "typed_read_timeout", None) is not None
                 )
                 else DEFAULT_METADATA_DISCOVERY_TIMEOUT
-                if args.command == "metadata" and args.operation == "discover"
+                if (
+                    args.command == "metadata"
+                    and args.operation == "discover"
+                )
+                or args.command in DRAFT_METADATA_DISCOVERY_COMMANDS
                 else DEFAULT_TIMEOUT
             )
         )

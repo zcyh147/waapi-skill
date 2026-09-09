@@ -623,6 +623,106 @@ def test_metadata_discover_has_a_bounded_thirty_second_default_deadline(
     assert connection.deadline.timeout == 30.0
 
 
+def test_draft_field_discovery_uses_the_live_metadata_deadline(
+    tmp_path: Path,
+) -> None:
+    args = waapi_gateway.build_parser().parse_args(
+        [
+            "draft-discover-fields",
+            "od1-" + ("0" * 32),
+            "--task-authority",
+            "da1-" + ("0" * 40),
+            "--expected-revision",
+            "1",
+            "--semantic-kind",
+            "sound-sfx",
+            "--meaning",
+            "Volume",
+        ]
+    )
+
+    connection = waapi_gateway.resolve_connection(
+        args,
+        env=_gateway_env(tmp_path),
+    )
+
+    assert connection.timeout == 30.0
+    assert connection.deadline.timeout == 30.0
+
+
+@pytest.mark.parametrize(
+    "command_args",
+    (
+        (
+            "draft-bind-field",
+            "--class-name",
+            "Sound",
+            "--token",
+            "Volume",
+        ),
+        (
+            "draft-discover-types",
+            "--meaning",
+            "source plugin",
+            "--role",
+            "source",
+        ),
+    ),
+)
+def test_other_draft_metadata_commands_share_the_discovery_deadline(
+    tmp_path: Path,
+    command_args: tuple[str, ...],
+) -> None:
+    args = waapi_gateway.build_parser().parse_args(
+        [
+            command_args[0],
+            "od1-" + ("0" * 32),
+            "--task-authority",
+            "da1-" + ("0" * 40),
+            "--expected-revision",
+            "1",
+            *command_args[1:],
+        ]
+    )
+
+    connection = waapi_gateway.resolve_connection(
+        args,
+        env=_gateway_env(tmp_path),
+    )
+
+    assert connection.timeout == 30.0
+    assert connection.deadline.timeout == 30.0
+
+
+def test_explicit_draft_field_discovery_deadline_takes_precedence(
+    tmp_path: Path,
+) -> None:
+    args = waapi_gateway.build_parser().parse_args(
+        [
+            "--timeout",
+            "5",
+            "draft-discover-fields",
+            "od1-" + ("0" * 32),
+            "--task-authority",
+            "da1-" + ("0" * 40),
+            "--expected-revision",
+            "1",
+            "--semantic-kind",
+            "sound-sfx",
+            "--meaning",
+            "Volume",
+        ]
+    )
+
+    connection = waapi_gateway.resolve_connection(
+        args,
+        env=_gateway_env(tmp_path),
+    )
+
+    assert connection.timeout == 5.0
+    assert connection.deadline.timeout == 5.0
+
+
 @pytest.mark.parametrize(
     "version",
     ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"),

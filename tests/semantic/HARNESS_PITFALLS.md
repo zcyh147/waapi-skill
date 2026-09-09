@@ -2956,6 +2956,54 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   reserved for one or two targets. Never carry an earlier Draft action across
   a later revision whose complete continuation selected another branch.
 
+### Draft metadata discovery needs the metadata deadline
+
+- Trigger: native-Windows integration Weather copied the returned RTPC field
+  discovery continuation exactly, but `ak.wwise.core.object.getPropertyInfo`
+  completed just beyond the ordinary ten-second Gateway deadline. The command
+  returned a structured `LIVE_METADATA_READ_FAILED` plus transport-close
+  timeout, so the Broker correctly rejected it and the root received no PASS.
+- Cause: direct `metadata discover` already used the bounded 30-second metadata
+  deadline, while the equivalent Draft commands still fell through to the
+  ordinary-read default.
+- Prevention: `draft-bind-field`, `draft-discover-fields`, and
+  `draft-discover-types` use the same 30-second live-metadata deadline unless
+  the caller explicitly supplies another positive timeout. Preserve the
+  structured failure and non-retry rule; a larger owned deadline must never
+  turn a rejected or late result into PASS after the fact.
+
+### Integration prompts must name the already-selected business target
+
+- Trigger: Alarm turn two asked for the previously diagnosed “emergency bus,”
+  but turn one and the fixture called the objects only the expected
+  `SFX_Machinery` Bus and the actual `Diagnostic_Dead_Bus`. A Fresh Agent
+  reasonably requested clarification, while the oracle required it to infer
+  one fixed target and continue immediately.
+- Prevention: when a fixture has exactly one expected mutation target, name
+  that same business object in the visible follow-up prompt. Do not test model
+  guessing with an undefined synonym while the hidden request and oracle are
+  already exact.
+
+### A completed Preview still needs enough turn time for the final reply
+
+- Trigger: native-Windows Harbor completed ten accepted Gateway commands and
+  produced its executable Preview, then the Codex turn hit the 360-second
+  ceiling before emitting its final response. The gate correctly failed
+  `one_completed_turn`; the Skill and Wwise result were already valid.
+- Prevention: use a fresh root with a 600-second per-turn campaign timeout on
+  this slower Windows host. Keep the timeout immutable within the root and do
+  not resume or reclassify the timed-out attempt. The larger bound is runtime
+  capacity, not permission to relax command, result, or business-oracle gates.
+
+### Prompt-input startup timeout is a pre-Agent infrastructure stop
+
+- Trigger: the final Weapons unit on each host stopped before its first Agent
+  command when `codex debug prompt-input` timed out twice. No Skill read,
+  Broker command, Gateway call, or Wwise mutation occurred.
+- Prevention: classify this as BLOCKED, freeze the root, and start only a new
+  root after the CLI/service preflight is healthy. Do not replay the blocked
+  root or count its pending units as failures.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:
