@@ -68,6 +68,9 @@ from wwise_waapi.business_adapters import (
     business_adapter,
     business_adapter_operations,
 )
+from wwise_waapi.audio_import_business_contracts import (
+    AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS,
+)
 from wwise_waapi.operation_registry import (
     OperationContractError,
     parse_operation_request,
@@ -11217,7 +11220,7 @@ class CodexGatewayBroker:
         actual_order = [
             group[1] for group in actual_groups if group[0] == "--row-order"
         ]
-        if not 1 <= len(actual_order) <= 3:
+        if not 1 <= len(actual_order) <= AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS:
             return None
 
         draft_key = str(actual[1]) if len(actual) > 1 else ""
@@ -11350,7 +11353,9 @@ class CodexGatewayBroker:
         ] = []
         cursor = 0
         while cursor < len(remaining):
-            chunk = remaining[cursor : cursor + 3]
+            chunk = remaining[
+                cursor : cursor + AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS
+            ]
             while len(chunk) > 1:
                 directories = {
                     directory

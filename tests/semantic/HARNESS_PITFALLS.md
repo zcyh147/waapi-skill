@@ -3038,6 +3038,13 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   six rows commit atomically and seven rows fail without changing the Draft.
   The semantic oracle continues to seal every row and field independently, so
   the larger chunk does not weaken business-result grading.
+- Harness boundary: macOS follow-up root `imac-int-8e4ea1b-r56-weather`
+  exposed two stale literal three-row widths in the Broker matcher after the
+  public contract and protocol calculations had moved to six. Import the one
+  production-owned batch constant in the Broker for both acceptance and
+  remaining-row repartitioning, and retain a direct one-command six-row Broker
+  regression. A contract assertion alone cannot prove the Fresh transport
+  accepts the advertised width.
 
 ### Ordered workflows advance to the next Preview after verification
 

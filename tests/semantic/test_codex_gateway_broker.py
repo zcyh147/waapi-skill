@@ -5319,7 +5319,7 @@ def test_audio_import_numbered_declarations_remain_strictly_ordered(
     assert all(step.subcommand != "draft-apply" for step in steps)
 
 
-def test_audio_import_broker_accepts_equivalent_one_to_three_row_rebatching(
+def test_audio_import_broker_accepts_equivalent_one_to_six_row_rebatching(
     tmp_path: Path,
 ) -> None:
     """Import row grouping is transport; six sealed rows remain the oracle."""
@@ -5382,25 +5382,7 @@ def test_audio_import_broker_accepts_equivalent_one_to_three_row_rebatching(
                 authority,
                 "--expected-revision",
                 "1",
-                *row_arguments(1, 4),
-            ),
-            (
-                "draft-declare-import-batch",
-                draft_id,
-                "--task-authority",
-                authority,
-                "--expected-revision",
-                "2",
-                *row_arguments(4, 5),
-            ),
-            (
-                "draft-declare-import-batch",
-                draft_id,
-                "--task-authority",
-                authority,
-                "--expected-revision",
-                "3",
-                *row_arguments(5, 7),
+                *row_arguments(1, 7),
             ),
         )
         for arguments in commands:
@@ -5422,8 +5404,6 @@ def test_audio_import_broker_accepts_equivalent_one_to_three_row_rebatching(
     assert evidence.consumed_step_names == (
         "tx01.draft-start",
         "tx01.declare-batch",
-        "tx01.declare-batch-02",
-        "tx01.declare-batch-03",
     )
 
 
