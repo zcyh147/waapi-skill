@@ -746,7 +746,7 @@ def test_normal_audio_import_schema_exposes_only_its_business_declaration_input(
     )
     declaration = schema["business_adapter"]["declaration_discipline"]
     assert declaration["task_local_id"] == "bounded_unique_not_business_data"
-    assert declaration["rows_per_command"] == {"minimum": 1, "maximum": 3}
+    assert declaration["rows_per_command"] == {"minimum": 1, "maximum": 6}
     assert declaration["completion"] == (
         "append_chunks_until_every_requested_row_is_present_then_check"
     )

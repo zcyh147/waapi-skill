@@ -8,7 +8,7 @@ from .business_declarations import SUPPORTED_BUSINESS_KINDS, SUPPORTED_WWISE_VER
 
 
 AUDIO_IMPORT_BUSINESS_CONTRACT = "waapi-skill.audio-import-business/v1"
-AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS = 3
+AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS = 6
 AUDIO_IMPORT_BUSINESS_SETTING_FIELDS = (
     "add_to_source_control",
     "check_out_from_source_control",

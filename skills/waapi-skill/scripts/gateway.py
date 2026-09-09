@@ -26247,6 +26247,20 @@ def _business_next_action_binding(
             },
         }
     if adapter.family == "audio-import":
+        dependency_closure = {
+            "scope": "all_remaining_user_requested_rows_not_only_the_next_chunk",
+            "bind_before_append": [
+                "existing_row_target_or_new_row_parent",
+                "output_bus_or_custom_reference",
+                "event_parent_for_every_row_requesting_an_event",
+            ],
+            "event_row": (
+                "include_--event_in_that_rows_same_chunk; omission_is_not_deferred"
+            ),
+            "append_gate": (
+                "every_handle_needed_by_the_next_chunk_is_already_bound"
+            ),
+        }
         audio_object_binding = {
             **object_binding,
             "use_only_for": [
@@ -26265,8 +26279,8 @@ def _business_next_action_binding(
         return {
             "contract": "waapi-skill.business-draft-next-action/v1",
             "required_next_phase": (
-                "bind_only_additional_handle_typed_business_values_then_append_"
-                "bounded_import_chunks"
+                "bind_all_prompt_visible_handle_dependencies_before_any_import_"
+                "chunk_then_append_bounded_complete_rows"
             ),
             "object_binding": audio_object_binding,
             "field_binding": {
@@ -26406,6 +26420,7 @@ def _business_next_action_binding(
                     "switch_assignment_and_event_in_the_same_command; partial_"
                     "rows_are_forbidden"
                 ),
+                "dependency_closure": dependency_closure,
                 "repeat_with_next_response_revision": True,
                 "check_only_after": (
                     "every_user_requested_row_has_been_appended"
@@ -27421,6 +27436,7 @@ def operation_draft_payload(
                     "fixed_argv_prefix_copy_instruction",
                     "rows_per_command",
                     "row_completeness",
+                    "dependency_closure",
                 )
             }
             raw_object_binding = next_action_binding.get("object_binding")
@@ -27451,8 +27467,8 @@ def operation_draft_payload(
             next_action_binding = {
                 "contract": "waapi-skill.business-draft-next-action/v1",
                 "required_next_phase": (
-                    "bind_later_row_dependencies_or_append_next_import_chunk_or_"
-                    "use_draft_next_command_when_all_requested_rows_are_present"
+                    "bind_all_remaining_user_requested_dependencies_before_append_"
+                    "next_import_chunk_or_use_draft_next_command_when_complete"
                 ),
                 "bind_additional_object_by_path_segments": bind_additional_object,
                 "append_import_chunk": append_import_chunk,

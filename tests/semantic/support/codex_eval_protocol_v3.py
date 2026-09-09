@@ -1048,8 +1048,8 @@ def build_audio_import_composer_transaction_steps(
     ):
         shared_import_media_directory = all_media_paths[0].parent
     # Seal one row per expected step.  The Broker may then prove that any
-    # submitted 1..3-row command is an exact partition of these row-level
-    # business facts.  Fixing three rows here would accidentally make a
+    # submitted 1..6-row command is an exact partition of these row-level
+    # business facts.  Fixing one command width here would accidentally make a
     # transport boundary part of the semantic oracle.
     for chunk_offset in range(len(batch_rows)):
         chunk_rows = batch_rows[chunk_offset : chunk_offset + 1]
@@ -5356,7 +5356,7 @@ def build_protocol_with_bounded_import_chunks(
     commutative_composer_setup_step_groups: Sequence[Sequence[str]] = (),
     optional_topic_schema_step_groups: Sequence[Sequence[str]] = (),
 ) -> V3GatewayProtocol:
-    """Build one protocol whose import rows may use any exact 1..3 partition."""
+    """Build one protocol whose import rows may use any exact 1..6 partition."""
 
     sealed_steps = tuple(steps)
     prefixes = tuple(turn_prefix_counts)

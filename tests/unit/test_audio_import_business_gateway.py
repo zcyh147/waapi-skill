@@ -42,7 +42,7 @@ def test_audio_import_contract_exposes_only_explicit_replace_mode() -> None:
     )
     assert contract["declaration_discipline"]["rows_per_command"] == {
         "minimum": 1,
-        "maximum": 3,
+        "maximum": 6,
     }
     assert contract["declaration_discipline"]["completion"] == (
         "append_chunks_until_every_requested_row_is_present_then_check"
@@ -389,8 +389,8 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
         "waapi-skill.business-draft-next-action/v1"
     )
     assert bound_next["required_next_phase"] == (
-        "bind_only_additional_handle_typed_business_values_then_append_bounded_"
-        "import_chunks"
+        "bind_all_prompt_visible_handle_dependencies_before_any_import_chunk_"
+        "then_append_bounded_complete_rows"
     )
     for scope_name in ("object_scope", "class_scope"):
         scope = bound_next["field_binding"][scope_name]
@@ -427,11 +427,23 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
         "switch_assignment_count": "Gateway_counts_rows_with_switch_assignment",
         "caller_supplied_counts": "forbidden",
     }
-    assert batch_action["rows_per_command"] == {"minimum": 1, "maximum": 3}
+    assert batch_action["rows_per_command"] == {"minimum": 1, "maximum": 6}
     assert batch_action["row_completeness"] == (
         "each_row_must_include_its_media_every_known_requested_field_switch_"
         "assignment_and_event_in_the_same_command; partial_rows_are_forbidden"
     )
+    assert batch_action["dependency_closure"] == {
+        "scope": "all_remaining_user_requested_rows_not_only_the_next_chunk",
+        "bind_before_append": [
+            "existing_row_target_or_new_row_parent",
+            "output_bus_or_custom_reference",
+            "event_parent_for_every_row_requesting_an_event",
+        ],
+        "event_row": (
+            "include_--event_in_that_rows_same_chunk; omission_is_not_deferred"
+        ),
+        "append_gate": "every_handle_needed_by_the_next_chunk_is_already_bound",
+    }
     assert batch_action["repeat_with_next_response_revision"] is True
     assert batch_action["check_only_after"] == (
         "every_user_requested_row_has_been_appended"
@@ -701,7 +713,7 @@ def test_audio_import_batch_chunks_are_atomic_cumulative_and_compact(
     assert bind_code == 0, bound
     parent_handle = bound["bound_object"]["handle"]
     media_files = []
-    for index in range(1, 5):
+    for index in range(1, 7):
         path = tmp_path / f"snow_step_{index:02d}.wav"
         path.write_bytes(b"RIFF-test")
         media_files.append(path)
@@ -726,7 +738,7 @@ def test_audio_import_batch_chunks_are_atomic_cumulative_and_compact(
         "--media-directory",
         str(tmp_path),
     ]
-    for index, path in enumerate(media_files[:2], start=1):
+    for index, path in enumerate(media_files[:5], start=1):
         declaration_id = f"snow-step-{index:02d}"
         batch_argv.extend(
             (
@@ -776,20 +788,42 @@ def test_audio_import_batch_chunks_are_atomic_cumulative_and_compact(
     assert "exactly one media directory" in missing["message"]
     assert record_path.read_bytes() == before_missing_directory
 
+    too_many_argv = [*batch_argv]
+    too_many_argv.extend(
+        (
+            "--row-order",
+            "snow-step-06",
+            "--new-row",
+            "snow-step-06",
+            "snow",
+            "Snow_Step_06",
+            "sound-sfx",
+            "--media-file",
+            "snow-step-06",
+            media_files[5].name,
+        )
+    )
+    before_too_many = record_path.read_bytes()
+    too_many_code, too_many = _offline(tmp_path, *too_many_argv)
+    assert too_many_code == 2
+    assert too_many["error_code"] == "GatewayInputError"
+    assert "at most 6 rows" in too_many["message"]
+    assert record_path.read_bytes() == before_too_many
+
     first_code, first = _offline(tmp_path, *batch_argv)
 
     assert first_code == 0, first
     assert first["draft"]["revision"] == 3
     assert first["draft"]["batch_receipt"] == {
         "contract": "waapi-skill.business-declaration-batch-receipt/v1",
-        "chunk_declaration_count": 3,
-        "cumulative_declaration_count": 3,
+        "chunk_declaration_count": 6,
+        "cumulative_declaration_count": 6,
         "switch_assignment_count": 1,
     }
     first_next = first["draft"]["next_action_binding"]
     assert first_next["required_next_phase"] == (
-        "bind_later_row_dependencies_or_append_next_import_chunk_or_use_draft_"
-        "next_command_when_all_requested_rows_are_present"
+        "bind_all_remaining_user_requested_dependencies_before_append_next_"
+        "import_chunk_or_use_draft_next_command_when_complete"
     )
     assert "append_import_chunk" in first_next
     assert first_next["bind_additional_object_by_path_segments"][
@@ -800,12 +834,15 @@ def test_audio_import_batch_chunks_are_atomic_cumulative_and_compact(
     ]
     assert first_next["append_import_chunk"]["rows_per_command"] == {
         "minimum": 1,
-        "maximum": 3,
+        "maximum": 6,
     }
     assert first_next["append_import_chunk"]["row_completeness"] == (
         "each_row_must_include_its_media_every_known_requested_field_switch_"
         "assignment_and_event_in_the_same_command; partial_rows_are_forbidden"
     )
+    assert first_next["append_import_chunk"]["dependency_closure"][
+        "event_row"
+    ] == "include_--event_in_that_rows_same_chunk; omission_is_not_deferred"
 
     second_argv = [
         "draft-declare-import-batch",
@@ -815,7 +852,7 @@ def test_audio_import_batch_chunks_are_atomic_cumulative_and_compact(
         "--expected-revision",
         "3",
     ]
-    for index, path in enumerate(media_files[2:], start=3):
+    for index, path in enumerate(media_files[5:], start=6):
         declaration_id = f"snow-step-{index:02d}"
         second_argv.extend(
             (
@@ -838,8 +875,8 @@ def test_audio_import_batch_chunks_are_atomic_cumulative_and_compact(
     assert batch["draft"]["revision"] == 4
     assert batch["draft"]["batch_receipt"] == {
         "contract": "waapi-skill.business-declaration-batch-receipt/v1",
-        "chunk_declaration_count": 2,
-        "cumulative_declaration_count": 5,
+        "chunk_declaration_count": 1,
+        "cumulative_declaration_count": 7,
         "switch_assignment_count": 1,
     }
     assert "declarations_summary" not in batch["draft"]
@@ -853,8 +890,8 @@ def test_audio_import_batch_chunks_are_atomic_cumulative_and_compact(
         "shell_tool_timeout_ms",
     }
     assert batch["draft"]["next_action_binding"]["required_next_phase"] == (
-        "bind_later_row_dependencies_or_append_next_import_chunk_or_use_draft_"
-        "next_command_when_all_requested_rows_are_present"
+        "bind_all_remaining_user_requested_dependencies_before_append_next_"
+        "import_chunk_or_use_draft_next_command_when_complete"
     )
     assert batch["draft"]["next_command"]["command"] == "draft-check"
     assert batch["draft"]["next_command"]["copy_exactly"] is True
@@ -884,6 +921,8 @@ def test_audio_import_batch_chunks_are_atomic_cumulative_and_compact(
         "snow-step-02",
         "snow-step-03",
         "snow-step-04",
+        "snow-step-05",
+        "snow-step-06",
     ]
     assert [
         row["fields"]["media_file"]
@@ -1080,7 +1119,7 @@ def test_audio_import_batch_count_mismatch_is_atomic(tmp_path: Path) -> None:
         "--expected-revision",
         "2",
     ]
-    for index in range(4):
+    for index in range(7):
         declaration_id = f"row-{index}"
         oversized_argv.extend(
             (
@@ -1097,7 +1136,7 @@ def test_audio_import_batch_count_mismatch_is_atomic(tmp_path: Path) -> None:
 
     assert oversized_code == 2
     assert oversized["error_code"] == "GatewayInputError"
-    assert "at most 3 rows" in oversized["message"]
+    assert "at most 6 rows" in oversized["message"]
     assert record_path.read_bytes() == before
 
 

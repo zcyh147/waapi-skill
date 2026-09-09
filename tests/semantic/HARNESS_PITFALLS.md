@@ -2675,7 +2675,7 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   setup ordering at the same time: accepting a contracted import batch must
   not accidentally make `draft-bind-object` calls sequential when their
   response bindings permit another order. Keep one regression that combines
-  both a legal setup permutation and a legal 1..3-row rebatch through final
+  both a legal setup permutation and a legal 1..6-row rebatch through final
   verification, plus negatives for impossible one-call packing, duplicates,
   out-of-order lifecycle steps, identity drift, and value drift.
 - Preflight: before another public integration root, run the complete fake
@@ -3007,6 +3007,37 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   exact sealed full path only when every parent segment and final child name
   match. Preserve the original argv for execution, and reject a different
   child, reordered parent, extra selector, or any query.
+
+### Close every prompt-visible import dependency before the next chunk
+
+- Trigger: #51 macOS `INT25-WEATHER` at candidate `9ae78b2` declared the
+  hierarchy-only first chunk, then tried to append Rain/Wind Sound rows before
+  binding their shared Event parent. Those Sound rows also omitted their
+  requested Event facts. The Broker rejected that incomplete second chunk
+  before Gateway or Wwise dispatch; the same frozen candidate passed Weather
+  on Windows.
+- Prevention: every audio-import continuation now carries one structured
+  `dependency_closure` gate over all remaining user-requested rows, not merely
+  the next bounded transport chunk. Before appending a chunk, bind every
+  existing target/new parent, output bus/custom reference, and Event parent it
+  needs. A row with a requested Event includes `--event` in that same chunk;
+  omission is never treated as deferred work. The post-chunk compact
+  continuation preserves this gate instead of presenting binding and appending
+  as unconstrained peers.
+
+### Keep business batches bounded without making the boundary Agent work
+
+- Trigger: #51 native-Windows `INT25-FOOTSTEPS` at candidate `9ae78b2`
+  submitted one complete four-row Snow import chunk. The old three-row ceiling
+  rejected it before Gateway or Wwise dispatch even though every row-level
+  business fact was valid. The failure was an arbitrary transport limit, not a
+  semantic defect in the requested operation.
+- Prevention: audio-import business declarations accept one through six rows
+  per command. Six covers the largest public integration unit while preserving
+  bounded argv, response, state, and Broker verification. Program tests prove
+  six rows commit atomically and seven rows fail without changing the Draft.
+  The semantic oracle continues to seal every row and field independently, so
+  the larger chunk does not weaken business-result grading.
 
 ### Ordered workflows advance to the next Preview after verification
 

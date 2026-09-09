@@ -741,8 +741,8 @@ def test_prepares_exact_gateway_checked_use_existing_batch(
     )
     assert prepared.protocol.turn_prefix_counts == (13, 17)
     assert prepared.protocol.allowed_turn_prefix_counts == (
-        (11, 12, 13),
-        (15, 16, 17),
+        (10, 11, 12, 13),
+        (14, 15, 16, 17),
     )
     assert prepared.protocol.commutative_read_only_step_groups == ()
     assert prepared.protocol.commutative_composer_setup_step_groups == ()

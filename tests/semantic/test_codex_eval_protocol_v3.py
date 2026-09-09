@@ -1158,7 +1158,7 @@ def test_audio_import_protocol_seals_rows_individually_but_allows_bounded_chunks
     assert len(batch_steps) == 6
     assert all(step.arguments.count("--row-order") == 1 for step in batch_steps)
     assert protocol.allowed_turn_prefix_counts == tuple(
-        tuple(range(maximum - 4, maximum + 1))
+        tuple(range(maximum - 5, maximum + 1))
         for maximum in protocol.turn_prefix_counts
     )
     assert protocol.terminal_prefix_counts == protocol.allowed_turn_prefix_counts[-1]
@@ -1187,7 +1187,7 @@ def test_allow_changes_preserves_bounded_audio_import_chunks() -> None:
 
     maximum = len(protocol.steps)
     assert protocol.allowed_turn_prefix_counts == (
-        tuple(range(maximum - 4, maximum + 1)),
+        tuple(range(maximum - 5, maximum + 1)),
     )
     assert protocol.terminal_prefix_counts == protocol.allowed_turn_prefix_counts[-1]
 

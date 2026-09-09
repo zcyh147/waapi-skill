@@ -11056,7 +11056,7 @@ class CodexGatewayBroker:
         self,
         actual: Sequence[str],
     ) -> tuple[ExpectedGatewayStep, str, tuple[str, ...]] | None:
-        """Accept a different 1..3-row transport partition of sealed imports.
+        """Accept a different 1..6-row transport partition of sealed imports.
 
         Every row and field remains sealed.  Only the command boundary may
         move, and only when parent dependencies are already present or travel

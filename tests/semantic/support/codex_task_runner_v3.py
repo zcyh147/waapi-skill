@@ -681,7 +681,7 @@ def _selected_workflow_step_names_are_closed(
     *,
     optional_names: set[str],
 ) -> bool:
-    """Validate optional routing plus Broker-proven 1..3-row import chunks."""
+    """Validate optional routing plus Broker-proven 1..6-row import chunks."""
 
     by_name = {step.name: step for step in protocol.steps}
     if (
