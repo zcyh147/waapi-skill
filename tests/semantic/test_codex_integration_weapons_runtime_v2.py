@@ -818,6 +818,11 @@ def test_prepares_scoped_complete_query_and_one_strict_batch(
             "relationship.output_bus.01",
             "relationship.output_bus.02",
         ),
+        (
+            "identity.audit_close",
+            "identity.audit_tail",
+            "identity.audit_mechanical",
+        ),
     )
     serialized = serialize_protocol(prepared.protocol)
     assert deserialize_protocol(serialized) == prepared.protocol
@@ -1358,6 +1363,17 @@ def test_reversed_output_bus_hops_pass_final_business_oracle(
     verification.assert_passed()
     assert verification.assertions["single_object_set_batch"] is True
     prepared.cleanup().assert_passed()
+
+
+def test_selected_identity_readbacks_are_order_independent(tmp_path: Path) -> None:
+    prepared, _fake, _runtime = _prepared(tmp_path)
+    canonical = tuple(step.name for step in prepared.protocol.steps[3:6])
+
+    assert gateway_step_sequence_matches(
+        canonical,
+        tuple(reversed(canonical)),
+        prepared.protocol.commutative_read_only_step_groups,
+    )
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])

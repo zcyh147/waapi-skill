@@ -415,6 +415,7 @@ def prepare_weapons_integration_runtime(
             _identity_readback_step(role, before.objects_by_role()[role])
             for role in _SELECTED_ROLES
         )
+        identity_step_names = tuple(step.name for step in identity_steps)
         read_prefix = 1 + len(output_bus_steps)
         steps = (audit_step, *output_bus_steps, *identity_steps, *transaction_steps)
         preview_prefix = next(
@@ -431,6 +432,7 @@ def prepare_weapons_integration_runtime(
             ),
             commutative_read_only_step_groups=(
                 tuple(step.name for step in output_bus_steps),
+                identity_step_names,
             ),
         )
         session.bind_protocol(protocol)
@@ -605,6 +607,9 @@ class _WeaponsSession:
             )
         output_bus_steps = _output_bus_readback_steps(self.before)
         output_bus_names = tuple(step.name for step in output_bus_steps)
+        identity_names = tuple(
+            f"identity.{role}" for role in _SELECTED_ROLES
+        )
         names = tuple(step.name for step in protocol.steps)
         transaction_names = names[6:]
         expected_turn_prefixes = (
@@ -651,7 +656,7 @@ class _WeaponsSession:
             != output_bus_steps
             or protocol.turn_prefix_counts != expected_turn_prefixes
             or protocol.commutative_read_only_step_groups
-            != (output_bus_names,)
+            != (output_bus_names, identity_names)
         ):
             raise WeaponsIntegrationRuntimeError(
                 "Weapons protocol is not the reviewed audit, distinct OutputBus "

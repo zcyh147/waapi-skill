@@ -2911,6 +2911,12 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   copy command and expected name/type/path per candidate. Those commands are
   dormant in the read-only turn; after a later selection, copy only the chosen
   rows before reading operate or choosing the mutation operation.
+- Order follow-up: candidate `b4e322b3` copied a valid selected candidate first,
+  but the Broker had encoded the three independent exact-ID readbacks in a
+  different arbitrary order. Declare only those selected identity reads as one
+  commutative read-only group. Every selected GUID/name/type/path is still
+  required exactly once before the schema; operation, Draft, Preview,
+  confirmation, execution, and verification ordering remains strict.
 
 ### A diagnosis turn does not preload a possible future repair lane
 
