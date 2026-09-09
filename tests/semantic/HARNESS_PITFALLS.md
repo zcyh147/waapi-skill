@@ -2985,6 +2985,23 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   the advanced lane for a native construct absent from the closed schema; do
   not widen the Broker to reward unnecessary model-authored WAQL.
 
+### A complete parent path plus a named direct child is already closed
+
+- Trigger: #51 macOS `INT25-FOOTSTEPS` at candidate `721d6eb` executed and
+  verified the Snow import, then correctly bound the exact `Player_Footsteps`
+  parent but issued an extra `query-object` for its named `Mud` child. The
+  continuation said an unscoped name requires a query, while the Broker's
+  schedule treated the complete parent path plus direct-child name as one
+  closed identity. The Broker rejected before the Mud-removal Preview; no Mud
+  mutation occurred. The same frozen candidate passed this unit on Windows,
+  confirming an ambiguous caller seam rather than a native API failure.
+- Prevention: `draft-bind-object` accepts `--scoped-child-name` only with a
+  complete repeated `--parent-path-segment` identity. The Gateway joins and
+  validates those business values into one exact path and requires one live
+  row. The copy-ready role continuation selects this route explicitly and
+  forbids an intervening query. A truly unscoped name still requires the
+  ordinary query-to-exact-ID flow.
+
 ### Ordered workflows advance to the next Preview after verification
 
 - Trigger: Windows Weather and Harbor correctly previewed, confirmed, executed,

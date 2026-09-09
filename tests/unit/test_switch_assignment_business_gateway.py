@@ -41,8 +41,10 @@ class FakeClient:
         self.responses = {
             uri: deque(values) for uri, values in responses.items()
         }
+        self.calls: list[tuple[str, Any, Any]] = []
 
     def call(self, uri: str, args: Any = None, options: Any = None) -> Any:
+        self.calls.append((uri, args, options))
         values = self.responses.get(uri)
         if not values:
             raise AssertionError(
@@ -226,6 +228,140 @@ def test_switch_assignment_continuation_owns_the_next_binding_role(
         "--role",
         "switch_container",
     ]
+
+
+def test_switch_assignment_binds_named_child_from_complete_parent_without_query(
+    tmp_path: Path,
+) -> None:
+    code, started = _offline(
+        tmp_path,
+        "draft-start",
+        "switchContainer.removeAssignment",
+    )
+    assert code == 0, started
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    container = _bind(
+        tmp_path,
+        draft_id=draft_id,
+        authority=authority,
+        revision=1,
+        role="switch_container",
+        object_id=CONTAINER_ID,
+        name="Player_Footsteps",
+        object_type="SwitchContainer",
+        path=(
+            r"\Containers\Default Work Unit\WAAPI Skill Integration V2"
+            r"\PlayerFootstepsMaintenance\Player_Footsteps"
+        ),
+    )
+
+    binding = container["draft"]["next_action_binding"]["object_binding"]
+    by_path = binding["by_path_segments"]
+    assert by_path["fixed_argv_prefix_copy"].endswith("--role child")
+    scoped = by_path["scoped_child_of_complete_parent"]
+    assert scoped["append_child"] == [
+        "--scoped-child-name",
+        "<exact-direct-child-name>",
+    ]
+    assert scoped["append_parent_repeated"] == [
+        "--parent-path-segment",
+        "<one-exact-parent-path-segment-without-separators>",
+    ]
+    assert scoped["direct_query_before_binding"] == "forbidden"
+
+    child_path = (
+        r"\Containers\Default Work Unit\WAAPI Skill Integration V2"
+        r"\PlayerFootstepsMaintenance\Player_Footsteps\Mud"
+    )
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": [_info()],
+            "ak.wwise.core.getProjectInfo": [_project(tmp_path)],
+            "ak.wwise.core.object.get": [
+                {
+                    "return": [
+                        {
+                            "id": CHILD_ID,
+                            "name": "Mud",
+                            "type": "RandomSequenceContainer",
+                            "path": child_path,
+                        }
+                    ]
+                },
+                {"return": [{"id": CHILD_ID, "@RandomOrSequence": 1}]},
+            ],
+        }
+    )
+    bind_code, bound = gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(tmp_path / "state"),
+            "draft-bind-object",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            "2",
+            "--role",
+            "child",
+            "--scoped-child-name",
+            "Mud",
+            "--parent-path-segment",
+            "Containers",
+            "--parent-path-segment",
+            "Default Work Unit",
+            "--parent-path-segment",
+            "WAAPI Skill Integration V2",
+            "--parent-path-segment",
+            "PlayerFootstepsMaintenance",
+            "--parent-path-segment",
+            "Player_Footsteps",
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+
+    assert bind_code == 0, bound
+    object_get = next(
+        call for call in client.calls if call[0] == "ak.wwise.core.object.get"
+    )
+    assert object_get[1] == {"from": {"path": [child_path]}}
+    assert bound["bound_object"]["name"] == "Mud"
+    assert bound["bound_object"]["business_kind"] == "random-container"
+
+
+def test_scoped_child_binding_rejects_missing_complete_parent_before_connecting(
+    tmp_path: Path,
+) -> None:
+    code, started = _offline(
+        tmp_path,
+        "draft-start",
+        "switchContainer.removeAssignment",
+    )
+
+    bind_code, rejected = gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(tmp_path / "state"),
+            "draft-bind-object",
+            started["draft"]["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            "1",
+            "--role",
+            "switch_container",
+            "--scoped-child-name",
+            "Mud",
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda url: pytest.fail(f"invalid input connected to {url}"),
+    )
+
+    assert bind_code == 2
+    assert rejected["error_code"] == "GatewayInputError"
+    assert "requires one complete parent path" in rejected["message"]
 
 
 @pytest.mark.parametrize(

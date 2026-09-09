@@ -2996,6 +2996,7 @@ def build_parser() -> argparse.ArgumentParser:
         nargs=2,
         metavar=("TYPE", "NAME"),
     )
+    object_selector.add_argument("--scoped-child-name")
     object_selector.add_argument("--direct-child-type")
     object_selector.add_argument(
         "--event-action-of-path-segment",
@@ -16841,9 +16842,28 @@ def _business_object_selector_from_namespace(
     parent_supplied = (
         args.parent_id is not None or args.parent_path_segment is not None
     )
-    if args.direct_child_type is None and parent_supplied:
+    if (
+        args.direct_child_type is None
+        and args.scoped_child_name is None
+        and parent_supplied
+    ):
         raise GatewayInputError(
-            "Business object parent selectors require --direct-child-type."
+            "Business object parent selectors require --direct-child-type or "
+            "--scoped-child-name."
+        )
+    if args.scoped_child_name is not None:
+        if args.parent_path_segment is None or args.parent_id is not None:
+            raise GatewayInputError(
+                "Business scoped-child binding requires one complete parent path."
+            )
+        complete_path = _business_object_path_from_segments(
+            [*args.parent_path_segment, args.scoped_child_name]
+        )
+        return _BusinessObjectSelector(
+            request={"from": {"path": [complete_path]}},
+            kind="scoped-child",
+            expected_path=complete_path,
+            expected_name=args.scoped_child_name,
         )
     if args.object_id is not None:
         if not _canonical_guid(args.object_id):
@@ -24032,10 +24052,38 @@ def _business_next_action_binding(
             "<one-exact-user-path-segment-without-separators>",
         ]
         role_by_path_segments["segment_order"] = "root_to_leaf"
+        role_by_path_segments["scoped_child_of_complete_parent"] = {
+            "append_child": [
+                "--scoped-child-name",
+                "<exact-direct-child-name>",
+            ],
+            "append_parent_repeated": [
+                "--parent-path-segment",
+                "<one-exact-parent-path-segment-without-separators>",
+            ],
+            "parent_segment_order": "root_to_leaf",
+            "gateway_owned_resolution": (
+                "join_parent_segments_and_child_then_require_one_exact_row"
+            ),
+            "direct_query_before_binding": "forbidden",
+        }
         return {
             **object_binding,
             "by_id": role_by_id,
             "by_path_segments": role_by_path_segments,
+            "selection_rule": (
+                "user_supplied_complete_path_requires_by_path_segments; "
+                "complete_parent_path_plus_exact_direct_child_name_requires_"
+                "by_path_segments.scoped_child_of_complete_parent_without_a_"
+                "query; "
+                "truly_unscoped_name_requires_query_then_by_id; "
+                "user_selected_guid_uses_by_id"
+            ),
+            "name_rule": (
+                "a_name_scoped_to_one_user_supplied_complete_parent_path_is_a_"
+                "closed_child_identity; only_a_truly_unscoped_name_requires_a_"
+                "query"
+            ),
             "next_role": next_role,
             "use_only_for": [next_role],
             "role_assignment": (
