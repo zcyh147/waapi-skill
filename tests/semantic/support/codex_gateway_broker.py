@@ -4457,6 +4457,61 @@ def _normalize_draft_bind_object_query_identity(
     return (*actual[:identity_index], "--object-id", expected_id)
 
 
+def _normalize_scoped_child_draft_binding(
+    step: "ExpectedGatewayStep",
+    supplied_arguments: Sequence[str],
+) -> tuple[Any, ...]:
+    """Normalize one closed parent-path plus exact child-name binding.
+
+    The public Gateway owns path joining for this selector. The semantic
+    protocol still seals the resulting exact full path, so only the same
+    parent segments and final child name are accepted.
+    """
+
+    actual = tuple(supplied_arguments)
+    if step.subcommand != "draft-bind-object":
+        return actual
+    try:
+        selector_index = step.arguments.index("--object-path-segment")
+    except ValueError:
+        return actual
+    expected_tail = tuple(step.arguments[selector_index:])
+    if (
+        not expected_tail
+        or len(expected_tail) % 2
+        or expected_tail[::2]
+        != ("--object-path-segment",) * (len(expected_tail) // 2)
+        or len(actual) <= selector_index
+    ):
+        return actual
+    supplied_tail = actual[selector_index:]
+    if len(supplied_tail) % 2:
+        return actual
+    pairs = tuple(zip(supplied_tail[::2], supplied_tail[1::2], strict=True))
+    if (
+        any(
+            option not in {"--parent-path-segment", "--scoped-child-name"}
+            or not value
+            or value != value.strip()
+            or "\\" in value
+            or "/" in value
+            for option, value in pairs
+        )
+        or sum(option == "--scoped-child-name" for option, _value in pairs) != 1
+        or not any(option == "--parent-path-segment" for option, _value in pairs)
+    ):
+        return actual
+    parent_segments = tuple(
+        value for option, value in pairs if option == "--parent-path-segment"
+    )
+    child_name = next(
+        value for option, value in pairs if option == "--scoped-child-name"
+    )
+    if (*parent_segments, child_name) != expected_tail[1::2]:
+        return actual
+    return (*actual[:selector_index], *expected_tail)
+
+
 def _normalize_redundant_single_role_object_binding(
     step: "ExpectedGatewayStep",
     supplied_arguments: Sequence[str],
@@ -12723,6 +12778,10 @@ class CodexGatewayBroker:
             validation_arguments,
         )
         validation_arguments = _normalize_redundant_single_role_object_binding(
+            step,
+            validation_arguments,
+        )
+        validation_arguments = _normalize_scoped_child_draft_binding(
             step,
             validation_arguments,
         )

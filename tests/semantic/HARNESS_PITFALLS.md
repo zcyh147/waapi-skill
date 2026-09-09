@@ -3001,6 +3001,12 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   row. The copy-ready role continuation selects this route explicitly and
   forbids an intervening query. A truly unscoped name still requires the
   ordinary query-to-exact-ID flow.
+- Oracle follow-up: the first focused rerun at `c9a60ab` used the new route
+  correctly, but the Fresh Broker still admitted only the older equivalent
+  full `--object-path-segment` spelling. Normalize the new selector to that
+  exact sealed full path only when every parent segment and final child name
+  match. Preserve the original argv for execution, and reject a different
+  child, reordered parent, extra selector, or any query.
 
 ### Ordered workflows advance to the next Preview after verification
 

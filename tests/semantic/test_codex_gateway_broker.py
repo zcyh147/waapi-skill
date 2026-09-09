@@ -9077,6 +9077,67 @@ def test_draft_object_binding_accepts_the_exact_prior_query_path() -> None:
     ) == wrong
 
 
+def test_draft_object_binding_accepts_exact_scoped_child_selector() -> None:
+    fixed = (
+        "od1-" + "1" * 32,
+        "--task-authority",
+        "da1-" + "2" * 40,
+        "--expected-revision",
+        "2",
+        "--role",
+        "child",
+    )
+    parent_segments = (
+        "Containers",
+        "Default Work Unit",
+        "WAAPI Skill Integration V2",
+        "PlayerFootstepsMaintenance",
+        "Player_Footsteps",
+    )
+    step = ExpectedGatewayStep(
+        "tx02.bind-child",
+        "draft-bind-object",
+        (
+            *fixed,
+            *(
+                item
+                for segment in (*parent_segments, "Mud")
+                for item in ("--object-path-segment", segment)
+            ),
+        ),
+    )
+    supplied = (
+        *fixed,
+        *(
+            item
+            for segment in parent_segments
+            for item in ("--parent-path-segment", segment)
+        ),
+        "--scoped-child-name",
+        "Mud",
+    )
+
+    assert broker_module._normalize_scoped_child_draft_binding(  # noqa: SLF001
+        step,
+        supplied,
+    ) == step.arguments
+    wrong_child = (*supplied[:-1], "Snow")
+    reordered_parent = (
+        *fixed,
+        "--parent-path-segment",
+        "Default Work Unit",
+        "--parent-path-segment",
+        "Containers",
+        *supplied[len(fixed) + 4 :],
+    )
+    extra_selector = (*supplied, "--parent-path-segment", "Unexpected")
+    for rejected in (wrong_child, reordered_parent, extra_selector):
+        assert broker_module._normalize_scoped_child_draft_binding(  # noqa: SLF001
+            step,
+            rejected,
+        ) == rejected
+
+
 def test_single_object_binding_accepts_only_the_redundant_exact_object_role() -> None:
     fixed = (
         "od1-" + "1" * 32,

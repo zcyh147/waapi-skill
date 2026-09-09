@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 import sys
 from collections import deque
 from pathlib import Path
@@ -258,7 +259,10 @@ def test_switch_assignment_binds_named_child_from_complete_parent_without_query(
 
     binding = container["draft"]["next_action_binding"]["object_binding"]
     by_path = binding["by_path_segments"]
-    assert by_path["fixed_argv_prefix_copy"].endswith("--role child")
+    assert re.search(
+        r"['\"]?--role['\"]?\s+['\"]?child['\"]?$",
+        by_path["fixed_argv_prefix_copy"],
+    )
     scoped = by_path["scoped_child_of_complete_parent"]
     assert scoped["append_child"] == [
         "--scoped-child-name",
