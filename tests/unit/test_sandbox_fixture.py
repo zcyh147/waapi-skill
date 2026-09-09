@@ -141,6 +141,25 @@ def test_headless_console_audio_environment_is_scoped_to_macos_2022(
     )
 
     assert prepared["WINEDLLOVERRIDES"] == expected
+    if platform_name == "darwin" and version == "2022.1":
+        assert prepared["CX_ENV"] == "WINEDLLOVERRIDES=winecoreaudio.drv="
+    else:
+        assert "CX_ENV" not in prepared
+
+
+def test_headless_console_audio_environment_survives_crossover_launcher() -> None:
+    prepared = sandbox_fixture.prepare_headless_console_environment(
+        {
+            "WINEDLLOVERRIDES": "version=n;winecoreaudio.drv=b",
+            "CX_ENV": "EXISTING=value",
+        },
+        version="2022.1",
+        platform_name="darwin",
+    )
+
+    assert prepared["CX_ENV"] == (
+        "EXISTING=value WINEDLLOVERRIDES=winecoreaudio.drv="
+    )
 
 
 class FakeProcess:
@@ -484,6 +503,7 @@ def test_launch_uses_sandbox_project_and_records_command(monkeypatch: pytest.Mon
     assert sandbox.metadata.wine_prefix_path == str(sandbox.wine_prefix_path)
     assert lifecycle.launch_env["WINEPREFIX"] == str(sandbox.wine_prefix_path)
     assert lifecycle.launch_env["WINEDLLOVERRIDES"] == "winecoreaudio.drv="
+    assert lifecycle.launch_env["CX_ENV"] == "WINEDLLOVERRIDES=winecoreaudio.drv="
     assert sandbox.metadata.process_cleanup_result == "cleaned"
     assert seen_project_paths == [sandbox.sandbox_project]
     cleanup_sandbox(sandbox)

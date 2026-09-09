@@ -651,23 +651,6 @@ def test_operations_catalog_routes_cli_console_intent_to_request_schema(
         },
     }
     assert payload["selection_guidance"] == {
-        "primary_media_import": {
-            "choose": ["operation-schema", "audio.import"],
-            "use_when": (
-                "the requested primary outcome imports, reimports, or "
-                "replaces audio media"
-            ),
-            "never_substitute": [
-                "operation-schema",
-                "object.set",
-            ],
-        },
-        "authoring_ui_command_id": {
-            "choose": ["operation-schema", "ui.commands.execute"],
-            "example": "SaveProject",
-            "use_when": "the user explicitly names an installed Wwise UI command ID",
-            "never_substitute": "a similarly named native project API",
-        },
         "connected_project_save": {
             "choose": ["request-schema", "ak.wwise.core.project.save"],
             "use_when": "the user asks to save the connected project without naming a UI command ID",
@@ -694,14 +677,6 @@ def test_operations_catalog_routes_cli_console_intent_to_request_schema(
             "choose": ["request-schema", "ak.soundengine.executeActionOnEvent"],
             "use_when": "the user asks to stop, pause, resume, or break one runtime Event",
             "never_substitute": ["operation-schema", "object.set"],
-        },
-        "single_reference_edit": {
-            "choose": ["operation-schema", "object.setReference"],
-            "never_substitute": ["operation-schema", "object.set"],
-        },
-        "wwise_console_soundbank_generation": {
-            "choose": ["request-schema", "ak.wwise.cli.generateSoundbank"],
-            "never_substitute": ["operation-schema", "soundbank.generate"],
         },
     }
 

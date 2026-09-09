@@ -13,6 +13,7 @@ from tests.semantic.support.codex_object_metadata_business_profile import (
     UNIT_IDS,
     load_object_metadata_business_profile,
 )
+from tests.semantic.support.codex_gateway_broker import MetadataQueryArgument
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -54,7 +55,7 @@ def test_unit_discovers_meaning_and_copies_opaque_handle_before_preview(tmp_path
     ]
     discover = steps[3]
     declare = steps[5]
-    assert unit.field_meaning in discover.arguments
+    assert MetadataQueryArgument(unit.field_meaning) in discover.arguments
     assert unit.native_reference not in discover.arguments
     assert "--token" not in discover.arguments
     assert "--field-handle" in declare.arguments

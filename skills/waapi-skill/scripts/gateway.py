@@ -9624,28 +9624,6 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             "request_schema_command_template": ["request-schema", "<api>"],
             "detail_available": True,
             "selection_guidance": {
-                "primary_media_import": {
-                    "choose": ["operation-schema", "audio.import"],
-                    "use_when": (
-                        "the requested primary outcome imports, reimports, "
-                        "or replaces audio media"
-                    ),
-                    "never_substitute": [
-                        "operation-schema",
-                        "object.set",
-                    ],
-                },
-                "authoring_ui_command_id": {
-                    "choose": ["operation-schema", "ui.commands.execute"],
-                    "example": "SaveProject",
-                    "use_when": (
-                        "the user explicitly names an installed Wwise UI "
-                        "command ID"
-                    ),
-                    "never_substitute": (
-                        "a similarly named native project API"
-                    ),
-                },
                 "connected_project_save": {
                     "choose": [
                         "request-schema",
@@ -9698,20 +9676,6 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     "never_substitute": [
                         "operation-schema",
                         "object.set",
-                    ],
-                },
-                "single_reference_edit": {
-                    "choose": ["operation-schema", "object.setReference"],
-                    "never_substitute": ["operation-schema", "object.set"],
-                },
-                "wwise_console_soundbank_generation": {
-                    "choose": [
-                        "request-schema",
-                        "ak.wwise.cli.generateSoundbank",
-                    ],
-                    "never_substitute": [
-                        "operation-schema",
-                        "soundbank.generate",
                     ],
                 },
             },

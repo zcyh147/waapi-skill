@@ -2843,9 +2843,20 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   `AudioDeviceCreateIOProcID`. The same host, shared CrossOver bottle, fixture
   lifecycle, and audio-device state launched Wwise 2023.1 and 2025.1 in about
   eight seconds, ruling out a general project-path or CoreAudio outage.
-- Prevention: the shared sandbox lifecycle adds
-  `WINEDLLOVERRIDES=winecoreaudio.drv=` only to macOS Wwise 2022.1
-  WwiseConsole child environments, preserving unrelated Wine overrides.
+- Root cause: the Wwise 2022 `WwiseConsole.sh` wrapper delegates to the bundled
+  CrossOver `wine` Perl launcher. During its own environment setup that
+  launcher explicitly deletes inherited `WINEDLLOVERRIDES`; setting the normal
+  child environment therefore looked correct in Python evidence but never
+  reached `WwiseConsole.exe`. Neither a fresh `HOME`/bottle nor spelling the
+  override as `winecoreaudio.drv=d` changed the live stack.
+- Prevention: the shared sandbox lifecycle keeps the ordinary
+  `WINEDLLOVERRIDES=winecoreaudio.drv=` audit value and also appends that value
+  through CrossOver's documented `CX_ENV` pass-through, only for macOS Wwise
+  2022.1 and while preserving unrelated caller variables. A real smoke must
+  reach WAAPI, report source hash/mtime unchanged, delete the passing sandbox,
+  and clean the child processes; the repairing smoke became ready in about
+  three seconds. Unit coverage must prove both environment projections so a
+  later cleanup cannot silently restore the ineffective inherited-only form.
   Headless WAAPI validation has no audible-output acceptance, so it must not
   initialize or hold the user's hardware device. Do not change the macOS
   default output, edit the shared bottle, restart CoreAudio, or merely raise

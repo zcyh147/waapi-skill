@@ -89,6 +89,19 @@ def prepare_headless_console_environment(
     ]
     retained.append(_WINE_COREAUDIO_OVERRIDE)
     prepared["WINEDLLOVERRIDES"] = ";".join(retained)
+
+    # Audiokinetic's Wwise 2022 launcher delegates to CrossOver's Perl
+    # ``wine`` wrapper.  That wrapper deliberately deletes the inherited
+    # WINEDLLOVERRIDES value, then reapplies variables supplied through its
+    # CX_ENV option.  Carry the same scoped override through that supported
+    # seam so the Windows child cannot initialize the hanging CoreAudio
+    # driver.  Appending makes this value authoritative if CX_ENV already
+    # contains a stale override.
+    crossover_override = f"WINEDLLOVERRIDES={_WINE_COREAUDIO_OVERRIDE}"
+    existing_crossover_env = prepared.get("CX_ENV", "").strip()
+    prepared["CX_ENV"] = " ".join(
+        item for item in (existing_crossover_env, crossover_override) if item
+    )
     return prepared
 
 
