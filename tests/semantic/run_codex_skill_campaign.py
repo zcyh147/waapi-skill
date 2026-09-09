@@ -258,7 +258,9 @@ from tests.semantic.support.codex_prompt_asset_reads_v3 import (  # noqa: E402
     validated_prompt_asset_cat_commands,
 )
 from tests.semantic.support.codex_task_runner_v3 import (  # noqa: E402
+    _effective_expected_skill_reads,
     _normalize_turn_reference_schedule,
+    _read_prefix_pass_gate,
     _selected_workflow_step_names_are_closed,
     _skill_reads_pass_gate,
 )
@@ -6090,6 +6092,7 @@ def _validate_heavy_v3_task_result(
             "passing heavy task turn directories do not match its turn count"
         )
     gateway_records: list[Mapping[str, Any]] = []
+    observed_skill_reads: list[str] = []
     previous_prefix = 0
     expected_skill_reads = _heavy_v3_expected_skill_reads(expected_unit)
     broker_value = value.get("broker")
@@ -6120,7 +6123,7 @@ def _validate_heavy_v3_task_result(
             expected_prefix,
             selected_step_names=selected_step_names,
         )
-        turn_gateway_records = _validate_heavy_v3_turn_grade(
+        turn_gateway_records, turn_skill_reads = _validate_heavy_v3_turn_grade(
             grade,
             index=index,
             turn_root=turn_root,
@@ -6135,10 +6138,12 @@ def _validate_heavy_v3_task_result(
             ],
             version=str(getattr(expected_unit, "version", "")),
             expected_skill_reads=expected_skill_reads[index - 1],
+            previous_skill_reads=tuple(observed_skill_reads),
             expected_skill_read_schedule=expected_skill_reads,
             prompt_provenance=prompt_evidence.provenance,
         )
         gateway_records.extend(turn_gateway_records)
+        observed_skill_reads.extend(turn_skill_reads)
         if len(gateway_records) != expected_prefix:
             raise CampaignEvidenceError(
                 "passing heavy turn command allocation differs from its broker prefix"
@@ -7196,9 +7201,10 @@ def _validate_heavy_v3_turn_grade(
     expected_steps: Sequence[Any],
     version: str,
     expected_skill_reads: Sequence[str],
+    previous_skill_reads: Sequence[str],
     expected_skill_read_schedule: Sequence[Sequence[str]],
     prompt_provenance: PromptProvenanceEvidence,
-) -> tuple[Mapping[str, Any], ...]:
+) -> tuple[tuple[Mapping[str, Any], ...], tuple[str, ...]]:
     if not isinstance(value, Mapping) or set(value) != {
         "index",
         "prompt_sha256",
@@ -7261,6 +7267,10 @@ def _validate_heavy_v3_turn_grade(
         raise CampaignEvidenceError(
             "passing heavy final response differs from Codex facts"
         )
+    effective_skill_reads = _effective_expected_skill_reads(
+        expected_skill_reads,
+        previous_skill_reads=previous_skill_reads,
+    )
     gateway_records = _validate_heavy_v3_codex_facts(
         facts,
         expected_thread_id=expected_thread_id,
@@ -7271,7 +7281,7 @@ def _validate_heavy_v3_turn_grade(
         options=options,
         expected_steps=expected_steps,
         version=version,
-        expected_skill_reads=expected_skill_reads,
+        expected_skill_reads=effective_skill_reads,
         expected_skill_read_schedule=expected_skill_read_schedule,
         archived_common_gates=common_gates,
         prompt_provenance=prompt_provenance,
@@ -7281,7 +7291,8 @@ def _validate_heavy_v3_turn_grade(
         raise CampaignEvidenceError(
             "passing heavy turn gateway command count differs from its sealed prefix delta"
         )
-    return gateway_records
+    command_facts = facts["command_facts"]
+    return gateway_records, tuple(command_facts["skill_read_files"])
 
 
 def _validate_heavy_v3_codex_facts(
@@ -7536,14 +7547,16 @@ def _validate_heavy_v3_codex_facts(
             read_files=read_files,
             allowed_reads=allowed_reads,
         ),
-        "read_prefix_exact": (
-            tuple(
-                record.command
+        "read_prefix_exact": _read_prefix_pass_gate(
+            records=tuple(
+                record
                 for index, record in enumerate(records)
-                if index
-                not in recoverable_preprocess_attempt_indexes(records)
-            )[: len(allowed_reads)]
-            == allowed_reads
+                if index not in recoverable_preprocess_attempt_indexes(records)
+            ),
+            allowed_reads=allowed_reads,
+            gateway_attempt_commands=classified.gateway_attempt_commands,
+            gateway_subcommands=classified.gateway_subcommands,
+            expected_reads=expected_reads,
         ),
         "gateway_count_exact": (
             len(classified.gateway_attempt_commands) == len(expected_steps)

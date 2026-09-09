@@ -3374,12 +3374,16 @@ def _execute_gateway_unconstrained(
             enriched["endpoint"] = dict(runtime_endpoint)
         if runtime_detected_version is not None and "detected_version" not in enriched:
             enriched["detected_version"] = runtime_detected_version
-        if args.command == "draft-apply" and getattr(args, "compact", False):
-            # The Draft start response has already supplied the bounded
-            # conversation/session introduction. Repeating that complete
-            # projection after every typed edit makes a long composition grow
-            # the model transcript without adding action-local facts. Compact
-            # edits therefore return only their durable delta and continuation.
+        if (
+            (args.command.startswith("draft-") and args.command != "draft-start")
+            or args.command == "transaction-show"
+        ):
+            # Draft and transaction continuations require opaque state emitted
+            # by an earlier Gateway result in this conversation. That earlier
+            # result already supplied the one-time session introduction.
+            # Repeating it can push a complete continuation past the Agent's
+            # visible shell frame, so return only the durable delta/review and
+            # its exact next action.
             return exit_code, enriched
         return exit_code, attach_gateway_session_context(
             enriched,
@@ -26315,6 +26319,18 @@ def _business_next_action_binding(
                         "<event-name>",
                         "<Play|Stop|Pause|Resume|Break|Seek>",
                     ],
+                },
+                "switch_assignment_ownership": {
+                    "attach_to": (
+                        "the_exact_declaration_assigned_as_the_Switch_Container_child"
+                    ),
+                    "container_with_media_children": (
+                        "put_switch_value_on_the_container_row_only_not_its_"
+                        "descendant_Sound_rows"
+                    ),
+                    "sound_row_exception": (
+                        "only_when_the_user_explicitly_assigns_that_Sound_directly"
+                    ),
                 },
                 "media_source": {
                     "directory": [

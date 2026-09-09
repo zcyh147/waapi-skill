@@ -417,6 +417,7 @@ def test_small_complete_audit_uses_simple_inventory_before_report_rules() -> Non
     assert "apply presentation logic only to its complete result" in query_flat
     assert "Use the business declaration for one source" in query_flat
     assert "Use advanced only for a native read-only construct absent from that schema" in query_flat
+    assert "descendants, flat predicates, and business includes do not justify `--advanced`" in query_flat
 
 
 def test_user_supplied_absolute_wwise_paths_keep_their_exact_versioned_root() -> None:

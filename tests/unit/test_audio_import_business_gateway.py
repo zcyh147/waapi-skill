@@ -449,6 +449,16 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
         "<one-file-name-without-separators>",
     ]
     assert "switch_assignment" in batch_action["row_fields"]
+    assert batch_action["switch_assignment_ownership"] == {
+        "attach_to": "the_exact_declaration_assigned_as_the_Switch_Container_child",
+        "container_with_media_children": (
+            "put_switch_value_on_the_container_row_only_not_its_descendant_"
+            "Sound_rows"
+        ),
+        "sound_row_exception": (
+            "only_when_the_user_explicitly_assigns_that_Sound_directly"
+        ),
+    }
     assert bound_next["object_binding"]["use_only_for"] == [
         "existing_import_row_target",
         "new_import_row_parent",

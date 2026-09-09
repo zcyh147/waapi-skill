@@ -86,7 +86,7 @@ Final take bounds returned rows, not internal scans; even a one-row result does 
 
 ### Bounded inventories
 
-Use the business declaration for one source and flat AND. Use advanced only for a native read-only construct absent from that schema. Plan one bounded request and apply presentation logic only to its complete result.
+Use the business declaration for one source and flat AND. Use advanced only for a native read-only construct absent from that schema; descendants, flat predicates, and business includes do not justify `--advanced`. Plan one bounded request and apply presentation logic only to its complete result.
 
 - The Agent names `volume-db`, `pitch-cents`, `output-bus`, `source-language`, and other business fields. The Gateway owns case-sensitive Wwise accessors and shell quoting. Output order is fixed identity first, then repeated includes, then custom maps.
 - Repeated `--predicate` values mean AND; preserve the user's condition order. Do not submit only a type condition. With nested boolean logic, use the advanced exact-WAQL lane. `isIncluded` is appended last because it is filter-only.

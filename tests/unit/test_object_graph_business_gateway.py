@@ -1239,6 +1239,7 @@ def test_object_set_discovers_two_business_field_meanings_in_one_revision(
         client_factory=lambda _url: bind_client,
     )
     assert bind_code == 0, bound
+    assert "session_context" not in bound
     handle = bound["bound_object"]["handle"]
     fade = {
         "name": "FadeTime",
@@ -1291,6 +1292,7 @@ def test_object_set_discovers_two_business_field_meanings_in_one_revision(
     )
 
     assert discover_code == 0, discovered
+    assert "session_context" not in discovered
     assert discovered["meaning_count"] == 2
     assert discovered["candidate_count"] == 2
     assert "field_candidates" not in discovered
@@ -1349,6 +1351,7 @@ def test_object_set_discovers_two_business_field_meanings_in_one_revision(
         "0",
     )
     assert declared_code == 0, declared
+    assert "session_context" not in declared
     declared_continuation = declared["draft"]["next_action_binding"]
     assert set(declared_continuation) == {
         "contract",

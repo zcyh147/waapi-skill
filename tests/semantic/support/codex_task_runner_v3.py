@@ -523,6 +523,11 @@ def run_v3_codex_task(
                         expected_skill_reads=expected_skill_reads[
                             turn_index - 1
                         ],
+                        previous_skill_reads=tuple(
+                            read_file
+                            for previous_result in results[:-1]
+                            for read_file in previous_result.command_facts.skill_read_files
+                        ),
                         expected_gateway_count=effective_prefix - previous_prefix,
                         expected_terminal_execute_exit2_count=(
                             terminal_execute_exit2_count
@@ -909,6 +914,7 @@ def _grade_common_turn(
     turn_index: int,
     required_reference: str | None,
     expected_skill_reads: Sequence[str] | None = None,
+    previous_skill_reads: Sequence[str] = (),
     expected_gateway_count: int,
     expected_terminal_execute_exit2_count: int = 0,
     prompt_provenance: Any | None = None,
@@ -928,6 +934,10 @@ def _grade_common_turn(
             if turn_index == 1
             else ()
         )
+    )
+    expected_reads = _effective_expected_skill_reads(
+        expected_reads,
+        previous_skill_reads=previous_skill_reads,
     )
     records = facts.command_records
     recoverable_read_indexes = frozenset(
@@ -977,10 +987,13 @@ def _grade_common_turn(
             read_files=read_files,
             allowed_reads=allowed_reads,
         ),
-        "read_prefix_exact": tuple(
-            record.command for record in effective_records[: len(allowed_reads)]
-        )
-        == allowed_reads,
+        "read_prefix_exact": _read_prefix_pass_gate(
+            records=effective_records,
+            allowed_reads=allowed_reads,
+            gateway_attempt_commands=facts.gateway_attempt_commands,
+            gateway_subcommands=getattr(facts, "gateway_subcommands", ()),
+            expected_reads=expected_reads,
+        ),
         "gateway_count_exact": gateway_count == expected_gateway_count,
         "no_other_commands": (
             len(effective_records)
@@ -1038,6 +1051,53 @@ def _skill_reads_pass_gate(
             "SKILL.md",
             "references/waapi-query.md",
             "references/waapi-operate.md",
+        )
+    )
+
+
+def _effective_expected_skill_reads(
+    expected_reads: Sequence[str],
+    *,
+    previous_skill_reads: Sequence[str],
+) -> tuple[str, ...]:
+    """Remove a safely preloaded reference from its later scheduled turn."""
+
+    seen = frozenset(previous_skill_reads)
+    return tuple(read_file for read_file in expected_reads if read_file not in seen)
+
+
+def _read_prefix_pass_gate(
+    *,
+    records: Sequence[Any],
+    allowed_reads: Sequence[str],
+    gateway_attempt_commands: Sequence[str],
+    gateway_subcommands: Sequence[str],
+    expected_reads: Sequence[str],
+) -> bool:
+    """Allow selected exact-ID readbacks immediately before the operate lane."""
+
+    record_commands = tuple(record.command for record in records)
+    reads = tuple(allowed_reads)
+    if record_commands[: len(reads)] == reads:
+        return True
+    if (
+        tuple(expected_reads) != ("references/waapi-operate.md",)
+        or len(reads) != 1
+    ):
+        return False
+    try:
+        read_index = record_commands.index(reads[0])
+    except ValueError:
+        return False
+    gateway_commands = tuple(gateway_attempt_commands)
+    subcommands = tuple(gateway_subcommands)
+    return (
+        read_index > 0
+        and record_commands[:read_index] == gateway_commands[:read_index]
+        and len(subcommands) >= read_index
+        and all(
+            subcommand == "query-object"
+            for subcommand in subcommands[:read_index]
         )
     )
 

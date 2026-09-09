@@ -849,6 +849,85 @@ def test_common_grade_tolerates_one_early_operate_read_after_query() -> None:
     assert gates["skill_reads_exact"] is True
 
 
+def test_common_grade_carries_early_operate_read_into_later_turn() -> None:
+    result = _result(turn=2, gateway_count=4, skill_reads=())
+
+    errors, gates = _grade_common_turn(
+        result,
+        turn_index=2,
+        required_reference="references/waapi-query.md",
+        expected_skill_reads=("references/waapi-operate.md",),
+        previous_skill_reads=(
+            "SKILL.md",
+            "references/waapi-query.md",
+            "references/waapi-operate.md",
+        ),
+        expected_gateway_count=4,
+    )
+
+    assert errors == ()
+    assert gates["skill_reads_exact"] is True
+
+
+def test_common_grade_allows_selected_identity_reads_before_operate_reference() -> None:
+    result = _result(
+        turn=2,
+        gateway_count=5,
+        skill_reads=("references/waapi-operate.md",),
+    )
+    read = result.command_facts.allowed_read_commands[0]
+    gateway = tuple(f"gateway {index}" for index in range(5))
+    result.command_facts.command_records = tuple(
+        SimpleNamespace(command=command)
+        for command in (*gateway[:3], read, *gateway[3:])
+    )
+    result.command_facts.gateway_attempt_commands = gateway
+    result.command_facts.gateway_subcommands = (
+        "query-object",
+        "query-object",
+        "query-object",
+        "operation-schema",
+        "draft-start",
+    )
+
+    errors, gates = _grade_common_turn(
+        result,
+        turn_index=2,
+        required_reference="references/waapi-query.md",
+        expected_skill_reads=("references/waapi-operate.md",),
+        expected_gateway_count=5,
+    )
+
+    assert errors == ()
+    assert gates["read_prefix_exact"] is True
+
+
+def test_common_grade_rejects_mutation_command_before_operate_reference() -> None:
+    result = _result(
+        turn=2,
+        gateway_count=2,
+        skill_reads=("references/waapi-operate.md",),
+    )
+    read = result.command_facts.allowed_read_commands[0]
+    gateway = ("gateway operation-schema", "gateway draft-start")
+    result.command_facts.command_records = tuple(
+        SimpleNamespace(command=command) for command in (gateway[0], read, gateway[1])
+    )
+    result.command_facts.gateway_attempt_commands = gateway
+    result.command_facts.gateway_subcommands = ("operation-schema", "draft-start")
+
+    errors, gates = _grade_common_turn(
+        result,
+        turn_index=2,
+        required_reference="references/waapi-query.md",
+        expected_skill_reads=("references/waapi-operate.md",),
+        expected_gateway_count=2,
+    )
+
+    assert "read_prefix_exact" in errors
+    assert gates["read_prefix_exact"] is False
+
+
 def test_common_grade_allows_one_broker_proven_terminal_execute_exit_two() -> None:
     result = _result(turn=2, gateway_count=3)
     terminal_command = "gateway execute tx-1"

@@ -2076,7 +2076,7 @@ def test_transaction_show_reads_immutable_artifact_and_journal_without_wwise(tmp
     )
     assert list(payload).index("confirmation") > list(payload).index("events")
     assert list(payload).index("next_command") > list(payload).index("events")
-    assert list(payload).index("next_command") > list(payload).index("session_context")
+    assert "session_context" not in payload
     assert list(payload)[-1] == "next_command"
     assert payload["artifact"] == artifact
     assert [event["event_type"] for event in payload["events"]] == [
@@ -2189,8 +2189,9 @@ def test_transaction_show_summary_omits_raw_artifact_bulk_but_keeps_review_evide
         requires_explicit_user_confirmation=True,
     )
     assert list(payload).index("next_command") > list(payload).index("events")
-    assert list(payload).index("next_command") > list(payload).index("session_context")
+    assert "session_context" not in payload
     assert list(payload)[-1] == "next_command"
+    assert waapi_gateway.gateway_json_document_size(payload) < 5_500
     assert payload["summary_only"] is True
     assert "artifact" not in payload
     assert payload["preview_summary"]["contract"] == artifact["contract"]

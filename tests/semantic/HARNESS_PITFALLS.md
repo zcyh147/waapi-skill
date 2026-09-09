@@ -2554,6 +2554,15 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   digest plus a dispatch-call summary/evidence path, while preserving the exact
   final `agent_result`. Full assertions, readbacks, and ProjectInfo remain in
   durable evidence; failure and indeterminate replies are not compacted.
+- Follow-up: #51 Windows Weather again stopped on a complete 6101-byte fourth
+  object-binding receipt, and macOS Weapons reconstructed a transaction id
+  after a 6244-byte `transaction-show --summary-only` reply. Draft
+  continuations and transaction-show require opaque state from an earlier
+  Gateway result in the same conversation, which already carried the one-time
+  introduction. Omit repeated `session_context` from those continuation-only
+  replies; keep it on `draft-start` and the first independently routable
+  command. This moves the exact next action below the observed model-view
+  boundary without weakening durable evidence.
 
 ### Public integration delegates first-use prose to its dedicated profile
 
@@ -2917,6 +2926,13 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   commutative read-only group. Every selected GUID/name/type/path is still
   required exactly once before the schema; operation, Draft, Preview,
   confirmation, execution, and verification ordering remains strict.
+- Prefix follow-up: native Windows then performed all three selected exact-ID
+  readbacks before reading `waapi-operate.md`, exactly as the Gateway's
+  `mutation_selection.required_before` contract requires. The old common gate
+  assumed every reference read preceded every Gateway call and falsely failed
+  the otherwise complete Preview. Permit only leading `query-object` calls
+  before that one scheduled operate reference; a mutation/schema/Draft command
+  before it still fails.
 
 ### A diagnosis turn does not preload a possible future repair lane
 
@@ -2936,6 +2952,10 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   Repeats, another reference, a different order, a non-read command, any
   mutation, or any business/oracle mismatch still fails normally. This avoids
   rerunning real Wwise solely to police context efficiency.
+- Cross-turn accounting: if that one allowed operate preload occurs, mark the
+  later scheduled operate read as already satisfied. Requiring the Agent to
+  reread it would contradict the conversation-wide once-only rule; omitting it
+  without a proven prior preload still fails.
 
 ### Import rebatching never waives row completeness
 
@@ -2947,6 +2967,23 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   known field, event, media item, and Switch assignment travels with its row.
   Rebatching may change only command boundaries around the same sealed rows; it
   never supplies a missing business value or grants PASS to a partial row.
+- #51 Windows Footsteps provided all three rows in one legal chunk but attached
+  `Snow` to the two descendant Sound rows instead of the direct container row.
+  That is a real semantic mismatch, not transport rebatching. The structured
+  import continuation now states that `switch_value` belongs on the exact
+  declaration assigned as the Switch Container child; a container with media
+  children owns it unless the user explicitly assigns a Sound directly.
+
+### A closed object audit does not become advanced merely because it is broad
+
+- Trigger: #51 Windows Weapons requested `query-schema --advanced` for a
+  descendant audit whose source, flat predicates, includes, and bound were all
+  present in the ordinary business schema. The Broker correctly stopped before
+  any Wwise call or mutation.
+- Prevention: state at the bounded-inventory decision point that descendants,
+  flat predicates, and business includes do not justify `--advanced`. Reserve
+  the advanced lane for a native construct absent from the closed schema; do
+  not widen the Broker to reward unnecessary model-authored WAQL.
 
 ### Ordered workflows advance to the next Preview after verification
 
