@@ -398,7 +398,6 @@ from wwise_waapi.runtime_playing_handles import (  # noqa: E402  # pyright: igno
     RuntimePlayingHandleStore,
 )
 from wwise_waapi.business_declarations import (  # noqa: E402  # pyright: ignore[reportMissingImports]
-    COMMON_BUSINESS_FIELDS,
     MAX_BUSINESS_NAME_BYTES,
     MAX_BUSINESS_PATH_BYTES,
     SUPPORTED_BUSINESS_KINDS,
@@ -17938,6 +17937,20 @@ def dispatch_business_existing_batch(
         raise OperationDraftBindingDrift(
             "Live project or Wwise build differs from the business declaration binding."
         )
+    declaration_contract = operation_business_contract(
+        binding.record.operation,
+        detected_version,
+    ).get("declaration", {})
+    raw_stable_field_types = (
+        declaration_contract.get("field_value_types")
+        if isinstance(declaration_contract, Mapping)
+        else None
+    )
+    stable_field_names = (
+        frozenset(raw_stable_field_types)
+        if isinstance(raw_stable_field_types, Mapping)
+        else frozenset()
+    )
 
     row_order = list(args.row_order)
     rows: dict[str, str] = {}
@@ -17966,7 +17979,7 @@ def dispatch_business_existing_batch(
     meanings_by_id: dict[str, list[tuple[str, str]]] = {}
     for declaration_id, field_name, value in args.field:
         target = (
-            stable_by_id if field_name in COMMON_BUSINESS_FIELDS else meanings_by_id
+            stable_by_id if field_name in stable_field_names else meanings_by_id
         )
         target.setdefault(declaration_id, []).append((field_name, value))
     for declaration_id, meaning, value in args.field_meaning_value:
@@ -18007,9 +18020,8 @@ def dispatch_business_existing_batch(
         project=binding.project,
         state_dir=binding.state_dir,
     )
-    field_count = sum(len(pairs) for pairs in stable_by_id.values()) + sum(
-        len(pairs) for pairs in meanings_by_id.values()
-    )
+    meaning_field_count = sum(len(pairs) for pairs in meanings_by_id.values())
+    field_count = sum(len(pairs) for pairs in stable_by_id.values()) + meaning_field_count
     adapter = business_adapter(binding.record.operation)
 
     def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
@@ -18078,7 +18090,7 @@ def dispatch_business_existing_batch(
             dynamic_by_id[declaration_id] = dynamic
         candidate_session = (
             current.with_handle_registry(handles)
-            if field_count
+            if meaning_field_count
             else current
         )
         for declaration_id in row_order:

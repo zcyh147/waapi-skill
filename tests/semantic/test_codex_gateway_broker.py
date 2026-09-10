@@ -14285,6 +14285,167 @@ def test_object_set_batch_normalizes_fact_order_and_field_meaning_spelling(
     assert normalized == step.arguments
 
 
+def test_broker_accepts_equivalent_object_set_batch_group_order(
+) -> None:
+    close_handle = "boh1-" + "1" * 32
+    tail_handle = "boh1-" + "2" * 32
+    mechanical_handle = "boh1-" + "3" * 32
+    bus_handle = "boh1-" + "4" * 32
+    step = ExpectedGatewayStep(
+        "tx01.declare-existing-batch",
+        "draft-declare-existing-batch",
+        (
+            "draft-id",
+            "--task-authority",
+            "authority",
+            "--expected-revision",
+            "6",
+            "--row-order",
+            "target-01",
+            "--row-order",
+            "target-02",
+            "--row-order",
+            "target-03",
+            "--row",
+            "target-01",
+            close_handle,
+            "--field",
+            "target-01",
+            "new_name",
+            "RFL_Close",
+            "--field",
+            "target-01",
+            "notes",
+            "release-ready | close",
+            "--field",
+            "target-01",
+            "output_bus",
+            bus_handle,
+            "--row",
+            "target-02",
+            tail_handle,
+            "--field",
+            "target-02",
+            "volume_db",
+            "-3",
+            "--row",
+            "target-03",
+            mechanical_handle,
+            "--field",
+            "target-03",
+            "notes",
+            "release-ready | mechanical",
+            "--field",
+            "target-03",
+            "output_bus",
+            bus_handle,
+        ),
+    )
+    actual = (
+        *step.arguments[:5],
+        "--row-order",
+        "rifle_close",
+        "--row",
+        "rifle_close",
+        close_handle,
+        "--field",
+        "rifle_close",
+        "new_name",
+        "RFL_Close",
+        "--field",
+        "rifle_close",
+        "output_bus",
+        bus_handle,
+        "--field",
+        "rifle_close",
+        "notes",
+        "release-ready | close",
+        "--row-order",
+        "rfl_tail",
+        "--row",
+        "rfl_tail",
+        tail_handle,
+        "--field",
+        "rfl_tail",
+        "volume_db",
+        "-3",
+        "--row-order",
+        "rfl_mechanical",
+        "--row",
+        "rfl_mechanical",
+        mechanical_handle,
+        "--field",
+        "rfl_mechanical",
+        "output_bus",
+        bus_handle,
+        "--field",
+        "rfl_mechanical",
+        "notes",
+        "release-ready | mechanical",
+    )
+    broker = object.__new__(CodexGatewayBroker)
+    broker._payloads_by_step = {}  # noqa: SLF001
+    rebound = broker._bind_task_local_declaration_id(  # noqa: SLF001
+        step,
+        actual,
+    )
+
+    normalized = broker._normalize_business_declaration_fact_order(  # noqa: SLF001
+        rebound,
+        actual,
+    )
+
+    assert normalized == rebound.arguments
+
+
+def test_object_set_batch_normalization_preserves_declared_row_order() -> None:
+    step = ExpectedGatewayStep(
+        "tx01.declare-existing-batch",
+        "draft-declare-existing-batch",
+        (
+            "draft-id",
+            "--task-authority",
+            "authority",
+            "--expected-revision",
+            "6",
+            "--row-order",
+            "first",
+            "--row-order",
+            "second",
+            "--row",
+            "first",
+            "first-handle",
+            "--field",
+            "first",
+            "notes",
+            "one",
+            "--row",
+            "second",
+            "second-handle",
+            "--field",
+            "second",
+            "notes",
+            "two",
+        ),
+    )
+    actual = (
+        *step.arguments[:5],
+        "--row-order",
+        "second",
+        "--row-order",
+        "first",
+        *step.arguments[9:],
+    )
+    broker = object.__new__(CodexGatewayBroker)
+
+    normalized = broker._normalize_business_declaration_fact_order(  # noqa: SLF001
+        step,
+        actual,
+    )
+
+    assert normalized != step.arguments
+
+
 def test_object_set_batch_normalizes_zero_seconds_to_one_sealed_numeric_spelling(
     tmp_path: Path,
 ) -> None:

@@ -1617,6 +1617,144 @@ def test_object_set_batch_declares_meanings_with_per_object_metadata_revalidatio
     }
 
 
+def test_object_set_batch_keeps_disclosed_stable_fields_out_of_metadata(
+    tmp_path: Path,
+) -> None:
+    start_code, started = _offline(tmp_path, "draft-start", "object.set")
+    assert start_code == 0, started
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    handles: dict[str, str] = {}
+    targets = (
+        (PARENT_ID, "Rifle_Close", "Sound", r"\Weapons\Rifle_Close"),
+        (SECOND_ACTION_ID, "RFL_Tail", "Sound", r"\Weapons\RFL_Tail"),
+        (
+            THIRD_ACTION_ID,
+            "RFL_Mechanical",
+            "Sound",
+            r"\Weapons\RFL_Mechanical",
+        ),
+        (CONTROL_ID, "WAAPI_V2_Weapons", "Bus", r"\Busses\WAAPI_V2_Weapons"),
+    )
+    for revision, (object_id, name, object_type, path) in enumerate(
+        targets,
+        start=1,
+    ):
+        client = _live_client(
+            tmp_path,
+            {
+                "ak.wwise.core.object.get": [
+                    {
+                        "return": [
+                            {
+                                "id": object_id,
+                                "name": name,
+                                "type": object_type,
+                                "path": path,
+                            }
+                        ]
+                    }
+                ]
+            },
+        )
+        bind_code, bound = gateway.execute_gateway(
+            [
+                "--state-dir",
+                str(tmp_path / "state"),
+                "draft-bind-object",
+                draft_id,
+                "--task-authority",
+                authority,
+                "--expected-revision",
+                str(revision),
+                "--object-id",
+                object_id,
+            ],
+            env=_env(tmp_path),
+            client_factory=lambda _url, client=client: client,
+        )
+        assert bind_code == 0, bound
+        handles[name] = bound["bound_object"]["handle"]
+
+    batch_client = _live_client(tmp_path, {})
+    batch_code, batch = gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(tmp_path / "state"),
+            "draft-declare-existing-batch",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            "5",
+            "--row-order",
+            "rifle_close",
+            "--row",
+            "rifle_close",
+            handles["Rifle_Close"],
+            "--field",
+            "rifle_close",
+            "new_name",
+            "RFL_Close",
+            "--field",
+            "rifle_close",
+            "output_bus",
+            handles["WAAPI_V2_Weapons"],
+            "--field",
+            "rifle_close",
+            "notes",
+            "release-ready | close",
+            "--row-order",
+            "rfl_tail",
+            "--row",
+            "rfl_tail",
+            handles["RFL_Tail"],
+            "--field",
+            "rfl_tail",
+            "volume_db",
+            "-3",
+            "--row-order",
+            "rfl_mechanical",
+            "--row",
+            "rfl_mechanical",
+            handles["RFL_Mechanical"],
+            "--field",
+            "rfl_mechanical",
+            "output_bus",
+            handles["WAAPI_V2_Weapons"],
+            "--field",
+            "rfl_mechanical",
+            "notes",
+            "release-ready | mechanical",
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda _url: batch_client,
+    )
+
+    assert batch_code == 0, json.dumps(batch, ensure_ascii=False, indent=2)
+    assert batch["batch_receipt"] == {
+        "row_count": 3,
+        "field_count": 6,
+        "metadata_scope": "each_exact_bound_object",
+        "applied_atomically": True,
+    }
+    stored = OperationDraftStore(tmp_path / "state").inspect(
+        draft_id,
+        task_authority=authority,
+    )
+    declarations = stored.composition["business_session"]["declarations"]
+    assert declarations[0]["fields"] == {
+        "new_name": "RFL_Close",
+        "output_bus": handles["WAAPI_V2_Weapons"],
+        "notes": "release-ready | close",
+    }
+    assert declarations[1]["fields"] == {"volume_db": -3.0}
+    assert declarations[2]["fields"] == {
+        "output_bus": handles["WAAPI_V2_Weapons"],
+        "notes": "release-ready | mechanical",
+    }
+
+
 def test_gateway_adds_subordinate_media_without_model_authored_json(
     tmp_path: Path,
 ) -> None:

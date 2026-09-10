@@ -3290,6 +3290,25 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   ambiguous metadata, changed values, and stable/dynamic contradictions still
   fail closed. Do not solve this by adding another Prompt-only copy warning.
 
+### Batch flag placement is not business row order
+
+- Trigger: exact candidate `2e60bce` produced the same `INT22-WEAPONS` and
+  `INT25-WEAPONS` failure on macOS and native Windows. Each Agent supplied the
+  sealed three objects, stable fields, values, output-bus handle, and requested
+  row order, but interleaved each `--row-order` with its row and reordered
+  independent fields inside a row. The Gateway CLI accepts those repeated
+  options, while the Broker compared their literal argv positions and rejected
+  argument 14 before Gateway or Wwise.
+- Prevention: canonicalize `draft-declare-existing-batch` groups by the sealed
+  row and field identities after task-local ids are bound. Derive stable fields
+  from the sealed expected contract rather than a partial hard-coded list, so
+  `new_name` and `notes` remain stable while an unrecognized `--field` shorthand
+  still resolves through live metadata. Preserve the explicit `--row-order`
+  value sequence exactly and continue rejecting missing/extra rows, changed
+  handles, fields, or values. Separately, the Gateway must derive its stable
+  field set from the operation business contract and must not rewrite an
+  unchanged handle registry for a stable-only batch.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:

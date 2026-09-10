@@ -11940,6 +11940,26 @@ class CodexGatewayBroker:
                 cursor += arity + 1
             return groups
 
+        expected_groups = parse(step.arguments)
+        actual_groups = parse(actual)
+        if expected_groups is None or actual_groups is None:
+            return tuple(actual)
+        expected_row_order = tuple(
+            group[1] for group in expected_groups if group[0] == "--row-order"
+        )
+        actual_row_order = tuple(
+            group[1] for group in actual_groups if group[0] == "--row-order"
+        )
+        if actual_row_order != expected_row_order:
+            return tuple(actual)
+        expected_stable_fields = {
+            (group[1], group[2])
+            for group in expected_groups
+            if group[0] == "--field"
+            and isinstance(group[1], str)
+            and isinstance(group[2], str)
+        }
+
         def key(group: tuple[Any, ...]) -> tuple[str, ...] | None:
             option = group[0]
             declaration_id = group[1]
@@ -11949,15 +11969,10 @@ class CodexGatewayBroker:
                 field = group[2]
                 if not isinstance(field, str):
                     return None
-                stable_fields = {
-                    "delay_ms",
-                    "fade_time_ms",
-                    "loop",
-                    "max_instances",
-                    "output_bus",
-                    "volume_db",
-                }
-                if option == "--field" and field in stable_fields:
+                if (
+                    option == "--field"
+                    and (declaration_id, field) in expected_stable_fields
+                ):
                     return (option, declaration_id, field)
                 field_key = "".join(
                     character for character in field.casefold() if character.isalnum()
@@ -11965,10 +11980,6 @@ class CodexGatewayBroker:
                 return ("--field-meaning-value", declaration_id, field_key)
             return (option, declaration_id)
 
-        expected_groups = parse(step.arguments)
-        actual_groups = parse(actual)
-        if expected_groups is None or actual_groups is None:
-            return tuple(actual)
         expected_keys = [key(group) for group in expected_groups]
         actual_keys = [key(group) for group in actual_groups]
         if (
