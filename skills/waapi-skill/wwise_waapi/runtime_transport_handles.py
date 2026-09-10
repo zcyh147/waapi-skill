@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Callable, Mapping
 
 from .canonical import canonical_json_bytes, canonical_sha256
+from .filesystem_security import path_is_link_or_reparse
 
 
 TRANSPORT_HANDLE_STORE_CONTRACT = "waapi-skill.runtime-transport-handle-store/v1"
@@ -334,13 +335,21 @@ class RuntimeTransportHandleStore:
         return handle
 
     def _load(self, path: Path) -> RuntimeTransportHandle:
-        if not path.exists():
+        if not os.path.lexists(path):
             raise RuntimeTransportHandleError(
                 "TRANSPORT_HANDLE_UNKNOWN",
                 "Transport handle was not issued by this Gateway state store.",
             )
-        metadata = path.lstat()
-        if not stat.S_ISREG(metadata.st_mode) or path.is_symlink():
+        try:
+            metadata = path.lstat()
+        except OSError as exc:
+            raise RuntimeTransportHandleError(
+                "TRANSPORT_HANDLE_STORE_CORRUPT",
+                "Transport handle record cannot be inspected safely.",
+            ) from exc
+        if not stat.S_ISREG(metadata.st_mode) or path_is_link_or_reparse(
+            path, metadata=metadata
+        ):
             raise RuntimeTransportHandleError(
                 "TRANSPORT_HANDLE_STORE_CORRUPT",
                 "Transport handle record is not a regular file.",
@@ -428,14 +437,29 @@ class RuntimeTransportHandleStore:
 
     @staticmethod
     def _ensure_directory(path: Path) -> None:
-        if path.exists():
-            if path.is_symlink() or not path.is_dir():
+        if os.path.lexists(path):
+            try:
+                metadata = path.lstat()
+            except OSError as exc:
+                raise RuntimeTransportHandleError(
+                    "TRANSPORT_HANDLE_STORE_CORRUPT",
+                    "Transport handle state path cannot be inspected safely.",
+                ) from exc
+            if path_is_link_or_reparse(path, metadata=metadata) or not stat.S_ISDIR(
+                metadata.st_mode
+            ):
                 raise RuntimeTransportHandleError(
                     "TRANSPORT_HANDLE_STORE_CORRUPT",
                     "Transport handle state path is not a real directory.",
                 )
             return
-        path.mkdir(mode=0o700)
+        try:
+            path.mkdir(mode=0o700)
+        except OSError as exc:
+            raise RuntimeTransportHandleError(
+                "TRANSPORT_HANDLE_STORE_CORRUPT",
+                "Transport handle state path cannot be created safely.",
+            ) from exc
 
     @staticmethod
     def _write_new(path: Path, payload: Mapping[str, Any]) -> None:

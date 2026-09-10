@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from .canonical import canonical_json_bytes, canonical_sha256
+from .filesystem_security import path_is_link_or_reparse
 from .runtime_game_object_handles import RuntimeGameObjectContext
 
 
@@ -229,15 +230,21 @@ class RuntimePlayingHandleStore:
                 remove_count -= 1
 
     def _load(self, path: Path) -> RuntimePlayingHandleRecord:
-        if not path.exists():
+        if not os.path.lexists(path):
             raise RuntimePlayingHandleError(
                 "PLAYING_HANDLE_NOT_AVAILABLE",
                 "Playing handle was not issued by this Gateway state store.",
             )
-        metadata = path.lstat()
+        try:
+            metadata = path.lstat()
+        except OSError as exc:
+            raise RuntimePlayingHandleError(
+                "PLAYING_HANDLE_STORE_CORRUPT",
+                "Playing handle record cannot be inspected safely.",
+            ) from exc
         if (
             not stat.S_ISREG(metadata.st_mode)
-            or path.is_symlink()
+            or path_is_link_or_reparse(path, metadata=metadata)
             or metadata.st_size > _MAX_RECORD_BYTES
         ):
             raise RuntimePlayingHandleError(
@@ -332,14 +339,29 @@ class RuntimePlayingHandleStore:
 
     @staticmethod
     def _ensure_directory(path: Path) -> None:
-        if path.exists():
-            if path.is_symlink() or not path.is_dir():
+        if os.path.lexists(path):
+            try:
+                metadata = path.lstat()
+            except OSError as exc:
+                raise RuntimePlayingHandleError(
+                    "PLAYING_HANDLE_STORE_CORRUPT",
+                    "Playing handle state path cannot be inspected safely.",
+                ) from exc
+            if path_is_link_or_reparse(path, metadata=metadata) or not stat.S_ISDIR(
+                metadata.st_mode
+            ):
                 raise RuntimePlayingHandleError(
                     "PLAYING_HANDLE_STORE_CORRUPT",
                     "Playing handle state path is not a real directory.",
                 )
             return
-        path.mkdir(mode=0o700)
+        try:
+            path.mkdir(mode=0o700)
+        except OSError as exc:
+            raise RuntimePlayingHandleError(
+                "PLAYING_HANDLE_STORE_CORRUPT",
+                "Playing handle state path cannot be created safely.",
+            ) from exc
 
     @staticmethod
     def _write_new(path: Path, payload: Mapping[str, object]) -> None:

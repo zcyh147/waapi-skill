@@ -100,6 +100,50 @@ def test_playing_handle_store_rejects_tampered_sealed_record(tmp_path: Path) -> 
     assert corrupt.value.error_code == "PLAYING_HANDLE_STORE_CORRUPT"
 
 
+@pytest.mark.parametrize("linked_component", ("state_dir", "root", "records"))
+def test_playing_handle_store_rejects_mocked_windows_reparse_components(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    linked_component: str,
+) -> None:
+    state_dir = tmp_path / "state"
+    root = state_dir / "soundengine-playing-handles-v1"
+    records = root / "records"
+    records.mkdir(parents=True)
+    selected = {
+        "state_dir": state_dir,
+        "root": root,
+        "records": records,
+    }[linked_component]
+    monkeypatch.setattr(
+        playing_handles,
+        "path_is_link_or_reparse",
+        lambda path, *, metadata: path == selected,
+    )
+
+    with pytest.raises(RuntimePlayingHandleError) as corrupt:
+        RuntimePlayingHandleStore(state_dir)
+    assert corrupt.value.error_code == "PLAYING_HANDLE_STORE_CORRUPT"
+
+
+def test_playing_handle_store_rejects_mocked_windows_reparse_record(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = RuntimePlayingHandleStore(tmp_path)
+    issued = _issue(store)
+    record = store.records / f"{issued.handle}.json"
+    monkeypatch.setattr(
+        playing_handles,
+        "path_is_link_or_reparse",
+        lambda path, *, metadata: path == record,
+    )
+
+    with pytest.raises(RuntimePlayingHandleError) as corrupt:
+        store.resolve(issued.handle, context=_context())
+    assert corrupt.value.error_code == "PLAYING_HANDLE_STORE_CORRUPT"
+
+
 def test_playing_handle_store_has_a_fail_closed_active_record_ceiling(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

@@ -70,6 +70,56 @@ def test_transport_handle_is_bound_to_exact_live_context(tmp_path: Path) -> None
     assert exc.value.error_code == "TRANSPORT_HANDLE_CONTEXT_DRIFT"
 
 
+@pytest.mark.parametrize("linked_component", ("state_dir", "root", "records"))
+def test_transport_handle_store_rejects_mocked_windows_reparse_components(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    linked_component: str,
+) -> None:
+    state_dir = tmp_path / "state"
+    root = state_dir / "runtime-transport-handles-v1"
+    records = root / "records"
+    records.mkdir(parents=True)
+    selected = {
+        "state_dir": state_dir,
+        "root": root,
+        "records": records,
+    }[linked_component]
+    monkeypatch.setattr(
+        transport_handles,
+        "path_is_link_or_reparse",
+        lambda path, *, metadata: path == selected,
+    )
+
+    with pytest.raises(RuntimeTransportHandleError) as corrupt:
+        RuntimeTransportHandleStore(state_dir)
+    assert corrupt.value.error_code == "TRANSPORT_HANDLE_STORE_CORRUPT"
+
+
+def test_transport_handle_store_rejects_mocked_windows_reparse_record(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = RuntimeTransportHandleStore(tmp_path)
+    issued = store.issue(
+        transport_id=74,
+        context=_context(),
+        source_transaction_id="tx1-00000000000000000000",
+        source_artifact_hash="c" * 64,
+        transport_row_sha256="d" * 64,
+    )
+    record = store.records / f"{issued.handle}.json"
+    monkeypatch.setattr(
+        transport_handles,
+        "path_is_link_or_reparse",
+        lambda path, *, metadata: path == record,
+    )
+
+    with pytest.raises(RuntimeTransportHandleError) as corrupt:
+        store.resolve(issued.handle, context=_context())
+    assert corrupt.value.error_code == "TRANSPORT_HANDLE_STORE_CORRUPT"
+
+
 def test_retired_handle_cannot_target_a_reused_native_transport_id(tmp_path: Path) -> None:
     tokens = iter((b"a" * 16, b"b" * 16))
     store = RuntimeTransportHandleStore(
