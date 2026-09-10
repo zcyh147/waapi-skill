@@ -14398,7 +14398,7 @@ def test_broker_accepts_equivalent_object_set_batch_group_order(
     assert normalized == rebound.arguments
 
 
-def test_object_set_batch_normalization_preserves_declared_row_order() -> None:
+def test_object_set_batch_normalization_accepts_independent_row_permutation() -> None:
     step = ExpectedGatewayStep(
         "tx01.declare-existing-batch",
         "draft-declare-existing-batch",
@@ -14443,7 +14443,7 @@ def test_object_set_batch_normalization_preserves_declared_row_order() -> None:
         actual,
     )
 
-    assert normalized != step.arguments
+    assert normalized == step.arguments
 
 
 def test_object_set_batch_normalizes_zero_seconds_to_one_sealed_numeric_spelling(

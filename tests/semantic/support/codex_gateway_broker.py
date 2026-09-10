@@ -11944,14 +11944,6 @@ class CodexGatewayBroker:
         actual_groups = parse(actual)
         if expected_groups is None or actual_groups is None:
             return tuple(actual)
-        expected_row_order = tuple(
-            group[1] for group in expected_groups if group[0] == "--row-order"
-        )
-        actual_row_order = tuple(
-            group[1] for group in actual_groups if group[0] == "--row-order"
-        )
-        if actual_row_order != expected_row_order:
-            return tuple(actual)
         expected_stable_fields = {
             (group[1], group[2])
             for group in expected_groups

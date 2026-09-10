@@ -3303,11 +3303,14 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   row and field identities after task-local ids are bound. Derive stable fields
   from the sealed expected contract rather than a partial hard-coded list, so
   `new_name` and `notes` remain stable while an unrecognized `--field` shorthand
-  still resolves through live metadata. Preserve the explicit `--row-order`
-  value sequence exactly and continue rejecting missing/extra rows, changed
-  handles, fields, or values. Separately, the Gateway must derive its stable
-  field set from the operation business contract and must not rewrite an
-  unchanged handle registry for a stable-only batch.
+  still resolves through live metadata. For independent existing-object edits,
+  compare `--row-order` as the same unique row-identity set instead of requiring
+  the Agent to preserve one arbitrary sequence; continue rejecting missing,
+  extra, or duplicate rows and changed handles, fields, or values. This does not
+  relax dependency-bearing `object.create` or `audio.import` row order.
+  Separately, the Gateway must derive its stable field set from the operation
+  business contract and must not rewrite an unchanged handle registry for a
+  stable-only batch.
 
 ## New-root preflight
 
