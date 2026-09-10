@@ -22,6 +22,7 @@ from wwise_waapi.transactions import (
     StateConflict,
     StateCorruptionError,
     StateDirectoryNotConfigured,
+    TransactionExecutionInProgress,
     TransactionNotFound,
     TransactionRecreateRequired,
     TransactionState,
@@ -1101,6 +1102,84 @@ def test_missing_windows_lock_backend_fails_closed(tmp_path, monkeypatch) -> Non
         store.create_preview("tx-no-windows-lock", {"unsafe": False})
 
     assert list(store.locks_dir.iterdir()) == []
+
+
+def test_execution_lease_fails_fast_while_owned_and_releases(tmp_path) -> None:
+    owner = TransactionStore(tmp_path)
+    contender = TransactionStore(tmp_path)
+
+    with owner.execution_lease("tx-live-command"):
+        with pytest.raises(
+            TransactionExecutionInProgress,
+            match="already has a command in progress",
+        ):
+            with contender.execution_lease("tx-live-command"):
+                raise AssertionError("contender must not enter an owned lease")
+
+    with contender.execution_lease("tx-live-command"):
+        pass
+
+    assert (owner.locks_dir / "tx-live-command.execution.lock").read_bytes() == b""
+
+
+def test_windows_execution_lease_contention_does_not_retry_or_sleep(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    class FakeMsvcrt:
+        LK_NBLCK = 1
+        LK_UNLCK = 2
+
+        def __init__(self) -> None:
+            self.acquire_attempts = 0
+
+        def locking(self, _fd: int, mode: int, _byte_count: int) -> None:
+            if mode == self.LK_NBLCK:
+                self.acquire_attempts += 1
+                raise OSError(errno.EACCES, "owned by another process")
+
+    fake_msvcrt = FakeMsvcrt()
+    sleeps: list[float] = []
+    monkeypatch.setattr(transaction_module, "_msvcrt", fake_msvcrt)
+    monkeypatch.setattr(transaction_module, "_lock_platform_name", lambda: "nt")
+    monkeypatch.setattr(transaction_module.time, "sleep", sleeps.append)
+    store = TransactionStore(tmp_path)
+
+    with pytest.raises(TransactionExecutionInProgress):
+        with store.execution_lease("tx-windows-live-command"):
+            raise AssertionError("contended lease must not be entered")
+
+    assert fake_msvcrt.acquire_attempts == 1
+    assert sleeps == []
+
+
+def test_windows_execution_lease_uses_byte_zero_and_releases(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    class FakeMsvcrt:
+        LK_NBLCK = 1
+        LK_UNLCK = 2
+
+        def __init__(self) -> None:
+            self.calls: list[tuple[int, int, int]] = []
+
+        def locking(self, fd: int, mode: int, byte_count: int) -> None:
+            self.calls.append((mode, byte_count, os.lseek(fd, 0, os.SEEK_CUR)))
+
+    fake_msvcrt = FakeMsvcrt()
+    monkeypatch.setattr(transaction_module, "_msvcrt", fake_msvcrt)
+    monkeypatch.setattr(transaction_module, "_lock_platform_name", lambda: "nt")
+    store = TransactionStore(tmp_path)
+
+    with store.execution_lease("tx-windows-command"):
+        pass
+
+    assert fake_msvcrt.calls == [
+        (fake_msvcrt.LK_NBLCK, 1, 0),
+        (fake_msvcrt.LK_UNLCK, 1, 0),
+    ]
+    assert (store.locks_dir / "tx-windows-command.execution.lock").read_bytes() == b""
 
 
 def test_windows_lock_backend_uses_byte_zero_beyond_eof_and_releases(tmp_path, monkeypatch) -> None:

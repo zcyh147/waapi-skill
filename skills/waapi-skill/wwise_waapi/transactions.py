@@ -125,6 +125,10 @@ class FileLockUnavailable(TransactionError):
     """No supported cross-process file-lock implementation is available."""
 
 
+class TransactionExecutionInProgress(TransactionError):
+    """Another process owns the long-lived command lease for a transaction."""
+
+
 class _PosixFileLockBackend:
     """Exclusive whole-file advisory locking through ``fcntl.flock``."""
 
@@ -138,6 +142,22 @@ class _PosixFileLockBackend:
             raise FileLockUnavailable(
                 "TransactionStore could not acquire its POSIX fcntl.flock lock."
             ) from exc
+
+    def try_acquire(self, handle: Any) -> bool:
+        try:
+            self._module.flock(
+                handle.fileno(),
+                self._module.LOCK_EX | self._module.LOCK_NB,
+            )
+        except BlockingIOError:
+            return False
+        except OSError as exc:
+            if exc.errno in {errno.EACCES, errno.EAGAIN}:
+                return False
+            raise FileLockUnavailable(
+                "TransactionStore could not acquire its POSIX fcntl.flock execution lease."
+            ) from exc
+        return True
 
     def release(self, handle: Any) -> None:
         try:
@@ -181,6 +201,22 @@ class _WindowsFileLockBackend:
                 ) from exc
             return
 
+    def try_acquire(self, handle: Any) -> bool:
+        self._seek_lock_region(handle)
+        try:
+            self._module.locking(
+                handle.fileno(),
+                self._module.LK_NBLCK,
+                _LOCK_REGION_BYTES,
+            )
+        except OSError as exc:
+            if _is_windows_lock_contention(exc):
+                return False
+            raise FileLockUnavailable(
+                "TransactionStore could not acquire its Windows msvcrt execution lease."
+            ) from exc
+        return True
+
     def release(self, handle: Any) -> None:
         self._seek_lock_region(handle)
         try:
@@ -209,7 +245,7 @@ def _select_file_lock_backend(platform_name: str) -> Any:
     if platform_name == "posix":
         if _fcntl is None or any(
             not hasattr(_fcntl, attribute)
-            for attribute in ("flock", "LOCK_EX", "LOCK_UN")
+            for attribute in ("flock", "LOCK_EX", "LOCK_NB", "LOCK_UN")
         ):
             raise FileLockUnavailable(
                 "TransactionStore requires fcntl.flock on macOS/Linux and will not run unlocked."
@@ -1073,6 +1109,65 @@ class TransactionStore:
         _ensure_plain_directory_tree(self.state_dir, label="State directory")
         for directory in (self.transactions_dir, self.locks_dir):
             _ensure_plain_directory_tree(directory, label="Store directory")
+
+    @contextmanager
+    def execution_lease(self, transaction_id: str) -> Iterator[None]:
+        """Hold one non-blocking cross-process lease across a live command.
+
+        The durable state lock protects each journal transition.  This separate
+        lease protects the interval between ``execution_started`` and the
+        terminal execution result, including the external WAAPI call.  An
+        abandoned OS lock is released by process exit, so an acquired lease
+        together with durable ``executing`` state is proof of a stale owner.
+        """
+
+        transaction_id = validate_transaction_id(transaction_id)
+        backend = _select_file_lock_backend(_lock_platform_name())
+        lock_path = self.locks_dir / f"{transaction_id}.execution.lock"
+        if _lexists(lock_path):
+            _require_plain_regular_file(lock_path, label="Transaction execution lease")
+        flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_BINARY", 0)
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        fd = os.open(lock_path, flags, 0o600)
+        try:
+            _require_opened_plain_regular_file(
+                lock_path,
+                descriptor=fd,
+                label="Transaction execution lease",
+            )
+            handle = os.fdopen(fd, "r+b", buffering=0, closefd=True)
+        except BaseException:
+            os.close(fd)
+            raise
+
+        acquired = False
+        body_error: BaseException | None = None
+        try:
+            acquired = backend.try_acquire(handle)
+            if not acquired:
+                raise TransactionExecutionInProgress(
+                    f"Transaction {transaction_id!r} already has a command in progress."
+                )
+            try:
+                yield
+            except BaseException as exc:
+                body_error = exc
+                raise
+        finally:
+            cleanup_error: BaseException | None = None
+            if acquired:
+                try:
+                    backend.release(handle)
+                except BaseException as exc:
+                    cleanup_error = exc
+            try:
+                handle.close()
+            except BaseException as exc:
+                if cleanup_error is None:
+                    cleanup_error = exc
+            if cleanup_error is not None and body_error is None:
+                raise cleanup_error
 
     @contextmanager
     def _transaction_lock(self, transaction_id: str) -> Iterator[None]:
