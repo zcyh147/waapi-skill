@@ -7254,6 +7254,23 @@ def test_object_operation_equivalence_ignores_unique_property_order_only() -> No
     )
 
 
+def test_object_set_equivalence_aligns_unique_rows_by_object_identity() -> None:
+    expected = _two_target_object_set_request()
+    actual = json.loads(json.dumps(expected))
+    actual["arguments"]["objects"].reverse()
+
+    assert broker_module._object_operation_json_equal(  # noqa: SLF001
+        actual,
+        expected,
+    )
+
+    actual["arguments"]["objects"][0]["properties"][0]["value"] = -4.0
+    assert not broker_module._object_operation_json_equal(  # noqa: SLF001
+        actual,
+        expected,
+    )
+
+
 def test_business_declaration_ids_are_task_local_but_bounded_and_unique(
     tmp_path: Path,
 ) -> None:

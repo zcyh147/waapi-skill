@@ -2720,6 +2720,23 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   The Program gate intentionally excludes `tests/semantic`, so a green Program
   result cannot prove these campaign-owned observers are current.
 
+### Object-set batch row order is not a business effect
+
+- Trigger: #51 macOS root `imac-int-d0ed925-r65-pending7` correctly previewed
+  the three requested Weapons edits in one `object.set` transaction, but its
+  durable Draft materialized the independent rows as Mechanical, Tail, Close
+  while the sealed witness retained the prompt order Close, Tail, Mechanical.
+  The Broker had already accepted the batch and every object id, field, value,
+  and reference matched; exact list comparison nevertheless changed the valid
+  Preview into exit 125.
+- Prevention: for `object.set.arguments.objects` only, align rows by each
+  unique closed `object.kind` plus `object.value` identity before comparing
+  their contents. Continue to compare every row recursively, keep property and
+  reference names unique and exact, and reject missing, extra, duplicate, or
+  changed identities and values. Do not copy this equivalence to
+  `object.create` child order or `audio.import` row order, where ordering can
+  carry business meaning.
+
 - Invalid diagnostic roots: macOS
   `imac-integration-7d69aa5-r24-retry4` and native-Windows
   `iwin-integration-7d69aa5-r23-retry3` overlapped the follow-up observer

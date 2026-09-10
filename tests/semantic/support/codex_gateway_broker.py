@@ -7226,6 +7226,7 @@ def _object_operation_json_equal(actual: Any, expected: Any) -> bool:
         "object.set",
     }:
         return False
+    operation = expected.get("operation")
 
     def compare(
         left: Any,
@@ -7280,6 +7281,39 @@ def _object_operation_json_equal(actual: Any, expected: Any) -> bool:
                 if key not in ignored_right
             )
         if isinstance(right, list):
+            if operation == "object.set" and path == ("arguments", "objects"):
+                def object_identity(item: Any) -> tuple[str, str] | None:
+                    if not isinstance(item, Mapping):
+                        return None
+                    selector = item.get("object")
+                    if not isinstance(selector, Mapping):
+                        return None
+                    kind = selector.get("kind")
+                    value = selector.get("value")
+                    if not isinstance(kind, str) or not isinstance(value, str):
+                        return None
+                    return kind, value
+
+                left_rows = left if isinstance(left, list) else []
+                left_keys = [object_identity(item) for item in left_rows]
+                right_keys = [object_identity(item) for item in right]
+                if (
+                    len(left_rows) == len(right)
+                    and None not in left_keys
+                    and None not in right_keys
+                    and len(set(left_keys)) == len(left_keys)
+                    and len(set(right_keys)) == len(right_keys)
+                    and set(left_keys) == set(right_keys)
+                ):
+                    left_by_identity = dict(zip(left_keys, left_rows, strict=True))
+                    return all(
+                        compare(
+                            left_by_identity[identity],
+                            item,
+                            (*path, f"{identity[0]}:{identity[1]}"),
+                        )
+                        for identity, item in zip(right_keys, right, strict=True)
+                    )
             if path and path[-1] in {"properties", "references"}:
                 left_by_name = (
                     {
