@@ -498,7 +498,7 @@ passed 462 / skipped 6 POSIX-only cases. Commit
 changes only domain/planning docs, one unit test, and the program manifest, so
 it does not replace the frozen Skill, suite, runner, or semantic harness.
 
-Final public `integration` candidate
+Pre-review public `integration` candidate
 `ebcfde245bcbcacd2b8842e5ec205e7111b86743` passed all 12 units in one fresh
 root on each host: macOS `imac-int-ebcfde2-r67-full12` and native Windows
 `iwin-int-ebcfde2-r56-full12`. Both roots then passed identical
@@ -507,9 +507,13 @@ full hashes and mtimes remained unchanged, passing sandboxes were removed, and
 final scoped-process checks were empty. The macOS LaunchAgent and Windows
 `InteractiveToken` / `Limited` Scheduled Tasks were deleted. This is
 independent single-root 12/12 evidence on both hosts, not cumulative repair-root
-credit. Exact-candidate gates passed macOS Program 4727 / 2 skipped, native
-Windows Program 4704 / 25 skipped, and macOS Non-live 10310 / 113 skipped / 27
-deselected.
+credit. Review-repair code candidate
+`6d335a9f821ce82c30dea619c0a9f00e9c91d520` later hardened playing and
+transport capability stores against Windows reparse points, so the earlier
+root remains truthful evidence but is not final-candidate acceptance for that
+successor. The successor passed macOS Program 4735 / 2 skipped, native Windows
+Program 4712 / 25 skipped, and macOS Non-live 10318 / 113 skipped / 27
+deselected before its new public-integration run.
 
 Composer migration evidence is focused Adapter evidence, not public
 `integration` acceptance. For `object.set`, candidate
