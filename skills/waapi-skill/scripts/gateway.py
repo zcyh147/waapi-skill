@@ -2388,9 +2388,13 @@ def build_parser() -> argparse.ArgumentParser:
     draft_declare_import_batch.add_argument(
         "--row-order",
         action="append",
+        nargs="+",
         required=True,
         metavar="ID",
-        help="Repeat once per row in the exact requested import order",
+        help=(
+            "Supply one to six IDs in exact requested import order; the option "
+            "may also be repeated with one ID each"
+        ),
     )
     draft_declare_import_batch.add_argument(
         "--new-root-row",
@@ -15363,7 +15367,13 @@ def dispatch_offline_business_draft_update(
         for declaration_id, object_handle in args.existing_row:
             add_row(declaration_id, "existing", (object_handle,))
 
-        row_order = list(args.row_order)
+        row_order = [
+            declaration_id
+            for group in args.row_order
+            for declaration_id in (
+                group if isinstance(group, list) else [group]
+            )
+        ]
         if (
             len(row_order) != len(set(row_order))
             or set(row_order) != set(row_specs)
@@ -26393,11 +26403,22 @@ def _business_next_action_binding(
                     ),
                     "caller_supplied_counts": "forbidden",
                 },
-                "row_order": [
-                    "--row-order",
-                    "<declaration-id>",
-                    "repeat_once_per_row_in_exact_import_order",
-                ],
+                "row_order": {
+                    "grouped": [
+                        "--row-order",
+                        "<declaration-id-1>",
+                        "[<declaration-id-2>...]",
+                    ],
+                    "repeated": [
+                        "--row-order",
+                        "<one-declaration-id>",
+                        "repeat_the_option_for_each_remaining_row",
+                    ],
+                    "rule": (
+                        "both_forms_are_equivalent; preserve_exact_import_order; "
+                        "supply_one_to_six_ids"
+                    ),
+                },
                 "row_forms": {
                     "new": [
                         "--new-row",
@@ -27490,6 +27511,7 @@ def operation_draft_payload(
                 for key in (
                     "fixed_argv_prefix_copy",
                     "fixed_argv_prefix_copy_instruction",
+                    "row_order",
                     "rows_per_command",
                     "row_completeness",
                     "dependency_closure",

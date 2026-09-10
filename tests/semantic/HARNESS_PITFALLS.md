@@ -1147,6 +1147,24 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   order. Test a deliberately non-alphabetic batch through the public business
   planner; import row order is semantic, not transport noise.
 
+### Grouped import row-order spelling is transport, not business meaning
+
+- Trigger: #51 macOS root `imac-int-a7d23a4-r63-full12` submitted six exact
+  topologically closed Weather rows, but wrote one `--row-order` followed by
+  all six task-local ids. The public parser and Broker accepted only six
+  repeated `--row-order <id>` pairs, so the Broker rejected the otherwise
+  closed batch before Gateway or Wwise dispatch.
+- Prevention: accept either one `--row-order` followed by one to six ids or the
+  repeated one-id spelling. Flatten both forms into one ordered id sequence in
+  Gateway parsing, and normalize the grouped form into the same sealed row
+  partition before Broker comparison. Preserve row order, facts, dependency
+  closure, media-directory ownership, and the six-row ceiling exactly; this is
+  a CLI transport equivalence, not permission to reorder or omit rows.
+- Keep the grouped form in the compact next-chunk continuation. A Fresh Agent
+  must not have to infer that an ordinary multi-value option unexpectedly
+  requires repeating the flag, and a rejected spelling must not be repaired by
+  prompt emphasis alone.
+
 ### Normalize reflected result shapes from real evidence, not fake fixtures
 
 - Evidence: r13 Windows Media Pool returned `Db` exactly as Wwise 2025.1
@@ -2658,6 +2676,25 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   one-shot launcher, prove there is no scoped Wwise/Fresh owner, and use a new
   campaign root. If the same spawn boundary repeats, stop and diagnose the
   Codex/launch environment before spending another semantic turn.
+
+### Correlated cross-host zero-action timeouts are infrastructure evidence
+
+- Evidence: #51 macOS `INT22-FOOTSTEPS` in
+  `imac-int-a7d23a4-r63-full12` and native-Windows `INT22-HARBOR` in
+  `iwin-int-a7d23a4-r53-full12` started in the same time window, each kept its
+  real Wwise sandbox alive for the sealed 600-second Codex allowance, and then
+  ended with `session_has_no_actions`. Neither scenario created a thread id,
+  turn directory, model action, or Broker record. Both source-project hashes
+  and mtimes were unchanged, and cleanup left zero scoped processes/tasks.
+- Classification: when two independent hosts show that complete signature in
+  the same time window after earlier units passed, treat the roots as frozen
+  infrastructure BLOCKED evidence. It is consistent with a transient Codex
+  service/session-start failure; it does not prove a Skill, Gateway, Wwise, or
+  semantic defect.
+- Recovery: never replay either root and do not change product code or prompt
+  wording to compensate. Re-attest the launch prerequisites, wait for a fresh
+  Codex session to become available, and run only the blocked units in new
+  roots before continuing the previously pending units.
 
 ### Integration runtime oracles must track the current business transport
 

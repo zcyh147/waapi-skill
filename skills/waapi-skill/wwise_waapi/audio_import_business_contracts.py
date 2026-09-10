@@ -132,6 +132,11 @@ def audio_import_business_contract_data(version: str) -> dict[str, Any]:
         },
         "declaration_discipline": {
             "task_local_id": "bounded_unique_not_business_data",
+            "row_order_transport": {
+                "grouped": "one_--row-order_followed_by_one_to_six_ids",
+                "repeated": "one_--row-order_per_id",
+                "forms_are_equivalent": True,
+            },
             "rows_per_command": {
                 "minimum": 1,
                 "maximum": AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS,

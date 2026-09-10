@@ -44,6 +44,11 @@ def test_audio_import_contract_exposes_only_explicit_replace_mode() -> None:
         "minimum": 1,
         "maximum": 6,
     }
+    assert contract["declaration_discipline"]["row_order_transport"] == {
+        "grouped": "one_--row-order_followed_by_one_to_six_ids",
+        "repeated": "one_--row-order_per_id",
+        "forms_are_equivalent": True,
+    }
     assert contract["declaration_discipline"]["completion"] == (
         "append_chunks_until_every_requested_row_is_present_then_check"
     )
@@ -738,6 +743,11 @@ def test_audio_import_batch_chunks_are_atomic_cumulative_and_compact(
         "2",
         "--row-order",
         "snow",
+        "snow-step-01",
+        "snow-step-02",
+        "snow-step-03",
+        "snow-step-04",
+        "snow-step-05",
         "--new-row",
         "snow",
         parent_handle,
@@ -753,8 +763,6 @@ def test_audio_import_batch_chunks_are_atomic_cumulative_and_compact(
         declaration_id = f"snow-step-{index:02d}"
         batch_argv.extend(
             (
-                "--row-order",
-                declaration_id,
                 "--new-row",
                 declaration_id,
                 "snow",
@@ -847,6 +855,15 @@ def test_audio_import_batch_chunks_are_atomic_cumulative_and_compact(
         "minimum": 1,
         "maximum": 6,
     }
+    assert first_next["append_import_chunk"]["row_order"]["grouped"] == [
+        "--row-order",
+        "<declaration-id-1>",
+        "[<declaration-id-2>...]",
+    ]
+    assert first_next["append_import_chunk"]["row_order"]["rule"] == (
+        "both_forms_are_equivalent; preserve_exact_import_order; "
+        "supply_one_to_six_ids"
+    )
     assert first_next["append_import_chunk"]["row_completeness"] == (
         "each_row_must_include_its_media_every_known_requested_field_switch_"
         "assignment_and_event_in_the_same_command; partial_rows_are_forbidden"

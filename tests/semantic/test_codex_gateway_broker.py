@@ -5367,6 +5367,24 @@ def test_audio_import_broker_accepts_equivalent_one_to_six_row_rebatching(
             )
         return tuple(arguments)
 
+    def grouped_row_arguments(start: int, stop: int) -> tuple[str, ...]:
+        arguments: list[str] = [
+            "--row-order",
+            *(f"row-{index:03d}" for index in range(start, stop)),
+        ]
+        for index in range(start, stop):
+            row_id = f"row-{index:03d}"
+            arguments.extend(
+                (
+                    "--new-row",
+                    row_id,
+                    "boh1-" + "3" * 32,
+                    f"Layer_{index}",
+                    "actor-mixer",
+                )
+            )
+        return tuple(arguments)
+
     step_values = [
         ExpectedGatewayStep("tx01.draft-start", "draft-start", ("audio.import",))
     ]
@@ -5405,7 +5423,7 @@ def test_audio_import_broker_accepts_equivalent_one_to_six_row_rebatching(
                 authority,
                 "--expected-revision",
                 "1",
-                *row_arguments(1, 7),
+                *grouped_row_arguments(1, 7),
             ),
         )
         for arguments in commands:

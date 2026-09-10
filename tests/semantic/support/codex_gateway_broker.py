@@ -11149,11 +11149,27 @@ class CodexGatewayBroker:
             "--event": 4,
         }
 
-        def parse_groups(values: Sequence[Any]) -> list[tuple[Any, ...]] | None:
+        def parse_groups(
+            values: Sequence[Any],
+            *,
+            grouped_row_order: bool = False,
+        ) -> list[tuple[Any, ...]] | None:
             groups: list[tuple[Any, ...]] = []
             cursor = 5
             while cursor < len(values):
                 option = values[cursor]
+                if grouped_row_order and option == "--row-order":
+                    cursor += 1
+                    start = cursor
+                    while (
+                        cursor < len(values)
+                        and values[cursor] not in option_arity
+                    ):
+                        groups.append(("--row-order", values[cursor]))
+                        cursor += 1
+                    if cursor == start:
+                        return None
+                    continue
                 arity = option_arity.get(option) if isinstance(option, str) else None
                 if arity is None or cursor + arity >= len(values):
                     return None
@@ -11237,7 +11253,7 @@ class CodexGatewayBroker:
         if len(all_ids) != len(pool):
             return None
 
-        actual_groups = parse_groups(actual[1:])
+        actual_groups = parse_groups(actual[1:], grouped_row_order=True)
         if actual_groups is None:
             return None
         actual_order = [
@@ -11316,6 +11332,14 @@ class CodexGatewayBroker:
                 dict[str, dict[str, str]],
             ]
         ] = []
+        normalized_actual = (
+            *actual[:6],
+            *(
+                value
+                for group in actual_groups
+                for value in group
+            ),
+        )
         for indexes in itertools.combinations(
             range(len(pool)),
             len(actual_order),
@@ -11335,7 +11359,7 @@ class CodexGatewayBroker:
             try:
                 semantic_hash, execution_arguments = self._validate_step(
                     candidate,
-                    actual,
+                    normalized_actual,
                 )
             except GatewayInvocationError:
                 continue
