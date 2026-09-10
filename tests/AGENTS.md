@@ -625,12 +625,13 @@ final scoped-process checks were empty. The macOS LaunchAgent and Windows
 `InteractiveToken` / `Limited` Scheduled Tasks were deleted. This is
 independent single-root 12/12 evidence on both hosts, not cumulative repair-root
 credit. Review-repair code candidate
-`6d335a9f821ce82c30dea619c0a9f00e9c91d520` later hardened playing and
-transport capability stores against Windows reparse points, so the earlier
-root remains truthful evidence but is not final-candidate acceptance for that
-successor. The successor passed macOS Program 4735 / 2 skipped, native Windows
-Program 4712 / 25 skipped, and macOS Non-live 10318 / 113 skipped / 27
-deselected before its new public-integration run.
+`170e8e8f01cd5e931933c6fe76baff47d0683f57` later hardened playing and
+transport capability stores against Windows reparse points and resolved
+non-stable object-set batch `--field` names through live metadata, so the
+earlier root remains truthful evidence but is not final-candidate acceptance
+for that successor. The successor passed macOS Program 4737 / 2 skipped,
+native Windows Program 4714 / 25 skipped, and macOS Non-live 10322 / 113
+skipped / 27 deselected before its new public-integration run.
 
 Composer migration evidence is focused Adapter evidence, not public
 `integration` acceptance. For `object.set`, candidate

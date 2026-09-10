@@ -189,8 +189,8 @@ code-only construction report, not real-host or Fresh Agent evidence.
 
 ## Verification scope
 
-The focused Program gate currently contains 4735 passing tests with two
-platform-specific skips on macOS and 4712 passing tests with 25
+The focused Program gate currently contains 4737 passing tests with two
+platform-specific skips on macOS and 4714 passing tests with 25
 platform-specific skips on native Windows. It exercises
 all 808 packaged route-contract version/API rows with
 in-process fake clients. It validates exact URI dispatch, reflected request and
