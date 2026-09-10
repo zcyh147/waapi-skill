@@ -161,13 +161,11 @@ def test_query_reference_has_no_raw_client_fallback() -> None:
     assert "projection and bound are fixed" in query_reference
 
 
-def test_topic_wait_policy_is_consistent_across_skill_reference_and_readmes() -> None:
+def test_topic_wait_policy_is_consistent_across_skill_and_query_reference() -> None:
     skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
     query = (SKILL_ROOT / "references" / "waapi-query.md").read_text(
         encoding="utf-8"
     )
-    english = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
-    chinese = (REPO_ROOT / "README.zh-CN.md").read_text(encoding="utf-8")
     skill_flat = " ".join(skill.split())
     query_flat = " ".join(query.split())
 
@@ -208,19 +206,6 @@ def test_topic_wait_policy_is_consistent_across_skill_reference_and_readmes() ->
         "不要收到后退出",
     ):
         assert intent in query
-
-    for readme in (english, chinese):
-        assert "--timeout" in readme
-        assert "--no-timeout" in readme
-        assert "256 KiB" in readme
-    assert "gateway default for every Topic wait is 10 seconds" in english
-    assert "not an unlimited output stream" in english
-    assert "explicitly invokes the same gateway with `--timeout 120`" in english
-    assert "120 seconds is a Skill policy, not a second gateway default" in english
-    assert "所有 Topic wait 的 gateway 默认值都是 10 秒" in chinese
-    assert "并不是无限输出流" in chinese
-    assert "显式给同一个 gateway 传入 `--timeout 120`" in chinese
-    assert "这是 Skill 的选择，不是另一套 gateway 默认值" in chinese
 
 
 def test_query_reference_exposes_only_the_closed_original_file_match_surface() -> None:
@@ -337,88 +322,56 @@ def test_normal_change_prose_stays_business_facing() -> None:
         assert "Keep exact `agent_result` machine-readable" in document
 
 
-def test_public_readmes_route_users_only_through_the_packaged_gateway() -> None:
-    readmes = (
-        (REPO_ROOT / "README.md").read_text(encoding="utf-8"),
-        (REPO_ROOT / "README.zh-CN.md").read_text(encoding="utf-8"),
-    )
+def test_public_readmes_keep_setup_and_usage_user_facing() -> None:
+    english = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    chinese = (REPO_ROOT / "README.zh-CN.md").read_text(encoding="utf-8")
+    readmes = (english, chinese)
 
     for readme in readmes:
-        for command in (
-            "python scripts/run.py gateway.py status",
-            "python scripts/run.py gateway.py query-object",
-            "python scripts/run.py gateway.py operation-schema object.setNotes",
-            "python scripts/run.py gateway.py draft-start object.setNotes",
-            "python scripts/run.py gateway.py transaction-show <transaction-id> --summary-only",
-            "python scripts/run.py gateway.py confirm <transaction-id> --confirmation-token <confirmation-token>",
-            "python scripts/run.py gateway.py execute <transaction-id>",
-            "python scripts/run.py gateway.py verify <transaction-id>",
-        ):
-            assert command in readme
-        assert "state-bound confirmation token" in readme or "与当前状态绑定的确认 token" in readme
-        assert readme.index("python scripts/run.py gateway.py draft-start object.setNotes") < readme.index(
-            "python scripts/run.py gateway.py transaction-show <transaction-id> --summary-only"
+        assert "git clone https://github.com/zcyh147/waapi-skill.git" in readme
+        assert (
+            "python skills/waapi-skill/scripts/run.py setup_environment.py" in readme
         )
-        assert readme.index(
-            "python scripts/run.py gateway.py transaction-show <transaction-id> --summary-only"
-        ) < readme.index(
-            "python scripts/run.py gateway.py confirm <transaction-id> --confirmation-token <confirmation-token>"
-        )
-        assert readme.count(
-            "python scripts/run.py gateway.py confirm <transaction-id> --artifact-hash"
-        ) == 0
-        for internal_route in ("WwiseDispatcher", "waapi_client", "SemanticPlanner", "semantic planner path"):
-            assert internal_route not in readme
-        assert "inline Python" in readme
-        assert "helper script" in readme
-        for operation_specific_field in (
-            "`new_name`",
-            "`notes`",
-            "`name_conflict`",
+        assert "python skills/waapi-skill/scripts/run.py gateway.py config-set" in readme
+        assert "python skills/waapi-skill/scripts/run.py gateway.py status" in readme
+        assert "read_only" in readme
+        assert "ask_before_changes" in readme
+        assert "allow_changes" in readme
+        assert "./skills/waapi-skill/references/waapi-coverage.md" in readme
+        assert "./tests/TEST_INVENTORY.md" in readme
+        assert "./skills/waapi-skill/SKILL.md" in readme
+        assert len(readme.splitlines()) < 220
+        for internal_detail in (
+            "WwiseDispatcher",
+            "waapi_client",
+            "SemanticPlanner",
+            "draft-start object.setNotes",
+            "--advanced-waql",
+            "--path-segment",
+            "4738",
+            "4715",
         ):
-            assert operation_specific_field not in readme
+            assert internal_detail not in readme
 
-    assert "Manifest reflection is discovery, not permission" in readmes[0]
-    assert "request-schema` exposes only reviewed exact-version continuations" in readmes[0]
-    assert "Manifest 反射只用于发现能力，不等于授权执行" in readmes[1]
-    assert "request-schema` 只开放经过审核、精确版本绑定且结果有界的唯一 continuation" in readmes[1]
+    assert "Control Wwise Authoring with natural language" in english
+    assert "List the Events under the Default Work Unit" in english
+    assert "用自然语言操作 Wwise Authoring" in chinese
+    assert "列出 Default Work Unit 下的所有 Event" in chinese
 
 
-def test_public_readmes_publish_exact_five_version_api_coverage() -> None:
+def test_public_readmes_link_exact_coverage_instead_of_inlining_it() -> None:
     english = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
     chinese = (REPO_ROOT / "README.zh-CN.md").read_text(encoding="utf-8")
     coverage_contract = (SKILL_ROOT / "references" / "waapi-coverage.md").read_text(encoding="utf-8")
 
-    expected_rows = (
-        "| `2021.1` | 126 | 124 | 97 | 27 | 2 |",
-        "| `2022.1` | 144 | 142 | 110 | 32 | 2 |",
-        "| `2023.1` | 181 | 179 | 147 | 32 | 2 |",
-        "| `2024.1` | 178 | 178 | 148 | 30 | 0 |",
-        "| `2025.1` | 185 | 185 | 154 | 31 | 0 |",
-    )
     for readme in (english, chinese):
-        for row in expected_rows:
-            assert row in readme
-        assert "**814**" in readme
-        assert "**808**" in readme
-        assert "**656**" in readme
-        assert "**152**" in readme
-        assert "**6**" in readme
-        assert "4738" in readme
-        assert "4715" in readme
+        for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+            assert f"| `{version}` |" in readme
         assert "./skills/waapi-skill/references/waapi-coverage.md" in readme
+        assert "Reflected rows" not in readme
+        assert "反射总行数" not in readme
+        assert "4738" not in readme
+        assert "4715" not in readme
 
-    assert "198 unique routed WAAPI URIs" in english
-    assert "198 个唯一已封装 WAAPI URI" in chinese
-    assert "still require a live Authoring host" in " ".join(english.split())
-    assert "仍要求实时宿主为 Authoring" in " ".join(chinese.split())
-    assert "not a claim that all 808 rows have been exercised against a real Wwise process" in english
-    assert "不等于已经在真实 Wwise 进程中逐一运行了全部 808 行" in chinese
     assert "currently contains 4738 passing tests" in coverage_contract
     assert "4715 passing tests with 25" in coverage_contract
-    for readme in (english, chinese):
-        assert "--path-segment" in readme
-        assert "--advanced-waql" in readme
-        assert "--typed-structured" not in readme
-        assert "--typed-advanced" not in readme
-        assert "--return-field id" not in readme
