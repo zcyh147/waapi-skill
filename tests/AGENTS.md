@@ -629,9 +629,12 @@ credit. Review-repair code candidate
 transport capability stores against Windows reparse points and resolved
 non-stable object-set batch `--field` names through live metadata, so the
 earlier root remains truthful evidence but is not final-candidate acceptance
-for that successor. The successor passed macOS Program 4737 / 2 skipped,
+for that successor. That successor passed macOS Program 4737 / 2 skipped,
 native Windows Program 4714 / 25 skipped, and macOS Non-live 10322 / 113
-skipped / 27 deselected before its new public-integration run.
+skipped / 27 deselected. Batch-order repair candidate
+`fd2f9ed2c9fd2336e76545b1aef6f0ce4e99acfe` then passed macOS Program 4738 /
+2 skipped, native Windows Program 4715 / 25 skipped, and macOS Non-live 10325 /
+113 skipped / 27 deselected before its targeted Weapons reruns.
 
 Composer migration evidence is focused Adapter evidence, not public
 `integration` acceptance. For `object.set`, candidate
