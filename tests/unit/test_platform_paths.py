@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from pathlib import PureWindowsPath
 
@@ -68,7 +69,8 @@ def _wine_project_guard(home: Path, project: Path, *, host: str = "127.0.0.1") -
         },
         "project": {
             "state": "open",
-            "path": "Y:\\" + "\\".join(relative.parts),
+            "path": "\\",
+            "filePath": "Y:\\" + "\\".join(relative.parts),
         },
     }
 
@@ -85,6 +87,27 @@ def _io_audit(uri: str, paths: list[tuple[str, str, str, str]]) -> dict[str, obj
             }
             for section, json_path, raw_path, resolved_path in paths
         ],
+    }
+
+
+def _wine_no_project_transition_guard(
+    target_project: Path,
+    *,
+    canonical_path: str | None = None,
+) -> dict[str, object]:
+    return {
+        "fingerprint": "no-project-transition-sha256",
+        "endpoint": {"host": "127.0.0.1", "port": 8080},
+        "wwise": {
+            "platform": "x64",
+            "processPath": r"c:\Program Files\Audiokinetic\Wwise\Wwise.exe",
+        },
+        "project_guard_mode": "transition_to_path",
+        "project": {"state": "none"},
+        "postcondition": {
+            "state": "open",
+            "canonical_path": canonical_path or f"posix:{target_project.resolve()}",
+        },
     }
 
 
@@ -136,6 +159,265 @@ def test_local_wine_cli_dispatch_translates_only_exact_audited_paths(tmp_path: P
     assert all(row["round_trip_verified"] is True for row in adapted.proof["path_bindings"])
     assert adapted.proof["mapping"]["anchor_drive"] == "Y"
     assert adapted.proof["host_dispatch_sha256"] != adapted.proof["wire_dispatch_sha256"]
+
+
+@pytest.mark.parametrize(
+    "uri",
+    (
+        "ak.wwise.console.project.create",
+        "ak.wwise.console.project.open",
+    ),
+)
+def test_local_wine_console_project_dispatch_translates_the_audited_path(
+    tmp_path: Path,
+    uri: str,
+) -> None:
+    home = tmp_path / "home"
+    active_project = home / "case" / "active" / "SampleProject.wproj"
+    target_project = home / "case" / "target" / "TargetProject.wproj"
+    active_project.parent.mkdir(parents=True)
+    active_project.write_text("<Project/>", encoding="utf-8")
+    target_project.parent.mkdir(parents=True)
+    target_project.write_text("<Project/>", encoding="utf-8")
+    args = {"path": str(target_project)}
+
+    adapted = adapt_cli_dispatch_paths(
+        uri=uri,
+        args=args,
+        options={},
+        io_audit=_io_audit(
+            uri,
+            [("args", "$.args.path", str(target_project), str(target_project.resolve()))],
+        ),
+        project_guard=_wine_project_guard(home, active_project),
+        host_os_name="posix",
+        account_home=home,
+    )
+
+    assert requires_wwise_wire_path_adaptation(uri) is True
+    assert adapted.args == {"path": r"Y:\case\target\TargetProject.wproj"}
+    assert adapted.proof["mode"] == "local_posix_wine"
+    assert adapted.proof["translated_path_count"] == 1
+
+
+@pytest.mark.parametrize(
+    ("uri", "target_exists"),
+    (
+        ("ak.wwise.ui.project.open", True),
+        ("ak.wwise.ui.project.create", False),
+    ),
+)
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="This test simulates local POSIX Wine drive translation",
+)
+def test_local_wine_authoring_project_transition_without_current_project_uses_target_anchor(
+    tmp_path: Path,
+    uri: str,
+    target_exists: bool,
+) -> None:
+    home = tmp_path / "home"
+    target_project = home / "case" / "target" / "TargetProject.wproj"
+    target_project.parent.mkdir(parents=True)
+    if target_exists:
+        target_project.write_text("<Project/>", encoding="utf-8")
+    guard = _wine_no_project_transition_guard(target_project)
+
+    adapted = adapt_cli_dispatch_paths(
+        uri=uri,
+        args={"path": str(target_project)},
+        options={},
+        io_audit=_io_audit(
+            uri,
+            [
+                (
+                    "args",
+                    "$.args.path",
+                    str(target_project),
+                    str(target_project.resolve()),
+                )
+            ],
+        ),
+        project_guard=guard,
+        current_project_guard=guard,
+        host_os_name="posix",
+        account_home=home,
+    )
+
+    assert requires_wwise_wire_path_adaptation(uri) is True
+    assert adapted.args == {"path": r"Y:\case\target\TargetProject.wproj"}
+    assert adapted.proof["mode"] == "local_posix_wine"
+    assert adapted.proof["mapping"]["anchor_source"] == "transition_target"
+    assert adapted.proof["translated_path_count"] == 1
+
+
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="This test simulates local POSIX Wine drive translation",
+)
+def test_local_wine_authoring_transition_target_preserves_complex_posix_spelling(
+    tmp_path: Path,
+) -> None:
+    home = tmp_path / "HomeCase"
+    target_project = (
+        home / "Space Ω $&;'() [Case]" / "TargetProject.WPROJ"
+    )
+    target_project.parent.mkdir(parents=True)
+    target_project.write_text("<Project/>", encoding="utf-8")
+    uri = "ak.wwise.ui.project.open"
+    guard = _wine_no_project_transition_guard(target_project)
+
+    adapted = adapt_cli_dispatch_paths(
+        uri=uri,
+        args={"path": str(target_project)},
+        options={},
+        io_audit=_io_audit(
+            uri,
+            [
+                (
+                    "args",
+                    "$.args.path",
+                    str(target_project),
+                    str(target_project.resolve()),
+                )
+            ],
+        ),
+        project_guard=guard,
+        current_project_guard=guard,
+        host_os_name="posix",
+        account_home=home,
+    )
+
+    assert adapted.args == {
+        "path": "Y:\\Space Ω $&;'() [Case]\\TargetProject.WPROJ"
+    }
+
+
+@pytest.mark.parametrize(
+    "canonical_path",
+    (
+        r"windows:c:\projects\TargetProject.wproj",
+        r"windows:\\server\share\TargetProject.wproj",
+        "posix:/tmp/case/../TargetProject.wproj",
+    ),
+)
+def test_local_wine_authoring_transition_target_rejects_non_posix_or_traversal_flavors(
+    tmp_path: Path,
+    canonical_path: str,
+) -> None:
+    home = tmp_path / "home"
+    target_project = home / "case" / "TargetProject.wproj"
+    target_project.parent.mkdir(parents=True)
+    target_project.write_text("<Project/>", encoding="utf-8")
+    uri = "ak.wwise.ui.project.open"
+    guard = _wine_no_project_transition_guard(
+        target_project,
+        canonical_path=canonical_path,
+    )
+
+    with pytest.raises(WwiseWirePathError) as rejected:
+        adapt_cli_dispatch_paths(
+            uri=uri,
+            args={"path": str(target_project)},
+            options={},
+            io_audit=_io_audit(
+                uri,
+                [
+                    (
+                        "args",
+                        "$.args.path",
+                        str(target_project),
+                        str(target_project.resolve()),
+                    )
+                ],
+            ),
+            project_guard=guard,
+            current_project_guard=guard,
+            host_os_name="posix",
+            account_home=home,
+        )
+
+    assert rejected.value.error_code == "WIRE_PATH_CONTEXT_UNAVAILABLE"
+
+
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="A backslash is a native separator on Windows",
+)
+def test_local_wine_authoring_transition_target_rejects_mixed_separator_component(
+    tmp_path: Path,
+) -> None:
+    home = tmp_path / "home"
+    target_project = home / "case\\mixed" / "TargetProject.wproj"
+    target_project.parent.mkdir(parents=True)
+    target_project.write_text("<Project/>", encoding="utf-8")
+    uri = "ak.wwise.ui.project.open"
+    guard = _wine_no_project_transition_guard(target_project)
+
+    with pytest.raises(WwiseWirePathError) as rejected:
+        adapt_cli_dispatch_paths(
+            uri=uri,
+            args={"path": str(target_project)},
+            options={},
+            io_audit=_io_audit(
+                uri,
+                [
+                    (
+                        "args",
+                        "$.args.path",
+                        str(target_project),
+                        str(target_project.resolve()),
+                    )
+                ],
+            ),
+            project_guard=guard,
+            current_project_guard=guard,
+            host_os_name="posix",
+            account_home=home,
+        )
+
+    assert rejected.value.error_code == "WIRE_PATH_COMPONENT_UNSAFE"
+
+
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="This test simulates local POSIX Wine drive translation",
+)
+def test_local_wine_authoring_transition_target_rejects_audit_path_drift(
+    tmp_path: Path,
+) -> None:
+    home = tmp_path / "home"
+    target_project = home / "case" / "TargetProject.wproj"
+    other_project = home / "other" / "OtherProject.wproj"
+    for path in (target_project, other_project):
+        path.parent.mkdir(parents=True)
+        path.write_text("<Project/>", encoding="utf-8")
+    uri = "ak.wwise.ui.project.open"
+    guard = _wine_no_project_transition_guard(target_project)
+
+    with pytest.raises(WwiseWirePathError) as rejected:
+        adapt_cli_dispatch_paths(
+            uri=uri,
+            args={"path": str(other_project)},
+            options={},
+            io_audit=_io_audit(
+                uri,
+                [
+                    (
+                        "args",
+                        "$.args.path",
+                        str(other_project),
+                        str(other_project.resolve()),
+                    )
+                ],
+            ),
+            project_guard=guard,
+            current_project_guard=guard,
+            host_os_name="posix",
+            account_home=home,
+        )
+
+    assert rejected.value.error_code == "WIRE_PATH_AUDIT_MISMATCH"
 
 
 def test_nested_platform_pairs_flow_from_io_audit_to_transient_wine_dispatch(

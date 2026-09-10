@@ -42,8 +42,9 @@ from tests.support.runtime_evidence_paths import (  # pyright: ignore[reportMiss
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PLAN_PATH = (
     REPO_ROOT
-    / "skills"
-    / "waapi-skill"
+    / "tests"
+    / "destructive"
+    / "support"
     / "resources"
     / "capabilities"
     / "2022.1"
@@ -51,8 +52,9 @@ PLAN_PATH = (
 )
 TASK6_PLAN_PATH = (
     REPO_ROOT
-    / "skills"
-    / "waapi-skill"
+    / "tests"
+    / "destructive"
+    / "support"
     / "resources"
     / "capabilities"
     / "2022.1"
@@ -330,10 +332,17 @@ def test_soundbank_generate_write_to_disk_or_records_blocker() -> None:
         sound_id: str | None = None
         try:
             for topic in ("ak.wwise.core.soundbank.generated", "ak.wwise.core.soundbank.generationDone"):
-                try:
-                    handlers.append(client.subscribe(topic, lambda *args, **kwargs: _put_event(event_queue, args, kwargs)))
-                except BaseException:
-                    handlers.append(None)
+                handler = client.subscribe(
+                    topic,
+                    lambda *args, _topic=topic, **kwargs: _put_topic_event(
+                        event_queue,
+                        _topic,
+                        args,
+                        kwargs,
+                    ),
+                )
+                assert handler is not None, f"WAAPI did not subscribe to {topic}"
+                handlers.append(handler)
             soundbank_name = _unique_name("generate_bank")
             soundbank_id = _create_object(client, SOUNDBANK_PARENT, "SoundBank", soundbank_name)
             sound_id = _create_object(client, ACTOR_PARENT, "Sound", _unique_name("generate_sound"))
@@ -368,6 +377,10 @@ def test_soundbank_generate_write_to_disk_or_records_blocker() -> None:
                 pytest.skip("soundbank.generate produced no sandbox output files to assert")
             assert all(_path_is_under(path, runtime.require_sandbox_path()) for path in new_outputs)
             assert _no_source_generated_outputs(runtime.source_generated_snapshot_before)
+            topic_events = _require_soundbank_topic_events(
+                event_queue,
+                soundbank_name,
+            )
             _write_case_evidence(
                 case,
                 evidence_root=EVIDENCE_ROOT,
@@ -376,7 +389,7 @@ def test_soundbank_generate_write_to_disk_or_records_blocker() -> None:
                     "soundbank_name": soundbank_name,
                     "generate_result": _json_safe(result),
                     "generated_files": [_relative_to_sandbox(path, runtime.require_sandbox_path()) for path in new_outputs[:20]],
-                    "topic_events": _drain_events(event_queue),
+                    "topic_events": topic_events,
                 },
             )
         except BaseException as exc:
@@ -866,6 +879,51 @@ def _put_event(event_queue: queue.Queue[Any], args: tuple[Any, ...], kwargs: Map
         pass
 
 
+def _put_topic_event(
+    event_queue: queue.Queue[Any],
+    topic: str,
+    args: tuple[Any, ...],
+    kwargs: Mapping[str, Any],
+) -> None:
+    payload = {"topic": topic, "args": args, "kwargs": dict(kwargs)}
+    try:
+        event_queue.put_nowait(payload)
+    except queue.Full:
+        pass
+
+
+def _require_soundbank_topic_events(
+    event_queue: queue.Queue[Any],
+    soundbank_name: str,
+) -> list[Any]:
+    deadline = time.monotonic() + TOPIC_TIMEOUT_SECONDS
+    events: list[Any] = []
+    while time.monotonic() < deadline:
+        remaining = max(0.0, deadline - time.monotonic())
+        try:
+            event = _json_safe(event_queue.get(timeout=remaining))
+        except queue.Empty:
+            break
+        events.append(event)
+        generated = any(
+            row.get("topic") == "ak.wwise.core.soundbank.generated"
+            and _event_mentions_name(row, soundbank_name)
+            for row in events
+            if isinstance(row, Mapping)
+        )
+        generation_done = any(
+            row.get("topic") == "ak.wwise.core.soundbank.generationDone"
+            for row in events
+            if isinstance(row, Mapping)
+        )
+        if generated and generation_done:
+            return events
+    raise AssertionError(
+        "soundbank.generate did not publish both the matching generated event "
+        f"and generationDone within {TOPIC_TIMEOUT_SECONDS} seconds: {events!r}"
+    )
+
+
 def _event_mentions_name(event: Any, name: str) -> bool:
     return name in json.dumps(_json_safe(event), sort_keys=True)
 
@@ -883,8 +941,8 @@ def _unsubscribe(handler: Any) -> None:
     if handler is None:
         return
     unsubscribe = getattr(handler, "unsubscribe", None)
-    if callable(unsubscribe):
-        unsubscribe()
+    assert callable(unsubscribe), "WAAPI subscription handler cannot unsubscribe"
+    assert unsubscribe() is True, "WAAPI subscription cleanup returned false"
 
 
 def _hash_mutation_bearing_project_files(root: Path) -> tuple[str, int, int]:

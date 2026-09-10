@@ -50,7 +50,7 @@ if str(REPO_ROOT) not in sys.path:
 from tests.semantic import run_codex_skill_matrix as matrix  # noqa: E402
 from wwise_waapi.operation_composer import (  # noqa: E402
     OperationComposerError,
-    parse_typed_action_cli_arguments,
+    parse_typed_action_cli_argument_sequence,
 )
 from tests.destructive.support.live_environment import (  # noqa: E402
     LiveEnvironmentError,
@@ -110,6 +110,7 @@ from tests.semantic.support.codex_business_oracle_plan_v3 import (  # noqa: E402
 from tests.semantic.support.codex_audio_media_business_plan_v3 import (  # noqa: E402
     AudioMediaBusinessPlanError,
     AudioMediaBusinessPlanSections,
+    audio_request_matches_resolved_object_ids,
     parse_audio_media_business_plan_sections,
     validate_audio_archived_verification,
     validate_audio_media_business_plan_archive,
@@ -127,6 +128,10 @@ from tests.semantic.support.codex_media_pool_runtime_v3 import (  # noqa: E402
     media_answer_requires_order,
     media_grouped_report_failures,
     media_near_classification,
+)
+from tests.semantic.support.codex_media_pool_business_oracle_v3 import (  # noqa: E402
+    MediaPoolBusinessOracleView,
+    verify_media_pool_business_projection,
 )
 from tests.semantic.support.codex_import_business_plan_v3 import (  # noqa: E402
     COMPOUND_IMPORT_BUSINESS_PLAN_SCHEMA,
@@ -153,13 +158,28 @@ from tests.semantic.support.codex_cli_runtime_v3 import (  # noqa: E402
 from tests.semantic.support.codex_object_business_plan_v3 import (  # noqa: E402
     ObjectBusinessPlanError,
     ObjectBusinessPlanSections,
+    TYPED_PROFILE_OBJECT_METADATA_UNITS,
+    TYPED_PROFILE_QUERY_REPAIR_UNIT_ID,
+    TYPED_PROFILE_RENAME_UNIT_ID,
+    TYPED_PROFILE_SET03_UNIT_ID,
     parse_object_business_plan_sections,
     validate_archived_object_business_plan,
     validate_object_archived_verification,
 )
-from tests.semantic.support.codex_operation_draft_archive_v3 import (  # noqa: E402
-    ComposerArchiveError,
-    validate_operation_draft_archive,
+from tests.semantic.support.codex_direct_business_plan_v3 import (  # noqa: E402
+    DIRECT_FIXTURE_KIND,
+    DirectBusinessPlanError,
+    DirectBusinessPlanSections,
+    parse_direct_business_plan_sections,
+    validate_direct_archived_verification,
+    validate_direct_business_plan_archive,
+    validate_direct_status_archive_binding,
+)
+from tests.semantic.support.codex_typed_draft_evidence_v3 import (  # noqa: E402
+    BUSINESS_DRAFT_EVIDENCE_CONTRACT,
+    TYPED_DRAFT_EVIDENCE_CONTRACT,
+    TypedDraftEvidenceError,
+    validate_typed_draft_evidence,
 )
 from tests.semantic.support.codex_soundbank_business_plan_v3 import (  # noqa: E402
     SoundBankBusinessPlanError,
@@ -187,20 +207,39 @@ from tests.semantic.support.codex_integration_workflows_v2 import (  # noqa: E40
 from tests.semantic.support.codex_object_heavy_v3 import (  # noqa: E402
     ObjectHeavyRecipeError,
     build_object_heavy_v3_recipe,
+    typed_input_business_query_recipe,
+    typed_input_merge_recipe,
+    typed_input_rename_recipe,
 )
 from tests.semantic.support.codex_object_runtime_v3 import (  # noqa: E402
     bounded_result_disclosure,
 )
 from tests.semantic.support.codex_prompt_provenance_v3 import (  # noqa: E402
+    AUDIO_IMPORT_DERIVED_SFX_PROTOCOL_REVISION,
     PROMPT_MATERIALIZATION_RECEIPT_CONTRACT,
     PROMPT_MATERIALIZATION_RECEIPT_FILE,
     PROMPT_PROVENANCE_FILE,
+    PromptProvenanceError,
     PromptProvenanceEvidence,
+    _canonicalize_legacy_protocol_manifest,
+    deserialize_protocol,
     read_prompt_provenance,
     serialize_protocol,
 )
 from tests.semantic.support.codex_eval_protocol_v3 import (  # noqa: E402
+    V3GatewayProtocol,
+    V3ProtocolError,
+    materialize_typed_transaction_protocol_requests,
     operation_request_equivalence,
+)
+from tests.semantic.support.codex_gateway_broker import (  # noqa: E402
+    ExpectedGatewayStep,
+    InlineTypedOperationArgument,
+    TypedRequestFactsArgument,
+)
+from tests.semantic.support.codex_gateway_contracts import (  # noqa: E402
+    GATEWAY_RESULT_CONTRACT,
+    gateway_payload_contracts,
 )
 from tests.semantic.support.codex_filesystem_security import (  # noqa: E402
     CodexFileSecurityError,
@@ -217,6 +256,13 @@ from tests.semantic.support.codex_prompt_asset_reads_v3 import (  # noqa: E402
     PromptAssetReadError,
     remove_validated_command_occurrences,
     validated_prompt_asset_cat_commands,
+)
+from tests.semantic.support.codex_task_runner_v3 import (  # noqa: E402
+    _effective_expected_skill_reads,
+    _normalize_turn_reference_schedule,
+    _read_prefix_pass_gate,
+    _selected_workflow_step_names_are_closed,
+    _skill_reads_pass_gate,
 )
 from tests.semantic.support.codex_harness import (  # noqa: E402
     CodexGatewayErrorExpectation,
@@ -239,16 +285,21 @@ from tests.semantic.support.codex_harness import (  # noqa: E402
     parse_jsonl_events,
     powershell_core_host_fingerprint,
     probe_windows_powershell_core,
+    recoverable_preprocess_attempt_indexes,
+    semantic_skill_bootstrap_developer_instructions,
+    semantic_task_developer_instructions,
     turn_usage,
     validate_codex_version_output,
     workspace_skill_install_path,
 )
 from tests.semantic.support.codex_gateway_broker import (  # noqa: E402
     CodexGatewayBroker,
+    DRAFT_REVISION_SUBCOMMANDS,
     GatewayInvocationError,
     ResponseBinding,
     SemanticJsonArgument,
     VALIDATED_SUBSCRIPTION_ACK_CONTRACT,
+    _extract_topic_stream_records,
     resolve_gateway_invocation,
     gateway_step_sequence_matches,
     validate_transaction_show_confirmation_payload,
@@ -278,6 +329,13 @@ EXIT_INTERRUPTED = 130
 HEAVY_V3_PROFILE_ID = matrix.HEAVY_V3_PROFILE_ID
 MODIFICATION_POLICY_V3_PROFILE_ID = matrix.MODIFICATION_POLICY_V3_PROFILE_ID
 COMPOUND_HEAVY_V1_PROFILE_ID = matrix.COMPOUND_HEAVY_V1_PROFILE_ID
+TYPED_INPUT_PROFILE_ID = matrix.TYPED_INPUT_PROFILE_ID
+DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID = matrix.DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID
+DEEP_INTERFACE_MVP_PROFILE_ID = matrix.DEEP_INTERFACE_MVP_PROFILE_ID
+AUDIO_IMPORT_BUSINESS_PROFILE_ID = matrix.AUDIO_IMPORT_BUSINESS_PROFILE_ID
+OFFLINE_BUSINESS_AGENT_PROFILE_IDS = frozenset(
+    matrix.OFFLINE_BUSINESS_AGENT_PROFILES
+)
 INTEGRATION_WORKFLOWS_V1_PROFILE_ID = (
     matrix.INTEGRATION_WORKFLOWS_V1_PROFILE_ID
 )
@@ -285,6 +343,7 @@ INTEGRATION_WORKFLOWS_V2_PROFILE_ID = (
     matrix.INTEGRATION_WORKFLOWS_V2_PROFILE_ID
 )
 INTEGRATION_PROFILE_ID = matrix.INTEGRATION_PROFILE_ID
+SEMANTIC_BOOTSTRAP_PROFILE_IDS = matrix.SEMANTIC_BOOTSTRAP_PROFILE_IDS
 _INTEGRATION_V1_WORKFLOW_IDS = frozenset(
     {
         "interactive_weather_build",
@@ -310,6 +369,10 @@ TERRA_LOCKED_V3_PROFILE_IDS = frozenset(
     {
         MODIFICATION_POLICY_V3_PROFILE_ID,
         COMPOUND_HEAVY_V1_PROFILE_ID,
+        TYPED_INPUT_PROFILE_ID,
+        DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID,
+        DEEP_INTERFACE_MVP_PROFILE_ID,
+        *OFFLINE_BUSINESS_AGENT_PROFILE_IDS,
         INTEGRATION_WORKFLOWS_V1_PROFILE_ID,
         INTEGRATION_WORKFLOWS_V2_PROFILE_ID,
         INTEGRATION_PROFILE_ID,
@@ -330,6 +393,51 @@ HEAVY_V3_PHASE = "scenario"
 HEAVY_V3_GROUP_ID = "heavy-v3"
 HEAVY_V3_PROJECT_OUTCOME_CONTRACT = "waapi-skill.codex-heavy-project-run/v3"
 HEAVY_V3_CLI_OUTCOME_CONTRACT = "waapi-skill.codex-heavy-cli-run/v3"
+AUDIO_IMPORT_BUSINESS_OUTCOME_CONTRACT = (
+    "waapi-skill.audio-import-business-agent-outcome/v1"
+)
+BUSINESS_AGENT_OUTCOME_CONTRACTS = {
+    matrix.AUDIO_IMPORT_BUSINESS_PROFILE_ID: AUDIO_IMPORT_BUSINESS_OUTCOME_CONTRACT,
+    matrix.OBJECT_LIFECYCLE_BUSINESS_PROFILE_ID: (
+        "waapi-skill.object-lifecycle-business-agent-outcome/v1"
+    ),
+    matrix.OBJECT_METADATA_BUSINESS_PROFILE_ID: (
+        "waapi-skill.object-metadata-business-agent-outcome/v1"
+    ),
+    matrix.OBJECT_GRAPH_BUSINESS_PROFILE_ID: (
+        "waapi-skill.object-graph-business-agent-outcome/v1"
+    ),
+    matrix.SWITCH_ASSIGNMENT_BUSINESS_PROFILE_ID: (
+        "waapi-skill.switch-assignment-business-agent-outcome/v1"
+    ),
+    matrix.CORE_BUSINESS_PROFILE_ID: (
+        "waapi-skill.core-business-agent-outcome/v1"
+    ),
+    matrix.PROJECT_SETTING_BUSINESS_PROFILE_ID: (
+        "waapi-skill.project-setting-business-agent-outcome/v1"
+    ),
+    matrix.RUNTIME_CONTROL_BUSINESS_PROFILE_ID: (
+        "waapi-skill.runtime-control-business-agent-outcome/v1"
+    ),
+    matrix.DEBUG_CONTROL_BUSINESS_PROFILE_ID: (
+        "waapi-skill.debug-control-business-agent-outcome/v1"
+    ),
+    matrix.SOUNDENGINE_BUSINESS_PROFILE_ID: (
+        "waapi-skill.soundengine-business-agent-outcome/v1"
+    ),
+    matrix.CLI_CONSOLE_BUSINESS_PROFILE_ID: (
+        "waapi-skill.cli-console-business-agent-outcome/v1"
+    ),
+    matrix.HOST_UI_DEBUG_BUSINESS_PROFILE_ID: (
+        "waapi-skill.host-ui-debug-business-agent-outcome/v1"
+    ),
+    matrix.COMPOUND_UNDO_BUSINESS_PROFILE_ID: (
+        "waapi-skill.compound-undo-business-agent-outcome/v1"
+    ),
+    matrix.AUTHORING_UI_BUSINESS_PROFILE_ID: (
+        "waapi-skill.authoring-ui-business-agent-outcome/v1"
+    ),
+}
 HEAVY_V3_PROJECT_LIFECYCLE_CONTRACT = (
     "waapi-skill.codex-semantic-scenario-lifecycle/v3"
 )
@@ -349,6 +457,15 @@ HEAVY_V3_PROMPT_MATERIALIZATION_CONTRACT = (
 )
 HEAVY_V3_PROMPT_MATERIALIZATION_FILE = PROMPT_MATERIALIZATION_RECEIPT_FILE
 HEAVY_V3_PROMPT_PROVENANCE_FILE = PROMPT_PROVENANCE_FILE
+_DERIVED_SFX_PROTOCOL_HARNESS_SHA256 = frozenset(
+    {
+        "b152de8c55f8cb1085321da3ec877507627352acb10bed43e2ba7dbfae8b37df",
+        "5100e2c672d2461fe0ce96dba4b0cf1536a43d48e100ad2ac3fc5dbc0203efdb",
+    }
+)
+_CURRENT_AUDIO_IMPORT_PROTOCOL_REVISION = (
+    "audio-import-business-agent/current-v2-batch"
+)
 HEAVY_V3_ORACLE_CONTRACT = "waapi-skill.heavy-oracle/v2"
 HEAVY_V3_LIVE_PREFLIGHT_CONTRACT = "waapi-skill.codex-semantic-live-preflight/v1"
 HEAVY_V3_MIGRATION_API = "ak.wwise.cli.migrate"
@@ -415,7 +532,9 @@ class CampaignOptions:
     offline_only: bool
     lock_timeout_seconds: float
     max_pre_action_retries: int
+    wwise_readiness_timeout_seconds: float = 60.0
     windows_powershell_core_host: WindowsPowerShellCoreHost | None = None
+    protocol_manifest_revision: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -430,6 +549,7 @@ class HeavyV3PromptEvidence:
         | SoundBankBusinessPlanSections
         | CliBusinessPlanSections
         | WorkflowBusinessPlanSections
+        | DirectBusinessPlanSections
         | None
     )
 
@@ -679,6 +799,37 @@ def main(argv: Sequence[str] | None = None) -> int:
         return EXIT_BLOCKED
 
 
+def require_skill_local_campaign_interpreter(
+    skill_source: Path,
+    *,
+    interpreter: str | Path | None = None,
+    platform_name: str | None = None,
+) -> Path:
+    """Fail before Codex if the candidate's packaged runtime is not active."""
+
+    active_platform = os.name if platform_name is None else platform_name
+    expected = (
+        skill_source / ".venv" / "Scripts" / "python.exe"
+        if active_platform == "nt" or active_platform.startswith("win")
+        else skill_source / ".venv" / "bin" / "python"
+    )
+    expected_lexical = Path(os.path.abspath(os.fspath(expected)))
+    if not expected_lexical.is_file():
+        raise CampaignEvidenceError(
+            "candidate Skill-local interpreter is missing; run this candidate's "
+            f"scripts/setup_environment.py before the campaign: {expected_lexical}"
+        )
+    observed = Path(
+        os.path.abspath(os.fspath(interpreter or sys.executable))
+    )
+    if os.path.normcase(str(observed)) != os.path.normcase(str(expected_lexical)):
+        raise CampaignEvidenceError(
+            "formal campaign must run with the exact candidate Skill-local "
+            f"interpreter {expected_lexical}; received {observed}"
+        )
+    return expected_lexical
+
+
 def run_campaign(options: CampaignOptions) -> int:
     if options.profile in EXECUTABLE_V3_PROFILE_IDS:
         return run_heavy_v3_campaign(options)
@@ -695,9 +846,13 @@ def run_campaign(options: CampaignOptions) -> int:
         raise CampaignConfigError(str(exc)) from exc
     if not sessions:
         raise CampaignConfigError("no semantic sessions matched the requested filters")
+    require_skill_local_campaign_interpreter(options.skill_source)
     required_units = required_unit_map(sessions)
     windows_path_budget = None
-    if not options.verify_only:
+    if (
+        not options.verify_only
+        and options.profile not in OFFLINE_BUSINESS_AGENT_PROFILE_IDS
+    ):
         try:
             windows_path_budget = _require_standard_windows_path_budget(
                 options,
@@ -928,7 +1083,10 @@ def run_heavy_v3_campaign(options: CampaignOptions) -> int:
 
     if options.pair_ids:
         raise CampaignConfigError("heavy V3 campaigns do not accept pair filters")
-    if options.offline_only:
+    if (
+        options.offline_only
+        and options.profile not in OFFLINE_BUSINESS_AGENT_PROFILE_IDS
+    ):
         raise CampaignConfigError("heavy V3 campaigns require real Wwise execution")
     if (
         options.profile == MODIFICATION_POLICY_V3_PROFILE_ID
@@ -943,6 +1101,7 @@ def run_heavy_v3_campaign(options: CampaignOptions) -> int:
     except (SystemExit, ValueError) as exc:
         raise CampaignConfigError(str(exc)) from exc
     required_units = {str(unit.unit_id): (HEAVY_V3_PHASE,) for unit in units}
+    require_skill_local_campaign_interpreter(options.skill_source)
     windows_path_budget = None
     if not options.verify_only:
         try:
@@ -965,6 +1124,7 @@ def run_heavy_v3_campaign(options: CampaignOptions) -> int:
     validation_options = replace(
         options,
         windows_powershell_core_host=sealed_windows_host,
+        protocol_manifest_revision=_sealed_protocol_manifest_revision(effective),
     )
 
     root = prepare_campaign_root(options)
@@ -1002,7 +1162,11 @@ def run_heavy_v3_campaign(options: CampaignOptions) -> int:
             )
         consolidated = consolidate_units(required_units, manifests)
         write_consolidated(root, consolidated)
-        terminal = heavy_v3_consolidated_exit(consolidated)
+        terminal = heavy_v3_consolidated_exit(
+            consolidated,
+            freeze_retryable=options.profile
+            in {TYPED_INPUT_PROFILE_ID, DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID},
+        )
         if terminal is not None:
             return terminal
         if options.verify_only:
@@ -1193,7 +1357,11 @@ def run_heavy_v3_campaign(options: CampaignOptions) -> int:
             print_status(consolidated)
             if interrupts.requested:
                 return EXIT_INTERRUPTED
-            terminal = heavy_v3_consolidated_exit(consolidated)
+            terminal = heavy_v3_consolidated_exit(
+                consolidated,
+                freeze_retryable=options.profile
+                in {TYPED_INPUT_PROFILE_ID, DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID},
+            )
             return terminal if terminal is not None else EXIT_PENDING
 
 
@@ -1214,8 +1382,11 @@ def load_heavy_v3_campaign_units(options: CampaignOptions) -> tuple[Any, ...]:
         case_ids=options.case_ids,
         versions=options.versions,
         pair_ids=(),
-        offline_only=False,
+        offline_only=options.offline_only,
         overwrite=False,
+        wwise_readiness_timeout_seconds=(
+            options.wwise_readiness_timeout_seconds
+        ),
     )
     return tuple(matrix.load_heavy_v3_units(matrix_options))
 
@@ -1254,6 +1425,8 @@ def build_heavy_v3_child_argv(
         options.service_tier,
         "--timeout",
         str(options.timeout_seconds),
+        "--wwise-readiness-timeout",
+        str(options.wwise_readiness_timeout_seconds),
     ]
     if windows_powershell_core_host is not None:
         argv.extend(
@@ -1264,6 +1437,8 @@ def build_heavy_v3_child_argv(
                 ),
             )
         )
+    if options.offline_only:
+        argv.append("--offline-only")
     for unit in units:
         argv.extend(("--case-id", str(unit.unit_id)))
     return argv
@@ -1297,6 +1472,9 @@ def heavy_v3_child_request(
             "reasoning_effort": options.reasoning_effort,
             "service_tier": options.service_tier,
             "timeout_seconds": options.timeout_seconds,
+            "wwise_readiness_timeout_seconds": (
+                options.wwise_readiness_timeout_seconds
+            ),
             "memory": "disabled",
             **(
                 {"approval_policy": "never"}
@@ -1304,6 +1482,7 @@ def heavy_v3_child_request(
                 else {}
             ),
             "sequential": True,
+            "offline_only": options.offline_only,
         },
         "argv": list(argv),
         "started_at": utc_now(),
@@ -1360,9 +1539,18 @@ def blocked_heavy_v3_validation(
     )
 
 
-def heavy_v3_consolidated_exit(consolidated: Mapping[str, Any]) -> int | None:
+def heavy_v3_consolidated_exit(
+    consolidated: Mapping[str, Any],
+    *,
+    freeze_retryable: bool = False,
+) -> int | None:
     if consolidated.get("blocked_unit_ids"):
         return EXIT_BLOCKED
+    if freeze_retryable and consolidated.get("retryable_unit_ids"):
+        # This release profile freezes every non-PASS root. Even a proven
+        # pre-action service failure may only be retried under a new candidate
+        # and campaign root; verify-only remains available after 25/25 PASS.
+        return EXIT_PENDING
     if consolidated.get("pending_unit_ids") or consolidated.get("retryable_unit_ids"):
         return None
     if consolidated.get("failed_unit_ids"):
@@ -1584,6 +1772,46 @@ def _sealed_windows_powershell_core_host(
         ) from exc
 
 
+def _sealed_protocol_manifest_revision(
+    effective: Mapping[str, Any],
+) -> str | None:
+    """Select only reviewed archive migrations from immutable campaign identity."""
+
+    selection = effective.get("selection")
+    harness = effective.get("harness")
+    if (
+        effective.get("synthetic") is True
+        and selection is None
+        and harness is None
+    ):
+        return None
+    if not isinstance(selection, Mapping) or not isinstance(harness, Mapping):
+        raise CampaignEvidenceError("campaign protocol revision identity is malformed")
+    profile = selection.get("profile")
+    semantic_sha256 = harness.get("semantic_tree_sha256")
+    sealed_revision = harness.get("protocol_manifest_revision")
+    if profile in {
+        AUDIO_IMPORT_BUSINESS_PROFILE_ID,
+        matrix.DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID,
+    }:
+        if sealed_revision == _CURRENT_AUDIO_IMPORT_PROTOCOL_REVISION:
+            return _CURRENT_AUDIO_IMPORT_PROTOCOL_REVISION
+        if sealed_revision is not None:
+            raise CampaignEvidenceError(
+                "audio import business protocol revision is unreviewed"
+            )
+        if semantic_sha256 in _DERIVED_SFX_PROTOCOL_HARNESS_SHA256:
+            return AUDIO_IMPORT_DERIVED_SFX_PROTOCOL_REVISION
+        raise CampaignEvidenceError(
+            "audio import business historical harness hash is unreviewed"
+        )
+    if sealed_revision is not None:
+        raise CampaignEvidenceError(
+            "non-audio-import campaign declares a protocol revision"
+        )
+    return None
+
+
 def _assert_codex_shell_frozen(
     codex: Mapping[str, Any],
     *,
@@ -1692,6 +1920,9 @@ def build_effective_config(
         "live_config": {
             "path": str(options.live_config),
             "sha256": sha256_file(options.live_config),
+            "readiness_timeout_seconds": (
+                options.wwise_readiness_timeout_seconds
+            ),
         },
         "codex": {
             "path": str(options.codex_binary),
@@ -1889,7 +2120,7 @@ def build_heavy_v3_effective_config(
             "case_ids": list(options.case_ids),
             "versions": list(options.versions),
             "pair_ids": [],
-            "offline_only": False,
+            "offline_only": options.offline_only,
             "units": unit_rows,
             "required_units": {
                 str(key): list(value) for key, value in required_units.items()
@@ -1920,11 +2151,33 @@ def build_heavy_v3_effective_config(
                 exclude_names=harness_excludes,
             ),
             "excluded_names": list(harness_excludes),
+            **(
+                {
+                    "protocol_manifest_revision": (
+                        _CURRENT_AUDIO_IMPORT_PROTOCOL_REVISION
+                    )
+                }
+                if options.profile
+                in {
+                    AUDIO_IMPORT_BUSINESS_PROFILE_ID,
+                    matrix.DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID,
+                }
+                else {}
+            ),
         },
-        "live_config": {
-            "path": str(options.live_config),
-            "sha256": sha256_file(options.live_config),
-        },
+        "live_config": (
+            {
+                "path": str(options.live_config),
+                "sha256": None,
+                "used": False,
+            }
+            if options.offline_only
+            else {
+                "path": str(options.live_config),
+                "sha256": sha256_file(options.live_config),
+                "used": True,
+            }
+        ),
         "live_inputs": live_inputs,
         "codex": {
             "path": str(options.codex_binary),
@@ -1980,10 +2233,13 @@ def heavy_v3_immutable_options(options: CampaignOptions) -> dict[str, Any]:
         "reasoning_effort": options.reasoning_effort,
         "service_tier": options.service_tier,
         "timeout_seconds": options.timeout_seconds,
+        "wwise_readiness_timeout_seconds": (
+            options.wwise_readiness_timeout_seconds
+        ),
         "case_ids": list(options.case_ids),
         "versions": list(options.versions),
         "pair_ids": [],
-        "offline_only": False,
+        "offline_only": options.offline_only,
         "lock_timeout_seconds": options.lock_timeout_seconds,
         "max_pre_action_retries": options.max_pre_action_retries,
     }
@@ -1998,6 +2254,21 @@ def _heavy_v3_live_input_fingerprints(
 
     if not unit_rows:
         raise CampaignEvidenceError("heavy live-input fingerprint requires selected units")
+    if options.profile in OFFLINE_BUSINESS_AGENT_PROFILE_IDS:
+        versions = sorted({str(row.get("version")) for row in unit_rows})
+        supported = matrix.OFFLINE_BUSINESS_AGENT_PROFILES[
+            options.profile
+        ].supported_versions
+        if any(version not in supported for version in versions):
+            raise CampaignEvidenceError(
+                "business Agent profile has an invalid fixture version"
+            )
+        return {
+            "mode": "deterministic-waapi-read-shim",
+            "versions": versions,
+            "wwise_started": False,
+            "production_gateway": True,
+        }
     versions: list[str] = []
     migration_selected = False
     for row in unit_rows:
@@ -2173,12 +2444,17 @@ def heavy_v3_unit_row(unit: Any, *, sequence: int) -> dict[str, Any]:
         or not api
     ):
         raise CampaignEvidenceError("heavy unit has an invalid identity")
+    runner_lane = getattr(unit, "runner_lane", None)
+    if runner_lane is None:
+        runner_lane = "cli" if api.startswith("ak.wwise.cli.") else "project"
+    if runner_lane not in {"project", "cli", "agent"}:
+        raise CampaignEvidenceError("heavy unit has an invalid runner lane")
     row = {
         "sequence": sequence,
         "scenario_id": scenario_id,
         "version": version,
         "api": api,
-        "runner": "cli" if api.startswith("ak.wwise.cli.") else "project",
+        "runner": runner_lane,
     }
     base_scenario_id = getattr(unit, "base_scenario_id", None)
     if base_scenario_id is not None:
@@ -2187,6 +2463,24 @@ def heavy_v3_unit_row(unit: Any, *, sequence: int) -> dict[str, Any]:
                 "heavy unit has an invalid base-scenario identity"
             )
         row["base_scenario_id"] = base_scenario_id
+    component_profile_id = getattr(unit, "component_profile_id", None)
+    family = getattr(unit, "family", None)
+    if component_profile_id is not None:
+        if (
+            not isinstance(component_profile_id, str)
+            or not component_profile_id
+            or not isinstance(family, str)
+            or not family
+        ):
+            raise CampaignEvidenceError(
+                "deep-business acceptance unit metadata is invalid"
+            )
+        row.update(
+            {
+                "component_profile_id": component_profile_id,
+                "family": family,
+            }
+        )
     policy_metadata = _policy_unit_metadata(unit)
     for key in (
         "base_scenario_id",
@@ -2318,7 +2612,11 @@ def validate_heavy_v3_child_run(
         expected_profile=options.profile,
         expected_rows=expected_rows,
     )
-    _validate_heavy_v3_live_preflight(root, summary=summary)
+    _validate_heavy_v3_live_preflight(
+        root,
+        summary=summary,
+        expected_profile=options.profile,
+    )
     _validate_heavy_v3_progress(run_config["progress"], summary=summary)
 
     case_rows = summary["case_records"]
@@ -2474,6 +2772,7 @@ def _validate_heavy_v3_run_config(
         "reasoning_effort",
         "service_tier",
         "timeout_seconds",
+        "wwise_readiness_timeout_seconds",
         "memory",
         "fresh_process_thread_and_task_per_scenario",
         "sequential_wwise_lifecycles",
@@ -2498,11 +2797,14 @@ def _validate_heavy_v3_run_config(
         "case_ids": expected_ids,
         "versions": [],
         "pair_ids": [],
-        "offline_only": False,
+        "offline_only": options.offline_only,
         "model": options.model,
         "reasoning_effort": options.reasoning_effort,
         "service_tier": options.service_tier,
         "timeout_seconds": options.timeout_seconds,
+        "wwise_readiness_timeout_seconds": (
+            options.wwise_readiness_timeout_seconds
+        ),
         "memory": "disabled",
         "fresh_process_thread_and_task_per_scenario": True,
         "sequential_wwise_lifecycles": True,
@@ -2613,6 +2915,8 @@ def _validate_heavy_v3_summary(
                 key
                 for key in (
                     "base_scenario_id",
+                    "component_profile_id",
+                    "family",
                     "policy_mode",
                     "project_modification_policy",
                     "repetition",
@@ -2758,12 +3062,27 @@ def _validate_heavy_v3_live_preflight(
     root: Path,
     *,
     summary: Mapping[str, Any],
+    expected_profile: str,
 ) -> None:
     payload = load_strict_regular_json(root / "live-preflight.json")
     if not isinstance(payload, Mapping):
         raise CampaignEvidenceError("heavy matrix live preflight must be an object")
     state = summary.get("preflight")
     if state == "passed":
+        if expected_profile in OFFLINE_BUSINESS_AGENT_PROFILE_IDS:
+            descriptor = matrix.OFFLINE_BUSINESS_AGENT_PROFILES[expected_profile]
+            expected = {
+                "contract": descriptor.preflight_contract,
+                "ok": True,
+                "mode": "offline-production-gateway",
+                "wwise_started": False,
+                "production_gateway": True,
+            }
+            if dict(payload) != expected:
+                raise CampaignEvidenceError(
+                    "business Agent preflight evidence is malformed"
+                )
+            return
         required = {
             "contract",
             "ok",
@@ -2878,6 +3197,15 @@ def _validate_heavy_v3_matrix_case(
     outcome = load_strict_regular_json(outcome_path)
     if outcome != runner_outcome:
         raise CampaignEvidenceError("heavy outcome file differs from matrix-case")
+    if value.get("runner") == "agent":
+        _validate_business_agent_outcome(
+            outcome,
+            matrix_case=value,
+            expected_unit=expected_unit,
+            scenario_root=scenario_root,
+            options=options,
+        )
+        return
     expected_outcome_keys = {
         "contract",
         "scenario_id",
@@ -2895,7 +3223,10 @@ def _validate_heavy_v3_matrix_case(
     for key in ("scenario_id", "version", "status", "reason", "scenario_root"):
         if outcome.get(key) != value.get(key):
             raise CampaignEvidenceError(f"heavy runner outcome mismatch for {key}")
-    expected_contract = _heavy_v3_outcome_contract(str(value["runner"]))
+    expected_contract = _heavy_v3_outcome_contract(
+        str(value["runner"]),
+        profile=options.profile,
+    )
     if outcome.get("contract") != expected_contract:
         raise CampaignEvidenceError("heavy runner outcome contract mismatch")
     if not isinstance(outcome.get("checks"), Mapping):
@@ -2932,7 +3263,857 @@ def _validate_heavy_v3_matrix_case(
                 outcome,
                 expected_unit=expected_unit,
                 scenario_root=scenario_root,
+                options=options,
             )
+
+
+def _validate_business_agent_outcome(
+    outcome: Mapping[str, Any],
+    *,
+    matrix_case: Mapping[str, Any],
+    expected_unit: Any,
+    scenario_root: Path,
+    options: CampaignOptions,
+) -> None:
+    protocol_unit = _business_agent_protocol_unit(expected_unit)
+    expected_keys = {
+        "contract",
+        "scenario_id",
+        "version",
+        "status",
+        "reason",
+        "thread_id",
+        "gates",
+        "command_count",
+        "transaction_count",
+        "production_gateway",
+        "wwise_started",
+        "final_response",
+    }
+    if set(outcome) != expected_keys:
+        raise CampaignEvidenceError(
+            "business Agent outcome schema is not closed"
+        )
+    for key in ("scenario_id", "version", "status", "reason"):
+        if outcome.get(key) != matrix_case.get(key):
+            raise CampaignEvidenceError(
+                f"business Agent outcome mismatch for {key}"
+            )
+    profile = str(
+        getattr(expected_unit, "component_profile_id", options.profile)
+    )
+    gates = outcome.get("gates")
+    transaction_count = getattr(expected_unit, "transaction_count", None)
+    if (
+        outcome.get("contract") != BUSINESS_AGENT_OUTCOME_CONTRACTS.get(profile)
+        or not isinstance(gates, Mapping)
+        or not gates
+        or any(type(value) is not bool for value in gates.values())
+        or type(outcome.get("command_count")) is not int
+        or outcome["command_count"] < 1
+        or type(outcome.get("transaction_count")) is not int
+        or outcome.get("transaction_count") != transaction_count
+        or outcome.get("production_gateway") is not True
+        or outcome.get("wwise_started") is not False
+        or not isinstance(outcome.get("final_response"), str)
+    ):
+        raise CampaignEvidenceError(
+            "business Agent outcome facts are malformed"
+        )
+    if outcome.get("status") == "PASS" and (
+        not isinstance(outcome.get("thread_id"), str)
+        or not outcome["thread_id"]
+        or not all(gates.values())
+    ):
+        raise CampaignEvidenceError(
+            "business Agent PASS lacks a fresh thread or passing gates"
+        )
+
+    evidence_root = _require_real_directory(
+        scenario_root / "evidence",
+        label="business Agent evidence root",
+    )
+    nested_outcome = load_strict_regular_json(evidence_root / "outcome.json")
+    reconciliation = load_strict_regular_json(
+        evidence_root / "broker-reconciliation.json"
+    )
+    broker = load_strict_regular_json(evidence_root / "broker-evidence.json")
+    load_strict_regular_json(evidence_root / "codex-result-facts.json")
+    if nested_outcome != outcome:
+        raise CampaignEvidenceError(
+            "business Agent nested outcome differs from scenario outcome"
+        )
+    if outcome.get("status") == "PASS" and (
+        reconciliation.get("passed") is not True
+        or broker.get("passed") is not True
+        or broker.get("complete") is not True
+        or not isinstance(broker.get("records"), list)
+        or outcome.get("command_count") != len(broker["records"])
+    ):
+        raise CampaignEvidenceError(
+            "business Agent PASS lacks complete Broker reconciliation"
+        )
+    if outcome.get("status") == "PASS":
+        if profile == AUDIO_IMPORT_BUSINESS_PROFILE_ID:
+            _validate_audio_import_business_agent_protocol(
+                broker,
+                expected_unit=protocol_unit,
+                scenario_root=scenario_root,
+                protocol_manifest_revision=options.protocol_manifest_revision,
+            )
+        else:
+            _validate_bound_business_agent_protocol(
+                broker,
+                expected_unit=protocol_unit,
+                profile=profile,
+                scenario_root=scenario_root,
+            )
+
+
+def _business_agent_protocol_unit(expected_unit: Any) -> Any:
+    """Return the sealed component unit behind a deep-acceptance wrapper."""
+
+    component = getattr(expected_unit, "component_unit", None)
+    return expected_unit if component is None else component
+
+
+def _protocol_manifest_revision_for_unit(
+    expected_unit: Any,
+    options: CampaignOptions,
+) -> str | None:
+    """Scope the audio protocol codec to the wrapped audio-import component."""
+
+    component_profile = str(
+        getattr(expected_unit, "component_profile_id", options.profile)
+    )
+    return (
+        options.protocol_manifest_revision
+        if component_profile == AUDIO_IMPORT_BUSINESS_PROFILE_ID
+        else None
+    )
+
+
+def _validate_audio_import_business_agent_outcome(
+    outcome: Mapping[str, Any],
+    *,
+    matrix_case: Mapping[str, Any],
+    expected_unit: Any,
+    scenario_root: Path,
+    options: CampaignOptions,
+) -> None:
+    """Compatibility name retained for focused audio-import evidence tests."""
+
+    _validate_business_agent_outcome(
+        outcome,
+        matrix_case=matrix_case,
+        expected_unit=expected_unit,
+        scenario_root=scenario_root,
+        options=options,
+    )
+
+
+def _validate_bound_business_agent_protocol(
+    broker: Mapping[str, Any],
+    *,
+    expected_unit: Any,
+    profile: str,
+    scenario_root: Path | None = None,
+) -> None:
+    """Rebuild one non-import Business Agent protocol from frozen suite facts."""
+
+    if profile == matrix.DEBUG_CONTROL_BUSINESS_PROFILE_ID:
+        from tests.semantic.support.codex_eval_protocol_v3 import (
+            build_debug_control_business_transaction_steps,
+        )
+
+        steps = build_debug_control_business_transaction_steps(
+            version=expected_unit.version,
+            label="tx01",
+            enabled=True,
+        )
+        preview_request = steps[-1].expected_operation_request
+    elif profile == matrix.OBJECT_LIFECYCLE_BUSINESS_PROFILE_ID:
+        from tests.semantic.support.codex_object_lifecycle_business_agent_runner import (
+            build_preview_only_lifecycle_steps,
+        )
+
+        arguments: dict[str, Any] = {
+            "object": {"kind": "path", "value": str(expected_unit.object["path"])}
+        }
+        if expected_unit.value is not None:
+            arguments["value"] = expected_unit.value
+        request = {
+            "contract": "waapi-skill.operation-request/v1",
+            "version": expected_unit.version,
+            "operation": expected_unit.operation,
+            "arguments": arguments,
+        }
+        steps = build_preview_only_lifecycle_steps(request)
+        preview_request = _bind_business_request_paths(
+            steps[-1].expected_operation_request,
+            objects=(expected_unit.object,),
+        )
+    elif profile == matrix.OBJECT_METADATA_BUSINESS_PROFILE_ID:
+        from tests.semantic.support.codex_eval_protocol_v3 import (
+            build_object_metadata_business_transaction_steps,
+        )
+
+        request = {
+            "contract": "waapi-skill.operation-request/v1",
+            "version": expected_unit.version,
+            "operation": expected_unit.operation,
+            "arguments": {
+                "object": {"kind": "id", "value": str(expected_unit.source["id"])},
+                "reference": expected_unit.native_reference,
+                "target": {"kind": "id", "value": str(expected_unit.target["id"])},
+            },
+        }
+        steps = build_object_metadata_business_transaction_steps(
+            request,
+            label="tx01",
+            field_meaning=expected_unit.field_meaning,
+            object_selector={
+                "kind": "path",
+                "value": str(expected_unit.source["path"]),
+            },
+            target_selector={
+                "kind": "path",
+                "value": str(expected_unit.target["path"]),
+            },
+            discover_before_target=True,
+        )
+        preview_request = request
+    elif profile == matrix.OBJECT_GRAPH_BUSINESS_PROFILE_ID:
+        from tests.semantic.support.codex_eval_protocol_v3 import (
+            build_object_graph_business_transaction_steps,
+        )
+        from tests.semantic.support.codex_object_graph_business_agent_runner import (
+            object_graph_business_request,
+        )
+
+        request = object_graph_business_request(expected_unit)
+        steps = build_object_graph_business_transaction_steps(
+            request,
+            label="tx01",
+            parent_selector={
+                "kind": "path",
+                "value": str(expected_unit.parent["path"]),
+            },
+        )
+        preview_request = request
+    elif profile == matrix.SWITCH_ASSIGNMENT_BUSINESS_PROFILE_ID:
+        from tests.semantic.support.codex_eval_protocol_v3 import (
+            build_switch_assignment_business_transaction_steps,
+        )
+
+        request = {
+            "contract": "waapi-skill.operation-request/v1",
+            "version": expected_unit.version,
+            "operation": expected_unit.operation,
+            "arguments": {
+                role: {
+                    "kind": "path",
+                    "value": str(expected_unit.objects[role]["path"]),
+                }
+                for role in (
+                    "switch_container",
+                    "child",
+                    "state_or_switch",
+                )
+            },
+        }
+        steps = build_switch_assignment_business_transaction_steps(
+            request,
+            label="tx01",
+        )
+        preview_request = _bind_business_request_paths(
+            steps[-1].expected_operation_request,
+            objects=tuple(expected_unit.objects.values()),
+        )
+    elif profile == matrix.CORE_BUSINESS_PROFILE_ID:
+        from tests.semantic.support.codex_eval_protocol_v3 import (
+            build_core_business_transaction_steps,
+        )
+
+        steps = build_core_business_transaction_steps(
+            api=expected_unit.operation,
+            version=expected_unit.version,
+            label="tx01",
+        )
+        preview_request = steps[-1].expected_operation_request
+    elif profile == matrix.PROJECT_SETTING_BUSINESS_PROFILE_ID:
+        from tests.semantic.support.codex_eval_protocol_v3 import (
+            build_project_setting_business_transaction_steps,
+        )
+        from tests.semantic.support.codex_project_setting_business_profile import (
+            OBJECT_ID,
+            OBJECT_NAME,
+        )
+
+        steps = build_project_setting_business_transaction_steps(
+            version=expected_unit.version,
+            label="tx01",
+            object_id=OBJECT_ID,
+            object_name=OBJECT_NAME,
+        )
+        preview_request = steps[-1].expected_operation_request
+    elif profile == matrix.RUNTIME_CONTROL_BUSINESS_PROFILE_ID:
+        from tests.semantic.support.codex_eval_protocol_v3 import (
+            build_runtime_control_business_transaction_steps,
+        )
+
+        steps = build_runtime_control_business_transaction_steps(
+            version=expected_unit.version,
+            label="tx01",
+        )
+        preview_request = steps[-1].expected_operation_request
+    elif profile == matrix.SOUNDENGINE_BUSINESS_PROFILE_ID:
+        from tests.semantic.support.codex_eval_protocol_v3 import (
+            build_soundengine_business_transaction_steps,
+        )
+        from tests.semantic.support.codex_soundengine_business_profile import (
+            EVENT_ID,
+            EVENT_NAME,
+            GAME_OBJECT_NAME,
+            LISTENER_HANDLE,
+            LISTENER_ID,
+            MONITOR_MESSAGE,
+        )
+
+        steps = build_soundengine_business_transaction_steps(
+            version=expected_unit.version,
+            label="tx01",
+            operation=expected_unit.operation,
+            monitor_message=MONITOR_MESSAGE,
+            game_object_name=GAME_OBJECT_NAME,
+            event_id=EVENT_ID,
+            event_name=EVENT_NAME,
+            listener_handle=LISTENER_HANDLE,
+            listener_id=LISTENER_ID,
+        )
+        preview_request = steps[-1].expected_operation_request
+    elif profile == matrix.CLI_CONSOLE_BUSINESS_PROFILE_ID:
+        from tests.semantic.support.codex_cli_console_business_profile import (
+            OUTPUT_DIRECTORY,
+        )
+        from tests.semantic.support.codex_eval_protocol_v3 import (
+            build_cli_console_business_transaction_steps,
+        )
+
+        if scenario_root is None:
+            raise CampaignEvidenceError(
+                "CLI/Console Business Agent audit lacks its scenario root"
+            )
+        project_file = (
+            scenario_root
+            / "evidence"
+            / "codex-task"
+            / "runtime"
+            / "project"
+            / "SemanticProject.wproj"
+        ).resolve(strict=True)
+        steps = build_cli_console_business_transaction_steps(
+            api=expected_unit.operation,
+            version=expected_unit.version,
+            label="tx01",
+            project_file=str(project_file),
+            output_directory=OUTPUT_DIRECTORY,
+        )
+        preview_request = steps[-1].expected_operation_request
+    elif profile == matrix.HOST_UI_DEBUG_BUSINESS_PROFILE_ID:
+        from tests.semantic.support.codex_eval_protocol_v3 import (
+            build_host_ui_debug_business_transaction_steps,
+        )
+
+        if scenario_root is None:
+            raise CampaignEvidenceError(
+                "host/UI/Debug Business Agent audit lacks its scenario root"
+            )
+        output_file = (
+            scenario_root
+            / "evidence"
+            / "codex-task"
+            / "runtime"
+            / "output"
+            / "FreshAgentTone.wav"
+        ).resolve(strict=False)
+        steps = build_host_ui_debug_business_transaction_steps(
+            version=expected_unit.version,
+            label="tx01",
+            output_file=str(output_file),
+        )
+        preview_request = steps[-1].expected_operation_request
+    elif profile == matrix.COMPOUND_UNDO_BUSINESS_PROFILE_ID:
+        from tests.semantic.support.codex_compound_undo_business_agent_runner import (
+            compound_undo_business_child_expectations,
+        )
+        from tests.semantic.support.codex_eval_protocol_v3 import (
+            build_compound_undo_business_transaction_steps,
+        )
+
+        steps = build_compound_undo_business_transaction_steps(
+            compound_undo_business_child_expectations(expected_unit),
+            display_name=expected_unit.display_name,
+            label="tx03",
+        )
+        preview_request = steps[-1].expected_operation_request
+    elif profile == matrix.AUTHORING_UI_BUSINESS_PROFILE_ID:
+        from tests.semantic.support.codex_eval_protocol_v3 import (
+            build_authoring_ui_business_transaction_steps,
+        )
+
+        request = {
+            "contract": "waapi-skill.operation-request/v1",
+            "version": expected_unit.version,
+            "operation": expected_unit.operation,
+            "arguments": dict(expected_unit.request_arguments),
+        }
+        steps = build_authoring_ui_business_transaction_steps(
+            request,
+            label="tx01",
+        )
+        preview_request = request
+    else:
+        raise CampaignEvidenceError("unknown bound Business Agent profile")
+
+    expected_names = tuple(step.name for step in steps)
+    audited_steps = tuple(steps)
+    optional_discovery_labels = {
+        matrix.DEBUG_CONTROL_BUSINESS_PROFILE_ID: "tx01",
+        matrix.OBJECT_LIFECYCLE_BUSINESS_PROFILE_ID: "tx01",
+        matrix.OBJECT_METADATA_BUSINESS_PROFILE_ID: "tx01",
+        matrix.OBJECT_GRAPH_BUSINESS_PROFILE_ID: "tx01",
+        matrix.SWITCH_ASSIGNMENT_BUSINESS_PROFILE_ID: "tx01",
+        matrix.COMPOUND_UNDO_BUSINESS_PROFILE_ID: "tx03",
+        matrix.CORE_BUSINESS_PROFILE_ID: "tx01",
+        matrix.PROJECT_SETTING_BUSINESS_PROFILE_ID: "tx01",
+        matrix.RUNTIME_CONTROL_BUSINESS_PROFILE_ID: "tx01",
+        matrix.SOUNDENGINE_BUSINESS_PROFILE_ID: "tx01",
+        matrix.CLI_CONSOLE_BUSINESS_PROFILE_ID: "tx01",
+        matrix.HOST_UI_DEBUG_BUSINESS_PROFILE_ID: "tx01",
+    }
+    if profile in optional_discovery_labels:
+        label = optional_discovery_labels[profile]
+        optional_discovery = ExpectedGatewayStep(
+            name=f"{label}.operations",
+            subcommand="operations",
+        )
+        raw_expected_names = broker.get("expected_step_names")
+        observed_expected_names = (
+            tuple(raw_expected_names)
+            if isinstance(raw_expected_names, list)
+            else ()
+        )
+        allowed_prefixes: tuple[tuple[ExpectedGatewayStep, ...], ...] = (
+            (),
+            (optional_discovery,),
+        )
+        if profile == matrix.OBJECT_GRAPH_BUSINESS_PROFILE_ID:
+            from wwise_waapi.builders.common import split_wwise_path
+
+            segments = (
+                *split_wwise_path(str(expected_unit.parent["path"])),
+                str(expected_unit.root_name),
+            )
+            preflight_arguments = tuple(
+                argument
+                for segment in segments
+                for argument in ("--path-segment", segment)
+            )
+            optional_root_preflight = ExpectedGatewayStep(
+                name=f"{label}.query-object-preflight",
+                subcommand="query-object",
+                arguments=preflight_arguments,
+            )
+            allowed_prefixes = (
+                *allowed_prefixes,
+                (optional_root_preflight,),
+                (optional_discovery, optional_root_preflight),
+            )
+        matched_prefix = next(
+            (
+                prefix
+                for prefix in allowed_prefixes
+                if observed_expected_names
+                == (*(step.name for step in prefix), *expected_names)
+            ),
+            None,
+        )
+        if matched_prefix is None:
+            raise CampaignEvidenceError(
+                "Business Agent Broker used an unreviewed discovery prefix"
+            )
+        audited_steps = (*matched_prefix, *audited_steps)
+        expected_names = observed_expected_names
+    consumed_names = broker.get("consumed_step_names")
+    records = broker.get("records")
+    if (
+        broker.get("expected_step_names") != list(expected_names)
+        or consumed_names != list(expected_names)
+        or not isinstance(records, list)
+        or len(records) != len(expected_names)
+    ):
+        raise CampaignEvidenceError("bound Business Agent Broker topology drifted")
+    by_name = {
+        str(record.get("step_name")): record
+        for record in records
+        if isinstance(record, Mapping)
+    }
+    if len(by_name) != len(expected_names):
+        raise CampaignEvidenceError("bound Business Agent Broker step identity drifted")
+    for step in audited_steps:
+        record = by_name.get(step.name)
+        arguments = record.get("gateway_arguments") if isinstance(record, Mapping) else None
+        if (
+            not isinstance(record, Mapping)
+            or record.get("accepted") is not True
+            or record.get("authenticated") is not True
+            or record.get("succeeded") is not True
+            or record.get("exit_code") != 0
+            or not isinstance(arguments, list)
+            or arguments[:1] != [step.subcommand]
+            or (step.subcommand == "operations" and arguments != ["operations"])
+            or (
+                step.name.endswith(".query-object-preflight")
+                and arguments != [step.subcommand, *step.arguments]
+            )
+        ):
+            raise CampaignEvidenceError("bound Business Agent Broker record is not successful")
+        if step.subcommand == "preview-from-draft":
+            payload = record.get("payload")
+            agent_result = payload.get("agent_result") if isinstance(payload, Mapping) else None
+            observed_request = (
+                agent_result.get("request")
+                if isinstance(agent_result, Mapping)
+                else None
+            )
+            register_soundengine = (
+                profile == matrix.SOUNDENGINE_BUSINESS_PROFILE_ID
+                and expected_unit.operation == "ak.soundengine.registerGameObj"
+            )
+            register_arguments = (
+                observed_request.get("arguments")
+                if isinstance(observed_request, Mapping)
+                else None
+            )
+            register_args = (
+                register_arguments.get("args")
+                if isinstance(register_arguments, Mapping)
+                else None
+            )
+            register_request_matches = bool(
+                register_soundengine
+                and isinstance(observed_request, Mapping)
+                and observed_request.get("contract")
+                == "waapi-skill.operation-request/v1"
+                and observed_request.get("version") == expected_unit.version
+                and observed_request.get("operation") == "waapi.call"
+                and isinstance(register_arguments, Mapping)
+                and register_arguments.get("api")
+                == "ak.soundengine.registerGameObj"
+                and register_arguments.get("options") == {}
+                and isinstance(register_args, Mapping)
+                and register_args.get("name") == "Fresh Weather Listener"
+                and isinstance(register_args.get("gameObject"), int)
+                and not isinstance(register_args.get("gameObject"), bool)
+            ) if register_soundengine else False
+            if not register_request_matches and observed_request != preview_request:
+                raise CampaignEvidenceError("bound Business Agent Preview request drifted")
+
+
+def _bind_business_request_paths(
+    value: Any,
+    *,
+    objects: Sequence[Mapping[str, Any]],
+) -> Any:
+    path_to_id = {
+        str(row["path"]): str(row["id"])
+        for row in objects
+        if isinstance(row.get("path"), str) and isinstance(row.get("id"), str)
+    }
+
+    def visit(item: Any) -> Any:
+        if isinstance(item, Mapping):
+            if item.get("kind") == "path" and item.get("value") in path_to_id:
+                return {"kind": "id", "value": path_to_id[str(item["value"])]}
+            return {str(key): visit(child) for key, child in item.items()}
+        if isinstance(item, list):
+            return [visit(child) for child in item]
+        return item
+
+    return visit(value)
+
+
+def _validate_audio_import_business_agent_protocol(
+    broker: Mapping[str, Any],
+    *,
+    expected_unit: Any,
+    scenario_root: Path,
+    protocol_manifest_revision: str | None,
+) -> None:
+    """Rebuild the reviewed protocol and check its sealed Broker witnesses."""
+
+    from tests.semantic.support.codex_import_business_agent_runner import (
+        build_preview_only_business_steps,
+        reconstruct_import_business_requests,
+    )
+
+    task_root = scenario_root / "evidence" / "codex-task"
+    try:
+        requests = reconstruct_import_business_requests(
+            expected_unit,
+            task_root / "runtime",
+            require_media_files=True,
+        )
+        if protocol_manifest_revision == AUDIO_IMPORT_DERIVED_SFX_PROTOCOL_REVISION:
+            provenance = load_strict_regular_json(
+                scenario_root / "evidence" / HEAVY_V3_PROMPT_PROVENANCE_FILE
+            )
+            raw_protocol = provenance.get("protocol")
+            protocol_value = (
+                raw_protocol.get("value")
+                if isinstance(raw_protocol, Mapping)
+                else None
+            )
+            if not isinstance(protocol_value, Mapping):
+                raise PromptProvenanceError(
+                    "legacy audio import evidence lacks its sealed protocol"
+                )
+            canonical = _canonicalize_legacy_protocol_manifest(
+                protocol_value,
+                protocol_manifest_revision=protocol_manifest_revision,
+            )
+            protocol = deserialize_protocol(canonical)
+            steps = protocol.steps
+        else:
+            steps = build_preview_only_business_steps(requests)
+            protocol = V3GatewayProtocol(
+                steps=steps,
+                turn_prefix_counts=(len(steps),),
+            )
+    except (OSError, TypeError, ValueError, V3ProtocolError) as exc:
+        raise CampaignEvidenceError(
+            "audio import business sealed protocol cannot be reconstructed"
+        ) from exc
+    except PromptProvenanceError as exc:
+        raise CampaignEvidenceError(str(exc)) from exc
+
+    if protocol_manifest_revision == AUDIO_IMPORT_DERIVED_SFX_PROTOCOL_REVISION:
+        preview_steps = tuple(
+            step
+            for step in steps
+            if step.subcommand == "preview-from-draft"
+            and isinstance(step.expected_operation_request, Mapping)
+            and step.expected_operation_request.get("operation") == "audio.import"
+        )
+        if len(preview_steps) != len(requests):
+            raise CampaignEvidenceError(
+                "legacy audio import protocol transaction count drifted"
+            )
+    elif protocol_manifest_revision != _CURRENT_AUDIO_IMPORT_PROTOCOL_REVISION:
+        raise CampaignEvidenceError(
+            "audio import business protocol revision is unreviewed"
+        )
+
+    canonical_steps = tuple(steps)
+    observed_expected_names = broker.get("expected_step_names")
+    observed_consumed_names = broker.get("consumed_step_names")
+    records = broker.get("records")
+    if (
+        not isinstance(observed_expected_names, list)
+        or not isinstance(observed_consumed_names, list)
+        or observed_consumed_names != observed_expected_names
+        or not observed_expected_names
+        or len(observed_expected_names) != len(set(observed_expected_names))
+        or not isinstance(records, list)
+        or len(records) != len(observed_expected_names)
+    ):
+        raise CampaignEvidenceError(
+            "audio import business sealed Broker topology is inconsistent"
+        )
+    audited_steps = canonical_steps
+    if observed_expected_names[0] == "tx01.operations":
+        audited_steps = (
+            ExpectedGatewayStep(
+                name="tx01.operations",
+                subcommand="operations",
+            ),
+            *audited_steps,
+        )
+    replay = CodexGatewayBroker(
+        skill_source=SKILL_ROOT,
+        expected_steps=audited_steps,
+        expected_wwise_version=str(expected_unit.version),
+        project_modification_policy="ask_before_changes",
+        runner_environment={},
+    )
+    for index, record in enumerate(records):
+        arguments = (
+            record.get("gateway_arguments")
+            if isinstance(record, Mapping)
+            else None
+        )
+        if (
+            not isinstance(record, Mapping)
+            or record.get("accepted") is not True
+            or record.get("authenticated") is not True
+            or record.get("succeeded") is not True
+            or record.get("exit_code") != 0
+            or not isinstance(arguments, list)
+            or not arguments
+            or any(not isinstance(value, str) for value in arguments)
+            or index >= len(replay._execution_steps)  # noqa: SLF001
+        ):
+            raise CampaignEvidenceError(
+                "audio import business sealed Broker record is not successful"
+            )
+        actual = tuple(arguments)
+        replay._next_step = index  # noqa: SLF001
+        replay_step = replay._execution_steps[index]  # noqa: SLF001
+        replay_step = replay._rebase_business_draft_revision(  # noqa: SLF001
+            replay_step
+        )
+        replay_step = replay._bind_task_local_declaration_id(  # noqa: SLF001
+            replay_step,
+            actual,
+        )
+        replay._execution_steps[index] = replay_step  # noqa: SLF001
+        try:
+            replay._validate_step(replay_step, actual)  # noqa: SLF001
+        except GatewayInvocationError as first_error:
+            try:
+                matched = (
+                    replay._match_dependency_ready_draft_batch(actual)  # noqa: SLF001
+                    or replay._match_rebatched_import_rows(actual)  # noqa: SLF001
+                    or replay._match_dependency_ready_draft_action(actual)  # noqa: SLF001
+                    or replay._match_dependency_ready_business_setup_step(  # noqa: SLF001
+                        actual
+                    )
+                )
+            except GatewayInvocationError as exc:
+                raise CampaignEvidenceError(
+                    "audio import business archived command cannot replay: "
+                    f"{exc}"
+                ) from exc
+            if matched is None:
+                raise CampaignEvidenceError(
+                    "audio import business archived command cannot replay: "
+                    f"{first_error}"
+                ) from first_error
+            replay_step = matched[0]
+        if record.get("step_name") != replay_step.name:
+            raise CampaignEvidenceError(
+                "audio import business sealed Broker step identity is invalid"
+            )
+        if replay_step.subcommand in {
+            "draft-declare-new",
+            "draft-declare-existing",
+            "draft-declare-import-batch",
+        }:
+            _validate_audio_import_business_declaration_language(
+                replay_step,
+                arguments,
+            )
+        if replay_step.subcommand == "preview-from-draft":
+            payload = record.get("payload")
+            agent_result = (
+                payload.get("agent_result")
+                if isinstance(payload, Mapping)
+                else None
+            )
+            request = (
+                agent_result.get("request")
+                if isinstance(agent_result, Mapping)
+                else None
+            )
+            expected_request = _bind_audio_import_request_paths(
+                replay_step.expected_operation_request,
+                objects=getattr(expected_unit, "objects", ()),
+            )
+            if request != expected_request:
+                raise CampaignEvidenceError(
+                    "audio import business sealed Preview request witness drifted"
+                )
+        payload = record.get("payload")
+        if not isinstance(payload, Mapping):
+            raise CampaignEvidenceError(
+                "audio import business sealed Broker payload is malformed"
+            )
+        replay._payloads_by_step[replay_step.name] = payload  # noqa: SLF001
+        replay._next_step = index + 1  # noqa: SLF001
+
+    replay_names = tuple(
+        step.name for step in replay._execution_steps  # noqa: SLF001
+    )
+    consumed_names = broker.get("consumed_step_names")
+    if (
+        replay_names != tuple(observed_expected_names)
+        or tuple(consumed_names) != replay_names
+    ):
+        raise CampaignEvidenceError(
+            "audio import business sealed Broker topology is inconsistent"
+        )
+
+
+def _validate_audio_import_business_declaration_language(
+    step: Any,
+    arguments: Sequence[Any],
+) -> None:
+    values = tuple(str(value) for value in arguments)
+    if step.subcommand == "draft-declare-import-batch":
+        language_rows = tuple(
+            (values[index + 1], values[index + 3])
+            for index, value in enumerate(values[:-3])
+            if value == "--field" and values[index + 2] == "language"
+        )
+        language_values = tuple(value for _row, value in language_rows)
+        duplicate_language = len({row for row, _value in language_rows}) != len(
+            language_rows
+        )
+    else:
+        language_values = tuple(
+            values[index + 2]
+            for index, value in enumerate(values[:-2])
+            if value == "--field" and values[index + 1] == "language"
+        )
+        duplicate_language = len(language_values) > 1
+    if duplicate_language or any(value != "SFX" for value in language_values):
+        raise CampaignEvidenceError(
+            "audio import business derived SFX declaration is contradictory"
+        )
+    if language_values and not step.allow_explicit_derived_sfx_language:
+        raise CampaignEvidenceError(
+            "audio import business declaration added an unreviewed SFX language"
+        )
+
+
+def _bind_audio_import_request_paths(
+    value: Any,
+    *,
+    objects: Sequence[Any],
+) -> Any:
+    path_to_id = {
+        str(row["path"]): str(row["id"])
+        for row in objects
+        if isinstance(row, Mapping)
+        and isinstance(row.get("path"), str)
+        and isinstance(row.get("id"), str)
+    }
+
+    def visit(item: Any) -> Any:
+        if isinstance(item, Mapping):
+            if (
+                item.get("kind") == "path"
+                and isinstance(item.get("value"), str)
+                and item["value"] in path_to_id
+            ):
+                return {"kind": "id", "value": path_to_id[item["value"]]}
+            return {str(key): visit(nested) for key, nested in item.items()}
+        if isinstance(item, (list, tuple)):
+            return [visit(nested) for nested in item]
+        return item
+
+    return visit(value)
 
 
 def _validate_heavy_v3_pre_materialization_block(
@@ -2985,6 +4166,7 @@ def _validate_heavy_v3_failure_prompt_plan(
     *,
     expected_unit: Any,
     scenario_root: Path,
+    options: CampaignOptions,
 ) -> HeavyV3PromptEvidence:
     """Re-read the immutable prompt/common/typed plan chain for a failed case."""
 
@@ -3024,6 +4206,10 @@ def _validate_heavy_v3_failure_prompt_plan(
         scenario_root=scenario_root,
         expected_unit=expected_unit,
         expected_sha256=receipt_sha256,
+        protocol_manifest_revision=_protocol_manifest_revision_for_unit(
+            expected_unit,
+            options,
+        ),
     )
 
 
@@ -3263,6 +4449,10 @@ def _validate_heavy_v3_retryable_task_failure(
         expected_sha256=str(
             artifact_sha256[HEAVY_V3_PROMPT_MATERIALIZATION_FILE]
         ),
+        protocol_manifest_revision=_protocol_manifest_revision_for_unit(
+            expected_unit,
+            options,
+        ),
     )
     expected_prompts = prompt_evidence.prompts
     protocol = prompt_evidence.provenance.protocol
@@ -3295,6 +4485,7 @@ def _validate_heavy_v3_retryable_task_failure(
         task_root=task_root,
         turn_root=failed_turn_root,
         options=options,
+        expected_skill_read_schedule=expected_skill_reads,
     )
 
     turns_root = task_root / "turns"
@@ -3339,6 +4530,7 @@ def _validate_heavy_v3_retryable_task_failure(
             expected_steps=protocol.steps[previous_validated_prefix:expected_prefix],
             version=str(getattr(expected_unit, "version", "")),
             expected_skill_reads=expected_skill_reads[index - 1],
+            expected_skill_read_schedule=expected_skill_reads,
             prompt_provenance=prompt_evidence.provenance,
         )
         prior_gateway_records.extend(turn_gateway_records)
@@ -3406,6 +4598,7 @@ def _validate_heavy_v3_retryable_failed_facts(
     task_root: Path,
     turn_root: Path,
     options: CampaignOptions,
+    expected_skill_read_schedule: Sequence[Sequence[str]],
 ) -> None:
     required_keys = {
         "command",
@@ -3524,6 +4717,26 @@ def _validate_heavy_v3_retryable_failed_facts(
         sandbox_mode="workspace-write",
         allow_output_write=False,
         network_access=True,
+        developer_instructions=(
+            semantic_task_developer_instructions(
+                options.skill_source / "scripts" / "run.py",
+                task_skill_source=(
+                    task_root
+                    / "agent-workspace"
+                    / ".agents"
+                    / "skills"
+                    / "waapi-skill"
+                ),
+                expected_skill_reads=expected_skill_read_schedule,
+                base_developer_instructions=(
+                    semantic_skill_bootstrap_developer_instructions(
+                        options.skill_source / "scripts" / "run.py"
+                    )
+                ),
+            )
+            if options.profile in SEMANTIC_BOOTSTRAP_PROFILE_IDS
+            else ""
+        ),
     )
     expected_command = (
         build_task_exec_command(
@@ -3605,12 +4818,7 @@ def _steps_in_consumed_order(
                     "consumed Draft inspect precedes draft-start"
                 )
             latest_revision_step = step.name
-        elif step.subcommand in {
-            "draft-apply",
-            "draft-check",
-            "draft-cancel",
-            "preview-from-draft",
-        }:
+        elif step.subcommand in DRAFT_REVISION_SUBCOMMANDS:
             if latest_revision_step is None:
                 raise CampaignEvidenceError(
                     "consumed Draft mutation precedes draft-start"
@@ -3634,6 +4842,38 @@ def _steps_in_consumed_order(
     return tuple(rebound)
 
 
+def _contracted_protocol_linearization_is_valid(
+    canonical_steps: Sequence[Any],
+    execution_names: Sequence[str],
+    *,
+    commutative_read_only_step_groups: Sequence[Sequence[str]],
+    commutative_composer_setup_step_groups: Sequence[Sequence[str]],
+) -> bool:
+    """Combine closed import chunk contraction with legal setup ordering."""
+
+    canonical = tuple(canonical_steps)
+    selected_name_set = set(execution_names)
+    selected_canonical = tuple(
+        step for step in canonical if step.name in selected_name_set
+    )
+    selected_names = tuple(step.name for step in selected_canonical)
+    return (
+        len(canonical) != len(selected_canonical)
+        and len(selected_names) == len(tuple(execution_names))
+        and _selected_workflow_step_names_are_closed(
+            SimpleNamespace(steps=canonical),
+            selected_names,
+            optional_names=set(),
+        )
+        and gateway_step_sequence_matches(
+            selected_names,
+            execution_names,
+            commutative_read_only_step_groups,
+            commutative_composer_setup_step_groups,
+        )
+    )
+
+
 def _build_heavy_v3_broker_replay(
     *,
     skill_source: Path,
@@ -3644,6 +4884,7 @@ def _build_heavy_v3_broker_replay(
     commutative_composer_setup_step_groups: Sequence[Sequence[str]],
     expected_wwise_version: str,
     project_modification_policy: str,
+    existing_state_directory: Path | None = None,
 ) -> CodexGatewayBroker:
     """Build an offline replay from canonical policy and observed order.
 
@@ -3658,15 +4899,25 @@ def _build_heavy_v3_broker_replay(
     execution = tuple(execution_steps)
     canonical_names = tuple(step.name for step in canonical)
     execution_names = tuple(step.name for step in execution)
-    if not gateway_step_sequence_matches(
+    ordinary_linearization = gateway_step_sequence_matches(
         canonical_names,
         execution_names,
         commutative_read_only_step_groups,
         commutative_composer_setup_step_groups,
-    ):
+    )
+    import_contraction = _contracted_protocol_linearization_is_valid(
+        canonical,
+        execution_names,
+        commutative_read_only_step_groups=commutative_read_only_step_groups,
+        commutative_composer_setup_step_groups=(
+            commutative_composer_setup_step_groups
+        ),
+    )
+    if not ordinary_linearization and not import_contraction:
         raise CampaignEvidenceError(
             "archived broker uses an undeclared protocol linearization"
         )
+    replay_execution = canonical if import_contraction else execution
 
     present_names = set(canonical_names)
     replay_read_only_groups = tuple(
@@ -3685,6 +4936,49 @@ def _build_heavy_v3_broker_replay(
         if len(present_prefix) >= 2:
             replay_setup_groups.append(present_prefix)
 
+    offline_replay_preview_requests: dict[str, Mapping[str, Any]] = {}
+    for start_index, step in enumerate(replay_execution):
+        if (
+            step.subcommand != "draft-start"
+            or not step.arguments
+            or step.arguments[0]
+            not in {
+                "audio.import",
+                "lua.executeCliFile",
+                "lua.executeCoreFile",
+                "lua.executeCoreInline",
+            }
+        ):
+            continue
+        next_start_index = next(
+            (
+                index
+                for index in range(start_index + 1, len(replay_execution))
+                if replay_execution[index].subcommand == "draft-start"
+            ),
+            len(replay_execution),
+        )
+        preview_index = next(
+            (
+                index
+                for index in range(start_index + 1, next_start_index)
+                if replay_execution[index].subcommand == "preview-from-draft"
+            ),
+            None,
+        )
+        if preview_index is None:
+            continue
+        segment = V3GatewayProtocol(
+            steps=replay_execution[start_index : preview_index + 1],
+            turn_prefix_counts=(preview_index - start_index + 1,),
+        )
+        for pointer, request in materialize_typed_transaction_protocol_requests(
+            segment,
+            version=expected_wwise_version,
+            allow_cleaned_file_evidence=True,
+        ):
+            offline_replay_preview_requests[pointer.rsplit("/", 1)[-1]] = request
+
     replay = CodexGatewayBroker(
         skill_source=skill_source,
         invocation_skill_source=invocation_skill_source,
@@ -3694,10 +4988,13 @@ def _build_heavy_v3_broker_replay(
         expected_wwise_version=expected_wwise_version,
         project_modification_policy=project_modification_policy,
         runner_environment={},
+        existing_state_directory=existing_state_directory,
+        offline_replay_preview_requests=offline_replay_preview_requests,
     )
     # Offline replay never starts the Broker.  Its Draft payload validator must
     # follow the archived dependency-valid order and its rebound revision chain.
-    replay._execution_steps = list(execution)  # noqa: SLF001
+    replay._execution_steps = list(replay_execution)  # noqa: SLF001
+    replay._archive_dynamic_linearization = import_contraction  # noqa: SLF001
     return replay
 
 
@@ -4278,12 +5575,14 @@ def _validate_heavy_v3_pass_outcome(
         options=options,
     )
     primary_count = _heavy_v3_primary_dispatch_count(expected_unit)
+    audited_count = _heavy_v3_audited_dispatch_count(expected_unit)
     _validate_heavy_v3_pass_checks(
         checks,
         expected_unit=expected_unit,
         expected_row=expected_row,
         expected_thread_id=thread_id,
         primary_count=primary_count,
+        audited_count=audited_count,
         task_root=task_root,
         prompt_evidence=prompt_evidence,
     )
@@ -4316,6 +5615,21 @@ def _heavy_v3_primary_dispatch_count(expected_unit: Any) -> int:
             "heavy scenario has no closed primary-dispatch count"
         )
     return count
+
+
+def _heavy_v3_audited_dispatch_count(expected_unit: Any) -> int:
+    declared = getattr(
+        expected_unit,
+        "expected_audited_dispatch_count",
+        None,
+    )
+    if declared is None:
+        return _heavy_v3_primary_dispatch_count(expected_unit)
+    if type(declared) is not int or declared < 0:
+        raise CampaignEvidenceError(
+            "policy unit has an invalid audited-dispatch count"
+        )
+    return declared
 
 
 def _heavy_v3_base_scenario_id(expected_unit: Any) -> str:
@@ -4352,7 +5666,7 @@ def _heavy_v3_topic_publisher_request_count(
     return len(requests)
 
 
-def _heavy_v3_required_reference(expected_unit: Any) -> str:
+def _heavy_v3_required_reference(expected_unit: Any) -> str | None:
     if _heavy_v3_integration_workflow_id(
         expected_unit
     ) in _INTEGRATION_QUERY_FIRST_WORKFLOW_IDS:
@@ -4360,6 +5674,8 @@ def _heavy_v3_required_reference(expected_unit: Any) -> str:
     scenario = getattr(expected_unit, "scenario", None)
     api = getattr(scenario, "api", None)
     item_type = getattr(scenario, "item_type", None)
+    if api == "ak.wwise.core.getInfo":
+        return None
     if api in {
         "ak.wwise.core.object.get",
         "ak.wwise.core.mediaPool.get",
@@ -4393,12 +5709,11 @@ def _heavy_v3_expected_skill_reads(
             (),
         )
     else:
-        lane_schedule = (
-            ((required_reference,),) + ((),) * (turn_count - 1)
-        )
-    return (
-        ("SKILL.md", *lane_schedule[0]),
-        *lane_schedule[1:],
+        lane_schedule = None
+    return _normalize_turn_reference_schedule(
+        prompt_count=turn_count,
+        required_reference=required_reference,
+        turn_reference_schedule=lane_schedule,
     )
 
 
@@ -4489,6 +5804,7 @@ def _validate_heavy_v3_prompt_materialization(
     scenario_root: Path,
     expected_unit: Any,
     expected_sha256: str,
+    protocol_manifest_revision: str | None = None,
 ) -> HeavyV3PromptEvidence:
     """Validate provenance -> receipt -> archived turn binding."""
 
@@ -4544,12 +5860,41 @@ def _validate_heavy_v3_prompt_materialization(
             "heavy prompt receipt points outside fixed business-oracle plan"
         )
     try:
-        provenance = read_prompt_provenance(
-            provenance_path,
-            scenario=scenario,
-            version=str(getattr(expected_unit, "version", "")),
-            scenario_root=scenario_root,
-            require_paths=False,
+        raw_provenance = load_strict_regular_json(provenance_path)
+        raw_protocol = (
+            raw_provenance.get("protocol", {}).get("value")
+            if isinstance(raw_provenance, Mapping)
+            and isinstance(raw_provenance.get("protocol"), Mapping)
+            else None
+        )
+        if isinstance(raw_protocol, Mapping):
+            # Lazy, verify-only import: the current campaign/provenance path
+            # never imports or exposes the retired manifest grammar.
+            from tests.semantic.support.codex_prompt_provenance_archive_v3 import (
+                is_archived_prompt_protocol,
+                read_archived_prompt_provenance,
+            )
+
+            archived_protocol = is_archived_prompt_protocol(raw_protocol)
+        else:
+            archived_protocol = False
+        provenance = (
+            read_archived_prompt_provenance(
+                provenance_path,
+                scenario=scenario,
+                version=str(getattr(expected_unit, "version", "")),
+                scenario_root=scenario_root,
+                require_paths=False,
+            )
+            if archived_protocol
+            else read_prompt_provenance(
+                provenance_path,
+                scenario=scenario,
+                version=str(getattr(expected_unit, "version", "")),
+                scenario_root=scenario_root,
+                require_paths=False,
+                protocol_manifest_revision=protocol_manifest_revision,
+            )
         )
     except Exception as exc:
         raise CampaignEvidenceError(
@@ -4597,6 +5942,7 @@ def _validate_heavy_v3_prompt_materialization(
         CliBusinessPlanError,
         ImportBusinessPlanError,
         ObjectBusinessPlanError,
+        DirectBusinessPlanError,
         ObjectHeavyRecipeError,
         SoundBankBusinessPlanError,
         KeyError,
@@ -4673,24 +6019,20 @@ def _validate_heavy_v3_task_result(
         "broker",
         "turn_grades",
     }
-    is_optional_protocol = (
-        getattr(expected_unit, "project_modification_policy", None)
-        == "read_only"
+    optional_protocol_keys = {
+        "protocol_terminal_passed",
+        "accepted_terminal_prefixes",
+    }
+    provisionally_allowed_shapes = (
+        required_keys,
+        required_keys | {"composer_evidence"},
+        required_keys | optional_protocol_keys,
+        required_keys | optional_protocol_keys | {"composer_evidence"},
     )
-    if is_optional_protocol:
-        required_keys.update(
-            {
-                "protocol_terminal_passed",
-                "accepted_terminal_prefixes",
-            }
-        )
     expected_turn_count = getattr(expected_unit, "user_turn_count", None)
     if (
         not isinstance(value, Mapping)
-        or set(value) not in (
-            required_keys,
-            required_keys | {"composer_evidence"},
-        )
+        or set(value) not in provisionally_allowed_shapes
         or value.get("contract") != HEAVY_V3_TASK_RESULT_CONTRACT
         or value.get("scenario_id")
         != _heavy_v3_base_scenario_id(expected_unit)
@@ -4700,13 +6042,6 @@ def _validate_heavy_v3_task_result(
         or expected_turn_count < 1
         or value.get("turn_count") != expected_turn_count
         or value.get("passed") is not True
-        or (
-            is_optional_protocol
-            and (
-                value.get("protocol_terminal_passed") is not True
-                or value.get("accepted_terminal_prefixes") != [1]
-            )
-        )
         or not isinstance(value.get("prompt_materialization_sha256"), str)
         or _SHA256_RE.fullmatch(
             str(value.get("prompt_materialization_sha256"))
@@ -4720,8 +6055,23 @@ def _validate_heavy_v3_task_result(
         scenario_root=scenario_root,
         expected_unit=expected_unit,
         expected_sha256=str(value["prompt_materialization_sha256"]),
+        protocol_manifest_revision=_protocol_manifest_revision_for_unit(
+            expected_unit,
+            options,
+        ),
     )
     protocol = prompt_evidence.provenance.protocol
+    is_optional_protocol = bool(protocol.allowed_turn_prefix_counts)
+    if is_optional_protocol:
+        required_keys.update(optional_protocol_keys)
+        if (
+            value.get("protocol_terminal_passed") is not True
+            or value.get("accepted_terminal_prefixes")
+            != list(protocol.accepted_terminal_prefixes)
+        ):
+            raise CampaignEvidenceError(
+                "passing heavy task-result optional protocol is invalid"
+            )
     is_composer_protocol = any(
         step.subcommand.startswith("draft-")
         or step.subcommand == "preview-from-draft"
@@ -4742,8 +6092,15 @@ def _validate_heavy_v3_task_result(
             "passing heavy task turn directories do not match its turn count"
         )
     gateway_records: list[Mapping[str, Any]] = []
+    observed_skill_reads: list[str] = []
     previous_prefix = 0
     expected_skill_reads = _heavy_v3_expected_skill_reads(expected_unit)
+    broker_value = value.get("broker")
+    selected_step_names = (
+        broker_value.get("expected_step_names")
+        if isinstance(broker_value, Mapping)
+        else None
+    )
     for index, grade in enumerate(turn_grades, start=1):
         turn_root = turns_root / f"turn-{index:02d}"
         expected_prefix = (
@@ -4761,7 +6118,12 @@ def _validate_heavy_v3_task_result(
             raise CampaignEvidenceError(
                 "passing heavy turn selected an invalid optional broker prefix"
             )
-        turn_gateway_records = _validate_heavy_v3_turn_grade(
+        consumed_protocol_steps = _consumed_heavy_v3_protocol_steps(
+            protocol,
+            expected_prefix,
+            selected_step_names=selected_step_names,
+        )
+        turn_gateway_records, turn_skill_reads = _validate_heavy_v3_turn_grade(
             grade,
             index=index,
             turn_root=turn_root,
@@ -4771,12 +6133,17 @@ def _validate_heavy_v3_task_result(
             options=options,
             previous_broker_prefix=previous_prefix,
             expected_broker_prefix=expected_prefix,
-            expected_steps=protocol.steps[previous_prefix:expected_prefix],
+            expected_steps=consumed_protocol_steps[
+                previous_prefix:expected_prefix
+            ],
             version=str(getattr(expected_unit, "version", "")),
             expected_skill_reads=expected_skill_reads[index - 1],
+            previous_skill_reads=tuple(observed_skill_reads),
+            expected_skill_read_schedule=expected_skill_reads,
             prompt_provenance=prompt_evidence.provenance,
         )
         gateway_records.extend(turn_gateway_records)
+        observed_skill_reads.extend(turn_skill_reads)
         if len(gateway_records) != expected_prefix:
             raise CampaignEvidenceError(
                 "passing heavy turn command allocation differs from its broker prefix"
@@ -4804,24 +6171,62 @@ def _validate_heavy_v3_task_result(
         consumed_names = broker_value.get("consumed_step_names")
         if not isinstance(broker_records, list) or not isinstance(consumed_names, list):
             raise CampaignEvidenceError("passing Composer Broker evidence is malformed")
+        sealed_composer = value.get("composer_evidence")
+        is_current_typed_evidence = _is_current_draft_evidence(
+            sealed_composer
+        )
         try:
-            replayed_composer = validate_operation_draft_archive(
-                state_directory=task_root / "broker" / "state",
-                steps=_steps_in_consumed_order(
-                    protocol.steps[: len(consumed_names)],
+            selected_protocol_steps = _consumed_heavy_v3_protocol_steps(
+                protocol,
+                previous_prefix,
+                selected_step_names=broker_value.get("expected_step_names"),
+            )
+            validator_arguments = {
+                "state_directory": task_root / "broker" / "state",
+                "steps": _steps_in_consumed_order(
+                    selected_protocol_steps[: len(consumed_names)],
                     consumed_names,
                 ),
-                broker_records=broker_records,
-            )
-        except ComposerArchiveError as exc:
+                "broker_records": broker_records,
+            }
+            if is_current_typed_evidence:
+                replayed_composer = validate_typed_draft_evidence(
+                    **validator_arguments,
+                    allow_cleaned_file_evidence=True,
+                )
+            else:
+                # Historical grammar is imported only at the explicit
+                # verify-only archive boundary. Normal campaign construction
+                # and current evidence parsing never import or expose it.
+                from tests.semantic.support.codex_operation_draft_archive_v3 import (
+                    ComposerArchiveError,
+                    validate_operation_draft_archive,
+                )
+
+                try:
+                    replayed_composer = validate_operation_draft_archive(
+                        **validator_arguments
+                    )
+                except ComposerArchiveError as exc:
+                    raise TypedDraftEvidenceError(str(exc)) from exc
+        except TypedDraftEvidenceError as exc:
             raise CampaignEvidenceError(
-                f"passing Composer archive cannot be replayed: {exc}"
+                f"passing Composer evidence cannot be replayed: {exc}"
             ) from exc
-        if replayed_composer is None or value.get("composer_evidence") != replayed_composer:
+        if replayed_composer is None or sealed_composer != replayed_composer:
             raise CampaignEvidenceError(
                 "passing Composer task-result evidence differs from offline replay"
             )
     return prompt_evidence
+
+
+def _is_current_draft_evidence(value: Any) -> bool:
+    """Recognize both current single-flow and multi-flow Draft archives."""
+
+    return isinstance(value, Mapping) and value.get("contract") in {
+        BUSINESS_DRAFT_EVIDENCE_CONTRACT,
+        TYPED_DRAFT_EVIDENCE_CONTRACT,
+    }
 
 
 def _validate_heavy_v3_broker_result(
@@ -4868,12 +6273,17 @@ def _validate_heavy_v3_broker_result(
         top_keys.add("commutative_composer_setup_step_groups")
     if not isinstance(value, Mapping) or set(value) != top_keys:
         raise CampaignEvidenceError("passing heavy task broker evidence is malformed")
-    expected_names = [step.name for step in protocol.steps]
     consumed_count = (
-        len(expected_names)
+        len(protocol.steps)
         if expected_consumed_count is None
         else expected_consumed_count
     )
+    protocol_steps = _consumed_heavy_v3_protocol_steps(
+        protocol,
+        consumed_count,
+        selected_step_names=value.get("expected_step_names"),
+    )
+    expected_names = [step.name for step in protocol_steps]
     accepted_terminal = tuple(
         getattr(protocol, "accepted_terminal_prefixes", (len(expected_names),))
     )
@@ -4912,12 +6322,40 @@ def _validate_heavy_v3_broker_result(
     )
     if value.get("runner_path") != str(expected_runner):
         raise CampaignEvidenceError("passing heavy broker runner path is misbound")
+    workflow_optional_names = {
+        *getattr(
+            protocol,
+            "optional_workflow_operations_discovery_step_names",
+            (),
+        ),
+        *getattr(
+            protocol,
+            "optional_workflow_query_schema_step_names",
+            (),
+        ),
+        *getattr(
+            protocol,
+            "optional_workflow_revalidation_step_names",
+            (),
+        ),
+    }
+    selected_name_set = set(expected_names)
+    canonical_policy_steps = (
+        tuple(
+            step
+            for step in protocol.steps
+            if step.name not in workflow_optional_names
+            or step.name in selected_name_set
+        )
+        if workflow_optional_names
+        else protocol_steps[:consumed_count]
+    )
     _validate_heavy_v3_broker_records(
         records,
         task_root=task_root,
-        canonical_steps=protocol.steps[:consumed_count],
+        canonical_steps=canonical_policy_steps,
         steps=_steps_in_consumed_order(
-            protocol.steps[:consumed_count],
+            protocol_steps[:consumed_count],
             consumed_names,
         ),
         commutative_read_only_step_groups=getattr(
@@ -4955,6 +6393,128 @@ def _validate_heavy_v3_broker_result(
         )
 
 
+def _consumed_heavy_v3_protocol_steps(
+    protocol: Any,
+    consumed_count: int,
+    *,
+    selected_step_names: Any = None,
+) -> tuple[Any, ...]:
+    """Select the sealed command lane after reviewed optional disclosures."""
+
+    steps = tuple(protocol.steps)
+    optional_topic_groups = tuple(
+        getattr(protocol, "optional_topic_schema_step_groups", ())
+    )
+    if optional_topic_groups:
+        if (
+            not isinstance(selected_step_names, list)
+            or len(selected_step_names) != consumed_count
+            or len(selected_step_names) != len(set(selected_step_names))
+        ):
+            return ()
+        by_name = {step.name: step for step in steps}
+        optional_names = {
+            name for group in optional_topic_groups for name in group
+        }
+        if any(name not in by_name for name in selected_step_names):
+            return ()
+        mandatory_names = tuple(
+            step.name for step in steps if step.name not in optional_names
+        )
+        selected_mandatory = tuple(
+            name for name in selected_step_names if name not in optional_names
+        )
+        if selected_mandatory != mandatory_names:
+            return ()
+        return tuple(by_name[name] for name in selected_step_names)
+    optional_query_names = tuple(
+        getattr(protocol, "optional_query_schema_step_names", ())
+    )
+    if optional_query_names:
+        if (
+            not isinstance(selected_step_names, list)
+            or len(selected_step_names) != consumed_count
+            or len(selected_step_names) != len(set(selected_step_names))
+        ):
+            return ()
+        by_name = {step.name: step for step in steps}
+        if (
+            not selected_step_names
+            or selected_step_names[-1] != steps[-1].name
+            or any(
+                name not in optional_query_names
+                for name in selected_step_names[:-1]
+            )
+        ):
+            return ()
+        return tuple(by_name[name] for name in selected_step_names)
+    optional_workflow_operations = tuple(
+        getattr(
+            protocol,
+            "optional_workflow_operations_discovery_step_names",
+            (),
+        )
+    )
+    optional_workflow_query_schema = tuple(
+        getattr(
+            protocol,
+            "optional_workflow_query_schema_step_names",
+            (),
+        )
+    )
+    optional_workflow_revalidation = tuple(
+        getattr(
+            protocol,
+            "optional_workflow_revalidation_step_names",
+            (),
+        )
+    )
+    if (
+        optional_workflow_operations
+        or optional_workflow_query_schema
+        or optional_workflow_revalidation
+    ):
+        if (
+            not isinstance(selected_step_names, list)
+            or not 0 <= consumed_count <= len(selected_step_names)
+            or len(selected_step_names) != len(set(selected_step_names))
+        ):
+            return ()
+        by_name = {step.name: step for step in steps}
+        optional_names = {
+            *optional_workflow_operations,
+            *optional_workflow_query_schema,
+            *optional_workflow_revalidation,
+        }
+        if not _selected_workflow_step_names_are_closed(
+            protocol,
+            selected_step_names,
+            optional_names=optional_names,
+        ):
+            return ()
+        return tuple(by_name[name] for name in selected_step_names)
+    if getattr(protocol, "optional_initial_query_schema", False) or getattr(
+        protocol,
+        "optional_initial_operations_discovery",
+        False,
+    ):
+        names = tuple(step.name for step in steps)
+        selected = (
+            tuple(selected_step_names)
+            if isinstance(selected_step_names, list)
+            else ()
+        )
+        if (
+            selected not in {names, names[1:]}
+            or len(selected) != len(set(selected))
+            or not 0 <= consumed_count <= len(selected)
+        ):
+            return ()
+        by_name = {step.name: step for step in steps}
+        return tuple(by_name[name] for name in selected)
+    return steps
+
+
 def _codex_command_exit_status_aligns(
     command_record: Mapping[str, Any],
     *,
@@ -4986,58 +6546,145 @@ def _archived_draft_action(
     *,
     label: str,
 ) -> Mapping[str, Any]:
-    """Recover the exact submitted Draft action for deterministic replay."""
+    """Recover historical grammar through its offline-only codec."""
 
-    typed_indexes = [
+    from tests.semantic.support.codex_operation_draft_archive_v3 import (
+        ComposerArchiveError,
+        decode_archived_draft_action,
+    )
+
+    try:
+        return decode_archived_draft_action(gateway_arguments, label=label)
+    except ComposerArchiveError as exc:
+        raise CampaignEvidenceError(str(exc)) from exc
+
+
+def _submitted_typed_draft_actions(
+    gateway_arguments: Sequence[str],
+    *,
+    label: str,
+) -> tuple[Mapping[str, Any], ...]:
+    """Recover one bounded current typed action batch without historical grammar."""
+
+    if "--action-json" in gateway_arguments:
+        raise CampaignEvidenceError(
+            f"{label} current Draft action cannot contain action JSON"
+        )
+    indexes = [
         index
         for index, value in enumerate(gateway_arguments[:-1])
         if value == "--facts" and gateway_arguments[index + 1] == "--action"
     ]
-    if len(typed_indexes) == 1:
-        try:
-            return parse_typed_action_cli_arguments(
-                gateway_arguments[typed_indexes[0] + 1 :],
-                legacy_compatibility=True,
-            )
-        except OperationComposerError as exc:
-            raise CampaignEvidenceError(
-                f"{label} Draft typed action argv is invalid"
-            ) from exc
-    if typed_indexes:
+    if len(indexes) != 1:
         raise CampaignEvidenceError(
-            f"{label} Draft action argv contains multiple typed action prefixes"
+            f"{label} Draft action argv does not contain one typed action batch"
         )
-
-    indexes = [
-        index
-        for index, value in enumerate(gateway_arguments)
-        if value == "--action-json"
-    ]
-    if len(indexes) != 1 or indexes[0] + 1 >= len(gateway_arguments):
-        raise CampaignEvidenceError(
-            f"{label} Draft action argv does not contain one action JSON value"
-        )
-
-    def reject_duplicate_keys(pairs: Sequence[tuple[str, Any]]) -> dict[str, Any]:
-        decoded: dict[str, Any] = {}
-        for key, value in pairs:
-            if key in decoded:
-                raise ValueError(f"duplicate JSON key: {key}")
-            decoded[key] = value
-        return decoded
-
     try:
-        decoded = json.loads(
-            gateway_arguments[indexes[0] + 1],
-            object_pairs_hook=reject_duplicate_keys,
+        return parse_typed_action_cli_argument_sequence(
+            gateway_arguments[indexes[0] + 1 :]
         )
-    except (json.JSONDecodeError, ValueError) as exc:
+    except OperationComposerError as exc:
         raise CampaignEvidenceError(
-            f"{label} Draft action argv is not strict JSON"
+            f"{label} Draft typed action argv is invalid"
         ) from exc
-    if not isinstance(decoded, Mapping):
-        raise CampaignEvidenceError(f"{label} Draft action JSON is not an object")
-    return decoded
+
+
+def _prepare_heavy_v3_replay_step(
+    replay: CodexGatewayBroker,
+    *,
+    index: int,
+    expected_step: ExpectedGatewayStep,
+    actual_arguments: Sequence[str],
+    label: str,
+) -> ExpectedGatewayStep:
+    """Apply the same deterministic pre-validation binding as live Broker."""
+
+    replay._next_step = index  # noqa: SLF001
+    replay_step = replay._execution_steps[index]  # noqa: SLF001
+    if replay_step.name != expected_step.name:
+        raise CampaignEvidenceError(
+            f"{label} replay step order differs at {expected_step.name}"
+        )
+    replay_step = replay._bind_task_local_declaration_id(  # noqa: SLF001
+        replay_step,
+        actual_arguments,
+    )
+    replay._execution_steps[index] = replay_step  # noqa: SLF001
+    return replay_step
+
+
+def _select_heavy_v3_replay_step(
+    replay: CodexGatewayBroker,
+    *,
+    index: int,
+    expected_step: ExpectedGatewayStep,
+    actual_arguments: Sequence[str],
+    label: str,
+) -> tuple[ExpectedGatewayStep, str | None, tuple[str, ...] | None]:
+    """Select one archived step through the same safe order rules as live."""
+
+    if getattr(replay, "_archive_dynamic_linearization", False):
+        replay._next_step = index  # noqa: SLF001
+        replay_step = replay._execution_steps[index]  # noqa: SLF001
+        replay_step = replay._rebase_business_draft_revision(  # noqa: SLF001
+            replay_step
+        )
+        replay_step = replay._bind_task_local_declaration_id(  # noqa: SLF001
+            replay_step,
+            actual_arguments,
+        )
+        replay._execution_steps[index] = replay_step  # noqa: SLF001
+        try:
+            semantic_hash, execution_arguments = replay._validate_step(  # noqa: SLF001
+                replay_step,
+                actual_arguments,
+            )
+        except GatewayInvocationError as first_error:
+            try:
+                matched = (
+                    replay._match_dependency_ready_draft_batch(  # noqa: SLF001
+                        actual_arguments
+                    )
+                    or replay._match_rebatched_import_rows(  # noqa: SLF001
+                        actual_arguments
+                    )
+                    or replay._match_dependency_ready_draft_action(  # noqa: SLF001
+                        actual_arguments
+                    )
+                    or replay._match_dependency_ready_business_setup_step(  # noqa: SLF001
+                        actual_arguments
+                    )
+                    or replay._match_commutative_read_only_step(  # noqa: SLF001
+                        actual_arguments
+                    )
+                )
+            except GatewayInvocationError as exc:
+                raise CampaignEvidenceError(
+                    f"{label} dynamic replay cannot select {expected_step.name}: {exc}"
+                ) from exc
+            if matched is None:
+                raise CampaignEvidenceError(
+                    f"{label} dynamic replay cannot select {expected_step.name}: "
+                    f"{first_error}"
+                ) from first_error
+            replay_step, semantic_hash, execution_arguments = matched
+        if replay_step.name != expected_step.name:
+            raise CampaignEvidenceError(
+                f"{label} dynamic replay selected {replay_step.name} instead of "
+                f"{expected_step.name}"
+            )
+        return replay_step, semantic_hash, execution_arguments
+    return (
+        _prepare_heavy_v3_replay_step(
+            replay,
+            index=index,
+            expected_step=expected_step,
+            actual_arguments=actual_arguments,
+            label=label,
+        ),
+        None,
+        None,
+    )
 
 
 def _validate_heavy_v3_broker_records(
@@ -5098,6 +6745,7 @@ def _validate_heavy_v3_broker_records(
         project_modification_policy=(
             expected_project_modification_policy or "ask_before_changes"
         ),
+        existing_state_directory=task_root / "broker" / "state",
     )
     record_keys = {
         "sequence",
@@ -5157,16 +6805,42 @@ def _validate_heavy_v3_broker_records(
                 invocation_skill_source=invocation_skill_source,
                 shim_directory=task_root / "broker" / "bin",
             )
-            semantic_sha, execution_arguments = replay._validate_step(  # noqa: SLF001
-                step,
-                resolved.gateway_arguments,
+            (
+                replay_step,
+                semantic_sha,
+                execution_arguments,
+            ) = _select_heavy_v3_replay_step(
+                replay,
+                index=index - 1,
+                expected_step=step,
+                actual_arguments=resolved.gateway_arguments,
+                label=label,
             )
+            if semantic_sha is None or execution_arguments is None:
+                try:
+                    semantic_sha, execution_arguments = replay._validate_step(  # noqa: SLF001
+                        replay_step,
+                        resolved.gateway_arguments,
+                    )
+                except GatewayInvocationError:
+                    rebound = (
+                        replay._match_dependency_ready_draft_batch(  # noqa: SLF001
+                            resolved.gateway_arguments,
+                        )
+                        or replay._match_rebatched_import_rows(  # noqa: SLF001
+                            resolved.gateway_arguments,
+                        )
+                    )
+                    if rebound is None:
+                        raise
+                    replay_step, semantic_sha, execution_arguments = rebound
+            step = replay_step
         except Exception as exc:
             raise CampaignEvidenceError(
                 f"{label} broker argv cannot replay protocol step {step.name}: {exc}"
             ) from exc
-        submitted_draft_action = (
-            _archived_draft_action(
+        submitted_draft_actions = (
+            _submitted_typed_draft_actions(
                 resolved.gateway_arguments,
                 label=f"{label} protocol step {step.name}",
             )
@@ -5240,8 +6914,7 @@ def _validate_heavy_v3_broker_records(
                 f"{label} broker hashes, exits, or timing are inconsistent"
             )
         expected_topic_ack = (
-            step.name == "soundbank.generated.wait"
-            and step.subcommand == "wait-topic"
+            step.subcommand in {"wait-topic", "stream-topic"}
             and bool(step.arguments)
             and step.arguments[0] == SOUNDBANK_TOPIC
         )
@@ -5251,6 +6924,7 @@ def _validate_heavy_v3_broker_records(
                 record=record,
                 task_root=task_root,
                 label=f"{label} broker subscription ACK",
+                expected_step_name=step.name,
             )
         elif record.get("subscription_ack") is not None:
             raise CampaignEvidenceError(
@@ -5294,10 +6968,15 @@ def _validate_heavy_v3_broker_records(
                 f"{label} broker record is not uniquely aligned to Codex facts"
             )
         try:
-            observed_payload = json.loads(
-                str(command_record.get("aggregated_output", "")).strip()
-            )
-        except json.JSONDecodeError as exc:
+            if step.subcommand == "stream-topic":
+                observed_payload = _extract_topic_stream_records(
+                    str(command_record.get("aggregated_output", ""))
+                )[-1]
+            else:
+                observed_payload = json.loads(
+                    str(command_record.get("aggregated_output", "")).strip()
+                )
+        except (json.JSONDecodeError, GatewayInvocationError) as exc:
             raise CampaignEvidenceError(
                 f"{label} Codex command output is not the broker JSON payload"
             ) from exc
@@ -5323,11 +7002,15 @@ def _validate_heavy_v3_broker_records(
                     f"{label} Draft response cannot replay protocol step "
                     f"{step.name}: {exc}"
                 ) from exc
-        if submitted_draft_action is not None:
+        if submitted_draft_actions is not None:
             replay._submitted_draft_actions_by_step[step.name] = (  # noqa: SLF001
-                submitted_draft_action
+                submitted_draft_actions
             )
+        replay._remember_replayed_successful_gateway_arguments(  # noqa: SLF001
+            resolved.gateway_arguments
+        )
         replay._payloads_by_step[step.name] = payload  # noqa: SLF001
+        replay._next_step = index  # noqa: SLF001
 
 
 def _validate_heavy_v3_broker_subscription_ack_record(
@@ -5336,6 +7019,7 @@ def _validate_heavy_v3_broker_subscription_ack_record(
     record: Mapping[str, Any],
     task_root: Path,
     label: str,
+    expected_step_name: str,
 ) -> Mapping[str, Any]:
     """Validate the broker-owned ACK facts independently of runner checks."""
 
@@ -5369,7 +7053,7 @@ def _validate_heavy_v3_broker_subscription_ack_record(
     if (
         value.get("contract") != VALIDATED_SUBSCRIPTION_ACK_CONTRACT
         or value.get("ack_contract") != TOPIC_ACK_CONTRACT
-        or value.get("step_name") != "soundbank.generated.wait"
+        or value.get("step_name") != expected_step_name
         or value.get("topic") != SOUNDBANK_TOPIC
         or not isinstance(ack_path, str)
         or Path(ack_path).parent != expected_directory
@@ -5410,7 +7094,12 @@ def _validate_heavy_v3_gateway_payload(
     runner_exit_code: Any,
     expected_project_modification_policy: str | None = None,
 ) -> None:
-    if payload.get("contract") != "waapi-skill.gateway-result/v1":
+    allowed_contracts = (
+        frozenset({GATEWAY_RESULT_CONTRACT})
+        if step.allowed_exit_codes == (2,)
+        else gateway_payload_contracts(step.subcommand)
+    )
+    if payload.get("contract") not in allowed_contracts:
         raise CampaignEvidenceError("heavy broker payload contract is invalid")
     context = payload.get("session_context")
     introduction = (
@@ -5512,8 +7201,10 @@ def _validate_heavy_v3_turn_grade(
     expected_steps: Sequence[Any],
     version: str,
     expected_skill_reads: Sequence[str],
+    previous_skill_reads: Sequence[str],
+    expected_skill_read_schedule: Sequence[Sequence[str]],
     prompt_provenance: PromptProvenanceEvidence,
-) -> tuple[Mapping[str, Any], ...]:
+) -> tuple[tuple[Mapping[str, Any], ...], tuple[str, ...]]:
     if not isinstance(value, Mapping) or set(value) != {
         "index",
         "prompt_sha256",
@@ -5576,6 +7267,10 @@ def _validate_heavy_v3_turn_grade(
         raise CampaignEvidenceError(
             "passing heavy final response differs from Codex facts"
         )
+    effective_skill_reads = _effective_expected_skill_reads(
+        expected_skill_reads,
+        previous_skill_reads=previous_skill_reads,
+    )
     gateway_records = _validate_heavy_v3_codex_facts(
         facts,
         expected_thread_id=expected_thread_id,
@@ -5586,7 +7281,8 @@ def _validate_heavy_v3_turn_grade(
         options=options,
         expected_steps=expected_steps,
         version=version,
-        expected_skill_reads=expected_skill_reads,
+        expected_skill_reads=effective_skill_reads,
+        expected_skill_read_schedule=expected_skill_read_schedule,
         archived_common_gates=common_gates,
         prompt_provenance=prompt_provenance,
     )
@@ -5595,7 +7291,8 @@ def _validate_heavy_v3_turn_grade(
         raise CampaignEvidenceError(
             "passing heavy turn gateway command count differs from its sealed prefix delta"
         )
-    return gateway_records
+    command_facts = facts["command_facts"]
+    return gateway_records, tuple(command_facts["skill_read_files"])
 
 
 def _validate_heavy_v3_codex_facts(
@@ -5610,6 +7307,7 @@ def _validate_heavy_v3_codex_facts(
     expected_steps: Sequence[Any],
     version: str,
     expected_skill_reads: Sequence[str],
+    expected_skill_read_schedule: Sequence[Sequence[str]],
     archived_common_gates: Mapping[str, Any],
     prompt_provenance: PromptProvenanceEvidence,
 ) -> tuple[Mapping[str, Any], ...]:
@@ -5690,6 +7388,26 @@ def _validate_heavy_v3_codex_facts(
         sandbox_mode="workspace-write",
         allow_output_write=False,
         network_access=True,
+        developer_instructions=(
+            semantic_task_developer_instructions(
+                options.skill_source / "scripts" / "run.py",
+                task_skill_source=(
+                    task_root
+                    / "agent-workspace"
+                    / ".agents"
+                    / "skills"
+                    / "waapi-skill"
+                ),
+                expected_skill_reads=expected_skill_read_schedule,
+                base_developer_instructions=(
+                    semantic_skill_bootstrap_developer_instructions(
+                        options.skill_source / "scripts" / "run.py"
+                    )
+                ),
+            )
+            if options.profile in SEMANTIC_BOOTSTRAP_PROFILE_IDS
+            else ""
+        ),
     )
     expected_command = (
         build_task_exec_command(
@@ -5761,9 +7479,12 @@ def _validate_heavy_v3_codex_facts(
         expected_wwise_version=version,
     )
     expected_command_facts = _json_canonical_value(asdict(classified))
-    if command_facts != expected_command_facts:
+    if any(
+        command_facts.get(key) != expected_command_facts.get(key)
+        for key in ("commands", "command_records")
+    ):
         raise CampaignEvidenceError(
-            "heavy command facts differ from the classification of events.jsonl"
+            "heavy raw command facts differ from the sealed events.jsonl"
         )
 
     records = classified.command_records
@@ -5821,18 +7542,30 @@ def _validate_heavy_v3_codex_facts(
         ),
         "one_target_skill": prompt_audit.get("passed") is True,
         "no_collaboration": value.get("collab_call_count") == 0,
-        "skill_reads_exact": (
-            read_files == expected_reads and len(allowed_reads) == len(read_files)
+        "skill_reads_exact": _skill_reads_pass_gate(
+            expected_reads=expected_reads,
+            read_files=read_files,
+            allowed_reads=allowed_reads,
         ),
-        "read_prefix_exact": (
-            tuple(record.command for record in records[: len(allowed_reads)])
-            == allowed_reads
+        "read_prefix_exact": _read_prefix_pass_gate(
+            records=tuple(
+                record
+                for index, record in enumerate(records)
+                if index not in recoverable_preprocess_attempt_indexes(records)
+            ),
+            allowed_reads=allowed_reads,
+            gateway_attempt_commands=classified.gateway_attempt_commands,
+            gateway_subcommands=classified.gateway_subcommands,
+            expected_reads=expected_reads,
         ),
         "gateway_count_exact": (
             len(classified.gateway_attempt_commands) == len(expected_steps)
         ),
         "no_other_commands": (
             len(records)
+            - len(
+                recoverable_preprocess_attempt_indexes(records)
+            )
             == len(allowed_reads)
             + len(prompt_asset_reads)
             + len(expected_steps)
@@ -5859,8 +7592,25 @@ def _validate_heavy_v3_codex_facts(
         or archived_common_gates != expected_common_gates
         or not all(expected_common_gates.values())
     ):
+        mismatched = {
+            key: {
+                "archived": archived_common_gates.get(key),
+                "recomputed": expected_common_gates.get(key),
+            }
+            for key in sorted(expected_common_gates)
+            if archived_common_gates.get(key) != expected_common_gates.get(key)
+            or expected_common_gates.get(key) is not True
+        }
+        if expected_common_gates.get("no_unexpected_commands") is not True:
+            mismatched["no_unexpected_commands"]["unexpected_commands"] = list(
+                classified.unexpected_commands
+            )
+            mismatched["no_unexpected_commands"][
+                "non_gateway_unexpected_commands"
+            ] = list(classified.non_gateway_unexpected_commands)
         raise CampaignEvidenceError(
-            "passing heavy turn common gates cannot be recomputed from raw evidence"
+            "passing heavy turn common gates cannot be recomputed from raw evidence: "
+            f"{mismatched}"
         )
     return tuple(
         _json_canonical_value(asdict(record))
@@ -5883,6 +7633,8 @@ def _validate_heavy_v3_events_against_facts(
     events = parse_jsonl_events(text)
     started_command_ids: list[str] = []
     completed_command_ids: list[str] = []
+    started_commands: dict[str, str | None] = {}
+    completed_commands: dict[str, str | None] = {}
     for event in events:
         item = event.get("item")
         if not isinstance(item, Mapping) or item.get("type") != "command_execution":
@@ -5897,12 +7649,28 @@ def _validate_heavy_v3_events_against_facts(
             )
         if event_type == "item.started":
             started_command_ids.append(item_id)
+            started_commands[item_id] = (
+                item.get("command")
+                if isinstance(item.get("command"), str)
+                else None
+            )
         else:
             completed_command_ids.append(item_id)
+            completed_commands[item_id] = (
+                item.get("command")
+                if isinstance(item.get("command"), str)
+                else None
+            )
     if (
         len(started_command_ids) != len(set(started_command_ids))
         or len(completed_command_ids) != len(set(completed_command_ids))
-        or started_command_ids != completed_command_ids
+        or set(started_command_ids) != set(completed_command_ids)
+        or any(
+            started_commands[item_id] is not None
+            and completed_commands[item_id] is not None
+            and started_commands[item_id] != completed_commands[item_id]
+            for item_id in started_commands
+        )
     ):
         raise CampaignEvidenceError(
             f"{label} command event item ids are duplicated or mispaired"
@@ -5982,6 +7750,8 @@ def _heavy_v3_business_plan_fixture_spec(
         "ak.wwise.core.object.set": "object_materialized_v1",
         "ak.wwise.core.audio.convert": "audio_conversion_materialized_v1",
         "ak.wwise.core.mediaPool.get": "media_pool_materialized_v1",
+        "ak.wwise.core.getInfo": DIRECT_FIXTURE_KIND,
+        "ak.wwise.core.executeLuaScript": DIRECT_FIXTURE_KIND,
     }
     import_apis = {
         "ak.wwise.core.audio.import",
@@ -6060,14 +7830,17 @@ def _validate_heavy_v3_typed_business_plan(
     *,
     expected_unit: Any,
     provenance: PromptProvenanceEvidence,
+    direct_status_payload: Mapping[str, Any] | None = None,
+    direct_sandbox_project: str | None = None,
 ) -> (
     ObjectBusinessPlanSections
     | ImportBusinessPlanSections
     | AudioMediaBusinessPlanSections
-        | SoundBankBusinessPlanSections
-        | CliBusinessPlanSections
-        | WorkflowBusinessPlanSections
-        | None
+    | SoundBankBusinessPlanSections
+    | CliBusinessPlanSections
+    | WorkflowBusinessPlanSections
+    | DirectBusinessPlanSections
+    | None
     ):
     """Parse and independently validate one supported family plan archive."""
 
@@ -6081,6 +7854,7 @@ def _validate_heavy_v3_typed_business_plan(
         | SoundBankBusinessPlanSections
         | CliBusinessPlanSections
         | WorkflowBusinessPlanSections
+        | DirectBusinessPlanSections
         | None
     )
     workflow_id = _heavy_v3_integration_workflow_id(expected_unit)
@@ -6093,6 +7867,24 @@ def _validate_heavy_v3_typed_business_plan(
         )
         return sections
     if api in {
+        "ak.wwise.core.getInfo",
+        "ak.wwise.core.executeLuaScript",
+    }:
+        sections = parse_direct_business_plan_sections(plan_value)
+        validate_direct_business_plan_archive(
+            sections,
+            scenario_id=_heavy_v3_base_scenario_id(expected_unit),
+            api=api,
+            version=str(getattr(expected_unit, "version", "")),
+            protocol_steps=tuple(
+                {"name": step.name, "subcommand": step.subcommand}
+                for step in protocol.steps
+            ),
+            status_payload=direct_status_payload,
+            sandbox_project=direct_sandbox_project,
+        )
+        return sections
+    if api in {
         "ak.wwise.core.object.get",
         "ak.wwise.core.object.create",
         "ak.wwise.core.object.set",
@@ -6102,12 +7894,45 @@ def _validate_heavy_v3_typed_business_plan(
             _heavy_v3_base_scenario_id(expected_unit),
             version=str(getattr(expected_unit, "version", "")),
         )
+        unit_id = getattr(expected_unit, "unit_id", None)
+        if unit_id in {
+            "TYP21-QUERY-OBJECT-GET",
+            "TYP23-QUERY-OBJECT-GET",
+        }:
+            recipe = typed_input_business_query_recipe(
+                recipe,
+                unit_id=str(unit_id),
+            )
+        elif unit_id == (
+            "TYP21-DEDICATED-OBJECT-CREATE"
+        ):
+            recipe = typed_input_merge_recipe(
+                recipe,
+                unit_id="TYP21-DEDICATED-OBJECT-CREATE",
+            )
+        elif unit_id == (
+            TYPED_PROFILE_RENAME_UNIT_ID
+        ):
+            recipe = typed_input_rename_recipe(
+                recipe,
+                unit_id=TYPED_PROFILE_RENAME_UNIT_ID,
+            )
         sections = validate_archived_object_business_plan(
             plan_value,
             scenario=scenario,
             recipe=recipe,
             protocol=protocol,
             verify_files=False,
+            profile_unit_id=(
+                str(getattr(expected_unit, "unit_id", ""))
+                if getattr(expected_unit, "unit_id", None)
+                in {
+                    *TYPED_PROFILE_OBJECT_METADATA_UNITS,
+                    TYPED_PROFILE_QUERY_REPAIR_UNIT_ID,
+                    TYPED_PROFILE_RENAME_UNIT_ID,
+                }
+                else None
+            ),
         )
         if parsed.writer_kwargs() != sections.writer_kwargs():
             raise CampaignEvidenceError(
@@ -6216,7 +8041,10 @@ def _validate_heavy_v3_typed_business_plan(
     if isinstance(sections, SoundBankBusinessPlanSections) and api == SOUNDBANK_TOPIC:
         dispatch_invalid = (
             expected_count < 1
-            or primary_steps != ["soundbank.generated.wait"]
+            or not isinstance(primary_steps, list)
+            or len(primary_steps) != 1
+            or primary_steps[0]
+            not in {"soundbank.generated.wait", "soundbank.generated.stream"}
         )
     else:
         dispatch_invalid = (
@@ -6334,11 +8162,32 @@ def _validate_integration_workflow_business_plan(
     }
     transaction_step_kind = {
         "operation-schema": "operation_schema",
+        "request-array-item": "operation_compose",
+        "request-map-container": "operation_compose",
         "draft-start": "operation_compose",
         "draft-apply": "operation_compose",
+        "draft-business-configure": "operation_compose",
+        "draft-declare-import-batch": "operation_compose",
+        "draft-bind-object": "operation_compose",
+        "draft-bind-field": "operation_compose",
+        "draft-discover-fields": "operation_compose",
+        "query-object": "operation_compose",
+        "draft-declare-field-change": "operation_compose",
+        "draft-declare-rtpc": "operation_compose",
+        "draft-declare-switch-assignment": "operation_compose",
+        "draft-declare-soundbank-plan": "operation_compose",
+        "draft-declare-artifact-plan": "operation_compose",
+        "draft-declare-ui-plan": "operation_compose",
+        "draft-add-ui-command": "operation_compose",
+        "draft-declare-new": "operation_compose",
+        "draft-declare-existing": "operation_compose",
+        "draft-declare-existing-batch": "operation_compose",
+        "draft-revise-declaration": "operation_compose",
+        "draft-remove-declaration": "operation_compose",
         "draft-check": "operation_compose_check",
         "preview": "preview",
         "preview-from-draft": "preview",
+        "typed-operation": "preview",
         "transaction-show": "transaction_show",
         "confirm": "confirm",
         "execute": "execute",
@@ -6612,6 +8461,19 @@ def _revalidate_modification_policy_natural_behavior(
         )
 
 
+def _accepts_delegated_first_use_intro(
+    expected_unit: Any,
+    first_use_intro: Any,
+) -> bool:
+    """Accept the sealed delegation marker only for reviewed profile units."""
+
+    return first_use_intro == "delegated_to_dedicated_profile" and (
+        getattr(expected_unit, "component_profile_id", None)
+        == TYPED_INPUT_PROFILE_ID
+        or getattr(expected_unit, "delegates_first_use_intro", False) is True
+    )
+
+
 def _validate_heavy_v3_pass_checks(
     checks: Mapping[str, Any],
     *,
@@ -6619,6 +8481,7 @@ def _validate_heavy_v3_pass_checks(
     expected_row: Mapping[str, Any],
     expected_thread_id: str,
     primary_count: int,
+    audited_count: int,
     task_root: Path,
     prompt_evidence: HeavyV3PromptEvidence,
 ) -> None:
@@ -6636,7 +8499,7 @@ def _validate_heavy_v3_pass_checks(
             set(primary)
             != {"api", "count", "connection_lost", "connection_lost_after_dispatch"}
             or primary.get("api") != api
-            or primary.get("count") != primary_count
+            or primary.get("count") != audited_count
             or not isinstance(primary.get("connection_lost"), bool)
             or not isinstance(primary.get("connection_lost_after_dispatch"), bool)
         ):
@@ -6681,9 +8544,15 @@ def _validate_heavy_v3_pass_checks(
 
     if checks.get("direct_client_closed") is not True:
         raise CampaignEvidenceError("passing project runner did not close its direct client")
-    if checks.get("first_use_intro") is not True or checks.get(
-        "final_response_nonempty"
-    ) is not True:
+    first_use_intro = checks.get("first_use_intro")
+    delegated_intro = _accepts_delegated_first_use_intro(
+        expected_unit,
+        first_use_intro,
+    )
+    if (
+        first_use_intro is not True
+        and not delegated_intro
+    ) or checks.get("final_response_nonempty") is not True:
         raise CampaignEvidenceError(
             "passing project checks lack intro or final-response proof"
         )
@@ -6717,11 +8586,29 @@ def _validate_heavy_v3_pass_checks(
         )
     if item_type == "topic":
         publisher_count = _heavy_v3_topic_publisher_request_count(prompt_evidence)
+        topic_lifecycle_steps = tuple(
+            step
+            for step in prompt_evidence.provenance.protocol.steps
+            if step.subcommand in {"wait-topic", "stream-topic"}
+        )
+        expected_lifecycle = (
+            topic_lifecycle_steps[0].subcommand
+            if len(topic_lifecycle_steps) == 1
+            else None
+        )
+        expected_dispatch_calls = 0 if expected_lifecycle == "stream-topic" else 1
         if (
-            set(primary) != {"api", "gateway_dispatch_calls", "event_count"}
+            set(primary)
+            != {
+                "api",
+                "gateway_dispatch_calls",
+                "topic_lifecycle",
+                "event_count",
+            }
             or primary.get("api") != api
-            or primary.get("gateway_dispatch_calls") != 1
-            or primary.get("event_count") != primary_count
+            or primary.get("gateway_dispatch_calls") != expected_dispatch_calls
+            or primary.get("topic_lifecycle") != expected_lifecycle
+            or primary.get("event_count") != audited_count
             or checks.get("topic_publisher_call_count") != publisher_count
             or type(checks.get("topic_publisher_direct_call_count")) is not int
             or checks.get("topic_publisher_direct_call_count", 0) < publisher_count
@@ -6757,10 +8644,55 @@ def _validate_heavy_v3_pass_checks(
             label="topic oracle",
         )
         return
+    if api in {
+        "ak.wwise.core.getInfo",
+        "ak.wwise.core.executeLuaScript",
+    }:
+        expected_primary_keys = {"api", "dispatch_count"}
+        if api == "ak.wwise.core.getInfo":
+            expected_primary_keys.add("status_preflight_dispatch_count")
+        if (
+            set(primary) != expected_primary_keys
+            or primary.get("api") != api
+            or primary.get("dispatch_count") != audited_count
+            or (
+                api == "ak.wwise.core.getInfo"
+                and primary.get("status_preflight_dispatch_count") != 0
+            )
+        ):
+            raise CampaignEvidenceError(
+                "passing direct primary-dispatch proof is invalid"
+            )
+        if api == "ak.wwise.core.executeLuaScript":
+            _validate_heavy_v3_archived_verification(
+                checks.get("turn_02_workflow"),
+                api=api,
+                scenario_id=_heavy_v3_base_scenario_id(expected_unit),
+                version=str(expected_row["version"]),
+                runner=runner,
+                primary_count=primary_count,
+                task_root=task_root,
+                prompt_evidence=prompt_evidence,
+                scenario_fixture=getattr(scenario, "fixture", {}),
+                label="direct weak-verifier UX oracle",
+            )
+        _validate_heavy_v3_archived_verification(
+            checks.get("business_verification"),
+            api=api,
+            scenario_id=_heavy_v3_base_scenario_id(expected_unit),
+            version=str(expected_row["version"]),
+            runner=runner,
+            primary_count=primary_count,
+            task_root=task_root,
+            prompt_evidence=prompt_evidence,
+            scenario_fixture=getattr(scenario, "fixture", {}),
+            label="direct business oracle",
+        )
+        return
     if (
         set(primary) != {"api", "dispatch_count"}
         or primary.get("api") != api
-        or primary.get("dispatch_count") != primary_count
+        or primary.get("dispatch_count") != audited_count
     ):
         raise CampaignEvidenceError("passing project primary-dispatch proof is invalid")
     workflow_id = _heavy_v3_integration_workflow_id(expected_unit)
@@ -6959,7 +8891,33 @@ def _validate_heavy_v3_archived_verification(
         task_root=task_root,
         label=label,
     )
-    if isinstance(prompt_evidence.typed_sections, WorkflowBusinessPlanSections):
+    if (
+        isinstance(prompt_evidence.typed_sections, DirectBusinessPlanSections)
+        and api == "ak.wwise.core.getInfo"
+    ):
+        start = load_strict_regular_json(task_root.parent / "start.json")
+        sandbox_project = (
+            start.get("sandbox_project") if isinstance(start, Mapping) else None
+        )
+        try:
+            validate_direct_status_archive_binding(
+                prompt_evidence.typed_sections,
+                status_payload=_heavy_v3_broker_step_payload(
+                    task_root,
+                    step_name="host.status",
+                ),
+                sandbox_project=(
+                    sandbox_project if isinstance(sandbox_project, str) else None
+                ),
+            )
+        except DirectBusinessPlanError as exc:
+            raise CampaignEvidenceError(
+                f"{label} getInfo status/lifecycle binding is invalid: {exc}"
+            ) from exc
+    if isinstance(
+        prompt_evidence.typed_sections,
+        (WorkflowBusinessPlanSections, DirectBusinessPlanSections),
+    ):
         return
 
     if api in {
@@ -7027,16 +8985,24 @@ def _validate_heavy_v3_archived_verification(
         )
         return
     if api == "ak.wwise.core.mediaPool.get":
+        sections = prompt_evidence.typed_sections
+        if not isinstance(sections, AudioMediaBusinessPlanSections):
+            raise CampaignEvidenceError(
+                f"{label} Media Pool case lacks its typed business plan"
+            )
+        expected_request = sections.live_binding.get("request")
+        if not isinstance(expected_request, Mapping):
+            raise CampaignEvidenceError(
+                f"{label} Media Pool typed request is unavailable"
+            )
         _validate_heavy_v3_media_pool_oracle(
             verification,
             scenario_id=scenario_id,
             task_root=task_root,
             expected_final_response_sha256=_heavy_v3_final_response_sha256(task_root),
             final_response=_heavy_v3_final_response(task_root),
-            expected_request=_heavy_v3_protocol_call_request(
-                prompt_evidence,
-                api="ak.wwise.core.mediaPool.get",
-            ),
+            expected_request=expected_request,
+            expected_step=_heavy_v3_media_business_protocol_step(prompt_evidence),
             label=label,
         )
         return
@@ -7085,6 +9051,7 @@ def _validate_heavy_v3_typed_archived_verification(
         | SoundBankBusinessPlanSections
         | CliBusinessPlanSections
         | WorkflowBusinessPlanSections
+        | DirectBusinessPlanSections
         | None
     ),
     verification: Any,
@@ -7161,6 +9128,17 @@ def _validate_heavy_v3_typed_archived_verification(
                 label=label,
             )
             return
+        if isinstance(sections, DirectBusinessPlanSections):
+            if sections.static_expectation.get("api") != api:
+                raise CampaignEvidenceError(
+                    f"{label} direct typed plan is cross-bound to {api}"
+                )
+            validate_direct_archived_verification(
+                sections,
+                verification,
+                weak_report=label == "direct weak-verifier UX oracle",
+            )
+            return
         if api in {
             "ak.wwise.core.object.get",
             "ak.wwise.core.object.create",
@@ -7178,6 +9156,8 @@ def _validate_heavy_v3_typed_archived_verification(
             "ak.wwise.cli.tabDelimitedImport",
             "ak.wwise.cli.convertExternalSource",
             HEAVY_V3_MIGRATION_API,
+            "ak.wwise.core.getInfo",
+            "ak.wwise.core.executeLuaScript",
         }:
             raise CampaignEvidenceError(
                 f"{label} lacks required typed business-plan sections"
@@ -7187,6 +9167,7 @@ def _validate_heavy_v3_typed_archived_verification(
         CliBusinessPlanError,
         ImportBusinessPlanError,
         ObjectBusinessPlanError,
+        DirectBusinessPlanError,
         SoundBankBusinessPlanError,
         WorkflowBusinessPlanError,
     ) as exc:
@@ -7931,26 +9912,40 @@ def _heavy_v3_final_response(task_root: Path) -> str:
 def _heavy_v3_protocol_operation_request(
     evidence: HeavyV3PromptEvidence,
 ) -> Mapping[str, Any]:
-    steps = serialize_protocol(evidence.provenance.protocol)["steps"]
-    values: list[Mapping[str, Any]] = []
-    for step in steps:
-        arguments = step.get("arguments")
-        if (
-            step.get("subcommand") == "preview"
-            and isinstance(arguments, list)
-            and len(arguments) == 3
-            and arguments[0] == {"kind": "literal", "value": "--apply"}
-            and arguments[1] == {"kind": "literal", "value": "--request-json"}
-            and isinstance(arguments[2], Mapping)
-            and arguments[2].get("kind") in {
-                "semantic_json",
-                "semantic_json_object_operation_v1",
-                "semantic_json_soundbank_generate_v1",
-                "sealed_query_identity_object_operation_json",
-            }
-            and isinstance(arguments[2].get("value"), Mapping)
-        ):
-            values.append(arguments[2]["value"])
+    version = evidence.provenance.payload.get("version")
+    if not isinstance(version, str):
+        version = next(
+            (
+                str(argument.expected["version"])
+                for step in evidence.provenance.protocol.steps
+                for argument in step.arguments
+                if isinstance(argument, InlineTypedOperationArgument)
+                and isinstance(argument.expected.get("version"), str)
+            ),
+            None,
+        )
+    if version is None:
+        version = next(
+            (
+                argument.contract.version
+                for step in evidence.provenance.protocol.steps
+                for argument in step.arguments
+                if isinstance(argument, TypedRequestFactsArgument)
+            ),
+            None,
+        )
+    if not isinstance(version, str):
+        raise CampaignEvidenceError("heavy typed protocol lacks one exact version")
+    try:
+        values = [
+            request
+            for _pointer, request in materialize_typed_transaction_protocol_requests(
+                evidence.provenance.protocol,
+                version=version,
+            )
+        ]
+    except V3ProtocolError as exc:
+        raise CampaignEvidenceError("heavy typed protocol cannot be materialized") from exc
     if len(values) != 1:
         raise CampaignEvidenceError(
             "heavy protocol does not contain one exact operation request"
@@ -7988,47 +9983,50 @@ def _validate_heavy_v3_completed_transaction_protocol(
         "tx01.execute",
         "/transaction_id",
     )
+    preview_index = next(
+        (index for index, step in enumerate(steps) if step.name == "tx01.preview"),
+        None,
+    )
+    if preview_index is None:
+        raise CampaignEvidenceError(
+            "heavy audio transaction lacks exact preview/confirm/execute/verify binding"
+        )
+    tail = steps[preview_index:]
+    try:
+        materialized = _heavy_v3_protocol_operation_request(evidence)
+    except CampaignEvidenceError:
+        raise
     if (
-        protocol.turn_prefix_counts != (2, 6)
-        or len(steps) != 6
-        or tuple(step.name for step in steps)
+        not _nonempty_text(operation)
+        or materialized != expected_operation_request
+        or protocol.turn_prefix_counts != (preview_index + 1, len(steps))
+        or tuple(step.name for step in tail)
         != (
-            "tx01.operation-schema",
             "tx01.preview",
             "tx01.transaction-show",
             "tx01.confirm",
             "tx01.execute",
             "tx01.verify",
         )
-        or tuple(step.subcommand for step in steps)
-        != (
-            "operation-schema",
-            "preview",
-            "transaction-show",
-            "confirm",
-            "execute",
-            "verify",
-        )
-        or not _nonempty_text(operation)
-        or steps[0].arguments != (operation,)
-        or len(steps[1].arguments) != 3
-        or steps[1].arguments[:2] != ("--apply", "--request-json")
-        or not isinstance(steps[1].arguments[2], SemanticJsonArgument)
-        or steps[1].arguments[2].expected != expected_operation_request
-        or steps[1].arguments[2].equivalence
-        != operation_request_equivalence(str(operation))
-        or steps[2].arguments != (preview_transaction_id, "--summary-only")
-        or steps[3].arguments
+        or tail[0].subcommand not in {
+            "typed-call",
+            "typed-operation",
+            "preview-from-draft",
+        }
+        or tuple(step.subcommand for step in tail[1:])
+        != ("transaction-show", "confirm", "execute", "verify")
+        or tail[1].arguments != (preview_transaction_id, "--summary-only")
+        or tail[2].arguments
         != (
             shown_transaction_id,
             "--confirmation-token",
             confirmation_token,
         )
-        or steps[4].arguments != (confirmed_transaction_id,)
-        or steps[5].arguments != (executed_transaction_id,)
+        or tail[3].arguments != (confirmed_transaction_id,)
+        or tail[4].arguments != (executed_transaction_id,)
         or any(
-            step.allowed_exit_codes != ((0, 2) if index == 4 else (0,))
-            for index, step in enumerate(steps)
+            step.allowed_exit_codes != ((0, 2) if index == 3 else (0,))
+            for index, step in enumerate(tail)
         )
         or any(step.gateway_global_arguments for step in steps)
         or any(step.expected_error_code for step in steps)
@@ -8075,47 +10073,78 @@ def _heavy_v3_protocol_call_request(
     *,
     api: str,
 ) -> Mapping[str, Any]:
-    steps = serialize_protocol(evidence.provenance.protocol)["steps"]
-    values: list[dict[str, Any]] = []
-    for step in steps:
-        arguments = step.get("arguments")
-        has_post_filter = (
-            isinstance(arguments, list)
-            and len(arguments) == 7
-            and arguments[5]
-            == {"kind": "literal", "value": "--post-filter-json"}
-            and isinstance(arguments[6], Mapping)
-            and arguments[6].get("kind") == "semantic_json"
+    payload = evidence.provenance.payload
+    version = payload.get("version") if isinstance(payload, Mapping) else None
+    if not isinstance(version, str):
+        raise CampaignEvidenceError("heavy typed protocol version is unavailable")
+    try:
+        requests = materialize_typed_transaction_protocol_requests(
+            evidence.provenance.protocol,
+            version=version,
         )
+    except V3ProtocolError as exc:
+        raise CampaignEvidenceError(
+            f"heavy protocol cannot materialize the typed request for {api}"
+        ) from exc
+    values: list[dict[str, Any]] = []
+    for _pointer, request in requests:
+        arguments = request.get("arguments")
         if (
-            step.get("subcommand") == "call"
-            and isinstance(arguments, list)
-            and len(arguments) in {5, 7}
-            and arguments[0] == {"kind": "literal", "value": api}
-            and arguments[1] == {"kind": "literal", "value": "--args-json"}
-            and isinstance(arguments[2], Mapping)
-            and arguments[2].get("kind") == "semantic_json"
-            and arguments[3] == {"kind": "literal", "value": "--options-json"}
-            and isinstance(arguments[4], Mapping)
-            and arguments[4].get("kind") == "semantic_json"
-            and (len(arguments) == 5 or has_post_filter)
+            request.get("operation") != "waapi.call"
+            or not isinstance(arguments, Mapping)
+            or arguments.get("api") != api
+            or not isinstance(arguments.get("args"), Mapping)
+            or not isinstance(arguments.get("options"), Mapping)
         ):
-            values.append(
-                {
-                    "args": arguments[2].get("value"),
-                    "options": arguments[4].get("value"),
-                    "post_filter": (
-                        arguments[6].get("value") if has_post_filter else None
-                    ),
-                }
-            )
-    if len(values) != 1 or not all(
-        isinstance(values[0].get(key), Mapping) for key in ("args", "options")
-    ):
+            continue
+        values.append(
+            {
+                "args": arguments["args"],
+                "options": arguments["options"],
+                "post_filter": None,
+            }
+        )
+    check_steps = tuple(
+        step
+        for step in evidence.provenance.protocol.steps
+        if step.subcommand == "draft-check"
+        and len(step.arguments) == 9
+        and step.arguments[5] == "--post-filter-value"
+        and step.arguments[7] == "--post-filter-limit"
+    )
+    if len(values) == 1 and len(check_steps) == 1:
+        check = check_steps[0]
+        values[0]["post_filter"] = {
+            "field": "Filename",
+            "operator": "containsCaseSensitive",
+            "value": check.arguments[6],
+            "limit": int(check.arguments[8]),
+        }
+    if len(values) != 1:
         raise CampaignEvidenceError(
             f"heavy protocol does not contain one exact call request for {api}"
         )
     return values[0]
+
+
+def _heavy_v3_media_business_protocol_step(
+    evidence: HeavyV3PromptEvidence,
+) -> ExpectedGatewayStep:
+    """Return the one sealed direct Media Pool business step."""
+
+    matches = tuple(
+        step
+        for step in evidence.provenance.protocol.steps
+        if step.name == "media.get"
+        and step.subcommand == "core-call"
+        and step.arguments
+        and step.arguments[0] == "ak.wwise.core.mediaPool.get"
+    )
+    if len(matches) != 1:
+        raise CampaignEvidenceError(
+            "heavy protocol does not contain one exact Media Pool business step"
+        )
+    return matches[0]
 
 
 def _heavy_v3_audio_byte_change_paths(fixture: Any) -> tuple[str, ...]:
@@ -9410,7 +11439,9 @@ def _validate_object_query_gateway_payload(
             raise CampaignEvidenceError(
                 f"{label} object.get broker has an unknown derived identity"
             )
-        language = _campaign_language_name(row.get("audioSource:language"))
+        language = _campaign_language_name(
+            row.get("source_language", row.get("audioSource:language"))
+        )
         parent = row.get("parent")
         parent_id = (
             str(parent.get("id"))
@@ -10082,18 +12113,43 @@ def _validate_archived_paired_path_answer(
     order = proof.get("observed_answer_order")
     if not all(isinstance(value, list) for value in (required, excluded, paired, order)):
         raise CampaignEvidenceError(f"{label} paired answer arrays are invalid")
-    for item in required:
-        token = _closed_oracle_mapping(
+    required_tokens = [
+        _closed_oracle_mapping(
             item,
             {"key", "path", "occurrence_count", "first_line"},
             label=f"{label} required path token",
         )
+        for item in required
+    ]
+    first_lines = [token.get("first_line") for token in required_tokens]
+    paired_line_hashes = [
+        row.get("line_sha256") if isinstance(row, Mapping) else None
+        for row in paired
+    ]
+    if (
+        not first_lines
+        or any(type(index) is not int or index < 0 for index in first_lines)
+        or not paired_line_hashes
+        or any(not _sha256_text_value(value) for value in paired_line_hashes)
+    ):
+        raise CampaignEvidenceError(f"{label} required answer scope is invalid")
+    paired_line_indexes = [
+        index
+        for line_hash in paired_line_hashes
+        for index, line in enumerate(lines)
+        if hashlib.sha256(line.encode("utf-8")).hexdigest() == line_hash
+    ]
+    if len(paired_line_indexes) != len(paired_line_hashes):
+        raise CampaignEvidenceError(f"{label} paired path proof scope is invalid")
+    answer_start = min(paired_line_indexes)
+    answer_lines = tuple(enumerate(lines[answer_start:], start=answer_start))
+    for token in required_tokens:
         path = token.get("path")
         if not _nonempty_text(path):
             raise CampaignEvidenceError(f"{label} required path is invalid")
         matches = [
             (index, offset)
-            for index, line in enumerate(lines)
+            for index, line in answer_lines
             for offset in _campaign_path_token_offsets(line, str(path))
         ]
         if (
@@ -10115,7 +12171,7 @@ def _validate_archived_paired_path_answer(
             raise CampaignEvidenceError(f"{label} excluded path is invalid")
         matches = [
             offset
-            for line in lines
+            for _, line in answer_lines
             for offset in _campaign_path_token_offsets(line, str(path))
         ]
         if token.get("occurrence_count") != len(matches) or matches:
@@ -10163,7 +12219,7 @@ def _validate_archived_paired_path_answer(
             raise CampaignEvidenceError(f"{label} paired path row values are invalid")
         child_matches = [
             (index, offset)
-            for index, line in enumerate(lines)
+            for index, line in answer_lines
             for offset in _campaign_path_token_offsets(line, str(row["child_path"]))
         ]
         line_index = child_matches[0][0] if child_matches else None
@@ -10354,10 +12410,23 @@ def _validate_heavy_v3_audio_conversion_oracle(
     _validate_audio_conversion_snapshot(
         evidence.get("after"), label=f"{label} after"
     )
+    before = evidence["before"]
+    after = evidence["after"]
     paths = evidence.get("observed_target_paths")
     byte_change_paths = evidence.get("byte_change_required_paths")
     slots = evidence.get("target_slots")
     operation_request = evidence.get("operation_request")
+    try:
+        request_identity_matches = isinstance(
+            operation_request,
+            Mapping,
+        ) and audio_request_matches_resolved_object_ids(
+            operation_request,
+            expected_operation_request,
+            before.get("artifacts"),
+        )
+    except AudioMediaBusinessPlanError:
+        request_identity_matches = False
     if (
         row.get("phase") != "after"
         or not _plain_int(slots, minimum=1)
@@ -10371,7 +12440,7 @@ def _validate_heavy_v3_audio_conversion_oracle(
         or evidence.get("after_digest")
         != evidence.get("after", {}).get("digest")
         or not isinstance(operation_request, Mapping)
-        or operation_request != expected_operation_request
+        or not request_identity_matches
         or evidence.get("operation_request_sha256")
         != _canonical_sha256(operation_request)
         or evidence.get("verify_request_sha256")
@@ -10391,23 +12460,36 @@ def _validate_heavy_v3_audio_conversion_oracle(
         raise CampaignEvidenceError(
             f"{label} audio conversion target paths are duplicated"
         )
-    before = evidence["before"]
-    after = evidence["after"]
     arguments = operation_request.get("arguments")
     request_args = arguments.get("args") if isinstance(arguments, Mapping) else None
     objects = request_args.get("objects") if isinstance(request_args, Mapping) else None
     platforms = request_args.get("platforms") if isinstance(request_args, Mapping) else None
     languages = request_args.get("languages") if isinstance(request_args, Mapping) else None
     io_root = arguments.get("io_root") if isinstance(arguments, Mapping) else None
+    expected_arguments = expected_operation_request.get("arguments")
+    expected_request_args = (
+        expected_arguments.get("args")
+        if isinstance(expected_arguments, Mapping)
+        else None
+    )
+    expected_objects = (
+        expected_request_args.get("objects")
+        if isinstance(expected_request_args, Mapping)
+        else None
+    )
     if (
         operation_request.get("operation") != "waapi.call"
         or not isinstance(arguments, Mapping)
         or arguments.get("api") != "ak.wwise.core.audio.convert"
         or arguments.get("options") != {}
         or not isinstance(objects, list)
+        or not isinstance(expected_objects, list)
         or not isinstance(platforms, list)
         or not isinstance(languages, list)
-        or not all(objects) or not all(platforms) or not all(languages)
+        or not all(objects)
+        or not all(expected_objects)
+        or not all(platforms)
+        or not all(languages)
         or any(not _nonempty_text(item) for item in (*objects, *platforms, *languages))
         or not _nonempty_text(io_root)
         or before["input_files"] != after["input_files"]
@@ -10481,11 +12563,11 @@ def _validate_heavy_v3_audio_conversion_oracle(
         )
     expected_slots = {
         (str(object_path), str(platform), str(language))
-        for object_path in objects
+        for object_path in expected_objects
         for platform in platforms
         for language in languages
     }
-    if not set(byte_change_paths).issubset(set(objects)):
+    if not set(byte_change_paths).issubset(set(expected_objects)):
         raise CampaignEvidenceError(
             f"{label} byte-change paths escape the target object set"
         )
@@ -10819,6 +12901,7 @@ def _validate_heavy_v3_media_pool_oracle(
     expected_final_response_sha256: str,
     final_response: str,
     expected_request: Mapping[str, Any],
+    expected_step: ExpectedGatewayStep,
     label: str,
 ) -> None:
     row = _closed_oracle_mapping(
@@ -10931,35 +13014,42 @@ def _validate_heavy_v3_media_pool_oracle(
         or model_get_fields.get("return") != available_fields
     ):
         raise CampaignEvidenceError(f"{label} getFields differs from sealed inventory")
-    requested_fields = sealed_request.get("options", {}).get("return")
     model_result = evidence.get("model_media_result")
-    raw_rows = model_result.get("return") if isinstance(model_result, Mapping) else None
-    expected_by_id = {
-        item["file_id"]: item
-        for item in oracle.get("rows", [])
-        if item.get("key") in expected_keys
-    }
-    actual_by_id: dict[str, Mapping[str, Any]] = {}
-    if not isinstance(requested_fields, list) or not isinstance(raw_rows, list):
-        raise CampaignEvidenceError(f"{label} Media Pool result is malformed")
-    for item in raw_rows:
-        if not isinstance(item, Mapping) or not _nonempty_text(item.get("FileId")):
-            raise CampaignEvidenceError(f"{label} Media Pool result row is malformed")
-        file_id = str(item["FileId"])
-        if file_id in actual_by_id:
-            raise CampaignEvidenceError(f"{label} Media Pool result duplicates FileId")
-        actual_by_id[file_id] = item
-    if set(actual_by_id) != set(expected_by_id):
-        raise CampaignEvidenceError(f"{label} Media Pool FileId set is invalid")
-    for file_id, item in actual_by_id.items():
-        expected_row = expected_by_id[file_id]
-        if set(item) != set(requested_fields) or any(
-            not _same_media_value_v3(
-                item.get(field), expected_row.get("values", {}).get(field)
-            )
-            for field in requested_fields
-        ):
-            raise CampaignEvidenceError(f"{label} Media Pool return fields/values drifted")
+    broker_payload = _heavy_v3_broker_step_payload(
+        task_root,
+        step_name="media.get",
+    )
+    broker_result = broker_payload.get("agent_result")
+    business_request = broker_payload.get("business_request")
+    if (
+        not isinstance(model_result, Mapping)
+        or not isinstance(broker_result, Mapping)
+        or not isinstance(business_request, Mapping)
+        or _canonical_sha256(model_result) != _canonical_sha256(broker_result)
+    ):
+        raise CampaignEvidenceError(
+            f"{label} Media Pool business result is not bound to Broker evidence"
+        )
+    try:
+        archived_oracle = MediaPoolBusinessOracleView.from_archive(
+            oracle,
+            scenario_id=scenario_id,
+        )
+    except ValueError as exc:
+        raise CampaignEvidenceError(
+            f"{label} Media Pool archived projection inputs are malformed"
+        ) from exc
+    projection = verify_media_pool_business_projection(
+        archived_oracle,
+        expected_step,
+        model_result,
+        business_request,
+    )
+    if not projection.ok:
+        raise CampaignEvidenceError(
+            f"{label} Media Pool business projection is invalid: "
+            f"{projection.details.get('error', projection.code)}"
+        )
     if supporting:
         _validate_compact_media_reference_archive(
             evidence.get("model_reference_result"),
@@ -11960,10 +14050,16 @@ def _validate_heavy_v3_topic_publisher_process(
     diagnostic_ack_payload = {
         key: nested for key, nested in ack_payload.items() if key != "nonce"
     }
+    proof_requirement = proof.get("requirement")
+    expected_step_name = (
+        proof_requirement.get("step_name")
+        if isinstance(proof_requirement, Mapping)
+        else None
+    )
     if (
         api != SOUNDBANK_TOPIC
         or ack.get("contract") != TOPIC_ACK_CONTRACT
-        or ack.get("step_name") != "soundbank.generated.wait"
+        or ack.get("step_name") != expected_step_name
         or ack.get("topic") != api
         or ack.get("path") != proof.get("ack_path")
         or ack.get("file_sha256") != proof.get("ack_file_sha256")
@@ -12103,10 +14199,15 @@ def _validate_heavy_v3_topic_subscription_ack(
         if isinstance(topic_binding, Mapping)
         else None
     )
+    expected_step_name = (
+        planned_requirement.get("step_name")
+        if isinstance(planned_requirement, Mapping)
+        else None
+    )
     expected_requirement = {
         "contract": TOPIC_ACK_REQUIREMENT_CONTRACT,
         "ack_contract": TOPIC_ACK_CONTRACT,
-        "step_name": "soundbank.generated.wait",
+        "step_name": expected_step_name,
         "topic": api,
         "fresh_exclusive_path_required": True,
         "publisher_requires_valid_ack": True,
@@ -12137,7 +14238,7 @@ def _validate_heavy_v3_topic_subscription_ack(
             record
             for record in records
             if isinstance(record, Mapping)
-            and record.get("step_name") == "soundbank.generated.wait"
+            and record.get("step_name") == expected_step_name
         ]
         if isinstance(records, list)
         else []
@@ -12158,6 +14259,7 @@ def _validate_heavy_v3_topic_subscription_ack(
         record=broker_record,
         task_root=task_root,
         label="topic subscription ACK broker record",
+        expected_step_name=str(expected_step_name),
     )
 
     ack_path_value = proof.get("ack_path")
@@ -12724,11 +14826,16 @@ def _load_strict_regular_text(path: Path, *, limit_bytes: int = 8 * 1024 * 1024)
         raise CampaignEvidenceError(f"child text is not UTF-8: {source}") from exc
 
 
-def _heavy_v3_outcome_contract(runner: str) -> str:
+def _heavy_v3_outcome_contract(runner: str, *, profile: str | None = None) -> str:
     if runner == "project":
         return HEAVY_V3_PROJECT_OUTCOME_CONTRACT
     if runner == "cli":
         return HEAVY_V3_CLI_OUTCOME_CONTRACT
+    if runner == "agent":
+        contract = BUSINESS_AGENT_OUTCOME_CONTRACTS.get(str(profile))
+        if contract is None:
+            raise CampaignEvidenceError("unknown business Agent outcome contract")
+        return contract
     raise CampaignEvidenceError(f"unknown heavy runner lane: {runner}")
 
 
@@ -12831,12 +14938,24 @@ def assert_effective_inputs_frozen(
     harness = require_section("harness")
     file_bindings = (
         ("suite", options.suite_path, suite),
-        ("live config", options.live_config, live_config),
+        *(
+            (("live config", options.live_config, live_config),)
+            if not options.offline_only
+            else ()
+        ),
         ("Codex binary", options.codex_binary, codex),
     )
     for label, path, section in file_bindings:
         if section.get("path") != str(path) or section.get("sha256") != sha256_file(path):
             raise CampaignEvidenceError(f"{label} drifted from the immutable campaign fingerprint")
+    if options.offline_only and live_config != {
+        "path": str(options.live_config),
+        "sha256": None,
+        "used": False,
+    }:
+        raise CampaignEvidenceError(
+            "offline campaign must seal live config as unused"
+        )
     if codex.get("runtime_files", []) != _codex_runtime_fingerprints(options.codex_binary):
         raise CampaignEvidenceError(
             "Codex runtime helpers drifted from the immutable campaign fingerprint"
@@ -13049,6 +15168,8 @@ def build_child_argv(
         options.service_tier,
         "--timeout",
         str(options.timeout_seconds),
+        "--wwise-readiness-timeout",
+        str(options.wwise_readiness_timeout_seconds),
     ]
     if windows_powershell_core_host is not None:
         argv.extend(
@@ -13447,16 +15568,27 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
     )
     parser.add_argument("--service-tier")
     parser.add_argument("--timeout", type=float)
+    parser.add_argument(
+        "--wwise-readiness-timeout",
+        type=float,
+        default=60.0,
+    )
     parser.add_argument("--case-id", action="append", default=[])
     parser.add_argument("--version", action="append", choices=SUPPORTED_VERSIONS, default=[])
     parser.add_argument("--pair-id", action="append", default=[])
     parser.add_argument("--offline-only", action="store_true")
     parser.add_argument("--lock-timeout", type=float, default=10.0)
-    parser.add_argument("--max-pre-action-retries", type=int, default=1)
+    parser.add_argument("--max-pre-action-retries", type=int)
     args = parser.parse_args(argv)
     is_executable_v3 = args.profile in EXECUTABLE_V3_PROFILE_IDS
     is_policy_v3 = args.profile == MODIFICATION_POLICY_V3_PROFILE_ID
     is_compound_v1 = args.profile == COMPOUND_HEAVY_V1_PROFILE_ID
+    is_typed_input = args.profile == TYPED_INPUT_PROFILE_ID
+    is_deep_business_acceptance = (
+        args.profile == DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID
+    )
+    is_deep_interface_mvp = args.profile == DEEP_INTERFACE_MVP_PROFILE_ID
+    business_agent_profile = matrix.OFFLINE_BUSINESS_AGENT_PROFILES.get(args.profile)
     is_integration_v1 = args.profile == INTEGRATION_WORKFLOWS_V1_PROFILE_ID
     is_integration_v2 = args.profile == INTEGRATION_WORKFLOWS_V2_PROFILE_ID
     is_integration = args.profile == INTEGRATION_PROFILE_ID
@@ -13466,6 +15598,8 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
         else (
             matrix.INTEGRATION_CODEX_TIMEOUT_SECONDS
             if is_integration
+            else matrix.TYPED_INPUT_CODEX_TIMEOUT_SECONDS
+            if is_typed_input or is_deep_business_acceptance
             else matrix.DEFAULT_CODEX_TIMEOUT_SECONDS
         )
     )
@@ -13474,8 +15608,33 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
         parser.error("--verify-only requires --resume")
     if timeout_seconds <= 0 or args.lock_timeout <= 0:
         parser.error("--timeout and --lock-timeout must be greater than zero")
-    if args.max_pre_action_retries < 0:
+    if (
+        not math.isfinite(args.wwise_readiness_timeout)
+        or args.wwise_readiness_timeout <= 0
+    ):
+        parser.error("--wwise-readiness-timeout must be positive and finite")
+    max_pre_action_retries = (
+        0
+        if args.max_pre_action_retries is None
+        and (
+            is_typed_input
+            or is_deep_business_acceptance
+            or business_agent_profile is not None
+        )
+        else 1
+        if args.max_pre_action_retries is None
+        else int(args.max_pre_action_retries)
+    )
+    if max_pre_action_retries < 0:
         parser.error("--max-pre-action-retries must be zero or greater")
+    if (
+        is_typed_input
+        or is_deep_business_acceptance
+        or business_agent_profile is not None
+    ) and max_pre_action_retries != 0:
+        parser.error(
+            f"{args.profile} forbids same-root pre-action retries"
+        )
     for name, values in (
         ("--case-id", args.case_id),
         ("--version", args.version),
@@ -13493,7 +15652,11 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
         parser.error(str(exc))
     if is_executable_v3 and args.pair_id:
         parser.error(f"--pair-id is not supported by {args.profile}")
-    if is_executable_v3 and args.offline_only:
+    if (
+        is_executable_v3
+        and args.offline_only
+        and business_agent_profile is None
+    ):
         parser.error(f"--offline-only is not supported by {args.profile}")
     if not is_executable_v3:
         unknown_case_ids = sorted(set(args.case_id) - set(CASE_IDS))
@@ -13501,6 +15664,21 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
             parser.error(
                 "unknown v2 --case-id values: " + ", ".join(unknown_case_ids)
             )
+    if is_deep_interface_mvp and any(
+        version not in {"2022.1", "2025.1"} for version in args.version
+    ):
+        parser.error(
+            f"{args.profile} supports only "
+            "--version 2022.1 and 2025.1"
+        )
+    if business_agent_profile is not None and any(
+        version not in business_agent_profile.supported_versions
+        for version in args.version
+    ):
+        parser.error(
+            f"{args.profile} supports only --version "
+            + " and ".join(sorted(business_agent_profile.supported_versions))
+        )
     if (
         is_compound_v1
         or is_integration_v1
@@ -13532,6 +15710,14 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
         (
             matrix.DEFAULT_MODIFICATION_POLICY_V3_SUITE
             if is_policy_v3
+            else matrix.DEFAULT_DEEP_INTERFACE_MVP_SUITE
+            if is_deep_interface_mvp
+            else business_agent_profile.suite_path
+            if business_agent_profile is not None
+            else matrix.DEFAULT_TYPED_INPUT_SUITE
+            if is_typed_input
+            else matrix.DEFAULT_DEEP_BUSINESS_ACCEPTANCE_SUITE
+            if is_deep_business_acceptance
             else (
                 matrix.DEFAULT_INTEGRATION_SUITE
                 if is_integration
@@ -13559,7 +15745,9 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
             else None
         )
         auth_json = Path(args.auth_json).expanduser().resolve(strict=True)
-        live_config = Path(args.live_config).expanduser().resolve(strict=True)
+        live_config = Path(args.live_config).expanduser().resolve(
+            strict=not args.offline_only
+        )
     except (OSError, matrix.CodexHarnessError) as exc:
         parser.error(str(exc))
     return CampaignOptions(
@@ -13581,7 +15769,10 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
         pair_ids=tuple(str(value) for value in args.pair_id),
         offline_only=bool(args.offline_only),
         lock_timeout_seconds=float(args.lock_timeout),
-        max_pre_action_retries=int(args.max_pre_action_retries),
+        max_pre_action_retries=max_pre_action_retries,
+        wwise_readiness_timeout_seconds=float(
+            args.wwise_readiness_timeout
+        ),
         windows_powershell_core_host=windows_powershell_core_host,
     )
 

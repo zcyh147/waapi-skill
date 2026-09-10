@@ -1,0 +1,19 @@
+{
+  "contract": "waapi-skill.core-business-profile/v1",
+  "profile_id": "core_business_1",
+  "model": {
+    "name": "gpt-5.6-terra",
+    "reasoning_effort": "medium",
+    "service_tier": "default",
+    "memory": "disabled"
+  },
+  "units": [
+    {
+      "unit_id": "CORE25-PROJECT-SAVE-PREVIEW",
+      "operation": "ak.wwise.core.project.save",
+      "version": "2025.1",
+      "prompt": "请为当前 Wwise 工程生成一次保存项目的预览，不要执行，也不要启用自动签出到源代码管理。",
+      "final_markers": ["保存", "预览"]
+    }
+  ]
+}

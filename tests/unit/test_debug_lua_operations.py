@@ -247,26 +247,23 @@ def test_debug_mode_changes_are_closed_nonretry_transactions(
 
 
 @pytest.mark.parametrize(
-    ("operation", "version", "acknowledgement", "uri", "disconnect"),
+    ("operation", "version", "uri", "disconnect"),
     (
         (
             "debug.restartWaapiServers",
             "2023.1",
-            "restart_waapi_servers",
             "ak.wwise.debug.restartWaapiServers",
             True,
         ),
         (
             "debug.testAssert",
             "2022.1",
-            "trigger_debug_assert",
             "ak.wwise.debug.testAssert",
             False,
         ),
         (
             "debug.testCrash",
             "2022.1",
-            "crash_wwise_process",
             "ak.wwise.debug.testCrash",
             True,
         ),
@@ -275,14 +272,13 @@ def test_debug_mode_changes_are_closed_nonretry_transactions(
 def test_dangerous_debug_host_controls_are_explicit_terminal_nonretry_transactions(
     operation: str,
     version: str,
-    acknowledgement: str,
     uri: str,
     disconnect: bool,
 ) -> None:
     request = parse_operation_request(
         _request(
             operation,
-            {"acknowledge": acknowledgement},
+            {},
             version=version,
         )
     )
@@ -303,7 +299,7 @@ def test_dangerous_debug_host_controls_are_explicit_terminal_nonretry_transactio
 
     with pytest.raises(
         OperationContractError,
-        match="exact immutable acknowledgement",
+        match="closed JSON contract",
     ):
         parse_operation_request(
             _request(

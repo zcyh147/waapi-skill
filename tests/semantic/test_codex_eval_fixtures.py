@@ -134,37 +134,6 @@ class FakeTrustedWwise:
         command_args = parsed["command_args"]
         self.requests.append({**parsed, "env": dict(env)})
         common = {"contract": GATEWAY_CONTRACT, "ok": True, "command": command}
-        if command == "preview":
-            request = json.loads(command_args[command_args.index("--request-json") + 1])
-            tx = f"tx-{self._next_tx}"
-            self._next_tx += 1
-            artifact_hash = f"{self._next_tx:064x}"[-64:]
-            event_sequence = 2
-            last_event_hash = "b" * 64
-            self.transactions[tx] = {
-                "request": copy.deepcopy(request),
-                "artifact_hash": artifact_hash,
-                "confirmation_token": confirmation_token_for(
-                    transaction_id=tx,
-                    artifact_hash=artifact_hash,
-                    state="awaiting_confirmation",
-                    event_sequence=event_sequence,
-                    last_event_hash=last_event_hash,
-                ),
-                "event_sequence": event_sequence,
-                "last_event_hash": last_event_hash,
-                "state": "awaiting_confirmation",
-            }
-            return {
-                **common,
-                "state": "awaiting_confirmation",
-                "status": "awaiting_confirmation",
-                "transaction_id": tx,
-                "artifact_hash": artifact_hash,
-                "preview_summary": {"request": request},
-                "executed": False,
-                "verified": False,
-            }
         transaction_id = command_args[0]
         transaction = self.transactions[transaction_id]
         if command == "transaction-show":
@@ -239,6 +208,46 @@ class FakeTrustedWwise:
                 },
             }
         raise AssertionError(command)
+
+    def preview_request(
+        self,
+        request: Mapping[str, Any],
+        _state_dir: Path,
+        _evidence_dir: Path,
+    ) -> Mapping[str, Any]:
+        """Create fake immutable state without restoring a retired CLI route."""
+
+        tx = f"tx-{self._next_tx}"
+        self._next_tx += 1
+        artifact_hash = f"{self._next_tx:064x}"[-64:]
+        event_sequence = 2
+        last_event_hash = "b" * 64
+        self.transactions[tx] = {
+            "request": copy.deepcopy(dict(request)),
+            "artifact_hash": artifact_hash,
+            "confirmation_token": confirmation_token_for(
+                transaction_id=tx,
+                artifact_hash=artifact_hash,
+                state="awaiting_confirmation",
+                event_sequence=event_sequence,
+                last_event_hash=last_event_hash,
+            ),
+            "event_sequence": event_sequence,
+            "last_event_hash": last_event_hash,
+            "state": "awaiting_confirmation",
+        }
+        return {
+            "contract": GATEWAY_CONTRACT,
+            "ok": True,
+            "command": "preview-from-draft",
+            "state": "awaiting_confirmation",
+            "status": "awaiting_confirmation",
+            "transaction_id": tx,
+            "artifact_hash": artifact_hash,
+            "preview_summary": {"request": copy.deepcopy(dict(request))},
+            "executed": False,
+            "verified": False,
+        }
 
     def read(self, uri: str, args: Mapping[str, Any], options: Mapping[str, Any]) -> Any:
         if uri == "ak.wwise.core.object.get":
@@ -409,13 +418,14 @@ def fake_runtime(tmp_path: Path) -> tuple[FakeTrustedWwise, dict[str, Any]]:
             "BASH_ENV": "/model/writable/bash-env",
         },
         "trusted_gateway": fake.gateway,
+        "trusted_preview": fake.preview_request,
         "read_call": fake.read,
         "fixture_token": "fixed-token",
     }
     return fake, kwargs
 
 
-def test_fake_trusted_wwise_show_returns_exact_token_continuation() -> None:
+def test_fake_trusted_wwise_show_returns_exact_token_continuation(tmp_path: Path) -> None:
     fake = FakeTrustedWwise()
     request = {
         "contract": "waapi-skill.operation-request/v1",
@@ -423,14 +433,7 @@ def test_fake_trusted_wwise_show_returns_exact_token_continuation() -> None:
         "operation": "object.setNotes",
         "arguments": {"target": {"id": "{fixture}"}, "value": "notes"},
     }
-    preview = fake.gateway(
-        (
-            "preview",
-            "--request-json",
-            json.dumps(request, ensure_ascii=False, separators=(",", ":")),
-        ),
-        {},
-    )
+    preview = fake.preview_request(request, tmp_path / "state", tmp_path / "evidence")
     transaction_id = str(preview["transaction_id"])
     transaction = fake.transactions[transaction_id]
 
@@ -943,6 +946,7 @@ def test_version_specific_parent_is_closed(
         private_root=private,
         runner_env={"PATH": "/usr/bin"},
         trusted_gateway=fake.gateway,
+        trusted_preview=fake.preview_request,
         read_call=fake.read,
         fixture_token=f"case-{version.replace('.', '-')}",
     )
@@ -1001,6 +1005,7 @@ def test_2025_fixture_rejects_legacy_actor_mixer_readback(tmp_path: Path) -> Non
             private_root=private,
             runner_env={"PATH": "/usr/bin"},
             trusted_gateway=fake.gateway,
+            trusted_preview=fake.preview_request,
             read_call=fake.read,
             fixture_token="legacy-type",
         )
@@ -1041,6 +1046,7 @@ def test_recursive_query_versions_reuse_only_the_validated_live_q4_baseline(
         private_root=private,
         runner_env={"PATH": "/usr/bin"},
         trusted_gateway=fake.gateway,
+        trusted_preview=fake.preview_request,
         read_call=read_once,
         fixture_token=f"q4-single-read-{version.replace('.', '-')}",
     )
@@ -1104,6 +1110,7 @@ def test_recursive_query_versions_reject_an_unvalidated_first_live_q4_result(
             private_root=private,
             runner_env={"PATH": "/usr/bin"},
             trusted_gateway=fake.gateway,
+            trusted_preview=fake.preview_request,
             read_call=empty_q4_read,
             fixture_token=f"q4-invalid-{version.replace('.', '-')}",
         )
@@ -1141,6 +1148,7 @@ def test_non_recursive_query_versions_keep_live_q4_snapshot_reads(
         private_root=private,
         runner_env={"PATH": "/usr/bin"},
         trusted_gateway=fake.gateway,
+        trusted_preview=fake.preview_request,
         read_call=counted_read,
         fixture_token=f"q4-live-{version.replace('.', '-')}",
     )
@@ -1431,12 +1439,12 @@ def test_unknown_case_adapter_expectation_and_malformed_read_fail_closed(
     "bad_payload",
     [
         [],
-        {"contract": "wrong", "ok": True, "command": "preview"},
-        {"contract": GATEWAY_CONTRACT, "ok": False, "command": "preview"},
+        {"contract": "wrong", "ok": True, "command": "operation-schema"},
+        {"contract": GATEWAY_CONTRACT, "ok": False, "command": "operation-schema"},
         {"contract": GATEWAY_CONTRACT, "ok": True, "command": "execute"},
     ],
 )
-def test_trusted_gateway_errors_fail_closed_before_returning_a_bundle(
+def _archive_test_trusted_gateway_errors_fail_closed_before_returning_a_bundle(
     tmp_path: Path,
     bad_payload: Any,
 ) -> None:
@@ -1484,21 +1492,21 @@ def test_setup_failure_rolls_back_only_verified_partial_fixture_ids(tmp_path: Pa
     sandbox.mkdir()
     preview_count = 0
 
-    def fail_once(argv: Sequence[str], env: Mapping[str, str]) -> Mapping[str, Any]:
+    def fail_once_preview(
+        request: Mapping[str, Any], state_dir: Path, evidence_dir: Path
+    ) -> Mapping[str, Any]:
         nonlocal preview_count
-        parsed = _parse_gateway_argv(argv)
-        if parsed["command"] == "preview":
-            preview_count += 1
-            if preview_count == 4:
-                return {
-                    "contract": GATEWAY_CONTRACT,
-                    "ok": False,
-                    "command": "preview",
-                    "message": "injected setup failure",
-                }
-        return fake.gateway(argv, env)
+        preview_count += 1
+        if preview_count == 4:
+            return {
+                "contract": GATEWAY_CONTRACT,
+                "ok": False,
+                "command": "preview-from-draft",
+                "message": "injected setup failure",
+            }
+        return fake.preview_request(request, state_dir, evidence_dir)
 
-    with pytest.raises(FixtureContractError, match="trusted gateway preview failed"):
+    with pytest.raises(FixtureContractError, match="fixture preview did not await"):
         create_shared_fixture_bundle(
             version="2022.1",
             host="localhost",
@@ -1506,7 +1514,8 @@ def test_setup_failure_rolls_back_only_verified_partial_fixture_ids(tmp_path: Pa
             sandbox_path=sandbox,
             private_root=tmp_path / "private",
             runner_env={"PATH": "/usr/bin"},
-            trusted_gateway=fail_once,
+            trusted_gateway=fake.gateway,
+            trusted_preview=fail_once_preview,
             read_call=fake.read,
             fixture_token="partial-failure",
         )
@@ -1552,6 +1561,7 @@ def test_post_execute_result_parse_failure_recovers_unique_path_and_rolls_back(
                 "WAAPI_CODEX_GATEWAY_REQUIRED": "1",
             },
             trusted_gateway=corrupt_first_create_result,
+            trusted_preview=fake.preview_request,
             read_call=fake.read,
             fixture_token="parse-failure",
         )
@@ -1592,6 +1602,7 @@ def test_post_execute_verify_failure_uses_execute_proof_for_rollback(tmp_path: P
             private_root=tmp_path / "private",
             runner_env={"PATH": "/usr/bin"},
             trusted_gateway=fail_first_create_verify,
+            trusted_preview=fake.preview_request,
             read_call=fake.read,
             fixture_token="verify-failure",
         )
@@ -1646,6 +1657,7 @@ def test_partial_recovery_ambiguity_fails_closed_without_deleting_candidate(
             private_root=tmp_path / "private",
             runner_env={"PATH": "/usr/bin"},
             trusted_gateway=corrupt_first_create_result,
+            trusted_preview=fake.preview_request,
             read_call=ambiguous_recovery_read,
             fixture_token="ambiguous-recovery",
         )

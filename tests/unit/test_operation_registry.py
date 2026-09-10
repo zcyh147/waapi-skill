@@ -9,13 +9,19 @@ from typing import Any, Mapping
 
 import pytest  # pyright: ignore[reportMissingImports]
 
+from tests.support.compound_undo import compound_undo_request
+
 from wwise_waapi.builders.common import SemanticValidationError  # pyright: ignore[reportMissingImports]
 from wwise_waapi.operation_import import (  # pyright: ignore[reportMissingImports]
     allowed_import_hierarchy_roots,
 )
+from wwise_waapi.business_declarations import BusinessDeclarationError
+from wwise_waapi.compound_undo_business import build_compound_undo_child_snapshot
+from wwise_waapi.typed_operations import compound_child_request_contract
 from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImports]
+    BUSINESS_DECLARATION_INPUT_MODE,
     COMPOSER_INPUT_MODE,
-    LEGACY_JSON_INPUT_MODE,
+    INTERNAL_CANONICAL_INPUT_MODE,
     OPERATION_INPUT_MODE_LANES,
     OPERATION_REQUEST_CONTRACT,
     UNDO_GROUP_INNER_URIS_BY_VERSION,
@@ -71,6 +77,29 @@ EXPECTED_ACTOR_MIXER_METADATA_TYPES = {
 }
 
 
+def _typed_undo_group_request(version: str) -> dict[str, Any]:
+    return compound_undo_request(
+        version=version,
+        display_name="Batch edit",
+        child_requests=[
+            {
+                "contract": OPERATION_REQUEST_CONTRACT,
+                "version": version,
+                "operation": "waapi.call",
+                "arguments": {
+                    "api": "ak.wwise.core.object.setRandomizer",
+                    "args": {
+                        "object": r"\Actor-Mixer Hierarchy\A",
+                        "property": "Volume",
+                        "enabled": True,
+                    },
+                    "options": {},
+                },
+            }
+        ],
+    )
+
+
 def test_every_supported_operation_version_has_one_explicit_normal_input_mode() -> None:
     specs = {spec.name: spec for spec in list_operation_specs()}
 
@@ -80,9 +109,44 @@ def test_every_supported_operation_version_has_one_explicit_normal_input_mode() 
     )
     for name, spec in specs.items():
         expected_mode = (
-            COMPOSER_INPUT_MODE
-            if name in {"audio.import", "object.set"}
-            else LEGACY_JSON_INPUT_MODE
+            BUSINESS_DECLARATION_INPUT_MODE
+            if name
+            in {
+                    "audio.import",
+                    "audio.importTabDelimited",
+                    "waapi.undoGroup",
+                    "debug.restartWaapiServers",
+                    "debug.setAsserts",
+                    "debug.setAutomationMode",
+                    "debug.testAssert",
+                    "debug.testCrash",
+                "lua.executeCliFile",
+                "lua.executeCoreFile",
+                "lua.executeCoreInline",
+                "object.copy",
+                "object.delete",
+                "object.move",
+                "object.setName",
+                "object.setNotes",
+                "object.setLinked",
+                "object.setProperty",
+                "object.setReference",
+                "object.create",
+                "object.createPlugin",
+                "object.setRTPC",
+                "object.set",
+                "soundbank.convertExternalSources",
+                "soundbank.generate",
+                "soundbank.processDefinitionFiles",
+                "soundbank.setInclusions",
+                "switchContainer.addAssignment",
+                "switchContainer.removeAssignment",
+                "ui.captureScreen",
+                "ui.commands.execute",
+                "ui.commands.register",
+                "ui.commands.unregister",
+            }
+            else INTERNAL_CANONICAL_INPUT_MODE
         )
         assert operation_input_modes_by_version(name) == {
             version: expected_mode
@@ -110,7 +174,7 @@ def test_every_supported_operation_version_has_one_explicit_normal_input_mode() 
                 OperationInputModeLane(
                     operation="missing.operation",
                     version="2022.1",
-                    input_mode=LEGACY_JSON_INPUT_MODE,
+                    input_mode=INTERNAL_CANONICAL_INPUT_MODE,
                 ),
             ),
             "unknown operation",
@@ -121,7 +185,7 @@ def test_every_supported_operation_version_has_one_explicit_normal_input_mode() 
                 OperationInputModeLane(
                     operation="object.set",
                     version="2021.1",
-                    input_mode=LEGACY_JSON_INPUT_MODE,
+                    input_mode=INTERNAL_CANONICAL_INPUT_MODE,
                 ),
             ),
             "unsupported version lane",
@@ -176,10 +240,22 @@ def test_input_mode_selection_is_isolated_by_exact_operation_not_shared_native_u
     monkeypatch.setattr(registry, "OPERATION_INPUT_MODE_LANES", migrated)
 
     assert operation_input_mode("object.set", "2022.1") == COMPOSER_INPUT_MODE
-    assert operation_input_mode("object.setRTPC", "2022.1") == LEGACY_JSON_INPUT_MODE
-    assert operation_input_mode("object.createPlugin", "2022.1") == LEGACY_JSON_INPUT_MODE
-    assert operation_input_mode("lua.executeCoreInline", "2025.1") == COMPOSER_INPUT_MODE
-    assert operation_input_mode("lua.executeCoreFile", "2025.1") == LEGACY_JSON_INPUT_MODE
+    assert (
+        operation_input_mode("object.setRTPC", "2022.1")
+        == BUSINESS_DECLARATION_INPUT_MODE
+    )
+    assert (
+        operation_input_mode("object.createPlugin", "2022.1")
+        == BUSINESS_DECLARATION_INPUT_MODE
+    )
+    assert (
+        operation_input_mode("lua.executeCoreInline", "2025.1")
+        == COMPOSER_INPUT_MODE
+    )
+    assert (
+        operation_input_mode("lua.executeCoreFile", "2025.1")
+        == BUSINESS_DECLARATION_INPUT_MODE
+    )
     assert {
         (spec.name, version): operation_request_schema_digest(spec.name, version)
         for spec in list_operation_specs()
@@ -204,7 +280,7 @@ def test_operation_request_schema_digest_owns_only_versioned_machine_contract() 
     assert "selection_guidance" not in contract_2022
     assert "next_step" not in contract_2022
     assert operation_request_schema_digest("object.set", "2022.1") == (
-        "2b6d3903c5b3e11618c3eaf0a3d5a26aa0045db26750320f3a8ce8c7da004cee"
+        "997c56c07d4f946579c9ec0ee96d9c05d4491105989010b003c7d7e1d02fa02b"
     )
     assert operation_request_schema_digest("object.set", "2025.1") != (
         operation_request_schema_digest("object.set", "2022.1")
@@ -217,7 +293,7 @@ def test_operation_request_schema_digest_owns_only_versioned_machine_contract() 
     )
     assert operation_request_schema_digest(
         "audio.importTabDelimited", "2022.1"
-    ) == "3380aa555705e7432d3cce8626e99a1de7e17155f1d552a34031d6f51f0c418d"
+    ) == "66596c320b3cb9905249882d588ce91be6fd13c0ab683f8114ca7399d949c3d7"
     assert operation_request_schema_digest(
         "audio.importTabDelimited", "2025.1"
     ) == "231a06eaa5f85cbd1b842af68e7ec93eb096dad57f918b85140a2a04642530c3"
@@ -391,7 +467,7 @@ def test_operation_catalog_is_truthful_about_closed_and_boundary_operations() ->
     assert specs["waapi.call"]["argument_contract"] == {
         "type": "object",
         "required": ["api"],
-        "optional": ["args", "options", "io_root"],
+        "optional": ["args", "options", "io_root", "result_projection"],
         "additionalProperties": False,
         "properties": {
             "api": {
@@ -423,6 +499,13 @@ def test_operation_catalog_is_truthful_about_closed_and_boundary_operations() ->
                     "Absolute isolated I/O root at $.arguments.io_root; it is a "
                     "sibling of api, args, and options and must never be nested "
                     "inside args."
+                ),
+            },
+            "result_projection": {
+                "type": "object",
+                "description": (
+                    "Gateway-owned bounded result projection for the exact "
+                    "closed business route; never forwarded to WAAPI."
                 ),
             },
         },
@@ -595,7 +678,10 @@ def test_operation_catalog_is_truthful_about_closed_and_boundary_operations() ->
     assert specs["object.set"]["argument_contract"]["properties"]["objects"]["items"]["properties"][
         "platform"
     ]["minLength"] == 1
-    assert "returned copy GUID" in specs["object.copy"]["boundary"]
+    assert specs["object.copy"]["implemented"] is True
+    assert specs["object.move"]["implemented"] is True
+    assert specs["object.copy"]["boundary"] is None
+    assert "returned copy GUID" in specs["object.copy"]["constraints"][0]
     assert specs["object.setProperty"]["identity_contract"]["caller_rows_allowed"] is False
     assert specs["object.setProperty"]["identity_contract"]["one_of"] == [
         "id",
@@ -1333,6 +1419,14 @@ def test_switch_remove_schema_prefers_scoped_names_from_parent_evidence() -> Non
     assert "does not add a Group display-name path segment" in properties[
         "state_or_switch"
     ]["description"]
+    assert any(
+        "exact child name plus a closed parent requires scoped-name" in constraint
+        for constraint in remove["constraints"]
+    )
+    assert any(
+        "exact Switch or State value name" in constraint
+        for constraint in remove["constraints"]
+    )
     assert "description" not in describe_operation(
         "switchContainer.addAssignment"
     ).as_dict()["argument_contract"]["properties"]["child"]
@@ -1580,21 +1674,7 @@ def test_undo_group_builds_one_exact_versioned_immutable_plan(
     version: str,
     cancel_args: Mapping[str, Any],
 ) -> None:
-    parsed = parse_operation_request(
-        request(
-            "waapi.undoGroup",
-            {
-                "display_name": "Batch edit",
-                "calls": [
-                    {
-                        "api": "ak.wwise.core.object.setNotes",
-                        "args": {"object": GUID, "value": "after"},
-                    }
-                ],
-            },
-            version=version,
-        )
-    )
+    parsed = parse_operation_request(_typed_undo_group_request(version))
     prepared = prepare_operation(parsed, read_call=lambda *_: {}).as_dict()
     plan = prepared["pre_state"]["execution_plan"]
 
@@ -1604,11 +1684,46 @@ def test_undo_group_builds_one_exact_versioned_immutable_plan(
         "options": {},
     }
     assert plan["begin"]["uri"] == "ak.wwise.core.undo.beginGroup"
-    assert plan["calls"][0]["api"] == "ak.wwise.core.object.setNotes"
+    assert plan["calls"][0]["api"] == "ak.wwise.core.object.setRandomizer"
     assert plan["end"]["args"] == {"displayName": "Batch edit"}
     assert plan["cancel"]["args"] == cancel_args
     assert plan["same_connection_required"] is True
     assert plan["automatic_retry"] is False
+
+
+def test_generic_undo_child_retains_explicit_partial_verification_boundary() -> None:
+    parsed = parse_operation_request(_typed_undo_group_request("2022.1"))
+    prepared = prepare_operation(parsed, read_call=lambda *_: {}).as_dict()
+    verification = verify_prepared_operation(
+        prepared,
+        execution_result={
+            "ok": True,
+            "result": {
+                "phases": [
+                    {
+                        "uri": "ak.wwise.core.undo.beginGroup",
+                        "dispatch_result": {"ok": True, "result": {}},
+                    },
+                    {
+                        "uri": "ak.wwise.core.object.setRandomizer",
+                        "dispatch_result": {"ok": True, "result": {}},
+                    },
+                    {
+                        "uri": "ak.wwise.core.undo.endGroup",
+                        "dispatch_result": {"ok": True, "result": {}},
+                    },
+                ]
+            },
+        },
+        read_call=lambda *_: {},
+    )
+
+    assert verification.ok is True
+    assert verification.status == "result_schema_checked"
+    assert verification.business_state_verified is False
+    assert verification.verification_strength == (
+        "complete_reflected_schema"
+    )
 
 
 def test_undo_group_rejects_independent_members_version_drift_and_large_requests() -> None:
@@ -1622,24 +1737,32 @@ def test_undo_group_rejects_independent_members_version_drift_and_large_requests
     assert independent.value.error_code == "UNDO_GROUP_COMPOSITE_REQUIRED"
     assert independent.value.details["required_operation"] == "waapi.undoGroup"
 
-    with pytest.raises(OperationContractError) as version_drift:
-        parse_operation_request(
-            request(
-                "waapi.undoGroup",
-                {
-                    "display_name": "Not in 2022",
-                    "calls": [
-                        {
-                            "api": "ak.wwise.core.object.setStateGroups",
-                            "args": {},
-                        }
-                    ],
+    with pytest.raises(BusinessDeclarationError):
+        build_compound_undo_child_snapshot(
+            version="2022.1",
+            source_draft_id="od1-11111111111111111111111111111111",
+            source_revision=1,
+            request={
+                "contract": OPERATION_REQUEST_CONTRACT,
+                "version": "2022.1",
+                "operation": "waapi.call",
+                "arguments": {
+                    "api": "ak.wwise.core.object.setStateGroups",
+                    "args": {},
+                    "options": {},
                 },
-                version="2022.1",
-            )
+            },
         )
-    assert version_drift.value.error_code == "UNDO_GROUP_INNER_NOT_ALLOWED"
 
+    child_request = {
+        "contract": OPERATION_REQUEST_CONTRACT,
+        "version": "2022.1",
+        "operation": "object.setNotes",
+        "arguments": {
+            "object": {"kind": "id", "value": GUID},
+            "value": "x" * (129 * 1024),
+        },
+    }
     with pytest.raises(OperationContractError) as oversized:
         parse_operation_request(
             request(
@@ -1648,8 +1771,10 @@ def test_undo_group_rejects_independent_members_version_drift_and_large_requests
                     "display_name": "Oversized",
                     "calls": [
                         {
-                            "api": "ak.wwise.core.object.setNotes",
-                            "args": {"object": GUID, "value": "x" * (129 * 1024)},
+                            "schema_digest": compound_child_request_contract(
+                                "object.setNotes", "2022.1"
+                            ).schema_digest,
+                            "request": child_request,
                         }
                     ],
                 },
@@ -1682,27 +1807,9 @@ def test_undo_group_public_schema_uses_the_runtime_version_allowlist(
     spec = next(
         item for item in list_operation_specs() if item.name == "waapi.undoGroup"
     ).as_dict(version=version)
-    api_schema = spec["argument_contract"]["properties"]["calls"]["items"][
-        "properties"
-    ]["api"]
-    expected = sorted(UNDO_GROUP_INNER_URIS_BY_VERSION[version])
-
-    assert api_schema["enum"] == expected
-    assert "pattern" not in api_schema
-    assert [row["const"] for row in api_schema["value_contracts"]] == expected
-    for row in api_schema["value_contracts"]:
-        assert row["schema_pointer"] == {
-            "gateway_argv": [
-                "--version",
-                version,
-                "describe",
-                row["const"],
-                "--full-schema",
-            ],
-            "result_path": (
-                f"$.availability.{version}.capability.schema.full"
-            ),
-        }
+    item_schema = spec["argument_contract"]["properties"]["calls"]["items"]
+    assert item_schema["required"] == ["schema_digest", "request"]
+    assert set(item_schema["properties"]) == {"schema_digest", "request"}
 
 
 def test_ui_command_descriptor_schema_is_closed_and_shared_by_both_operations() -> None:
@@ -1873,8 +1980,8 @@ def test_compact_operation_inventory_is_stable_and_keeps_boundary_text() -> None
     }
     assert specs["object.create"]["implemented"] is True
     assert specs["object.create"]["boundary"] is None
-    assert specs["object.copy"]["implemented"] is False
-    assert "returned copy GUID" in specs["object.copy"]["boundary"]
+    assert specs["object.copy"]["implemented"] is True
+    assert specs["object.copy"]["boundary"] is None
     assert "argument_contract" not in specs["object.create"]
 
 
@@ -1900,9 +2007,16 @@ def test_request_contract_rejects_unknown_fields_metadata_injection_and_boundari
     assert injected.value.error_code == "INVALID_REQUEST"
     assert injected.value.details["unknown_fields"] == ["property_info"]
 
-    with pytest.raises(OperationContractError) as boundary:
-        parse_operation_request(request("object.copy", {"object": {}, "parent": {}}))
-    assert boundary.value.error_code == "OPERATION_BOUNDARY"
+    copied = parse_operation_request(
+        request(
+            "object.copy",
+            {
+                "object": {"kind": "id", "value": GUID},
+                "parent": {"kind": "id", "value": TARGET_GUID},
+            },
+        )
+    )
+    assert copied.operation == "object.copy"
 
     with pytest.raises(OperationContractError) as mismatch:
         parse_operation_request(
@@ -1947,6 +2061,189 @@ def test_request_contract_rejects_unknown_fields_metadata_injection_and_boundari
             )
         )
     assert nested_inclusion.value.error_code == "INVALID_REQUEST"
+
+
+@pytest.mark.parametrize("operation", ("object.copy", "object.move"))
+@pytest.mark.parametrize(
+    ("object_type", "path", "name_mode"),
+    (
+        (
+            "Action",
+            r"\Events\Default Work Unit\Play_Rain\[Play - Rain]",
+            "derived",
+        ),
+        (
+            "EffectSlot",
+            r"\Actor-Mixer Hierarchy\Default Work Unit\Weather\[Effect Slot 0]",
+            "anonymous_slot",
+        ),
+        ("Curve", r"\Fixture\[Curve]", "embedded_value"),
+        ("CustomState", r"\Fixture\[Custom State]", "owned_collection_entry"),
+        ("Modifier", r"\Fixture\[Modifier]", "embedded_value"),
+        (
+            "MultiSwitchEntry",
+            r"\Fixture\[Multi Switch Entry]",
+            "owned_collection_entry",
+        ),
+        (
+            "MusicPlaylistItem",
+            r"\Fixture\[Music Playlist Item]",
+            "owned_collection_entry",
+        ),
+        (
+            "MusicStinger",
+            r"\Fixture\[Music Stinger]",
+            "owned_collection_entry",
+        ),
+        (
+            "MusicTrackSequence",
+            r"\Fixture\[Music Track Sequence]",
+            "owned_collection_entry",
+        ),
+        ("Panner", r"\Fixture\[Panner]", "embedded_value"),
+        ("Position", r"\Fixture\[Position]", "embedded_value"),
+        ("RTPC", r"\Fixture\[RTPC]", "embedded_value"),
+        (
+            "StateGroupInfo",
+            r"\Fixture\[State Group Info]",
+            "owned_collection_entry",
+        ),
+    ),
+)
+def test_name_collision_operations_report_the_non_intrinsic_name_boundary(
+    operation: str,
+    object_type: str,
+    path: str,
+    name_mode: str,
+) -> None:
+    source = object_row(
+        name="",
+        object_type=object_type,
+        path=path,
+    )
+    parent = object_row(
+        object_id=TARGET_GUID,
+        name="Destination Event",
+        object_type="Event",
+        path=r"\Events\Default Work Unit\Destination Event",
+    )
+
+    with pytest.raises(OperationContractError) as error:
+        prepare_operation(
+            parse_operation_request(
+                request(
+                    operation,
+                    {
+                        "object": {"kind": "id", "value": GUID},
+                        "parent": {"kind": "id", "value": TARGET_GUID},
+                    },
+                )
+            ),
+            read_call=ScriptedReader(
+                {"ak.wwise.core.object.get": [{"return": [source]}, {"return": [parent]}]}
+            ),
+        )
+
+    assert error.value.error_code == "DERIVED_OBJECT_NAME_BOUNDARY"
+    assert error.value.details["object_type"] == object_type
+    assert error.value.details["name_mode"] == name_mode
+
+
+@pytest.mark.parametrize(
+    "object_type",
+    (
+        "Action",
+        "Curve",
+        "CustomState",
+        "EffectSlot",
+        "Modifier",
+        "MultiSwitchEntry",
+        "MusicPlaylistItem",
+        "MusicStinger",
+        "MusicTrackSequence",
+        "Panner",
+        "Position",
+        "RTPC",
+        "StateGroupInfo",
+    ),
+)
+def test_set_name_reports_the_non_intrinsic_name_boundary(object_type: str) -> None:
+    target = object_row(
+        name="",
+        object_type=object_type,
+        path=r"\Events\Default Work Unit\Play_Rain\[Play - Rain]",
+    )
+
+    with pytest.raises(OperationContractError) as error:
+        prepare_operation(
+            parse_operation_request(
+                request(
+                    "object.setName",
+                    {
+                        "object": {"kind": "id", "value": GUID},
+                        "value": "Renamed Action",
+                    },
+                )
+            ),
+            read_call=ScriptedReader(
+                {"ak.wwise.core.object.get": [{"return": [target]}]}
+            ),
+        )
+
+    assert error.value.error_code == "DERIVED_OBJECT_NAME_BOUNDARY"
+
+
+@pytest.mark.parametrize(
+    "object_type",
+    (
+        "Action",
+        "Curve",
+        "CustomState",
+        "EffectSlot",
+        "Modifier",
+        "MultiSwitchEntry",
+        "MusicPlaylistItem",
+        "MusicStinger",
+        "MusicTrackSequence",
+        "Panner",
+        "Position",
+        "RTPC",
+        "StateGroupInfo",
+    ),
+)
+def test_object_set_rename_reports_the_non_intrinsic_name_boundary(
+    object_type: str,
+) -> None:
+    target = object_row(
+        name="",
+        object_type=object_type,
+        path=r"\Events\Default Work Unit\Play_Rain\[Play - Rain]",
+    )
+
+    with pytest.raises(OperationContractError) as error:
+        prepare_operation(
+            parse_operation_request(
+                request(
+                    "object.set",
+                    {
+                        "objects": [
+                            {
+                                "object": {"kind": "id", "value": GUID},
+                                "name": "Renamed Action",
+                            }
+                        ]
+                    },
+                )
+            ),
+            read_call=ScriptedReader(
+                {
+                    "ak.wwise.core.object.getTypes": [SOUND_TYPE_RESULT],
+                    "ak.wwise.core.object.get": [{"return": [target]}],
+                }
+            ),
+        )
+
+    assert error.value.error_code == "DERIVED_OBJECT_NAME_BOUNDARY"
 
 
 @pytest.mark.parametrize(
@@ -5620,6 +5917,99 @@ def test_switch_assignment_validates_relationship_prestate_drift_and_exact_post_
     )
 
 
+def test_switch_assignment_execution_guard_rejects_new_selector_ambiguity() -> None:
+    container_id = "{aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa}"
+    child_id = "{bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb}"
+    state_id = "{cccccccc-cccc-cccc-cccc-cccccccccccc}"
+    group_id = "{dddddddd-dddd-dddd-dddd-dddddddddddd}"
+    duplicate_id = "{eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee}"
+    container_row = object_row(
+        object_id=container_id,
+        name="ClosedSwitch",
+        object_type="SwitchContainer",
+        path=r"\Actor-Mixer Hierarchy\Default Work Unit\ClosedSwitch",
+        parent=PARENT_GUID,
+    )
+    child_row = object_row(
+        object_id=child_id,
+        name="Child",
+        object_type="Sound",
+        path=container_row["path"] + r"\Child",
+        parent=container_id,
+    )
+    group_row = object_row(
+        object_id=group_id,
+        name="ClosedGroup",
+        object_type="SwitchGroup",
+        path=r"\Switches\Default Work Unit\ClosedGroup",
+        parent="{switches-workunit}",
+    )
+    state_row = object_row(
+        object_id=state_id,
+        name="ClosedState",
+        object_type="Switch",
+        path=group_row["path"] + r"\ClosedState",
+        parent=group_id,
+    )
+    reference_row = {
+        "id": container_id,
+        "path": container_row["path"],
+        "SwitchGroupOrStateGroup": {"id": group_id},
+    }
+    prepared = prepare_operation(
+        parse_operation_request(
+            request(
+                "switchContainer.addAssignment",
+                {
+                    "switch_container": {
+                        "kind": "exact-type-name",
+                        "type": "SwitchContainer",
+                        "name": "ClosedSwitch",
+                    },
+                    "child": {"kind": "id", "value": child_id},
+                    "state_or_switch": {"kind": "id", "value": state_id},
+                },
+            )
+        ),
+        read_call=ScriptedReader(
+            {
+                "ak.wwise.core.object.get": [
+                    {"return": [container_row]},
+                    {"return": [child_row]},
+                    {"return": [state_row]},
+                    {"return": [reference_row]},
+                    {"return": [group_row]},
+                ],
+                "ak.wwise.core.switchContainer.getAssignments": [{"return": []}],
+            }
+        ),
+    ).as_dict()
+
+    duplicate = {**container_row, "id": duplicate_id, "path": container_row["path"] + "2"}
+    guarded = validate_prepared_roles(
+        prepared,
+        read_call=ScriptedReader(
+            {
+                "ak.wwise.core.object.get": [
+                    {"return": [container_row, child_row, state_row, group_row]},
+                    {"return": [container_row, duplicate]},
+                    {"return": [reference_row]},
+                ],
+                "ak.wwise.core.switchContainer.getAssignments": [{"return": []}],
+            }
+        ),
+    )
+
+    assert guarded["status"] == "repreview_required"
+    selector_assertion = next(
+        item
+        for item in guarded["assertions"]
+        if item["name"] == "switch_container original selector remains unique and unchanged"
+    )
+    assert selector_assertion["passed"] is False
+    assert selector_assertion["evidence"]["error"]["error_code"] == "AMBIGUOUS_IDENTITY"
+
+
 @pytest.mark.parametrize(
     ("api", "arguments", "expected_connected"),
     [
@@ -5692,7 +6082,8 @@ def test_public_remote_lifecycle_uses_connection_status_business_readback(
 
 
 def test_public_transport_create_requires_returned_id_list_membership_and_state_readback() -> None:
-    transport_id = 73
+    # Real Wwise 2022.1 Authoring assigns zero to the first live transport.
+    transport_id = 0
     prepared = prepare_operation(
         parse_operation_request(
             request(
@@ -5736,13 +6127,13 @@ def test_public_transport_create_requires_returned_id_list_membership_and_state_
     ]
     assertion_names = {item["name"] for item in verified.assertions if item["passed"]}
     assert assertion_names >= {
-        "transport.create returned a non-zero uint32 transport ID",
+        "transport.create returned a uint32 transport ID",
         "created transport ID appears exactly once in transport.getList",
         "created transport ID resolves through transport.getState",
     }
 
 
-@pytest.mark.parametrize("invalid_id", [None, 0, True, -1, 0x100000000, "73"])
+@pytest.mark.parametrize("invalid_id", [None, True, -1, 0x100000000, "73"])
 def test_public_transport_create_never_reads_or_claims_verified_for_invalid_returned_id(
     invalid_id: Any,
 ) -> None:
@@ -5775,7 +6166,7 @@ def test_public_transport_create_never_reads_or_claims_verified_for_invalid_retu
     transport_assertion = next(
         item
         for item in verification.assertions
-        if item["name"] == "transport.create returned a non-zero uint32 transport ID"
+        if item["name"] == "transport.create returned a uint32 transport ID"
     )
     assert transport_assertion["passed"] is False
 
@@ -5815,7 +6206,7 @@ def test_public_transport_create_fails_if_list_or_state_does_not_prove_existence
 
 
 def test_public_transport_destroy_uses_request_id_and_proves_absence_from_get_list() -> None:
-    transport_id = 73
+    transport_id = 0
     prepared = prepare_operation(
         parse_operation_request(
             request(
@@ -5863,7 +6254,7 @@ def test_public_transport_destroy_uses_request_id_and_proves_absence_from_get_li
     )["passed"] is False
 
 
-@pytest.mark.parametrize("invalid_id", [0, True, -1, 0x100000000, "73"])
+@pytest.mark.parametrize("invalid_id", [True, -1, 0x100000000, "73"])
 def test_public_transport_destroy_rejects_invalid_transport_id_before_preview(invalid_id: Any) -> None:
     with pytest.raises(OperationContractError) as invalid:
         parse_operation_request(

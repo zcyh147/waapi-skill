@@ -39,7 +39,7 @@ from tests.semantic.support.codex_version_layout_v3 import (
 
 
 VERSION = "2022.1"
-COMPOUND_VERSIONS = ("2022.1", "2025.1")
+COMPOUND_VERSIONS = ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
 OPERATION_REQUEST_CONTRACT = "waapi-skill.operation-request/v1"
 OBJECT_CREATE_URI = "ak.wwise.core.object.create"
 OBJECT_GET_URI = "ak.wwise.core.object.get"
@@ -56,11 +56,18 @@ OBJECT_CREATE_CASE_IDS = tuple(f"OBJ22-F-CREATE-{index:02d}" for index in range(
 OBJECT_GET_CASE_IDS = tuple(f"OBJ22-F-GET-{index:02d}" for index in range(1, 6))
 OBJECT_SET_CASE_IDS = tuple(f"OBJ22-F-SET-{index:02d}" for index in range(1, 6))
 OBJECT_HEAVY_CASE_IDS = OBJECT_CREATE_CASE_IDS + OBJECT_GET_CASE_IDS + OBJECT_SET_CASE_IDS
-OBJECT_COMPOUND_CROSS_VERSION_CASE_IDS = (
-    "OBJ22-F-CREATE-02",
-    "OBJ22-F-CREATE-03",
-    "OBJ22-F-SET-01",
-    "OBJ22-F-SET-02",
+OBJECT_COMPOUND_CROSS_VERSION_CASE_VERSIONS = MappingProxyType(
+    {
+        "OBJ22-F-GET-01": ("2021.1",),
+        "OBJ22-F-GET-02": ("2023.1",),
+        "OBJ22-F-CREATE-02": ("2021.1", "2025.1"),
+        "OBJ22-F-CREATE-03": ("2023.1", "2025.1"),
+        "OBJ22-F-SET-01": ("2024.1", "2025.1"),
+        "OBJ22-F-SET-02": ("2025.1",),
+    }
+)
+OBJECT_COMPOUND_CROSS_VERSION_CASE_IDS = tuple(
+    OBJECT_COMPOUND_CROSS_VERSION_CASE_VERSIONS
 )
 
 Scalar: TypeAlias = str | int | float | bool | None
@@ -468,10 +475,23 @@ def _translate_object_recipe(
             f"{recipe.scenario_id} is not approved for Wwise {layout.version}"
         )
     request = recipe.request
-    if not isinstance(request, OperationRequestSpec):
-        raise ObjectHeavyRecipeError(
-            f"{recipe.scenario_id} cross-version compound case must be a mutation"
+    if isinstance(request, OperationRequestSpec):
+        translated_request: AllowedRequest = replace(
+            request,
+            arguments=_translate_frozen_json(request.arguments, layout),
         )
+    elif isinstance(request, QueryObjectRequestSpec):
+        translated_request = replace(
+            request,
+            argv=tuple(
+                layout.version
+                if index == 2
+                else layout.translate_2022_path(value)
+                for index, value in enumerate(request.argv)
+            ),
+        )
+    else:  # pragma: no cover - static union plus constructor coverage.
+        raise ObjectHeavyRecipeError("cross-version object request is unsupported")
     translated = replace(
         recipe,
         version=layout.version,
@@ -493,10 +513,7 @@ def _translate_object_recipe(
                 for parent, prefix in recipe.fixture.absent_sibling_prefixes
             ),
         ),
-        request=replace(
-            request,
-            arguments=_translate_frozen_json(request.arguments, layout),
-        ),
+        request=translated_request,
         oracle=replace(
             recipe.oracle,
             expected_objects=tuple(
@@ -743,11 +760,16 @@ def _expected(
     )
 
 
-def _where(predicates: Sequence[Mapping[str, Any]]) -> str:
-    value: Any = list(predicates)
-    if len(value) == 1:
-        value = value[0]
-    return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+def _where_scalar(value: Any) -> tuple[str, str]:
+    if isinstance(value, bool):
+        return "boolean", "true" if value else "false"
+    if isinstance(value, int):
+        return "integer", str(value)
+    if isinstance(value, float):
+        return "number", str(value)
+    if isinstance(value, str):
+        return "string", value
+    raise ObjectHeavyRecipeError("query predicate scalar is not supported")
 
 
 def _query(
@@ -768,8 +790,19 @@ def _query(
     argv = ["gateway.py", "--version", VERSION, "query-object", source[0], source[1]]
     for select in selects:
         argv.extend(("--select", select))
-    if predicates:
-        argv.extend(("--where-json", _where(predicates)))
+    for predicate in predicates:
+        if set(predicate) != {"field", "operator", "value"}:
+            raise ObjectHeavyRecipeError("query predicate shape is not closed")
+        value_type, value = _where_scalar(predicate["value"])
+        argv.extend(
+            (
+                "--where",
+                str(predicate["field"]),
+                str(predicate["operator"]),
+                value_type,
+                value,
+            )
+        )
     argv.extend(("--take", str(take)))
     for field_name in return_fields:
         argv.extend(("--return-field", field_name))
@@ -784,6 +817,61 @@ def _query(
         primary_row_policy=primary_row_policy,
         derived_row_policy=derived_row_policy,
         final_answer_policy=final_answer_policy,
+    )
+
+
+def _business_query(
+    *,
+    path: str,
+    relationships: Sequence[str] = (),
+    predicates: Sequence[tuple[str, str]] = (),
+    take: int,
+    includes: Sequence[str],
+    return_fields: Sequence[str],
+    strategy: QueryResultStrategy,
+    exact_keys: Sequence[str],
+    superset_keys: Sequence[str],
+    final_filter: FinalAnswerFilter,
+) -> QueryObjectRequestSpec:
+    argv = ["gateway.py", "--version", VERSION, "query-object"]
+    argv.extend(business_query_path_arguments(path))
+    for relationship in relationships:
+        argv.extend(("--relationship", relationship))
+    for condition, value in predicates:
+        argv.extend(("--predicate", condition, value))
+    argv.extend(("--max-results", str(take)))
+    for field_name in includes:
+        argv.extend(("--include", field_name))
+    return QueryObjectRequestSpec(
+        argv=tuple(argv),
+        take=take,
+        return_fields=tuple(return_fields),
+        result_strategy=strategy,
+        exact_expected_keys=tuple(exact_keys),
+        bounded_superset_keys=tuple(superset_keys),
+        final_filter=final_filter,
+    )
+
+
+def business_query_path_arguments(path: str) -> tuple[str, ...]:
+    """Compile one canonical Wwise hierarchy path to closed business flags."""
+
+    if (
+        not isinstance(path, str)
+        or not path.startswith("\\")
+        or path.endswith("\\")
+        or "\\\\" in path
+    ):
+        raise ObjectHeavyRecipeError(
+            f"business query path is not canonical: {path!r}"
+        )
+    segments = tuple(path[1:].split("\\"))
+    if not segments or any(not segment for segment in segments):
+        raise ObjectHeavyRecipeError("business query path has no visible segments")
+    return tuple(
+        argument
+        for segment in segments
+        for argument in ("--path-segment", segment)
     )
 
 
@@ -1789,28 +1877,28 @@ def _get_03() -> ObjectHeavyRecipe:
         _seed("q3_decoy_outside", outside_path + r"\Outside_Match", "Sound", role="decoy", notes="mix-review outside", volume=-9.0, output_bus="q3_bus_b", language="SFX", included=True),
     )
     objects.extend(decoys)
-    return_fields = ("id", "name", "type", "path", "@Volume", "notes", "audioSource:language", "OutputBus", "isIncluded")
+    return_fields = ("id", "name", "type", "path", "@Volume", "notes", "OutputBus", "isIncluded")
     exact_keys = tuple(key for key, *_ in sorted(matches, key=lambda row: row[1]))
     expected = tuple(
         _expected_from_seed(next(item for item in objects if item.key == key), objects, return_fields=return_fields)
         for key in exact_keys
-    )
-    predicates = (
-        {"field": "type", "operator": "=", "value": "Sound"},
-        {"field": "@Volume", "operator": "<=", "value": -6.0},
-        {"field": "notes", "operator": ":", "value": "mix-review"},
-        {"field": "isIncluded", "operator": "=", "value": True},
     )
     return _recipe(
         "OBJ22-F-GET-03",
         OBJECT_GET_URI,
         prompt_literals=(combat_path, "Sound", "-6 dB", "mix-review", "12 条", "Output Bus"),
         fixture=_fixture(objects),
-        request=_query(
-            source=("--path", combat_path),
-            selects=("descendants",),
-            predicates=predicates,
+        request=_business_query(
+            path=combat_path,
+            relationships=("descendants",),
+            predicates=(
+                ("kind-is", "all-sounds"),
+                ("volume-db-at-most", "-6.0"),
+                ("notes-contain", "mix-review"),
+                ("included-is", "true"),
+            ),
             take=12,
+            includes=("volume-db", "notes", "output-bus"),
             return_fields=return_fields,
             strategy="exact_rows",
             exact_keys=exact_keys,
@@ -2169,26 +2257,49 @@ def _validate_query_request(recipe: ObjectHeavyRecipe) -> None:
         raise ObjectHeavyRecipeError(
             f"{recipe.scenario_id} query must use the packaged query-object route"
         )
-    if argv.count("query-object") != 1 or argv.count("--take") != 1:
+    bound_option = "--max-results" if "--max-results" in argv else "--take"
+    if argv.count("query-object") != 1 or argv.count(bound_option) != 1:
         raise ObjectHeavyRecipeError(
             f"{recipe.scenario_id} query must be one explicitly bounded command"
         )
-    take_index = argv.index("--take")
+    take_index = argv.index(bound_option)
     if argv[take_index + 1] != str(request.take) or not 1 <= request.take <= 1000:
         raise ObjectHeavyRecipeError(f"{recipe.scenario_id} query take is inconsistent")
     if "--all-results" in argv or "--args-json" in argv or "--options-json" in argv:
         raise ObjectHeavyRecipeError(
             f"{recipe.scenario_id} query bypasses the bounded query-object builder"
         )
-    argv_return_fields = tuple(
-        argv[index + 1]
-        for index, item in enumerate(argv)
-        if item == "--return-field"
-    )
-    if argv_return_fields != request.return_fields or not request.return_fields:
-        raise ObjectHeavyRecipeError(
-            f"{recipe.scenario_id} query return fields are inconsistent"
+    if bound_option == "--max-results":
+        if recipe.scenario_id != "OBJ22-F-GET-03":
+            raise ObjectHeavyRecipeError(
+                f"{recipe.scenario_id} lacks a reviewed business query declaration"
+            )
+        if any(
+            option in argv
+            for option in ("--path", "--type", "--select", "--where", "--return-field")
+        ):
+            raise ObjectHeavyRecipeError(
+                f"{recipe.scenario_id} business query retains native query inputs"
+            )
+        argv_includes = tuple(
+            argv[index + 1]
+            for index, item in enumerate(argv)
+            if item == "--include"
         )
+        if argv_includes != ("volume-db", "notes", "output-bus"):
+            raise ObjectHeavyRecipeError(
+                f"{recipe.scenario_id} business query outputs are inconsistent"
+            )
+    else:
+        argv_return_fields = tuple(
+            argv[index + 1]
+            for index, item in enumerate(argv)
+            if item == "--return-field"
+        )
+        if argv_return_fields != request.return_fields or not request.return_fields:
+            raise ObjectHeavyRecipeError(
+                f"{recipe.scenario_id} query return fields are inconsistent"
+            )
     if any(token in argument for argument in argv for token in _FORBIDDEN_ARGV_TOKENS):
         raise ObjectHeavyRecipeError(
             f"{recipe.scenario_id} query argv contains shell composition"
@@ -2377,9 +2488,8 @@ _CROSS_VERSION_RECIPES: Mapping[tuple[str, str], ObjectHeavyRecipe] = (
                 _RECIPES[scenario_id],
                 get_codex_version_layout_v3(version),
             )
-            for scenario_id in OBJECT_COMPOUND_CROSS_VERSION_CASE_IDS
-            for version in COMPOUND_VERSIONS
-            if version != VERSION
+            for scenario_id, versions in OBJECT_COMPOUND_CROSS_VERSION_CASE_VERSIONS.items()
+            for version in versions
         }
     )
 )
@@ -2411,6 +2521,212 @@ def build_object_heavy_v3_recipe(
         ) from exc
 
 
+def typed_input_business_query_recipe(
+    recipe: ObjectHeavyRecipe,
+    *,
+    unit_id: str,
+) -> ObjectHeavyRecipe:
+    """Migrate the two historical superset reads at the typed-input boundary.
+
+    The underlying heavy-V3 recipes remain frozen for historical replay.  The
+    current typed-input profile instead exposes only the public business query
+    vocabulary that replaced raw paths, native predicates, and return fields.
+    """
+
+    reviewed = {
+        "TYP21-QUERY-OBJECT-GET": (
+            "OBJ22-F-GET-01",
+            "2021.1",
+            SEMANTIC_LAB + r"\Combat",
+            (("kind-is", "all-sounds"),),
+            ("volume-db", "notes", "output-bus"),
+        ),
+        "TYP23-QUERY-OBJECT-GET": (
+            "OBJ22-F-GET-02",
+            "2023.1",
+            SEMANTIC_LAB,
+            (),
+            ("parent", "source-language", "volume-db", "notes"),
+        ),
+    }.get(unit_id)
+    if (
+        reviewed is None
+        or not isinstance(recipe.request, QueryObjectRequestSpec)
+        or recipe.api != OBJECT_GET_URI
+        or (recipe.scenario_id, recipe.version) != reviewed[:2]
+    ):
+        raise ObjectHeavyRecipeError(
+            "typed-input business query is outside its reviewed unit/version lane"
+        )
+    request = recipe.request
+    migrated = _business_query(
+        path=reviewed[2],
+        relationships=("descendants",),
+        predicates=reviewed[3],
+        take=request.take,
+        includes=reviewed[4],
+        return_fields=request.return_fields,
+        strategy=request.result_strategy,
+        exact_keys=request.exact_expected_keys,
+        superset_keys=request.bounded_superset_keys,
+        final_filter=request.final_filter,
+    )
+    migrated = replace(
+        migrated,
+        primary_row_policy=request.primary_row_policy,
+        derived_row_policy=request.derived_row_policy,
+        final_answer_policy=request.final_answer_policy,
+    )
+    return replace(recipe, request=migrated)
+
+
+def typed_input_merge_recipe(
+    recipe: ObjectHeavyRecipe,
+    *,
+    unit_id: str,
+) -> ObjectHeavyRecipe:
+    """Narrow the reviewed typed-input merge to one recursive Alert group."""
+
+    if (
+        unit_id != "TYP21-DEDICATED-OBJECT-CREATE"
+        or recipe.scenario_id != "OBJ22-F-CREATE-02"
+        or recipe.version != "2021.1"
+        or recipe.api != OBJECT_CREATE_URI
+        or not isinstance(recipe.request, OperationRequestSpec)
+        or recipe.request.operation != "object.create"
+    ):
+        raise ObjectHeavyRecipeError(
+            "typed-input merge recipe is outside its reviewed unit/version lane"
+        )
+    arguments = _plain(recipe.request.arguments)
+    children = arguments.get("children")
+    if not isinstance(children, list):
+        raise ObjectHeavyRecipeError("typed-input merge children are malformed")
+    selected_children = [
+        row
+        for row in children
+        if isinstance(row, dict) and row.get("name") == "Alert"
+    ]
+    if len(selected_children) != 1:
+        raise ObjectHeavyRecipeError(
+            "typed-input merge must select one exact Alert group"
+        )
+    selected_children[0].pop("notes", None)
+    arguments["children"] = selected_children
+    retained_keys = {
+        "robot",
+        "idle",
+        "idle_a",
+        "alert",
+        "alert_a",
+        "alert_b",
+    }
+    expected_objects = tuple(
+        replace(row, children=("idle", "alert"))
+        if row.key == "robot"
+        else replace(
+            row,
+            fields=tuple(field for field in row.fields if field.name != "notes"),
+        )
+        if row.key == "alert"
+        else row
+        for row in recipe.oracle.expected_objects
+        if row.key in retained_keys
+    )
+    rules = tuple(
+        replace(
+            rule,
+            subject_keys=tuple(
+                key for key in rule.subject_keys if key in retained_keys
+            ),
+        )
+        for rule in recipe.oracle.rules
+    )
+    return replace(
+        recipe,
+        prompt_literals=tuple(
+            value
+            for value in recipe.prompt_literals
+            if value
+            not in {"Combat", "Damage", "警戒对白", "战斗对白", "受击对白"}
+        ),
+        request=OperationRequestSpec(
+            operation="object.create",
+            arguments=_freeze(arguments),
+        ),
+        oracle=replace(
+            recipe.oracle,
+            expected_objects=expected_objects,
+            new_keys=("alert", "alert_a", "alert_b"),
+            rules=rules,
+        ),
+    )
+
+
+def typed_input_rename_recipe(
+    recipe: ObjectHeavyRecipe,
+    *,
+    unit_id: str,
+) -> ObjectHeavyRecipe:
+    """Focus the typed-input rename lane on one collision-root creation."""
+
+    if (
+        unit_id != "TYP23-DEDICATED-OBJECT-CREATE"
+        or recipe.scenario_id != "OBJ22-F-CREATE-03"
+        or recipe.version != "2023.1"
+        or recipe.api != OBJECT_CREATE_URI
+        or not isinstance(recipe.request, OperationRequestSpec)
+        or recipe.request.operation != "object.create"
+    ):
+        raise ObjectHeavyRecipeError(
+            "typed-input rename recipe is outside its reviewed unit/version lane"
+        )
+    arguments = _plain(recipe.request.arguments)
+    arguments.pop("properties", None)
+    arguments.pop("children", None)
+    created = tuple(
+        replace(
+            row,
+            fields=tuple(field for field in row.fields if field.name == "notes"),
+            children=(),
+        )
+        for row in recipe.oracle.expected_objects
+        if row.key == "new_impact"
+    )
+    if len(created) != 1:
+        raise ObjectHeavyRecipeError(
+            "typed-input rename must select one exact collision root"
+        )
+    rule_keys = {"new_impact", *recipe.oracle.preserved_keys}
+    rules = tuple(
+        replace(
+            rule,
+            subject_keys=tuple(
+                key for key in rule.subject_keys if key in rule_keys
+            ),
+        )
+        for rule in recipe.oracle.rules
+    )
+    return replace(
+        recipe,
+        prompt_literals=tuple(
+            value
+            for value in recipe.prompt_literals
+            if value not in {"-1.5 dB", "Metal", "Wood", "Light", "Heavy"}
+        ),
+        request=OperationRequestSpec(
+            operation="object.create",
+            arguments=_freeze(arguments),
+        ),
+        oracle=replace(
+            recipe.oracle,
+            expected_objects=created,
+            new_keys=("new_impact",),
+            rules=rules,
+        ),
+    )
+
+
 def all_object_heavy_v3_recipes() -> tuple[ObjectHeavyRecipe, ...]:
     """Return all fifteen recipes in create/get/set review order."""
 
@@ -2423,6 +2739,7 @@ __all__ = [
     "COMPOUND_VERSIONS",
     "MASTER_DWU",
     "OBJECT_COMPOUND_CROSS_VERSION_CASE_IDS",
+    "OBJECT_COMPOUND_CROSS_VERSION_CASE_VERSIONS",
     "OBJECT_CREATE_CASE_IDS",
     "OBJECT_GET_CASE_IDS",
     "OBJECT_HEAVY_CASE_IDS",
@@ -2447,4 +2764,8 @@ __all__ = [
     "QueryObjectRequestSpec",
     "all_object_heavy_v3_recipes",
     "build_object_heavy_v3_recipe",
+    "business_query_path_arguments",
+    "typed_input_business_query_recipe",
+    "typed_input_merge_recipe",
+    "typed_input_rename_recipe",
 ]

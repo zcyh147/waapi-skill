@@ -104,7 +104,13 @@ def test_inventory_count_matches_latest_nonlive_result_without_collect_only_over
         inventory,
     )
     assert len(recorded_results) >= 2
-    assert len(set(recorded_results)) == 1
+    latest = re.search(
+        r"latest completed passing non-live verification reported `"
+        r"(\d+ passed, \d+ skipped, \d+ deselected)`",
+        inventory,
+    )
+    assert latest is not None
+    assert latest.group(1) == recorded_results[-1]
     assert "not a fresh full `--collect-only` recount" in inventory
 
 
@@ -204,6 +210,14 @@ def test_public_integration_candidate_evidence_is_exact_and_host_scoped() -> Non
     inventory = documents[-1]
     assert "`ci\\test.bat --mode program -- -q -ra`" in inventory
     assert "2609 passed, 34 skipped in 167.50s; exit 0" in inventory
+    assert "3322 passed, 15 skipped; exit 0" in inventory
+    assert "442 passed, 7 skipped; exit 0" in inventory
+    assert "412a23b55822a70da2b26ec76971b23cf87bd9e8" in inventory
+    assert "ci\\test.bat --mode nonlive -- -q -ra" in inventory
+    assert "current public typed proof" in inventory
+    assert "283d6199a3fa11ea06de38dd7971450c0445dce4" in inventory
+    assert "windows-category-evidence.jsonl" in inventory
+    assert "Live 20 passed; Destructive 46 passed / 4 version-bound Lua skips" in inventory
     assert "The batch launcher delegated repository development tests to Poetry" in inventory
     assert "started neither Codex nor Wwise" in inventory
 

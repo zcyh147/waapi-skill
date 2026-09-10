@@ -13,6 +13,11 @@ import pytest  # pyright: ignore[reportMissingImports]
 
 if os.getenv("WWISE_LIVE") != "1":
     pytest.skip("WWISE_LIVE=1 is required for live profiler/transport/soundengine tests", allow_module_level=True)
+if os.getenv("WWISE_VERSION") != "2022.1":
+    pytest.skip(
+        "the legacy profiler/transport fixture is pinned to Wwise 2022.1",
+        allow_module_level=True,
+    )
 
 from wwise_waapi.headless import HeadlessLifecycleError, default_waapi_client_factory  # pyright: ignore[reportMissingImports]
 from tests.destructive.support.live_environment import (  # pyright: ignore[reportMissingImports]

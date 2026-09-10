@@ -1,0 +1,96 @@
+{
+  "contract": "waapi-skill.audio-import-business-profile/v2",
+  "profile_id": "audio_import_business_8",
+  "model": {
+    "name": "gpt-5.6-terra",
+    "reasoning_effort": "medium",
+    "service_tier": "default",
+    "memory": "disabled"
+  },
+  "units": [
+    {
+      "unit_id": "AIB22-WEATHER",
+      "family": "weather",
+      "version": "2022.1",
+      "variants": [
+        {"id": "A", "prompt": "素材是 {media_rain} 和 {media_wind}。请在 {path_root} 下新建 Weather，并放入 Rain_Bed、Wind_Bed 两个循环 SFX，音量分别为 -4 dB、-6 dB，都输出到 {path_bus}；只生成预览，不执行。", "transaction_indexes": [0], "final_markers": ["Rain_Bed", "Wind_Bed", "-4", "-6"]},
+        {"id": "B", "prompt": "先在 {path_root} 下新建一个叫 Weather 的容器，再用 {media_rain}、{media_wind} 放入 Rain_Bed 和 Wind_Bed 两个声音；均无限循环，分别压到负四和负六分贝，走 {path_bus}，最终只看预览。", "transaction_indexes": [0], "final_markers": ["Rain_Bed", "Wind_Bed", "-4", "-6"]}
+      ],
+      "objects": [
+        {"role": "root", "id": "{10000000-0000-0000-0000-000000000001}", "name": "BusinessImportRoot", "type": "ActorMixer", "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\BusinessImportRoot"},
+        {"role": "bus", "id": "{10000000-0000-0000-0000-000000000002}", "name": "BusinessImportBus", "type": "Bus", "path": "\\Master-Mixer Hierarchy\\Default Work Unit\\BusinessImportBus"}
+      ],
+      "fields": [],
+      "transactions": [
+        {
+          "arguments": {
+            "imports": [
+              {"object_path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\BusinessImportRoot\\<Actor-Mixer>Weather", "object_type": "ActorMixer"},
+              {"object_path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\BusinessImportRoot\\<Actor-Mixer>Weather\\<Sound SFX>Rain_Bed", "object_type": "Sound SFX", "audio_file": "media://rain.wav", "import_language": "SFX", "properties": [{"name": "IsLoopingEnabled", "value": true}, {"name": "IsLoopingInfinite", "value": true}, {"name": "Volume", "value": -4}], "references": [{"name": "OutputBus", "target": {"kind": "path", "value": "\\Master-Mixer Hierarchy\\Default Work Unit\\BusinessImportBus"}}]},
+              {"object_path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\BusinessImportRoot\\<Actor-Mixer>Weather\\<Sound SFX>Wind_Bed", "object_type": "Sound SFX", "audio_file": "media://wind.wav", "import_language": "SFX", "properties": [{"name": "IsLoopingEnabled", "value": true}, {"name": "IsLoopingInfinite", "value": true}, {"name": "Volume", "value": -6}], "references": [{"name": "OutputBus", "target": {"kind": "path", "value": "\\Master-Mixer Hierarchy\\Default Work Unit\\BusinessImportBus"}}]}
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "unit_id": "AIB22-RIFLE",
+      "family": "rifle",
+      "version": "2022.1",
+      "variants": [
+        {"id": "A", "prompt": "现有 Rifle 是 {path_rifle}，新素材是 {media_rifle}。请做一次保留对象身份的安全重导入预览，不要执行。", "transaction_indexes": [0], "final_markers": ["Rifle", "保留"]},
+        {"id": "B", "prompt": "把 {media_rifle} 用到 {path_rifle}，我明确要求替换旧对象；只生成替换预览，不要执行。", "transaction_indexes": [1], "final_markers": ["Rifle", "替换"]}
+      ],
+      "objects": [
+        {"role": "root", "id": "{10000000-0000-0000-0000-000000000001}", "name": "BusinessImportRoot", "type": "ActorMixer", "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\BusinessImportRoot"},
+        {"role": "rifle", "id": "{10000000-0000-0000-0000-000000000003}", "name": "Rifle", "type": "Sound", "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\BusinessImportRoot\\Rifle", "is_voice": false}
+      ],
+      "fields": [],
+      "transactions": [
+        {"arguments": {"import_operation": "useExisting", "imports": [{"object_path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\BusinessImportRoot\\Rifle", "object_type": "Sound SFX", "audio_file": "media://rifle.wav", "import_language": "SFX"}]}},
+        {"arguments": {"import_operation": "replaceExisting", "imports": [{"object_path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\BusinessImportRoot\\Rifle", "object_type": "Sound SFX", "audio_file": "media://rifle.wav", "import_language": "SFX"}]}}
+      ]
+    },
+    {
+      "unit_id": "AIB25-FOOTSTEPS",
+      "family": "footsteps",
+      "version": "2025.1",
+      "variants": [
+        {"id": "A", "prompt": "素材 {media_snow} 要作为 Snow_Step 放进 {path_footsteps}：SFX、-2 dB、输出到 {path_bus}，并分配给 Switch 值 Snow；只预览。", "transaction_indexes": [0], "final_markers": ["Snow_Step", "Snow", "-2"]},
+        {"id": "B", "prompt": "在 {path_footsteps} 下准备一个名为 Snow_Step 的雪地脚步，音频是 {media_snow}，音量降两分贝，走 {path_bus}，对应 Snow 切换值。不要真正导入。", "transaction_indexes": [0], "final_markers": ["Snow_Step", "Snow", "-2"]}
+      ],
+      "objects": [
+        {"role": "footsteps", "id": "{10000000-0000-0000-0000-000000000004}", "name": "Footsteps", "type": "SwitchContainer", "path": "\\Containers\\Default Work Unit\\BusinessImportRoot\\Footsteps"},
+        {"role": "bus", "id": "{10000000-0000-0000-0000-000000000002}", "name": "BusinessImportBus", "type": "Bus", "path": "\\Busses\\Default Work Unit\\BusinessImportBus"}
+      ],
+      "fields": [],
+      "transactions": [
+        {"arguments": {"imports": [{"object_path": "\\Containers\\Default Work Unit\\BusinessImportRoot\\Footsteps\\<Sound SFX>Snow_Step", "object_type": "Sound SFX", "audio_file": "media://snow.wav", "import_language": "SFX", "switch_assignment": "Snow", "properties": [{"name": "Volume", "value": -2}], "references": [{"name": "OutputBus", "target": {"kind": "path", "value": "\\Busses\\Default Work Unit\\BusinessImportBus"}}]}]}}
+      ]
+    },
+    {
+      "unit_id": "AIB25-WEAPONS",
+      "family": "weapons",
+      "version": "2025.1",
+      "variants": [
+        {"id": "A", "prompt": "请把 {media_mechanical} 和 {media_tail} 一批放进 {path_weapons}，名字分别是 Rifle_Mechanical、Rifle_Tail，音量 -3 dB、-6 dB，都输出到 {path_bus}。Mechanical 的 CustomWetness 设 0.75，CustomAuxBus 指向 {path_aux}；只预览。", "transaction_indexes": [0], "final_markers": ["Rifle_Mechanical", "Rifle_Tail", "CustomWetness", "CustomAuxBus", "0.75", "-3", "-6"]},
+        {"id": "B", "prompt": "在 {path_weapons} 里准备 Rifle_Mechanical 与 Rifle_Tail 两条素材（{media_mechanical}、{media_tail}），分别负三、负六分贝并走 {path_bus}；前者的自定义字段 CustomWetness 设为四分之三，CustomAuxBus 使用 {path_aux}。一次批量预览，不执行。", "transaction_indexes": [0], "final_markers": ["Rifle_Mechanical", "Rifle_Tail", "CustomWetness", "CustomAuxBus", "0.75", "-3", "-6"]}
+      ],
+      "objects": [
+        {"role": "weapons", "id": "{10000000-0000-0000-0000-000000000005}", "name": "Weapons", "type": "ActorMixer", "path": "\\Containers\\Default Work Unit\\BusinessImportRoot\\Weapons"},
+        {"role": "bus", "id": "{10000000-0000-0000-0000-000000000002}", "name": "BusinessImportBus", "type": "Bus", "path": "\\Busses\\Default Work Unit\\BusinessImportBus"},
+        {"role": "aux", "id": "{10000000-0000-0000-0000-000000000006}", "name": "Weapons_Aux", "type": "AuxBus", "path": "\\Busses\\Default Work Unit\\Weapons_Aux"}
+      ],
+      "fields": [
+        {"token": "CustomWetness", "type": "Real32", "restriction": {"type": "range", "min": 0, "max": 1}},
+        {"token": "CustomAuxBus", "type": "Reference", "restriction": {"type": "reference", "restrictions": [{"type": ["AuxBus"]}]}}
+      ],
+      "transactions": [
+        {"arguments": {"imports": [
+          {"object_path": "\\Containers\\Default Work Unit\\BusinessImportRoot\\Weapons\\<Sound SFX>Rifle_Mechanical", "object_type": "Sound SFX", "audio_file": "media://mechanical.wav", "import_language": "SFX", "properties": [{"name": "Volume", "value": -3}, {"name": "CustomWetness", "value": 0.75}], "references": [{"name": "OutputBus", "target": {"kind": "path", "value": "\\Busses\\Default Work Unit\\BusinessImportBus"}}, {"name": "CustomAuxBus", "target": {"kind": "path", "value": "\\Busses\\Default Work Unit\\Weapons_Aux"}}]},
+          {"object_path": "\\Containers\\Default Work Unit\\BusinessImportRoot\\Weapons\\<Sound SFX>Rifle_Tail", "object_type": "Sound SFX", "audio_file": "media://tail.wav", "import_language": "SFX", "properties": [{"name": "Volume", "value": -6}], "references": [{"name": "OutputBus", "target": {"kind": "path", "value": "\\Busses\\Default Work Unit\\BusinessImportBus"}}]}
+        ]}}
+      ]
+    }
+  ]
+}

@@ -319,6 +319,15 @@ def test_parse_args_rejects_non_positive_timeout() -> None:
         matrix.parse_args(["--timeout", "0"])
 
 
+def test_parse_args_seals_positive_finite_wwise_readiness_timeout() -> None:
+    parsed = matrix.parse_args(["--wwise-readiness-timeout", "180"])
+
+    assert parsed.wwise_readiness_timeout_seconds == 180.0
+    for invalid in ("0", "-1", "nan", "inf"):
+        with pytest.raises(SystemExit):
+            matrix.parse_args(["--wwise-readiness-timeout", invalid])
+
+
 def test_parse_args_rejects_unknown_and_duplicate_versions() -> None:
     with pytest.raises(SystemExit):
         matrix.parse_args(["--version", "2099.1"])

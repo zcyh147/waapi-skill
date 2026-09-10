@@ -7,10 +7,11 @@ import json
 import os
 import re
 from dataclasses import dataclass
-from pathlib import Path, PurePath, PureWindowsPath
+from pathlib import Path, PurePath, PurePosixPath, PureWindowsPath
 from typing import Any, Iterable, Mapping
 
 from .endpoint_scope import is_loopback_waapi_host
+from .host_paths import HostPathError, parse_absolute_host_path
 
 try:  # ``pwd`` is unavailable on native Windows.
     import pwd
@@ -26,9 +27,19 @@ WWISE_WIRE_PATH_INPUT_AUDIT_CONTRACT = (
 )
 WINE_WIRE_PATH_WAAPI_URIS = frozenset(
     {
+        "ak.wwise.console.project.create",
+        "ak.wwise.console.project.open",
         "ak.wwise.core.audio.importTabDelimited",
         "ak.wwise.core.soundbank.convertExternalSources",
         "ak.wwise.core.soundbank.processDefinitionFiles",
+        "ak.wwise.ui.project.create",
+        "ak.wwise.ui.project.open",
+    }
+)
+_AUTHORING_PROJECT_TRANSITION_URIS = frozenset(
+    {
+        "ak.wwise.ui.project.create",
+        "ak.wwise.ui.project.open",
     }
 )
 _WINDOWS_ABSOLUTE_PATH = re.compile(r"^[A-Za-z]:[\\/]")
@@ -84,8 +95,8 @@ def adapt_cli_dispatch_paths(
     helper deep-copies the dispatch and replaces only the exact JSON paths
     named by that audit.  A translated path must round-trip through the same
     sealed Wine drive mapping before the transient dispatch is returned.  The
-    translation surface is closed to Wwise CLI calls plus reviewed WAAPI
-    functions whose reflected payloads contain OS paths.
+    translation surface is closed to Wwise CLI calls plus reviewed Console and
+    Core WAAPI functions whose reflected payloads contain OS paths.
     """
 
     host_dispatch = {"args": _strict_json_copy(args), "options": _strict_json_copy(options)}
@@ -144,13 +155,27 @@ def adapt_cli_dispatch_paths(
         (
             project.get(field)
             for field in ("path", "projectPath", "filePath")
-            if isinstance(project.get(field), str) and project.get(field)
+            if (
+                isinstance(project.get(field), str)
+                and (
+                    _WINDOWS_ABSOLUTE_PATH.match(project.get(field)) is not None
+                    or Path(project.get(field)).is_absolute()
+                )
+            )
         ),
         None,
     )
     windows_runtime = isinstance(process_path, str) and _WINDOWS_ABSOLUTE_PATH.match(process_path) is not None
     if not windows_runtime:
-        if isinstance(project_wire_path, str) and Path(project_wire_path).is_absolute():
+        native_posix_process = (
+            isinstance(process_path, str)
+            and PurePosixPath(process_path).is_absolute()
+        )
+        local_endpoint = (
+            isinstance(endpoint_host, str)
+            and is_loopback_waapi_host(endpoint_host)
+        )
+        if native_posix_process and local_endpoint:
             proof = _identity_adaptation_proof(
                 uri,
                 host_dispatch,
@@ -176,23 +201,125 @@ def adapt_cli_dispatch_paths(
             "Host paths cannot be mapped into a remote Windows Wwise filesystem.",
             details={"endpoint_host": endpoint_host},
         )
-    if not isinstance(project_wire_path, str):
-        raise WwiseWirePathError(
-            "WIRE_PATH_CONTEXT_UNAVAILABLE",
-            "The local Wine project guard has no absolute project path anchor.",
-        )
-
     home = _account_home(account_home)
-    drive, _, anchor_host = _prove_wire_mapping(
-        project_wire_path,
-        account_home=home,
-    )
-    if not anchor_host.is_file() or anchor_host.is_symlink() or anchor_host.suffix.casefold() != ".wproj":
-        raise WwiseWirePathError(
-            "WIRE_PATH_ANCHOR_INVALID",
-            "The sealed Wine project path does not round-trip to one regular local .wproj file.",
-            details={"localized_project_path": str(anchor_host)},
+    if isinstance(project_wire_path, str):
+        drive, _, anchor_host = _prove_wire_mapping(
+            project_wire_path,
+            account_home=home,
         )
+        anchor_wire_path = _normalize_wire_path(project_wire_path)
+        anchor_source = "current_project"
+        if (
+            not anchor_host.is_file()
+            or anchor_host.is_symlink()
+            or anchor_host.suffix.casefold() != ".wproj"
+        ):
+            raise WwiseWirePathError(
+                "WIRE_PATH_ANCHOR_INVALID",
+                "The sealed Wine project path does not round-trip to one regular local .wproj file.",
+                details={"localized_project_path": str(anchor_host)},
+            )
+    else:
+        postcondition = live_project_guard.get("postcondition")
+        target_path = (
+            postcondition.get("canonical_path")
+            if isinstance(postcondition, Mapping)
+            else None
+        )
+        if (
+            uri not in _AUTHORING_PROJECT_TRANSITION_URIS
+            or project.get("state") != "none"
+            or live_project_guard.get("project_guard_mode") != "transition_to_path"
+            or not isinstance(target_path, str)
+        ):
+            raise WwiseWirePathError(
+                "WIRE_PATH_CONTEXT_UNAVAILABLE",
+                "The local Wine project guard has no absolute project path anchor.",
+            )
+        if not target_path.startswith("posix:/"):
+            raise WwiseWirePathError(
+                "WIRE_PATH_CONTEXT_UNAVAILABLE",
+                "The Authoring project transition target is not a canonical local POSIX path.",
+                details={"canonical_target_project_path": target_path},
+            )
+        target_host_path = target_path.removeprefix("posix:")
+        try:
+            parsed_target = parse_absolute_host_path(target_host_path)
+        except HostPathError as exc:
+            raise WwiseWirePathError(
+                "WIRE_PATH_CONTEXT_UNAVAILABLE",
+                "The Authoring project transition target is not one normalized non-traversing POSIX path.",
+                details={"canonical_target_project_path": target_path},
+            ) from exc
+        if (
+            parsed_target.flavor != "posix"
+            or f"posix:{parsed_target.pure_path.as_posix()}" != target_path
+        ):
+            raise WwiseWirePathError(
+                "WIRE_PATH_CONTEXT_UNAVAILABLE",
+                "The Authoring project transition target changed under canonical path parsing.",
+                details={"canonical_target_project_path": target_path},
+            )
+        anchor_host = Path(parsed_target.pure_path).resolve(strict=False)
+        transition_target_audits = [
+            row
+            for row in audit_paths
+            if isinstance(row, Mapping)
+            and row.get("section") == "args"
+            and row.get("json_path") == "$.args.path"
+            and isinstance(row.get("resolved_path"), str)
+        ]
+        if (
+            len(transition_target_audits) != 1
+            or Path(str(transition_target_audits[0]["resolved_path"])).resolve(
+                strict=False
+            )
+            != anchor_host
+        ):
+            raise WwiseWirePathError(
+                "WIRE_PATH_AUDIT_MISMATCH",
+                "The Authoring project transition target differs from its exact audited path.",
+                details={"canonical_target_project_path": target_path},
+            )
+        if (
+            not anchor_host.is_absolute()
+            or anchor_host.is_symlink()
+            or anchor_host.suffix.casefold() != ".wproj"
+            or (
+                uri == "ak.wwise.ui.project.open"
+                and not anchor_host.is_file()
+            )
+            or (
+                uri == "ak.wwise.ui.project.create"
+                and not anchor_host.parent.is_dir()
+            )
+        ):
+            raise WwiseWirePathError(
+                "WIRE_PATH_ANCHOR_INVALID",
+                "The Authoring project transition target is not a valid local .wproj anchor.",
+                details={"target_project_path": str(anchor_host)},
+            )
+        drive, mapping_root = _mapping_for_host_path(
+            anchor_host,
+            account_home=home,
+        )
+        anchor_wire_path = _host_to_wire_path(
+            anchor_host,
+            drive=drive,
+            mapping_root=mapping_root,
+        )
+        if (
+            _wire_to_host_path(anchor_wire_path, account_home=home).resolve(
+                strict=False
+            )
+            != anchor_host
+        ):
+            raise WwiseWirePathError(
+                "WIRE_PATH_ROUND_TRIP_FAILED",
+                "The Authoring project transition target did not round-trip through its Wine mapping.",
+                details={"drive": drive},
+            )
+        anchor_source = "transition_target"
 
     indexed_audit: dict[tuple[str, str], Mapping[str, Any]] = {}
     for index, row in enumerate(audit_paths):
@@ -323,10 +450,11 @@ def adapt_cli_dispatch_paths(
         "current_project_guard_fingerprint": current_fingerprint,
         "mapping": {
             "anchor_drive": drive,
+            "anchor_source": anchor_source,
             "supported_drives": ["Y", "Z"],
             "anchor_host_path_sha256": hashlib.sha256(str(anchor_host).encode("utf-8")).hexdigest(),
             "anchor_wire_path_sha256": hashlib.sha256(
-                _normalize_wire_path(project_wire_path).encode("utf-8")
+                anchor_wire_path.encode("utf-8")
             ).hexdigest(),
             "round_trip_verified": True,
         },
@@ -349,6 +477,69 @@ def requires_wwise_wire_path_adaptation(uri: str) -> bool:
     return isinstance(uri, str) and (
         uri.startswith("ak.wwise.cli.") or uri in WINE_WIRE_PATH_WAAPI_URIS
     )
+
+
+def localize_live_wwise_project_path(
+    value: str,
+    *,
+    endpoint: Mapping[str, Any],
+    wwise: Mapping[str, Any],
+    host_os_name: str | None = None,
+    account_home: str | Path | None = None,
+) -> str:
+    """Map one live local-Wine project path back to its host identity.
+
+    Project-transition previews retain the caller's host path, while Wwise
+    running through Wine reports the opened project through its Y:/Z: drive.
+    Verification compares those identities only after the returned wire path
+    round-trips to one existing regular local WPROJ file.
+    """
+
+    if not isinstance(value, str) or not value:
+        raise WwiseWirePathError(
+            "WIRE_PATH_CONTEXT_UNAVAILABLE",
+            "The live Wwise project path is empty or malformed.",
+        )
+    effective_os_name = os.name if host_os_name is None else host_os_name
+    if effective_os_name == "nt":
+        return value
+    process_path = wwise.get("processPath")
+    windows_runtime = (
+        isinstance(process_path, str)
+        and _WINDOWS_ABSOLUTE_PATH.match(process_path) is not None
+    )
+    if not windows_runtime:
+        return value
+    endpoint_host = endpoint.get("host")
+    if not isinstance(endpoint_host, str) or not is_loopback_waapi_host(
+        endpoint_host
+    ):
+        return value
+    localized = _wire_to_host_path(value, account_home=_account_home(account_home))
+    if localized.is_symlink():
+        raise WwiseWirePathError(
+            "WIRE_PATH_ANCHOR_INVALID",
+            "The live Wine project path must not be a symlink.",
+            details={"project_path": value, "localized_project_path": str(localized)},
+        )
+    try:
+        resolved = localized.resolve(strict=True)
+    except (OSError, RuntimeError) as exc:
+        raise WwiseWirePathError(
+            "WIRE_PATH_ANCHOR_INVALID",
+            "The live Wine project path does not resolve to a local file.",
+            details={"project_path": value, "reason": str(exc)},
+        ) from exc
+    if (
+        not resolved.is_file()
+        or resolved.suffix.casefold() != ".wproj"
+    ):
+        raise WwiseWirePathError(
+            "WIRE_PATH_ANCHOR_INVALID",
+            "The live Wine project path does not identify one regular local .wproj file.",
+            details={"project_path": value, "localized_project_path": str(resolved)},
+        )
+    return str(resolved)
 
 
 def _identity_adaptation_proof(

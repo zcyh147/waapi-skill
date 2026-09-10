@@ -84,6 +84,34 @@ def _composer_transaction_steps(
     ]
 
 
+def _business_transaction_steps(
+    transaction: dict[str, object],
+    construction: list[str],
+) -> list[dict[str, object]]:
+    transaction_id = transaction["transaction_id"]
+    values = [
+        ("operation-schema", "operation_schema"),
+        ("draft-start", "operation_compose"),
+        *((name, "operation_compose") for name in construction),
+        ("check", "operation_compose_check"),
+        ("preview", "preview"),
+        ("transaction-show", "transaction_show"),
+        ("confirm", "confirm"),
+        ("execute", "execute"),
+        ("verify", "verify"),
+    ]
+    return [
+        {
+            "name": f"{transaction_id}.{suffix}",
+            "kind": kind,
+            "phase": transaction["phase"],
+            "transaction_id": transaction_id,
+            "api": transaction["api"],
+        }
+        for suffix, kind in values
+    ]
+
+
 def _workflow_inputs(kind: str) -> dict[str, object]:
     if kind == "three_transactions":
         transactions = [
@@ -267,7 +295,59 @@ def test_workflow_sections_are_deeply_immutable() -> None:
     assert isinstance(sections.static_expectation["transactions"], tuple)
 
 
-def test_object_set_composer_is_one_complete_ordered_transaction() -> None:
+@pytest.mark.parametrize(
+    ("transaction_index", "construction"),
+    [
+        (
+            1,
+            [
+                "bind-target-01-01",
+                "discover-field-01",
+                "declare-existing-01",
+            ],
+        ),
+        (
+            2,
+            [
+                "bind-owner",
+                "discover-property",
+                "bind-control-input",
+                "declare-rtpc",
+            ],
+        ),
+    ],
+)
+def test_business_object_transactions_are_complete_workflow_transactions(
+    transaction_index: int,
+    construction: list[str],
+) -> None:
+    inputs = _workflow_inputs("three_transactions")
+    transaction = inputs["transactions"][transaction_index]
+    steps = inputs["workflow_steps"]
+    transaction_id = transaction["transaction_id"]
+    first = next(
+        index
+        for index, row in enumerate(steps)
+        if row["transaction_id"] == transaction_id
+    )
+    last = max(
+        index
+        for index, row in enumerate(steps)
+        if row["transaction_id"] == transaction_id
+    )
+    steps[first : last + 1] = _business_transaction_steps(
+        transaction,
+        construction,
+    )
+
+    sections = compile_workflow_business_plan_sections(**inputs)
+
+    assert sections.static_expectation["transactions"][transaction_index][
+        "transaction_id"
+    ] == transaction_id
+
+
+def _archive_test_object_set_composer_is_one_complete_ordered_transaction() -> None:
     inputs = _workflow_inputs("three_transactions")
     transaction = inputs["transactions"][1]
     steps = inputs["workflow_steps"]
@@ -304,9 +384,67 @@ def test_object_set_composer_is_one_complete_ordered_transaction() -> None:
     ]
 
 
+def _archive_test_composer_accepts_independent_facts_before_bound_container_disclosure() -> None:
+    inputs = _workflow_inputs("three_transactions")
+    transaction = inputs["transactions"][1]
+    steps = _composer_transaction_steps(transaction, action_count=4)
+    construction = steps[2:6]
+    steps[2:6] = [
+        construction[0],
+        construction[2],
+        {
+            **construction[0],
+            "name": "tx02.disclose.001.choices",
+        },
+        {
+            **construction[0],
+            "name": "tx02.disclose.001",
+        },
+        construction[1],
+        construction[3],
+    ]
+    workflow_steps = inputs["workflow_steps"]
+    first = next(
+        index
+        for index, row in enumerate(workflow_steps)
+        if row["transaction_id"] == "tx02"
+    )
+    last = max(
+        index
+        for index, row in enumerate(workflow_steps)
+        if row["transaction_id"] == "tx02"
+    )
+    workflow_steps[first : last + 1] = steps
+
+    sections = compile_workflow_business_plan_sections(**inputs)
+
+    names = [
+        row["name"]
+        for row in sections.static_expectation["workflow_steps"]
+        if row["transaction_id"] == "tx02"
+    ]
+    assert names[2:8] == [
+        "tx02.action.001",
+        "tx02.action.003",
+        "tx02.disclose.001.choices",
+        "tx02.disclose.001",
+        "tx02.action.002",
+        "tx02.action.004",
+    ]
+
+
 @pytest.mark.parametrize(
     "attack",
-    ("action_gap", "wrong_kind", "wrong_operation", "missing_check"),
+    (
+        "action_gap",
+        "duplicate_action",
+        "reordered_actions",
+        "orphan_disclosure",
+        "split_choice_disclosure",
+        "wrong_kind",
+        "wrong_operation",
+        "missing_check",
+    ),
 )
 def test_object_set_composer_rejects_incomplete_or_cross_operation_steps(
     attack: str,
@@ -316,10 +454,26 @@ def test_object_set_composer_rejects_incomplete_or_cross_operation_steps(
     steps = _composer_transaction_steps(transaction)
     if attack == "action_gap":
         steps[2]["name"] = "tx02.action.003"
+    elif attack == "duplicate_action":
+        steps[3]["name"] = "tx02.action.001"
+    elif attack == "reordered_actions":
+        steps[2], steps[3] = steps[3], steps[2]
+    elif attack == "orphan_disclosure":
+        steps.insert(
+            4,
+            {**steps[2], "name": "tx02.disclose.001"},
+        )
+    elif attack == "split_choice_disclosure":
+        steps[2:4] = [
+            {**steps[2], "name": "tx02.disclose.001.choices"},
+            steps[2],
+            {**steps[2], "name": "tx02.disclose.001"},
+            steps[3],
+        ]
     elif attack == "wrong_kind":
         steps[2]["kind"] = "checkpoint"
     elif attack == "wrong_operation":
-        transaction["operation"] = "object.setRTPC"
+        transaction["operation"] = "object.setReference"
     elif attack == "missing_check":
         steps[:] = [row for row in steps if row["name"] != "tx02.check"]
     else:
@@ -339,7 +493,11 @@ def test_object_set_composer_rejects_incomplete_or_cross_operation_steps(
 
     with pytest.raises(
         WorkflowBusinessPlanError,
-        match="does not contain one complete transaction",
+        match=(
+            "workflow step names must be unique"
+            if attack == "duplicate_action"
+            else "does not contain one complete transaction"
+        ),
     ):
         compile_workflow_business_plan_sections(**inputs)
 

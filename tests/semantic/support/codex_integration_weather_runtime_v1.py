@@ -21,19 +21,18 @@ from typing import Any, Callable, Mapping, Sequence
 
 from tests.semantic.support.codex_eval_protocol_v3 import (
     V3GatewayProtocol,
-    build_audio_import_composer_transaction_steps,
-    build_object_set_composer_transaction_steps,
+    build_protocol_with_bounded_import_chunks,
     build_transaction_protocol,
     metadata_candidate_limit,
 )
 from tests.semantic.support.codex_gateway_broker import (
     DraftActionMetadataBinding,
+    DraftTypedActionArgument,
+    DraftTypedActionBatchArgument,
     ExpectedGatewayStep,
     GatewayDerivedReferenceActivationAllowance,
-    MetadataBoundJsonArgument,
     MetadataQueryArgument,
     MetadataTokenProjection,
-    SemanticJsonArgument,
     project_required_metadata_tokens,
 )
 from tests.semantic.support.codex_filesystem_security import path_is_link_or_reparse
@@ -410,7 +409,6 @@ def prepare_weather_workflow(
             (),
             (),
         ),
-        reused_metadata_steps={"tx03": "tx01"},
     )
     visible_values = MappingProxyType(
         {
@@ -987,10 +985,9 @@ def _weather_import_request(
     weather_root: str,
     weather_bus: str,
 ) -> Mapping[str, Any]:
-    imports: list[dict[str, Any]] = [
-        {"object_path": path, "object_type": object_type}
-        for path, object_type, _parent in _weather_container_specs(weather_root)
-    ]
+    container_specs = _weather_container_specs(weather_root)
+    container_paths = {path for path, _object_type, _parent in container_specs}
+    media_by_parent: dict[str, list[dict[str, Any]]] = {}
     for target in targets:
         properties = [
             {"name": "IsLoopingEnabled", "value": True},
@@ -1006,7 +1003,12 @@ def _weather_import_request(
             },
             {"name": "Volume", "value": target.volume},
         ]
-        imports.append(
+        parent_path, separator, _name = target.logical_path.rpartition("\\")
+        if not separator or parent_path not in container_paths:
+            raise IntegrationWeatherRuntimeError(
+                "weather media target is not a direct child of a declared container"
+            )
+        media_by_parent.setdefault(parent_path, []).append(
             {
                 "object_path": target.logical_path,
                 "object_type": "Sound SFX",
@@ -1021,6 +1023,20 @@ def _weather_import_request(
                     }
                 ],
             }
+        )
+    # Canonicalize the business request as one topological structure phase
+    # followed by media rows.  Sibling containers are independent and this
+    # order lets every bounded shell chunk remain complete without coupling a
+    # structure-only row to an unrelated media row.
+    imports: list[dict[str, Any]] = [
+        {"object_path": path, "object_type": object_type}
+        for path, object_type, _parent in container_specs
+    ]
+    for path, _object_type, _parent in container_specs:
+        imports.extend(media_by_parent.pop(path, ()))
+    if media_by_parent:
+        raise IntegrationWeatherRuntimeError(
+            "weather import order left media outside the declared hierarchy"
         )
     return MappingProxyType(
         {
@@ -1155,48 +1171,7 @@ def _build_metadata_workflow_protocol(
             "weather transactions require schema-first token discovery and "
             "Gateway-owned draft-check validation"
         )
-    tx01_metadata = metadata[0]
-    tx02_metadata = metadata[1]
-    assert tx01_metadata is not None and tx02_metadata is not None
-    composer_tx01 = build_audio_import_composer_transaction_steps(
-        requests[0],
-        label="tx01",
-        metadata_binding=DraftActionMetadataBinding(
-            step="tx01.metadata",
-            object_type=tx01_metadata[0],
-            required_tokens=tuple(tx01_metadata[2]),
-            expected_projection=tuple(tx01_metadata[3]),
-        ),
-    )
-    legacy_base = build_transaction_protocol(requests)
-    composer_tx02 = build_object_set_composer_transaction_steps(
-        requests[1],
-        label="tx02",
-        metadata_binding=DraftActionMetadataBinding(
-            step="tx02.metadata",
-            object_type=tx02_metadata[0],
-            required_tokens=tuple(tx02_metadata[2]),
-            expected_projection=tuple(tx02_metadata[3]),
-        ),
-    )
-    composer_by_tx = {
-        "tx01": composer_tx01,
-        "tx02": composer_tx02,
-    }
-    base_steps: list[ExpectedGatewayStep] = []
-    inserted_composer: set[str] = set()
-    for step in legacy_base.steps:
-        prefix = step.name.split(".", 1)[0]
-        composer_steps = composer_by_tx.get(prefix)
-        if composer_steps is None:
-            base_steps.append(step)
-        elif prefix not in inserted_composer:
-            base_steps.extend(composer_steps)
-            inserted_composer.add(prefix)
-    if inserted_composer != set(composer_by_tx):
-        raise IntegrationWeatherRuntimeError(
-            "weather Composer transactions are missing from the base protocol"
-        )
+    base_steps = list(build_transaction_protocol(requests).steps)
     metadata_by_tx = {
         f"tx{index:02d}": row
         for index, row in enumerate(metadata, start=1)
@@ -1228,6 +1203,11 @@ def _build_metadata_workflow_protocol(
         prefix = step.name.split(".", 1)[0]
         if step.subcommand == "operation-schema":
             metadata_row = metadata_by_tx[prefix]
+            transaction_index = int(prefix[2:]) - 1
+            operation = requests[transaction_index].get("operation")
+            if operation in {"audio.import", "object.set", "object.setRTPC"}:
+                steps.append(step)
+                continue
             if metadata_row is None:
                 steps.append(step)
                 continue
@@ -1260,59 +1240,53 @@ def _build_metadata_workflow_protocol(
                 subcommand="metadata",
                 arguments=tuple(arguments),
             )
-            transaction_index = int(prefix[2:]) - 1
-            operation = requests[transaction_index].get("operation")
-            if operation in {"object.create", "object.set", "audio.import"}:
+            if operation in {"object.create", "object.set"}:
                 steps.extend((step, metadata_step))
             else:
                 steps.extend((metadata_step, step))
             continue
-        if step.subcommand == "preview":
-            if (
-                len(step.arguments) != 3
-                or step.arguments[:2] != ("--apply", "--request-json")
-                or not isinstance(step.arguments[2], SemanticJsonArgument)
-            ):
-                raise IntegrationWeatherRuntimeError(
-                    "weather transaction preview topology drifted"
-                )
-            metadata_row = metadata_by_tx[prefix]
-            if metadata_row is not None:
-                (
-                    object_type,
-                    _queries,
-                    tokens,
-                    projection,
-                    equivalence,
-                ) = metadata_row
-                step = replace(
-                    step,
-                    arguments=(
-                        "--apply",
-                        "--request-json",
-                        MetadataBoundJsonArgument(
-                            expected=step.arguments[2].expected,
-                            metadata_step=(
-                                f"{reused_metadata_steps[prefix]}.metadata"
-                                if prefix in reused_metadata_steps
-                                else f"{prefix}.metadata"
-                            ),
-                            object_type=object_type,
-                            required_tokens=tuple(tokens),
-                            expected_required_token_projection=tuple(projection),
-                            equivalence=equivalence,
-                            gateway_derived_reference_activations=tuple(
-                                gateway_derived_reference_activations[
-                                    int(prefix[2:]) - 1
-                                ]
-                            ),
-                        ),
-                    ),
-                )
-            else:
-                raise IntegrationWeatherRuntimeError(
-                    "weather legacy preview is missing its explicit metadata step"
-                )
+        metadata_row = metadata_by_tx[prefix]
+        if metadata_row is not None and any(
+            isinstance(
+                argument,
+                (DraftTypedActionArgument, DraftTypedActionBatchArgument),
+            )
+            for argument in step.arguments
+        ):
+            object_type, _queries, tokens, projection, _equivalence = metadata_row
+            binding = DraftActionMetadataBinding(
+                step=(
+                    f"{reused_metadata_steps[prefix]}.metadata"
+                    if prefix in reused_metadata_steps
+                    else f"{prefix}.metadata"
+                ),
+                object_type=object_type,
+                required_tokens=tuple(tokens),
+                expected_projection=tuple(projection),
+            )
+            arguments: list[Any] = []
+            for argument in step.arguments:
+                if isinstance(argument, DraftTypedActionArgument):
+                    if argument.metadata_binding is None and any(
+                        token in _string_facts(argument.expected)
+                        for token in tokens
+                    ):
+                        argument = replace(argument, metadata_binding=binding)
+                elif isinstance(argument, DraftTypedActionBatchArgument):
+                    argument = DraftTypedActionBatchArgument(
+                        tuple(
+                            replace(action, metadata_binding=binding)
+                            if action.metadata_binding is None
+                            and any(
+                                token in _string_facts(action.expected)
+                                for token in tokens
+                            )
+                            else action
+                            for action in argument.actions
+                        )
+                    )
+                arguments.append(argument)
+            step = replace(step, arguments=tuple(arguments))
         steps.append(step)
     prefixes = tuple(
         next(
@@ -1327,14 +1301,26 @@ def _build_metadata_workflow_protocol(
             "tx03.verify",
         )
     )
-    return V3GatewayProtocol(
-        tuple(steps),
-        prefixes,
-        commutative_read_only_step_groups=(
-            ("tx01.operation-schema", "tx01.metadata"),
-            ("tx02.operation-schema", "tx02.metadata"),
+    return build_protocol_with_bounded_import_chunks(
+        steps=tuple(steps),
+        turn_prefix_counts=prefixes,
+        commutative_read_only_step_groups=tuple(
+            (f"{prefix}.operation-schema", f"{prefix}.metadata")
+            for prefix, metadata_row in metadata_by_tx.items()
+            if metadata_row is not None
+            and prefix not in reused_metadata_steps
+            and requests[int(prefix[2:]) - 1].get("operation")
+            == "object.create"
         ),
     )
+
+
+def _string_facts(value: Any) -> set[str]:
+    if isinstance(value, Mapping):
+        return set().union(*(_string_facts(item) for item in value.values()), set())
+    if isinstance(value, (list, tuple)):
+        return set().union(*(_string_facts(item) for item in value), set())
+    return {value} if isinstance(value, str) else set()
 
 
 def _weather_plan_transactions() -> tuple[Mapping[str, Any], ...]:
@@ -1375,11 +1361,28 @@ def _workflow_plan_steps(
     result: list[Mapping[str, Any]] = []
     kind_by_subcommand = {
         "operation-schema": "operation_schema",
+        "request-array-item": "operation_compose",
+        "request-map-container": "operation_compose",
         "draft-start": "operation_compose",
         "draft-apply": "operation_compose",
+        "draft-business-configure": "operation_compose",
+        "draft-declare-import-batch": "operation_compose",
+        "draft-bind-object": "operation_compose",
+        "draft-bind-field": "operation_compose",
+        "draft-discover-fields": "operation_compose",
+        "draft-declare-field-change": "operation_compose",
+        "draft-declare-rtpc": "operation_compose",
+        "draft-declare-new": "operation_compose",
+        "draft-declare-existing": "operation_compose",
+        "draft-declare-existing-batch": "operation_compose",
+        "draft-declare-ui-plan": "operation_compose",
+        "draft-add-ui-command": "operation_compose",
+        "draft-revise-declaration": "operation_compose",
+        "draft-remove-declaration": "operation_compose",
         "draft-check": "operation_compose_check",
         "preview-from-draft": "preview",
         "preview": "preview",
+        "typed-operation": "preview",
         "transaction-show": "transaction_show",
         "confirm": "confirm",
         "execute": "execute",

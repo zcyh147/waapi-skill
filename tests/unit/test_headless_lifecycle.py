@@ -426,6 +426,8 @@ def test_launch_passes_launch_env_to_process_factory(tmp_path: Path) -> None:
     lifecycle.launch()
 
     assert seen_kwargs[0]["env"]["WINEPREFIX"] == str(tmp_path / ".wine-prefix")
+    assert seen_kwargs[0]["encoding"] == "utf-8"
+    assert seen_kwargs[0]["errors"] == "replace"
     lifecycle.shutdown(suppress_errors=True)
 
 
@@ -699,6 +701,10 @@ def test_shutdown_timeout_raises_after_force_kill_timeout(tmp_path: Path) -> Non
     else:
         assert fake_process.terminated is True
         assert lifecycle.process is None
+
+
+def test_default_force_kill_timeout_allows_slow_native_process_reaping() -> None:
+    assert LifecycleTimeouts().kill == 10.0
 
 
 def test_close_alias_shuts_down_running_process(tmp_path: Path) -> None:

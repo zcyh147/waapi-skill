@@ -216,8 +216,10 @@ class ObjectMutationBuilder:
         object_rows: Sequence[Mapping[str, Any]] | Mapping[str, Any] | None = None,
         parent_rows: Sequence[Mapping[str, Any]] | Mapping[str, Any] | None = None,
         on_name_conflict: str = "fail",
+        auto_add_to_source_control: bool | None = None,
+        auto_check_out_to_source_control: bool | None = None,
     ) -> SemanticPreview:
-        return self._copy_or_move(ObjectMutationOperation.COPY, object=object, parent=parent, object_rows=object_rows, parent_rows=parent_rows, on_name_conflict=on_name_conflict)
+        return self._copy_or_move(ObjectMutationOperation.COPY, object=object, parent=parent, object_rows=object_rows, parent_rows=parent_rows, on_name_conflict=on_name_conflict, auto_add_to_source_control=auto_add_to_source_control, auto_check_out_to_source_control=auto_check_out_to_source_control)
 
     def move(
         self,
@@ -227,8 +229,9 @@ class ObjectMutationBuilder:
         object_rows: Sequence[Mapping[str, Any]] | Mapping[str, Any] | None = None,
         parent_rows: Sequence[Mapping[str, Any]] | Mapping[str, Any] | None = None,
         on_name_conflict: str = "fail",
+        auto_check_out_to_source_control: bool | None = None,
     ) -> SemanticPreview:
-        return self._copy_or_move(ObjectMutationOperation.MOVE, object=object, parent=parent, object_rows=object_rows, parent_rows=parent_rows, on_name_conflict=on_name_conflict)
+        return self._copy_or_move(ObjectMutationOperation.MOVE, object=object, parent=parent, object_rows=object_rows, parent_rows=parent_rows, on_name_conflict=on_name_conflict, auto_add_to_source_control=None, auto_check_out_to_source_control=auto_check_out_to_source_control)
 
     def diff(
         self,
@@ -348,14 +351,21 @@ class ObjectMutationBuilder:
         object_rows: Sequence[Mapping[str, Any]] | Mapping[str, Any] | None,
         parent_rows: Sequence[Mapping[str, Any]] | Mapping[str, Any] | None,
         on_name_conflict: str,
+        auto_add_to_source_control: bool | None,
+        auto_check_out_to_source_control: bool | None,
     ) -> SemanticPreview:
         resolved_object = _resolve_identity("object", object, object_rows)
         resolved_parent = _resolve_identity("parent", parent, parent_rows)
         parent_target_identity = _require_writable_parent_container(operation=operation, parent=resolved_parent)
         _require_allowed("on_name_conflict", on_name_conflict, COPY_MOVE_CONFLICT_POLICIES)
+        args: dict[str, Any] = {"object": resolved_object.object, "parent": resolved_parent.object, "onNameConflict": on_name_conflict}
+        if auto_add_to_source_control is not None:
+            args["autoAddToSourceControl"] = auto_add_to_source_control
+        if auto_check_out_to_source_control is not None:
+            args["autoCheckOutToSourceControl"] = auto_check_out_to_source_control
         return self._build_preview(
             operation,
-            {"object": resolved_object.object, "parent": resolved_parent.object, "onNameConflict": on_name_conflict},
+            args,
             {},
             identities={"object": resolved_object.as_dict(), "parent": resolved_parent.as_dict()},
             target_identities={"object": _target_identity_from_resolved(resolved_object), "parent": parent_target_identity},

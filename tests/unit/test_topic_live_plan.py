@@ -15,6 +15,11 @@ TASK_8_PLAN_PATHS = {
     "2024.1": REPO_ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities" / "2024.1" / "task-8-object-topic-live-plan.json",
     "2025.1": REPO_ROOT / "tests" / "destructive" / "support" / "resources" / "capabilities" / "2025.1" / "task-8-object-topic-live-plan.json",
 }
+TASK_91_PLAN_PATH = (
+    CAPABILITY_ROOT
+    / "2022.1"
+    / "task-91-topic-business-live-plan.json"
+)
 SAFE_TASK_8_TOPIC_URIS = {
     "ak.wwise.core.object.childAdded",
     "ak.wwise.core.object.childRemoved",
@@ -24,6 +29,7 @@ SAFE_TASK_8_TOPIC_URIS = {
     "ak.wwise.core.object.postDeleted",
     "ak.wwise.core.object.preDeleted",
     "ak.wwise.core.object.propertyChanged",
+    "ak.wwise.core.object.structureChanged",
     "ak.wwise.core.log.itemAdded",
 }
 FORBIDDEN_TASK_8_TOPIC_URIS = {
@@ -31,7 +37,6 @@ FORBIDDEN_TASK_8_TOPIC_URIS = {
     "ak.wwise.core.object.attenuationCurveLinkChanged",
     "ak.wwise.core.object.curveChanged",
     "ak.wwise.core.object.referenceChanged",
-    "ak.wwise.core.object.structureChanged",
     "ak.wwise.core.profiler.captureLog.itemAdded",
     "ak.wwise.core.project.saved",
     "ak.wwise.ui.selectionChanged",
@@ -193,6 +198,56 @@ def test_property_changed_subscription_options_render_disposable_object_id() -> 
         "property": "Volume",
     }
     assert "object" not in case["subscription_options"]
+
+
+def test_task_91_plan_compiles_public_business_options_and_match() -> None:
+    plan = _task8_plan(TASK_91_PLAN_PATH)
+    case = next(
+        item
+        for item in plan["topic_cases"]
+        if item["uri"] == "ak.wwise.core.object.propertyChanged"
+    )
+    module = import_module("tests.live.versioned_object_topics_sandbox")
+    render_options = getattr(module, "_subscription_options")
+    compile_business = getattr(module, "_business_subscription_inputs")
+    object_id = "{12345678-1234-1234-1234-123456789abc}"
+
+    business = compile_business(
+        "2022.1",
+        case,
+        render_options(case, {"object": object_id}),
+    )
+
+    assert business.options == {
+        "return": ["id", "name", "type", "path", "notes", "Volume"],
+        "object": object_id,
+        "property": "Volume",
+    }
+    assert business.match == {"new": -3.0}
+    assert business.option_request.schema_digest
+    assert business.match_request.schema_digest
+
+
+def test_task_91_plan_covers_every_safe_2022_object_event_family() -> None:
+    plan = _task8_plan(TASK_91_PLAN_PATH)
+
+    assert plan["metadata"]["version"] == "2022.1"
+    assert {case["uri"] for case in plan["topic_cases"]} == {
+        "ak.wwise.core.object.childAdded",
+        "ak.wwise.core.object.childRemoved",
+        "ak.wwise.core.object.created",
+        "ak.wwise.core.object.nameChanged",
+        "ak.wwise.core.object.notesChanged",
+        "ak.wwise.core.object.postDeleted",
+        "ak.wwise.core.object.preDeleted",
+        "ak.wwise.core.object.propertyChanged",
+    }
+    for case in plan["topic_cases"]:
+        assert case["bounded_wait_seconds"] == 5.0
+        assert case["subscribe_before_mutation"] is True
+        assert case["evidence_path"].startswith(
+            ".waapi-skill-state/evidence/waapi-test-remediation/topic-business/2022.1/"
+        )
 
 
 def _topic_case(uri: str) -> Mapping[str, Any]:

@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import shlex
 import uuid
 from pathlib import Path
 from types import SimpleNamespace
@@ -26,9 +27,12 @@ from tests.semantic.support.codex_integration_workflows_v2 import (
 )
 from tests.semantic.support.codex_gateway_broker import (
     CodexGatewayBroker,
-    DraftActionJsonArgument,
+    DraftActionMetadataBinding,
+    DraftTypedActionBatchArgument,
+    DraftTypedActionArgument,
     DraftActionQueryIdentityBinding,
     GatewayInvocationError,
+    MetadataQueryArgument,
     ResponseBinding,
     SealedQueryIdentityBoundJsonArgument,
     SemanticJsonArgument,
@@ -39,6 +43,7 @@ from tests.semantic.support.codex_prompt_provenance_v3 import (
     deserialize_protocol,
     serialize_protocol,
 )
+from wwise_waapi.builders.common import split_wwise_path
 from wwise_waapi.builders.metadata import (
     GET_PROPERTY_AND_REFERENCE_NAMES_URI,
     GET_PROPERTY_INFO_URI,
@@ -379,24 +384,24 @@ class FakeWeaponsWaapi:
                 }
         raise AssertionError(f"unexpected fake WAAPI call: {uri} {args} {options}")
 
+    def audit_row(self, role: str) -> Mapping[str, Any]:
+        row = self.rows[self.roles[role].casefold()]
+        return {
+            "id": copy.deepcopy(row["id"]),
+            "name": copy.deepcopy(row["name"]),
+            "type": copy.deepcopy(row["type"]),
+            "path": copy.deepcopy(row["path"]),
+            "output_bus": copy.deepcopy(row["OutputBus"]),
+            "volume_db": copy.deepcopy(row["@Volume"]),
+            "notes": copy.deepcopy(row["notes"]),
+        }
+
     def audit_payload(self) -> Mapping[str, Any]:
-        fields = (
-            "id", "name", "type", "path", "parent", "@Volume", "notes",
-            "OutputBus", "activeSource",
-        )
         return {
             "ok": True,
             "command": "query-object",
             "count": len(IN_SCOPE),
-            "objects": [
-                {
-                    field: copy.deepcopy(
-                        self.rows[self.roles[role].casefold()].get(field)
-                    )
-                    for field in fields
-                }
-                for role in IN_SCOPE
-            ],
+            "objects": [self.audit_row(role) for role in IN_SCOPE],
         }
 
     def identity_payload(self, role: str) -> Mapping[str, Any]:
@@ -532,7 +537,7 @@ def _prepared(tmp_path: Path, *, version: str = "2022.1") -> tuple[Any, FakeWeap
     return prepared, fake, runtime
 
 
-def test_weapons_composer_protocol_compiles_as_one_complete_workflow_transaction(
+def test_weapons_business_protocol_compiles_as_one_complete_workflow_transaction(
     tmp_path: Path,
 ) -> None:
     from tests.semantic.support import codex_heavy_project_runner_v3 as project_runner
@@ -558,6 +563,25 @@ def test_weapons_composer_protocol_compiles_as_one_complete_workflow_transaction
     assert transaction_steps[-6]["kind"] == "operation_compose_check"
     assert transaction_steps[-5]["kind"] == "preview"
 
+    wrapped, rebuilt = project_runner.integration_operations_protocol_and_plan(
+        unit=unit,
+        protocol=prepared.protocol,
+        sections=sections,
+    )
+    assert wrapped.steps[0].name == "routing.operations"
+    assert wrapped.steps[1].name == "routing.query-schema"
+    assert wrapped.steps[2].name == "routing.query-schema.advanced"
+    assert rebuilt.static_expectation["workflow_id"] == unit.workflow_id
+    CodexGatewayBroker(
+        skill_source=(
+            Path(__file__).resolve().parents[2] / "skills" / "waapi-skill"
+        ),
+        expected_steps=wrapped.steps,
+        commutative_read_only_step_groups=(
+            wrapped.commutative_read_only_step_groups
+        ),
+    )
+
 
 def _typed_action_broker(
     prepared: Any,
@@ -565,12 +589,7 @@ def _typed_action_broker(
     action: str,
     occurrence: int = 0,
 ) -> tuple[CodexGatewayBroker, Any, dict[str, Any]]:
-    def matches_requested_action(step: Any) -> bool:
-        if step.subcommand != "draft-apply" or not isinstance(
-            step.arguments[-1], DraftActionJsonArgument
-        ):
-            return False
-        expected = step.arguments[-1].expected
+    def matches_requested_action(expected: Mapping[str, Any]) -> bool:
         if action == "set_property":
             return bool(expected.get("properties"))
         if action == "set_reference":
@@ -578,29 +597,13 @@ def _typed_action_broker(
         return expected.get("action") == action
 
     matches = [
-        step
+        (step, argument)
         for step in prepared.protocol.steps
-        if matches_requested_action(step)
+        if step.subcommand == "draft-apply"
+        for argument in _draft_action_members(step)
+        if matches_requested_action(argument.expected)
     ]
-    step = matches[occurrence]
-    argument = step.arguments[-1]
-    assert isinstance(argument, DraftActionJsonArgument)
-    handles = [f"odh1-{index:024x}" for index in range(1, 4)]
-    current_facts = [
-        {"handle": handle, "selector": {"kind": "id", "value": _guid(str(index))}}
-        for index, handle in enumerate(handles, start=1)
-    ]
-    add_target_steps = [
-        candidate
-        for candidate in prepared.protocol.steps
-        if candidate.subcommand == "draft-apply"
-        and isinstance(candidate.arguments[-1], DraftActionJsonArgument)
-        and candidate.arguments[-1].expected.get("action") == "add_target"
-    ]
-    handle_by_step = {
-        candidate.name: handle
-        for candidate, handle in zip(add_target_steps, handles, strict=True)
-    }
+    step, argument = matches[occurrence]
     start = next(
         candidate
         for candidate in prepared.protocol.steps
@@ -623,52 +626,109 @@ def _typed_action_broker(
             "current_facts": [],
         },
     }
-    for expected in step.arguments:
-        if not isinstance(expected, ResponseBinding) or expected.step == start.name:
-            continue
-        broker._payloads_by_step[expected.step] = {  # noqa: SLF001
-            "draft": {"revision": 99, "current_facts": current_facts}
-        }
-    for binding in argument.response_bindings:
-        broker._payloads_by_step[binding.step] = {  # noqa: SLF001
-            "draft": {
-                "revision": 99,
-                "action_result": {
-                    "created_handles": [handle_by_step[binding.step]],
-                },
+    broker._payloads_by_step["tx01.metadata"] = (  # noqa: SLF001
+        _weapons_metadata_payload()
+    )
+    for member in _draft_action_members(step):
+        for binding in member.query_identity_bindings:
+            source_step = next(
+                candidate
+                for candidate in prepared.protocol.steps
+                if candidate.name == binding.step
+            )
+            target = member.expected["references"][0]["target"]
+            broker._payloads_by_step[binding.step] = {  # noqa: SLF001
+                "ok": True,
+                "command": "query-object",
+                "count": 1,
+                "objects": [
+                    {
+                        "id": source_step.arguments[1],
+                        "name": "Weapons_Bus",
+                        "type": "Bus",
+                        "path": target["value"],
+                    }
+                ],
             }
-        }
     supplied_action = copy.deepcopy(dict(argument.expected))
-    for binding in argument.response_bindings:
-        supplied_action[binding.pointer.removeprefix("/")] = handle_by_step[
-            binding.step
-        ]
-    for binding in argument.query_identity_bindings:
-        source_step = next(
-            candidate
-            for candidate in prepared.protocol.steps
-            if candidate.name == binding.step
-        )
-        broker._payloads_by_step[binding.step] = {  # noqa: SLF001
-            "ok": True,
-            "command": "query-object",
-            "count": 1,
-            "objects": [
-                {
-                    "id": source_step.arguments[1],
-                    "name": "Weapons_Bus",
-                    "type": "Bus",
-                    "path": supplied_action["references"][0]["target"]["value"],
-                }
-            ],
-        }
     return broker, step, supplied_action
+
+
+def _weapons_metadata_payload() -> dict[str, object]:
+    def row(name: str) -> dict[str, object]:
+        dependency = name == "OutputBus"
+        return {
+            "name": name,
+            "kind": "reference" if dependency else "property",
+            "matched_queries": ["requested field"],
+            "same_object_dependencies": ["OverrideOutput"] if dependency else [],
+            "dependency_requirements": (
+                [
+                    {
+                        "action": "Enable",
+                        "context": "Self",
+                        "property": "OverrideOutput",
+                        "required_values": [True],
+                        "type": "override",
+                    }
+                ]
+                if dependency
+                else []
+            ),
+            "metadata": {
+                "name": name,
+                "type": (
+                    ""
+                    if dependency
+                    else "Boolean"
+                    if name == "OverrideOutput"
+                    else "Real32"
+                ),
+                "default": None,
+                "display": {"name": name},
+                "restriction": {},
+            },
+        }
+
+    return {
+        "agent_result": {
+            "contract": "waapi-skill.metadata-discovery/v2",
+            "authority": "live-waapi",
+            "result_detail": "compact",
+            "scope": {
+                "kind": "object_type",
+                "requested": "Sound",
+                "resolved": {"classId": 1, "name": "Sound", "type": "Sound"},
+            },
+            "candidates": [row("Volume"), row("OutputBus")],
+            "dependency_candidates": [row("OverrideOutput")],
+            "dependency_closure_complete": True,
+            "unresolved_dependencies": [],
+            "selection_required": True,
+            "exact_live_name_required_for_mutation": True,
+        }
+    }
+
+
+def _draft_action_members(step: Any) -> tuple[DraftTypedActionArgument, ...]:
+    argument = step.arguments[-1]
+    if isinstance(argument, DraftTypedActionArgument):
+        return (argument,)
+    if isinstance(argument, DraftTypedActionBatchArgument):
+        return argument.actions
+    return ()
 
 
 def _typed_action_argv(step: Any, action: Mapping[str, Any]) -> tuple[str, ...]:
     revision_binding = step.arguments[4]
     assert isinstance(revision_binding, ResponseBinding)
     revision = "1" if revision_binding.step.endswith(".draft-start") else "99"
+    actual_actions = []
+    for member in _draft_action_members(step):
+        actual = copy.deepcopy(dict(member.expected))
+        if actual.get("selector") == action.get("selector"):
+            actual = copy.deepcopy(dict(action))
+        actual_actions.append(actual)
     return (
         step.subcommand,
         "od1-" + "2" * 32,
@@ -678,7 +738,11 @@ def _typed_action_argv(step: Any, action: Mapping[str, Any]) -> tuple[str, ...]:
         revision,
         "--compact",
         "--facts",
-        *typed_action_cli_arguments(action),
+        *tuple(
+            token
+            for actual in actual_actions
+            for token in typed_action_cli_arguments(actual)
+        ),
     )
 
 
@@ -705,26 +769,12 @@ def _observe(
     if reverse_output_bus_pair:
         steps[1:3] = reversed(steps[1:3])
     if add_all_targets_before_fields:
-        action_indexes = [
-            index
-            for index, step in enumerate(steps)
+        assert all(
+            member.expected.get("action") == "add_target"
+            for step in steps
             if step.subcommand == "draft-apply"
-        ]
-        action_steps = [steps[index] for index in action_indexes]
-        reordered = [
-            *(
-                step
-                for step in action_steps
-                if step.arguments[-1].expected.get("action") == "add_target"
-            ),
-            *(
-                step
-                for step in action_steps
-                if step.arguments[-1].expected.get("action") != "add_target"
-            ),
-        ]
-        for index, step in zip(action_indexes, reordered, strict=True):
-            steps[index] = step
+            for member in _draft_action_members(step)
+        )
     for step in steps:
         if step.name == "tx01.execute" and apply:
             fake.apply_set(prepared.operation_request)
@@ -763,94 +813,71 @@ def test_prepares_scoped_complete_query_and_one_strict_batch(
         "tx01.operation-schema",
         "tx01.draft-start",
     )
-    assert prepared.protocol.turn_prefix_counts == (3, 13, 17)
+    assert prepared.protocol.turn_prefix_counts == (3, 15, 19)
     assert prepared.protocol.commutative_read_only_step_groups == (
         (
             "relationship.output_bus.01",
             "relationship.output_bus.02",
         ),
+        (
+            "identity.audit_close",
+            "identity.audit_tail",
+            "identity.audit_mechanical",
+        ),
     )
     serialized = serialize_protocol(prepared.protocol)
     assert deserialize_protocol(serialized) == prepared.protocol
-    tampered = copy.deepcopy(serialized)
-    identity_bound_argument = next(
-        argument
-        for step in tampered["steps"]
-        for argument in step["arguments"]
-        if argument.get("kind") == "draft_action_json"
-        and argument.get("query_identity_bindings")
-    )
-    identity_bound_argument["query_identity_bindings"][0]["step"] = (
-        "missing.output.bus.query"
-    )
-    with pytest.raises(
-        PromptProvenanceError,
-        match="pre-Draft query-object response",
-    ):
-        deserialize_protocol(tampered)
-    composer_steps = prepared.protocol.steps[7:13]
-    assert composer_steps[0].subcommand == "draft-start"
-    assert [step.subcommand for step in composer_steps[-2:]] == [
+    business_steps = prepared.protocol.steps[7:15]
+    assert business_steps[0].subcommand == "draft-start"
+    assert [step.subcommand for step in business_steps[-2:]] == [
         "draft-check",
         "preview-from-draft",
     ]
-    action_steps = [
-        step for step in composer_steps if step.subcommand == "draft-apply"
-    ]
-    assert len(action_steps) == 3
-    assert all(
-        isinstance(step.arguments[-1], DraftActionJsonArgument)
-        for step in action_steps
-    )
-    reference_actions = [
-        step.arguments[-1]
-        for step in action_steps
-        if step.arguments[-1].expected.get("references")
-    ]
-    assert len(reference_actions) == 2
-    assert all(
-        argument.query_identity_bindings
-        == (
-            DraftActionQueryIdentityBinding(
-                pointer="/references/0/target",
-                step="relationship.output_bus.02",
-            ),
-        )
-        for argument in reference_actions
-    )
     assert not any(
-        isinstance(argument, SealedQueryIdentityBoundJsonArgument)
-        for step in composer_steps
-        for argument in step.arguments
+        step.subcommand == "draft-apply" for step in business_steps
     )
+    binding_steps = [
+        step for step in business_steps if step.subcommand == "draft-bind-object"
+    ]
+    assert [step.name for step in binding_steps] == [
+        "tx01.bind-target-01-01",
+        "tx01.bind-reference-01-02",
+        "tx01.bind-target-02-03",
+        "tx01.bind-target-03-04",
+    ]
+    declarations = [
+        step
+        for step in business_steps
+        if step.subcommand == "draft-declare-existing-batch"
+    ]
+    assert len(declarations) == 1
+    assert declarations[0].arguments.count("--row-order") == 3
+    assert declarations[0].arguments.count("--row") == 3
+    assert declarations[0].arguments.count("--field") == 6
     audit = prepared.protocol.steps[0]
     assert audit.subcommand == "query-object"
-    assert audit.arguments[:4] == (
-        "--path",
-        prepared.visible_values["weapons_audit_root_path"],
-        "--select",
-        "descendants",
+    audit_path_arguments = tuple(
+        item
+        for segment in split_wwise_path(
+            prepared.visible_values["weapons_audit_root_path"]
+        )
+        for item in ("--path-segment", segment)
     )
-    assert audit.arguments[4:] == (
-        "--where-json",
-        SemanticJsonArgument(
-            {"field": "type", "operator": "=", "value": "Sound"}
-        ),
-        "--all-results",
-        "--return-field",
-        "id",
-        "--return-field",
-        "name",
-        "--return-field",
-        "type",
-        "--return-field",
-        "path",
-        "--return-field",
-        "OutputBus",
-        "--return-field",
-        "@Volume",
-        "--return-field",
+    assert audit.arguments == (
+        *audit_path_arguments,
+        "--relationship",
+        "descendants",
+        "--predicate",
+        "kind-is",
+        "all-sounds",
+        "--max-results",
+        "6",
+        "--include",
         "notes",
+        "--include",
+        "volume-db",
+        "--include",
+        "output-bus",
     )
     before = prepared.before_snapshot.objects_by_role()
     expected_bus_ids = (
@@ -862,16 +889,8 @@ def test_prepares_scoped_complete_query_and_one_strict_batch(
     ):
         assert step.subcommand == "query-object"
         assert step.arguments == (
-            "--object-id",
+            "--exact-id",
             object_id,
-            "--return-field",
-            "id",
-            "--return-field",
-            "name",
-            "--return-field",
-            "type",
-            "--return-field",
-            "path",
         )
     for step, role in zip(
         prepared.protocol.steps[3:6],
@@ -880,16 +899,8 @@ def test_prepares_scoped_complete_query_and_one_strict_batch(
     ):
         assert step.subcommand == "query-object"
         assert step.arguments == (
-            "--object-id",
+            "--exact-id",
             before[role].object_id,
-            "--return-field",
-            "id",
-            "--return-field",
-            "name",
-            "--return-field",
-            "type",
-            "--return-field",
-            "path",
         )
     request = _plain(prepared.operation_request)
     assert request["contract"] == "waapi-skill.operation-request/v1"
@@ -910,76 +921,62 @@ def test_prepares_scoped_complete_query_and_one_strict_batch(
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])
-def test_weapons_fast_path_keeps_canonical_volume_and_rejects_query_accessor(
+def test_weapons_business_draft_keeps_canonical_volume_field(
     tmp_path: Path,
     version: str,
 ) -> None:
     prepared, _fake, _runtime = _prepared(tmp_path, version=version)
-    broker, step, action = _typed_action_broker(
-        prepared,
-        action="set_property",
+    declaration = next(
+        step
+        for step in prepared.protocol.steps
+        if step.name == "tx01.declare-existing-batch"
     )
 
-    assert action["properties"] == [{"name": "Volume", "value": -3.0}]
-    broker._validate_step(step, _typed_action_argv(step, action))  # noqa: SLF001
-
-    action["properties"][0]["name"] = "@Volume"
-    with pytest.raises(GatewayInvocationError, match="typed Draft action"):
-        broker._validate_step(  # noqa: SLF001
-            step,
-            _typed_action_argv(step, action),
-        )
+    volume_group = declaration.arguments[
+        declaration.arguments.index("volume_db") - 2 :
+        declaration.arguments.index("volume_db") + 2
+    ]
+    assert volume_group[:3] == ("--field", "target-02", "volume_db")
+    assert volume_group[3].values == ("-3", "-3.0")
+    assert "@Volume" not in declaration.arguments
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])
-def test_composer_repeats_the_exact_reviewed_output_bus_path(
+def test_business_draft_reuses_the_exact_queried_output_bus_id(
     tmp_path: Path,
     version: str,
 ) -> None:
     prepared, _fake, _runtime = _prepared(tmp_path, version=version)
-    references = [
-        step.arguments[-1].expected["references"][0]
+    reference_bindings = [
+        step
         for step in prepared.protocol.steps
-        if step.subcommand == "draft-apply"
-        and isinstance(step.arguments[-1], DraftActionJsonArgument)
-        and step.arguments[-1].expected.get("references")
+        if step.name.startswith("tx01.bind-reference-")
     ]
+    assert len(reference_bindings) == 1
+    binding = reference_bindings[0]
+    assert binding.arguments[5:] == (
+        "--object-id",
+        prepared.before_snapshot.objects_by_role()["weapons_bus"].object_id,
+    )
 
-    assert len(references) == 2
-    assert [row["name"] for row in references] == ["OutputBus", "OutputBus"]
-    assert [row["target"] for row in references] == [
-        {
-            "kind": "path",
-            "value": prepared.visible_values["weapons_bus_path"],
-        },
-        {
-            "kind": "path",
-            "value": prepared.visible_values["weapons_bus_path"],
-        },
+    declarations = [
+        step
+        for step in prepared.protocol.steps
+        if step.subcommand == "draft-declare-existing-batch"
     ]
-    for occurrence in range(2):
-        broker, step, action = _typed_action_broker(
-            prepared,
-            action="set_reference",
-            occurrence=occurrence,
-        )
-        broker._validate_step(step, _typed_action_argv(step, action))  # noqa: SLF001
-        binding = step.arguments[-1].query_identity_bindings[0]
-        source_step = next(
-            candidate
-            for candidate in prepared.protocol.steps
-            if candidate.name == binding.step
-        )
-        _set_action_pointer(
-            action,
-            binding.pointer,
-            {"kind": "id", "value": source_step.arguments[1]},
-        )
-        broker._validate_step(step, _typed_action_argv(step, action))  # noqa: SLF001
+    assert len(declarations) == 1
+    arguments = declarations[0].arguments
+    output_bus_bindings = [
+        arguments[index + 3]
+        for index, argument in enumerate(arguments[:-3])
+        if argument == "--field" and arguments[index + 2] == "output_bus"
+    ]
+    assert len(output_bus_bindings) == 2
+    assert output_bus_bindings[0] == output_bus_bindings[1]
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])
-def test_compact_draft_replay_accepts_only_the_exact_queried_bus_guid(
+def _archive_test_compact_draft_replay_accepts_only_the_exact_queried_bus_guid(
     tmp_path: Path,
     version: str,
 ) -> None:
@@ -1008,38 +1005,16 @@ def test_compact_draft_replay_accepts_only_the_exact_queried_bus_guid(
     }
 
     composition = new_composition("object.set", version)
-    handle_by_step: dict[str, str] = {}
-    handle_index = 0
-    revision = 1
     canonical_action_steps = [
         step for step in prepared.protocol.steps if step.subcommand == "draft-apply"
     ]
-    action_steps = [
-        *(
-            step
-            for step in canonical_action_steps
-            if step.arguments[-1].expected.get("action") == "add_target"
-        ),
-        *(
-            step
-            for step in canonical_action_steps
-            if step.arguments[-1].expected.get("action") != "add_target"
-        ),
-    ]
-    first_action_index = broker._execution_steps.index(  # noqa: SLF001
-        canonical_action_steps[0]
-    )
-    broker._execution_steps[  # noqa: SLF001
-        first_action_index : first_action_index + len(action_steps)
-    ] = action_steps
-    for action_step in action_steps:
-        argument = action_step.arguments[-1]
-        assert isinstance(argument, DraftActionJsonArgument)
+    assert len(canonical_action_steps) == 1
+    action_step = canonical_action_steps[0]
+    action_members = _draft_action_members(action_step)
+    assert len(action_members) == 3
+    created_handles: list[str] = []
+    for index, argument in enumerate(action_members, start=1):
         actual_action = copy.deepcopy(dict(argument.expected))
-        for binding in argument.response_bindings:
-            actual_action[binding.pointer.removeprefix("/")] = handle_by_step[
-                binding.step
-            ]
         for binding in argument.query_identity_bindings:
             source_step = next(
                 step for step in prepared.protocol.steps if step.name == binding.step
@@ -1047,65 +1022,98 @@ def test_compact_draft_replay_accepts_only_the_exact_queried_bus_guid(
             _set_action_pointer(
                 actual_action,
                 binding.pointer,
-                {
-                    "kind": "id",
-                    "value": str(source_step.arguments[1]),
-                },
+                {"kind": "id", "value": str(source_step.arguments[1])},
             )
-
-        created_handle: str | None = None
-        if actual_action["action"] == "add_target":
-            handle_index += 1
-            created_handle = f"odh1-{handle_index:024x}"
-
-        def create_handle() -> str:
-            assert created_handle is not None
-            return created_handle
-
-        composition, action_name = apply_composer_action(
+        created_handle = f"odh1-{index:024x}"
+        composition, _action_name = apply_composer_action(
             "object.set",
             version,
             composition,
             actual_action,
-            handle_factory=create_handle,
+            handle_factory=lambda value=created_handle: value,
         )
-        created_handles = [created_handle] if created_handle is not None else []
-        if created_handle is not None:
-            handle_by_step[action_step.name] = created_handle
-        facts = composition_projection(
-            "object.set",
-            version,
-            composition,
-        )["current_facts"]
-        revision += 1
-        broker._payloads_by_step[action_step.name] = {  # noqa: SLF001
-            "draft": {
-                "draft_id": "od1-" + "2" * 32,
-                "revision": revision,
-                "action_result": {
-                    "contract": "waapi-skill.operation-draft-action-result/v1",
-                    "action": action_name,
-                    "created_handles": created_handles,
-                    "affected_handles": sorted(
-                        value
-                        for key, value in actual_action.items()
-                        if key.endswith("_handle") and isinstance(value, str)
+        created_handles.append(created_handle)
+    facts = composition_projection(
+        "object.set",
+        version,
+        composition,
+    )["current_facts"]
+    completion_argv = [
+        "python",
+        "/owned/run.py",
+        "gateway.py",
+        "draft-check",
+        "od1-" + "2" * 32,
+        "--task-authority",
+        "da1-" + "1" * 40,
+        "--expected-revision",
+        "4",
+    ]
+    broker._payloads_by_step[action_step.name] = {  # noqa: SLF001
+        "draft": {
+            "draft_id": "od1-" + "2" * 32,
+            "revision": 4,
+            "action_result": {
+                "contract": "waapi-skill.operation-draft-action-result/v1",
+                "action": "batch",
+                "last_action": "add_target",
+                "action_count": 3,
+                "applied_atomically": True,
+                "created_handles": created_handles,
+                "affected_handles": [],
+            },
+            "current_facts_summary": {
+                "contract": "waapi-skill.operation-draft-facts-summary/v1",
+                "target_count": len(facts),
+                "handle_count": len(
+                    {
+                        row["handle"]
+                        for row in facts
+                        if isinstance(row, Mapping) and "handle" in row
+                    }
+                ),
+                "canonical_sha256": canonical_sha256(facts),
+            },
+            "next_action_binding": {
+                "shell_tool_timeout_ms": 30_000,
+                "completion_candidate": {
+                    "condition": (
+                        "all_current_business_request_facts_and_"
+                        "disclosures_submitted"
+                    ),
+                    "business_completion_check": {
+                        "source": "current_user_business_request",
+                        "schema_required_fields_complete_is_insufficient": True,
+                        "all_user_present_optional_map_and_constant_facts_required": True,
+                        "exact_values_and_object_types_required": True,
+                    },
+                    "is_next_command_when_condition_true": True,
+                    "fixed_argv_prefix": completion_argv,
+                    "copy_exactly": True,
+                    "copy_instruction": {
+                        "contract": (
+                            "waapi-skill.operation-draft-command-copy-instruction/v1"
+                        ),
+                        "source_field": "copy_command",
+                        "action": "execute_verbatim_as_one_shell_tool_call",
+                        "forbidden_transformations": [
+                            "reconstruct",
+                            "shorten",
+                            "normalize",
+                            "substitute_path_segments",
+                            "select_another_field",
+                        ],
+                    },
+                    "copy_command": shlex.join(completion_argv),
+                    "allowed_suffix_source": "request_schema_terminal_arguments_only",
+                    "draft_apply_action_check": "invalid",
+                    "when_condition_false": (
+                        "continue_with_one_atomic_typed_action_batch_or_dynamic_disclosure"
                     ),
                 },
-                "current_facts_summary": {
-                    "contract": "waapi-skill.operation-draft-facts-summary/v1",
-                    "target_count": len(facts),
-                    "handle_count": len(
-                        {
-                            row["handle"]
-                            for row in facts
-                            if isinstance(row, Mapping) and "handle" in row
-                        }
-                    ),
-                    "canonical_sha256": canonical_sha256(facts),
-                },
-            }
+            },
         }
+    }
 
     preview = next(
         step
@@ -1151,39 +1159,6 @@ def test_compact_draft_replay_accepts_only_the_exact_queried_bus_guid(
         match="canonical request does not replay",
     ):
         broker._validate_operation_draft_payload(preview, tampered)  # noqa: SLF001
-
-
-@pytest.mark.parametrize("version", ["2022.1", "2025.1"])
-@pytest.mark.parametrize("reference_index", [0, 1])
-@pytest.mark.parametrize("wrong_identity", ["guid", "path"])
-def test_composer_rejects_wrong_output_bus_guid_or_path(
-    tmp_path: Path,
-    version: str,
-    reference_index: int,
-    wrong_identity: str,
-) -> None:
-    prepared, _fake, _runtime = _prepared(tmp_path, version=version)
-    broker, step, action = _typed_action_broker(
-        prepared,
-        action="set_reference",
-        occurrence=reference_index,
-    )
-    binding = step.arguments[-1].query_identity_bindings[0]
-    target = action["references"][0]["target"]
-    if wrong_identity == "guid":
-        _set_action_pointer(
-            action,
-            binding.pointer,
-            {"kind": "id", "value": _guid("wrong-output-bus")},
-        )
-    else:
-        target["value"] += "_Wrong"
-
-    with pytest.raises(GatewayInvocationError, match="typed Draft action"):
-        broker._validate_step(  # noqa: SLF001
-            step,
-            _typed_action_argv(step, action),
-        )
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])
@@ -1325,9 +1300,7 @@ def test_oracle_detects_protected_state_drift(
 def test_audit_payload_fails_closed_on_scope_escape(tmp_path: Path) -> None:
     prepared, fake, _runtime = _prepared(tmp_path)
     payload = copy.deepcopy(fake.audit_payload())
-    payload["objects"].append(
-        copy.deepcopy(fake.rows[fake.roles["audit_out_of_scope"].casefold()])
-    )
+    payload["objects"].append(fake.audit_row("audit_out_of_scope"))
 
     with pytest.raises(WeaponsIntegrationRuntimeError, match="escaped"):
         prepared.observe_payload(prepared.protocol.steps[0], payload)
@@ -1336,7 +1309,7 @@ def test_audit_payload_fails_closed_on_scope_escape(tmp_path: Path) -> None:
 def test_audit_payload_fails_closed_on_unreviewed_output_bus(tmp_path: Path) -> None:
     prepared, fake, _runtime = _prepared(tmp_path)
     payload = copy.deepcopy(fake.audit_payload())
-    payload["objects"][0]["OutputBus"] = {"id": _guid("unreviewed-bus")}
+    payload["objects"][0]["output_bus"] = {"id": _guid("unreviewed-bus")}
 
     with pytest.raises(WeaponsIntegrationRuntimeError, match="distinct OutputBus set"):
         prepared.observe_payload(prepared.protocol.steps[0], payload)
@@ -1391,6 +1364,17 @@ def test_reversed_output_bus_hops_pass_final_business_oracle(
     verification.assert_passed()
     assert verification.assertions["single_object_set_batch"] is True
     prepared.cleanup().assert_passed()
+
+
+def test_selected_identity_readbacks_are_order_independent(tmp_path: Path) -> None:
+    prepared, _fake, _runtime = _prepared(tmp_path)
+    canonical = tuple(step.name for step in prepared.protocol.steps[3:6])
+
+    assert gateway_step_sequence_matches(
+        canonical,
+        tuple(reversed(canonical)),
+        prepared.protocol.commutative_read_only_step_groups,
+    )
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])

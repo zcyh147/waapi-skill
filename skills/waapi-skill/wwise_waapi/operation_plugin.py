@@ -697,7 +697,13 @@ def verify_created_plugin_row(
     )
     expected_fields = plugin_verification_fields(descriptor)
     actual_fields = tuple(row)
-    if set(actual_fields) != set(expected_fields):
+    allowed_missing_fields = (
+        {"owner"} if descriptor.kind == "source" else set()
+    )
+    if (
+        set(actual_fields) - set(expected_fields)
+        or (set(expected_fields) - set(actual_fields)) - allowed_missing_fields
+    ):
         raise PluginOperationContractError(
             "INVALID_PLUGIN_READBACK",
             "Plug-in readback fields do not match the closed descriptor "
@@ -715,7 +721,7 @@ def verify_created_plugin_row(
         field="plugin.parent",
     )
     owner_id = _closed_object_reference_id(
-        row.get("owner"),
+        row.get("owner", row.get("parent")),
         field="plugin.owner",
     )
     expected_parent_id = _require_guid(
@@ -753,9 +759,16 @@ def verify_created_plugin_row(
         "parent": expected_parent_id,
         "owner": expected_owner_id,
     }
+    native_type = row.get("type")
+    normalized_type = (
+        descriptor.object_type
+        if native_type
+        in {descriptor.object_type, f"{descriptor.object_type}Plugin"}
+        else native_type
+    )
     actual = {
         "name": row.get("name"),
-        "type": row.get("type"),
+        "type": normalized_type,
         "classId": row.get("classId"),
         "parent": parent_id,
         "owner": owner_id,

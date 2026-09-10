@@ -473,7 +473,12 @@ class _FakeWorld:
     ) -> tuple[Mapping[str, Any], int]:
         store = TransactionStore(state_directory)
         transaction_label = step.name.rsplit(".", 1)[0]
-        if step.subcommand == "preview":
+        if step.subcommand in {
+            "preview",
+            "typed-call",
+            "typed-operation",
+            "preview-from-draft",
+        }:
             transaction_id = f"tx-cli-{len(self.transaction_ids) + 1:02d}"
             request = next(
                 (
@@ -503,7 +508,7 @@ class _FakeWorld:
                 {
                     "contract": "waapi-skill.gateway-result/v1",
                     "ok": True,
-                    "command": "preview",
+                    "command": step.subcommand,
                     "status": "awaiting_confirmation",
                     "state": awaiting.state.value,
                     "transaction_id": transaction_id,

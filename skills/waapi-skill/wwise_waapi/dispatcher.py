@@ -462,7 +462,7 @@ class WwiseDispatcher:
 
         try:
             normalized = _normalize_exception(exc, error_code=error_code or self._error_code(exc))
-            return self._error_result(
+            result = self._error_result(
                 request.api,
                 request.version,
                 normalized["error_code"],
@@ -472,14 +472,18 @@ class WwiseDispatcher:
                 waapi_error_uri=normalized.get("waapi_error_uri"),
                 waapi_error_details=normalized.get("waapi_error_details"),
             )
+            result["failure_origin"] = "exception"
+            return result
         except BaseException:  # noqa: BLE001 - hostile exception hooks must not cross dispatch
-            return self._error_result(
+            result = self._error_result(
                 _bounded_public_string(request.api, "<omitted>", MAX_EXCEPTION_URI_BYTES),
                 _bounded_public_string(request.version, "<omitted>", 80),
                 "ERROR_NORMALIZATION_FAILED",
                 "The underlying error could not be normalized safely",
                 item_type=_bounded_public_string(item_type, None, 80),
             )
+            result["failure_origin"] = "exception"
+            return result
 
     def _publish_result(self, result: dict[str, Any], request: DispatcherRequest) -> dict[str, Any]:
         """Apply the live public ceiling before returning or recording evidence."""

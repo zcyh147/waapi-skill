@@ -1,0 +1,295 @@
+{
+  "contract": "waapi-skill.interface-depth-review-policy/v1",
+  "uniform_migration_invariant": {
+    "scope": "every permitted public API and every supported version lane",
+    "required_boundary": "Agent supplies only closed business values or exact user artifacts; Gateway constructs the exact versioned native request and execution plan",
+    "non_exemptions": [
+      "the API is simple",
+      "the API previously passed deterministic, real-host, or Fresh Agent tests",
+      "the API already has a dedicated route, builder, or verifier",
+      "the current typed request is already syntactically closed"
+    ],
+    "allowed_final_dispositions": [
+      "deep business or domain declaration",
+      "Gateway-owned zero-input or fixed read contract with no leaked model-authored implementation value",
+      "explicit prohibited boundary"
+    ]
+  },
+  "source_contracts": {
+    "gateway_parser_sha256": "38126ae5d3aa5d7bb67df5afb772c7cbabe33223fa6cbcca18e71abf32123578",
+    "operation_contract_sha256": "5740eb71829385a4072b776cad3052c5b1c43d76e95b2cfa60c9e4e79776ee8d",
+    "public_continuation_sha256": "c5dd9de956bf7b393c2c4b38c80561940d0873f6695acc2e5a635a7ad2bd8ee3",
+    "typed_request_surface_sha256": "7cbe0a9ba6d9756c94ecea58bb1b2ac56da242059f17c5cdfdaf768271d133a8"
+  },
+  "ownership_classes": {
+    "stable_business_declaration": "A prompt-derived business value remains visible in the public request.",
+    "gateway_derivation": "The Gateway deterministically derives or serializes this value or workflow mechanic.",
+    "live_bound_handle": "The Gateway issues a capability- and live-state-bound handle which the caller may only copy.",
+    "exact_user_artifact": "User-owned bytes, files, paths, tables, or source text remain exact inputs inside a Gateway envelope.",
+    "bounded_domain_expression": "An exact domain expression is accepted only by its reviewed read-only or code boundary.",
+    "reviewed_adapter": "An operation-specific Adapter must replace the current native-facing value or structure.",
+    "prohibited_boundary": "The value or route is intentionally unavailable through the public surface."
+  },
+  "mechanic_owners": {
+    "ambiguous_continuation_selection": "gateway_derivation",
+    "batch_layout": "gateway_derivation",
+    "dependency_order": "gateway_derivation",
+    "metadata_scope": "gateway_derivation",
+    "native_object_path": "gateway_derivation",
+    "object_identity_shape": "gateway_derivation",
+    "object_name_mutability": "gateway_derivation",
+    "property_or_reference_token": "live_bound_handle",
+    "request_fragment": "gateway_derivation",
+    "revision_arithmetic": "gateway_derivation",
+    "shell_quoting": "gateway_derivation",
+    "wire_type": "gateway_derivation"
+  },
+  "named_operation_groups": [
+    {
+      "id": "named-audio-import-audited-deep",
+      "disposition": "already_deep",
+      "owner_issue": null,
+      "operations": ["audio.import"],
+      "leaked_mechanics": [],
+      "audit_evidence": "The public audio-import-business/v1 contract exposes semantic kinds and stable declaration values, binds objects and fields live, derives native paths/types/order/batches/continuation, preserves media artifacts exactly, and has complete #54 five-version Program plus macOS/Windows Fresh and real-host evidence."
+    },
+    {
+      "id": "named-internal-canonical-boundary",
+      "disposition": "prohibited_boundary",
+      "owner_issue": null,
+      "operations": ["waapi.call"],
+      "leaked_mechanics": [],
+      "audit_evidence": "waapi.call is an internal canonical transaction representation, absent from normal operation discovery, and cannot accept a model-authored native request document."
+    },
+    {
+      "id": "named-object-lifecycle",
+      "disposition": "already_deep",
+      "owner_issue": null,
+      "operations": ["object.copy", "object.delete", "object.move", "object.setName", "object.setNotes"],
+      "leaked_mechanics": [],
+      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; force distinct object and parent roles where both exist; keep every opaque handle inside the Draft so declaration accepts only scalar business values; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence."
+    },
+    {
+      "id": "named-object-metadata-fields",
+      "disposition": "already_deep",
+      "owner_issue": null,
+      "operations": ["object.setLinked", "object.setProperty", "object.setReference"],
+      "leaked_mechanics": [],
+      "audit_evidence": "The public object-metadata-business/v1 Adapters accept exact object identities, short user-facing field meanings, optional platform, and business outcomes; live discovery issues opaque field handles, compiles the exact metadata scope, token, wire value, request, and staged continuation inside the Gateway, and removes normal inline_typed ingress for all 13 lanes. #77 retains five-version deterministic repair and non-bypass coverage, exact macOS/Windows 2022.1 and 2025.1 real-host execution, and a current-v3 Terra Fresh Agent Alarm reference repair PASS plus identical verify-only audit on both hosts."
+    },
+    {
+      "id": "named-object-creation-graph",
+      "disposition": "already_deep",
+      "owner_issue": null,
+      "operations": ["object.create", "object.createPlugin", "object.set", "object.setRTPC"],
+      "leaked_mechanics": [],
+      "audit_evidence": "The public object-graph-business/v1 Adapters accept named hierarchy outcomes, plug-in roles, stable business fields including the unambiguous ignore-parent-instance-limit intent, exact user artifacts, references, and RTPC points; bind opaque object, field, plug-in-type, control-input, and output-bus handles; compile exact Wwise types, paths, metadata scope/tokens, dependency order, batch row and Switch-assignment counts, revisions, native requests, and phase-relevant copy-ready continuations into one Preview inside the Gateway. The pre-#78 Composer action vocabulary, ambiguous override-parent field, caller-supplied batch counts, and normal fallback are removed. #78 retains five-version deterministic and exact macOS/Windows 2022.1 and 2025.1 real-host evidence; repaired-candidate Terra Fresh Agent Weather remains an open release gate rather than inherited evidence."
+    },
+    {
+      "id": "named-switch-assignments",
+      "disposition": "already_deep",
+      "owner_issue": null,
+      "operations": ["switchContainer.addAssignment", "switchContainer.removeAssignment"],
+      "leaked_mechanics": [],
+      "audit_evidence": "The public switch-assignment-business/v1 Adapters accept only three live-bound business identities and the operation-selected add or remove outcome; issue and enforce each exact role in one Gateway-owned continuation; derive exact GUID relationships, opposite preconditions, native payloads, immutable Preview intent, and pair readback inside the Gateway; and remove the normal inline_typed entry for all ten lanes. #93 retains five-version deterministic coverage, exact macOS/Windows 2022.1 and 2025.1 real-host add/remove execution, and targeted Terra Fresh Agent routing plus identical verify-only evidence on both hosts."
+    },
+    {
+      "id": "named-soundbank-planning",
+      "disposition": "already_deep",
+      "owner_issue": null,
+      "operations": ["soundbank.convertExternalSources", "soundbank.generate", "soundbank.processDefinitionFiles", "soundbank.setInclusions"],
+      "leaked_mechanics": [],
+      "audit_evidence": "The public soundbank-business/v1 Adapters accept live-bound SoundBank and inclusion identities, stable platform/language/rebuild/filter scalars, exact source artifacts, and exact Definition files; issue and enforce operation-selected business-role continuations; compile native object paths, wire types, dependency order, batch layout, request envelopes, file-processing plans, and the one immutable Preview inside the Gateway; and remove normal SoundBank inline_typed and Composer ingress. #79 retains five-version deterministic coverage, exact macOS/Windows 2022.1 and 2025.1 real-host execution for all four operations, and targeted Terra Fresh Agent Harbor evidence on both hosts."
+    },
+    {
+      "id": "named-exact-artifact-code",
+      "disposition": "already_deep",
+      "owner_issue": null,
+      "operations": ["audio.importTabDelimited", "lua.executeCliFile", "lua.executeCoreFile", "lua.executeCoreInline"],
+      "leaked_mechanics": [],
+      "audit_evidence": "The public exact-artifact-business/v1 Adapters accept exact tabular files, Lua files or source, recursive bounded script argument maps with operation-specific reserved-key exclusions, live-bound import locations, and stable language/mode/source-control/watchdog values; derive and persist source authority, canonical I/O roots, native loader fields, import identity/mode, request order, serialization, revisions, and the one immutable Preview inside the Gateway; expose object binding only for tab import; require WwiseConsole for CLI Lua; and remove normal tabular inline_typed and Lua Composer ingress for all 12 lanes. #80 retains five-version deterministic and non-bypass coverage, proportional dual-host Wwise 2025.1 inline/Core/tab execution with an explicit non-retry CLI transport boundary, and final-candidate native-Windows Terra Fresh Agent PASS plus replay for the changed Lua seam."
+    },
+    {
+      "id": "named-authoring-ui-registration",
+      "disposition": "already_deep",
+      "owner_issue": null,
+      "operations": ["ui.captureScreen", "ui.commands.execute", "ui.commands.register", "ui.commands.unregister"],
+      "leaked_mechanics": [],
+      "audit_evidence": "The public authoring-ui-business/v1 Adapter accepts capture outcomes, exact installed command choices, bounded command descriptors, exact Program/Lua handler artifacts, and explicit registration ownership decisions; derives host/platform checks, project-scoped registration IDs, source authority, native request fields, revisions, dependency order, fresh command-inventory guards, paired unregister cleanup, and the one immutable Preview inside the Gateway; and removes normal UI inline_typed and Composer ingress for all 20 lanes. #81 retains five-version deterministic and non-bypass coverage, a matching native-Windows Wwise Authoring 2022.1 capture/execute/register/unregister PASS, candid macOS 2022.1/2025.1 readiness BLOCKED evidence with no behavior credit, and proportional Terra Fresh Agent capture/SaveProject evidence on both hosts."
+    },
+    {
+      "id": "named-dangerous-debug-controls",
+      "disposition": "already_deep",
+      "owner_issue": null,
+      "operations": ["debug.restartWaapiServers", "debug.setAsserts", "debug.setAutomationMode", "debug.testAssert", "debug.testCrash"],
+      "leaked_mechanics": [],
+      "audit_evidence": "The public debug-business/v1 Adapter accepts only stable enabled/disabled outcomes for asserts and automation mode, or a zero-value deliberate restart/assert/crash intent; derives the exact versioned URI, boolean or empty native args, fixed internal host-control marker, explicit-confirmation boundary, terminal accepted/indeterminate/failure journal, disconnect interpretation, and non-retry behavior inside the Gateway; and removes all 23 legacy Debug inline_typed lanes and acknowledgement guidance. #82 retains five-version deterministic, generic non-bypass, closed state-machine, explicit returned-failure, normalized expected-disconnect, and accepted-return coverage. Program and Non-live are the primary proportional evidence; no deliberate real crash, assert, or server restart was executed."
+    },
+    {
+      "id": "named-compound-undo",
+      "disposition": "already_deep",
+      "owner_issue": null,
+      "operations": ["waapi.undoGroup"],
+      "leaked_mechanics": [],
+      "audit_evidence": "The public compound-undo-business/v1 Adapter accepts one display name plus an ordered user-requested business sequence of closed child outcomes. Its parent-owned start_child continuation creates each child with an internal parent handoff; a checked child cannot produce an independent Preview and returns only its opaque child argument plus the next-child or parent-finish choices. The Gateway snapshots each exact checked child request and schema, rejects overlapping final outcomes, derives child bindings, revisions, the fixed native begin/child/end phase dependency order with cancel-on-failure, one aggregate business-outcome verification, and one immutable parent Preview. The generic typed children remain prohibited; public Undo child schemas, call handles, native request fragments, dependency edges, and Composer ordering grammar remain unavailable, and no shallow fallback exists."
+    }
+  ],
+  "native_lane_rules": [
+    {
+      "id": "generic-topics",
+      "disposition": "already_deep",
+      "owner_issue": null,
+      "match": {"item_types": ["topic"]},
+      "leaked_mechanics": [],
+      "audit_evidence": "The public waapi-skill.topic-business/v1 envelope covers all 154 exact five-version Topic lanes. Callers supply stable event meanings, business match values, and explicit wait or stream intent; ambiguous scalar meanings are selected only by contract-bound opaque tvc1 handles, so callers never author wire types. The Gateway derives versioned event-schema paths, native types, nested match structure, contract digest, the sole continuation, subscription ACK, projection, and cleanup. The SoundBank-generated lane additionally exposes closed object-identity, platform-name, and SoundBank-name business shortcuts; the Gateway expands them to the same typed contract and keeps the generic lossless path available. wait-topic owns finite timeout or explicitly bounded no-timeout behavior. stream-topic requires an event ceiling even with a finite duration, bounds every event and cumulative NDJSON bytes, emits ordered started/event/terminal records, and reports cancellation unsubscribe truth separately from transport cleanup. The 24-family 2022.1/2025.1 structural policy credits only fresh matching payloads from active safe publishers; prerequisite and prohibited families retain exact blockers and receive no real PASS credit."
+    },
+    {
+      "id": "generic-core-media-build",
+      "disposition": "already_deep",
+      "owner_issue": null,
+      "match": {"uris": ["ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion", "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion", "ak.wwise.core.mediaPool.get", "ak.wwise.core.soundbank.getInclusions"]},
+      "leaked_mechanics": [],
+      "audit_evidence": "The public media-build-business/v1 Adapter covers all 16 exact peak-region, trimmed-peak, Media Pool, and SoundBank inclusion lanes. Callers provide exact AudioFileSource or SoundBank identities, finite time/count values, or bounded Media Pool business meanings and filters. The Gateway owns exact native fields, live exact-case Media Pool field binding, binary peak decoding, inclusion identity enrichment, projection, sorting, result ceilings, and completeness boundaries. request-schema exposes only core-call, while typed-call, typed containers, typed Draft start/continuation, and native request fragments are blocked."
+    },
+    {
+      "id": "generic-dedicated-route-boundary",
+      "disposition": "prohibited_boundary",
+      "owner_issue": null,
+      "match": {"dedicated_operation_uri": true},
+      "leaked_mechanics": [],
+      "audit_evidence": "request-schema rejects these exact URI lanes before construction and directs callers to the Registry-selected dedicated operation, preventing a weaker generic bypass."
+    },
+    {
+      "id": "generic-fixed-query-metadata",
+      "disposition": "already_deep",
+      "owner_issue": null,
+      "match": {"routes": ["fixed_command"], "fixed_command_model_values": true},
+      "leaked_mechanics": [],
+      "audit_evidence": "The fixed query, metadata, selection, profiler, and Debug routes accept business sources, predicates, outputs, meanings, identities, capture intent, and bounded exact artifacts. The Gateway owns native paths, types, accessors, projections, metadata tokens, pipeline IDs, Debug envelopes, result bounds, and every continuation; request-schema and typed-call cannot bypass those routes."
+    },
+    {
+      "id": "generic-fixed-command-audited-deep",
+      "disposition": "already_deep",
+      "owner_issue": null,
+      "match": {"routes": ["fixed_command"], "fixed_command_model_values": false},
+      "leaked_mechanics": [],
+      "audit_evidence": "The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior."
+    },
+    {
+      "id": "generic-zero-input-audited-deep",
+      "disposition": "already_deep",
+      "owner_issue": null,
+      "match": {"construction_shapes": ["zero"]},
+      "leaked_mechanics": [],
+      "audit_evidence": "The reflected request accepts no model-authored values; the Gateway owns the complete zero-input envelope, authorization/effect policy, dispatch, result bound, and any project guard."
+    },
+    {
+      "id": "generic-soundengine-runtime",
+      "disposition": "already_deep",
+      "owner_issue": null,
+      "match": {"uri_prefixes": ["ak.soundengine."]},
+      "leaked_mechanics": [],
+      "audit_evidence": "The public soundengine-control-business/v1 Adapter covers all 26 operations and 124 supported version/API rows. Mutations accept bound Wwise object roles, opaque runtime game-object and playing handles, stable action/mode/layout names, finite business values, percentages, decibels, and bounded position or routing rows; the Gateway derives native IDs, reserved sentinels, enums, overload branches, nested arrays, channel configuration, gain conversion, lifecycle retirement, execution-time handle revalidation, exact identity drift checks, immutable Preview, and result projection. getState and getSwitch use direct bounded reads with exact group identity validation. Normal typed-call, typed container, and shallow Composer ingress is removed. Final #88 dual-host real and Fresh evidence remains a release gate rather than an interface-depth claim."
+    },
+    {
+      "id": "generic-cli-console",
+      "disposition": "already_deep",
+      "owner_issue": null,
+      "match": {"uri_prefixes": ["ak.wwise.cli.", "ak.wwise.console."]},
+      "leaked_mechanics": [],
+      "audit_evidence": "The public cli-console-business/v1 Adapter covers all 65 exact CLI and Console project/build lanes. Callers provide exact project and file artifacts plus stable platform, language, build, migration, verification, output, source-control, and verbosity intent through one closed declaration. The compact Gateway catalog owns the natural-language WwiseConsole SoundBank route and returns the exact reflected URI instead of requiring model recall. The Gateway derives every versioned native option, negative flag, platform pair layout, ordering, I/O root, transient Wine wire path, shell serialization, immutable Preview, non-retry boundary, project transition, and verifier. Normal typed-call, typed containers, prompt-level native CLI assembly, and custom-command hooks are blocked. #89 retains five-version deterministic and non-bypass coverage, dual-host Wwise 2022.1/2025.1 project/build evidence, and final Terra Fresh Agent WwiseConsole build-intent PASS plus identical verify-only on both hosts."
+    },
+    {
+      "id": "generic-host-ui-debug-waapi",
+      "disposition": "already_deep",
+      "owner_issue": null,
+      "match": {"uri_prefixes": ["ak.wwise.debug.", "ak.wwise.ui.", "ak.wwise.waapi."]},
+      "leaked_mechanics": [],
+      "audit_evidence": "The public host-ui-debug-business/v1 Adapter and bounded waapi-schema read cover all 15 exact host, Authoring project, Tone WAV, and WAAPI schema lanes. Callers provide stable waveform, duration, level, channel, project-policy, include-examples, and exact target artifact intent; the Gateway owns versioned native field names, waveform masks, marker shape, project open/create flags, host requirements, isolated I/O roots, POSIX-to-Wine path translation, immutable Preview, execute-once, project-transition settling, and verification. Normal typed-call, typed containers, raw native args/options, and shallow Draft construction are blocked. #90 retains five-version deterministic and hostile-value coverage, dual-host real schema/Tone and Authoring close/open evidence, and final Terra Fresh Agent host-plan PASS plus identical verify-only on both hosts."
+    },
+    {
+      "id": "generic-core-project-object",
+      "disposition": "already_deep",
+      "owner_issue": null,
+      "match": {"uri_prefixes": ["ak.wwise.core.audio.", "ak.wwise.core.blendContainer.", "ak.wwise.core.object.", "ak.wwise.core.project.", "ak.wwise.core.switchContainer.", "ak.wwise.core.workUnit."]},
+      "leaked_mechanics": [],
+      "audit_evidence": "The public core-business/v1 declarations cover all 55 exact Core project, object, audio, Blend, Switch, and Work Unit lanes. Bounded reads accept exact object choices plus user-facing field meaning where needed; mutations accept live-bound object and Field Handles, stable Wwise-facing values, exact I/O authority, curves, edges, platforms, and languages. The Gateway derives native GUID placement, property tokens, enum spellings, arrays, nested point and edge structures, request revisions, Preview lifecycle, result bounds, and the sole continuation; request-schema exposes no typed fields and typed-call or draft-apply cannot bypass the business route."
+    },
+    {
+      "id": "generic-core-runtime-inspection",
+      "disposition": "already_deep",
+      "owner_issue": null,
+      "match": {"uri_prefixes": ["ak.wwise.core.log.", "ak.wwise.core.profiler.", "ak.wwise.core.remote.", "ak.wwise.core.transport."]},
+      "leaked_mechanics": [],
+      "audit_evidence": "The public runtime-inspection-business/v1 direct-read contracts and runtime-control-business/v1 Draft declarations cover all 94 exact log, Profiler, Remote, and Transport lanes. Callers supply bounded capture/filter/time intent, stable control outcomes, exact target names, and opaque Gateway-issued handles. The Gateway owns native data-type and action tokens, projections, handle encoding and validation, request arrays and fragments, host requirements, dependency order, immutable Preview, authorization, verification, and the sole continuation. Direct reads expose only core-call; runtime controls expose only the closed Draft declaration path; typed-call, typed-zero-call, raw request fragments, and weaker generic bypass are blocked before dispatch."
+    },
+    {
+      "id": "generic-core-remaining",
+      "disposition": "already_deep",
+      "owner_issue": null,
+      "match": {"uri_prefixes": ["ak.wwise.core."]},
+      "leaked_mechanics": [],
+      "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. Game Parameter names use a Gateway-fixed typed-name binding and dedicated range flags. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Packaged candidate 98d9e70 passed macOS Program 4126/2 skipped; final evidence candidate a0a0178 passed native-Windows Program 4111/17 skipped and macOS Non-live 9324/111 skipped/27 deselected. The 2025.1 project-setting plus external source-control proportional real workflow passed on both hosts at 590a416, and the final packaged Skill passed Fresh Agent plus verify-only cumulatively on macOS and Windows with clean task/process teardown."
+    }
+  ],
+  "ticket_blueprints": {},
+  "completed_family_seals": {
+    "generic-core-project-object": {
+      "github_issue": 84,
+      "row_count": 55,
+      "rows_sha256": "caf467378cbabccb637cd93d18cc4e87e5356d409ce110da1f040825af4245ed"
+    },
+    "generic-core-media-build": {
+      "github_issue": 85,
+      "row_count": 16,
+      "rows_sha256": "eb0692ad57f0a504bf110f38355997bb9abca7519ed412c4ed97c223a6a0decf"
+    },
+    "generic-core-remaining": {
+      "github_issue": 86,
+      "row_count": 43,
+      "rows_sha256": "a7541ae6dad3c8c033b13089c13c1faad9a2688aee985c72e5c414fdb812fa8a"
+    },
+    "generic-core-runtime-inspection": {
+      "github_issue": 87,
+      "row_count": 94,
+      "rows_sha256": "b66b1f4d66d8d77b456b98041c7e14fa2d383e02bae02b4a17fabfb85261d593"
+    },
+    "generic-soundengine-runtime": {
+      "github_issue": 88,
+      "row_count": 124,
+      "rows_sha256": "5075fdcc32810059d6a3fee10499ff6823eea0be4c300dfb717bede6697c6ced"
+    },
+    "generic-cli-console": {
+      "github_issue": 89,
+      "row_count": 65,
+      "rows_sha256": "3f5b7464510f32b6f06dc4c6c3e0a7da700159ad07b8aff69b4b759bed41b9e1"
+    },
+    "generic-host-ui-debug-waapi": {
+      "github_issue": 90,
+      "row_count": 15,
+      "rows_sha256": "8d701d66442416c74f627e468842139fa8971b441b9b813be95cd9e7d3712ee0"
+    },
+    "generic-topics": {
+      "github_issue": 91,
+      "row_count": 154,
+      "rows_sha256": "48f62fffb957f2ed581bee75cb11ddd6624411b77fc307813d1984b5ce015982"
+    }
+  },
+  "ticket_issue_numbers": {},
+  "field_ownership_rules": {
+    "gateway_derivation_names": ["acknowledge", "transform"],
+    "fixed_gateway_derivation_names": ["advanced_return", "api", "array_handle", "choice_handle", "map_handle", "member_key", "parent_schema_token", "return", "return_field", "schema_digest", "select", "shape", "typed_advanced", "typed_append", "typed_choose", "typed_choose_dynamic", "typed_map_correct", "typed_map_put", "typed_map_remove", "typed_present", "typed_schema_digest", "typed_set", "typed_structured"],
+    "fixed_reviewed_adapter_names": ["where"],
+    "fixed_tuple_component_ownership": {"where": {"FIELD": "gateway_derivation", "OPERATOR": "gateway_derivation", "TYPE": "gateway_derivation", "VALUE": "stable_business_declaration"}},
+    "exact_artifact_names": ["audio_file", "files", "import_file", "io_root", "lua_code", "project", "script_file", "source_file", "sources", "tab_delimited_import_file", "wa_args"],
+    "filesystem_artifact_names": ["source"],
+    "exact_artifact_suffixes": ["_directory", "_file", "_path"],
+    "filesystem_path_uris": ["ak.wwise.cli.", "ak.wwise.console.", "ak.wwise.debug.generateToneWAV", "ak.wwise.ui.captureScreen", "ak.wwise.ui.project."],
+    "bounded_expression_names": ["advanced_waql", "waql"],
+    "live_bound_names": ["field", "metadata", "property", "reference"],
+    "reviewed_adapter_names": ["calls", "children", "commands", "control_input", "import_location", "inclusions", "kind", "object_path", "object_type", "objects", "plugin", "points", "type"],
+    "live_bound_description_phrases": ["mutation token", "property metadata"],
+    "reviewed_adapter_description_all": [["exact wwise", "token"]],
+    "gateway_structure_shapes": ["array", "branch", "map"]
+  }
+}

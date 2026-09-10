@@ -8,6 +8,12 @@ That Skill-local environment is reserved for the packaged Skill runtime and
 real semantic campaigns, keeping developer tooling separate from the minimal
 user-facing environment.
 
+Before direct-SSH pytest from a newly created Windows candidate worktree, read
+`tests/semantic/HARNESS_PITFALLS.md` section "A clean Windows pytest worktree
+selected the Store Python alias". Select the exact complete developer
+interpreter through `WAAPI_TEST_PYTHON`; the launcher must pass its locked
+runtime preflight before a test-context header or Wwise startup.
+
 ## Common commands
 
 - `ci/test.sh --mode program`
@@ -28,11 +34,48 @@ The program gate forces `WWISE_LIVE=0`, `WWISE_DESTRUCTIVE=0`, and `WWISE_STRICT
 
 Extra arguments after `--` may be pytest flags or filters such as `-q`, `-ra`, `--collect-only`, or `-k expression`. Additional test paths, node ids, `.py` files, and `--pyargs` are rejected so the fixed program-only collection cannot be widened accidentally.
 
-For the structured object-query lane, this gate proves the versioned
-`waapi-skill.object-query/v1` request/schema contract, deterministic Python
-compilation, exact fake dispatch, and fail-closed rejection. It does not prove
-that a newly added WAQL construct executes successfully in Wwise; record that
-only from the matching real read-only lane.
+Run formal gates directly so their process exit status remains authoritative.
+Do not pipe `ci/test.sh` or `ci/test.bat` through `tee` unless the invoking
+shell has an explicit fail-closed pipeline policy and the pytest-side status is
+checked. Without `pipefail`, a pytest failure or `KeyboardInterrupt` can be
+masked by `tee` returning zero; such a run is invalid evidence even when its
+outer command reports success.
+
+After interrupting `ci/test.sh`, prove that its exact `test_driver.py` / pytest
+process group exited before starting another gate. An outer PTY interrupt can
+end the command session while leaving that owned child group alive. Inspect
+PID, parent, process-group ID, and command line; terminate only the exact stale
+owned group. A run that overlapped a stale gate or a changing worktree is not
+evidence and must be restarted from a stable candidate.
+
+Freeze the exact Git candidate before starting a cross-host or Fresh Agent
+attempt, and keep the worktree read-only until every selected host has sealed
+its result. If HEAD or any candidate-owned file changes while a child process
+is running, freeze that root as candidate-drift evidence with no PASS credit,
+even when its raw semantic assertions passed. Start a new root only after the
+candidate is clean and stable; never combine the drifting result with the new
+candidate.
+
+Candidate Skill immutability is source immutability, not a ban on interpreter
+caches. Hash and compare the Skill tree with the same repository-declared
+runtime exclusions used to make the detached task copy (`.venv`,
+`__pycache__`, `.pytest_cache`, `.coverage`, and `.DS_Store`). Generated
+bytecode or cache files therefore cannot create a false Agent-write failure,
+while every non-excluded source or resource change still fails the gate.
+
+Do not inspect or regenerate source-derived inventories while a Program or
+Non-live pytest process is still running. Isolation tests may temporarily
+rewrite packaged Gateway or Registry files and restore them during teardown;
+an intermediate `git diff`, parser digest, continuation digest, or generated
+inventory can therefore describe only the test fixture, not the candidate.
+Wait for pytest to exit, confirm that no owned test process remains, and only
+then read the worktree or regenerate sealed artifacts.
+
+For the business object-query lane, this gate proves the versioned closed
+business declaration, deterministic Python compilation, exact fake dispatch,
+and fail-closed rejection. It does not prove that a newly added advanced WAQL
+construct executes successfully in Wwise; record that only from the matching
+real read-only lane.
 
 ## New Wwise version checklist
 
@@ -46,14 +89,17 @@ a version string:
    classifications, metadata index, and semantic/WAQL resources.
 3. Classify changed routes by host and execution lane, then update the
    capability and execution registries, adapter and request-mapping registries,
-   and native-surface policy where applicable. For structured Gateway
+   and native-surface policy where applicable. For named structured Gateway
    operations, `skills/waapi-skill/wwise_waapi/operation_registry.py` is
-   authoritative; a builder implementation by itself is not a public operation
-   contract.
-4. Review the default structured `query-schema` and the separately disclosed
-   `query-schema --advanced` contract against the new reflection. Extend
-   five-version Builder compiler goldens, advanced fixed-URI/final-cap tests,
-   schema parity, UTF-8 byte/framing disclosure, request ceilings, and
+   authoritative. Reviewed exact reflected-URI business lanes instead use their
+   version-aware business contract registry and Gateway `request-schema`.
+   A builder or dispatcher implementation by itself is never a public operation
+   contract, and neither public lane permits caller-authored native `args` or
+   `options`.
+4. Review the default business-declaration `query-schema` and the separately
+   disclosed `query-schema --advanced` contract against the new reflection.
+   Extend five-version business compiler goldens, advanced fixed-URI/final-cap
+   tests, schema parity, UTF-8 byte/framing disclosure, request ceilings, and
    mutation-isolation negatives whenever either query layer changes. Native
    advanced syntax is accepted or rejected
    by the matching live Wwise version; program tests must not claim otherwise.
@@ -92,6 +138,12 @@ unknown string by replacing slashes:
   `tests/semantic/support/codex_archive_paths.py`; persist only its canonical
   POSIX spelling. Do not use host `Path` semantics or `replace("\\", "/")` to
   derive an archive identity.
+- Archived business-Draft replay preserves the public abstraction boundary.
+  Only an Adapter that owns cleaned-file evidence may materialize its Preview
+  from a sealed pre-cleanup witness. A request whose identities were bound from
+  live project state must replay the sealed Draft state through the existing
+  state directory. Never add raw GUIDs, Wwise paths, or native request fields to
+  a public receipt merely to make offline replay easier.
 - Wwise object hierarchy paths, JSON Pointers, WAQL expressions, URI strings,
   and similar domain values are not filesystem paths. Preserve their domain
   separators and validate them with the owning parser instead of `pathlib`.
@@ -135,6 +187,97 @@ Audit rows include the pid, port, command, sandbox project, `getInfo` version pr
 
 During WwiseConsole startup, repeated `ConnectionRefusedError` lines from WAAPI probes can be normal while Wwise loads the project, missing-plugin warnings, or WAAPI server listeners. Do not treat those probe errors as failure by themselves; judge the run by the final `smoke ok`/`getInfo` proof, `ReadinessTimeout`, or `EarlyProcessExit` diagnostics. For slow 2021.1 launches, `WWISE_READINESS_TIMEOUT=180` and optional `WWISE_WAAPI_PORT=<port>` are valid debugging overrides.
 
+On macOS, do not overlap a Fresh Agent campaign with any smoke, live, or
+destructive pytest process, even when their campaign roots, sandboxes, ports,
+or Wwise versions differ. Audiokinetic's wrappers share the
+`Wwise2019x64` CrossOver bottle: one lane can switch or hold that bottle while
+the other is starting, causing Broker prefix loss, a direct client that cannot
+close, or a long `ConnectionRefusedError` readiness timeout. Before launching
+the one-shot Fresh LaunchAgent, prove that no real-test driver, matching pytest,
+WwiseConsole wrapper, or campaign process is active. If overlap is discovered,
+freeze the affected roots without replay, let the already-running owner finish,
+then clean only proved-idle bottle helpers before starting a new root.
+
+WwiseConsole stdout/stderr is drained as UTF-8 with replacement for malformed
+bytes. Keep that explicit decoder on Windows; the locale default can be GBK
+and can terminate the drain thread on platform labels such as `Windows®`.
+
+`ak.wwise.cli.executeLuaScript` can end the macOS WwiseConsole WAAPI transport
+after one non-retry indeterminate result. Record that operation as a host
+boundary and never retry it. A module-scoped destructive fixture may then shut
+down the lost lifecycle and relaunch the same sandbox on the same sealed port
+solely to restore infrastructure for later, different tests. Teardown must own
+the replacement lifecycle; otherwise later cases inherit a dead endpoint or
+the replacement process escapes cleanup. A later PASS is evidence only for its
+own operation, never retroactive credit for the blocked CLI Lua call.
+Before that replacement launch, seal the stopped lifecycle's audit and call the
+shared bounded `wait_for_port_release` guard for the exact host/port. On macOS,
+the Console process can be gone while the CrossOver socket remains temporarily
+unavailable; relaunching immediately can raise `PortUnavailable` and overwrite
+the valid first-launch metadata with an unstarted replacement. Never add an
+unbounded sleep or select a new port to hide this state: the original port must
+become bindable inside the fixed release window or the fixture fails closed.
+
+CLI/Console operations that verify, open, or otherwise own a project can also
+end or invalidate the active module host even when their one-shot result is a
+truthful non-retry boundary. Run each such real node in its own pytest process
+and Wwise lifecycle. Do not use one full-module destructive invocation as a
+category campaign: after the first terminal CLI boundary, later failures are
+only dead-host contamination and must not be interpreted as independent API
+failures or retried inside that root.
+
+Real fixtures must follow the current closed query interface too. Exact GUID
+readback uses `query-object --exact-id`; exact hierarchy lookup repeats one
+`--path-segment` per already-closed business name. Identity fields are returned
+by default, while optional values use business `--include` names such as
+`notes` or `volume-db`. Never restore the retired `--object-id`, raw `--path`,
+or `--return-field` flags, and never split a Wwise path string locally to
+reconstruct the segment list.
+
+Real category evidence uses the shared two-phase v3 finalizer. Pytest's exact
+setup/call reports determine each selected node's PASS, FAIL, SKIP, or BLOCKED
+state; a session failure counter is not an outcome oracle. The finalizer first
+moves the sandbox into the evidence quarantine and writes a `prepared` /
+`PENDING` row. Only after transaction materialization, host shutdown, lock
+release, source-integrity checks, and quarantine cleanup all succeed may it
+append a `final` / `PASS` row. A prepared row grants no credit. Any earlier
+failure writes a final non-PASS row and derives `quarantined`, `retained`, or
+`quarantine_failed` from the observed filesystem state; it must never claim a
+quarantine without its exact path. A late evidence or cleanup failure must
+never leave a final PASS.
+
+### SoundBank file-operation fixtures
+
+Keep the file-authority sequence explicit in real SoundBank workflows. The
+operation I/O root must own both the active sandbox project and every exact
+input/output artifact, and the sandbox project must be saved and non-dirty
+before each file-processing Preview. Copy the `project.save` continuation
+returned by `request-schema`: 2022.1 returns a complete zero-input
+`gateway_argv`; 2025.1 returns a `business_declaration`, so follow its
+Gateway-owned `draft-start` continuation and explicitly declare the closed
+`auto_check_out` business choice before check, Preview, confirmation, and
+execute. Do not reconstruct the retired inline `gateway_argv_prefix` shape.
+
+Wwise 2022.1 has a real silent-effect boundary for SoundBank Definition rows:
+an ordinary Event row using the official quoted-name form can return success
+while leaving `getInclusions` empty on both macOS and native Windows. Use a
+canonical GUID or supported uint32 Short ID in 2022.1 fixtures and require the
+public route to reject name identities before dispatch. The same quoted-name
+workflow has macOS real passing evidence on 2023.1, 2024.1, and 2025.1;
+preserve this as a versioned contract rather than globally removing name
+support.
+
+The committed 2025.1 SampleProject contains a hash-pinned optional Auro
+Headphone reference that makes otherwise valid SoundBank generation report a
+`MissingPlugin` error. For a generate workflow, normalize only the private
+sandbox copy before Wwise starts with
+`WWISE_2025_SOUNDBANK_AURO_PROFILE` from
+`tests/semantic/support/codex_project_prelaunch_v3.py`. Keep its project and
+output roots under one case-owned parent, preserve the normalizer's hash
+attestations, and clean that complete parent after the attempt. A hand-edited
+source project or a verifier that ignores the generation error is invalid
+evidence.
+
 ## Extra pytest args passthrough
 
 Append pytest args after `--`:
@@ -147,6 +290,11 @@ Append pytest args after `--`:
 `--mode all` runs the non-live suite first, then `--mode matrix` with `--version all`. `--mode matrix` still runs supported versions sequentially. Do not run all versions in parallel.
 
 ## Fresh-Codex semantic suites and the 40 / 98 / 168 numbers
+
+Before preparing a new formal Fresh root or diagnosing a repeated Broker,
+launcher, interpreter, or evidence-classification failure, read
+`tests/semantic/HARNESS_PITFALLS.md`. It is the incident ledger and preflight
+checklist; this file remains the authoritative rule set.
 
 `skills/waapi-skill/evals/evals-v2.json` is the frozen historical semantic
 suite. Its three profile names are also their exact fresh-Codex session totals:
@@ -162,6 +310,224 @@ campaign completed, and they must not be reused as coverage totals for a newer
 suite. A partial, quota-blocked, prerequisite-blocked, or interrupted campaign
 is incomplete even if its selected profile is named `formal_98` or
 `full_cross_version_168`.
+
+The frozen v2 prompts and historical digests do not guarantee that their shared
+fixture bootstrap still matches the current public Gateway vocabulary. If a
+selected v2 root is blocked before Codex starts because runner-owned setup calls
+a retired Gateway command, freeze that root as zero semantic PASS and preserve
+its lifecycle evidence. Do not retry the root, edit `evals-v2.json`, or count
+the runner failure as an Agent result. Use a current executable profile when
+one owns the changed routing, or satisfy an issue's explicit `real or Agent`
+evidence boundary with the proportional real-host lane.
+
+### Native-Windows Fresh Agent isolation
+
+Native Codex resolves the current user's `%USERPROFILE%\.agents\skills` through
+the Windows user profile Known Folder. Disposable `HOME`, `USERPROFILE`, and
+`CODEX_HOME` values do not by themselves hide that tree. Before each formal
+Windows campaign, enumerate its direct regular `SKILL.md` files and seal exact
+path-based `skills.config=[{path=...,enabled=false}]` session overrides into
+both `codex debug prompt-input` and every `codex exec`/resume argv. The
+task-local `.agents\skills\waapi-skill\SKILL.md` remains enabled and the prompt
+audit must still prove that it is the only non-system Skill visible. Recompute
+the sealed list for a new campaign root so a newly installed user Skill cannot
+appear silently; never rename, delete, or modify the user's Skill tree.
+
+Pass these TOML overrides as an argv list through the attested PowerShell Core
+host with native argument mode `Standard` or `Windows`. Windows PowerShell 5
+legacy native argument passing strips the embedded TOML quotes and is not a
+valid isolation probe. Formal Fresh Agent work runs from the active desktop
+user's Scheduled Task with `InteractiveToken` and `Limited`; SSH only creates,
+starts, waits for, reads, and removes that task. Ordinary `ci\test.bat` and
+pytest runs continue directly over SSH.
+
+With PowerShell's ScheduledTasks cmdlets, pass `-LogonType Interactive` and
+`-RunLevel Limited`; the registered task must then report `InteractiveToken`
+in its exported XML and `Limited` in its Principal. Stop before launch if
+either attestation differs.
+
+Matching Authoring-UI tests require more than a listening WAAPI port. Create the
+disposable SampleProject through the existing optional-plugin isolation
+prelaunch, start Wwise Authoring in an `InteractiveToken` / `Limited` desktop
+task, and require `getProjectInfo` to report the exact sandbox project before
+dispatch. A first load may pause with `ak.wwise.locked` while the message box
+states that the project cache was generated by an older Wwise version; inspect
+the interactive desktop and click only that exact `OK` prompt, then repeat the
+normal readiness checks. A listener, task state, or `getInfo` alone is not
+project readiness. If there is no active desktop session, the exact modal
+cannot be identified, or the exact sandbox path never becomes ready, stop as
+BLOCKED and preserve the evidence rather than guessing or retrying a failed
+root.
+
+Treat Task Scheduler `Ready` as the action-shell state, not campaign
+completion. A formal campaign can leave token-owned Python/Codex/Wwise
+descendants running after the PowerShell action returns. After `Ready`, wait
+for the exact campaign-root token to disappear from a fresh process query,
+then require the sealed consolidated summary and attempt manifest. Run that
+query from a generic profile-free `.ps1` whose own path omits the root token;
+otherwise the checker can count itself. Only then unregister the task and
+classify the root.
+
+The unelevated Codex runner may transiently report
+`CreateProcessAsUserW failed: 267` for an invalid working directory before
+PowerShell starts, even after earlier commands in the same task succeeded. The
+formal semantic bootstrap requires every model shell call to omit an explicit
+`workdir`/`cwd` and inherit the exact task workspace; a model-reconstructed
+Windows campaign path can be drive-qualified yet still duplicate an older
+campaign root before process creation. The
+Skill permits exactly one identical replay of that complete shell command, and
+the harness credits it only through `recoverable_preprocess_attempt_indexes`;
+this is process-launch recovery inside one task, not a Gateway or campaign-root
+retry. A second 267, a changed command, or an Agent that stops instead freezes
+the root as infrastructure-blocked. Preserve the failed command index and exact
+reported `cwd` in evidence; do not repair, resume, or rerun that failed root.
+If the Agent itself repeats the command, retain both attempts: the later command
+may reach the Broker successfully while the unit still fails its sealed command
+count or copy-integrity contract. Record that as a semantic FAIL with a
+pre-Broker infrastructure precursor, not as successful recovery and not as a
+reason to retry the same root.
+
+Do not match the literal English `Active` in `quser`: its state column is
+localized. On `fusion-win11`, prove the desktop from a user-owned `console`
+row plus an `explorer.exe` in that same numeric session, or use a locale-neutral
+WTS connect-state check; otherwise stop as blocked. `Get-ScheduledTask` must
+report Principal `RunLevel=Limited`, while exported XML must report
+`LogonType=InteractiveToken`. Task Scheduler may omit the default
+`<RunLevel>LeastPrivilege</RunLevel>` element, so absence of that optional XML
+tag is not a failed Limited attestation.
+
+On native Windows, a Gateway-owned v2 `model_command` must use the fixed
+backslash task-local runner spelling. Do not emit the POSIX spelling and rely on
+Broker path normalization: Fresh Agents otherwise reconstruct the familiar
+Windows spelling instead of copying the continuation verbatim, and exact
+continuation provenance is lost even when the resulting argv is equivalent.
+Continuation grading must unwrap the attested host frame through the shared
+command-record helper; never assume every recorded command is a three-token
+POSIX `shell -lc <script>` wrapper when grading native Windows evidence.
+
+Run the final scoped-process check from a separate SSH invocation after the
+Scheduled Task reports `Ready`. A cleanup script whose own path contains the
+campaign-root token also places that token in its parent `bash.exe` command
+line; filtering only the current PowerShell PID therefore creates a false
+residual-process match. Either exclude the complete checker ancestor chain or,
+preferably, finish the checker and use a fresh read-only SSH process query.
+Never kill a matching process until its exact PID, ancestry, and command line
+prove that it belongs to the completed campaign rather than to the check itself.
+Put a Windows process query that uses PowerShell `$variables` in a temporary
+profile-free `.ps1`, copy and run it through SSH, then remove it. An inline
+`-Command` can lose those variables across the SSH and shell layers. Filter by
+the exact campaign-root token; existing Codex app-server or proxy processes
+without that token are unrelated and remain untouched.
+
+An ended Windows desktop-development task can leave hundreds of long-lived
+`node_repl.exe` children plus old session-0 Codex app-server/proxy trees. They
+may coincide with standalone Fresh runs whose exact profile-free Skill read has
+`started` events but no `completed` event. This observation is a cleanup signal,
+not proof that every such process caused the failure. Never terminate these
+trees merely because a Fresh root blocked. First freeze that root, obtain the
+user's confirmation that the owning task has ended, enumerate PID ancestry and
+command lines, and preserve `explorer.exe`, the desktop Codex/ChatGPT parent,
+Wwise, and any unowned worker. Only then may the confirmed ended-task
+session-0 app-server/proxy tree and its `node_repl`/code-mode descendants be
+removed. Prove zero selected residue, re-attest the active desktop, and use a
+new campaign root; cleanup never makes the blocked root retryable.
+
+### macOS Fresh Agent launch ownership
+
+A formal macOS campaign may outlive the Codex app's unified command session.
+Do not use a long-lived unified command or `nohup`: the former may deliver
+`SIGTERM`, while the latter can leave the child matrix running after the
+top-level campaign process has disappeared, so the attempt never seals. A
+matrix summary is not campaign evidence until the top-level attempt manifest
+and digest exist.
+
+Launch long macOS campaigns as a one-shot user LaunchAgent. Its temporary
+plist must use the exact Skill-local Python campaign argv, the clean candidate
+worktree as `WorkingDirectory`, `RunAtLoad=true`, and `KeepAlive=false`.
+Put the Skill-local Python executable and complete campaign argv directly in
+`ProgramArguments`; do not route the job through a temporary shell script under
+`Documents`. A background `/bin/bash` can be denied that script by macOS TCC
+before the campaign creates a root, even when the interactive Codex process can
+read the same repository.
+Validate the plist, bootstrap it in `gui/$(id -u)`, and require exactly one run
+and exit code zero. Do not use `launchctl submit`: its generated job can relaunch
+the same immutable root after a successful run. After completion, require the
+sealed attempt manifest and digest, the expected consolidated result, and zero
+scoped Codex/Wwise/campaign processes; then boot out the job and remove its
+temporary plist. Freeze any interrupted or unsealed root without resume or
+verify-only replay.
+
+When macOS TCC denies a background process access to a candidate below
+`Documents`, make a clean detached clone at a no-space path outside that
+protected tree and prove its exact commit before launch. Prepare both runtime
+layers there: `setup_environment.py` provides the packaged Skill/campaign
+interpreter, while Poetry provides the repository smoke/readiness probes. Run
+the matching real smoke lane from that exact clone before spending a Fresh
+Agent attempt. If the selected fixture legitimately needs longer than the
+default 60-second WAAPI readiness window, pass an explicit finite
+`--wwise-readiness-timeout` on the campaign command (for example, `180`); the
+campaign seals and forwards that value. Do not rely on an ambient environment
+override or treat an unrecorded timeout increase as equivalent evidence.
+
+On native Windows, a large project can spend several minutes enumerating
+missing plug-ins before the WAAPI server becomes reachable. A launch may print
+`Wwise Authoring API server started` only while the timed-out helper is already
+collecting diagnostics; that late log line does not turn the frozen root into a
+PASS. Preserve the BLOCKED root, confirm that its source hash and mtime are
+unchanged and its scoped descendants are gone, then use a new root with a
+larger explicit finite `--wwise-readiness-timeout` when the diagnostics prove
+that project loading merely exceeded the sealed limit. Never resume or replay
+the timed-out root, and never change the Skill, fixture, PATH, sandbox, or
+failed unit to hide this infrastructure boundary.
+
+The scoped residual-process check does not cover CrossOver bottle services
+that reparent to PID 1. If macOS Wwise stays running but readiness times out
+and its output stops at the bottle link or project-loading banner, first prove
+that no WwiseConsole or Authoring project process is active, then count the
+Audiokinetic `Wwise2019x64` Wine helpers (`wineserver`, `services.exe`,
+`winedevice.exe`, `rpcss.exe`, and related bottle services). A large
+cross-campaign residue is an infrastructure fault even when every campaign
+root reports zero scoped processes. Terminate only that proved-idle
+Audiokinetic bottle set, prove its helper count reaches zero, and require the
+matching version's real smoke lane to pass before opening another Fresh root.
+Never kill bottle helpers while a Wwise project process is active, and never
+credit the cleanup or smoke as semantic PASS.
+
+### Failure-first campaign scheduling
+
+After a frozen full-profile root exposes ordinary semantic failures, repair the
+shared deterministic causes before spending more Fresh Agent tokens. First run
+tight non-live regressions for every prior failure family. A later formal root
+may schedule those previously failing units first only when the selected full
+profile, candidate, immutable options, and evidence root remain unchanged and
+each selected unit still runs at most once. If the priority units pass, continue
+the remaining units in that same root; do not rerun the priority units.
+
+Classify failures before scheduling another broad root. A repeatable product,
+suite, or oracle defect requires a repair and proportional regression. A
+one-off Agent deviation on an unchanged exact candidate instead enters a
+failure queue: let the current full root finish, then run only the queued units
+in fresh targeted roots and replay each passing root with identical
+`--resume --verify-only`. Combine those roots only as explicitly labelled
+same-candidate cumulative evidence; never call them a single-root PASS. Run a
+new full root only after the candidate, suite, harness, immutable options, or an
+explicit single-root acceptance criterion makes the earlier completed units
+insufficient. A failed root always stays frozen without verify-only replay.
+
+### Multi-Draft Broker flow identity
+
+Compound business protocols may keep one parent Draft alive while several child
+Drafts are started, revised, checked, and then consumed. The semantic Broker
+must resolve every revision binding, response projection, read-only
+classification, and Preview replay through the command's exact owning
+`draft-start` and `draft_id`. Never infer ownership from the most recently
+started or most recently updated Draft. Same-Draft dependency-ready reordering
+may use the latest prior receipt with that exact `draft_id`; a receipt from any
+other Draft must remain invisible to the flow and cannot satisfy a stale
+revision. Focused Broker regressions must cover an interleaved parent plus at
+least two children, a wrong child/parent identity, a stale revision, and the
+existing single-Draft reordering path before a new compound Fresh campaign is
+opened.
 
 The focused `modification_policy_9` campaign is separate from those historical
 v2 totals. Its sealed
@@ -253,6 +619,44 @@ passed 462 / skipped 6 POSIX-only cases. Commit
 `030231b41e623e72f72de785d6bcbc3780d7eb37`
 changes only domain/planning docs, one unit test, and the program manifest, so
 it does not replace the frozen Skill, suite, runner, or semantic harness.
+
+Pre-review public `integration` candidate
+`ebcfde245bcbcacd2b8842e5ec205e7111b86743` passed all 12 units in one fresh
+root on each host: macOS `imac-int-ebcfde2-r67-full12` and native Windows
+`iwin-int-ebcfde2-r56-full12`. Both roots then passed identical
+`--resume --verify-only`. Across the 24 PASS lifecycle records, source-project
+full hashes and mtimes remained unchanged, passing sandboxes were removed, and
+final scoped-process checks were empty. The macOS LaunchAgent and Windows
+`InteractiveToken` / `Limited` Scheduled Tasks were deleted. This is
+independent single-root 12/12 evidence on both hosts, not cumulative repair-root
+credit. Review-repair code candidate
+`170e8e8f01cd5e931933c6fe76baff47d0683f57` later hardened playing and
+transport capability stores against Windows reparse points and resolved
+non-stable object-set batch `--field` names through live metadata, so the
+earlier root remains truthful evidence but is not final-candidate acceptance
+for that successor. That successor passed macOS Program 4737 / 2 skipped,
+native Windows Program 4714 / 25 skipped, and macOS Non-live 10322 / 113
+skipped / 27 deselected. Batch-order repair candidate
+`fd2f9ed2c9fd2336e76545b1aef6f0ce4e99acfe` then passed macOS Program 4738 /
+2 skipped, native Windows Program 4715 / 25 skipped, and macOS Non-live 10325 /
+113 skipped / 27 deselected before its targeted Weapons reruns.
+
+Final semantic-harness candidate
+`0682c1a979f7ce5bfb648914914b7393148a6495` keeps the packaged Skill tree
+byte-identical to `0edaf1a` and accepts permutations of independent existing-
+object edit rows while still rejecting missing, extra, duplicate, or changed
+objects, fields, handles, and values. Native-Windows root
+`iwin-int-0682c1a-r63-full12` passed the public `integration` profile 12/12 in
+one root plus identical verify-only. MacOS root
+`imac-int-0682c1a-r73-full12` passed 11/12; only INT22 Rifle stopped before
+Preview after the Agent incorrectly called an explicit
+`complete=true, truncated=false` response truncated. Fresh queued root
+`imac-int-0682c1a-r74-int22-rifle` then passed that sole unit plus identical
+verify-only without any code, suite, harness, or option change. MacOS therefore
+has same-candidate cumulative 12/12 evidence, not a single-root 12/12 claim.
+Every source hash and project mtime remained unchanged, passing sandboxes were
+removed, the failed sandbox stayed sealed, and all temporary LaunchAgents,
+Scheduled Tasks, and Wwise processes were cleared.
 
 Composer migration evidence is focused Adapter evidence, not public
 `integration` acceptance. For `object.set`, candidate
@@ -391,13 +795,13 @@ adapters and sealed real-Wwise evidence for 70 cases on 2022.1, five on 2024.1,
 and five on 2025.1. Do not extrapolate those 80 results to the remaining V3
 catalog or to every version/API row.
 
-The current 2022.1 v3 selection is 326 scenarios for 142 APIs: 116 single-turn
-scenarios and 210 cases using the preview/confirm protocol. Seventeen cases
-require more than one separately previewed call, for 230 confirmation turns in
+The current 2022.1 v3 selection is 326 scenarios for 142 APIs: 120 single-turn
+scenarios and 206 cases using the preview/confirm protocol. Fifteen cases
+require more than one separately previewed call, for 224 confirmation turns in
 total. With one fresh memory-isolated Codex task per scenario, that means 326
-fresh tasks and 556 user turns. The representative later-version increments add
+fresh tasks and 550 user turns. The representative later-version increments add
 74 / 27 / 17 tasks for 2023.1 / 2024.1 / 2025.1, so the complete reviewed
-selection is 444 fresh tasks and 792 user turns. Every confirmation binds only
+selection is 444 fresh tasks and 783 user turns. Every confirmation binds only
 the currently visible immutable preview. Do not describe this as a
 dozens-of-conversations run or silently combine APIs to reduce the total;
 changing that cost model requires reviewed composite cases with their own

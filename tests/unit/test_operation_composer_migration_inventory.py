@@ -5,8 +5,10 @@ import hashlib
 from pathlib import Path
 
 from wwise_waapi.operation_registry import (
+    BUSINESS_DECLARATION_INPUT_MODE,
     COMPOSER_INPUT_MODE,
-    LEGACY_JSON_INPUT_MODE,
+    INLINE_TYPED_INPUT_MODE,
+    INTERNAL_CANONICAL_INPUT_MODE,
     OPERATION_SPECS,
     operation_input_mode,
 )
@@ -27,7 +29,7 @@ def _assignments(inventory: dict[str, object]) -> dict[str, tuple[str, str]]:
     result: dict[str, tuple[str, str]] = {}
     for disposition, collection in (
         ("migration_wave", inventory["waves"]),
-        ("exception_candidate", inventory["exceptions"]),
+        ("internal_representation", inventory["internal_representations"]),
         ("non_model_facing_exclusion", inventory["exclusions"]),
     ):
         for group in collection:
@@ -55,7 +57,60 @@ def test_inventory_exactly_covers_every_registry_operation_and_version_lane() ->
     lane_rows = []
     for name, spec in OPERATION_SPECS.items():
         modes = {operation_input_mode(name, version) for version in spec.supported_versions}
-        expected_mode = COMPOSER_INPUT_MODE if assignments[name][1] == "wave-00-complete" else LEGACY_JSON_INPUT_MODE
+        expected_mode = INTERNAL_CANONICAL_INPUT_MODE
+        if name in {
+            "audio.import",
+            "audio.importTabDelimited",
+            "waapi.undoGroup",
+            "debug.restartWaapiServers",
+            "debug.setAsserts",
+            "debug.setAutomationMode",
+            "debug.testAssert",
+            "debug.testCrash",
+            "lua.executeCliFile",
+            "lua.executeCoreFile",
+            "lua.executeCoreInline",
+            "object.copy",
+            "object.delete",
+            "object.move",
+            "object.setName",
+            "object.setNotes",
+            "object.setLinked",
+            "object.setProperty",
+            "object.setReference",
+            "object.create",
+            "object.createPlugin",
+            "object.set",
+            "object.setRTPC",
+            "soundbank.convertExternalSources",
+            "soundbank.generate",
+            "soundbank.processDefinitionFiles",
+            "soundbank.setInclusions",
+            "switchContainer.addAssignment",
+            "switchContainer.removeAssignment",
+            "ui.captureScreen",
+            "ui.commands.execute",
+            "ui.commands.register",
+            "ui.commands.unregister",
+        }:
+            expected_mode = BUSINESS_DECLARATION_INPUT_MODE
+        elif (
+            assignments[name][1]
+            in {"wave-00-complete", "wave-02-object-graph"}
+            or name == "object.create"
+            or assignments[name][1] == "wave-05-file-lua"
+            and name.startswith("lua.")
+        ):
+            expected_mode = COMPOSER_INPUT_MODE
+        elif assignments[name][1] in {
+            "wave-01-single-object-edits",
+            "wave-02-object-lifecycle",
+            "wave-03-switch-assignments",
+            "wave-04-soundbank-and-files",
+            "wave-05-authoring-ui",
+            "wave-05-file-lua",
+        }:
+            expected_mode = INLINE_TYPED_INPUT_MODE
         assert modes == {expected_mode}
         for version in spec.supported_versions:
             lane_rows.append(
@@ -77,7 +132,11 @@ def test_inventory_exactly_covers_every_registry_operation_and_version_lane() ->
     ).encode("utf-8")
     assert hashlib.sha256(encoded).hexdigest() == inventory["scope"]["lane_inventory_sha256"]
     assert sum(row["input_mode"] == COMPOSER_INPUT_MODE for row in lane_rows) == inventory["scope"]["composer_version_lanes"]
-    assert sum(row["input_mode"] == LEGACY_JSON_INPUT_MODE for row in lane_rows) == inventory["scope"]["legacy_json_version_lanes"]
+    assert sum(
+        row["input_mode"] == BUSINESS_DECLARATION_INPUT_MODE for row in lane_rows
+    ) == inventory["scope"]["business_declaration_version_lanes"]
+    assert sum(row["input_mode"] == INLINE_TYPED_INPUT_MODE for row in lane_rows) == inventory["scope"]["inline_typed_version_lanes"]
+    assert sum(row["input_mode"] == INTERNAL_CANONICAL_INPUT_MODE for row in lane_rows) == inventory["scope"]["internal_canonical_version_lanes"]
 
 
 def test_every_assignment_has_reason_or_complete_wave_evidence() -> None:
@@ -88,11 +147,12 @@ def test_every_assignment_has_reason_or_complete_wave_evidence() -> None:
         assert wave["reuse"]
         assert wave["isolation_regressions"]
         assert wave["minimum_real_evidence"]
-    for group in (*inventory["exceptions"], *inventory["exclusions"]):
+    for group in (*inventory["internal_representations"], *inventory["exclusions"]):
         assert group["operations"]
         assert group["reason"]
-    for operation in inventory["exclusions"][0]["operations"]:
-        assert OPERATION_SPECS[operation].implemented is False
+    for group in inventory["exclusions"]:
+        for operation in group["operations"]:
+            assert OPERATION_SPECS[operation].implemented is False
 
 
 def test_human_inventory_names_every_exact_operation_once() -> None:
@@ -106,6 +166,32 @@ def test_human_inventory_names_every_exact_operation_once() -> None:
     assert set(rows) == set(OPERATION_SPECS)
 
 
+def test_human_inventory_does_not_label_business_cutovers_as_inline_typed() -> None:
+    rows = {
+        line.split("|", 3)[1].strip().strip("`"): line.split("|", 4)[3].strip()
+        for line in INVENTORY_DOC_PATH.read_text(encoding="utf-8").splitlines()
+        if line.startswith("| `")
+    }
+
+    for operation in (
+        "object.copy",
+        "object.delete",
+        "object.move",
+        "object.setName",
+        "object.setNotes",
+        "debug.restartWaapiServers",
+        "debug.setAsserts",
+        "debug.setAutomationMode",
+        "debug.testAssert",
+        "debug.testCrash",
+        "soundbank.convertExternalSources",
+        "soundbank.generate",
+        "soundbank.processDefinitionFiles",
+        "soundbank.setInclusions",
+    ):
+        assert rows[operation] == "Business declaration"
+
+
 def test_inventory_preserves_single_normal_input_and_exact_name_isolation() -> None:
     inventory = _inventory()
     assignments = _assignments(inventory)
@@ -117,25 +203,24 @@ def test_inventory_preserves_single_normal_input_and_exact_name_isolation() -> N
         for name in ("object.set", "object.setRTPC", "object.createPlugin")
     } == {"ak.wwise.core.object.set"}
     scope = inventory["scope"]
-    assert "never chooses" in scope["normal_input_rule"]
+    assert "one typed normal input mode" in scope["normal_input_rule"]
     assert "exact operation name" in scope["native_uri_rule"]
 
 
-def test_legacy_exit_is_a_later_evidence_decision_not_deletion_authority() -> None:
+def test_cutover_gates_record_the_final_single_typed_decision() -> None:
     inventory = _inventory()
-    gates = {gate["id"]: gate["requirement"] for gate in inventory["legacy_exit_gates"]}
+    gates = {gate["id"]: gate["requirement"] for gate in inventory["cutover_gates"]}
     assert set(gates) == {
         "all-lanes-decided",
         "normal-surface-single-entry",
         "consumer-inventory",
         "archive-and-replay",
         "cross-platform-release-evidence",
-        "explicit-removal-decision",
+        "single-typed-input-decision",
     }
-    assert "retain or remove" in gates["explicit-removal-decision"]
-    assert "neither authorizes removal" in gates["explicit-removal-decision"]
+    assert "ADR 0002 authorizes" in gates["single-typed-input-decision"]
     assert "macOS and native Windows" in gates["cross-platform-release-evidence"]
     assert "cumulative or failed roots" in gates["cross-platform-release-evidence"]
     second_round = inventory["second_round_ticketing"]
     assert len(second_round["required_ticket_slices"]) == 5
-    assert "Legacy removal depends" in second_round["dependency_rule"]
+    assert "Cutover depends" in second_round["dependency_rule"]

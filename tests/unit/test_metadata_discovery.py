@@ -21,6 +21,8 @@ from wwise_waapi.metadata_discovery import (  # pyright: ignore[reportMissingImp
     METADATA_DISCOVERY_CONTRACT,
     MetadataDiscoveryError,
     discover_metadata,
+    metadata_candidate_limit_contract,
+    metadata_candidate_limit_for_query_count,
 )
 
 
@@ -63,6 +65,21 @@ class MetadataReader:
         if uri == GET_PROPERTY_INFO_URI:
             return dict(self.info[str(args["property"])])
         raise AssertionError(f"unapproved metadata URI: {uri}")
+
+
+def test_metadata_candidate_limit_has_one_production_authority() -> None:
+    assert metadata_candidate_limit_contract() == {
+        "1..2": 8,
+        "3..4": 3,
+        "5..8": 2,
+    }
+    assert [
+        metadata_candidate_limit_for_query_count(count)
+        for count in range(1, 9)
+    ] == [8, 8, 3, 3, 2, 2, 2, 2]
+    for invalid in (True, 0, 9):
+        with pytest.raises(ValueError, match="integer from 1 through 8"):
+            metadata_candidate_limit_for_query_count(invalid)
 
 
 def _property_info(
@@ -138,7 +155,9 @@ def test_object_type_discovery_resolves_live_name_and_returns_compact_candidates
         "default",
         "display",
         "restriction",
+        "typed_value_type",
     }
+    assert looping["metadata"]["typed_value_type"] == "boolean"
     detailed = discovery.as_dict(detail=True)
     assert detailed["contract"] == "waapi-skill.metadata-discovery/v1"
     assert "result_detail" not in detailed
@@ -151,6 +170,7 @@ def test_object_type_discovery_resolves_live_name_and_returns_compact_candidates
         "candidate_count",
         "query_results",
         "candidates",
+        "mutation_authoring_policy",
         "dependency_candidates",
         "dependency_closure_complete",
         "unresolved_dependencies",
@@ -402,11 +422,58 @@ def test_same_object_dependency_closure_is_live_bounded_and_cycle_safe() -> None
             "required_values": [True],
         }
     ]
+    assert override["matched_queries"] == ["OutputBus"]
     assert {
         call[1]["property"]
         for call in reader.calls
         if call[0] == GET_PROPERTY_INFO_URI
     } == {"EnableRouting", "OutputBus", "OverrideOutput"}
+
+
+def test_dependency_candidate_preserves_overlap_with_an_explicit_enable_query() -> None:
+    reader = MetadataReader(
+        names=["MaxSoundPerInstance", "UseMaxSoundPerInstance"],
+        info={
+            "MaxSoundPerInstance": _property_info(
+                "MaxSoundPerInstance",
+                property_type="int16",
+                display_name="Maximum playback instances",
+                dependencies=[_self_dependency("UseMaxSoundPerInstance")],
+            ),
+            "UseMaxSoundPerInstance": _property_info(
+                "UseMaxSoundPerInstance",
+                display_name="Limit Sound Instances",
+            ),
+        },
+    )
+
+    result = discover_metadata(
+        read_call=reader,
+        object_type="Sound",
+        queries=["maximum playback instances enabled"],
+        limit=1,
+    ).as_dict()
+
+    assert [row["name"] for row in result["candidates"]] == [
+        "MaxSoundPerInstance"
+    ]
+    assert result["dependency_candidates"] == [
+        {
+            "name": "UseMaxSoundPerInstance",
+            "kind": "property",
+            "matched_queries": ["maximum playback instances enabled"],
+            "required_by": ["MaxSoundPerInstance"],
+            "dependency_requirements": [],
+            "metadata": {
+                "name": "UseMaxSoundPerInstance",
+                "type": "Boolean",
+                "default": False,
+                "display": {"name": "Limit Sound Instances"},
+                "restriction": {},
+                "typed_value_type": "boolean",
+            },
+        }
+    ]
 
 
 def test_dependency_cycle_below_root_does_not_repeat_reads_or_exhaust_depth() -> None:

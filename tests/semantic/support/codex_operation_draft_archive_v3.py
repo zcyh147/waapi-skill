@@ -7,19 +7,20 @@ from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
 from tests.semantic.support.codex_gateway_broker import (
-    DraftActionJsonArgument,
+    DraftTypedActionArgument,
     GatewayInvocationError,
     project_required_metadata_tokens,
 )
+from tests.semantic.support import legacy_audio_import_composer
 
 from wwise_waapi.canonical import canonical_json_bytes, canonical_sha256
 from wwise_waapi.operation_composer import (
     OperationComposerError,
-    apply_composer_action,
-    composition_projection,
-    new_composition,
-    operation_composer_contract,
-    parse_typed_action_cli_arguments,
+    apply_composer_action as _current_apply_composer_action,
+    composition_projection as _current_composition_projection,
+    new_composition as _current_new_composition,
+    operation_composer_contract as _current_operation_composer_contract,
+    parse_typed_action_cli_arguments as _current_parse_typed_action_cli_arguments,
 )
 from wwise_waapi.operation_drafts import (
     OperationDraftError,
@@ -52,6 +53,68 @@ _DRAFT_SUBCOMMANDS = frozenset(
 
 class ComposerArchiveError(RuntimeError):
     """Composer evidence is missing, inconsistent, or not replayable."""
+
+
+def operation_composer_contract(operation: str, version: str) -> Mapping[str, Any]:
+    if operation == "audio.import":
+        return legacy_audio_import_composer.contract(version)
+    return _current_operation_composer_contract(operation, version)
+
+
+def parse_typed_action_cli_arguments(
+    arguments: Sequence[str],
+    *,
+    legacy_compatibility: bool = False,
+) -> Mapping[str, Any]:
+    try:
+        return _current_parse_typed_action_cli_arguments(
+            arguments,
+            legacy_compatibility=legacy_compatibility,
+        )
+    except OperationComposerError:
+        if not legacy_compatibility:
+            raise
+        return legacy_audio_import_composer.parse_typed_action(arguments)
+
+
+def new_composition(operation: str, version: str) -> dict[str, Any]:
+    if operation == "audio.import":
+        return legacy_audio_import_composer.new_composition(version)
+    return _current_new_composition(operation, version)
+
+
+def composition_projection(
+    operation: str,
+    version: str,
+    composition: Mapping[str, Any],
+) -> dict[str, Any]:
+    if operation == "audio.import":
+        return legacy_audio_import_composer.projection(version, composition)
+    return _current_composition_projection(operation, version, composition)
+
+
+def apply_composer_action(
+    operation: str,
+    version: str,
+    composition: Mapping[str, Any],
+    action: Mapping[str, Any],
+    *,
+    handle_factory: Callable[[], str] | None = None,
+) -> tuple[dict[str, Any], str]:
+    if operation == "audio.import":
+        return legacy_audio_import_composer.apply_action(
+            version,
+            composition,
+            action,
+            handle_factory=handle_factory,
+        )
+    return _current_apply_composer_action(
+        operation,
+        version,
+        composition,
+        action,
+        handle_factory=handle_factory,
+    )
 
 
 def classify_composer_failure_stage(subcommand: str) -> str:
@@ -227,6 +290,57 @@ def _strict_action(
     if not isinstance(action, Mapping):
         _fail("Composer action must be a JSON object")
     return dict(action)
+
+
+def decode_archived_draft_action(
+    gateway_arguments: Sequence[str],
+    *,
+    label: str,
+) -> Mapping[str, Any]:
+    """Decode one historical action only at the explicit archive boundary."""
+
+    arguments = tuple(gateway_arguments)
+    typed_indexes = [
+        index
+        for index, value in enumerate(arguments[:-1])
+        if value == "--facts" and arguments[index + 1] == "--action"
+    ]
+    if len(typed_indexes) == 1:
+        try:
+            return parse_typed_action_cli_arguments(
+                arguments[typed_indexes[0] + 1 :],
+                legacy_compatibility=True,
+            )
+        except OperationComposerError as exc:
+            raise ComposerArchiveError(
+                f"{label} Draft typed action argv is invalid"
+            ) from exc
+    if typed_indexes:
+        _fail(f"{label} Draft action argv contains multiple typed action prefixes")
+    indexes = [
+        index for index, value in enumerate(arguments) if value == "--action-json"
+    ]
+    if len(indexes) != 1 or indexes[0] + 1 >= len(arguments):
+        _fail(f"{label} Draft action argv does not contain one action JSON value")
+    def reject_duplicate_keys(pairs: Sequence[tuple[str, Any]]) -> dict[str, Any]:
+        decoded: dict[str, Any] = {}
+        for key, value in pairs:
+            if key in decoded:
+                raise ValueError(f"duplicate JSON key: {key}")
+            decoded[key] = value
+        return decoded
+    try:
+        decoded = json.loads(
+            arguments[indexes[0] + 1],
+            object_pairs_hook=reject_duplicate_keys,
+        )
+    except (json.JSONDecodeError, RecursionError, UnicodeError, ValueError) as exc:
+        raise ComposerArchiveError(
+            f"{label} Draft action argv is not strict JSON"
+        ) from exc
+    if not isinstance(decoded, Mapping):
+        _fail(f"{label} Draft action JSON is not an object")
+    return dict(decoded)
 
 
 def _handles(value: Any) -> set[str]:
@@ -513,7 +627,11 @@ def validate_operation_draft_archive(
                 _fail("draft-start evidence is missing its issued Draft id")
             draft_ids.append(draft_id)
         durable_records = (
-            load_operation_draft_archive_records(state_directory, draft_ids)
+            load_operation_draft_archive_records(
+                state_directory,
+                draft_ids,
+                allow_retired_audio_import_composition=True,
+            )
             if draft_ids
             else {}
         )
@@ -662,7 +780,7 @@ def _validate_operation_draft_archive(
                 version=version,
             )
             expected_argument = step.arguments[-1]
-            if not isinstance(expected_argument, DraftActionJsonArgument):
+            if not isinstance(expected_argument, DraftTypedActionArgument):
                 _fail("Composer archive action lacks its typed protocol argument")
             metadata_binding = expected_argument.metadata_binding
             if metadata_binding is not None:

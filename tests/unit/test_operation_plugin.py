@@ -555,6 +555,33 @@ def test_verification_returns_exact_plugin_identity_state_view_and_slot() -> Non
     }
 
 
+def test_source_verification_normalizes_native_sourceplugin_and_parent_ownership() -> None:
+    descriptor = normalize_plugin_creation(
+        {"kind": "source", "name": "Generated Tone", "class_id": 123_456}
+    )
+    evidence = verify_created_plugin_row(
+        descriptor,
+        {
+            "id": PLUGIN_ID,
+            "name": "Generated Tone",
+            "type": "SourcePlugin",
+            "classId": 123_456,
+            "parent": {"id": TARGET_ID},
+        },
+        version="2022.1",
+        expected_parent_id=TARGET_ID,
+        expected_owner_id=TARGET_ID,
+        validated_properties=(),
+        preexisting_plugin_ids=(),
+        readback_view=_readback_view(descriptor),
+        placement_evidence=_source_placement(),
+    )
+
+    assert evidence.type == "Source"
+    assert evidence.parent_id == TARGET_ID
+    assert evidence.owner_id == TARGET_ID
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     (

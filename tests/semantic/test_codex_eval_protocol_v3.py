@@ -1,50 +1,595 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
-from types import MappingProxyType
 
 import pytest
 
 from tests.support.platform_filesystem import native_absolute_test_path
 from tests.semantic.support.codex_eval_protocol_v3 import (
-    _materialize_audio_import_composer_actions,
+    CompoundUndoChildExpectation,
     StructuredRefusal,
     V3GatewayProtocol,
     V3ProtocolError,
     build_audio_import_composer_transaction_steps,
+    build_audio_convert_business_transaction_steps,
+    build_compound_undo_business_transaction_steps,
     build_direct_protocol,
+    build_exact_artifact_business_transaction_steps,
     build_metadata_transaction_protocol,
+    build_modification_policy_protocol,
+    build_object_lifecycle_business_transaction_steps,
+    build_object_graph_business_transaction_steps,
+    build_workflow_operations_discovery_protocol,
+    build_workflow_query_schema_discovery_protocol,
+    build_object_metadata_business_transaction_steps,
+    build_switch_assignment_business_transaction_steps,
     build_object_set_composer_transaction_steps,
+    build_operations_discovery_protocol,
     build_schema_query_transaction_protocol,
     build_transaction_protocol,
     call_step,
+    media_pool_business_call_step,
     metadata_candidate_limit,
     query_object_step,
+    stream_topic_step,
+    typed_read_draft_steps,
     wait_topic_step,
 )
 from tests.semantic.support.codex_gateway_broker import (
-    CodexGatewayBroker,
-    DraftActionJsonArgument,
+    BoundedIntegerArgument,
+    DraftActionQueryIdentityBinding,
+    DraftActionResponseBinding,
+    DraftTypedActionArgument,
+    DraftTypedActionBatchArgument,
     DraftActionMetadataBinding,
     ExpectedGatewayStep,
-    MetadataBoundJsonArgument,
+    ExactArgumentAlternatives,
     MetadataQueryArgument,
     MetadataTokenProjection,
     ResponseBinding,
-    SemanticJsonArgument,
+    validate_operation_draft_protocol_steps,
+    TypedRequestFactsArgument,
     validate_commutative_composer_setup_step_groups,
-    resolve_gateway_invocation,
 )
+from tests.semantic.support.codex_object_heavy_v3 import (
+    build_object_heavy_v3_recipe,
+)
+from tests.semantic.support.codex_typed_input_profile import (
+    load_typed_input_profile,
+)
+from tests.semantic.support.typed_gateway_input import (
+    _authoring_ui_command_suffix_matches,
+    _authoring_ui_plan_suffix_matches,
+    _soundbank_plan_suffix_matches,
+)
+from wwise_waapi.operation_composer import typed_action_cli_arguments
+from wwise_waapi.builders.debug_lua import LUA_SOURCE_AUTHORITY
+from wwise_waapi.platform_commands import encode_windows_powershell_argv
 
 
 def _request(index: int = 1) -> dict[str, object]:
     return {
         "contract": "waapi-skill.operation-request/v1",
-        "version": "2022.1",
-        "operation": "object.create",
-        "arguments": {"parent": {"kind": "path", "value": "\\Root"}, "name": f"N{index}", "type": "Sound"},
+        "version": "2025.1",
+        "operation": "lua.executeCoreInline",
+        "arguments": {
+            "lua_code": f"return {index}\n",
+            "io_root": native_absolute_test_path("lua-protocol-root"),
+            "source_authority": LUA_SOURCE_AUTHORITY,
+        },
     }
+
+
+def test_query_object_step_keeps_canonical_first_path_segment() -> None:
+    step = query_object_step(
+        "query",
+        (
+            "query-object",
+            "--path-segment",
+            "Actor-Mixer Hierarchy",
+            "--path-segment",
+            "Default Work Unit",
+        ),
+    )
+
+    assert step.arguments == (
+        "--path-segment",
+        "Actor-Mixer Hierarchy",
+        "--path-segment",
+        "Default Work Unit",
+    )
+
+
+def test_stream_topic_step_owns_finite_duration_and_typed_business_facts() -> None:
+    step = stream_topic_step(
+        "soundbank.generated.stream",
+        "ak.wwise.core.soundbank.generated",
+        version="2024.1",
+        event_count=2,
+        match={"soundbank": {"name": "Weapons_Core"}},
+        options={"return": ["id", "name", "type", "path"]},
+        timeout_seconds=30.0,
+    )
+
+    assert step.subcommand == "stream-topic"
+    assert step.gateway_global_arguments == ("--timeout", "30")
+    assert step.arguments[:2] == (
+        "ak.wwise.core.soundbank.generated",
+        "--event-count",
+    )
+    ceiling = step.arguments[2]
+    assert isinstance(ceiling, BoundedIntegerArgument)
+    assert (ceiling.minimum, ceiling.maximum) == (3, 64)
+    assert step.arguments[3:5] == (
+        "--topic-contract-digest",
+        step.arguments[4],
+    )
+    assert "--topic-option" in step.arguments
+    assert "--event-match" in step.arguments
+
+
+def test_authoring_ui_business_suffixes_match_only_closed_public_flags() -> None:
+    assert _authoring_ui_plan_suffix_matches(
+        "ui.commands.execute",
+        ["--command-id", "SaveProject", "--value", "boolean", "true"],
+    )
+    assert _authoring_ui_plan_suffix_matches(
+        "ui.commands.register",
+        ["--command-count", "2"],
+    )
+    assert _authoring_ui_plan_suffix_matches(
+        "ui.commands.unregister",
+        ["--registered-command-key", "notify-selection"],
+    )
+    assert _authoring_ui_command_suffix_matches(
+        [
+            "--key",
+            "notify-selection",
+            "--display-name",
+            "Notify",
+            "--handler-kind",
+            "notification",
+        ]
+    )
+
+
+def test_authoring_ui_business_suffixes_reject_native_or_unsafe_inputs() -> None:
+    assert not _authoring_ui_plan_suffix_matches(
+        "ui.commands.register",
+        ["--command-count", "1", "--source-authority", "user_supplied_verbatim"],
+    )
+    assert not _authoring_ui_command_suffix_matches(
+        [
+            "--key",
+            "program",
+            "--display-name",
+            "Program",
+            "--handler-kind",
+            "program",
+            "--handler-path",
+            "/owned/tool",
+            "--argument-token=--unsafe",
+        ]
+    )
+
+
+def test_exact_artifact_business_steps_hide_lua_loader_fields(
+    tmp_path: Path,
+) -> None:
+    request = _request()
+    request["arguments"]["io_root"] = str(tmp_path)
+    request["arguments"]["wa_args"] = {
+        "name": "Weather",
+        "enabled": True,
+        "missing": None,
+        "rows": [1, 2],
+    }
+
+    steps = build_exact_artifact_business_transaction_steps(
+        request,
+        label="tx01",
+    )
+
+    assert [step.subcommand for step in steps] == [
+        "operation-schema",
+        "draft-start",
+        "draft-declare-artifact-plan",
+        "draft-check",
+        "preview-from-draft",
+    ]
+    declaration = steps[2]
+    assert "--source-authority" not in declaration.arguments
+    assert "--arguments-json" not in declaration.arguments
+    argument_rows = []
+    for index, value in enumerate(declaration.arguments):
+        if value == "--argument":
+            argument_rows.append(declaration.arguments[index : index + 4])
+    assert argument_rows == [
+        ("--argument", "name", "string", "Weather"),
+        ("--argument", "enabled", "boolean", "true"),
+        ("--argument", "missing", "null", "null"),
+        ("--argument", "rows", "json", "[1,2]"),
+    ]
+    lua_index = declaration.arguments.index("--lua-source")
+    assert declaration.arguments[lua_index : lua_index + 4] == (
+        "--lua-source",
+        request["arguments"]["lua_code"],
+        "--io-root",
+        request["arguments"]["io_root"],
+    )
+    assert steps[-1].expected_operation_request == request
+
+
+def test_exact_artifact_tab_steps_bind_location_and_translate_mode() -> None:
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "audio.importTabDelimited",
+        "arguments": {
+            "import_file": "/owned/import.tsv",
+            "import_location": {
+                "kind": "path",
+                "value": r"\Actor-Mixer Hierarchy\Default Work Unit",
+            },
+            "import_language": "SFX",
+            "import_operation": "useExisting",
+            "auto_add_to_source_control": False,
+        },
+    }
+
+    steps = build_exact_artifact_business_transaction_steps(
+        request,
+        label="tx01",
+    )
+
+    assert [step.subcommand for step in steps] == [
+        "operation-schema",
+        "draft-start",
+        "draft-bind-object",
+        "draft-declare-artifact-plan",
+        "draft-check",
+        "preview-from-draft",
+    ]
+    assert steps[2].arguments[-4:] == (
+        "--object-path-segment",
+        "Actor-Mixer Hierarchy",
+        "--object-path-segment",
+        "Default Work Unit",
+    )
+    declaration = steps[3]
+    assert "--mode" in declaration.arguments
+    assert declaration.arguments[declaration.arguments.index("--mode") + 1] == (
+        "reimport"
+    )
+    assert "--no-add-to-source-control" in declaration.arguments
+    assert steps[-1].expected_operation_request == request
+
+
+def test_switch_assignment_business_steps_bind_three_paths_before_declaration() -> None:
+    container = r"\Actor-Mixer Hierarchy\Default Work Unit\Footsteps"
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "switchContainer.removeAssignment",
+        "arguments": {
+            "switch_container": {"kind": "path", "value": container},
+            "child": {"kind": "path", "value": container + r"\Mud"},
+            "state_or_switch": {
+                "kind": "path",
+                "value": r"\Switches\Default Work Unit\Surface\Mud",
+            },
+        },
+    }
+
+    steps = build_switch_assignment_business_transaction_steps(
+        request,
+        label="tx01",
+    )
+
+    assert [step.subcommand for step in steps] == [
+        "operation-schema",
+        "draft-start",
+        "draft-bind-object",
+        "draft-bind-object",
+        "draft-bind-object",
+        "draft-declare-switch-assignment",
+        "draft-check",
+        "preview-from-draft",
+    ]
+    declare = steps[5]
+    assert declare.arguments[-6:] == (
+        "--switch-container-handle",
+        ResponseBinding("tx01.bind-switch-container", "/bound_object/handle"),
+        "--child-handle",
+        ResponseBinding("tx01.bind-child", "/bound_object/handle"),
+        "--state-or-switch-handle",
+        ResponseBinding("tx01.bind-state-or-switch", "/bound_object/handle"),
+    )
+    assert steps[-1].expected_operation_request == request
+
+
+def test_compound_undo_steps_check_children_before_one_parent_preview() -> None:
+    object_path = r"\Actor-Mixer Hierarchy\Default Work Unit\Weather\Rain"
+    requests = (
+        {
+            "contract": "waapi-skill.operation-request/v1",
+            "version": "2022.1",
+            "operation": "object.setNotes",
+            "arguments": {
+                "object": {"kind": "path", "value": object_path},
+                "value": "Exterior rain loop",
+            },
+        },
+        {
+            "contract": "waapi-skill.operation-request/v1",
+            "version": "2022.1",
+            "operation": "object.setName",
+            "arguments": {
+                "object": {"kind": "path", "value": object_path},
+                "value": "Rain_Exterior",
+            },
+        },
+    )
+    children = tuple(
+        CompoundUndoChildExpectation(
+            request=request,
+            selector={"kind": "path", "value": object_path},
+        )
+        for request in requests
+    )
+    steps = build_compound_undo_business_transaction_steps(
+        children,
+        display_name="Weather rain cleanup",
+        label="tx03",
+    )
+    validate_operation_draft_protocol_steps(steps)
+    assert steps[0].name == "tx03.operation-schema"
+    assert steps[0].arguments == ("waapi.undoGroup",)
+
+    assert [step.subcommand for step in steps] == [
+        "operation-schema",
+        "draft-start",
+        "draft-start-undo-child",
+        "draft-bind-object",
+        "draft-declare-object-change",
+        "draft-check",
+        "draft-start-undo-child",
+        "draft-bind-object",
+        "draft-declare-object-change",
+        "draft-check",
+        "draft-declare-undo-plan",
+        "draft-check",
+        "preview-from-draft",
+    ]
+    declaration = steps[-3]
+    assert declaration.arguments[-6:] == (
+        "--child-draft",
+        ResponseBinding("tx01.draft-start", "/draft/draft_id"),
+        ResponseBinding("tx01.draft-start", "/task_authority"),
+        "--child-draft",
+        ResponseBinding("tx02.draft-start", "/draft/draft_id"),
+        ResponseBinding("tx02.draft-start", "/task_authority"),
+    )
+    assert steps[-1].expected_operation_request["operation"] == "waapi.undoGroup"
+    assert [
+        row["request"]["operation"]
+        for row in steps[-1].expected_operation_request["arguments"]["calls"]
+    ] == ["object.setNotes", "object.setName"]
+
+    with pytest.raises(ValueError, match="child Draft must end checked"):
+        validate_operation_draft_protocol_steps(
+            tuple(step for step in steps if step.name != "tx01.check")
+        )
+
+    child_start = steps[2]
+    wrong_parent = replace(
+        child_start,
+        arguments=(
+            ResponseBinding("tx02.draft-start", "/draft/draft_id"),
+            *child_start.arguments[1:],
+        ),
+    )
+    with pytest.raises(ValueError, match="exact compound parent"):
+        validate_operation_draft_protocol_steps(
+            (*steps[:2], wrong_parent, *steps[3:])
+        )
+
+
+def test_real_gateway_helper_reuses_soundbank_plan_cli_grammar() -> None:
+    handle = "boh1-" + "1" * 32
+    assert _soundbank_plan_suffix_matches(
+        "soundbank.generate",
+        (
+            "--soundbank",
+            handle,
+            "nonlocalized",
+            "--soundbank-rebuild",
+            handle,
+            "false",
+            "--platform",
+            "Windows",
+            "--rebuild-soundbanks",
+            "false",
+            "--clear-audio-file-cache",
+            "false",
+            "--rebuild-init-bank",
+            "false",
+            "--io-root",
+            r"C:\owned",
+        ),
+    )
+    assert not _soundbank_plan_suffix_matches(
+        "soundbank.generate",
+        ("--native-request", "{}"),
+    )
+
+
+def _archive_test_object_create_top_level_facts_precede_dynamic_container_disclosure() -> None:
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2021.1",
+        "operation": "object.create",
+        "arguments": {
+            "parent": {
+                "kind": "path",
+                "value": r"\Actor-Mixer Hierarchy\Default Work Unit\SemanticLab\NPC",
+            },
+            "type": "ActorMixer",
+            "name": "TypedRoot",
+            "children": [
+                {
+                    "type": "Sound",
+                    "name": "TypedChild",
+                    "children": [
+                        {
+                            "type": "Sound",
+                            "name": "TypedGrandchild",
+                        }
+                    ],
+                }
+            ],
+        },
+    }
+
+    protocol = build_transaction_protocol([request])
+    subcommands = tuple(step.subcommand for step in protocol.steps)
+
+    first_disclosure = subcommands.index("request-array-item")
+    assert any(
+        step.subcommand == "draft-apply"
+        for step in protocol.steps[2:first_disclosure]
+    )
+    disclosures = tuple(
+        step
+        for step in protocol.steps
+        if step.subcommand in {"request-array-item", "request-map-container"}
+    )
+    assert any(
+        "--schema-digest" in step.arguments
+        and "--parent-schema-token" not in step.arguments
+        for step in disclosures
+    )
+    assert any("--parent-schema-token" in step.arguments for step in disclosures)
+    assert all(
+        "--schema-digest" not in step.arguments
+        for step in disclosures
+        if "--parent-schema-token" in step.arguments
+    )
+
+
+def _archive_test_typed_profile_object_create_batches_fit_windows_command_transport() -> None:
+    profile = load_typed_input_profile(
+        Path(__file__).resolve().parent / "data" / "typed-input-v1" / "profile.json"
+    )
+    unit = next(
+        row
+        for row in profile.units
+        if row.unit_id == "TYP21-DEDICATED-OBJECT-CREATE"
+    )
+    recipe = build_object_heavy_v3_recipe(unit.base_scenario_id, unit.version)
+    protocol = build_transaction_protocol(
+        (recipe.request.as_dict(version=unit.version),)
+    )
+    # Reserve a deliberately long runner path; the formal Windows campaign
+    # additionally constrains its owned workspace/current-directory lengths.
+    runner = "C:/" + ("owned/" * 28) + "run.py"
+    encoded_lengths: list[int] = []
+    for step in protocol.steps:
+        if step.subcommand != "draft-apply":
+            continue
+        argv = ["python", runner, "gateway.py", "--version", unit.version]
+        argv.append(step.subcommand)
+        for argument in step.arguments:
+            if isinstance(argument, ResponseBinding):
+                if argument.pointer.endswith("/draft_id"):
+                    argv.append("od1-" + ("0" * 32))
+                elif argument.pointer.endswith("/task_authority"):
+                    argv.append("da1-" + ("0" * 40))
+                else:
+                    argv.append("999")
+            elif isinstance(argument, DraftTypedActionBatchArgument):
+                for action in argument.actions:
+                    argv.extend(typed_action_cli_arguments(action.expected))
+            elif isinstance(argument, DraftTypedActionArgument):
+                argv.extend(typed_action_cli_arguments(argument.expected))
+            else:
+                assert isinstance(argument, str)
+                argv.append(argument)
+        encoded_lengths.append(len(encode_windows_powershell_argv(argv)))
+
+    assert encoded_lengths
+    assert max(encoded_lengths) < 30_000
+
+
+def _archive_test_typed_profile_object_create_applies_each_disclosed_node_before_the_next(
+) -> None:
+    profile = load_typed_input_profile(
+        Path(__file__).resolve().parent / "data" / "typed-input-v1" / "profile.json"
+    )
+    unit = next(
+        row
+        for row in profile.units
+        if row.unit_id == "TYP21-DEDICATED-OBJECT-CREATE"
+    )
+    recipe = build_object_heavy_v3_recipe(unit.base_scenario_id, unit.version)
+    protocol = build_transaction_protocol(
+        (recipe.request.as_dict(version=unit.version),)
+    )
+    construction = tuple(
+        step
+        for step in protocol.steps
+        if ".action." in step.name or ".disclose." in step.name
+    )
+
+    assert [step.name for step in construction[:9]] == [
+        "tx01.action.001",
+        "tx01.disclose.001",
+        "tx01.action.002",
+        "tx01.disclose.002",
+        "tx01.action.003",
+        "tx01.disclose.003",
+        "tx01.action.004",
+        "tx01.disclose.004",
+        "tx01.action.005",
+    ]
+    action_sizes = []
+    for step in construction:
+        if ".action." not in step.name:
+            continue
+        argument = step.arguments[-1]
+        action_sizes.append(
+            len(argument.actions)
+            if isinstance(argument, DraftTypedActionBatchArgument)
+            else 1
+        )
+    assert action_sizes == [6, 4, 1, 3, 3, 4, 1, 3, 3, 4, 1, 3, 3]
+
+
+def _archive_test_typed_profile_object_create_uses_one_standard_disclosure_argv() -> None:
+    profile = load_typed_input_profile(
+        Path(__file__).resolve().parent / "data" / "typed-input-v1" / "profile.json"
+    )
+    unit = next(
+        row
+        for row in profile.units
+        if row.unit_id == "TYP21-DEDICATED-OBJECT-CREATE"
+    )
+    recipe = build_object_heavy_v3_recipe(unit.base_scenario_id, unit.version)
+    protocol = build_transaction_protocol(
+        (recipe.request.as_dict(version=unit.version),)
+    )
+    disclosures = tuple(
+        step
+        for step in protocol.steps
+        if step.subcommand in {"request-array-item", "request-map-container"}
+    )
+
+    assert all(
+        "--no-dynamic-descendants" not in step.arguments
+        for step in disclosures
+    )
 
 
 def _object_set_request(**options: object) -> dict[str, object]:
@@ -103,7 +648,23 @@ def _audio_import_request() -> dict[str, object]:
     }
 
 
-def test_audio_import_composer_emits_ordered_typed_actions_without_full_json() -> None:
+def _typed_draft_action_arguments(
+    steps: tuple[ExpectedGatewayStep, ...],
+) -> list[DraftTypedActionArgument]:
+    actions: list[DraftTypedActionArgument] = []
+    for step in steps:
+        if step.subcommand != "draft-apply":
+            continue
+        argument = step.arguments[-1]
+        if isinstance(argument, DraftTypedActionBatchArgument):
+            actions.extend(argument.actions)
+        else:
+            assert isinstance(argument, DraftTypedActionArgument)
+            actions.append(argument)
+    return actions
+
+
+def test_audio_import_protocol_emits_ordered_business_steps_without_native_rows() -> None:
     metadata = DraftActionMetadataBinding(
         step="tx01.metadata",
         object_type="Sound",
@@ -114,24 +675,30 @@ def test_audio_import_composer_emits_ordered_typed_actions_without_full_json() -
         label="tx01",
         metadata_binding=metadata,
     )
-    action_arguments = [
-        step.arguments[-1]
+    assert [step.subcommand for step in steps[:9]] == [
+        "operation-schema",
+        "draft-start",
+        "draft-bind-object",
+        "draft-bind-object",
+        "draft-bind-object",
+        "draft-business-configure",
+        "draft-declare-import-batch",
+        "draft-check",
+        "preview-from-draft",
+    ]
+    declaration = next(
+        step
         for step in steps
-        if step.subcommand == "draft-apply"
-    ]
-
-    assert all(isinstance(value, DraftActionJsonArgument) for value in action_arguments)
-    assert [value.operation for value in action_arguments] == ["audio.import"] * 5
-    assert [value.expected["action"] for value in action_arguments] == [
-        "set_import_option",
-        "set_import_default",
-        "set_import_default",
-        "set_import_default",
-        "add_import_row",
-    ]
-    assert action_arguments[3].metadata_binding == metadata
-    assert action_arguments[4].metadata_binding == metadata
-    assert action_arguments[4].expected["assignment"] == {"mode": "none"}
+        if step.subcommand == "draft-declare-import-batch"
+    )
+    assert "--field" in declaration.arguments
+    assert "volume_db" in declaration.arguments
+    assert "output_bus" in declaration.arguments
+    assert "--event" in declaration.arguments
+    assert declaration.arguments.count("--row-order") == 1
+    assert "--expected-declaration-count" not in declaration.arguments
+    assert "--expected-switch-assignment-count" not in declaration.arguments
+    assert all(step.subcommand != "draft-apply" for step in steps)
     assert next(step for step in steps if step.name == "tx01.preview").subcommand == (
         "preview-from-draft"
     )
@@ -141,70 +708,34 @@ def test_audio_import_composer_emits_ordered_typed_actions_without_full_json() -
     )
 
 
-def test_audio_import_switch_assignment_is_part_of_the_initial_row_action() -> None:
+def test_audio_import_switch_assignment_is_part_of_the_business_declaration() -> None:
     request = _audio_import_request()
     switch_assignment = "Snow"
     request["arguments"]["imports"][0]["switch_assignment"] = switch_assignment  # type: ignore[index]
 
-    action_arguments = [
-        step.arguments[-1]
+    declaration = next(
+        step
         for step in build_audio_import_composer_transaction_steps(
-            request,
-            label="tx01",
+            request, label="tx01"
         )
-        if step.subcommand == "draft-apply"
-    ]
-
-    row = action_arguments[-1]
-    assert row.expected["action"] == "add_import_row"
-    assert row.expected["assignment"] == {
-        "mode": "switch",
-        "value": switch_assignment,
-    }
-    assert row.response_bindings == ()
+        if step.subcommand == "draft-declare-import-batch"
+    )
+    switch_index = declaration.arguments.index("--switch-value")
+    assert declaration.arguments[switch_index + 1] == "row-001"
+    assert declaration.arguments[switch_index + 2] == switch_assignment
 
     request["arguments"]["imports"][0].pop("switch_assignment")  # type: ignore[index]
-    ordinary_row = [
-        step.arguments[-1]
+    ordinary = next(
+        step
         for step in build_audio_import_composer_transaction_steps(
-            request,
-            label="tx01",
+            request, label="tx01"
         )
-        if step.subcommand == "draft-apply"
-    ][-1]
-    assert ordinary_row.expected["action"] == "add_import_row"
-    assert ordinary_row.expected["assignment"] == {"mode": "none"}
-    assert ordinary_row.response_bindings == ()
-
-
-def test_audio_import_archive_replay_preserves_the_removed_assigned_row_action() -> None:
-    materialized = _materialize_audio_import_composer_actions(
-        (
-            {
-                "contract": "waapi-skill.operation-draft-action/v1",
-                "action": "add_switch_assigned_import_row",
-                "object_path": (
-                    r"\Actor-Mixer Hierarchy\Default Work Unit\Footsteps\Snow"
-                ),
-                "object_type": "RandomSequenceContainer",
-                "assignment": {"mode": "switch", "value": "Snow"},
-            },
-        ),
-        version="2022.1",
+        if step.subcommand == "draft-declare-import-batch"
     )
-
-    assert materialized["arguments"]["imports"] == [
-        {
-            "object_path": (
-                r"\Actor-Mixer Hierarchy\Default Work Unit\Footsteps\Snow"
-            ),
-            "object_type": "RandomSequenceContainer",
-            "switch_assignment": "Snow",
-        }
-    ]
+    assert "--switch-value" not in ordinary.arguments
 
 
-def test_audio_import_composer_rejects_unreviewed_request_fields() -> None:
+def test_audio_import_business_builder_rejects_unreviewed_request_fields() -> None:
     request = _audio_import_request()
     request["arguments"]["native_args"] = {}  # type: ignore[index]
 
@@ -221,11 +752,7 @@ def test_object_set_composer_lets_gateway_own_schema_defaults() -> None:
         ),
         label="tx01",
     )
-    actions = [
-        step.arguments[-1].expected
-        for step in steps
-        if step.subcommand == "draft-apply"
-    ]
+    actions = [argument.expected for argument in _typed_draft_action_arguments(steps)]
 
     assert actions == [
         {
@@ -240,6 +767,198 @@ def test_object_set_composer_lets_gateway_own_schema_defaults() -> None:
     ]
 
 
+def test_object_set_business_binds_one_unnamed_direct_child_by_parent() -> None:
+    request = _object_set_request()
+    request["arguments"]["objects"][0]["object"] = {  # type: ignore[index]
+        "kind": "direct-child",
+        "type": "Action",
+        "parent": {
+            "kind": "path",
+            "value": r"\Events\Default Work Unit\Play_Rain",
+        },
+    }
+
+    steps = build_object_graph_business_transaction_steps(request, label="tx01")
+    binding = next(
+        step for step in steps if step.subcommand == "draft-bind-object"
+    )
+
+    assert binding.arguments[-8:] == (
+        "--direct-child-type",
+        "Action",
+        "--parent-path-segment",
+        "Events",
+        "--parent-path-segment",
+        "Default Work Unit",
+        "--parent-path-segment",
+        "Play_Rain",
+    )
+
+
+def test_object_set_rtpc_business_uses_bound_curve_declaration() -> None:
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "object.setRTPC",
+        "arguments": {
+            "object": {
+                "kind": "path",
+                "value": r"\Actor-Mixer Hierarchy\Default Work Unit\Rain",
+            },
+            "property": "Volume",
+            "control_input": {
+                "kind": "path",
+                "value": r"\Game Parameters\Ambience\Rain_Intensity",
+            },
+            "points": [
+                {"x": 0.0, "y": -48.0, "shape": "Linear"},
+                {"x": 100.0, "y": 0.0, "shape": "Linear"},
+            ],
+            "mode": "add_or_replace",
+        },
+    }
+
+    steps = build_object_graph_business_transaction_steps(request, label="tx03")
+
+    assert [step.subcommand for step in steps] == [
+        "operation-schema",
+        "draft-start",
+        "draft-bind-object",
+        "draft-discover-fields",
+        "draft-bind-object",
+        "draft-declare-rtpc",
+        "draft-check",
+        "preview-from-draft",
+    ]
+    declaration = next(
+        step for step in steps if step.subcommand == "draft-declare-rtpc"
+    )
+    assert "--point" in declaration.arguments
+    assert "--mode" in declaration.arguments
+    assert "add-or-update" in declaration.arguments
+    assert steps[-1].expected_operation_request == request
+
+
+def test_operations_discovery_is_optional_before_query_first_workflow() -> None:
+    base = V3GatewayProtocol(
+        steps=(
+            ExpectedGatewayStep("diag.query", "query-object"),
+            ExpectedGatewayStep(
+                "tx01.operation-schema",
+                "operation-schema",
+                ("object.setReference",),
+            ),
+            ExpectedGatewayStep("tx01.verify", "verify"),
+            ExpectedGatewayStep(
+                "tx02.operation-schema",
+                "operation-schema",
+                ("object.setReference",),
+            ),
+        ),
+        turn_prefix_counts=(2, 4),
+    )
+
+    protocol = build_workflow_operations_discovery_protocol(base)
+
+    assert [step.subcommand for step in protocol.steps] == [
+        "operations",
+        "query-object",
+        "operations",
+        "operation-schema",
+        "verify",
+        "operations",
+        "operation-schema",
+    ]
+    assert protocol.turn_prefix_counts == (4, 7)
+    assert protocol.allowed_turn_prefix_counts == ((2, 3, 4), (4, 5, 6, 7))
+    assert protocol.accepted_terminal_prefixes == (4, 5, 6, 7)
+    assert protocol.optional_workflow_operations_discovery_step_names == (
+        "routing.operations",
+        "routing.operations.tx01.operation-schema",
+        "routing.operations.tx02.operation-schema",
+    )
+    assert protocol.optional_initial_operations_discovery is True
+
+
+def test_query_schema_discovery_is_optional_before_multi_turn_workflow() -> None:
+    base = V3GatewayProtocol(
+        steps=(
+            ExpectedGatewayStep("diag.query", "query-object"),
+            ExpectedGatewayStep(
+                "tx01.operation-schema",
+                "operation-schema",
+                ("object.setReference",),
+            ),
+            ExpectedGatewayStep("tx01.verify", "verify"),
+        ),
+        turn_prefix_counts=(1, 2, 3),
+    )
+
+    protocol = build_workflow_query_schema_discovery_protocol(base)
+
+    assert [step.subcommand for step in protocol.steps] == [
+        "query-schema",
+        "query-schema",
+        "query-object",
+        "operation-schema",
+        "verify",
+    ]
+    assert protocol.steps[1].arguments == ("--advanced",)
+    assert protocol.turn_prefix_counts == (3, 4, 5)
+    assert protocol.allowed_turn_prefix_counts == (
+        (1, 2, 3),
+        (2, 3, 4),
+        (3, 4, 5),
+    )
+    assert protocol.accepted_terminal_prefixes == (3, 4, 5)
+    assert protocol.optional_workflow_query_schema_step_names == (
+        "routing.query-schema",
+        "routing.query-schema.advanced",
+    )
+
+
+def test_workflow_operations_choices_do_not_split_commutative_read_group() -> None:
+    base = V3GatewayProtocol(
+        steps=(
+            ExpectedGatewayStep(
+                "diag.operation-schema",
+                "operation-schema",
+                ("object.set",),
+            ),
+            ExpectedGatewayStep(
+                "diag.metadata",
+                "metadata",
+                (
+                    "discover",
+                    "--object-type",
+                    "Action",
+                    "--query",
+                    MetadataQueryArgument("fade time"),
+                    "--limit",
+                    "8",
+                ),
+            ),
+            ExpectedGatewayStep(
+                "tx01.operation-schema",
+                "operation-schema",
+                ("object.setReference",),
+            ),
+        ),
+        turn_prefix_counts=(2, 3),
+        commutative_read_only_step_groups=(
+            ("diag.operation-schema", "diag.metadata"),
+        ),
+    )
+
+    protocol = build_workflow_operations_discovery_protocol(base)
+
+    assert protocol.turn_prefix_counts == (3, 5)
+    assert protocol.allowed_turn_prefix_counts == ((2, 3), (3, 4, 5))
+    assert protocol.commutative_read_only_step_groups == (
+        ("diag.operation-schema", "diag.metadata"),
+    )
+
+
 def test_object_set_composer_keeps_nondefault_request_options_explicit() -> None:
     steps = build_object_set_composer_transaction_steps(
         _object_set_request(
@@ -250,11 +969,7 @@ def test_object_set_composer_keeps_nondefault_request_options_explicit() -> None
         ),
         label="tx01",
     )
-    actions = [
-        step.arguments[-1].expected
-        for step in steps
-        if step.subcommand == "draft-apply"
-    ]
+    actions = [argument.expected for argument in _typed_draft_action_arguments(steps)]
 
     assert actions[:4] == [
         {
@@ -284,40 +999,255 @@ def test_object_set_composer_keeps_nondefault_request_options_explicit() -> None
     ]
 
 
+def test_object_set_protocol_batches_sibling_children_after_parent_handle() -> None:
+    request = _object_set_request()
+    request["arguments"]["objects"][0]["children"] = [  # type: ignore[index]
+        {"type": "Sound", "name": "Light"},
+        {"type": "Sound", "name": "Heavy"},
+    ]
+
+    steps = build_object_set_composer_transaction_steps(request, label="tx01")
+    action_steps = tuple(
+        step for step in steps if step.subcommand == "draft-apply"
+    )
+
+    assert len(action_steps) == 2
+    assert isinstance(action_steps[0].arguments[-1], DraftTypedActionArgument)
+    child_batch = action_steps[1].arguments[-1]
+    assert isinstance(child_batch, DraftTypedActionBatchArgument)
+    assert [action.expected["action"] for action in child_batch.actions] == [
+        "add_child",
+        "add_child",
+    ]
+    assert [action.response_bindings for action in child_batch.actions] == [
+        (
+            DraftActionResponseBinding(
+                "/parent_handle",
+                "tx01.action.001",
+                "/draft/action_result/created_handles/0",
+            ),
+        ),
+        (
+            DraftActionResponseBinding(
+                "/parent_handle",
+                "tx01.action.001",
+                "/draft/action_result/created_handles/0",
+            ),
+        ),
+    ]
+
+
+def test_object_set_protocol_batches_independent_query_bound_targets() -> None:
+    bus_path = r"\Master-Mixer Hierarchy\Default Work Unit\Weapons"
+    request = _object_set_request()
+    template = request["arguments"]["objects"][0]  # type: ignore[index]
+    request["arguments"]["objects"] = [  # type: ignore[index]
+        {
+            **template,
+            "object": {"kind": "path", "value": rf"\Root\Target{index}"},
+            "references": [
+                {
+                    "name": "OutputBus",
+                    "target": {"kind": "path", "value": bus_path},
+                }
+            ],
+        }
+        for index in range(3)
+    ]
+
+    steps = build_object_set_composer_transaction_steps(
+        request,
+        label="tx01",
+        reference_identity_sources={bus_path: "relationship.output_bus"},
+    )
+    action_steps = tuple(
+        step for step in steps if step.subcommand == "draft-apply"
+    )
+
+    assert len(action_steps) == 1
+    batch = action_steps[0].arguments[-1]
+    assert isinstance(batch, DraftTypedActionBatchArgument)
+    assert len(batch.actions) == 3
+    assert all(
+        action.query_identity_bindings
+        == (
+            DraftActionQueryIdentityBinding(
+                "/references/0/target",
+                "relationship.output_bus",
+            ),
+        )
+        for action in batch.actions
+    )
+
+
 def test_single_transaction_spans_two_turn_prefixes_with_response_bindings() -> None:
     protocol = build_transaction_protocol([_request()])
 
-    assert protocol.turn_prefix_counts == (2, 6)
+    assert protocol.turn_prefix_counts == (5, 9)
     assert tuple(step.subcommand for step in protocol.steps) == (
         "operation-schema",
-        "preview",
+        "draft-start",
+        "draft-declare-artifact-plan",
+        "draft-check",
+        "preview-from-draft",
         "transaction-show",
         "confirm",
         "execute",
         "verify",
     )
-    assert protocol.steps[4].allowed_exit_codes == (0, 2)
-    assert protocol.steps[4].terminal_execute is False
-    assert protocol.steps[5].allowed_exit_codes == (0,)
-    assert protocol.steps[2].arguments == (
+    by_name = {step.name: step for step in protocol.steps}
+    assert by_name["tx01.execute"].allowed_exit_codes == (0, 2)
+    assert by_name["tx01.execute"].terminal_execute is False
+    assert by_name["tx01.verify"].allowed_exit_codes == (0,)
+    assert by_name["tx01.transaction-show"].arguments == (
         ResponseBinding("tx01.preview", "/transaction_id"),
         "--summary-only",
     )
-    assert protocol.steps[3].arguments == (
+    assert by_name["tx01.confirm"].arguments == (
         ResponseBinding("tx01.transaction-show", "/transaction_id"),
         "--confirmation-token",
         ResponseBinding("tx01.transaction-show", "/confirmation/token"),
     )
-    assert protocol.steps[4].arguments == (
+    assert by_name["tx01.execute"].arguments == (
         ResponseBinding("tx01.confirm", "/transaction_id"),
     )
-    assert protocol.steps[5].arguments == (
+    assert by_name["tx01.verify"].arguments == (
         ResponseBinding("tx01.execute", "/transaction_id"),
     )
-    assert protocol.steps[1].arguments[:2] == ("--apply", "--request-json")
-    request_argument = protocol.steps[1].arguments[2]
-    assert isinstance(request_argument, SemanticJsonArgument)
-    assert request_argument.equivalence == "object_operation_v1"
+    assert all("--request-json" not in step.arguments for step in protocol.steps)
+
+
+def test_operations_discovery_wraps_one_natural_language_business_transaction() -> None:
+    base = build_transaction_protocol([_request()])
+
+    protocol = build_operations_discovery_protocol(base)
+
+    assert tuple(step.subcommand for step in protocol.steps[:2]) == (
+        "operations",
+        "operation-schema",
+    )
+    assert protocol.steps[0].name == "tx01.operations"
+    assert protocol.turn_prefix_counts == tuple(
+        count + 1 for count in base.turn_prefix_counts
+    )
+    assert protocol.allowed_turn_prefix_counts == tuple(
+        (count, count + 1) for count in base.turn_prefix_counts
+    )
+    assert protocol.optional_initial_operations_discovery is True
+    assert protocol.steps[1:] == base.steps
+
+
+def test_audio_import_protocol_seals_rows_individually_but_allows_bounded_chunks() -> None:
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "audio.import",
+        "arguments": {
+            "imports": [
+                {
+                    "object_path": (
+                        rf"\Actor-Mixer Hierarchy\Default Work Unit\Layer_{index}"
+                    ),
+                    "object_type": "ActorMixer",
+                }
+                for index in range(1, 7)
+            ]
+        },
+    }
+
+    protocol = build_transaction_protocol([request])
+    batch_steps = tuple(
+        step
+        for step in protocol.steps
+        if step.subcommand == "draft-declare-import-batch"
+    )
+
+    assert len(batch_steps) == 6
+    assert all(step.arguments.count("--row-order") == 1 for step in batch_steps)
+    assert protocol.allowed_turn_prefix_counts == tuple(
+        tuple(range(maximum - 5, maximum + 1))
+        for maximum in protocol.turn_prefix_counts
+    )
+    assert protocol.terminal_prefix_counts == protocol.allowed_turn_prefix_counts[-1]
+
+
+def test_allow_changes_preserves_bounded_audio_import_chunks() -> None:
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "audio.import",
+        "arguments": {
+            "imports": [
+                {
+                    "object_path": (
+                        rf"\Actor-Mixer Hierarchy\Default Work Unit\Layer_{index}"
+                    ),
+                    "object_type": "ActorMixer",
+                }
+                for index in range(1, 7)
+            ]
+        },
+    }
+    base = build_transaction_protocol([request])
+
+    protocol = build_modification_policy_protocol(base, policy="allow_changes")
+
+    maximum = len(protocol.steps)
+    assert protocol.allowed_turn_prefix_counts == (
+        tuple(range(maximum - 5, maximum + 1)),
+    )
+    assert protocol.terminal_prefix_counts == protocol.allowed_turn_prefix_counts[-1]
+
+
+def test_audio_convert_uses_core_business_draft_instead_of_typed_call() -> None:
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2024.1",
+        "operation": "waapi.call",
+        "arguments": {
+            "api": "ak.wwise.core.audio.convert",
+            "args": {
+                "objects": [
+                    r"\Actor-Mixer Hierarchy\Default Work Unit\Weather\Rain",
+                    r"\Actor-Mixer Hierarchy\Default Work Unit\Weather\Wind",
+                ],
+                "platforms": ["Windows", "Mac"],
+                "languages": ["SFX"],
+            },
+            "options": {},
+            "io_root": native_absolute_test_path("audio-convert-business"),
+        },
+    }
+
+    steps = build_audio_convert_business_transaction_steps(
+        request,
+        label="tx01",
+    )
+
+    assert tuple(step.subcommand for step in steps) == (
+        "request-schema",
+        "draft-start",
+        "draft-bind-object",
+        "draft-bind-object",
+        "draft-declare-core-plan",
+        "draft-check",
+        "preview-from-draft",
+    )
+    assert all(step.subcommand != "typed-call" for step in steps)
+    assert steps[-1].expected_operation_request == request
+
+    protocol = build_transaction_protocol((request,))
+    assert tuple(step.subcommand for step in protocol.steps[:7]) == tuple(
+        step.subcommand for step in steps
+    )
+    assert all(step.subcommand != "typed-call" for step in protocol.steps)
+
+    discovered = build_operations_discovery_protocol(protocol)
+    assert tuple(step.subcommand for step in discovered.steps[:2]) == (
+        "operations",
+        "request-schema",
+    )
+    assert discovered.optional_initial_operations_discovery is True
 
 
 def test_commutative_read_only_groups_are_adjacent_and_cannot_cross_turns() -> None:
@@ -430,7 +1360,7 @@ def test_commutative_composer_setup_groups_are_narrow_and_cannot_cross_turns() -
         "tx01.action.001",
         "draft-apply",
         (
-            DraftActionJsonArgument(
+            DraftTypedActionArgument(
                 {
                     "contract": "waapi-skill.operation-draft-action/v1",
                     "action": "set_import_option",
@@ -450,7 +1380,7 @@ def test_commutative_composer_setup_groups_are_narrow_and_cannot_cross_turns() -
         "tx01.action.002",
         "draft-apply",
         (
-            DraftActionJsonArgument(
+            DraftTypedActionArgument(
                 {
                     "contract": "waapi-skill.operation-draft-action/v1",
                     "action": "set_import_default",
@@ -473,22 +1403,308 @@ def test_commutative_composer_setup_groups_are_narrow_and_cannot_cross_turns() -
         )
 
 
-def test_non_object_transaction_request_keeps_wire_exact_json() -> None:
+def test_audio_import_transaction_request_uses_business_declaration_steps() -> None:
+    protocol = build_transaction_protocol([_audio_import_request()])
+
+    assert any(
+        step.subcommand == "draft-declare-import-batch"
+        for step in protocol.steps
+    )
+    assert any(step.subcommand == "draft-bind-object" for step in protocol.steps)
+    assert all(step.subcommand != "draft-apply" for step in protocol.steps)
+    assert all("--request-json" not in step.arguments for step in protocol.steps)
+
+
+def test_recursive_object_create_uses_business_graph_declarations() -> None:
     request = {
-        **_request(),
-        "operation": "audio.import",
-        "arguments": {"imports": []},
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2021.1",
+        "operation": "object.create",
+        "arguments": {
+            "parent": {
+                "kind": "path",
+                "value": r"\Actor-Mixer Hierarchy\Default Work Unit\SemanticLab\NPC",
+            },
+            "type": "ActorMixer",
+            "name": "Robot_VO",
+            "children": [
+                {
+                    "type": "RandomSequenceContainer",
+                    "name": "Alert",
+                    "children": [
+                        {"type": "Sound", "name": "Alert_A"},
+                        {"type": "Sound", "name": "Alert_B"},
+                    ],
+                }
+            ],
+            "on_name_conflict": "merge",
+        },
     }
 
-    protocol = build_transaction_protocol([request])
+    steps = build_object_graph_business_transaction_steps(request, label="tx01")
 
-    assert protocol.steps[1].arguments[:2] == ("--apply", "--request-json")
-    request_argument = protocol.steps[1].arguments[2]
-    assert isinstance(request_argument, SemanticJsonArgument)
-    assert request_argument.equivalence == "wire_exact"
+    assert [step.subcommand for step in steps] == [
+        "operation-schema",
+        "draft-start",
+        "draft-bind-object",
+        "draft-business-configure",
+        "draft-declare-new",
+        "draft-declare-new",
+        "draft-declare-new",
+        "draft-declare-new",
+        "draft-check",
+        "preview-from-draft",
+    ]
+    declarations = [
+        step for step in steps if step.subcommand == "draft-declare-new"
+    ]
+    encoded = repr([step.arguments for step in declarations])
+    assert "actor-mixer" in encoded
+    assert "random-container" in encoded
+    assert encoded.count("sound-sfx") == 2
+    assert "ActorMixer" not in encoded
+    assert "RandomSequenceContainer" not in encoded
+    assert all(step.subcommand != "draft-apply" for step in steps)
+    assert steps[-1].expected_operation_request == request
 
 
-def test_soundbank_generate_transaction_uses_narrow_default_equivalence() -> None:
+def test_bulk_object_set_uses_existing_and_child_business_declarations() -> None:
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2025.1",
+        "operation": "object.set",
+        "arguments": {
+            "objects": [
+                {
+                    "object": {
+                        "kind": "path",
+                        "value": r"\Containers\Default Work Unit\SemanticLab\UI\Error",
+                    },
+                    "notes": "错误操作反馈",
+                    "properties": [{"name": "Volume", "value": -4.0}],
+                    "children": [{"type": "Sound", "name": "Error_Layer"}],
+                }
+            ],
+            "on_name_conflict": "fail",
+        },
+    }
+
+    protocol = build_transaction_protocol((request,))
+
+    assert any(
+        step.subcommand == "draft-declare-existing" for step in protocol.steps
+    )
+    assert any(step.subcommand == "draft-declare-new" for step in protocol.steps)
+    assert all(step.subcommand != "draft-apply" for step in protocol.steps)
+    assert all("--request-json" not in step.arguments for step in protocol.steps)
+    preview = next(
+        step for step in protocol.steps if step.subcommand == "preview-from-draft"
+    )
+    assert preview.expected_operation_request == request
+
+
+@pytest.mark.parametrize(
+    ("operation", "arguments", "expected_flags"),
+    [
+        (
+            "object.copy",
+            {
+                "object": {"kind": "path", "value": r"\Actor-Mixer Hierarchy\Source"},
+                "parent": {"kind": "id", "value": "{parent}"},
+                "on_name_conflict": "rename",
+                "auto_add_to_source_control": False,
+                "auto_check_out_to_source_control": True,
+            },
+            {"--name-conflict", "--no-add-to-source-control", "--check-out-from-source-control"},
+        ),
+        (
+            "object.delete",
+            {
+                "object": {"kind": "id", "value": "{object}"},
+                "auto_check_out_to_source_control": False,
+            },
+            {"--no-check-out-from-source-control"},
+        ),
+        (
+            "object.move",
+            {
+                "object": {"kind": "id", "value": "{object}"},
+                "parent": {"kind": "path", "value": r"\Actor-Mixer Hierarchy\Destination"},
+                "on_name_conflict": "fail",
+            },
+            {"--name-conflict"},
+        ),
+        (
+            "object.setName",
+            {"object": {"kind": "id", "value": "{object}"}, "value": "Rain"},
+            {"--new-name"},
+        ),
+        (
+            "object.setNotes",
+            {"object": {"kind": "id", "value": "{object}"}, "value": "Wet"},
+            {"--notes"},
+        ),
+    ],
+)
+def test_object_lifecycle_protocol_uses_business_declarations(
+    operation: str,
+    arguments: dict[str, object],
+    expected_flags: set[str],
+) -> None:
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2024.1",
+        "operation": operation,
+        "arguments": arguments,
+    }
+
+    steps = build_object_lifecycle_business_transaction_steps(request, label="tx01")
+    declaration = next(
+        step for step in steps if step.subcommand == "draft-declare-object-change"
+    )
+
+    assert expected_flags.issubset(set(declaration.arguments))
+    assert "--object-handle" not in declaration.arguments
+    assert "--parent-handle" not in declaration.arguments
+    assert [step.subcommand for step in steps][-3:] == [
+        "draft-declare-object-change",
+        "draft-check",
+        "preview-from-draft",
+    ]
+    assert all(step.subcommand != "draft-apply" for step in steps)
+    assert all("--request-json" not in step.arguments for step in steps)
+    preview = next(step for step in steps if step.name == "tx01.preview")
+    assert preview.expected_operation_request == request
+
+
+def test_transaction_protocol_routes_object_lifecycle_around_generic_typed_facts() -> None:
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "object.setNotes",
+        "arguments": {
+            "object": {"kind": "path", "value": r"\Actor-Mixer Hierarchy\Target"},
+            "value": "Closed business notes",
+        },
+    }
+
+    protocol = build_transaction_protocol((request,))
+
+    assert any(
+        step.subcommand == "draft-declare-object-change" for step in protocol.steps
+    )
+    assert all(step.subcommand != "draft-apply" for step in protocol.steps)
+
+
+def test_object_lifecycle_business_builder_rejects_native_or_unknown_fields() -> None:
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "object.setName",
+        "arguments": {
+            "object": {"kind": "id", "value": "{object}"},
+            "value": "Rain",
+            "native_args": {},
+        },
+    }
+
+    with pytest.raises(V3ProtocolError, match="fields are not supported"):
+        build_object_lifecycle_business_transaction_steps(request, label="tx01")
+
+
+@pytest.mark.parametrize(
+    ("operation", "arguments", "outcome_flag"),
+    [
+        (
+            "object.setProperty",
+            {
+                "object": {"kind": "id", "value": "{object}"},
+                "property": "Volume",
+                "value": -4.0,
+                "platform": "Windows",
+            },
+            "--business-value",
+        ),
+        (
+            "object.setReference",
+            {
+                "object": {"kind": "id", "value": "{object}"},
+                "reference": "OutputBus",
+                "target": {"kind": "id", "value": "{target}"},
+            },
+            "--target-handle",
+        ),
+        (
+            "object.setLinked",
+            {
+                "object": {"kind": "id", "value": "{object}"},
+                "property": "Volume",
+                "platform": "Windows",
+                "linked": False,
+            },
+            "--link-state",
+        ),
+    ],
+)
+def test_object_metadata_protocol_uses_meaning_and_opaque_field_handle(
+    operation: str,
+    arguments: dict[str, object],
+    outcome_flag: str,
+) -> None:
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2025.1",
+        "operation": operation,
+        "arguments": arguments,
+    }
+
+    steps = build_object_metadata_business_transaction_steps(
+        request,
+        label="tx01",
+    )
+
+    discover = next(
+        step for step in steps if step.subcommand == "draft-discover-fields"
+    )
+    declare = next(
+        step for step in steps if step.subcommand == "draft-declare-field-change"
+    )
+    assert "--meaning" in discover.arguments
+    assert "--token" not in discover.arguments
+    assert outcome_flag in declare.arguments
+    assert [step.subcommand for step in steps][-3:] == [
+        "draft-declare-field-change",
+        "draft-check",
+        "preview-from-draft",
+    ]
+    assert all(step.subcommand != "draft-apply" for step in steps)
+    assert next(step for step in steps if step.name == "tx01.preview").expected_operation_request == request
+
+
+def test_transaction_protocol_routes_object_metadata_around_typed_ingress() -> None:
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "object.setReference",
+        "arguments": {
+            "object": {"kind": "id", "value": "{object}"},
+            "reference": "OutputBus",
+            "target": None,
+        },
+    }
+
+    protocol = build_transaction_protocol((request,))
+
+    assert any(
+        step.subcommand == "draft-discover-fields" for step in protocol.steps
+    )
+    assert any(
+        step.subcommand == "draft-declare-field-change" for step in protocol.steps
+    )
+    assert all(step.subcommand != "typed-operation" for step in protocol.steps)
+
+
+def test_soundbank_generate_transaction_uses_one_complete_business_plan() -> None:
     request = {
         **_request(),
         "operation": "soundbank.generate",
@@ -512,64 +1728,170 @@ def test_soundbank_generate_transaction_uses_narrow_default_equivalence() -> Non
 
     protocol = build_transaction_protocol([request])
 
-    request_argument = protocol.steps[1].arguments[2]
-    assert isinstance(request_argument, SemanticJsonArgument)
-    assert request_argument.equivalence == "soundbank_generate_v1"
+    declare = next(
+        step
+        for step in protocol.steps
+        if step.subcommand == "draft-declare-soundbank-plan"
+    )
+
+    assert "--soundbank" in declare.arguments
+    assert "--platform" in declare.arguments
+    assert ("--rebuild-soundbanks", "false") in tuple(
+        zip(declare.arguments, declare.arguments[1:])
+    )
+    assert ("--clear-audio-file-cache", "false") in tuple(
+        zip(declare.arguments, declare.arguments[1:])
+    )
+    assert ("--rebuild-init-bank", "false") in tuple(
+        zip(declare.arguments, declare.arguments[1:])
+    )
+    assert any(step.subcommand == "draft-bind-object" for step in protocol.steps)
+    binding = next(
+        step for step in protocol.steps if step.subcommand == "draft-bind-object"
+    )
+    assert binding.arguments[-5:] == (
+        "--role",
+        "soundbank",
+        "--exact-type-name",
+        "SoundBank",
+        "Main_UI",
+    )
+    assert all(step.subcommand != "query-object" for step in protocol.steps)
+    assert any(step.subcommand == "preview-from-draft" for step in protocol.steps)
+    assert all(step.subcommand != "draft-apply" for step in protocol.steps)
+    assert all(step.subcommand != "typed-operation" for step in protocol.steps)
+    assert all("--request-json" not in step.arguments for step in protocol.steps)
 
 
-def test_metadata_transaction_protocol_is_generic_and_binds_every_preview() -> None:
-    first = _request(1)
-    first["arguments"] = {
-        "object": {"kind": "path", "value": r"\Root\One"},
-        "properties": [{"name": "Volume", "value": -1.5}],
+def test_multi_bank_business_plan_binds_each_bank_once_before_one_declaration() -> None:
+    request = {
+        **_request(),
+        "version": "2024.1",
+        "operation": "soundbank.generate",
+        "arguments": {
+            "soundbanks": [
+                {
+                    "name": "Main_UI",
+                    "artifact_expectation": "nonlocalized",
+                    "rebuild": False,
+                },
+                {
+                    "name": "Dialogue",
+                    "artifact_expectation": "nonlocalized",
+                    "rebuild": False,
+                },
+            ],
+            "platforms": ["Windows"],
+            "skip_languages": True,
+            "write_to_disk": True,
+            "io_root": "/owned",
+            "rebuild_soundbanks": False,
+            "clear_audio_file_cache": False,
+            "rebuild_init_bank": False,
+        },
     }
-    second = _request(2)
-    second["arguments"] = {
-        "object": {"kind": "path", "value": r"\Root\Two"},
-        "properties": [{"name": "Volume", "value": -3}],
+
+    protocol = build_transaction_protocol([request])
+    bindings = [
+        step for step in protocol.steps if step.subcommand == "draft-bind-object"
+    ]
+    declarations = [
+        step
+        for step in protocol.steps
+        if step.subcommand == "draft-declare-soundbank-plan"
+    ]
+
+    assert all(step.subcommand != "query-object" for step in protocol.steps)
+    assert len(bindings) == 2
+    assert [step.arguments[-5:] for step in bindings] == [
+        ("--role", "soundbank", "--exact-type-name", "SoundBank", "Main_UI"),
+        ("--role", "soundbank", "--exact-type-name", "SoundBank", "Dialogue"),
+    ]
+    assert len(declarations) == 1
+    declare = declarations[0]
+    assert declare.arguments.count("--soundbank") == 2
+    assert declare.arguments.count("--soundbank-rebuild") == 2
+    assert declare.arguments[4] == ResponseBinding(
+        "tx01.bind-object.002",
+        "/draft/revision",
+    )
+
+
+def test_set_inclusions_business_plan_binds_ids_without_typed_disclosure() -> None:
+    request = {
+        **_request(),
+        "operation": "soundbank.setInclusions",
+        "arguments": {
+            "soundbank": {
+                "kind": "id",
+                "value": "{00000000-0000-0000-0000-000000000001}",
+            },
+            "mode": "replace",
+            "inclusions": [
+                {
+                    "object": {
+                        "kind": "id",
+                        "value": "{00000000-0000-0000-0000-000000000002}",
+                    },
+                    "filters": ["events", "structures", "media"],
+                }
+            ],
+        },
     }
 
-    protocol = build_metadata_transaction_protocol(
-        (first, second),
-        object_type="ActorMixer",
-        metadata_queries=("output volume", "voice gain"),
-        required_tokens=("Volume",),
-        expected_required_token_projection=(
-            MetadataTokenProjection("Volume", "property", "Real32"),
-        ),
+    protocol = build_transaction_protocol([request])
+    bindings = [
+        step for step in protocol.steps if step.subcommand == "draft-bind-object"
+    ]
+    declare = next(
+        step
+        for step in protocol.steps
+        if step.subcommand == "draft-declare-soundbank-plan"
     )
 
-    assert protocol.turn_prefix_counts == (3, 9, 13)
-    assert protocol.steps[0].name == "metadata.discover"
-    assert protocol.steps[0].subcommand == "metadata"
-    assert protocol.steps[0].arguments[:3] == (
-        "discover",
-        "--object-type",
-        "ActorMixer",
+    assert len(bindings) == 2
+    assert bindings[0].arguments[-2:] == (
+        "--object-id",
+        "{00000000-0000-0000-0000-000000000001}",
     )
-    query_arguments = tuple(
-        item
-        for item in protocol.steps[0].arguments
-        if isinstance(item, MetadataQueryArgument)
+    assert bindings[0].arguments[-4:-2] == ("--role", "soundbank")
+    assert bindings[1].arguments[-2:] == (
+        "--object-id",
+        "{00000000-0000-0000-0000-000000000002}",
     )
-    assert tuple(item.label for item in query_arguments) == (
-        "output volume",
-        "voice gain",
+    assert bindings[1].arguments[-4:-2] == ("--role", "inclusion_object")
+    assert declare.arguments[-9:] == (
+        "--mode",
+        "replace",
+        "--soundbank-handle",
+        ResponseBinding("tx01.bind-object.001", "/bound_object/handle"),
+        "--inclusion",
+        ResponseBinding("tx01.bind-object.002", "/bound_object/handle"),
+        "events",
+        "structures",
+        "media",
     )
-    previews = tuple(
-        step for step in protocol.steps if step.subcommand == "preview"
-    )
-    assert len(previews) == 2
-    for preview, request in zip(previews, (first, second), strict=True):
-        argument = preview.arguments[2]
-        assert isinstance(argument, MetadataBoundJsonArgument)
-        assert argument.expected == request
-        assert argument.metadata_step == "metadata.discover"
-        assert argument.object_type == "ActorMixer"
-        assert argument.required_tokens == ("Volume",)
-        assert argument.equivalence == "wire_exact"
-        assert argument.expected_required_token_projection == (
-            MetadataTokenProjection("Volume", "property", "Real32"),
+    assert declare.arguments.count("--inclusion") == 1
+    assert all(step.subcommand != "draft-apply" for step in protocol.steps)
+
+
+def test_object_set_rejects_the_retired_outer_metadata_protocol() -> None:
+    first = _object_set_request()
+    second = _object_set_request()
+    second["arguments"]["objects"][0]["object"]["value"] = r"\Root\Two"  # type: ignore[index]
+
+    with pytest.raises(
+        V3ProtocolError,
+        match="Business Draft owns live field discovery",
+    ):
+        build_metadata_transaction_protocol(
+            (first, second),
+            object_type="ActorMixer",
+            metadata_queries=("output volume", "voice gain"),
+            required_tokens=("Volume",),
+            expected_required_token_projection=(
+                MetadataTokenProjection("Volume", "property", "Real32"),
+            ),
         )
 
 
@@ -577,24 +1899,13 @@ def test_metadata_transaction_protocol_is_generic_and_binds_every_preview() -> N
     ("query_count", "expected_limit"),
     ((1, 8), (2, 8), (3, 3), (4, 3), (5, 2), (8, 2)),
 )
-def test_metadata_transaction_protocol_uses_the_skill_query_count_budget(
+def test_metadata_candidate_limit_uses_the_skill_query_count_budget(
     query_count: int,
     expected_limit: int,
 ) -> None:
     queries = tuple(f"setting {index}" for index in range(query_count))
 
-    protocol = build_metadata_transaction_protocol(
-        (_request(),),
-        object_type="Sound",
-        metadata_queries=queries,
-        required_tokens=("Volume",),
-    )
-
     assert metadata_candidate_limit(queries) == expected_limit
-    assert protocol.steps[0].arguments[-2:] == (
-        "--limit",
-        str(expected_limit),
-    )
 
 
 @pytest.mark.parametrize("queries", ((), tuple("q" for _ in range(9)), "volume"))
@@ -605,36 +1916,24 @@ def test_metadata_candidate_budget_rejects_non_protocol_query_counts(
         metadata_candidate_limit(queries)  # type: ignore[arg-type]
 
 
-def test_schema_first_metadata_protocol_exposes_version_before_exact_scope() -> None:
-    protocol = build_metadata_transaction_protocol(
-        (_request(),),
-        object_type="PropertyContainer",
-        metadata_queries=("output volume",),
-        required_tokens=("Volume",),
-        expected_required_token_projection=(
-            MetadataTokenProjection("Volume", "property", "Real32"),
-        ),
-        schema_first=True,
-    )
-
-    assert protocol.turn_prefix_counts == (3, 7)
-    assert tuple(step.subcommand for step in protocol.steps[:3]) == (
-        "operation-schema",
-        "metadata",
-        "preview",
-    )
-    assert protocol.steps[1].arguments[:3] == (
-        "discover",
-        "--object-type",
-        "PropertyContainer",
-    )
-    argument = protocol.steps[2].arguments[2]
-    assert isinstance(argument, MetadataBoundJsonArgument)
-    assert argument.metadata_step == "metadata.discover"
-    assert argument.object_type == "PropertyContainer"
+def test_schema_first_object_set_metadata_protocol_is_retired() -> None:
+    with pytest.raises(
+        V3ProtocolError,
+        match="Business Draft owns live field discovery",
+    ):
+        build_metadata_transaction_protocol(
+            (_object_set_request(),),
+            object_type="PropertyContainer",
+            metadata_queries=("output volume",),
+            required_tokens=("Volume",),
+            expected_required_token_projection=(
+                MetadataTokenProjection("Volume", "property", "Real32"),
+            ),
+            schema_first=True,
+        )
 
 
-def test_schema_query_protocol_requires_one_exact_auditable_object_lookup() -> None:
+def test_schema_query_protocol_requires_one_exact_auditable_preflight_lookup() -> None:
     query = query_object_step(
         "object.merge-root",
         (
@@ -657,13 +1956,13 @@ def test_schema_query_protocol_requires_one_exact_auditable_object_lookup() -> N
         query_step=query,
     )
 
-    assert protocol.turn_prefix_counts == (3, 7)
+    assert protocol.turn_prefix_counts == (6, 10)
     assert tuple(step.subcommand for step in protocol.steps[:3]) == (
-        "operation-schema",
         "query-object",
-        "preview",
+        "operation-schema",
+        "draft-start",
     )
-    assert protocol.steps[1] == query
+    assert protocol.steps[0] == query
 
 
 def test_metadata_transaction_protocol_selects_closed_audio_import_equivalence() -> None:
@@ -697,32 +1996,19 @@ def test_metadata_transaction_protocol_selects_closed_audio_import_equivalence()
         required_tokens=("IsLoopingEnabled",),
         equivalence="audio_import_v1",
     )
-    action_arguments = [
-        step.arguments[-1]
-        for step in protocol.steps
-        if step.subcommand == "draft-apply"
-    ]
-
     assert protocol.turn_prefix_counts == (7, 11)
     assert tuple(step.subcommand for step in protocol.steps[:2]) == (
         "operation-schema",
-        "metadata",
+        "draft-start",
     )
-    assert [argument.expected["action"] for argument in action_arguments] == [
-        "set_import_default",
-        "add_import_row",
-    ]
-    assert all(
-        isinstance(argument, DraftActionJsonArgument)
-        and argument.operation == "audio.import"
-        for argument in action_arguments
+    assert any(step.subcommand == "draft-bind-field" for step in protocol.steps)
+    assert any(
+        step.subcommand == "draft-declare-import-batch"
+        for step in protocol.steps
     )
-    assert action_arguments[0].metadata_binding is not None
-    assert action_arguments[1].metadata_binding is None
-    assert sum(step.subcommand == "metadata" for step in protocol.steps) == 1
-    assert protocol.commutative_read_only_step_groups == (
-        ("tx01.operation-schema", "metadata.discover"),
-    )
+    assert all(step.subcommand != "metadata" for step in protocol.steps)
+    assert all(step.subcommand != "draft-apply" for step in protocol.steps)
+    assert protocol.commutative_read_only_step_groups == ()
     assert "preview" not in {
         step.subcommand for step in protocol.steps
     }
@@ -731,7 +2017,53 @@ def test_metadata_transaction_protocol_selects_closed_audio_import_equivalence()
     }
 
 
-def test_metadata_transaction_protocol_selects_closed_tab_import_equivalence() -> None:
+def test_audio_import_protocol_serializes_bound_existing_declarations() -> None:
+    request = _audio_import_request()
+    request["arguments"]["imports"] = [
+        {
+            "audio_file": native_absolute_test_path("audio", f"source-{index}.wav"),
+            "object_path": rf"\Actor-Mixer Hierarchy\Default Work Unit\Target{index}",
+            "object_type": "Sound SFX",
+            "import_language": "SFX",
+        }
+        for index in range(5)
+    ]
+    request["arguments"].pop("defaults")
+    request["arguments"].pop("auto_add_to_source_control")
+    request["arguments"]["import_operation"] = "useExisting"
+
+    steps = build_audio_import_composer_transaction_steps(request, label="tx01")
+    assert sum(step.subcommand == "draft-bind-object" for step in steps) == 5
+    declarations = [
+        step
+        for step in steps
+        if step.subcommand == "draft-declare-import-batch"
+    ]
+    assert len(declarations) == 5
+    assert sum(
+        declaration.arguments.count("--existing-row")
+        for declaration in declarations
+    ) == 5
+    assert sum(
+        declaration.arguments.count("--row-order")
+        for declaration in declarations
+    ) == 5
+    assert all(
+        declaration.arguments.count("--row-order") == 1
+        for declaration in declarations
+    )
+    assert all(
+        "--expected-declaration-count" not in declaration.arguments
+        for declaration in declarations
+    )
+    assert all(
+        "--expected-switch-assignment-count" not in declaration.arguments
+        for declaration in declarations
+    )
+    assert all(step.subcommand != "draft-apply" for step in steps)
+
+
+def test_metadata_transaction_protocol_keeps_tab_import_on_business_preview() -> None:
     request = {
         "contract": "waapi-skill.operation-request/v1",
         "version": "2025.1",
@@ -753,11 +2085,13 @@ def test_metadata_transaction_protocol_selects_closed_tab_import_equivalence() -
         required_tokens=("IsLoopingEnabled",),
         equivalence="audio_import_tab_v1",
     )
-    argument = protocol.steps[2].arguments[2]
-
-    assert isinstance(argument, MetadataBoundJsonArgument)
-    assert argument.expected == request
-    assert argument.equivalence == "audio_import_tab_v1"
+    preview = next(
+        step for step in protocol.steps if step.subcommand == "preview-from-draft"
+    )
+    assert preview.metadata_binding is not None
+    assert preview.metadata_binding.step == "metadata.discover"
+    assert preview.metadata_binding.required_tokens == ("IsLoopingEnabled",)
+    assert all(step.subcommand != "typed-operation" for step in protocol.steps)
 
 
 def test_metadata_transaction_protocol_selects_closed_object_set_equivalence() -> None:
@@ -785,11 +2119,16 @@ def test_metadata_transaction_protocol_selects_closed_object_set_equivalence() -
         required_tokens=("Volume",),
         equivalence="object_set_v1",
     )
-    argument = protocol.steps[2].arguments[2]
-
-    assert isinstance(argument, MetadataBoundJsonArgument)
-    assert argument.expected == request
-    assert argument.equivalence == "object_set_v1"
+    declaration = next(
+        step
+        for step in protocol.steps
+        if step.subcommand == "draft-declare-existing"
+    )
+    assert ("--field", "volume_db") == (
+        declaration.arguments[-3],
+        declaration.arguments[-2],
+    )
+    assert all(step.subcommand != "draft-apply" for step in protocol.steps)
 
 
 @pytest.mark.parametrize(
@@ -937,9 +2276,9 @@ def test_audio_import_metadata_equivalence_rejects_duplicate_expected_names() ->
 def test_three_transactions_preserve_four_natural_turn_boundaries() -> None:
     protocol = build_transaction_protocol([_request(1), _request(2), _request(3)])
 
-    assert protocol.turn_prefix_counts == (2, 8, 14, 18)
-    assert len(protocol.steps) == 18
-    assert [step.name for step in protocol.steps if step.subcommand == "preview"] == [
+    assert protocol.turn_prefix_counts == (5, 14, 23, 27)
+    assert len(protocol.steps) == 27
+    assert [step.name for step in protocol.steps if step.subcommand == "preview-from-draft"] == [
         "tx01.preview",
         "tx02.preview",
         "tx03.preview",
@@ -965,7 +2304,7 @@ def test_structured_refusal_is_one_turn_and_exact_exit_two() -> None:
         [_request()], refusal=StructuredRefusal("INPUT_FILE_NOT_FOUND")
     )
 
-    assert protocol.turn_prefix_counts == (2,)
+    assert protocol.turn_prefix_counts == (5,)
     assert protocol.steps[-1].allowed_exit_codes == (2,)
     assert protocol.steps[-1].expected_error_code == "INPUT_FILE_NOT_FOUND"
     assert protocol.steps[-1].expected_result_command == "preview"
@@ -974,10 +2313,13 @@ def test_structured_refusal_is_one_turn_and_exact_exit_two() -> None:
 def test_terminal_execute_transaction_ends_at_execute_without_verify() -> None:
     protocol = build_transaction_protocol([_request()], terminal_execute=True)
 
-    assert protocol.turn_prefix_counts == (2, 5)
+    assert protocol.turn_prefix_counts == (5, 8)
     assert tuple(step.subcommand for step in protocol.steps) == (
         "operation-schema",
-        "preview",
+        "draft-start",
+        "draft-declare-artifact-plan",
+        "draft-check",
+        "preview-from-draft",
         "transaction-show",
         "confirm",
         "execute",
@@ -1002,17 +2344,22 @@ def test_terminal_execute_rejects_multi_request_or_refusal_combinations() -> Non
 def test_direct_call_and_topic_protocols_are_single_turn() -> None:
     protocol = build_direct_protocol(
         [
-            call_step("fields", "ak.wwise.core.mediaPool.getFields"),
+            call_step(
+                "fields",
+                "ak.wwise.core.mediaPool.getFields",
+                version="2025.1",
+            ),
             wait_topic_step(
                 "generated",
                 "ak.wwise.core.soundbank.generated",
+                version="2025.1",
                 event_count=4,
-                match={"platform": "Windows"},
+                match={},
             ),
         ]
     )
     assert protocol.turn_prefix_counts == (2,)
-    assert protocol.steps[0].allow_omitted_empty_json_objects is True
+    assert protocol.steps[0].subcommand == "typed-zero-call"
     assert protocol.steps[1].gateway_global_arguments == ("--timeout", "120")
     assert protocol.steps[1].allow_omitted_default_event_count_one is False
 
@@ -1021,11 +2368,13 @@ def test_wait_topic_allows_omitted_event_count_only_for_the_default_one() -> Non
     default_step = wait_topic_step(
         "one",
         "ak.wwise.core.soundbank.generated",
+        version="2025.1",
         event_count=1,
     )
     multiple_step = wait_topic_step(
         "multiple",
         "ak.wwise.core.soundbank.generated",
+        version="2025.1",
         event_count=2,
     )
 
@@ -1033,188 +2382,215 @@ def test_wait_topic_allows_omitted_event_count_only_for_the_default_one() -> Non
     assert multiple_step.allow_omitted_default_event_count_one is False
 
 
-def test_call_step_deeply_normalizes_frozen_json_for_broker_validation(
-    tmp_path: Path,
-) -> None:
-    args = MappingProxyType(
-        {
-            "from": MappingProxyType(
-                {"path": ("\\Interactive Music Hierarchy", "\\Events")}
-            ),
-            "filters": (
-                MappingProxyType({"field": "type", "values": ("MusicSegment",)}),
-            ),
-        }
-    )
-    options = MappingProxyType({"return": ("id", "name", "path")})
-
+def test_call_step_binds_typed_facts_to_exact_contract() -> None:
     step = call_step(
-        "object.get",
-        "ak.wwise.core.object.get",
-        args=args,
-        options=options,
+        "transport.state",
+        "ak.wwise.core.transport.getState",
+        version="2025.1",
+        args={"transport": 42},
     )
-    expected_args = step.arguments[2]
-    expected_options = step.arguments[4]
-    assert isinstance(expected_args, SemanticJsonArgument)
-    assert isinstance(expected_options, SemanticJsonArgument)
-    assert type(expected_args.expected) is dict
-    assert type(expected_args.expected["from"]) is dict
-    assert type(expected_args.expected["from"]["path"]) is list
-    assert type(expected_args.expected["filters"]) is list
-    assert type(expected_args.expected["filters"][0]) is dict
-    assert type(expected_args.expected["filters"][0]["values"]) is list
-    assert type(expected_options.expected["return"]) is list
-    json.dumps(expected_args.expected, allow_nan=False, sort_keys=True)
-    json.dumps(expected_options.expected, allow_nan=False, sort_keys=True)
-
-    skill_source = tmp_path / "waapi-skill"
-    broker = CodexGatewayBroker(
-        skill_source=skill_source,
-        expected_steps=(step,),
+    assert step.subcommand == "typed-call"
+    assert step.arguments[:2] == (
+        "ak.wwise.core.transport.getState",
+        "--schema-digest",
     )
-    gateway_arguments = (
-        "call",
-        "ak.wwise.core.object.get",
-        "--args-json",
-        json.dumps(expected_args.expected, separators=(",", ":")),
-        "--options-json",
-        json.dumps(expected_options.expected, separators=(",", ":")),
-    )
-    resolved = resolve_gateway_invocation(
-        (
-            "python",
-            str(skill_source.resolve() / "scripts" / "run.py"),
-            "gateway.py",
-            *gateway_arguments,
-        ),
-        skill_source=skill_source,
-    )
-
-    semantic_hash, execution_arguments = broker._validate_step(  # noqa: SLF001
-        step,
-        resolved.gateway_arguments,
-    )
-    assert len(semantic_hash) == 64
-    assert execution_arguments == gateway_arguments
+    argument = step.arguments[-1]
+    assert isinstance(argument, TypedRequestFactsArgument)
+    assert argument.contract.version == "2025.1"
+    assert argument.expected_args == {"transport": 42}
+    assert argument.expected_options == {}
 
 
-def test_call_step_appends_closed_post_filter_json_for_media_pool(
-    tmp_path: Path,
-) -> None:
-    step = call_step(
+def test_media_pool_read_draft_appends_typed_post_filter() -> None:
+    steps = typed_read_draft_steps(
         "media.get",
         "ak.wwise.core.mediaPool.get",
+        version="2025.1",
         args={"maxResults": 200},
         options={"return": ["Filename"]},
-        post_filter=MappingProxyType(
-            {
-                "field": "Filename",
-                "operator": "containsCaseSensitive",
-                "value": "footstep",
-                "limit": 20,
-            }
-        ),
+        post_filter={
+            "field": "Filename",
+            "operator": "containsCaseSensitive",
+            "value": "footstep",
+            "limit": 20,
+        },
     )
+    check = steps[-1]
+    assert check.subcommand == "draft-check"
+    assert check.arguments[-4:] == (
+        "--post-filter-value",
+        "footstep",
+        "--post-filter-limit",
+        "20",
+    )
+    assert all("--post-filter-json" not in step.arguments for step in steps)
 
-    assert step.arguments[-2] == "--post-filter-json"
-    assert isinstance(step.arguments[-1], SemanticJsonArgument)
-    assert step.arguments[-1].expected == {
-        "field": "Filename",
-        "operator": "containsCaseSensitive",
-        "value": "footstep",
-        "limit": 20,
-    }
-    assert step.allow_omitted_empty_json_objects is False
-
-    skill_source = tmp_path / "waapi-skill"
-    broker = CodexGatewayBroker(
-        skill_source=skill_source,
-        expected_steps=(step,),
-    )
-    gateway_arguments = (
-        "call",
-        "ak.wwise.core.mediaPool.get",
-        "--args-json",
-        '{"maxResults":200}',
-        "--options-json",
-        '{"return":["Filename"]}',
-        "--post-filter-json",
-        json.dumps(step.arguments[-1].expected, separators=(",", ":")),
-    )
-    resolved = resolve_gateway_invocation(
-        (
-            "python",
-            str(skill_source.resolve() / "scripts" / "run.py"),
-            "gateway.py",
-            *gateway_arguments,
-        ),
-        skill_source=skill_source,
-    )
-    _semantic_hash, execution_arguments = broker._validate_step(  # noqa: SLF001
-        step,
-        resolved.gateway_arguments,
-    )
-    assert execution_arguments == gateway_arguments
-
-    with pytest.raises(V3ProtocolError, match="must not be empty"):
-        call_step(
+    with pytest.raises(V3ProtocolError, match="outside its closed contract"):
+        typed_read_draft_steps(
             "bad",
             "ak.wwise.core.mediaPool.get",
+            version="2025.1",
+            args={"maxResults": 200},
+            options={"return": ["Filename"]},
             post_filter={},
         )
 
 
-def test_wait_topic_and_operation_requests_deeply_normalize_frozen_json() -> None:
+def test_media_pool_public_business_read_uses_one_bounded_core_call() -> None:
+    step = media_pool_business_call_step(
+        "media.get",
+        scenario_id="VS25-F-MEDIAPOOL-GET-01",
+        args={
+            "databases": [r"\Databases\Project Originals"],
+            "filters": [
+                {
+                    "type": "field",
+                    "field": "Filename",
+                    "operator": "contains",
+                    "value": "footstep",
+                },
+                {
+                    "type": "field",
+                    "field": "WAV/Duration",
+                    "operator": "lessThan",
+                    "value": 0.8,
+                },
+            ],
+            "maxResults": 200,
+        },
+        options={"return": ["Path", "FileId", "Db", "Filename", "WAV/Duration"]},
+        post_filter={
+            "field": "Filename",
+            "operator": "containsCaseSensitive",
+            "value": "footstep",
+            "limit": 20,
+        },
+    )
+
+    assert step.subcommand == "core-call"
+    filename_meaning = step.arguments[6]
+    assert isinstance(filename_meaning, ExactArgumentAlternatives)
+    assert "name/file" in filename_meaning.values
+    canonical_arguments = tuple(
+        argument.values[0]
+        if isinstance(argument, ExactArgumentAlternatives)
+        else argument
+        for argument in step.arguments
+    )
+    assert canonical_arguments == (
+        "ak.wwise.core.mediaPool.get",
+        "--max-results",
+        "200",
+        "--database-scope",
+        "project-originals",
+        "--text-filter",
+        "Filename",
+        "contains",
+        "footstep",
+        "--number-filter",
+        "WAV/Duration",
+        "lessThan",
+        "0.8",
+        "--exact-name-contains",
+        "footstep",
+        "--final-limit",
+        "20",
+        "--sort-by",
+        "WAV/Duration",
+        "ascending",
+        "--sort-by",
+        "Path",
+        "ascending",
+    )
+
+
+def test_media_pool_read_draft_keeps_dynamic_choice_and_value_in_one_batch() -> None:
+    steps = typed_read_draft_steps(
+        "media",
+        "ak.wwise.core.mediaPool.get",
+        version="2025.1",
+        args={
+            "databases": [r"\Databases\Project Originals"],
+            "filters": [
+                {
+                    "type": "field",
+                    "field": "Filename",
+                    "operator": "contains",
+                    "value": "footstep",
+                },
+                {
+                    "type": "field",
+                    "field": "WAV/Duration",
+                    "operator": "lessThan",
+                    "value": 0.8,
+                },
+            ],
+            "maxResults": 200,
+        },
+        options={
+            "return": [
+                "Path",
+                "FileId",
+                "Db",
+                "Filename",
+                "WAV/Duration",
+                "WAV/Sample Rate",
+                "WAV/Channels",
+            ]
+        },
+        post_filter={
+            "field": "Filename",
+            "operator": "containsCaseSensitive",
+            "value": "footstep",
+            "limit": 20,
+        },
+    )
+
+    action_batches = []
+    for step in steps:
+        if step.subcommand != "draft-apply":
+            continue
+        argument = step.arguments[-1]
+        actions = (
+            argument.actions
+            if isinstance(argument, DraftTypedActionBatchArgument)
+            else (argument,)
+        )
+        action_batches.append(tuple(action.expected for action in actions))
+
+    assert tuple(len(batch) for batch in action_batches) == (6, 3, 5, 4, 5, 4)
+    assert all(batch[-1]["fact_action"] != "choose-dynamic" for batch in action_batches)
+    for batch in action_batches:
+        for index, action in enumerate(batch):
+            if action["fact_action"] != "choose-dynamic":
+                continue
+            paired = batch[index + 1]
+            assert paired["fact_action"] == "map-put"
+            assert paired["field_handle"] == action["field_handle"]
+            assert paired["key"] == action["key"]
+
+
+def test_wait_topic_uses_business_input_and_operations_keep_typed_internals() -> None:
     topic_step = wait_topic_step(
         "generated",
         "ak.wwise.core.soundbank.generated",
+        version="2025.1",
         event_count=2,
-        match=MappingProxyType(
-            {"platform": MappingProxyType({"name": ("Windows", "Mac")})}
-        ),
-        options=MappingProxyType({"return": ("id", "path")}),
+        match={},
+        options={},
     )
-    topic_options = topic_step.arguments[2]
-    topic_match = topic_step.arguments[6]
-    assert isinstance(topic_options, SemanticJsonArgument)
-    assert isinstance(topic_match, SemanticJsonArgument)
-    assert topic_options.expected == {"return": ["id", "path"]}
-    assert topic_match.expected == {
-        "platform": {"name": ["Windows", "Mac"]}
-    }
+    assert "--options-json" not in topic_step.arguments
+    assert "--match-json" not in topic_step.arguments
+    assert "--options-schema-digest" not in topic_step.arguments
+    assert "--match-schema-digest" not in topic_step.arguments
+    assert not any(str(value).startswith("trh1-") for value in topic_step.arguments)
 
-    request = MappingProxyType(
-        {
-            "contract": "waapi-skill.operation-request/v1",
-            "version": "2022.1",
-            "operation": "object.create",
-            "arguments": MappingProxyType(
-                {
-                    "objects": (
-                        MappingProxyType(
-                            {"name": "Music_A", "type": "MusicSegment"}
-                        ),
-                        MappingProxyType(
-                            {"name": "Music_B", "type": "MusicSegment"}
-                        ),
-                    )
-                }
-            ),
-        }
+    protocol = build_transaction_protocol((_request(),))
+    assert all("--request-json" not in step.arguments for step in protocol.steps)
+    assert any(
+        step.subcommand == "draft-declare-artifact-plan"
+        for step in protocol.steps
     )
-    protocol = build_transaction_protocol((request,))
-    assert protocol.steps[1].arguments[:2] == ("--apply", "--request-json")
-    preview_request = protocol.steps[1].arguments[2]
-    assert isinstance(preview_request, SemanticJsonArgument)
-    assert type(preview_request.expected) is dict
-    assert type(preview_request.expected["arguments"]) is dict
-    assert type(preview_request.expected["arguments"]["objects"]) is list
-    assert all(
-        type(item) is dict
-        for item in preview_request.expected["arguments"]["objects"]
-    )
-    json.dumps(preview_request.expected, allow_nan=False, sort_keys=True)
 
 
 @pytest.mark.parametrize(
@@ -1230,17 +2606,28 @@ def test_wait_topic_and_operation_requests_deeply_normalize_frozen_json() -> Non
 )
 def test_call_step_rejects_values_outside_closed_json(invalid) -> None:
     with pytest.raises(V3ProtocolError):
-        call_step("bad", "ak.wwise.core.object.get", args=invalid)
+        call_step(
+            "bad",
+            "ak.wwise.core.transport.getState",
+            version="2025.1",
+            args=invalid,
+        )
 
 
 def test_protocol_entry_points_reject_wrong_container_types_and_cycles() -> None:
     with pytest.raises(V3ProtocolError, match="call args must be a mapping"):
-        call_step("bad", "ak.wwise.core.object.get", args=[])  # type: ignore[arg-type]
+        call_step(
+            "bad",
+            "ak.wwise.core.transport.getState",
+            version="2025.1",
+            args=[],  # type: ignore[arg-type]
+        )
 
     with pytest.raises(V3ProtocolError, match="non-string object key"):
         wait_topic_step(
             "bad",
             "ak.wwise.core.object.created",
+            version="2025.1",
             event_count=1,
             match={False: "not-json"},  # type: ignore[dict-item]
         )

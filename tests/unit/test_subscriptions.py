@@ -11,6 +11,7 @@ from typing import Any, Callable
 
 import pytest  # pyright: ignore[reportMissingImports]
 
+import wwise_waapi.subscriptions as subscriptions_module
 from wwise_waapi.subscriptions import (  # pyright: ignore[reportMissingImports]
     DEFAULT_CALLBACK_EXECUTOR,
     MAX_WAIT_EVENT_COUNT,
@@ -457,7 +458,24 @@ def test_wait_for_event_timeout_unsubscribes_once() -> None:
     assert manager.active_topics == set()
 
 
-def test_wait_for_event_timeout_includes_subscription_setup_time() -> None:
+def test_wait_for_event_timeout_includes_subscription_setup_time(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    queue_timeouts: list[float] = []
+    base_queue = queue.Queue
+
+    class RecordingQueue(base_queue):  # type: ignore[type-arg]
+        def get(
+            self,
+            block: bool = True,
+            timeout: float | None = None,
+        ) -> Any:
+            if timeout is not None:
+                queue_timeouts.append(timeout)
+            return super().get(block=block, timeout=timeout)
+
+    monkeypatch.setattr(subscriptions_module.queue, "Queue", RecordingQueue)
+
     class SlowSubscribeClient(FakeSubscriptionClient):
         def subscribe(
             self,
@@ -471,12 +489,12 @@ def test_wait_for_event_timeout_includes_subscription_setup_time() -> None:
 
     client = SlowSubscribeClient()
     manager = SubscriptionManager(client)
-    started_at = time.monotonic()
 
     with pytest.raises(SubscriptionTimeout, match="Timed out"):
         manager.wait_for_event("ak.never", timeout=0.04)
 
-    assert time.monotonic() - started_at < 0.065
+    assert len(queue_timeouts) == 1
+    assert 0.0 <= queue_timeouts[0] < 0.02
     assert client.unsubscribe_calls == 1
     assert manager.active_topics == set()
 

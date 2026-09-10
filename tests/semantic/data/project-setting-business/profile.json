@@ -1,0 +1,19 @@
+{
+  "contract": "waapi-skill.project-setting-business-profile/v1",
+  "profile_id": "project_setting_business_1",
+  "model": {
+    "name": "gpt-5.6-terra",
+    "reasoning_effort": "medium",
+    "service_tier": "default",
+    "memory": "disabled"
+  },
+  "units": [
+    {
+      "unit_id": "PSET25-GAME-PARAMETER-RANGE-PREVIEW",
+      "operation": "ak.wwise.core.gameParameter.setRange",
+      "version": "2025.1",
+      "prompt": "请把当前 Wwise 工程里的 WeatherIntensity Game Parameter 范围改为 -10 到 100，并让已有曲线随新范围拉伸。只生成预览，不要执行。",
+      "final_markers": ["WeatherIntensity", "-10", "100", "预览"]
+    }
+  ]
+}

@@ -15,7 +15,6 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_metadata_transaction_protocol,
 )
 from tests.semantic.support.codex_gateway_broker import (
-    DraftActionJsonArgument,
     project_required_metadata_tokens,
 )
 from tests.semantic.support.codex_import_assets_v3 import (
@@ -381,8 +380,8 @@ def test_compound_direct_import_binds_defaults_row_overrides_and_inline_wav(
     )
     assert tuple(step.name for step in protocol.steps[:3]) == (
         "tx01.operation-schema",
-        "metadata.discover",
         "tx01.draft-start",
+        "tx01.bind-object.001",
     )
     assert next(step for step in protocol.steps if step.name == "tx01.preview").subcommand == (
         "preview-from-draft"
@@ -393,22 +392,22 @@ def test_compound_direct_import_binds_defaults_row_overrides_and_inline_wav(
         if step.subcommand == "preview-from-draft"
     )
     assert protocol.turn_prefix_counts == (preview_index, len(protocol.steps))
-    action_arguments = [
-        step.arguments[-1]
+    declarations = [
+        step
         for step in protocol.steps
-        if step.subcommand == "draft-apply"
+        if step.subcommand == "draft-declare-import-batch"
     ]
-    assert action_arguments
-    assert all(isinstance(item, DraftActionJsonArgument) for item in action_arguments)
-    metadata_arguments = [
-        item for item in action_arguments if item.metadata_binding is not None
+    assert declarations
+    assert not any(step.subcommand == "draft-apply" for step in protocol.steps)
+    field_bindings = [
+        step for step in protocol.steps if step.subcommand == "draft-bind-field"
     ]
-    assert metadata_arguments
-    assert all(
-        item.metadata_binding.step == "metadata.discover"
-        for item in metadata_arguments
-    )
-    assert sum(step.subcommand == "metadata" for step in protocol.steps) == 1
+    assert field_bindings
+    assert {
+        step.arguments[step.arguments.index("--token") + 1]
+        for step in field_bindings
+    } == {"IsLoopingEnabled", "MaxSoundPerInstance", "OverrideOutput"}
+    assert not any(step.subcommand == "metadata" for step in protocol.steps)
 
     mission = _compound_unit("CMP22-O22-AUDIO-IMPORT-03")
     mission_staged = materialize_import_case(
@@ -561,11 +560,16 @@ def test_compound_use_existing_tab_seals_exact_dynamic_cell_matrix(
         ),
         equivalence="audio_import_tab_v1",
     )
-    assert tuple(step.name for step in protocol.steps[:3]) == (
+    assert tuple(step.name for step in protocol.steps[:7]) == (
         "metadata.discover",
         "tx01.operation-schema",
+        "tx01.draft-start",
+        "tx01.bind-import-location",
+        "tx01.declare-artifact-plan",
+        "tx01.check",
         "tx01.preview",
     )
+    assert all(step.subcommand != "typed-operation" for step in protocol.steps)
 
 
 def test_compound_tab_dynamic_header_rejects_unknown_row_key(

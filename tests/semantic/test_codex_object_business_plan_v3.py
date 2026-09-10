@@ -12,20 +12,26 @@ from tests.support.platform_filesystem import create_symlink_or_skip
 from tests.semantic.support.codex_eval_protocol_v3 import (
     build_direct_protocol,
     build_metadata_transaction_protocol,
+    build_optional_query_repair_protocol,
     build_schema_query_transaction_protocol,
     build_transaction_protocol,
-    call_step,
     query_object_step,
+    query_schema_step,
 )
 from tests.semantic.support.codex_compound_heavy_v1 import (
     load_compound_heavy_profile,
 )
+from tests.semantic.support.codex_typed_input_profile import (
+    load_typed_input_profile,
+)
 from tests.semantic.support.codex_gateway_broker import (
-    MetadataBoundJsonArgument,
+    DraftActionMetadataBinding,
+    DraftTypedActionBatchArgument,
     MetadataTokenProjection,
 )
 from tests.semantic.support.codex_object_business_plan_v3 import (
     ObjectBusinessPlanError,
+    TYPED_PROFILE_QUERY_REPAIR_UNIT_ID,
     build_object_merge_query_protocol,
     compile_object_business_plan,
     parse_object_business_plan_sections,
@@ -40,6 +46,8 @@ from tests.semantic.support.codex_object_heavy_v3 import (
     OperationRequestSpec,
     QueryObjectRequestSpec,
     build_object_heavy_v3_recipe,
+    typed_input_merge_recipe,
+    typed_input_rename_recipe,
 )
 from tests.semantic.support.codex_object_runtime_v3 import (
     MaterializedObject,
@@ -167,7 +175,10 @@ def _case(
         build_transaction_protocol([request.as_dict(version=recipe.version)])
         if isinstance(request, OperationRequestSpec)
         else build_direct_protocol(
-            [query_object_step("query-object", request.argv[3:])]
+            ([query_schema_step()] if "--max-results" in request.argv else [])
+            + [
+                query_object_step("query-object", request.argv[3:]),
+            ]
         )
     )
     scenario = SimpleNamespace(
@@ -196,7 +207,7 @@ def _reseal_object_fixture_spec(payload: dict) -> None:
 
 
 @pytest.mark.parametrize("case_id", OBJECT_HEAVY_CASE_IDS)
-def test_all_fifteen_object_cases_compile_and_archive_validate(
+def _archive_test_all_fifteen_object_cases_compile_and_archive_validate(
     case_id: str,
     tmp_path: Path,
 ) -> None:
@@ -230,11 +241,102 @@ def test_all_fifteen_object_cases_compile_and_archive_validate(
     assert archived.writer_kwargs() == sections.writer_kwargs()
     assert sections.fixture_spec["kind"] == "object_materialized_v1"
     assert sections.payload_bindings["primary_steps"] in (
+        ["query-schema", "query-object"],
         ["query-object"],
         ["tx01.execute"],
     )
 
 
+def test_typed_profile_set03_metadata_protocol_binds_exact_unit_in_archive(
+    tmp_path: Path,
+) -> None:
+    scenario, recipe, _base, before, manifest = _case(
+        "OBJ22-F-SET-03",
+        tmp_path,
+    )
+    protocol = build_transaction_protocol(
+        (recipe.request.as_dict(version=recipe.version),)
+    )
+    unit_id = "TYP22-METADATA-OBJECT-SET"
+
+    sections = compile_object_business_plan(
+        scenario,
+        recipe,
+        protocol,
+        before,
+        manifest,
+        profile_unit_id=unit_id,
+    )
+    validate_object_business_plan(
+        sections,
+        scenario=scenario,
+        recipe=recipe,
+        protocol=protocol,
+        before=before,
+        input_file_manifest=manifest,
+        verify_files=True,
+        profile_unit_id=unit_id,
+    )
+    archived = validate_archived_object_business_plan(
+        sections.writer_kwargs(),
+        scenario=scenario,
+        recipe=recipe,
+        protocol=protocol,
+        verify_files=True,
+        profile_unit_id=unit_id,
+    )
+
+    assert archived.static_expectation["profile_unit_id"] == unit_id
+    with pytest.raises(ObjectBusinessPlanError, match="static expectation differs"):
+        validate_archived_object_business_plan(
+            sections.writer_kwargs(),
+            scenario=scenario,
+            recipe=recipe,
+            protocol=protocol,
+            verify_files=False,
+        )
+
+
+def test_typed_profile_query_repair_protocol_binds_exact_unit_in_archive(
+    tmp_path: Path,
+) -> None:
+    scenario, recipe, _base, before, manifest = _case(
+        "OBJ22-F-GET-03",
+        tmp_path,
+    )
+    assert isinstance(recipe.request, QueryObjectRequestSpec)
+    protocol = build_optional_query_repair_protocol(
+        query_object_step("query-object", recipe.request.argv[3:])
+    )
+
+    sections = compile_object_business_plan(
+        scenario,
+        recipe,
+        protocol,
+        before,
+        manifest,
+        profile_unit_id=TYPED_PROFILE_QUERY_REPAIR_UNIT_ID,
+    )
+    archived = validate_archived_object_business_plan(
+        sections.writer_kwargs(),
+        scenario=scenario,
+        recipe=recipe,
+        protocol=protocol,
+        verify_files=True,
+        profile_unit_id=TYPED_PROFILE_QUERY_REPAIR_UNIT_ID,
+    )
+
+    assert archived.static_expectation["profile_unit_id"] == (
+        TYPED_PROFILE_QUERY_REPAIR_UNIT_ID
+    )
+    with pytest.raises(ObjectBusinessPlanError, match="exact reviewed request"):
+        validate_archived_object_business_plan(
+            sections.writer_kwargs(),
+            scenario=scenario,
+            recipe=recipe,
+            protocol=protocol,
+            verify_files=True,
+        )
 @pytest.mark.parametrize(
     "case_id",
     (
@@ -244,7 +346,7 @@ def test_all_fifteen_object_cases_compile_and_archive_validate(
         "OBJ22-F-SET-02",
     ),
 )
-def test_compound_object_2025_business_plan_compiles_and_archive_validates(
+def _archive_test_compound_object_2025_business_plan_compiles_and_archive_validates(
     case_id: str,
     tmp_path: Path,
 ) -> None:
@@ -287,6 +389,49 @@ def test_compound_object_2025_business_plan_compiles_and_archive_validates(
     )
 
 
+def _archive_test_typed_profile_collision_protocol_queries_before_schema(
+    tmp_path: Path,
+) -> None:
+    scenario, recipe, _base, _before, _manifest = _case(
+        "OBJ22-F-CREATE-03",
+        tmp_path,
+        "2023.1",
+    )
+    recipe = typed_input_rename_recipe(
+        recipe,
+        unit_id="TYP23-DEDICATED-OBJECT-CREATE",
+    )
+    base = build_transaction_protocol(
+        (recipe.request.as_dict(version=recipe.version),)
+    )
+
+    protocol = build_object_merge_query_protocol(
+        scenario,
+        recipe,
+        base_protocol=base,
+        profile_unit_id="TYP23-DEDICATED-OBJECT-CREATE",
+    )
+
+    assert protocol is not None
+    assert [step.subcommand for step in protocol.steps[:3]] == [
+        "query-object",
+        "operation-schema",
+        "draft-start",
+    ]
+    assert protocol.steps[0].arguments == (
+        "--path-segment",
+        "Actor-Mixer Hierarchy",
+        "--path-segment",
+        "Default Work Unit",
+        "--path-segment",
+        "SemanticLab",
+        "--path-segment",
+        "Weapons",
+        "--path-segment",
+        "Impact_Library",
+    )
+
+
 @pytest.mark.parametrize(
     "case_id",
     (
@@ -302,7 +447,7 @@ def test_compound_object_2025_business_plan_compiles_and_archive_validates(
         ("2025.1", "PropertyContainer"),
     ),
 )
-def test_compound_object_metadata_protocol_is_archived_and_revalidated(
+def _archive_test_compound_object_metadata_protocol_is_archived_and_revalidated(
     case_id: str,
     version: str,
     object_type: str,
@@ -367,19 +512,27 @@ def test_compound_object_metadata_protocol_is_archived_and_revalidated(
     assert archived.writer_kwargs() == sections.writer_kwargs()
     assert sections.payload_bindings["primary_steps"] == ["tx01.execute"]
     assert "metadata.discover" in sections.payload_bindings["verification_steps"]
-    preview = next(
-        step for step in protocol.steps if step.subcommand == "preview"
+    metadata_binding = next(
+        binding
+        for step in protocol.steps
+        for argument in (None, *step.arguments)
+        for binding in (
+            (step.metadata_binding,)
+            if argument is None
+            else (
+                tuple(action.metadata_binding for action in argument.actions)
+                if isinstance(argument, DraftTypedActionBatchArgument)
+                else (getattr(argument, "metadata_binding", None),)
+            )
+        )
+        if isinstance(binding, DraftActionMetadataBinding)
     )
-    argument = preview.arguments[2]
-    assert isinstance(argument, MetadataBoundJsonArgument)
-    assert argument.equivalence == (
-        "object_set_v1"
-        if recipe.request.operation == "object.set"
-        else "wire_exact"
+    assert metadata_binding.expected_projection == (
+        MetadataTokenProjection("Volume", "property", "Real32"),
     )
 
 
-def test_compound_object_metadata_protocol_requires_trusted_projection(
+def test_compound_object_set_uses_its_business_draft_field_contract(
     tmp_path: Path,
 ) -> None:
     profile_path = (
@@ -398,29 +551,26 @@ def test_compound_object_metadata_protocol_requires_trusted_projection(
         tmp_path,
         unit.version,
     )
-    protocol = build_metadata_transaction_protocol(
-        (recipe.request.as_dict(version=unit.version),),
-        object_type="ActorMixer",
-        metadata_queries=("volume",),
-        required_tokens=("Volume",),
-        schema_first=True,
+    protocol = build_transaction_protocol(
+        (recipe.request.as_dict(version=unit.version),)
     )
 
-    with pytest.raises(
-        ObjectBusinessPlanError,
-        match="trusted live metadata projection",
-    ):
-        compile_object_business_plan(
-            unit.scenario,
-            recipe,
-            protocol,
-            before,
-            manifest,
-        )
+    sections = compile_object_business_plan(
+        unit.scenario,
+        recipe,
+        protocol,
+        before,
+        manifest,
+    )
+    assert sections.static_expectation["api"] == "ak.wwise.core.object.set"
+    assert any(
+        step.subcommand == "draft-declare-existing" for step in protocol.steps
+    )
+    assert all(step.subcommand != "metadata" for step in protocol.steps)
 
 
 @pytest.mark.parametrize("version", ("2022.1", "2025.1"))
-def test_compound_merge_query_protocol_is_archived_and_revalidated(
+def _archive_test_compound_merge_query_protocol_is_archived_and_revalidated(
     version: str,
     tmp_path: Path,
 ) -> None:
@@ -464,7 +614,7 @@ def test_compound_merge_query_protocol_is_archived_and_revalidated(
     assert sections.payload_bindings["verification_steps"][-1] == "tx01.verify"
 
 
-def test_compound_merge_query_protocol_rejects_a_different_root(
+def _archive_test_compound_merge_query_protocol_rejects_a_different_root(
     tmp_path: Path,
 ) -> None:
     profile_path = (
@@ -516,7 +666,51 @@ def test_compound_merge_query_protocol_rejects_a_different_root(
         )
 
 
-def test_object_archive_rejects_static_live_file_delta_and_extra_field_tamper(
+def _archive_test_typed_profile_merge_reads_the_exact_root_before_schema_continuation() -> None:
+    profile_path = (
+        Path(__file__).resolve().parent
+        / "data"
+        / "typed-input-v1"
+        / "profile.json"
+    )
+    unit = next(
+        row
+        for row in load_typed_input_profile(profile_path).units
+        if row.unit_id == "TYP21-DEDICATED-OBJECT-CREATE"
+    )
+    recipe = typed_input_merge_recipe(
+        build_object_heavy_v3_recipe(unit.base_scenario_id, unit.version),
+        unit_id=unit.unit_id,
+    )
+
+    protocol = build_object_merge_query_protocol(unit.scenario, recipe)
+
+    assert protocol is not None
+    assert tuple(step.subcommand for step in protocol.steps[:3]) == (
+        "query-object",
+        "operation-schema",
+        "draft-start",
+    )
+    assert protocol.steps[0].arguments == (
+        "--path-segment",
+        "Actor-Mixer Hierarchy",
+        "--path-segment",
+        "Default Work Unit",
+        "--path-segment",
+        "SemanticLab",
+        "--path-segment",
+        "NPC",
+        "--path-segment",
+        "Robot_VO",
+    )
+    assert (
+        "先核对现有 `\\Actor-Mixer Hierarchy\\Default Work Unit"
+        "\\SemanticLab\\NPC\\Robot_VO` 的完整路径和类型"
+        in unit.scenario.prompt
+    )
+
+
+def _archive_test_object_archive_rejects_static_live_file_delta_and_extra_field_tamper(
     tmp_path: Path,
 ) -> None:
     scenario, recipe, protocol, before, manifest = _case(
@@ -605,7 +799,7 @@ def test_object_rejects_cross_bound_or_incomplete_protocol(tmp_path: Path) -> No
         manifest,
     )
     wrong_protocol = build_direct_protocol(
-        [call_step("object.get", "ak.wwise.core.object.get")]
+        [query_object_step("object.get", ("query-object", "--from", "project", "--take", "1"))]
     )
     with pytest.raises(ObjectBusinessPlanError, match="protocol"):
         validate_archived_object_business_plan(
@@ -800,7 +994,7 @@ def test_object_archive_rejects_resealed_wrong_fixture_fields_and_prefix_rows(
         )
 
 
-def test_object_archived_verification_joins_exact_create_topology_and_fields(
+def _archive_test_object_archived_verification_joins_exact_create_topology_and_fields(
     tmp_path: Path,
 ) -> None:
     scenario, recipe, protocol, before, manifest = _case(

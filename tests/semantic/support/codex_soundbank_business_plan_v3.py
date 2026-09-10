@@ -20,25 +20,31 @@ from tests.semantic.support.codex_archive_paths import (
 from tests.semantic.support.codex_eval_protocol_v3 import (
     StructuredRefusal,
     V3GatewayProtocol,
-    build_direct_protocol,
+    build_optional_topic_schema_protocol,
+    build_operations_discovery_protocol,
     build_transaction_protocol,
+    stream_topic_step,
     wait_topic_step,
+    topic_schema_match_group_step,
+    topic_schema_step,
 )
 from tests.semantic.support.codex_filesystem_security import (
     CodexFileSecurityError,
     read_bounded_exclusive_regular_file,
 )
+from tests.semantic.support.codex_gateway_broker import ExpectedGatewayStep
 from tests.semantic.support.codex_prompt_provenance_v3 import serialize_protocol
+from wwise_waapi.topic_business import topic_business_contract
 from tests.semantic.support.codex_soundbank_runtime_v3 import (
     MAX_FILE_BYTES,
     OPERATION_REQUEST_CONTRACT,
     PROCESS_REFUSAL_ERROR_CODE,
     SOUNDBANK_APIS,
     SOUNDBANK_TOPIC,
-    SUPPORTED_VERSIONS,
     MaterializedSoundBankCase,
     SoundBankSnapshot,
     TopicPlan,
+    soundbank_scenario_supports_version,
 )
 
 
@@ -72,6 +78,19 @@ _DEFINITION_FILTER_TO_INCLUSION = MappingProxyType(
         "Media": "media",
     }
 )
+_STREAM_TOPIC_SCENARIO_IDS = frozenset({"O22-SB-GENERATED-03"})
+_STREAM_TOPIC_TIMEOUT_SECONDS = 30.0
+_RESULT_ONLY_TOPIC_DISCLOSURES = MappingProxyType(
+    {"O22-SB-GENERATED-03": ("platform",)}
+)
+
+
+def soundbank_topic_lifecycle(scenario_id: str) -> tuple[str, str]:
+    """Return the sealed model-facing lifecycle for one reviewed Topic case."""
+
+    if scenario_id in _STREAM_TOPIC_SCENARIO_IDS:
+        return "soundbank.generated.stream", "stream-topic"
+    return "soundbank.generated.wait", "wait-topic"
 
 
 @dataclass(frozen=True, slots=True)
@@ -105,8 +124,11 @@ def compile_soundbank_business_plan(
     if blueprint.api == SOUNDBANK_TOPIC:
         topic = materialized.topic_plan
         assert topic is not None
+        lifecycle_name, _lifecycle_command = soundbank_topic_lifecycle(
+            blueprint.scenario_id
+        )
         return _sections(
-            "soundbank_topic_materialized_v1", ("soundbank.generated.wait",), (), _TOPIC_ASSERTIONS,
+            "soundbank_topic_materialized_v1", (lifecycle_name,), (), _TOPIC_ASSERTIONS,
             static, live, (_topic_delta(topic, before),),
         )
     if blueprint.expected_primary_dispatch_count == 0:
@@ -195,12 +217,17 @@ def validate_soundbank_business_plan_archive(
     if api == SOUNDBANK_TOPIC:
         if kind != "soundbank_topic_materialized_v1" or sections.assertion_ids != _TOPIC_ASSERTIONS:
             raise SoundBankBusinessPlanError("archived topic kind/assertions drifted")
-        expected_primary, expected_verification = ["soundbank.generated.wait"], []
+        lifecycle_name, _lifecycle_command = soundbank_topic_lifecycle(
+            str(static["scenario_id"])
+        )
+        expected_primary, expected_verification = [lifecycle_name], []
         expected_delta = _topic_archive_delta(static, live)
         if live["topic"]["event_count"] != len(live["topic"]["expected_events"]):
             raise SoundBankBusinessPlanError("topic event count is not closed")
-        if any(name == "soundbank.generated.wait" for name in live["topic"]["publisher_steps"]):
-            raise SoundBankBusinessPlanError("runner publisher was recorded as a model wait step")
+        if any(name == lifecycle_name for name in live["topic"]["publisher_steps"]):
+            raise SoundBankBusinessPlanError(
+                "runner publisher was recorded as a model Topic lifecycle step"
+            )
     elif static["zero_dispatch_error_code"] is not None:
         if kind != "soundbank_refusal_materialized_v1" or sections.assertion_ids != _REFUSAL_ASSERTIONS:
             raise SoundBankBusinessPlanError("archived refusal kind/assertions drifted")
@@ -209,8 +236,7 @@ def validate_soundbank_business_plan_archive(
     else:
         if kind != "soundbank_function_materialized_v1" or sections.assertion_ids != _FUNCTION_ASSERTIONS:
             raise SoundBankBusinessPlanError("archived function kind/assertions drifted")
-        expected = build_transaction_protocol(static["operation_requests"])
-        serial = _protocol(expected)
+        serial = _protocol(protocol)
         expected_primary = [step["name"] for step in serial["steps"] if step["subcommand"] == "execute"]
         expected_verification = [step["name"] for step in serial["steps"] if step["subcommand"] != "execute"]
         expected_delta = _function_archive_delta(static, live)
@@ -263,15 +289,29 @@ def _validate_inputs(materialized: MaterializedSoundBankCase, before: SoundBankS
     if not isinstance(materialized, MaterializedSoundBankCase) or not isinstance(before, SoundBankSnapshot):
         raise SoundBankBusinessPlanError("compiler requires materialized SoundBank case and snapshot")
     blueprint = materialized.blueprint
-    if blueprint.version not in SUPPORTED_VERSIONS or blueprint.api not in SOUNDBANK_APIS or before.scenario_id != blueprint.scenario_id:
+    if (
+        not soundbank_scenario_supports_version(
+            blueprint.scenario_id,
+            blueprint.api,
+            blueprint.version,
+        )
+        or before.scenario_id != blueprint.scenario_id
+    ):
         raise SoundBankBusinessPlanError("SoundBank materialization identity is invalid")
     if blueprint.api == SOUNDBANK_TOPIC:
         if materialized.topic_plan is None or materialized.operation_requests or materialized.topic_plan.event_count != blueprint.expected_primary_dispatch_count:
             raise SoundBankBusinessPlanError("topic must have only a closed topic plan")
         topic = materialized.topic_plan
-        expected = build_direct_protocol([
-            wait_topic_step("soundbank.generated.wait", topic.topic, event_count=topic.event_count, match=topic.match, options=topic.options),
-        ])
+        expected = build_optional_topic_schema_protocol(
+            soundbank_topic_protocol_steps(
+                scenario_id=blueprint.scenario_id,
+                topic=topic.topic,
+                version=blueprint.version,
+                event_count=topic.event_count,
+                match=topic.match,
+                options=topic.options,
+            )
+        )
     elif materialized.topic_plan is not None or not materialized.operation_requests:
         raise SoundBankBusinessPlanError("function/refusal materialization has invalid request topology")
     else:
@@ -281,8 +321,17 @@ def _validate_inputs(materialized: MaterializedSoundBankCase, before: SoundBankS
             raise SoundBankBusinessPlanError("zero-dispatch refusal must retain its one refused request")
         expected = build_transaction_protocol(
             materialized.operation_requests,
-            refusal=StructuredRefusal(blueprint.zero_dispatch_error_code) if blueprint.expected_primary_dispatch_count == 0 else None,
+            refusal=(
+                StructuredRefusal(
+                    blueprint.zero_dispatch_error_code,
+                    result_command="preview-from-draft",
+                )
+                if blueprint.expected_primary_dispatch_count == 0
+                else None
+            ),
         )
+    if protocol.steps[0].subcommand == "operations":
+        expected = build_operations_discovery_protocol(expected)
     if blueprint.expected_primary_dispatch_count == 0:
         if blueprint.zero_dispatch_error_code != PROCESS_REFUSAL_ERROR_CODE:
             raise SoundBankBusinessPlanError("zero-dispatch refusal lacks exact unknown-identity code")
@@ -319,7 +368,10 @@ def _live(case: MaterializedSoundBankCase, before: SoundBankSnapshot) -> dict[st
             "expected_events": topic.expected_events, "publisher_requests": [item.operation_request for item in topic.publishers],
             "publisher_steps": [f"publisher.{index:02d}" for index, _item in enumerate(topic.publishers, 1)],
             "reject_n_plus_one": topic.reject_n_plus_one,
-            "subscription_ack_requirement": _topic_ack_requirement(topic),
+            "subscription_ack_requirement": _topic_ack_requirement(
+                topic,
+                scenario_id=case.blueprint.scenario_id,
+            ),
         },
     })
 
@@ -337,7 +389,10 @@ def _topic_delta(topic: TopicPlan, before: SoundBankSnapshot) -> dict[str, Any]:
     return _json({"enum": "soundbank.topic_delta_v1", "event_count": topic.event_count,
                   "expected_event_keys": [item.key for item in topic.expected_events],
                   "publisher_request_sha256": [_sha(item.operation_request) for item in topic.publishers],
-                  "subscription_ack_requirement": _topic_ack_requirement(topic),
+                  "subscription_ack_requirement": _topic_ack_requirement(
+                      topic,
+                      scenario_id=before.scenario_id,
+                  ),
                   "before_output_files_sha256": _sha(before.output_files), "before_project_files_sha256": _sha(before.project_files)})
 
 
@@ -364,11 +419,16 @@ def _topic_archive_delta(static: Mapping[str, Any], live: Mapping[str, Any]) -> 
             "before_output_files_sha256": _sha(before["output_files"]), "before_project_files_sha256": _sha(before["project_files"])}
 
 
-def _topic_ack_requirement(topic: TopicPlan) -> dict[str, Any]:
+def _topic_ack_requirement(
+    topic: TopicPlan,
+    *,
+    scenario_id: str,
+) -> dict[str, Any]:
+    step_name, _command = soundbank_topic_lifecycle(scenario_id)
     return {
         "contract": TOPIC_ACK_REQUIREMENT_CONTRACT,
         "ack_contract": TOPIC_ACK_CONTRACT,
-        "step_name": "soundbank.generated.wait",
+        "step_name": step_name,
         "topic": topic.topic,
         "fresh_exclusive_path_required": True,
         "publisher_requires_valid_ack": True,
@@ -382,12 +442,127 @@ def _refusal_archive_delta(static: Mapping[str, Any], live: Mapping[str, Any]) -
 def _expected_protocol_archive(static: Mapping[str, Any], live: Mapping[str, Any], protocol: V3GatewayProtocol) -> dict[str, Any]:
     if static["api"] == SOUNDBANK_TOPIC:
         topic = live["topic"]
-        return _protocol(build_direct_protocol([wait_topic_step("soundbank.generated.wait", topic["topic"], event_count=topic["event_count"], match=topic["match"], options=topic["options"])]))
-    return _protocol(build_transaction_protocol(static["operation_requests"], refusal=None if static["zero_dispatch_error_code"] is None else _refusal(static["zero_dispatch_error_code"])))
+        return _protocol(
+            build_optional_topic_schema_protocol(
+                soundbank_topic_protocol_steps(
+                    scenario_id=str(static["scenario_id"]),
+                    topic=topic["topic"],
+                    version=str(static["version"]),
+                    event_count=topic["event_count"],
+                    match=topic["match"],
+                    options=topic["options"],
+                )
+            )
+        )
+    expected = build_transaction_protocol(
+        static["operation_requests"],
+        refusal=(
+            None
+            if static["zero_dispatch_error_code"] is None
+            else _refusal(static["zero_dispatch_error_code"])
+        ),
+    )
+    if protocol.steps[0].subcommand == "operations":
+        expected = build_operations_discovery_protocol(expected)
+    return _protocol(expected)
+
+
+def soundbank_topic_protocol_steps(
+    *,
+    scenario_id: str,
+    topic: str,
+    version: str,
+    event_count: int,
+    match: Mapping[str, Any],
+    options: Mapping[str, Any],
+) -> list[ExpectedGatewayStep]:
+    """Build the exact progressive Topic disclosure used by SoundBank waits."""
+
+    steps = [topic_schema_step("soundbank.generated.schema", topic)]
+    contract = topic_business_contract(version, topic)
+    canonical_match = json.loads(
+        json.dumps(
+            _json(match),
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    )
+    canonical_options = json.loads(
+        json.dumps(
+            _json(options),
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    )
+    lifecycle_name, lifecycle_command = soundbank_topic_lifecycle(scenario_id)
+    # Match construction is Agent-owned. Result-only identities normally come
+    # from the event projection, not hidden schema-read chores. The explicit
+    # stream case keeps platform as one optional disclosure because its prompt
+    # asks the Agent to distinguish two platform records before subscribing.
+    disclosure_scopes = (
+        *tuple(sorted(canonical_match)),
+        *tuple(
+            scope
+            for scope in _RESULT_ONLY_TOPIC_DISCLOSURES.get(scenario_id, ())
+            if scope not in canonical_match
+        ),
+    )
+    for scope in disclosure_scopes:
+        value = canonical_match.get(scope)
+        has_match_group = any(
+            candidate.path and candidate.path[0] == scope
+            for field in contract.match_fields
+            for candidate in field._candidates
+        )
+        has_entry = any(entry.token == scope for entry in contract.entry_fields)
+        if isinstance(value, Mapping) and has_match_group:
+            steps.append(
+                topic_schema_match_group_step(
+                    f"soundbank.generated.schema.{scope}.match-group",
+                    topic,
+                    group=scope,
+                )
+            )
+        if has_entry and not (scope in canonical_match and has_match_group):
+            steps.append(
+                topic_schema_step(
+                    f"soundbank.generated.schema.{scope}.entry",
+                    topic,
+                    entry=scope,
+                )
+            )
+    if lifecycle_command == "stream-topic":
+        steps.append(
+            stream_topic_step(
+                lifecycle_name,
+                topic,
+                version=version,
+                event_count=event_count,
+                match=canonical_match,
+                options=canonical_options,
+                timeout_seconds=_STREAM_TOPIC_TIMEOUT_SECONDS,
+            )
+        )
+    else:
+        steps.append(
+            wait_topic_step(
+                lifecycle_name,
+                topic,
+                version=version,
+                event_count=event_count,
+                match=canonical_match,
+                options=canonical_options,
+            )
+        )
+    return steps
 
 
 def _refusal(code: str):
-    return StructuredRefusal(code)
+    return StructuredRefusal(code, result_command="preview-from-draft")
 
 
 def _sections(kind: str, primary: Sequence[str], verify: Sequence[str], assertions: Sequence[str], static: Mapping[str, Any], live: Mapping[str, Any], rules: Sequence[Mapping[str, Any]]) -> SoundBankBusinessPlanSections:
@@ -466,10 +641,13 @@ def _validate_archive_inputs(static: Mapping[str, Any], live: Mapping[str, Any])
         ):
             raise SoundBankBusinessPlanError("archived SoundBank topic dispatch shape is invalid")
         ack_requirement = topic.get("subscription_ack_requirement")
+        lifecycle_name, _lifecycle_command = soundbank_topic_lifecycle(
+            str(static["scenario_id"])
+        )
         if ack_requirement != {
             "contract": TOPIC_ACK_REQUIREMENT_CONTRACT,
             "ack_contract": TOPIC_ACK_CONTRACT,
-            "step_name": "soundbank.generated.wait",
+            "step_name": lifecycle_name,
             "topic": SOUNDBANK_TOPIC,
             "fresh_exclusive_path_required": True,
             "publisher_requires_valid_ack": True,
@@ -1250,4 +1428,4 @@ def _json(value: Any) -> Any:
 def _plain(value: Any) -> Any: return _json(value)
 
 
-__all__ = ["SoundBankBusinessPlanError", "SoundBankBusinessPlanSections", "TOPIC_ACK_CONTRACT", "TOPIC_ACK_PROOF_CONTRACT", "TOPIC_ACK_REQUIREMENT_CONTRACT", "compile_soundbank_business_plan", "validate_soundbank_business_plan", "soundbank_archive_identity", "parse_soundbank_business_plan_sections", "validate_soundbank_business_plan_archive", "validate_soundbank_archived_verification"]
+__all__ = ["SoundBankBusinessPlanError", "SoundBankBusinessPlanSections", "TOPIC_ACK_CONTRACT", "TOPIC_ACK_PROOF_CONTRACT", "TOPIC_ACK_REQUIREMENT_CONTRACT", "compile_soundbank_business_plan", "validate_soundbank_business_plan", "soundbank_archive_identity", "soundbank_topic_protocol_steps", "parse_soundbank_business_plan_sections", "validate_soundbank_business_plan_archive", "validate_soundbank_archived_verification"]

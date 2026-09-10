@@ -27,7 +27,11 @@ from tests.semantic.support.codex_gateway_broker import (
     TrustedSubscriptionAckSpec,
     TrustedStepObserver,
     TrustedStepPreObserver,
+    business_draft_setup_step_prefix,
     gateway_step_sequence_matches,
+)
+from tests.semantic.support.codex_gateway_contracts import (
+    task_local_runner_matches_normalized,
 )
 from tests.semantic.support.codex_filesystem_security import write_utf8_text_bytes
 from tests.semantic.support.codex_harness import (
@@ -43,6 +47,8 @@ from tests.semantic.support.codex_harness import (
     gateway_continuation_binding_errors,
     normalized_gateway_command_argv,
     prepare_workspace_skill_install,
+    recoverable_preprocess_attempt_indexes,
+    semantic_task_developer_instructions,
 )
 from tests.semantic.support.codex_prompt_provenance_v3 import (
     PROMPT_MATERIALIZATION_RECEIPT_CONTRACT,
@@ -56,10 +62,13 @@ from tests.semantic.support.codex_prompt_asset_reads_v3 import (
     remove_validated_command_occurrences,
     validated_prompt_asset_cat_commands,
 )
-from tests.semantic.support.codex_operation_draft_archive_v3 import (
-    ComposerArchiveError,
+from tests.semantic.support.codex_typed_draft_evidence_v3 import (
+    TypedDraftEvidenceError,
     classify_composer_failure_stage,
-    validate_operation_draft_archive,
+    validate_typed_draft_evidence,
+)
+from wwise_waapi.audio_import_business_contracts import (
+    AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS,
 )
 
 
@@ -173,7 +182,7 @@ def run_v3_codex_task(
     service_tier: str,
     timeout_seconds: float,
     runner_environment: Mapping[str, str],
-    required_reference: str,
+    required_reference: str | None,
     business_oracle_plan: BusinessOraclePlanEvidence,
     windows_powershell_core_host: WindowsPowerShellCoreHost | None = None,
     turn_reference_schedule: Sequence[Sequence[str]] | None = None,
@@ -184,6 +193,7 @@ def run_v3_codex_task(
     turn_observer: TurnObserver | None = None,
     project_modification_policy: str = "ask_before_changes",
     expected_primary_dispatch_count: int | None = None,
+    developer_instructions: str = "",
 ) -> V3TaskRun:
     """Run every natural turn in one exact, memory-isolated Codex thread."""
 
@@ -283,6 +293,16 @@ def run_v3_codex_task(
     )
     workspace = root / "agent-workspace"
     skill_install = _prepare_agent_workspace(workspace, skill_source)
+    sealed_developer_instructions = (
+        semantic_task_developer_instructions(
+            skill_source / "scripts" / "run.py",
+            task_skill_source=skill_install,
+            expected_skill_reads=expected_skill_reads,
+            base_developer_instructions=developer_instructions,
+        )
+        if developer_instructions
+        else ""
+    )
     broker_root = root / "broker"
     results: list[CodexRunResult] = []
     grades: list[V3TurnGrade] = []
@@ -317,6 +337,7 @@ def run_v3_codex_task(
         allow_output_write=False,
         network_access=True,
         expected_gateway_errors=gateway_errors,
+        developer_instructions=sealed_developer_instructions,
     )
     broker = CodexGatewayBroker(
         skill_source=skill_source,
@@ -328,6 +349,23 @@ def run_v3_codex_task(
         commutative_composer_setup_step_groups=(
             protocol.commutative_composer_setup_step_groups
         ),
+        optional_topic_schema_step_groups=(
+            protocol.optional_topic_schema_step_groups
+        ),
+        optional_query_schema_step_names=(
+            protocol.optional_query_schema_step_names
+        ),
+        optional_expected_initial_operations_discovery=(
+            protocol.optional_initial_operations_discovery
+            and not protocol.optional_workflow_operations_discovery_step_names
+        ),
+        optional_expected_operations_discovery_step_names=(
+            protocol.optional_workflow_operations_discovery_step_names
+        ),
+        optional_expected_workflow_read_step_names=(
+            protocol.optional_workflow_query_schema_step_names
+            + protocol.optional_workflow_revalidation_step_names
+        ),
         expected_wwise_version=version,
         project_modification_policy=project_modification_policy,
         runner_environment=runner_environment,
@@ -338,6 +376,10 @@ def run_v3_codex_task(
         trusted_step_observer=trusted_step_observer,
         trusted_subscription_ack=trusted_subscription_ack,
         trusted_subscription_ack_observer=trusted_subscription_ack_observer,
+        optional_initial_query_schema=(
+            protocol.optional_initial_query_schema
+            and not protocol.optional_query_schema_step_names
+        ),
     )
     try:
         with broker:
@@ -393,6 +435,16 @@ def run_v3_codex_task(
                         )
                         infrastructure_error = exc
                         break
+                    if _exhausted_windows_267_after_only_skill_read(
+                        result,
+                        broker_evidence=broker.evidence(),
+                        previous_broker_prefix=previous_prefix,
+                    ):
+                        raise V3CommandLifecycleError(
+                            "native Windows exhausted its one permitted identical "
+                            "CreateProcessAsUserW 267 retry after only the sealed "
+                            "Skill read; no Gateway or Wwise command ran"
+                        )
                     results.append(result)
                     turn_gateway = _gateway_candidate_argvs(
                         result,
@@ -474,6 +526,11 @@ def run_v3_codex_task(
                         expected_skill_reads=expected_skill_reads[
                             turn_index - 1
                         ],
+                        previous_skill_reads=tuple(
+                            read_file
+                            for previous_result in results[:-1]
+                            for read_file in previous_result.command_facts.skill_read_files
+                        ),
                         expected_gateway_count=effective_prefix - previous_prefix,
                         expected_terminal_execute_exit2_count=(
                             terminal_execute_exit2_count
@@ -593,7 +650,7 @@ def run_v3_codex_task(
         broker_records = broker_payload["records"]
         steps_by_name = {step.name: step for step in protocol.steps}
         try:
-            composer_evidence = validate_operation_draft_archive(
+            composer_evidence = validate_typed_draft_evidence(
                 state_directory=root / "broker" / "state",
                 steps=tuple(
                     steps_by_name[str(record["step_name"])]
@@ -601,7 +658,7 @@ def run_v3_codex_task(
                 ),
                 broker_records=broker_records,
             )
-        except (ComposerArchiveError, KeyError) as exc:
+        except (TypedDraftEvidenceError, KeyError) as exc:
             raise V3TaskRunnerError(
                 f"Composer task evidence cannot be sealed: {exc}",
                 thread_id=run.thread_id,
@@ -621,6 +678,93 @@ def run_v3_codex_task(
     return run
 
 
+def _selected_workflow_step_names_are_closed(
+    protocol: Any,
+    selected_names: Sequence[str],
+    *,
+    optional_names: set[str],
+) -> bool:
+    """Validate optional routing plus Broker-proven 1..6-row import chunks."""
+
+    by_name = {step.name: step for step in protocol.steps}
+    if (
+        len(selected_names) != len(set(selected_names))
+        or any(name not in by_name for name in selected_names)
+    ):
+        return False
+    selected_set = set(selected_names)
+    canonical_selected: list[str] = []
+    rebatched_regions: list[tuple[int, tuple[str, ...], tuple[str, ...]]] = []
+    protocol_cursor = 0
+    while protocol_cursor < len(protocol.steps):
+        step = protocol.steps[protocol_cursor]
+        if step.name in optional_names:
+            if step.name in selected_set:
+                canonical_selected.append(step.name)
+            protocol_cursor += 1
+            continue
+        if step.subcommand != "draft-declare-import-batch":
+            if step.name not in selected_set:
+                return False
+            canonical_selected.append(step.name)
+            protocol_cursor += 1
+            continue
+        block: list[str] = []
+        while (
+            protocol_cursor < len(protocol.steps)
+            and protocol.steps[protocol_cursor].subcommand
+            == "draft-declare-import-batch"
+        ):
+            block.append(protocol.steps[protocol_cursor].name)
+            protocol_cursor += 1
+        selected_block = tuple(name for name in block if name in selected_set)
+        selected_count = len(selected_block)
+        minimum_chunks = (
+            len(block) + AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS - 1
+        ) // AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS
+        if not minimum_chunks <= selected_count <= len(block):
+            return False
+        if selected_block != tuple(block[:selected_count]):
+            return False
+
+        transaction_prefix = step.name.split(".", 1)[0]
+        setup_start = len(canonical_selected)
+        while setup_start > 0:
+            setup_name = canonical_selected[setup_start - 1]
+            if business_draft_setup_step_prefix(setup_name) != transaction_prefix:
+                break
+            setup_start -= 1
+        setup_names = tuple(canonical_selected[setup_start:])
+        region_start = setup_start
+        canonical_selected.extend(selected_block)
+        if setup_names:
+            rebatched_regions.append(
+                (region_start, setup_names, selected_block)
+            )
+
+    if set(canonical_selected) != selected_set:
+        return False
+
+    normalized = list(selected_names)
+    for start, setup_names, declaration_names in rebatched_regions:
+        canonical_region = (*setup_names, *declaration_names)
+        width = len(canonical_region)
+        actual_region = tuple(normalized[start : start + width])
+        allowed_regions = {
+            (
+                *setup_names[:split],
+                declaration_names[0],
+                *setup_names[split:],
+                *declaration_names[1:],
+            )
+            for split in range(len(setup_names) + 1)
+        }
+        if actual_region not in allowed_regions:
+            continue
+        normalized[start : start + width] = canonical_region
+    return tuple(normalized) == tuple(canonical_selected)
+
+
 def _broker_terminal_protocol_passed(
     protocol: V3GatewayProtocol,
     evidence: GatewayBrokerEvidence,
@@ -630,6 +774,118 @@ def _broker_terminal_protocol_passed(
     consumed_count = len(evidence.consumed_step_names)
     if consumed_count not in protocol.accepted_terminal_prefixes:
         return False
+
+    def selected_lane_passed(selected_names: Sequence[str]) -> bool:
+        read_groups = getattr(protocol, "commutative_read_only_step_groups", ())
+        setup_groups = getattr(
+            protocol,
+            "commutative_composer_setup_step_groups",
+            (),
+        )
+        return bool(
+            gateway_step_sequence_matches(
+                selected_names,
+                evidence.consumed_step_names,
+                read_groups,
+                setup_groups,
+            )
+            and getattr(evidence, "commutative_read_only_step_groups", ())
+            == read_groups
+            and getattr(
+                evidence,
+                "commutative_composer_setup_step_groups",
+                (),
+            )
+            == setup_groups
+            and len(evidence.records) == len(selected_names)
+            and tuple(record.step_name for record in evidence.records)
+            == evidence.consumed_step_names
+            and not evidence.rejected_records
+            and all(record.succeeded for record in evidence.records)
+            and evidence.complete
+            and evidence.passed
+            and evidence.terminal_state == "COMPLETE"
+        )
+    if protocol.optional_query_schema_step_names:
+        protocol_names = tuple(step.name for step in protocol.steps)
+        optional_names = set(protocol.optional_query_schema_step_names)
+        selected_names = evidence.expected_step_names
+        if (
+            not selected_names
+            or selected_names[-1] != protocol_names[-1]
+            or any(name not in optional_names for name in selected_names[:-1])
+            or len(selected_names) != len(set(selected_names))
+        ):
+            return False
+        return selected_lane_passed(selected_names)
+    if protocol.optional_initial_query_schema:
+        protocol_names = tuple(step.name for step in protocol.steps)
+        selected_names = evidence.expected_step_names
+        if selected_names not in {protocol_names, protocol_names[1:]}:
+            return False
+        return selected_lane_passed(selected_names)
+    optional_workflow_operations = getattr(
+        protocol,
+        "optional_workflow_operations_discovery_step_names",
+        (),
+    )
+    optional_workflow_query_schema = getattr(
+        protocol,
+        "optional_workflow_query_schema_step_names",
+        (),
+    )
+    optional_workflow_revalidation = getattr(
+        protocol,
+        "optional_workflow_revalidation_step_names",
+        (),
+    )
+    if (
+        optional_workflow_operations
+        or optional_workflow_query_schema
+        or optional_workflow_revalidation
+    ):
+        optional_names = {
+            *optional_workflow_operations,
+            *optional_workflow_query_schema,
+            *optional_workflow_revalidation,
+        }
+        selected_names = evidence.expected_step_names
+        if not _selected_workflow_step_names_are_closed(
+            protocol,
+            selected_names,
+            optional_names=optional_names,
+        ):
+            return False
+        return selected_lane_passed(selected_names)
+    if protocol.optional_initial_operations_discovery:
+        protocol_names = tuple(step.name for step in protocol.steps)
+        selected_names = evidence.expected_step_names
+        if selected_names not in {protocol_names, protocol_names[1:]}:
+            return False
+        return selected_lane_passed(selected_names)
+    if protocol.optional_topic_schema_step_groups:
+        protocol_names = tuple(step.name for step in protocol.steps)
+        optional_names = {
+            name
+            for group in protocol.optional_topic_schema_step_groups
+            for name in group
+        }
+        selected_names = evidence.expected_step_names
+        selected_optional = tuple(
+            name for name in selected_names if name in optional_names
+        )
+        mandatory_names = tuple(
+            name for name in protocol_names if name not in optional_names
+        )
+        if (
+            tuple(name for name in selected_names if name not in optional_names)
+            != mandatory_names
+            or len(selected_names) != len(set(selected_names))
+            or any(name not in protocol_names for name in selected_names)
+            or any(name not in optional_names for name in selected_optional)
+        ):
+            return False
+        return selected_lane_passed(selected_names)
     expected_names = tuple(
         step.name for step in protocol.steps[:consumed_count]
     )
@@ -651,12 +907,10 @@ def _broker_terminal_protocol_passed(
         or not all(record.succeeded for record in evidence.records)
     ):
         return False
-    if consumed_count == len(protocol.steps):
-        return evidence.passed
-    return (
-        protocol.allowed_turn_prefix_counts
-        and not evidence.complete
-        and evidence.terminal_state == "RUNNING"
+    return bool(
+        evidence.passed
+        and evidence.complete
+        and evidence.terminal_state == "COMPLETE"
     )
 
 
@@ -664,8 +918,9 @@ def _grade_common_turn(
     result: CodexRunResult,
     *,
     turn_index: int,
-    required_reference: str,
+    required_reference: str | None,
     expected_skill_reads: Sequence[str] | None = None,
+    previous_skill_reads: Sequence[str] = (),
     expected_gateway_count: int,
     expected_terminal_execute_exit2_count: int = 0,
     prompt_provenance: Any | None = None,
@@ -677,12 +932,28 @@ def _grade_common_turn(
         tuple(expected_skill_reads)
         if expected_skill_reads is not None
         else (
-            ("SKILL.md", required_reference)
+            (
+                ("SKILL.md", required_reference)
+                if required_reference is not None
+                else ("SKILL.md",)
+            )
             if turn_index == 1
             else ()
         )
     )
+    expected_reads = _effective_expected_skill_reads(
+        expected_reads,
+        previous_skill_reads=previous_skill_reads,
+    )
     records = facts.command_records
+    recoverable_read_indexes = frozenset(
+        recoverable_preprocess_attempt_indexes(records)
+    )
+    effective_records = tuple(
+        record
+        for index, record in enumerate(records)
+        if index not in recoverable_read_indexes
+    )
     gateway_count = len(facts.gateway_attempt_commands)
     try:
         prompt_asset_reads = validated_prompt_asset_cat_commands(
@@ -717,11 +988,21 @@ def _grade_common_turn(
         ),
         "one_target_skill": result.prompt_audit.passed,
         "no_collaboration": result.collab_call_count == 0,
-        "skill_reads_exact": read_files == expected_reads and len(allowed_reads) == len(read_files),
-        "read_prefix_exact": tuple(record.command for record in records[: len(allowed_reads)]) == allowed_reads,
+        "skill_reads_exact": _skill_reads_pass_gate(
+            expected_reads=expected_reads,
+            read_files=read_files,
+            allowed_reads=allowed_reads,
+        ),
+        "read_prefix_exact": _read_prefix_pass_gate(
+            records=effective_records,
+            allowed_reads=allowed_reads,
+            gateway_attempt_commands=facts.gateway_attempt_commands,
+            gateway_subcommands=getattr(facts, "gateway_subcommands", ()),
+            expected_reads=expected_reads,
+        ),
         "gateway_count_exact": gateway_count == expected_gateway_count,
         "no_other_commands": (
-            len(records)
+            len(effective_records)
             == len(allowed_reads)
             + len(prompt_asset_reads)
             + expected_gateway_count
@@ -747,10 +1028,90 @@ def _grade_common_turn(
     return errors, gates
 
 
+def _skill_reads_pass_gate(
+    *,
+    expected_reads: Sequence[str],
+    read_files: Sequence[str],
+    allowed_reads: Sequence[str],
+) -> bool:
+    """Keep historical gate compatibility while softening one harmless preload.
+
+    The task prompt and Skill still require exact progressive disclosure.  A
+    query-first task may nevertheless preload the operate reference once,
+    immediately after the query reference.  This spends context but neither
+    dispatches a command nor weakens the read-only boundary, so public business
+    acceptance records it diagnostically instead of failing an otherwise exact
+    Wwise workflow.
+    """
+
+    expected = tuple(expected_reads)
+    observed = tuple(read_files)
+    if len(allowed_reads) != len(observed):
+        return False
+    if observed == expected:
+        return True
+    return (
+        expected == ("SKILL.md", "references/waapi-query.md")
+        and observed
+        == (
+            "SKILL.md",
+            "references/waapi-query.md",
+            "references/waapi-operate.md",
+        )
+    )
+
+
+def _effective_expected_skill_reads(
+    expected_reads: Sequence[str],
+    *,
+    previous_skill_reads: Sequence[str],
+) -> tuple[str, ...]:
+    """Remove a safely preloaded reference from its later scheduled turn."""
+
+    seen = frozenset(previous_skill_reads)
+    return tuple(read_file for read_file in expected_reads if read_file not in seen)
+
+
+def _read_prefix_pass_gate(
+    *,
+    records: Sequence[Any],
+    allowed_reads: Sequence[str],
+    gateway_attempt_commands: Sequence[str],
+    gateway_subcommands: Sequence[str],
+    expected_reads: Sequence[str],
+) -> bool:
+    """Allow selected exact-ID readbacks immediately before the operate lane."""
+
+    record_commands = tuple(record.command for record in records)
+    reads = tuple(allowed_reads)
+    if record_commands[: len(reads)] == reads:
+        return True
+    if (
+        tuple(expected_reads) != ("references/waapi-operate.md",)
+        or len(reads) != 1
+    ):
+        return False
+    try:
+        read_index = record_commands.index(reads[0])
+    except ValueError:
+        return False
+    gateway_commands = tuple(gateway_attempt_commands)
+    subcommands = tuple(gateway_subcommands)
+    return (
+        read_index > 0
+        and record_commands[:read_index] == gateway_commands[:read_index]
+        and len(subcommands) >= read_index
+        and all(
+            subcommand == "query-object"
+            for subcommand in subcommands[:read_index]
+        )
+    )
+
+
 def _normalize_turn_reference_schedule(
     *,
     prompt_count: int,
-    required_reference: str,
+    required_reference: str | None,
     turn_reference_schedule: Sequence[Sequence[str]] | None,
 ) -> tuple[tuple[str, ...], ...]:
     """Close per-turn lane reads while preserving the historical default.
@@ -761,15 +1122,22 @@ def _normalize_turn_reference_schedule(
     task, matching the Skill's conversation-scoped read contract.
     """
 
-    if (
-        type(prompt_count) is not int
-        or prompt_count < 1
-        or not isinstance(required_reference, str)
+    if type(prompt_count) is not int or prompt_count < 1:
+        raise V3TaskRunnerError("prompt_count must be a positive integer")
+    if required_reference is not None and (
+        not isinstance(required_reference, str)
         or required_reference not in _PACKAGED_LANE_REFERENCES
     ):
         raise V3TaskRunnerError(
-            "required_reference must be one packaged waapi lane reference"
+            "required_reference must be one packaged waapi lane reference or None"
         )
+    if required_reference is None:
+        if turn_reference_schedule is not None:
+            raise V3TaskRunnerError(
+                "a SKILL-only task must not schedule lane references"
+            )
+        reference_rows = ((),) * prompt_count
+        return (("SKILL.md",), *reference_rows[1:])
     if turn_reference_schedule is None:
         reference_rows: tuple[tuple[str, ...], ...] = (
             ((required_reference,),) + ((),) * (prompt_count - 1)
@@ -791,7 +1159,7 @@ def _normalize_turn_reference_schedule(
             )
         normalized_rows: list[tuple[str, ...]] = []
         seen: set[str] = set()
-        for raw_row in turn_reference_schedule:
+        for turn_index, raw_row in enumerate(turn_reference_schedule, start=1):
             if isinstance(raw_row, (str, bytes)):
                 raise V3TaskRunnerError(
                     "turn_reference_schedule rows must be reference sequences"
@@ -802,9 +1170,11 @@ def _normalize_turn_reference_schedule(
                 raise V3TaskRunnerError(
                     "turn_reference_schedule rows must be reference sequences"
                 ) from exc
-            if len(row) > 1:
+            max_references = 2 if turn_index == 1 else 1
+            if len(row) > max_references:
                 raise V3TaskRunnerError(
-                    "each Codex turn may read at most one waapi lane reference"
+                    "turn 1 may read at most two reviewed lane references; "
+                    "later turns may read at most one"
                 )
             for reference in row:
                 if (
@@ -821,9 +1191,9 @@ def _normalize_turn_reference_schedule(
                 seen.add(reference)
             normalized_rows.append(row)
         reference_rows = tuple(normalized_rows)
-        if reference_rows[0] != (required_reference,):
+        if not reference_rows[0] or reference_rows[0][0] != required_reference:
             raise V3TaskRunnerError(
-                "turn 1 must read the required_reference lane"
+                "turn 1 must begin with the required_reference lane"
             )
     return (
         ("SKILL.md", *reference_rows[0]),
@@ -863,23 +1233,75 @@ def _gateway_candidate_argvs(
     alternate_skill_sources: Sequence[Path] = (),
     expected_wwise_version: str,
 ) -> tuple[tuple[str, ...], ...]:
-    expected_runners = {
+    expected_runners = tuple(dict.fromkeys(
         os.path.abspath(os.fspath(source / "scripts" / "run.py"))
         for source in (skill_source, *alternate_skill_sources)
-    }
+    ))
+    records = result.command_facts.command_records
+    recoverable_indexes = frozenset(
+        recoverable_preprocess_attempt_indexes(records)
+    )
     candidates: list[tuple[str, ...]] = []
-    for record in result.command_facts.command_records:
+    for index, record in enumerate(records):
+        if index in recoverable_indexes:
+            continue
         argv = normalized_gateway_command_argv(
             record.argv,
             expected_wwise_version=expected_wwise_version,
         )
-        if (
-            len(argv) >= 4
-            and os.path.abspath(os.path.expanduser(argv[1])) in expected_runners
-            and argv[2] == "gateway.py"
-        ):
-            candidates.append(argv)
+        runner = _candidate_runner_path(argv, expected_runners=expected_runners)
+        if runner is not None:
+            candidates.append((argv[0], runner, *argv[2:]))
     return tuple(candidates)
+
+
+def _exhausted_windows_267_after_only_skill_read(
+    result: CodexRunResult,
+    *,
+    broker_evidence: GatewayBrokerEvidence,
+    previous_broker_prefix: int,
+) -> bool:
+    """Recognize one exact post-Skill Windows process-launch exhaustion.
+
+    This narrow shape contains no semantic Gateway evidence: the Skill read
+    succeeded, one later PowerShell command failed to start twice with the
+    permitted identical 267 retry, and nothing reached the Broker or Wwise.
+    """
+
+    facts = result.command_facts
+    records = tuple(facts.command_records)
+    if (
+        previous_broker_prefix != 0
+        or broker_evidence.records
+        or broker_evidence.consumed_step_names
+        or facts.skill_read is not True
+        or facts.skill_read_files != ("SKILL.md",)
+        or facts.gateway_commands
+        or facts.gateway_attempt_commands
+        or result.collab_call_count != 0
+        or result.file_change_count != 0
+        or len(records) != 3
+    ):
+        return False
+    first, first_failure, second_failure = records
+    return (
+        getattr(first, "status", "") == "completed"
+        and getattr(first, "exit_code", None) == 0
+        and getattr(first_failure, "command", "")
+        == getattr(second_failure, "command", "")
+        and getattr(first_failure, "argv", ())
+        == getattr(second_failure, "argv", ())
+        and all(
+            getattr(record, "status", "") == "failed"
+            and getattr(record, "exit_code", None) == -1
+            and getattr(record, "parser_kind", "") == "windows-pwsh-command"
+            and not getattr(record, "parse_error", "")
+            and not getattr(record, "has_shell_operators", False)
+            and "CreateProcessAsUserW failed: 267"
+            in getattr(record, "aggregated_output", "")
+            for record in (first_failure, second_failure)
+        )
+    )
 
 
 def _gateway_candidate_records(
@@ -891,23 +1313,46 @@ def _gateway_candidate_records(
 ) -> tuple[CodexCommandRecord, ...]:
     """Keep raw Codex records for response-derived continuation binding."""
 
-    expected_runners = {
+    expected_runners = tuple(dict.fromkeys(
         os.path.abspath(os.fspath(source / "scripts" / "run.py"))
         for source in (skill_source, *alternate_skill_sources)
-    }
+    ))
+    records = result.command_facts.command_records
+    recoverable_indexes = frozenset(
+        recoverable_preprocess_attempt_indexes(records)
+    )
     candidates: list[CodexCommandRecord] = []
-    for record in result.command_facts.command_records:
+    for index, record in enumerate(records):
+        if index in recoverable_indexes:
+            continue
         argv = normalized_gateway_command_argv(
             record.argv,
             expected_wwise_version=expected_wwise_version,
         )
-        if (
-            len(argv) >= 4
-            and os.path.abspath(os.path.expanduser(argv[1])) in expected_runners
-            and argv[2] == "gateway.py"
-        ):
+        if _candidate_runner_path(argv, expected_runners=expected_runners) is not None:
             candidates.append(record)
     return tuple(candidates)
+
+
+def _candidate_runner_path(
+    argv: Sequence[str],
+    *,
+    expected_runners: Sequence[str],
+) -> str | None:
+    if len(argv) < 4 or argv[2] != "gateway.py":
+        return None
+    supplied = Path(argv[1]).expanduser()
+    if supplied.is_absolute():
+        normalized = os.path.abspath(os.fspath(supplied))
+        return normalized if normalized in expected_runners else None
+    return next(
+        (
+            expected
+            for expected in expected_runners
+            if task_local_runner_matches_normalized(argv[1], expected)
+        ),
+        None,
+    )
 
 
 def _bind_gateway_prefix_reconciliation(

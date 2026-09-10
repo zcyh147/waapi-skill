@@ -139,12 +139,7 @@ def test_authoring_profile_assigns_exact_ui_command_routes(
         assert record.route == "managed_transaction"
         assert record.effect == "runtime_mutation"
         assert record.requires_authorization is True
-        assert record.gateway_commands == (
-            "preview",
-            "confirm",
-            "execute",
-            "verify",
-        )
+        assert record.gateway_commands == ("operation-schema",)
         assert AUTHORING_UI_DEDICATED_OPERATIONS[uri] in record.program_case
     assert records[
         "ak.wwise.ui.commands.register"
@@ -256,7 +251,7 @@ def test_authoring_capabilities_expose_correct_safety_route_and_evidence(
         assert record.safety.interface_status == "available_via_transaction"
     read = records["ak.wwise.ui.commands.getCommands"]
     assert read.preferred_route == "manifest_dispatch"
-    assert read.gateway_commands == ("call",)
+    assert read.gateway_commands == ("request-schema",)
     assert read.safety.read_only is True
     assert read.safety.requires_authorization is False
     topic = records["ak.wwise.ui.commands.executed"]

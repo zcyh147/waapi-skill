@@ -19,6 +19,7 @@ import pytest
 
 from tests.semantic import run_codex_skill_campaign as campaign
 from tests.semantic import run_codex_skill_matrix as matrix
+from tests.semantic.support import codex_heavy_project_runner_v3 as project_runner
 from tests.semantic.support.codex_business_oracle_plan_v3 import (
     BusinessOraclePlanEvidence,
     business_family_for_api,
@@ -54,20 +55,41 @@ from tests.semantic.support.codex_campaign_runner import (
 )
 from tests.semantic.support.codex_eval_protocol_v3 import (
     V3GatewayProtocol,
+    build_audio_import_composer_transaction_steps,
     build_audio_import_composer_protocol,
     build_direct_protocol,
+    build_metadata_transaction_protocol,
     build_object_set_composer_transaction_steps,
+    build_optional_query_repair_protocol,
+    build_optional_query_schema_protocol,
+    build_optional_topic_schema_protocol,
+    build_protocol_with_bounded_import_chunks,
     build_transaction_protocol,
+    build_workflow_operations_discovery_protocol,
     query_object_step,
+    topic_schema_step,
+    wait_topic_step,
+    _typed_fact_cli_arguments,
 )
 from tests.semantic.support.codex_gateway_broker import (
+    BoundedIntegerArgument,
     CodexGatewayBroker,
-    DraftActionJsonArgument,
+    DRAFT_REVISION_SUBCOMMANDS,
+    DraftTypedActionArgument,
+    DraftTypedActionBatchArgument,
     ExpectedGatewayStep,
+    InlineTypedOperationArgument,
     MetadataQueryArgument,
+    MetadataTokenProjection,
     ResponseBinding,
     SemanticJsonArgument,
+    TypedRequestFactsArgument,
     resolve_gateway_invocation,
+)
+from tests.semantic.support.codex_gateway_contracts import (
+    GATEWAY_RESULT_CONTRACT,
+    TYPED_CONTAINER_HANDLE_CONTRACT,
+    gateway_payload_contracts,
 )
 from tests.semantic.support.codex_harness import (
     CodexHarnessConfig,
@@ -82,6 +104,8 @@ from tests.semantic.support.codex_harness import (
     final_agent_message,
     parse_jsonl_events,
     prepare_workspace_skill_install,
+    semantic_skill_bootstrap_developer_instructions,
+    semantic_task_developer_instructions,
     turn_usage,
     workspace_skill_install_path,
 )
@@ -92,6 +116,10 @@ from tests.semantic.support.codex_prompt_provenance_v3 import (
     write_prompt_provenance,
 )
 from tests.semantic.support.codex_object_business_plan_v3 import (
+    ObjectBusinessPlanError,
+    TYPED_PROFILE_OBJECT_METADATA_UNITS,
+    TYPED_PROFILE_QUERY_REPAIR_UNIT_ID,
+    TYPED_PROFILE_RENAME_UNIT_ID,
     compile_object_business_plan,
     validate_object_archived_verification,
 )
@@ -102,6 +130,9 @@ from tests.semantic.support.codex_object_heavy_v3 import (
     OperationRequestSpec,
     QueryObjectRequestSpec,
     build_object_heavy_v3_recipe,
+    typed_input_business_query_recipe,
+    typed_input_merge_recipe,
+    typed_input_rename_recipe,
 )
 from wwise_waapi.platform_commands import (
     PlatformCommandError,
@@ -111,9 +142,38 @@ from wwise_waapi.platform_commands import (
     encode_windows_model_argv,
     encode_windows_powershell_argv,
 )
+from wwise_waapi.operation_composer import (
+    composition_projection,
+    operation_composer_digest,
+    operation_draft_public_projection,
+    typed_action_cli_arguments,
+)
+from wwise_waapi.operation_drafts import (
+    OperationDraftStore,
+    load_operation_draft_archive_record,
+)
+from wwise_waapi.operation_registry import operation_request_schema_digest
+from wwise_waapi.business_adapters import business_adapter
+from wwise_waapi.business_declaration_state import BusinessDeclarationSession
+from wwise_waapi.exact_artifact_business import (
+    exact_artifact_evidence_from_request,
+)
+from wwise_waapi.business_declarations import (
+    BusinessContext,
+    BusinessHandleRegistry,
+    ExistingObjectTarget,
+)
+from wwise_waapi.transaction_cleanup import transaction_cleanup_payload
+from wwise_waapi.typed_operations import inline_operation_cli_arguments
+from wwise_waapi.typed_requests import (
+    request_contract,
+    typed_request_construction_for_values,
+)
+from wwise_waapi.typed_topics import topic_match_contract, topic_options_contract
 from tests.semantic.support.codex_object_runtime_v3 import ObjectRuntimeSnapshot
 from tests.semantic.support.codex_soundbank_business_plan_v3 import (
     compile_soundbank_business_plan,
+    soundbank_topic_protocol_steps,
 )
 from tests.semantic.support.codex_soundbank_runtime_v3 import (
     PROCESS_REFUSAL_ERROR_CODE,
@@ -135,6 +195,304 @@ from wwise_waapi.transactions import (
 )
 
 
+EXPECTED_DRAFT_REVISION_SUBCOMMANDS = frozenset(
+    {
+        "draft-apply",
+        "draft-add-media",
+        "draft-bind-field",
+        "draft-bind-object",
+        "draft-business-configure",
+        "draft-declare-debug-intent",
+        "draft-declare-import-batch",
+        "draft-clear-object-list",
+        "draft-declare-existing",
+        "draft-declare-existing-batch",
+        "draft-declare-field-change",
+        "draft-declare-new",
+        "draft-declare-object-change",
+        "draft-declare-rtpc",
+        "draft-declare-undo-plan",
+        "draft-declare-switch-assignment",
+        "draft-declare-soundbank-plan",
+        "draft-declare-artifact-plan",
+        "draft-declare-core-plan",
+        "draft-declare-cli-console-plan",
+        "draft-declare-host-plan",
+        "draft-declare-project-setting-plan",
+        "draft-declare-runtime-control-plan",
+        "draft-declare-soundengine-plan",
+        "draft-declare-source-control-plan",
+        "draft-declare-ui-plan",
+        "draft-add-ui-command",
+        "draft-discover-fields",
+        "draft-discover-types",
+        "draft-remove-declaration",
+        "draft-revise-declaration",
+        "draft-check",
+        "draft-cancel",
+        "preview-from-draft",
+    }
+)
+
+
+def test_typed_input_named_mutation_requires_operations_discovery() -> None:
+    from tests.semantic.support.codex_typed_input_profile import (
+        load_typed_input_profile,
+    )
+
+    profile = load_typed_input_profile(
+        Path(__file__).resolve().parent
+        / "data"
+        / "typed-input-v1"
+        / "profile.json"
+    )
+    mutation = next(
+        unit
+        for unit in profile.units
+        if unit.unit_id == "TYP22-METADATA-OBJECT-SET"
+    )
+    recipe = build_object_heavy_v3_recipe(
+        mutation.base_scenario_id,
+        version=mutation.version,
+    )
+    base = build_transaction_protocol(
+        (recipe.request.as_dict(version=recipe.version),)
+    )
+
+    protocol = project_runner.typed_input_operations_protocol(mutation, base)
+
+    assert tuple(step.subcommand for step in protocol.steps[:2]) == (
+        "operations",
+        "operation-schema",
+    )
+
+    query = next(
+        unit
+        for unit in profile.units
+        if unit.unit_id == "TYP21-QUERY-OBJECT-GET"
+    )
+    query_protocol = build_direct_protocol(
+        (ExpectedGatewayStep("query-object", "query-object"),)
+    )
+    assert (
+        project_runner.typed_input_operations_protocol(query, query_protocol)
+        is query_protocol
+    )
+
+
+def test_typed_input_business_plan_accepts_sealed_operations_discovery() -> None:
+    from tests.semantic.support.codex_typed_input_profile import (
+        load_typed_input_profile,
+    )
+
+    profile = load_typed_input_profile(
+        Path(__file__).resolve().parent
+        / "data"
+        / "typed-input-v1"
+        / "profile.json"
+    )
+    unit = next(
+        row
+        for row in profile.units
+        if row.unit_id == "TYP22-METADATA-OBJECT-SET"
+    )
+    recipe = build_object_heavy_v3_recipe(
+        unit.base_scenario_id,
+        version=unit.version,
+    )
+    base = build_transaction_protocol(
+        (recipe.request.as_dict(version=recipe.version),)
+    )
+    protocol = project_runner.typed_input_operations_protocol(unit, base)
+    sections = compile_object_business_plan(
+        unit.scenario,
+        recipe,
+        protocol,
+        _synthetic_object_before(recipe),
+        (),
+        profile_unit_id=unit.unit_id,
+    )
+
+    parsed = campaign._validate_heavy_v3_typed_business_plan(
+        sections.writer_kwargs(),
+        expected_unit=unit,
+        provenance=SimpleNamespace(protocol=protocol),
+    )
+
+    assert parsed is not None
+    assert parsed.static_expectation["profile_unit_id"] == unit.unit_id
+
+
+def test_integration_plan_requires_catalog_before_query_first_protocol() -> None:
+    from tests.semantic.support.codex_workflow_business_plan_v3 import (
+        compile_workflow_business_plan_sections,
+    )
+
+    unit = SimpleNamespace(
+        workflow_id="alarm_diagnose_and_repair",
+    )
+    protocol = V3GatewayProtocol(
+        steps=(
+            ExpectedGatewayStep("diag.search", "query-object"),
+            ExpectedGatewayStep(
+                "tx01.operation-schema",
+                "operation-schema",
+                ("object.setReference",),
+            ),
+            ExpectedGatewayStep("tx01.preview", "preview"),
+            ExpectedGatewayStep("tx01.transaction-show", "transaction-show"),
+            ExpectedGatewayStep("tx01.confirm", "confirm"),
+            ExpectedGatewayStep("tx01.execute", "execute"),
+            ExpectedGatewayStep("tx01.verify", "verify"),
+        ),
+        turn_prefix_counts=(1, 3, 7),
+    )
+    sections = compile_workflow_business_plan_sections(
+        workflow_id=unit.workflow_id,
+        transactions=(
+            {
+                "transaction_id": "tx01",
+                "api": "ak.wwise.core.object.set",
+                "operation": "object.setReference",
+                "phase": f"{unit.workflow_id}.transaction_01",
+                "primary_step": "tx01.execute",
+            },
+        ),
+        workflow_steps=(
+            {
+                "name": "diag.search",
+                "kind": "diagnostic",
+                "phase": f"{unit.workflow_id}.diagnosis",
+                "transaction_id": None,
+                "api": "ak.wwise.core.object.get",
+            },
+            *(
+                {
+                    "name": step.name,
+                    "kind": kind,
+                    "phase": f"{unit.workflow_id}.transaction_01",
+                    "transaction_id": "tx01",
+                    "api": "ak.wwise.core.object.set",
+                }
+                for step, kind in zip(
+                    protocol.steps[1:],
+                    (
+                        "operation_schema",
+                        "preview",
+                        "transaction_show",
+                        "confirm",
+                        "execute",
+                        "verify",
+                    ),
+                    strict=True,
+                )
+            ),
+            {
+                "name": "cleanup.success",
+                "kind": "cleanup",
+                "phase": f"{unit.workflow_id}.cleanup",
+                "transaction_id": None,
+                "api": None,
+            },
+        ),
+        diagnostic_evidence=(
+            {
+                "evidence_id": "diag/search",
+                "step": "diag.search",
+                "api": "ak.wwise.core.object.get",
+                "phase": f"{unit.workflow_id}.diagnosis",
+                "expectation": {"bounded": True},
+            },
+        ),
+        live_bindings={"version": "2022.1"},
+        transaction_expectations=(
+            {"transaction_id": "tx01", "expectation": {"changed": True}},
+        ),
+    )
+
+    wrapped, rebuilt = (
+        project_runner.integration_operations_protocol_and_plan(
+            unit=unit,
+            protocol=protocol,
+            sections=sections,
+        )
+    )
+
+    assert [step.name for step in wrapped.steps[:6]] == [
+        "routing.operations",
+        "routing.query-schema",
+        "routing.query-schema.advanced",
+        "diag.search",
+        "routing.operations.tx01.operation-schema",
+        "tx01.operation-schema",
+    ]
+    assert wrapped.optional_workflow_query_schema_step_names == (
+        "routing.query-schema",
+        "routing.query-schema.advanced",
+    )
+    assert wrapped.allowed_turn_prefix_counts == (
+        (1, 2, 3, 4),
+        (3, 4, 5, 6, 7),
+        (7, 8, 9, 10, 11),
+    )
+    assert rebuilt.static_expectation["workflow_steps"][0] == {
+        "name": "routing.operations",
+        "kind": "checkpoint",
+        "phase": f"{unit.workflow_id}.checkpoint",
+        "transaction_id": None,
+        "api": None,
+    }
+    assert rebuilt.static_expectation["workflow_steps"][1] == {
+        "name": "routing.query-schema",
+        "kind": "checkpoint",
+        "phase": f"{unit.workflow_id}.checkpoint",
+        "transaction_id": None,
+        "api": None,
+    }
+    assert rebuilt.static_expectation["workflow_steps"][2] == {
+        "name": "routing.query-schema.advanced",
+        "kind": "checkpoint",
+        "phase": f"{unit.workflow_id}.checkpoint",
+        "transaction_id": None,
+        "api": None,
+    }
+
+@pytest.mark.parametrize(
+    "subcommand",
+    sorted(EXPECTED_DRAFT_REVISION_SUBCOMMANDS),
+)
+def test_consumed_order_rebinds_every_public_draft_revision_subcommand(
+    subcommand: str,
+) -> None:
+    start = ExpectedGatewayStep(
+        "tx01.draft-start",
+        "draft-start",
+        ("audio.import",),
+    )
+    mutation = ExpectedGatewayStep(
+        f"tx01.{subcommand}",
+        subcommand,
+        (
+            ResponseBinding(start.name, "/draft/draft_id"),
+            "--task-authority",
+            ResponseBinding(start.name, "/task_authority"),
+            "--expected-revision",
+            ResponseBinding("stale-step", "/draft/revision"),
+        ),
+    )
+
+    assert DRAFT_REVISION_SUBCOMMANDS == EXPECTED_DRAFT_REVISION_SUBCOMMANDS
+    rebound = campaign._steps_in_consumed_order(
+        (start, mutation),
+        (start.name, mutation.name),
+    )
+
+    assert rebound[1].arguments[4] == ResponseBinding(
+        start.name,
+        "/draft/revision",
+    )
+
+
 def test_consumed_composer_order_rebinds_each_revision_to_its_actual_predecessor(
 ) -> None:
     request = {
@@ -150,7 +508,7 @@ def test_consumed_composer_order_rebinds_each_revision_to_its_actual_predecessor
                     },
                     "properties": [{"name": "Volume", "value": index}],
                 }
-                for index in range(1, 4)
+                for index in range(1, 8)
             ]
         },
     }
@@ -161,18 +519,10 @@ def test_consumed_composer_order_rebinds_each_revision_to_its_actual_predecessor
     action_steps = [
         step for step in canonical if step.subcommand == "draft-apply"
     ]
-    reordered_actions = [
-        *(
-            step
-            for step in action_steps
-            if step.arguments[-1].expected["action"] == "add_target"
-        ),
-        *(
-            step
-            for step in action_steps
-            if step.arguments[-1].expected["action"] != "add_target"
-        ),
-    ]
+    assert len(action_steps) == 2
+    assert isinstance(action_steps[0].arguments[-1], DraftTypedActionBatchArgument)
+    assert isinstance(action_steps[1].arguments[-1], DraftTypedActionArgument)
+    reordered_actions = list(reversed(action_steps))
     consumed = [step.name for step in canonical]
     action_indexes = [
         index
@@ -204,6 +554,101 @@ def test_consumed_composer_order_rebinds_each_revision_to_its_actual_predecessor
         expected_steps=linearized,
         expected_wwise_version="2022.1",
     )
+
+
+def _archive_test_archived_typed_draft_accepts_dependency_free_rebatching(
+    tmp_path: Path,
+) -> None:
+    options = _options(tmp_path)
+    task_root = tmp_path / "task"
+    task_root.mkdir()
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "object.create",
+        "arguments": {
+            "parent": {"kind": "path", "value": r"\Root"},
+            "name": "ArchivedRebatch",
+            "type": "Sound",
+            "on_name_conflict": "fail",
+            "notes": "sealed-note",
+        },
+    }
+    canonical = build_transaction_protocol((request,))
+    action_indexes = tuple(
+        index
+        for index, step in enumerate(canonical.steps)
+        if step.subcommand == "draft-apply"
+    )
+    assert len(action_indexes) == 2
+    expected_actions = tuple(
+        action
+        for index in action_indexes
+        for action in (
+            canonical.steps[index].arguments[-1].actions
+            if isinstance(
+                canonical.steps[index].arguments[-1],
+                DraftTypedActionBatchArgument,
+            )
+            else (canonical.steps[index].arguments[-1],)
+        )
+    )
+    assert len(expected_actions) == 7
+    observed_steps = list(canonical.steps)
+    for step_index, actions in zip(
+        action_indexes,
+        (expected_actions[:4], expected_actions[4:]),
+        strict=True,
+    ):
+        observed_steps[step_index] = replace(
+            observed_steps[step_index],
+            arguments=(
+                *observed_steps[step_index].arguments[:-1],
+                DraftTypedActionBatchArgument(tuple(actions)),
+            ),
+        )
+    observed = replace(canonical, steps=tuple(observed_steps))
+    records = _synthetic_gateway_records(
+        options=options,
+        task_root=task_root,
+        protocol=observed,
+        version="2022.1",
+    )
+    command_records = completed_command_records(
+        parse_jsonl_events(
+            _synthetic_events(
+                thread_id="thread-rebatched-archive",
+                records=records,
+                final_response="操作完成。",
+                windows_powershell_core_host=options.windows_powershell_core_host,
+            )
+        ),
+        windows_powershell_core_host=options.windows_powershell_core_host,
+    )
+    serialized_commands = [
+        campaign._json_canonical_value(asdict(record))
+        for record in command_records
+    ]
+
+    campaign._validate_heavy_v3_broker_records(
+        records,
+        task_root=task_root,
+        steps=canonical.steps,
+        command_records=serialized_commands,
+        options=options,
+        version="2022.1",
+        label="passing rebatched archive",
+    )
+    from tests.semantic.support.codex_typed_draft_evidence_v3 import (
+        validate_typed_draft_evidence,
+    )
+
+    replayed = validate_typed_draft_evidence(
+        state_directory=task_root / "broker" / "state",
+        steps=canonical.steps,
+        broker_records=records,
+    )
+    assert replayed["canonical_request"] == request
 
 
 def test_archived_broker_replay_preserves_declared_composer_setup_order() -> None:
@@ -240,8 +685,8 @@ def test_archived_broker_replay_preserves_declared_composer_setup_order() -> Non
             "--expected-revision",
             ResponseBinding(start.name, "/draft/revision"),
             "--compact",
-            "--action-json",
-            DraftActionJsonArgument(
+            "--facts",
+            DraftTypedActionArgument(
                 {
                     "contract": "waapi-skill.operation-draft-action/v1",
                     "action": "set_import_option",
@@ -272,6 +717,368 @@ def test_archived_broker_replay_preserves_declared_composer_setup_order() -> Non
         step.name for step in canonical
     )
     assert tuple(step.name for step in replay._execution_steps) == consumed_names
+
+
+def test_archived_broker_replay_precomputes_audio_import_after_media_cleanup(
+    tmp_path: Path,
+) -> None:
+    media = tmp_path / "rain.wav"
+    media.write_bytes(b"RIFF-test")
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "audio.import",
+        "arguments": {
+            "import_operation": "createNew",
+            "imports": [
+                {
+                    "audio_file": str(media),
+                    "object_path": r"\Actor-Mixer Hierarchy\Default Work Unit\Rain",
+                    "object_type": "Sound SFX",
+                    "import_language": "SFX",
+                }
+            ],
+        },
+    }
+    protocol = build_audio_import_composer_protocol(request)
+    preview = next(
+        step
+        for step in protocol.steps
+        if step.subcommand == "preview-from-draft"
+    )
+    media.unlink()
+    execution_steps = campaign._steps_in_consumed_order(
+        protocol.steps,
+        tuple(step.name for step in protocol.steps),
+    )
+
+    replay = campaign._build_heavy_v3_broker_replay(
+        skill_source=Path("skills/waapi-skill"),
+        invocation_skill_source=Path("skills/waapi-skill"),
+        canonical_steps=protocol.steps,
+        execution_steps=execution_steps,
+        commutative_read_only_step_groups=(),
+        commutative_composer_setup_step_groups=(),
+        expected_wwise_version="2022.1",
+        project_modification_policy="ask_before_changes",
+    )
+
+    assert replay._offline_replay_preview_requests[preview.name] == (  # noqa: SLF001
+        preview.expected_operation_request
+    )
+
+
+def test_deep_business_campaign_unit_row_matches_matrix_wrapper_metadata() -> None:
+    unit = SimpleNamespace(
+        unit_id="CLI25-SOUNDBANK-BUILD-PREVIEW",
+        version="2025.1",
+        scenario=SimpleNamespace(api="ak.wwise.cli.generateSoundbank"),
+        runner_lane="agent",
+        component_profile_id="cli_console_business_1",
+        family="generic-cli-console",
+    )
+
+    assert campaign.heavy_v3_unit_row(unit, sequence=1) == {
+        "sequence": 1,
+        "scenario_id": "CLI25-SOUNDBANK-BUILD-PREVIEW",
+        "version": "2025.1",
+        "api": "ak.wwise.cli.generateSoundbank",
+        "runner": "agent",
+        "component_profile_id": "cli_console_business_1",
+        "family": "generic-cli-console",
+    }
+
+
+def test_deep_business_summary_accepts_the_same_wrapper_metadata(
+    tmp_path: Path,
+) -> None:
+    row = {
+        "sequence": 1,
+        "scenario_id": "CLI25-SOUNDBANK-BUILD-PREVIEW",
+        "version": "2025.1",
+        "api": "ak.wwise.cli.generateSoundbank",
+        "runner": "agent",
+        "component_profile_id": "cli_console_business_1",
+        "family": "generic-cli-console",
+    }
+    timestamp = "2026-09-01T00:00:00Z"
+    summary = {
+        "contract": matrix.HEAVY_V3_SUMMARY_CONTRACT,
+        "started_at": timestamp,
+        "updated_at": timestamp,
+        "completed_at": timestamp,
+        "profile": matrix.DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID,
+        "preflight": "passed",
+        "selected_unit_count": 1,
+        "attempted_unit_count": 1,
+        "attempted_unit_ids": [row["scenario_id"]],
+        "status_counts": {
+            "PASS": 1,
+            "FAIL": 0,
+            "BLOCKED": 0,
+            "INDETERMINATE": 0,
+        },
+        "passed_unit_ids": [row["scenario_id"]],
+        "failed_unit_ids": [],
+        "blocked_unit_ids": [],
+        "indeterminate_unit_ids": [],
+        "pending_unit_ids": [],
+        "stop_reason": None,
+        "stopped_early": False,
+        "all_selected_passed": True,
+        "run_errors": [],
+        "case_records": [
+            {
+                **row,
+                "status": "PASS",
+                "reason": "",
+                "scenario_root": str(tmp_path / "scenario"),
+            }
+        ],
+    }
+
+    campaign._validate_heavy_v3_summary(  # noqa: SLF001
+        summary,
+        expected_ids=(row["scenario_id"],),
+        returncode=0,
+        expected_profile=matrix.DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID,
+        expected_rows=(row,),
+    )
+
+
+def test_deep_business_protocol_validation_unwraps_the_component_unit() -> None:
+    component = SimpleNamespace(operation="ui.commands.execute")
+    wrapper = SimpleNamespace(component_unit=component)
+    ordinary = SimpleNamespace(operation="object.setNotes")
+
+    assert campaign._business_agent_protocol_unit(wrapper) is component  # noqa: SLF001
+    assert campaign._business_agent_protocol_unit(ordinary) is ordinary  # noqa: SLF001
+
+
+def test_archived_business_replay_rebinds_check_to_latest_batch_revision(
+    tmp_path: Path,
+) -> None:
+    media = tmp_path / "rain.wav"
+    media.write_bytes(b"RIFF-test")
+    protocol = build_audio_import_composer_protocol(
+        {
+            "contract": "waapi-skill.operation-request/v1",
+            "version": "2022.1",
+            "operation": "audio.import",
+            "arguments": {
+                "imports": [
+                    {
+                        "audio_file": str(media),
+                        "object_path": (
+                            r"\Actor-Mixer Hierarchy\Default Work Unit\Rain"
+                        ),
+                        "object_type": "Sound SFX",
+                        "import_language": "SFX",
+                    }
+                ],
+            },
+        }
+    )
+
+    replay_steps = campaign._steps_in_consumed_order(
+        protocol.steps,
+        tuple(step.name for step in protocol.steps),
+    )
+    declaration = next(
+        step
+        for step in replay_steps
+        if step.subcommand == "draft-declare-import-batch"
+    )
+    check = next(
+        step for step in replay_steps if step.subcommand == "draft-check"
+    )
+
+    assert check.arguments[4] == ResponseBinding(
+        declaration.name,
+        "/draft/revision",
+    )
+
+
+def test_archived_broker_replay_uses_sealed_switch_assignment_state(
+    tmp_path: Path,
+) -> None:
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "switchContainer.removeAssignment",
+        "arguments": {
+            "switch_container": {
+                "kind": "path",
+                "value": r"\Actor-Mixer Hierarchy\Default Work Unit\Footsteps",
+            },
+            "child": {
+                "kind": "path",
+                "value": r"\Actor-Mixer Hierarchy\Default Work Unit\Footsteps\Mud",
+            },
+            "state_or_switch": {
+                "kind": "path",
+                "value": r"\Switches\Default Work Unit\Surface\Mud",
+            },
+        },
+    }
+    protocol = build_transaction_protocol((request,))
+    preview = next(
+        step
+        for step in protocol.steps
+        if step.subcommand == "preview-from-draft"
+    )
+    execution_steps = campaign._steps_in_consumed_order(
+        protocol.steps,
+        tuple(step.name for step in protocol.steps),
+    )
+    state_directory = tmp_path / "state"
+    operation = "switchContainer.removeAssignment"
+    version = "2022.1"
+    schema_digest = operation_request_schema_digest(operation, version)
+    composer_digest = operation_composer_digest(operation, version)
+    store = OperationDraftStore(state_directory)
+    started = store.start(
+        operation=operation,
+        version=version,
+        schema_digest=schema_digest,
+        composer_digest=composer_digest,
+    )
+    context = BusinessContext.create(
+        task_authority=started.task_authority,
+        project_id="{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}",
+        project_path=str(tmp_path / "SampleProject.wproj"),
+        wwise_version=version,
+        wwise_build="2022.1.19.8584",
+    )
+    handles = BusinessHandleRegistry(context)
+    switch_container = handles.bind_object(
+        object_id="{11111111-1111-1111-1111-111111111111}",
+        name="Footsteps",
+        object_type="SwitchContainer",
+        path=request["arguments"]["switch_container"]["value"],
+        role="switch_container",
+    )
+    child = handles.bind_object(
+        object_id="{22222222-2222-2222-2222-222222222222}",
+        name="Mud",
+        object_type="RandomSequenceContainer",
+        path=request["arguments"]["child"]["value"],
+        role="child",
+    )
+    state_or_switch = handles.bind_object(
+        object_id="{33333333-3333-3333-3333-333333333333}",
+        name="Mud",
+        object_type="Switch",
+        path=request["arguments"]["state_or_switch"]["value"],
+        role="state_or_switch",
+    )
+    bound_session = BusinessDeclarationSession.create(
+        context
+    ).with_handle_registry(handles)
+    bound_record = store.apply_business_update(
+        started.record.draft_id,
+        task_authority=started.task_authority,
+        expected_revision=started.record.revision,
+        schema_digest=schema_digest,
+        composer_digest=composer_digest,
+        context=context,
+        update=lambda _session: bound_session,
+        event_type="handles.bound",
+    )
+    declared_session = bound_session.with_existing_declaration(
+        declaration_id="mud_assignment",
+        target=ExistingObjectTarget(switch_container.handle),
+        fields={
+            "child_handle": child.handle,
+            "state_or_switch_handle": state_or_switch.handle,
+        },
+    )
+    declared_record = store.apply_business_update(
+        started.record.draft_id,
+        task_authority=started.task_authority,
+        expected_revision=bound_record.revision,
+        schema_digest=schema_digest,
+        composer_digest=composer_digest,
+        context=context,
+        update=lambda _session: declared_session,
+        event_type="declaration.added",
+    )
+    materialized = store.materialize_request(
+        started.record.draft_id,
+        task_authority=started.task_authority,
+        expected_revision=declared_record.revision,
+        schema_digest=schema_digest,
+        composer_digest=composer_digest,
+    )
+    checked = store.record_check(
+        started.record.draft_id,
+        task_authority=started.task_authority,
+        expected_revision=declared_record.revision,
+        schema_digest=schema_digest,
+        composer_digest=composer_digest,
+        request_digest=materialized.request_digest,
+        project_guard={},
+        runtime_guard_fingerprint="b" * 64,
+        prepared_digest="c" * 64,
+    )
+    reservation = store.reserve_seal(
+        started.record.draft_id,
+        task_authority=started.task_authority,
+        expected_revision=checked.revision,
+        schema_digest=schema_digest,
+        composer_digest=composer_digest,
+        transaction_id="synthetic-transaction",
+        apply=True,
+        ttl_seconds=1800,
+        policy="ask_before_changes",
+    )
+    store.commit_seal(
+        started.record.draft_id,
+        task_authority=started.task_authority,
+        source_revision=reservation.source_revision,
+        transaction_id="synthetic-transaction",
+        artifact_hash="a" * 64,
+        transaction_state="awaiting_confirmation",
+    )
+
+    archived = load_operation_draft_archive_record(
+        state_directory,
+        started.record.draft_id,
+        allow_cleaned_file_evidence=True,
+    )
+    assert archived.seal is not None
+    from tests.semantic.support.codex_typed_draft_evidence_v3 import (
+        _materialize_archived_business_request,
+    )
+
+    assert _materialize_archived_business_request(
+        operation,
+        declared_session,
+        allow_cleaned_file_evidence=True,
+    ) == business_adapter(operation).materialize(declared_session)
+
+    replay = campaign._build_heavy_v3_broker_replay(
+        skill_source=Path("skills/waapi-skill"),
+        invocation_skill_source=Path("skills/waapi-skill"),
+        canonical_steps=protocol.steps,
+        execution_steps=execution_steps,
+        commutative_read_only_step_groups=(),
+        commutative_composer_setup_step_groups=(),
+        expected_wwise_version="2022.1",
+        project_modification_policy="ask_before_changes",
+        existing_state_directory=state_directory,
+    )
+
+    start = next(step for step in protocol.steps if step.subcommand == "draft-start")
+    replay._payloads_by_step[start.name] = {  # noqa: SLF001
+        "draft": {"draft_id": started.record.draft_id},
+        "task_authority": started.task_authority,
+    }
+    replayed = replay._replay_expected_operation_draft_request(  # noqa: SLF001
+        preview
+    )
+
+    assert replayed == business_adapter(operation).materialize(declared_session)
 
 
 def test_archived_broker_replay_rejects_undeclared_composer_interruption() -> None:
@@ -310,6 +1117,51 @@ def test_archived_broker_replay_rejects_undeclared_composer_interruption() -> No
             expected_wwise_version="2022.1",
             project_modification_policy="ask_before_changes",
         )
+
+
+def test_archive_accepts_import_contraction_plus_dependency_ready_setup_order() -> None:
+    canonical = tuple(
+        ExpectedGatewayStep(
+            f"tx01.declare-batch{suffix}",
+            "draft-declare-import-batch",
+        )
+        for suffix in ("", "-02", "-03", "-04")
+    ) + tuple(
+        ExpectedGatewayStep(name, subcommand)
+        for name, subcommand in (
+            ("tx02.bind-target-01-01", "draft-bind-object"),
+            ("tx02.bind-target-02-02", "draft-bind-object"),
+            ("tx02.discover-field-01", "draft-discover-fields"),
+            ("tx02.discover-field-02", "draft-discover-fields"),
+            ("tx02.declare-existing-01", "draft-declare-existing"),
+            ("tx02.declare-existing-02", "draft-declare-existing"),
+            ("tx02.check", "draft-check"),
+        )
+    )
+    observed_names = (
+        "tx01.declare-batch",
+        "tx01.declare-batch-02",
+        "tx02.bind-target-01-01",
+        "tx02.discover-field-01",
+        "tx02.declare-existing-01",
+        "tx02.bind-target-02-02",
+        "tx02.discover-field-02",
+        "tx02.declare-existing-02",
+        "tx02.check",
+    )
+
+    assert campaign._contracted_protocol_linearization_is_valid(
+        canonical,
+        observed_names,
+        commutative_read_only_step_groups=(),
+        commutative_composer_setup_step_groups=(),
+    )
+    assert not campaign._contracted_protocol_linearization_is_valid(
+        canonical,
+        observed_names[:-1],
+        commutative_read_only_step_groups=(),
+        commutative_composer_setup_step_groups=(),
+    )
 
 
 def test_archived_draft_action_preserves_submitted_json_spelling() -> None:
@@ -700,7 +1552,7 @@ def _matrix_options(
     root: Path,
 ) -> matrix.RunnerOptions:
     return matrix.RunnerOptions(
-        profile=matrix.HEAVY_V3_PROFILE_ID,
+        profile=options.profile,
         iteration_root=root,
         suite_path=options.suite_path,
         skill_source=options.skill_source,
@@ -731,6 +1583,7 @@ def _write_matrix_evidence(
     stop_reason: str = "",
     run_errors: Sequence[str] = (),
     visible_values_by_id: Mapping[str, Mapping[str, str]] | None = None,
+    omit_optional_query_schema_unit_ids: Sequence[str] = (),
 ) -> None:
     root.mkdir(parents=True, exist_ok=False)
     selected_rows = tuple(
@@ -751,6 +1604,9 @@ def _write_matrix_evidence(
                 thread_id=f"thread-{index}",
                 options=options,
                 visible_values=(visible_values_by_id or {}).get(unit.unit_id, {}),
+                omit_optional_query_schema=(
+                    unit.unit_id in omit_optional_query_schema_unit_ids
+                ),
             )
         else:
             task_root = scenario_root / "evidence" / "codex-task"
@@ -810,6 +1666,7 @@ def _write_matrix_evidence(
         preflight_state=preflight,
         started_at=started,
         completed_at=completed,
+        profile=options.profile,
     )
     matrix.write_json(root / "run-config.json", run_config)
     matrix.write_json(root / "summary.json", summary)
@@ -974,6 +1831,7 @@ def _mark_codex_infrastructure_block(
         matrix.write_json(
             prior_turn_root / "codex-facts.json",
             _synthetic_codex_facts(
+                unit=unit,
                 options=options,
                 task_root=task_root,
                 turn_root=prior_turn_root,
@@ -1005,6 +1863,7 @@ def _mark_codex_infrastructure_block(
         )
     )
     failed_facts = _synthetic_codex_facts(
+        unit=unit,
         options=options,
         task_root=task_root,
         turn_root=failed_turn_root,
@@ -1134,7 +1993,7 @@ def _mark_codex_infrastructure_block(
         sandbox_project.write_text("<WwiseDocument/>\n", encoding="utf-8")
         lifecycle = {
             "contract": campaign.HEAVY_V3_PROJECT_LIFECYCLE_CONTRACT,
-            "scenario_id": unit.unit_id,
+            "scenario_id": getattr(unit, "base_scenario_id", unit.unit_id),
             "version": unit.version,
             "requested_status": "BLOCKED",
             "final_status": "BLOCKED",
@@ -1298,7 +2157,22 @@ def _synthetic_typed_sections(
         "ak.wwise.core.object.create",
         "ak.wwise.core.object.set",
     }:
-        recipe = build_object_heavy_v3_recipe(unit.unit_id)
+        recipe = build_object_heavy_v3_recipe(
+            getattr(unit, "base_scenario_id", unit.unit_id),
+            version=unit.version,
+        )
+        if unit.unit_id in {
+            "TYP21-QUERY-OBJECT-GET",
+            "TYP23-QUERY-OBJECT-GET",
+        }:
+            recipe = typed_input_business_query_recipe(
+                recipe,
+                unit_id=unit.unit_id,
+            )
+        elif unit.unit_id == "TYP21-DEDICATED-OBJECT-CREATE":
+            recipe = typed_input_merge_recipe(recipe, unit_id=unit.unit_id)
+        elif unit.unit_id == "TYP23-DEDICATED-OBJECT-CREATE":
+            recipe = typed_input_rename_recipe(recipe, unit_id=unit.unit_id)
         before = _synthetic_object_before(recipe)
         audio_root = scenario_root / "owned" / "assets" / "object-query-audio"
         manifest: list[dict[str, Any]] = []
@@ -1323,6 +2197,16 @@ def _synthetic_typed_sections(
             protocol,
             before,
             manifest,
+            profile_unit_id=(
+                unit.unit_id
+                if unit.unit_id
+                in {
+                    TYPED_PROFILE_QUERY_REPAIR_UNIT_ID,
+                    TYPED_PROFILE_RENAME_UNIT_ID,
+                    *TYPED_PROFILE_OBJECT_METADATA_UNITS,
+                }
+                else None
+            ),
         )
     if unit.scenario.api == "ak.wwise.core.audio.convert":
         plan, before = _synthetic_audio_plan_and_before(unit, scenario_root)
@@ -1499,6 +2383,116 @@ def _synthetic_object_before(
         digest,
         override_output_rows,
     )
+
+
+def test_campaign_typed_business_query_archive_uses_the_migrated_recipe(
+    tmp_path: Path,
+) -> None:
+    from tests.semantic.support.codex_typed_input_profile import (
+        load_typed_input_profile,
+    )
+
+    profile = load_typed_input_profile(
+        Path(__file__).resolve().parent
+        / "data"
+        / "typed-input-v1"
+        / "profile.json"
+    )
+    unit = next(
+        row
+        for row in profile.units
+        if row.unit_id == "TYP21-QUERY-OBJECT-GET"
+    )
+    protocol = _synthetic_protocol(
+        unit,
+        scenario_root=tmp_path / "scenario",
+        visible_values={},
+    )
+    sections = _synthetic_typed_sections(
+        unit,
+        protocol=protocol,
+        scenario_root=tmp_path / "scenario",
+    )
+
+    parsed = campaign._validate_heavy_v3_typed_business_plan(
+        sections.writer_kwargs(),
+        expected_unit=unit,
+        provenance=SimpleNamespace(protocol=protocol),
+    )
+
+    assert parsed is not None
+    assert parsed.static_expectation["request"]["value"]["argv"][3:7] == [
+        "query-object",
+        "--path-segment",
+        "Actor-Mixer Hierarchy",
+        "--path-segment",
+    ]
+    assert protocol.optional_query_schema_step_names == (
+        "query-schema",
+        "query-schema.advanced",
+    )
+
+
+def test_campaign_replay_prevalidation_binds_task_local_declaration_id() -> None:
+    expected = ExpectedGatewayStep(
+        "tx01.declare-root-01",
+        "draft-declare-new",
+        (
+            "draft-id",
+            "--task-authority",
+            "authority",
+            "--expected-revision",
+            "1",
+            "--declaration-id",
+            "root-01",
+            "--parent-handle",
+            "parent",
+            "--name",
+            "Alert",
+            "--kind",
+            "random-container",
+        ),
+    )
+    replay = SimpleNamespace(
+        _next_step=-1,
+        _execution_steps=[expected],
+    )
+
+    def bind(step: ExpectedGatewayStep, actual: Sequence[str]):
+        assert actual[7] == "alert"
+        arguments = list(step.arguments)
+        arguments[6] = "alert"
+        return replace(step, arguments=tuple(arguments))
+
+    replay._bind_task_local_declaration_id = bind
+    actual = (
+        "draft-declare-new",
+        "draft-id",
+        "--task-authority",
+        "authority",
+        "--expected-revision",
+        "1",
+        "--declaration-id",
+        "alert",
+        "--parent-handle",
+        "parent",
+        "--name",
+        "Alert",
+        "--kind",
+        "random-container",
+    )
+
+    rebound = campaign._prepare_heavy_v3_replay_step(
+        replay,
+        index=0,
+        expected_step=expected,
+        actual_arguments=actual,
+        label="task-local declaration replay",
+    )
+
+    assert replay._next_step == 0
+    assert rebound.arguments[6] == "alert"
+    assert replay._execution_steps[0] == rebound
 
 
 def _synthetic_audio_components_and_profiles(scenario_id: str):
@@ -1714,7 +2708,7 @@ def _write_prompt_materialization(
             "delta_rules": (),
         }
     business_oracle_plan = write_business_oracle_plan(
-        scenario_id=unit.unit_id,
+        scenario_id=getattr(unit, "base_scenario_id", unit.unit_id),
         version=unit.version,
         api=unit.scenario.api,
         runner="cli" if unit.scenario.api.startswith("ak.wwise.cli.") else "project",
@@ -1774,12 +2768,39 @@ def _synthetic_protocol(
         "ak.wwise.core.object.create",
         "ak.wwise.core.object.set",
     }:
-        recipe = build_object_heavy_v3_recipe(unit.unit_id)
+        recipe = build_object_heavy_v3_recipe(
+            getattr(unit, "base_scenario_id", unit.unit_id),
+            version=unit.version,
+        )
+        if unit.unit_id in {
+            "TYP21-QUERY-OBJECT-GET",
+            "TYP23-QUERY-OBJECT-GET",
+        }:
+            recipe = typed_input_business_query_recipe(
+                recipe,
+                unit_id=unit.unit_id,
+            )
+        elif unit.unit_id == "TYP21-DEDICATED-OBJECT-CREATE":
+            recipe = typed_input_merge_recipe(recipe, unit_id=unit.unit_id)
+        elif unit.unit_id == "TYP23-DEDICATED-OBJECT-CREATE":
+            recipe = typed_input_rename_recipe(recipe, unit_id=unit.unit_id)
         if isinstance(recipe.request, OperationRequestSpec):
             return build_transaction_protocol((recipe.request.as_dict(),))
         if isinstance(recipe.request, QueryObjectRequestSpec):
-            return build_direct_protocol(
-                [query_object_step("query-object", recipe.request.argv[3:])]
+            query = query_object_step("query-object", recipe.request.argv[3:])
+            if unit.unit_id == TYPED_PROFILE_QUERY_REPAIR_UNIT_ID:
+                return build_optional_query_repair_protocol(query)
+            return (
+                build_optional_query_schema_protocol(
+                    query,
+                    allow_advanced=unit.unit_id
+                    in {
+                        "TYP21-QUERY-OBJECT-GET",
+                        "TYP23-QUERY-OBJECT-GET",
+                    },
+                )
+                if "--max-results" in recipe.request.argv
+                else build_direct_protocol((query,))
             )
         raise AssertionError("synthetic object recipe request is not closed")
     if api == "ak.wwise.core.audio.convert":
@@ -1790,16 +2811,19 @@ def _synthetic_protocol(
         request = _synthetic_audio_operation_request(unit, io_root=io_root)
         if unit.scenario.fixture.get("synthetic_preview_only") is not True:
             return build_transaction_protocol((request,))
-        step = ExpectedGatewayStep(
-            name="audio.preview",
-            subcommand="preview",
-            arguments=(
-                "--apply",
-                "--request-json",
-                SemanticJsonArgument(request),
-            ),
+        complete = build_transaction_protocol((request,))
+        preview_index = next(
+            index
+            for index, step in enumerate(complete.steps)
+            if step.subcommand in {"typed-call", "typed-operation", "preview-from-draft"}
         )
-        return V3GatewayProtocol((step,), (1,))
+        # Keep a deliberately incomplete lifecycle for the tamper test while
+        # still using the normal typed construction path.  The oracle must
+        # reject the missing execute/verify phases, not rely on retired JSON.
+        return V3GatewayProtocol(
+            complete.steps[: preview_index + 1],
+            (preview_index + 1,),
+        )
     steps = tuple(
         ExpectedGatewayStep(
             name=f"synthetic-step-{index}",
@@ -1868,7 +2892,10 @@ def _synthetic_gateway_records(
     transaction_id = "synthetic-transaction"
     transaction_store: TransactionStore | None = None
     awaiting_snapshot = None
-    if any(step.subcommand == "transaction-show" for step in protocol.steps):
+    has_draft_preview = any(
+        step.subcommand == "preview-from-draft" for step in protocol.steps
+    )
+    if any(step.subcommand == "transaction-show" for step in protocol.steps) and not has_draft_preview:
         transaction_store = TransactionStore(task_root / "broker" / "state")
         transaction_store.create_preview(
             transaction_id,
@@ -1881,6 +2908,60 @@ def _synthetic_gateway_records(
         awaiting_snapshot = transaction_store.load_snapshot(transaction_id)
         assert awaiting_snapshot.confirmation_token is not None
     records: list[dict[str, Any]] = []
+    draft_store = OperationDraftStore(task_root / "broker" / "state")
+    draft_started: dict[str, tuple[str, str, str, int]] = {}
+    soundbank_business_operations = {
+        "soundbank.convertExternalSources",
+        "soundbank.generate",
+        "soundbank.processDefinitionFiles",
+        "soundbank.setInclusions",
+    }
+    synthetic_plan_only_operations = {
+        *soundbank_business_operations,
+    }
+    exact_artifact_business_operations = {
+        "audio.importTabDelimited",
+        "lua.executeCliFile",
+        "lua.executeCoreFile",
+        "lua.executeCoreInline",
+    }
+    business_contexts: dict[str, BusinessContext] = {}
+    bound_artifact_handles: dict[str, str] = {}
+    expected_business_requests = {
+        str(step.expected_operation_request["operation"]): dict(
+            step.expected_operation_request
+        )
+        for step in protocol.steps
+        if step.expected_operation_request is not None
+    }
+    required_response_values: dict[tuple[str, str], Any] = {}
+    for expected_step in protocol.steps:
+        for expected_argument in expected_step.arguments:
+            action_arguments = (
+                (expected_argument,)
+                if isinstance(expected_argument, DraftTypedActionArgument)
+                else expected_argument.actions
+                if isinstance(expected_argument, DraftTypedActionBatchArgument)
+                else ()
+            )
+            for action_argument in action_arguments:
+                for binding in action_argument.response_bindings:
+                    key = binding.pointer.removeprefix("/")
+                    required_response_values[
+                        (binding.step, binding.response_pointer)
+                    ] = action_argument.expected[key]
+
+    def set_pointer(payload: dict[str, Any], pointer: str, value: Any) -> None:
+        current: dict[str, Any] = payload
+        segments = pointer.removeprefix("/").split("/")
+        for segment in segments[:-1]:
+            child = current.get(segment)
+            if not isinstance(child, dict):
+                child = {}
+                current[segment] = child
+            current = child
+        current[segments[-1]] = value
+
     use_candidate_runner = False
     for index, step in enumerate(protocol.steps, start=1):
         arguments = [*step.gateway_global_arguments, step.subcommand]
@@ -1896,26 +2977,45 @@ def _synthetic_gateway_records(
                         separators=(",", ":"),
                     )
                 )
+            elif isinstance(item, DraftTypedActionArgument):
+                arguments.extend(typed_action_cli_arguments(item.expected))
+            elif isinstance(item, DraftTypedActionBatchArgument):
+                for action_argument in item.actions:
+                    arguments.extend(
+                        typed_action_cli_arguments(action_argument.expected)
+                    )
+            elif isinstance(item, TypedRequestFactsArgument):
+                construction = typed_request_construction_for_values(
+                    item.contract,
+                    args=item.expected_args,
+                    options=item.expected_options,
+                )
+                arguments.extend(
+                    _typed_fact_cli_arguments(
+                        construction.facts,
+                        prefix=item.prefix,
+                    )
+                )
+            elif isinstance(item, InlineTypedOperationArgument):
+                arguments.extend(inline_operation_cli_arguments(item.expected)[1:])
             elif isinstance(item, ResponseBinding):
                 source = replay._payloads_by_step.get(item.step)  # noqa: SLF001
                 if source is None:
                     raise AssertionError("synthetic response binding is unavailable")
-                if item.pointer == "/transaction_id":
-                    bound = source.get("transaction_id")
-                elif item.pointer == "/confirmation/token":
-                    confirmation = source.get("confirmation")
-                    bound = (
-                        confirmation.get("token")
-                        if isinstance(confirmation, Mapping)
-                        else None
-                    )
-                else:
-                    raise AssertionError(
-                        "synthetic response binding pointer is not allow-listed"
-                    )
-                if not isinstance(bound, str) or not bound:
+                current: Any = source
+                for segment in item.pointer.removeprefix("/").split("/"):
+                    if isinstance(current, Mapping):
+                        current = current.get(segment)
+                    elif isinstance(current, list) and segment.isdigit():
+                        position = int(segment)
+                        current = current[position] if position < len(current) else None
+                    else:
+                        current = None
+                        break
+                bound = current
+                if not isinstance(bound, (str, int, float, bool)) or bound is None:
                     raise AssertionError("synthetic response binding is unavailable")
-                arguments.append(bound)
+                arguments.append(str(bound))
             else:
                 raise AssertionError("synthetic protocol argument is unsupported")
         model_argv = [
@@ -1935,14 +3035,688 @@ def _synthetic_gateway_records(
             resolved.gateway_arguments,
         )
         structured_refusal = step.allowed_exit_codes == (2,)
+        allowed_contracts = gateway_payload_contracts(step.subcommand)
+        payload_contract = (
+            GATEWAY_RESULT_CONTRACT
+            if structured_refusal
+            else (
+                TYPED_CONTAINER_HANDLE_CONTRACT
+                if step.subcommand
+                in {"request-map-container", "request-array-item"}
+                else next(iter(allowed_contracts))
+            )
+        )
         payload = {
-            "contract": "waapi-skill.gateway-result/v1",
+            "contract": payload_contract,
             "ok": not structured_refusal,
             "command": step.subcommand,
         }
         if structured_refusal:
             payload["error_code"] = step.expected_error_code
-        elif step.subcommand == "preview":
+        elif step.subcommand == "topic-schema":
+            topic = str(step.arguments[0])
+            payload.update(
+                {
+                    "version": version,
+                    "topic": topic,
+                    "options": {
+                        "schema_digest": topic_options_contract(
+                            version, topic
+                        ).schema_digest,
+                    },
+                    "event_match": {
+                        "schema_digest": topic_match_contract(
+                            version, topic
+                        ).schema_digest,
+                    },
+                }
+            )
+        elif step.subcommand == "draft-start":
+            operation = str(step.arguments[0])
+            schema_digest = (
+                request_contract(version, operation).schema_digest
+                if operation.startswith("ak.")
+                else operation_request_schema_digest(operation, version)
+            )
+            composer_digest = operation_composer_digest(operation, version)
+            started = draft_store.start(
+                operation=operation,
+                version=version,
+                schema_digest=schema_digest,
+                composer_digest=composer_digest,
+            )
+            draft_started[operation] = (
+                started.record.draft_id,
+                started.task_authority,
+                schema_digest,
+                started.record.revision,
+            )
+            if operation in exact_artifact_business_operations:
+                business_contexts[operation] = BusinessContext.create(
+                    task_authority=started.task_authority,
+                    project_id="{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}",
+                    project_path=str(task_root / "SampleProject.wproj"),
+                    wwise_version=version,
+                    wwise_build=f"{version}.synthetic",
+                )
+            elif operation == "ak.wwise.core.audio.convert":
+                business_contexts[operation] = BusinessContext.create(
+                    task_authority=started.task_authority,
+                    project_id="{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}",
+                    project_path=str(task_root / "SampleProject.wproj"),
+                    wwise_version=version,
+                    wwise_build=f"{version}.synthetic",
+                )
+            payload.update(
+                {
+                    "draft": {
+                        "contract": "waapi-skill.operation-draft/v1",
+                        "draft_id": started.record.draft_id,
+                        "revision": started.record.revision,
+                        "lifecycle_state": "editable",
+                        "binding": {
+                            "operation": operation,
+                            "version": version,
+                            "schema_digest": schema_digest,
+                        },
+                        **operation_draft_public_projection(
+                            composition_projection(
+                                operation,
+                                version,
+                                started.record.composition,
+                            )
+                        ),
+                    },
+                    "task_authority": started.task_authority,
+                }
+            )
+        elif step.subcommand == "query-object":
+            if step.name == "query-repair.ambiguous-kind":
+                payload.update(
+                    {
+                        "status": "needs_clarification",
+                        "agent_result": {
+                            "meaning": "Music",
+                            "candidate_count": 2,
+                            "candidates": [
+                                {
+                                    "classId": 17,
+                                    "name": "MusicTrack",
+                                    "type": "Object",
+                                },
+                                {
+                                    "classId": 18,
+                                    "name": "MusicSegment",
+                                    "type": "Object",
+                                },
+                            ],
+                            "repair": (
+                                "refine --custom-kind until one live Wwise "
+                                "type matches"
+                            ),
+                        },
+                    }
+                )
+            elif step.name == "query-repair.refined-kind":
+                payload.update(
+                    {
+                        "status": "ok",
+                        "count": 0,
+                        "objects": [],
+                        "agent_result": [],
+                    }
+                )
+            query_arguments = tuple(
+                item for item in step.arguments if isinstance(item, str)
+            )
+            if "--type" in query_arguments and "--where" in query_arguments:
+                object_type = query_arguments[query_arguments.index("--type") + 1]
+                where_index = query_arguments.index("--where")
+                if query_arguments[where_index + 1 : where_index + 4] == (
+                    "name",
+                    "=",
+                    "string",
+                ):
+                    object_name = query_arguments[where_index + 4]
+                    object_suffix = hashlib.sha256(
+                        f"{object_type}\0{object_name}".encode("utf-8")
+                    ).hexdigest()[:12].upper()
+                    payload["objects"] = [
+                        {
+                            "id": "{00000000-0000-0000-0000-" + object_suffix + "}",
+                            "name": object_name,
+                            "type": object_type,
+                            "path": f"\\Synthetic\\{object_name}",
+                        }
+                    ]
+        elif step.subcommand == "draft-bind-object":
+            operation = next(reversed(draft_started))
+            draft_id, authority, schema_digest, revision = draft_started[operation]
+            if operation in exact_artifact_business_operations:
+                if operation != "audio.importTabDelimited":
+                    raise AssertionError(
+                        "only tabular import binds an exact-artifact object"
+                    )
+                request = expected_business_requests[operation]
+                request_arguments = request["arguments"]
+                selector = request_arguments["import_location"]
+                selector_kind = selector.get("kind")
+                selector_value = selector.get("value")
+                if selector_kind == "path":
+                    object_id = "{00000000-0000-0000-0000-000000000001}"
+                    object_path = str(selector_value)
+                elif selector_kind == "id":
+                    object_id = str(selector_value)
+                    object_path = r"\Synthetic\Import Location"
+                else:
+                    raise AssertionError(
+                        "synthetic tabular import requires an exact path or GUID"
+                    )
+                context = business_contexts[operation]
+                created: dict[str, str] = {}
+
+                def bind_artifact_object(
+                    current: BusinessDeclarationSession,
+                ) -> BusinessDeclarationSession:
+                    handles = BusinessHandleRegistry.from_dict(
+                        current.handles.as_dict()
+                    )
+                    bound = handles.bind_object(
+                        object_id=object_id,
+                        name=object_path.rsplit("\\", 1)[-1],
+                        object_type="WorkUnit",
+                        path=object_path,
+                        role="import_location",
+                    )
+                    created["handle"] = bound.handle
+                    return current.with_handle_registry(handles)
+
+                updated = draft_store.apply_business_update(
+                    draft_id,
+                    task_authority=authority,
+                    expected_revision=revision,
+                    schema_digest=schema_digest,
+                    composer_digest=operation_composer_digest(operation, version),
+                    context=context,
+                    update=bind_artifact_object,
+                    event_type="handles.bound",
+                )
+                revision = updated.revision
+                handle = created["handle"]
+                bound_artifact_handles[operation] = handle
+            elif operation == "ak.wwise.core.audio.convert":
+                context = business_contexts[operation]
+                path_segments = tuple(
+                    str(arguments[position + 1])
+                    for position, value in enumerate(arguments[:-1])
+                    if value == "--object-path-segment"
+                )
+                object_path = "\\" + "\\".join(path_segments)
+                object_id = (
+                    "{00000000-0000-0000-0000-" + f"{index:012X}" + "}"
+                )
+                created: dict[str, str] = {}
+
+                def bind_core_object(
+                    current: BusinessDeclarationSession,
+                ) -> BusinessDeclarationSession:
+                    handles = BusinessHandleRegistry.from_dict(
+                        current.handles.as_dict()
+                    )
+                    bound = handles.bind_object(
+                        object_id=object_id,
+                        name=path_segments[-1],
+                        object_type="Sound",
+                        path=object_path,
+                        role="audio_object",
+                    )
+                    created["handle"] = bound.handle
+                    return current.with_handle_registry(handles)
+
+                updated = draft_store.apply_business_update(
+                    draft_id,
+                    task_authority=authority,
+                    expected_revision=revision,
+                    schema_digest=schema_digest,
+                    composer_digest=operation_composer_digest(operation, version),
+                    context=context,
+                    update=bind_core_object,
+                    event_type="handles.bound",
+                )
+                revision = updated.revision
+                handle = created["handle"]
+            elif operation in synthetic_plan_only_operations:
+                revision += 1
+                handle = "boh1-" + f"{index:032x}"
+            else:
+                raise AssertionError(
+                    "synthetic object binding is only modeled for SoundBank business"
+                )
+            draft_started[operation] = (
+                draft_id,
+                authority,
+                schema_digest,
+                revision,
+            )
+            payload.update(
+                {
+                    "draft": {
+                        "contract": "waapi-skill.operation-draft/v1",
+                        "draft_id": draft_id,
+                        "revision": revision,
+                        "lifecycle_state": "editable",
+                        "binding": {
+                            "operation": operation,
+                            "version": version,
+                            "schema_digest": schema_digest,
+                        },
+                    },
+                    "bound_object": {
+                        "handle": handle,
+                        **(
+                            {
+                                "id": object_id,
+                                "name": path_segments[-1],
+                                "type": "Sound",
+                                "path": object_path,
+                                "role": "audio_object",
+                            }
+                            if operation == "ak.wwise.core.audio.convert"
+                            else {}
+                        ),
+                    },
+                }
+            )
+        elif step.subcommand == "draft-declare-soundbank-plan":
+            operation = next(reversed(draft_started))
+            draft_id, authority, schema_digest, revision = draft_started[operation]
+            if operation not in soundbank_business_operations:
+                raise AssertionError("synthetic SoundBank plan operation is invalid")
+            revision += 1
+            draft_started[operation] = (
+                draft_id,
+                authority,
+                schema_digest,
+                revision,
+            )
+            payload["draft"] = {
+                "contract": "waapi-skill.operation-draft/v1",
+                "draft_id": draft_id,
+                "revision": revision,
+                "lifecycle_state": "editable",
+                "binding": {
+                    "operation": operation,
+                    "version": version,
+                    "schema_digest": schema_digest,
+                },
+            }
+        elif step.subcommand == "draft-declare-core-plan":
+            operation = next(reversed(draft_started))
+            draft_id, authority, schema_digest, revision = draft_started[operation]
+            if operation != "ak.wwise.core.audio.convert":
+                raise AssertionError("synthetic Core plan operation is invalid")
+            plan: dict[str, Any] = {
+                "audio_object_handles": [],
+                "platform_names": [],
+                "languages": [],
+            }
+            position = 0
+            while position < len(arguments):
+                value = arguments[position]
+                if value == "--role":
+                    name, item = arguments[position + 1 : position + 3]
+                    plan[str(name)].append(item)
+                    position += 3
+                elif value == "--item":
+                    name, item = arguments[position + 1 : position + 3]
+                    plan[str(name)].append(item)
+                    position += 3
+                elif value == "--value":
+                    name, item = arguments[position + 1 : position + 3]
+                    plan[str(name)] = item
+                    position += 3
+                else:
+                    position += 1
+            context = business_contexts[operation]
+
+            def declare_core(
+                current: BusinessDeclarationSession,
+            ) -> BusinessDeclarationSession:
+                candidate = current.with_settings({"core_plan": plan})
+                business_adapter(operation).materialize(candidate)
+                return candidate
+
+            updated = draft_store.apply_business_update(
+                draft_id,
+                task_authority=authority,
+                expected_revision=revision,
+                schema_digest=schema_digest,
+                composer_digest=operation_composer_digest(operation, version),
+                context=context,
+                update=declare_core,
+                event_type="settings.revised",
+            )
+            draft_started[operation] = (
+                draft_id,
+                authority,
+                schema_digest,
+                updated.revision,
+            )
+            payload["draft"] = {
+                "contract": "waapi-skill.operation-draft/v1",
+                "draft_id": draft_id,
+                "revision": updated.revision,
+                "lifecycle_state": "editable",
+                "binding": {
+                    "operation": operation,
+                    "version": version,
+                    "schema_digest": schema_digest,
+                },
+            }
+        elif step.subcommand == "draft-declare-artifact-plan":
+            operation = next(reversed(draft_started))
+            draft_id, authority, schema_digest, revision = draft_started[operation]
+            if operation not in exact_artifact_business_operations:
+                raise AssertionError("synthetic exact-artifact operation is invalid")
+            request = expected_business_requests[operation]
+            request_arguments = request["arguments"]
+            if operation == "audio.importTabDelimited":
+                native_mode = request_arguments.get("import_operation")
+                business_mode = {
+                    "createNew": "create",
+                    "useExisting": "reimport",
+                    "replaceExisting": "replace",
+                }
+                plan: dict[str, Any] = {
+                    "table_file": request_arguments["import_file"],
+                    "location_handle": bound_artifact_handles[operation],
+                    "language": request_arguments["import_language"],
+                }
+                if native_mode is not None:
+                    plan["mode"] = business_mode[native_mode]
+                if "auto_add_to_source_control" in request_arguments:
+                    plan["add_to_source_control"] = request_arguments[
+                        "auto_add_to_source_control"
+                    ]
+                if "auto_check_out_to_source_control" in request_arguments:
+                    plan["check_out_from_source_control"] = request_arguments[
+                        "auto_check_out_to_source_control"
+                    ]
+            elif operation.endswith("File"):
+                plan = {"script_file": request_arguments["script_file"]}
+                if "wa_args" in request_arguments:
+                    plan["arguments"] = request_arguments["wa_args"]
+                if "watchdog_seconds" in request_arguments:
+                    plan["watchdog_seconds"] = request_arguments[
+                        "watchdog_seconds"
+                    ]
+            else:
+                plan = {
+                    "lua_source": request_arguments["lua_code"],
+                    "io_root": request_arguments["io_root"],
+                }
+                if "wa_args" in request_arguments:
+                    plan["arguments"] = request_arguments["wa_args"]
+            context = business_contexts[operation]
+
+            def declare_artifact(
+                current: BusinessDeclarationSession,
+            ) -> BusinessDeclarationSession:
+                adapter = business_adapter(operation)
+                provisional = current.with_settings({"artifact_plan": plan})
+                request = adapter.materialize(provisional)
+                settings: dict[str, Any] = {"artifact_plan": plan}
+                evidence = exact_artifact_evidence_from_request(operation, request)
+                if evidence is not None:
+                    settings["artifact_evidence"] = evidence
+                candidate = current.with_settings(settings)
+                adapter.materialize(candidate)
+                return candidate
+
+            updated = draft_store.apply_business_update(
+                draft_id,
+                task_authority=authority,
+                expected_revision=revision,
+                schema_digest=schema_digest,
+                composer_digest=operation_composer_digest(operation, version),
+                context=context,
+                update=declare_artifact,
+                event_type="settings.revised",
+            )
+            draft_started[operation] = (
+                draft_id,
+                authority,
+                schema_digest,
+                updated.revision,
+            )
+            payload["draft"] = {
+                "contract": "waapi-skill.operation-draft/v1",
+                "draft_id": draft_id,
+                "revision": updated.revision,
+                "lifecycle_state": "editable",
+                "binding": {
+                    "operation": operation,
+                    "version": version,
+                    "schema_digest": schema_digest,
+                },
+            }
+        elif step.subcommand == "draft-apply":
+            operation = next(reversed(draft_started))
+            draft_id, authority, schema_digest, revision = draft_started[operation]
+            typed_argument = next(
+                item
+                for item in step.arguments
+                if isinstance(
+                    item,
+                    (DraftTypedActionArgument, DraftTypedActionBatchArgument),
+                )
+            )
+            action_arguments = (
+                (typed_argument,)
+                if isinstance(typed_argument, DraftTypedActionArgument)
+                else typed_argument.actions
+            )
+            actions: list[dict[str, Any]] = []
+            for action_argument in action_arguments:
+                action = dict(action_argument.expected)
+                for binding in action_argument.response_bindings:
+                    action[binding.pointer.removeprefix("/")] = required_response_values[
+                        (binding.step, binding.response_pointer)
+                    ]
+                actions.append(action)
+            updated = draft_store.apply_actions(
+                draft_id,
+                task_authority=authority,
+                expected_revision=revision,
+                schema_digest=schema_digest,
+                composer_digest=operation_composer_digest(operation, version),
+                actions=tuple(actions),
+            )
+            draft_started[operation] = (
+                draft_id,
+                authority,
+                schema_digest,
+                updated.revision,
+            )
+            payload["draft"] = {
+                "contract": "waapi-skill.operation-draft/v1",
+                "draft_id": draft_id,
+                "revision": updated.revision,
+                "lifecycle_state": "editable",
+                "binding": {
+                    "operation": operation,
+                    "version": version,
+                    "schema_digest": schema_digest,
+                },
+                "action_result": {
+                    "created_handles": sorted(
+                        value
+                        for (source_step, pointer), value in required_response_values.items()
+                        if source_step == step.name
+                        and pointer.endswith("/created_handles/0")
+                    ),
+                },
+                **operation_draft_public_projection(
+                    composition_projection(
+                        operation,
+                        version,
+                        updated.composition,
+                    )
+                ),
+            }
+        elif step.subcommand == "draft-check":
+            operation = next(reversed(draft_started))
+            draft_id, authority, schema_digest, revision = draft_started[operation]
+            if operation in synthetic_plan_only_operations:
+                revision += 1
+                draft_started[operation] = (
+                    draft_id,
+                    authority,
+                    schema_digest,
+                    revision,
+                )
+                checked_revision = revision
+                checked_composition: Mapping[str, Any] | None = None
+            else:
+                materialized = draft_store.materialize_request(
+                    draft_id,
+                    task_authority=authority,
+                    expected_revision=revision,
+                    schema_digest=schema_digest,
+                    composer_digest=operation_composer_digest(operation, version),
+                )
+                checked = draft_store.record_check(
+                    draft_id,
+                    task_authority=authority,
+                    expected_revision=revision,
+                    schema_digest=schema_digest,
+                    composer_digest=operation_composer_digest(operation, version),
+                    request_digest=materialized.request_digest,
+                    project_guard={},
+                    runtime_guard_fingerprint="b" * 64,
+                    prepared_digest="c" * 64,
+                )
+                draft_started[operation] = (
+                    draft_id,
+                    authority,
+                    schema_digest,
+                    checked.revision,
+                )
+                checked_revision = checked.revision
+                checked_composition = checked.composition
+            payload["draft"] = {
+                "contract": "waapi-skill.operation-draft/v1",
+                "draft_id": draft_id,
+                "revision": checked_revision,
+                "lifecycle_state": "editable",
+                "binding": {
+                    "operation": operation,
+                    "version": version,
+                    "schema_digest": schema_digest,
+                },
+                **(
+                    {}
+                    if checked_composition is None
+                    else operation_draft_public_projection(
+                        composition_projection(
+                            operation,
+                            version,
+                            checked_composition,
+                        )
+                    )
+                ),
+            }
+        elif step.subcommand == "draft-inspect":
+            operation = next(reversed(draft_started))
+            draft_id, _authority, schema_digest, revision = draft_started[operation]
+            payload["draft"] = {
+                "contract": "waapi-skill.operation-draft/v1",
+                "draft_id": draft_id,
+                "revision": revision,
+                "lifecycle_state": "editable",
+                "binding": {
+                    "operation": operation,
+                    "version": version,
+                    "schema_digest": schema_digest,
+                },
+            }
+        elif step.subcommand in {"request-map-container", "request-array-item"}:
+            payload.update(
+                {
+                    "handle": "trm1-" + "0" * 24,
+                    "schema_lineage_token": "synthetic-schema-lineage-token",
+                }
+            )
+        elif step.subcommand == "preview-from-draft":
+            operation = next(reversed(draft_started))
+            draft_id, authority, schema_digest, revision = draft_started[operation]
+            if operation in synthetic_plan_only_operations:
+                if step.expected_operation_request is None:
+                    raise AssertionError(
+                        "synthetic plan preview requires its canonical request"
+                    )
+                canonical_request = dict(step.expected_operation_request)
+                reservation = None
+            else:
+                reservation = draft_store.reserve_seal(
+                    draft_id,
+                    task_authority=authority,
+                    expected_revision=revision,
+                    schema_digest=schema_digest,
+                    composer_digest=operation_composer_digest(operation, version),
+                    transaction_id=transaction_id,
+                    apply=True,
+                    ttl_seconds=1800,
+                    policy="ask_before_changes",
+                )
+                canonical_request = reservation.request
+            prepared = {
+                "request": canonical_request,
+                "cleanup": {"kind": "none"},
+            }
+            artifact = {
+                "request": canonical_request,
+                "prepared_operation": prepared,
+            }
+            transaction_store = TransactionStore(task_root / "broker" / "state")
+            transaction_store.create_preview(transaction_id, artifact)
+            transaction_store.submit_for_confirmation(transaction_id)
+            awaiting_snapshot = transaction_store.load_snapshot(transaction_id)
+            artifact_hash = awaiting_snapshot.preview.artifact_hash
+            if reservation is not None:
+                draft_store.commit_seal(
+                    draft_id,
+                    task_authority=authority,
+                    source_revision=reservation.source_revision,
+                    transaction_id=transaction_id,
+                    artifact_hash=artifact_hash,
+                    transaction_state="awaiting_confirmation",
+                )
+            payload.update(
+                {
+                    "transaction_id": transaction_id,
+                    "artifact_hash": artifact_hash,
+                    "state": "awaiting_confirmation",
+                    "cleanup": transaction_cleanup_payload(
+                        prepared,
+                        phase="preview",
+                    ),
+                }
+            )
+            payload["agent_result"] = {
+                "request": canonical_request,
+                "transaction_id": transaction_id,
+                "artifact_hash": artifact_hash,
+                "cleanup": transaction_cleanup_payload(
+                    prepared,
+                    phase="preview",
+                ),
+            }
+        elif step.subcommand in {
+            "preview",
+            "typed-call",
+            "typed-operation",
+        }:
             payload.update(
                 {
                     "transaction_id": transaction_id,
@@ -1978,6 +3752,7 @@ def _synthetic_gateway_records(
                 "gateway_argv": gateway_argv,
                 "full_argv": full_argv,
                 "copy_exactly": True,
+                "shell_tool_timeout_ms": 30_000,
                 "requires_explicit_user_confirmation": True,
             }
             model_command: str | None = None
@@ -2058,21 +3833,61 @@ def _synthetic_gateway_records(
                 {
                     "transaction_id": transaction_id,
                     "artifact_hash": executed.artifact_hash,
+                    "cleanup": transaction_cleanup_payload(
+                        (
+                            awaiting_snapshot.preview.artifact["prepared_operation"]
+                            if "prepared_operation" in awaiting_snapshot.preview.artifact
+                            else {}
+                        ),
+                        phase="executed",
+                        execution_result={},
+                    ),
                 }
             )
         elif step.subcommand == "verify":
             assert transaction_store is not None
+            verification_details = {
+                "verification": {
+                    "contract": "waapi-skill.synthetic-verification/v1",
+                    "operation": (
+                        next(reversed(draft_started))
+                        if draft_started
+                        else "waapi.call"
+                    ),
+                    "status": "result_schema_checked",
+                    "ok": True,
+                    "verification_strength": "result_schema_only",
+                    "business_state_verified": False,
+                    "assertions": [],
+                    "readbacks": [],
+                }
+            }
             verified = transaction_store.record_verification(
                 transaction_id,
                 TransactionState.RESULT_SCHEMA_CHECKED,
+                details=verification_details,
             )
             payload.update(
                 {
                     "transaction_id": transaction_id,
                     "artifact_hash": verified.artifact_hash,
-                    "verification": {"verified": True},
+                    "verification": verification_details["verification"],
+                    "cleanup": transaction_cleanup_payload(
+                        (
+                            awaiting_snapshot.preview.artifact["prepared_operation"]
+                            if "prepared_operation" in awaiting_snapshot.preview.artifact
+                            else {}
+                        ),
+                        phase="verified",
+                        execution_result={},
+                    ),
                 }
             )
+        for (source_step, pointer), value in required_response_values.items():
+            if source_step == step.name:
+                set_pointer(payload, pointer, value)
+        if "agent_result" in payload:
+            payload["agent_result"] = payload.pop("agent_result")
         runner_command = [
             os.path.abspath(sys.executable),
             str(runner.resolve(strict=True)),
@@ -2114,14 +3929,378 @@ def _synthetic_gateway_records(
     return records
 
 
+def test_synthetic_topic_schema_supplies_bound_wait_digests(tmp_path: Path) -> None:
+    topic = "ak.wwise.core.soundbank.generated"
+    protocol = build_direct_protocol(
+        [
+            topic_schema_step("soundbank.generated.schema", topic),
+            wait_topic_step(
+                "soundbank.generated.wait",
+                topic,
+                version="2022.1",
+                event_count=1,
+            ),
+        ]
+    )
+    options = _options(tmp_path)
+    task_root = tmp_path / "synthetic-topic"
+    task_root.mkdir()
+
+    records = _synthetic_gateway_records(
+        options=options,
+        task_root=task_root,
+        protocol=protocol,
+        version="2022.1",
+    )
+
+    assert records[0]["payload"]["options"]["schema_digest"]
+    assert records[0]["payload"]["event_match"]["schema_digest"]
+    assert records[1]["accepted"] is True
+
+
+def test_soundbank_topic_protocol_discloses_each_nested_match_scope() -> None:
+    steps = soundbank_topic_protocol_steps(
+        scenario_id="O22-SB-GENERATED-02",
+        topic="ak.wwise.core.soundbank.generated",
+        version="2022.1",
+        event_count=3,
+        match={
+            "soundbank": {"name": "Dialogue_Chapter14"},
+            "platform": {"name": "Windows"},
+        },
+        options={"return": ["id", "name", "type", "path"]},
+    )
+
+    assert [step.name for step in steps] == [
+        "soundbank.generated.schema",
+        "soundbank.generated.schema.platform.entry",
+        "soundbank.generated.schema.soundbank.match-group",
+        "soundbank.generated.wait",
+    ]
+    assert steps[1].arguments == (
+        "ak.wwise.core.soundbank.generated",
+        "--entry",
+        "platform",
+    )
+    assert steps[2].arguments == (
+        "ak.wwise.core.soundbank.generated",
+        "--match-group",
+        "soundbank",
+    )
+
+    protocol = build_optional_topic_schema_protocol(steps)
+    assert protocol.allowed_turn_prefix_counts == ((2, 3, 4),)
+    assert protocol.terminal_prefix_counts == (2, 3, 4)
+    assert protocol.optional_topic_schema_step_groups == (
+        (
+            "soundbank.generated.schema.platform.entry",
+            "soundbank.generated.schema.soundbank.match-group",
+        ),
+    )
+
+    reordered = soundbank_topic_protocol_steps(
+        scenario_id="O22-SB-GENERATED-02",
+        topic="ak.wwise.core.soundbank.generated",
+        version="2022.1",
+        event_count=3,
+        match={
+            "platform": {"name": "Windows"},
+            "soundbank": {"name": "Dialogue_Chapter14"},
+        },
+        options={"return": ["id", "name", "type", "path"]},
+    )
+    assert reordered == steps
+
+    selected_names = [
+        "soundbank.generated.schema",
+        "soundbank.generated.schema.soundbank.match-group",
+        "soundbank.generated.schema.platform.entry",
+        "soundbank.generated.wait",
+    ]
+    selected = campaign._consumed_heavy_v3_protocol_steps(  # noqa: SLF001
+        protocol,
+        len(selected_names),
+        selected_step_names=selected_names,
+    )
+    assert [step.name for step in selected] == selected_names
+    assert campaign._consumed_heavy_v3_protocol_steps(  # noqa: SLF001
+        protocol,
+        3,
+        selected_step_names=[
+            "soundbank.generated.schema",
+            "soundbank.generated.schema.platform.entry",
+            "soundbank.generated.schema.soundbank.entry",
+        ],
+    ) == ()
+
+
+def test_optional_operations_archive_selects_the_sealed_lane_before_turn_slicing() -> None:
+    protocol = V3GatewayProtocol(
+        steps=(
+            ExpectedGatewayStep("tx01.operations", "operations", ()),
+            ExpectedGatewayStep(
+                "tx01.operation-schema",
+                "operation-schema",
+                ("object.set",),
+            ),
+            ExpectedGatewayStep("tx01.prepare", "status", ()),
+            ExpectedGatewayStep("tx01.finish", "status", ()),
+        ),
+        turn_prefix_counts=(3, 4),
+        allowed_turn_prefix_counts=((2, 3), (3, 4)),
+        terminal_prefix_counts=(3, 4),
+    )
+    selected_names = [
+        "tx01.operation-schema",
+        "tx01.prepare",
+        "tx01.finish",
+    ]
+
+    selected = campaign._consumed_heavy_v3_protocol_steps(  # noqa: SLF001
+        protocol,
+        2,
+        selected_step_names=selected_names,
+    )
+
+    assert [step.name for step in selected] == selected_names
+    assert [step.name for step in selected[:2]] == selected_names[:2]
+
+
+def test_workflow_operations_archive_selects_any_sealed_routing_subset() -> None:
+    protocol = V3GatewayProtocol(
+        steps=(
+            ExpectedGatewayStep("routing.operations", "operations"),
+            ExpectedGatewayStep("diag.query", "query-object"),
+            ExpectedGatewayStep(
+                "routing.operations.tx01.operation-schema",
+                "operations",
+            ),
+            ExpectedGatewayStep(
+                "tx01.operation-schema",
+                "operation-schema",
+                ("object.setReference",),
+            ),
+        ),
+        turn_prefix_counts=(4,),
+        allowed_turn_prefix_counts=((2, 3, 4),),
+        terminal_prefix_counts=(2, 3, 4),
+    )
+    selected_names = [
+        "diag.query",
+        "routing.operations.tx01.operation-schema",
+        "tx01.operation-schema",
+    ]
+
+    selected = campaign._consumed_heavy_v3_protocol_steps(  # noqa: SLF001
+        protocol,
+        len(selected_names),
+        selected_step_names=selected_names,
+    )
+
+    assert [step.name for step in selected] == selected_names
+
+
+def test_workflow_operations_archive_keeps_the_sealed_lane_for_earlier_turns() -> None:
+    protocol = V3GatewayProtocol(
+        steps=(
+            ExpectedGatewayStep("routing.operations", "operations"),
+            ExpectedGatewayStep("routing.query-schema", "query-schema"),
+            ExpectedGatewayStep("diag.query", "query-object"),
+            ExpectedGatewayStep(
+                "revalidation.sound",
+                "query-object",
+                ("--exact-id", "sound"),
+            ),
+            ExpectedGatewayStep(
+                "tx01.operation-schema",
+                "operation-schema",
+                ("object.setReference",),
+            ),
+            ExpectedGatewayStep("tx01.finish", "status"),
+        ),
+        turn_prefix_counts=(3, 6),
+        allowed_turn_prefix_counts=((1, 2, 3), (3, 4, 5, 6)),
+        terminal_prefix_counts=(3, 4, 5, 6),
+    )
+    selected_names = [
+        "diag.query",
+        "tx01.operation-schema",
+        "tx01.finish",
+    ]
+
+    selected = campaign._consumed_heavy_v3_protocol_steps(  # noqa: SLF001
+        protocol,
+        1,
+        selected_step_names=selected_names,
+    )
+
+    assert [step.name for step in selected] == selected_names
+    assert [step.name for step in selected[:1]] == ["diag.query"]
+
+
+def test_workflow_archive_replays_from_full_import_policy_after_rebatching(
+    tmp_path: Path,
+) -> None:
+    steps = build_audio_import_composer_transaction_steps(
+        {
+            "contract": "waapi-skill.operation-request/v1",
+            "version": "2022.1",
+            "operation": "audio.import",
+            "arguments": {
+                "imports": [
+                    {
+                        "object_path": (
+                            "\\Actor-Mixer Hierarchy\\Default Work Unit"
+                            f"\\<Sound SFX>Archive_{index}"
+                        ),
+                        "audio_file": f"/tmp/archive-{index}.wav",
+                        "object_type": "Sound SFX",
+                        "import_language": "SFX",
+                    }
+                    for index in range(1, 7)
+                ]
+            },
+        },
+        label="tx01",
+    )
+    protocol = build_workflow_operations_discovery_protocol(
+        build_protocol_with_bounded_import_chunks(
+            steps=steps,
+            turn_prefix_counts=(len(steps),),
+        )
+    )
+    declaration_names = tuple(
+        step.name
+        for step in protocol.steps
+        if step.subcommand == "draft-declare-import-batch"
+    )
+    selected_names = [
+        step.name
+        for step in protocol.steps
+        if step.subcommand != "draft-declare-import-batch"
+        or step.name in declaration_names[:2]
+    ]
+
+    selected_steps = campaign._consumed_heavy_v3_protocol_steps(  # noqa: SLF001
+        protocol,
+        len(selected_names),
+        selected_step_names=selected_names,
+    )
+    options = _options(tmp_path)
+    replay = campaign._build_heavy_v3_broker_replay(  # noqa: SLF001
+        skill_source=options.skill_source,
+        invocation_skill_source=options.skill_source,
+        canonical_steps=protocol.steps,
+        execution_steps=selected_steps,
+        commutative_read_only_step_groups=(),
+        commutative_composer_setup_step_groups=(),
+        expected_wwise_version="2022.1",
+        project_modification_policy="ask_before_changes",
+    )
+
+    assert [step.name for step in selected_steps] == selected_names
+    assert len(replay._execution_steps) == len(protocol.steps)  # noqa: SLF001
+
+
+def test_soundbank_topic_protocol_selects_finite_stream_for_explicit_stream_case() -> None:
+    steps = soundbank_topic_protocol_steps(
+        scenario_id="O22-SB-GENERATED-03",
+        topic="ak.wwise.core.soundbank.generated",
+        version="2024.1",
+        event_count=2,
+        match={"soundbank": {"name": "Weapons_Core"}},
+        options={"return": ["id", "name", "type", "path"]},
+    )
+
+    assert steps[-1].name == "soundbank.generated.stream"
+    assert steps[-1].subcommand == "stream-topic"
+    assert steps[-1].gateway_global_arguments == ("--timeout", "30")
+    assert [step.name for step in steps] == [
+        "soundbank.generated.schema",
+        "soundbank.generated.schema.soundbank.match-group",
+        "soundbank.generated.schema.platform.entry",
+        "soundbank.generated.stream",
+    ]
+    assert steps[-1].arguments[:2] == (
+        "ak.wwise.core.soundbank.generated",
+        "--event-count",
+    )
+    ceiling = steps[-1].arguments[2]
+    assert isinstance(ceiling, BoundedIntegerArgument)
+    assert (ceiling.minimum, ceiling.maximum) == (3, 64)
+
+    protocol = build_optional_topic_schema_protocol(steps)
+    selected_names = [
+        "soundbank.generated.schema",
+        "soundbank.generated.schema.soundbank.match-group",
+        "soundbank.generated.schema.platform.entry",
+        "soundbank.generated.stream",
+    ]
+    selected = campaign._consumed_heavy_v3_protocol_steps(  # noqa: SLF001
+        protocol,
+        len(selected_names),
+        selected_step_names=selected_names,
+    )
+    assert [step.name for step in selected] == selected_names
+
+
+def test_fixed_count_topic_needs_only_the_requested_match_disclosure() -> None:
+    """Result projection is a business option, not a hidden schema-read chore."""
+
+    steps = soundbank_topic_protocol_steps(
+        scenario_id="O22-SB-GENERATED-01",
+        topic="ak.wwise.core.soundbank.generated",
+        version="2021.1",
+        event_count=3,
+        match={"platform": {"name": "Windows"}},
+        options={"return": ["id", "name", "type", "path"]},
+    )
+    protocol = build_optional_topic_schema_protocol(steps)
+    selected_names = [
+        "soundbank.generated.schema",
+        "soundbank.generated.schema.platform.entry",
+        "soundbank.generated.wait",
+    ]
+
+    selected = campaign._consumed_heavy_v3_protocol_steps(  # noqa: SLF001
+        protocol,
+        len(selected_names),
+        selected_step_names=selected_names,
+    )
+
+    assert [step.name for step in selected] == selected_names
+
+
+def test_soundbank_topic_protocol_does_not_force_result_only_disclosures() -> None:
+    steps = soundbank_topic_protocol_steps(
+        scenario_id="O22-SB-GENERATED-01",
+        topic="ak.wwise.core.soundbank.generated",
+        version="2021.1",
+        event_count=3,
+        match={"platform": {"name": "Windows"}},
+        options={"return": ["id", "name", "type", "path"]},
+    )
+    disclosures = [
+        step
+        for step in steps
+        if step.name.startswith("soundbank.generated.schema.soundbank.")
+    ]
+
+    assert disclosures == []
+
+
 def _synthetic_audio_transaction_request() -> dict[str, Any]:
     return {
         "contract": "waapi-skill.operation-request/v1",
-        "version": "2022.1",
+        "version": "2025.1",
         "operation": "waapi.call",
         "arguments": {
             "api": "ak.wwise.core.audio.convert",
-            "args": {"objects": [r"\Actor-Mixer Hierarchy\ConversionTarget"]},
+            "args": {
+                "objects": [r"\Actor-Mixer Hierarchy\ConversionTarget"],
+                "platforms": ["Windows"],
+                "languages": ["SFX"],
+            },
             "options": {},
             "io_root": "/private/synthetic-io",
         },
@@ -2156,12 +4335,16 @@ def test_campaign_accepts_soundbank_generate_semantic_protocol_kind() -> None:
     request = _synthetic_soundbank_generate_request()
     protocol = build_transaction_protocol((request,))
     evidence = SimpleNamespace(
-        provenance=SimpleNamespace(protocol=protocol),
+        provenance=SimpleNamespace(
+            protocol=protocol,
+            payload={"version": request["version"]},
+        ),
     )
-    preview_argument = protocol.steps[1].arguments[2]
-
-    assert isinstance(preview_argument, SemanticJsonArgument)
-    assert preview_argument.equivalence == "soundbank_generate_v1"
+    assert all(
+        not isinstance(argument, SemanticJsonArgument)
+        for step in protocol.steps
+        for argument in step.arguments
+    )
     assert campaign._heavy_v3_protocol_operation_request(evidence) == request
     campaign._validate_heavy_v3_completed_transaction_protocol(
         evidence,
@@ -2173,7 +4356,10 @@ def test_campaign_transaction_validator_accepts_only_the_show_token_response_cha
     request = _synthetic_audio_transaction_request()
     protocol = build_transaction_protocol((request,))
     evidence = SimpleNamespace(
-        provenance=SimpleNamespace(protocol=protocol),
+        provenance=SimpleNamespace(
+            protocol=protocol,
+            payload={"version": request["version"]},
+        ),
     )
 
     campaign._validate_heavy_v3_completed_transaction_protocol(
@@ -2181,9 +4367,10 @@ def test_campaign_transaction_validator_accepts_only_the_show_token_response_cha
         expected_operation_request=request,
     )
 
+    indexes = {step.name: index for index, step in enumerate(protocol.steps)}
     invalid_arguments = (
         (
-            3,
+            indexes["tx01.confirm"],
             (
                 ResponseBinding("tx01.preview", "/transaction_id"),
                 "--confirmation-token",
@@ -2194,7 +4381,7 @@ def test_campaign_transaction_validator_accepts_only_the_show_token_response_cha
             ),
         ),
         (
-            3,
+            indexes["tx01.confirm"],
             (
                 ResponseBinding(
                     "tx01.transaction-show",
@@ -2208,11 +4395,11 @@ def test_campaign_transaction_validator_accepts_only_the_show_token_response_cha
             ),
         ),
         (
-            4,
+            indexes["tx01.execute"],
             (ResponseBinding("tx01.transaction-show", "/transaction_id"),),
         ),
         (
-            5,
+            indexes["tx01.verify"],
             (ResponseBinding("tx01.confirm", "/transaction_id"),),
         ),
     )
@@ -2226,14 +4413,23 @@ def test_campaign_transaction_validator_accepts_only_the_show_token_response_cha
         ):
             campaign._validate_heavy_v3_completed_transaction_protocol(
                 SimpleNamespace(
-                    provenance=SimpleNamespace(protocol=tampered),
+                    provenance=SimpleNamespace(
+                        protocol=tampered,
+                        payload={"version": request["version"]},
+                    ),
                 ),
                 expected_operation_request=request,
             )
 
 
 def test_campaign_rejects_transaction_show_with_incomplete_or_misbound_confirmation() -> None:
-    step = build_transaction_protocol((_synthetic_audio_transaction_request(),)).steps[2]
+    step = next(
+        candidate
+        for candidate in build_transaction_protocol(
+            (_synthetic_audio_transaction_request(),)
+        ).steps
+        if candidate.subcommand == "transaction-show"
+    )
     event_sequence = 2
     last_event_hash = "b" * 64
     token = confirmation_token_for(
@@ -2497,7 +4693,7 @@ def _synthetic_events(
                             "completed" if record["exit_code"] == 0 else "failed"
                         ),
                         "aggregated_output": json.dumps(
-                            record["payload"], ensure_ascii=False, sort_keys=True
+                            record["payload"], ensure_ascii=False
                         ),
                     },
                 },
@@ -2764,7 +4960,7 @@ def test_campaign_broker_seal_accepts_expected_exit2_failed_command_status(
 
     assert len(command_records) == len(protocol.steps)
     assert [(record.exit_code, record.status) for record in command_records] == [
-        (0, "completed"),
+        *((0, "completed"),) * (len(protocol.steps) - 1),
         (2, "failed"),
     ]
     campaign._validate_heavy_v3_broker_records(
@@ -2881,7 +5077,7 @@ def test_campaign_broker_seal_binds_confirmation_to_archived_transaction_store(
         options=options,
         task_root=task_root,
         protocol=protocol,
-        version="2022.1",
+        version="2025.1",
     )
     command_records = completed_command_records(
         parse_jsonl_events(
@@ -2905,7 +5101,7 @@ def test_campaign_broker_seal_binds_confirmation_to_archived_transaction_store(
         steps=protocol.steps,
         command_records=serialized_commands,
         options=options,
-        version="2022.1",
+        version="2025.1",
         label="durable confirmation",
     )
 
@@ -2940,9 +5136,169 @@ def test_campaign_broker_seal_binds_confirmation_to_archived_transaction_store(
             steps=protocol.steps,
             command_records=serialized_commands,
             options=options,
-            version="2022.1",
+            version="2025.1",
             label="tampered durable confirmation",
         )
+
+
+def test_passing_lua_draft_replays_after_owned_files_are_cleaned(
+    tmp_path: Path,
+) -> None:
+    options = replace(_options(tmp_path), skill_source=campaign.SKILL_ROOT)
+    task_root = tmp_path / "task"
+    task_root.mkdir()
+    io_root = tmp_path / "scenario" / "owned" / "assets" / "lua"
+    io_root.mkdir(parents=True)
+    script = io_root / "user-script.lua"
+    script.write_text("return wa_args.count\n", encoding="utf-8")
+    protocol = build_transaction_protocol(
+        (
+            {
+                "contract": "waapi-skill.operation-request/v1",
+                "version": "2023.1",
+                "operation": "lua.executeCoreFile",
+                "arguments": {
+                    "script_file": str(script),
+                    "io_root": str(io_root),
+                    "source_authority": "user_supplied_verbatim",
+                    "wa_args": {"count": 3},
+                },
+            },
+        )
+    )
+    records = _synthetic_gateway_records(
+        options=options,
+        task_root=task_root,
+        protocol=protocol,
+        version="2023.1",
+    )
+    command_records = completed_command_records(
+        parse_jsonl_events(
+            _synthetic_events(
+                thread_id="thread-lua-cleanup-replay",
+                records=records,
+                final_response="profile=typed_input, count=3; result schema only",
+                windows_powershell_core_host=options.windows_powershell_core_host,
+            )
+        ),
+        windows_powershell_core_host=options.windows_powershell_core_host,
+    )
+    serialized_commands = [
+        campaign._json_canonical_value(asdict(record))
+        for record in command_records
+    ]
+
+    script.unlink()
+    io_root.rmdir()
+
+    campaign._validate_heavy_v3_broker_records(
+        records,
+        task_root=task_root,
+        steps=protocol.steps,
+        command_records=serialized_commands,
+        options=options,
+        version="2023.1",
+        label="passing cleaned Lua",
+    )
+    from tests.semantic.support.codex_typed_draft_evidence_v3 import (
+        TypedDraftEvidenceError,
+        validate_typed_draft_evidence,
+    )
+
+    with pytest.raises(TypedDraftEvidenceError, match="archive replay failed"):
+        validate_typed_draft_evidence(
+            state_directory=task_root / "broker" / "state",
+            steps=protocol.steps,
+            broker_records=records,
+        )
+
+    replayed = validate_typed_draft_evidence(
+        state_directory=task_root / "broker" / "state",
+        steps=protocol.steps,
+        broker_records=records,
+        allow_cleaned_file_evidence=True,
+    )
+    assert replayed is not None
+
+
+def test_passing_tab_import_draft_replays_after_owned_files_are_cleaned(
+    tmp_path: Path,
+) -> None:
+    options = replace(_options(tmp_path), skill_source=campaign.SKILL_ROOT)
+    task_root = tmp_path / "task"
+    task_root.mkdir()
+    table_root = tmp_path / "scenario" / "owned" / "assets" / "tab"
+    table_root.mkdir(parents=True)
+    table = table_root / "import.tsv"
+    table.write_text("Audio File\tObject Path\tObject Type\n", encoding="utf-8")
+    protocol = build_transaction_protocol(
+        (
+            {
+                "contract": "waapi-skill.operation-request/v1",
+                "version": "2025.1",
+                "operation": "audio.importTabDelimited",
+                "arguments": {
+                    "import_file": str(table),
+                    "import_location": {
+                        "kind": "path",
+                        "value": r"\Containers\Default Work Unit",
+                    },
+                    "import_language": "SFX",
+                },
+            },
+        )
+    )
+    records = _synthetic_gateway_records(
+        options=options,
+        task_root=task_root,
+        protocol=protocol,
+        version="2025.1",
+    )
+    command_records = completed_command_records(
+        parse_jsonl_events(
+            _synthetic_events(
+                thread_id="thread-tab-cleanup-replay",
+                records=records,
+                final_response="tab import completed",
+                windows_powershell_core_host=options.windows_powershell_core_host,
+            )
+        ),
+        windows_powershell_core_host=options.windows_powershell_core_host,
+    )
+    serialized_commands = [
+        campaign._json_canonical_value(asdict(record))
+        for record in command_records
+    ]
+
+    table.unlink()
+    table_root.rmdir()
+
+    campaign._validate_heavy_v3_broker_records(
+        records,
+        task_root=task_root,
+        steps=protocol.steps,
+        command_records=serialized_commands,
+        options=options,
+        version="2025.1",
+        label="passing cleaned tab import",
+    )
+
+
+def test_campaign_routes_single_business_draft_to_current_archive_validator() -> None:
+    from tests.semantic.support.codex_typed_draft_evidence_v3 import (
+        BUSINESS_DRAFT_EVIDENCE_CONTRACT,
+        TYPED_DRAFT_EVIDENCE_CONTRACT,
+    )
+
+    assert campaign._is_current_draft_evidence(
+        {"contract": BUSINESS_DRAFT_EVIDENCE_CONTRACT}
+    )
+    assert campaign._is_current_draft_evidence(
+        {"contract": TYPED_DRAFT_EVIDENCE_CONTRACT}
+    )
+    assert not campaign._is_current_draft_evidence(
+        {"contract": "waapi-skill.operation-draft-archive/v3"}
+    )
 
 
 def test_campaign_archive_rejects_equivalent_requoted_continuation(
@@ -2956,7 +5312,7 @@ def test_campaign_archive_rejects_equivalent_requoted_continuation(
         options=options,
         task_root=task_root,
         protocol=protocol,
-        version="2022.1",
+        version="2025.1",
     )
     command_records = list(
         completed_command_records(
@@ -3014,7 +5370,7 @@ def test_campaign_archive_rejects_equivalent_requoted_continuation(
                 for record in command_records
             ],
             options=options,
-            version="2022.1",
+            version="2025.1",
             label="requoted continuation",
         )
 
@@ -3098,7 +5454,9 @@ def test_campaign_broker_seal_rejects_unreviewed_nonzero_exit(
         )
 
 
-def _synthetic_required_reference(unit: _Unit) -> str:
+def _synthetic_required_reference(unit: _Unit) -> str | None:
+    if unit.scenario.api == "ak.wwise.core.getInfo":
+        return None
     if (
         unit.scenario.api in {
             "ak.wwise.core.object.get",
@@ -3117,9 +5475,11 @@ def _synthetic_first_turn_reads(
     skill_source: Path | None = None,
 ) -> tuple[Path, Path]:
     source = skill_source or options.skill_source
+    reference = _synthetic_required_reference(unit)
     return (
-        source / "SKILL.md",
-        source / _synthetic_required_reference(unit),
+        (source / "SKILL.md",)
+        if reference is None
+        else (source / "SKILL.md", source / reference)
     )
 
 
@@ -3134,8 +5494,22 @@ def _synthetic_runtime_skill_read_source(
     )
 
 
+def test_typed_get_info_campaign_expects_only_the_mandatory_skill_read() -> None:
+    unit = SimpleNamespace(
+        user_turn_count=1,
+        scenario=SimpleNamespace(
+            api="ak.wwise.core.getInfo",
+            item_type="function",
+        ),
+    )
+
+    assert campaign._heavy_v3_required_reference(unit) is None
+    assert campaign._heavy_v3_expected_skill_reads(unit) == (("SKILL.md",),)
+
+
 def _synthetic_codex_facts(
     *,
+    unit: Any | None = None,
     options: campaign.CampaignOptions,
     task_root: Path,
     turn_root: Path,
@@ -3161,6 +5535,8 @@ def _synthetic_codex_facts(
         expected_gateway_subcommands=tuple(step.subcommand for step in protocol.steps),
         expected_wwise_version=version,
     )
+    if options.profile in campaign.SEMANTIC_BOOTSTRAP_PROFILE_IDS and unit is None:
+        raise AssertionError("semantic bootstrap fixture requires its profile unit")
     config = CodexHarnessConfig(
         workspace=task_root / "agent-workspace",
         skill_source=options.skill_source,
@@ -3174,6 +5550,26 @@ def _synthetic_codex_facts(
         sandbox_mode="workspace-write",
         allow_output_write=False,
         network_access=True,
+        developer_instructions=(
+            semantic_task_developer_instructions(
+                options.skill_source / "scripts" / "run.py",
+                task_skill_source=(
+                    task_root
+                    / "agent-workspace"
+                    / ".agents"
+                    / "skills"
+                    / "waapi-skill"
+                ),
+                expected_skill_reads=campaign._heavy_v3_expected_skill_reads(unit),
+                base_developer_instructions=(
+                    semantic_skill_bootstrap_developer_instructions(
+                        options.skill_source / "scripts" / "run.py"
+                    )
+                ),
+            )
+            if options.profile in campaign.SEMANTIC_BOOTSTRAP_PROFILE_IDS
+            else ""
+        ),
     )
     command = (
         build_task_exec_command(config, prompt=prompt, writable_dir=turn_root)
@@ -3323,7 +5719,7 @@ def _synthetic_object_oracle(
         verification = _synthetic_object_mutation_verification(plan)
     return {
         "contract": campaign.HEAVY_V3_ORACLE_CONTRACT,
-        "scenario_id": unit.unit_id,
+        "scenario_id": getattr(unit, "base_scenario_id", unit.unit_id),
         "version": unit.version,
         "api": unit.scenario.api,
         "runner": "project",
@@ -4720,6 +7116,7 @@ def _write_passing_project_outcome(
     thread_id: str,
     options: campaign.CampaignOptions,
     visible_values: Mapping[str, str] | None = None,
+    omit_optional_query_schema: bool = False,
 ) -> dict[str, Any]:
     evidence_root = scenario_root / "evidence"
     task_root = evidence_root / "codex-task"
@@ -4743,10 +7140,26 @@ def _write_passing_project_outcome(
         visible_values=visible_values,
     )
     protocol = provenance.protocol
+    active_steps = (
+        protocol.steps[1:]
+        if omit_optional_query_schema and protocol.optional_initial_query_schema
+        else protocol.steps
+    )
+    active_protocol = (
+        replace(
+            protocol,
+            steps=active_steps,
+            turn_prefix_counts=(len(active_steps),),
+            allowed_turn_prefix_counts=(),
+            terminal_prefix_counts=(),
+        )
+        if omit_optional_query_schema
+        else protocol
+    )
     records = _synthetic_gateway_records(
         options=options,
         task_root=task_root,
-        protocol=protocol,
+        protocol=active_protocol,
         version=unit.version,
         invocation_skill_source=skill_install,
     )
@@ -4756,8 +7169,8 @@ def _write_passing_project_outcome(
             business_oracle_plan.payload,
         )
     broker = {
-        "expected_step_names": [step.name for step in protocol.steps],
-        "consumed_step_names": [step.name for step in protocol.steps],
+        "expected_step_names": [step.name for step in active_steps],
+        "consumed_step_names": [step.name for step in active_steps],
         "records": records,
         "state_directory": str(broker_state),
         "evidence_directory": str(broker_evidence),
@@ -4768,6 +7181,21 @@ def _write_passing_project_outcome(
         "complete": True,
         "passed": True,
     }
+    composer_evidence = None
+    if any(
+        step.subcommand.startswith("draft-")
+        or step.subcommand == "preview-from-draft"
+        for step in active_steps
+    ):
+        from tests.semantic.support.codex_typed_draft_evidence_v3 import (
+            validate_typed_draft_evidence,
+        )
+
+        composer_evidence = validate_typed_draft_evidence(
+            state_directory=broker_state,
+            steps=active_steps,
+            broker_records=records,
+        )
     if unit.scenario.api == "ak.wwise.core.object.get":
         plan_payload = business_oracle_plan.payload
         final_response = _synthetic_object_final_response(plan_payload)
@@ -4776,7 +7204,7 @@ def _write_passing_project_outcome(
     grades: list[dict[str, Any]] = []
     previous_prefix = 0
     for index, prompt in enumerate(prompts, start=1):
-        prefix = protocol.turn_prefix_counts[index - 1]
+        prefix = active_protocol.turn_prefix_counts[index - 1]
         turn_records = records[previous_prefix:prefix]
         prompt_sha256 = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
         grade = {
@@ -4830,6 +7258,7 @@ def _write_passing_project_outcome(
         matrix.write_json(
             turn_root / "codex-facts.json",
             _synthetic_codex_facts(
+                unit=unit,
                 options=options,
                 task_root=task_root,
                 turn_root=turn_root,
@@ -4837,16 +7266,14 @@ def _write_passing_project_outcome(
                 prompt=prompt,
                 thread_id=thread_id,
                 events_text=events_text,
-                protocol=protocol,
+                protocol=active_protocol,
                 version=unit.version,
             ),
         )
         previous_prefix = prefix
-    matrix.write_json(
-        task_root / "task-result.json",
-        {
+    task_result = {
             "contract": campaign.HEAVY_V3_TASK_RESULT_CONTRACT,
-            "scenario_id": unit.unit_id,
+            "scenario_id": getattr(unit, "base_scenario_id", unit.unit_id),
             "version": unit.version,
             "thread_id": thread_id,
             "turn_count": len(prompts),
@@ -4856,7 +7283,17 @@ def _write_passing_project_outcome(
             ).hexdigest(),
             "broker": broker,
             "turn_grades": grades,
-        },
+        }
+    if protocol.allowed_turn_prefix_counts:
+        task_result["protocol_terminal_passed"] = True
+        task_result["accepted_terminal_prefixes"] = list(
+            protocol.accepted_terminal_prefixes
+        )
+    if composer_evidence is not None:
+        task_result["composer_evidence"] = composer_evidence
+    matrix.write_json(
+        task_root / "task-result.json",
+        task_result,
     )
     source_hash = {
         "algorithm": "sha256",
@@ -4918,7 +7355,11 @@ def _write_passing_project_outcome(
             "trusted_direct_call_count": 1,
             "primary_dispatch": {
                 "api": unit.scenario.api,
-                "dispatch_count": unit.scenario.primary_dispatch.count,
+                "dispatch_count": getattr(
+                    unit,
+                    "expected_audited_dispatch_count",
+                    unit.scenario.primary_dispatch.count,
+                ),
             },
             "business_verification": (
                 _synthetic_audio_oracle(
@@ -5040,6 +7481,51 @@ def test_parse_args_rejects_v2_only_heavy_filters(
         )
 
 
+def test_offline_business_profile_accepts_offline_only_without_live_config(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    codex = tmp_path / ("codex.exe" if os.name == "nt" else "codex")
+    auth = tmp_path / "auth.json"
+    missing_live = tmp_path / "missing-live-environment.json"
+    auth.write_text("{}\n", encoding="utf-8")
+    monkeypatch.setattr(matrix, "resolve_codex_binary", lambda _value: codex)
+    common = [
+        "--profile",
+        "core_business_1",
+        "--offline-only",
+        "--auth-json",
+        str(auth),
+        "--live-config",
+        str(missing_live),
+        "--codex-binary",
+        str(codex),
+    ]
+
+    campaign_options = campaign.parse_args(
+        ["--campaign-root", str(tmp_path / "campaign"), *common]
+    )
+    matrix_options = matrix.parse_args(
+        ["--iteration-root", str(tmp_path / "matrix"), *common]
+    )
+
+    assert campaign_options.offline_only is True
+    assert campaign_options.live_config == missing_live.resolve(strict=False)
+    assert matrix_options.offline_only is True
+    assert matrix_options.live_config == missing_live.resolve(strict=False)
+    run_config = matrix._heavy_v3_run_config(
+        matrix_options,
+        unit_rows=(),
+        records=(),
+        run_errors=(),
+        stop_reason="",
+        preflight_state="passed",
+        started_at="2026-08-29T00:00:00Z",
+        completed_at="2026-08-29T00:00:01Z",
+    )
+    assert run_config["offline_only"] is True
+
+
 def test_heavy_child_argv_reuses_matrix_and_requests_exact_pending_cases(tmp_path: Path) -> None:
     options = _options(tmp_path)
     units = (_unit(1), _unit(3, version="2025.1"))
@@ -5063,6 +7549,27 @@ def test_heavy_child_argv_reuses_matrix_and_requests_exact_pending_cases(tmp_pat
     assert "--overwrite" not in argv
     assert argv[argv.index("--model") + 1] == "gpt-5.6-terra"
     assert argv[argv.index("--reasoning-effort") + 1] == "medium"
+
+
+def test_offline_business_child_argv_and_options_preserve_offline_mode(
+    tmp_path: Path,
+) -> None:
+    options = replace(
+        _options(tmp_path),
+        profile=matrix.CORE_BUSINESS_PROFILE_ID,
+        offline_only=True,
+        live_config=tmp_path / "unused-live-environment.json",
+    )
+    units = (_unit(1, version="2025.1"),)
+
+    argv = campaign.build_heavy_v3_child_argv(
+        options,
+        units=units,
+        matrix_root=tmp_path / "matrix",
+    )
+
+    assert argv.count("--offline-only") == 1
+    assert campaign.heavy_v3_immutable_options(options)["offline_only"] is True
 
 
 def test_heavy_validator_preserves_fail_and_later_pass_observations(tmp_path: Path) -> None:
@@ -5254,7 +7761,8 @@ def test_heavy_validator_accepts_one_complete_abnormal_prefix_with_pending_suffi
         returncode=130,
     )
 
-    assert [row["status"] for row in result.observations] == ["PASS"]
+    if [row["status"] for row in result.observations] != ["PASS"]:
+        raise AssertionError(repr(result.phase_verdicts))
     assert result.pending_session_ids == ("OBJ22-F-GET-02", "OBJ22-F-GET-03")
 
 
@@ -5358,7 +7866,10 @@ def test_heavy_validator_accepts_frozen_materialized_request_prompt(
         returncode=0,
     )
 
-    assert [row["status"] for row in result.observations] == ["PASS"]
+    assert [row["status"] for row in result.observations] == ["PASS"], "\n".join(
+        verdict.reason for verdict in result.phase_verdicts
+    )
+
     archived = (
         root
         / "scenarios"
@@ -5372,7 +7883,288 @@ def test_heavy_validator_accepts_frozen_materialized_request_prompt(
     assert archived == f"请把目标音频转换到 {io_root} 并汇总。\n"
 
 
-def test_heavy_validator_accepts_reviewed_confirmation_prompt(
+def test_heavy_validator_accepts_audio_request_resolved_to_live_guid(
+    tmp_path: Path,
+) -> None:
+    options = _options(tmp_path)
+    units = (_visible_request_unit(1),)
+    root = tmp_path / "matrix"
+    io_root = str(
+        root / "scenarios" / "001-VS24-F-AUDIO-CONVERT-01" / "owned" / "io"
+    )
+    _write_matrix_evidence(
+        root,
+        options=options,
+        units=units,
+        statuses=("PASS",),
+        visible_values_by_id={units[0].unit_id: {"io_root": io_root}},
+    )
+
+    scenario_root = root / "scenarios" / "001-VS24-F-AUDIO-CONVERT-01"
+    outcome_path = scenario_root / "outcome.json"
+    case_path = scenario_root / "matrix-case.json"
+    outcome = json.loads(outcome_path.read_text(encoding="utf-8"))
+    evidence = outcome["checks"]["business_verification"]["verification"][
+        "evidence"
+    ]
+    operation_request = copy.deepcopy(evidence["operation_request"])
+    operation_request["arguments"]["args"]["objects"] = [
+        evidence["before"]["artifacts"][0]["object_id"]
+    ]
+    request_sha256 = campaign._canonical_sha256(operation_request)
+    evidence["operation_request"] = operation_request
+    evidence["operation_request_sha256"] = request_sha256
+    evidence["verify_request_sha256"] = request_sha256
+    matrix_case = json.loads(case_path.read_text(encoding="utf-8"))
+    matrix_case["runner_outcome"] = outcome
+    matrix.write_json(outcome_path, outcome)
+    matrix.write_json(case_path, matrix_case)
+
+    result = campaign.validate_heavy_v3_child_run(
+        root,
+        expected_units=units,
+        options=options,
+        returncode=0,
+    )
+
+    assert [row["status"] for row in result.observations] == ["PASS"], "\n".join(
+        verdict.reason for verdict in result.phase_verdicts
+    )
+
+    operation_request["arguments"]["args"]["objects"] = [
+        "{99999999-9999-9999-9999-999999999999}"
+    ]
+    request_sha256 = campaign._canonical_sha256(operation_request)
+    evidence["operation_request_sha256"] = request_sha256
+    evidence["verify_request_sha256"] = request_sha256
+    matrix_case["runner_outcome"] = outcome
+    matrix.write_json(outcome_path, outcome)
+    matrix.write_json(case_path, matrix_case)
+
+    blocked = campaign.validate_heavy_v3_child_run(
+        root,
+        expected_units=units,
+        options=options,
+        returncode=0,
+    )
+
+    assert [row["status"] for row in blocked.observations] == ["BLOCKED"]
+    assert "request drifted" in blocked.phase_verdicts[0].reason
+
+
+def test_heavy_validator_accepts_sealed_optional_query_schema_terminal_prefixes(
+    tmp_path: Path,
+) -> None:
+    options = _options(tmp_path)
+    units = (_unit(3),)
+    root = tmp_path / "matrix"
+    _write_matrix_evidence(
+        root,
+        options=options,
+        units=units,
+        statuses=("PASS",),
+    )
+
+    result = campaign.validate_heavy_v3_child_run(
+        root,
+        expected_units=units,
+        options=options,
+        returncode=0,
+    )
+
+    assert [row["status"] for row in result.observations] == ["PASS"], "\n".join(
+        verdict.reason for verdict in result.phase_verdicts
+    )
+
+
+def test_heavy_validator_accepts_typed_profile_query_repair_archive(
+    tmp_path: Path,
+) -> None:
+    from tests.semantic.support.codex_typed_input_profile import (
+        load_typed_input_profile,
+    )
+
+    options = _options(tmp_path)
+    profile = load_typed_input_profile(
+        Path(__file__).resolve().parent
+        / "data"
+        / "typed-input-v1"
+        / "profile.json",
+        unit_ids=("TYP22-GENERIC-OBJECT-QUERY",),
+    )
+    root = tmp_path / "matrix"
+    _write_matrix_evidence(
+        root,
+        options=options,
+        units=profile.units,
+        statuses=("PASS",),
+        omit_optional_query_schema_unit_ids=("TYP22-GENERIC-OBJECT-QUERY",),
+    )
+
+    result = campaign.validate_heavy_v3_child_run(
+        root,
+        expected_units=profile.units,
+        options=options,
+        returncode=0,
+    )
+
+    assert [row["status"] for row in result.observations] == ["PASS"], "\n".join(
+        verdict.reason for verdict in result.phase_verdicts
+    )
+
+
+def test_deep_campaign_scopes_audio_revision_and_accepts_delegated_typed_intro(
+    tmp_path: Path,
+) -> None:
+    from tests.semantic.support.codex_deep_business_acceptance_profile import (
+        load_deep_business_acceptance_profile,
+    )
+
+    profile_path = (
+        Path(__file__).resolve().parent
+        / "data"
+        / "deep-business-acceptance"
+        / "profile.json"
+    )
+    profile = load_deep_business_acceptance_profile(
+        profile_path,
+        unit_ids=("TYP22-GENERIC-OBJECT-QUERY",),
+    )
+    options = replace(
+        _options(tmp_path),
+        profile=campaign.DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID,
+        suite_path=profile_path,
+        protocol_manifest_revision=(
+            campaign._CURRENT_AUDIO_IMPORT_PROTOCOL_REVISION
+        ),
+    )
+    root = tmp_path / "matrix"
+    _write_matrix_evidence(
+        root,
+        options=options,
+        units=profile.units,
+        statuses=("PASS",),
+    )
+    scenario_root = root / "scenarios" / "001-TYP22-GENERIC-OBJECT-QUERY"
+    outcome_path = scenario_root / "outcome.json"
+    case_path = scenario_root / "matrix-case.json"
+    outcome = json.loads(outcome_path.read_text(encoding="utf-8"))
+    outcome["checks"]["first_use_intro"] = "delegated_to_dedicated_profile"
+    matrix_case = json.loads(case_path.read_text(encoding="utf-8"))
+    matrix_case["runner_outcome"] = outcome
+    matrix.write_json(outcome_path, outcome)
+    matrix.write_json(case_path, matrix_case)
+
+    result = campaign.validate_heavy_v3_child_run(
+        root,
+        expected_units=profile.units,
+        options=options,
+        returncode=0,
+    )
+
+    assert [row["status"] for row in result.observations] == ["PASS"], "\n".join(
+        verdict.reason for verdict in result.phase_verdicts
+    )
+
+
+def test_public_integration_unit_accepts_its_delegated_intro_marker() -> None:
+    unit = SimpleNamespace(delegates_first_use_intro=True)
+
+    assert campaign._accepts_delegated_first_use_intro(
+        unit,
+        "delegated_to_dedicated_profile",
+    )
+    assert not campaign._accepts_delegated_first_use_intro(unit, True)
+    assert not campaign._accepts_delegated_first_use_intro(
+        SimpleNamespace(delegates_first_use_intro=False),
+        "delegated_to_dedicated_profile",
+    )
+
+
+def test_heavy_validator_recomputes_derived_command_facts_from_sealed_events(
+    tmp_path: Path,
+) -> None:
+    options = _options(tmp_path)
+    units = (_unit(1),)
+    root = tmp_path / "matrix"
+    _write_matrix_evidence(
+        root,
+        options=options,
+        units=units,
+        statuses=("PASS",),
+    )
+    facts_path = (
+        root
+        / "scenarios"
+        / "001-OBJ22-F-GET-01"
+        / "evidence"
+        / "codex-task"
+        / "turns"
+        / "turn-01"
+        / "codex-facts.json"
+    )
+    facts = json.loads(facts_path.read_text(encoding="utf-8"))
+    facts["command_facts"]["gateway_subcommands"] = []
+    matrix.write_json(facts_path, facts)
+
+    result = campaign.validate_heavy_v3_child_run(
+        root,
+        expected_units=units,
+        options=options,
+        returncode=0,
+    )
+
+    assert [row["status"] for row in result.observations] == ["PASS"], "\n".join(
+        verdict.reason for verdict in result.phase_verdicts
+    )
+
+
+@pytest.mark.parametrize(
+    ("field", "replacement"),
+    (
+        ("protocol_terminal_passed", False),
+        ("accepted_terminal_prefixes", [1]),
+        ("accepted_terminal_prefixes", [2]),
+    ),
+)
+def test_heavy_validator_rejects_optional_protocol_claims_that_drift_from_seal(
+    tmp_path: Path,
+    field: str,
+    replacement: Any,
+) -> None:
+    options = _options(tmp_path)
+    units = (_unit(3),)
+    root = tmp_path / "matrix"
+    _write_matrix_evidence(
+        root,
+        options=options,
+        units=units,
+        statuses=("PASS",),
+    )
+    task_result_path = (
+        root
+        / "scenarios"
+        / "001-OBJ22-F-GET-03"
+        / "evidence"
+        / "codex-task"
+        / "task-result.json"
+    )
+    task_result = json.loads(task_result_path.read_text(encoding="utf-8"))
+    task_result[field] = replacement
+    matrix.write_json(task_result_path, task_result)
+
+    result = campaign.validate_heavy_v3_child_run(
+        root,
+        expected_units=units,
+        options=options,
+        returncode=0,
+    )
+
+    assert [row["status"] for row in result.observations] == ["BLOCKED"]
+    assert "optional protocol is invalid" in result.phase_verdicts[0].reason
+
+
+def _archive_test_heavy_validator_accepts_reviewed_confirmation_prompt(
     tmp_path: Path,
 ) -> None:
     options = _options(tmp_path)
@@ -5392,7 +8184,7 @@ def test_heavy_validator_accepts_reviewed_confirmation_prompt(
         returncode=0,
     )
 
-    assert [row["status"] for row in result.observations] == ["PASS"]
+    assert [row["status"] for row in result.observations] == ["PASS"], result.phase_verdicts
     confirmation = (
         root
         / "scenarios"
@@ -5406,7 +8198,7 @@ def test_heavy_validator_accepts_reviewed_confirmation_prompt(
     assert confirmation == units[0].turns[1].prompt + "\n"
 
 
-def test_heavy_validator_replays_attested_task_install_with_canonical_bytes(
+def _archive_test_heavy_validator_replays_attested_task_install_with_canonical_bytes(
     tmp_path: Path,
 ) -> None:
     options = _options(tmp_path)
@@ -5685,6 +8477,7 @@ def test_heavy_cli_pass_checks_accept_both_valid_migration_shutdown_shapes(
         expected_row={"api": unit.scenario.api, "runner": "cli", "version": "2022.1"},
         expected_thread_id="thread-1",
         primary_count=1,
+        audited_count=1,
         task_root=Path("/synthetic/task"),
         prompt_evidence=None,  # type: ignore[arg-type]
     )
@@ -5714,6 +8507,71 @@ def test_heavy_cli_pass_checks_reject_migration_disconnect_before_dispatch() -> 
             expected_row={"api": unit.scenario.api, "runner": "cli", "version": "2022.1"},
             expected_thread_id="thread-1",
             primary_count=1,
+            audited_count=1,
+            task_root=Path("/synthetic/task"),
+            prompt_evidence=None,  # type: ignore[arg-type]
+        )
+
+
+def test_get_info_pass_checks_bind_status_as_the_single_public_route(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    unit = SimpleNamespace(
+        scenario=SimpleNamespace(
+            id="O22-GET-INFO-01",
+            api="ak.wwise.core.getInfo",
+            item_type="function",
+            fixture={},
+        ),
+        unit_id="TYP21-ZERO-GET-INFO",
+    )
+    checks = {
+        "task_passed": True,
+        "first_use_intro": True,
+        "final_response_nonempty": True,
+        "direct_client_closed": True,
+        "primary_dispatch": {
+            "api": "ak.wwise.core.getInfo",
+            "dispatch_count": 1,
+            "status_preflight_dispatch_count": 0,
+        },
+        "business_verification": {"passed": True},
+    }
+    monkeypatch.setattr(
+        campaign,
+        "_validate_heavy_v3_archived_verification",
+        lambda *_args, **_kwargs: None,
+    )
+
+    campaign._validate_heavy_v3_pass_checks(
+        checks,
+        expected_unit=unit,
+        expected_row={
+            "api": "ak.wwise.core.getInfo",
+            "runner": "project",
+            "version": "2021.1",
+        },
+        expected_thread_id="thread-1",
+        primary_count=1,
+        audited_count=1,
+        task_root=Path("/synthetic/task"),
+        prompt_evidence=None,  # type: ignore[arg-type]
+    )
+
+    missing_preflight = copy.deepcopy(checks)
+    missing_preflight["primary_dispatch"].pop("status_preflight_dispatch_count")
+    with pytest.raises(CampaignEvidenceError, match="primary-dispatch proof"):
+        campaign._validate_heavy_v3_pass_checks(
+            missing_preflight,
+            expected_unit=unit,
+            expected_row={
+                "api": "ak.wwise.core.getInfo",
+                "runner": "project",
+                "version": "2021.1",
+            },
+            expected_thread_id="thread-1",
+            primary_count=1,
+            audited_count=1,
             task_root=Path("/synthetic/task"),
             prompt_evidence=None,  # type: ignore[arg-type]
         )
@@ -5748,7 +8606,7 @@ def test_heavy_validator_maps_clean_pre_agent_quota_block_to_retryable(
         returncode=1,
     )
 
-    assert [row["status"] for row in result.observations] == ["RETRYABLE"]
+    assert [row["status"] for row in result.observations] == ["RETRYABLE"], result.phase_verdicts
     assert result.phase_verdicts[0].retry_category == "quota_or_rate_limit"
     assert result.retry_categories == ("quota_or_rate_limit",)
     assert result.pending_session_ids == ("OBJ22-F-GET-02", "OBJ22-F-GET-03")
@@ -5827,7 +8685,7 @@ def test_heavy_validator_maps_clean_cli_quota_block_to_retryable(
     assert result.pending_session_ids == ("O22-CLI-MIGRATE-02",)
 
 
-def test_heavy_validator_accepts_later_turn_quota_after_proven_prior_turn(
+def _archive_test_heavy_validator_accepts_later_turn_quota_after_proven_prior_turn(
     tmp_path: Path,
 ) -> None:
     options = _options(tmp_path)
@@ -5862,7 +8720,7 @@ def test_heavy_validator_accepts_later_turn_quota_after_proven_prior_turn(
     assert result.pending_session_ids == ("OBJ22-F-GET-02",)
 
 
-def test_heavy_validator_rejects_resealed_retryable_failed_prompt(
+def _archive_test_heavy_validator_rejects_resealed_retryable_failed_prompt(
     tmp_path: Path,
 ) -> None:
     options = _options(tmp_path)
@@ -6200,7 +9058,7 @@ def test_heavy_validator_rejects_broker_advance_with_resealed_artifact(
     _assert_single_heavy_case_blocked(result, reason="prior proven prefix")
 
 
-def test_heavy_validator_rejects_failed_prior_turn_grade(
+def _archive_test_heavy_validator_rejects_failed_prior_turn_grade(
     tmp_path: Path,
 ) -> None:
     options = _options(tmp_path)
@@ -6632,6 +9490,11 @@ def test_heavy_codex_probe_denial_precedes_campaign_root_and_child(
 
     monkeypatch.setattr(campaign, "load_heavy_v3_campaign_units", lambda _options: units)
     monkeypatch.setattr(
+        campaign,
+        "require_skill_local_campaign_interpreter",
+        lambda _skill_source: Path(sys.executable),
+    )
+    monkeypatch.setattr(
         campaign.subprocess,
         "run",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(denied),
@@ -6665,6 +9528,50 @@ def test_runtime_distribution_fingerprint_permission_error_names_interpreter(
 
     assert sys.executable in str(captured.value)
     assert "PermissionError" in str(captured.value)
+
+
+@pytest.mark.parametrize(
+    "platform_name,relative_interpreter",
+    (
+        ("posix", Path(".venv/bin/python")),
+        ("nt", Path(".venv/Scripts/python.exe")),
+    ),
+)
+def test_formal_campaign_requires_the_candidate_skill_local_interpreter(
+    tmp_path: Path,
+    platform_name: str,
+    relative_interpreter: Path,
+) -> None:
+    skill = tmp_path / "waapi-skill"
+    expected = skill / relative_interpreter
+    expected.parent.mkdir(parents=True)
+
+    with pytest.raises(
+        campaign.CampaignEvidenceError,
+        match="candidate Skill-local interpreter is missing",
+    ):
+        campaign.require_skill_local_campaign_interpreter(
+            skill,
+            interpreter=expected,
+            platform_name=platform_name,
+        )
+
+    expected.write_bytes(b"candidate interpreter")
+    assert campaign.require_skill_local_campaign_interpreter(
+        skill,
+        interpreter=expected,
+        platform_name=platform_name,
+    ) == expected
+
+    with pytest.raises(
+        campaign.CampaignEvidenceError,
+        match="exact candidate Skill-local interpreter",
+    ):
+        campaign.require_skill_local_campaign_interpreter(
+            skill,
+            interpreter=tmp_path / "other" / relative_interpreter.name,
+            platform_name=platform_name,
+        )
 
 
 def test_heavy_fingerprint_rejects_source_project_and_launcher_drift(
@@ -6746,6 +9653,11 @@ def test_heavy_resume_verify_only_and_resume_schedule_only_pending(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     options = _options(tmp_path)
+    monkeypatch.setattr(
+        campaign,
+        "require_skill_local_campaign_interpreter",
+        lambda _skill_source: Path(sys.executable),
+    )
     units = (_unit(1), _unit(2))
     effective = {
         "candidate": {
@@ -6828,6 +9740,11 @@ def test_heavy_resume_retries_in_original_suite_order(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     options = _options(tmp_path)
+    monkeypatch.setattr(
+        campaign,
+        "require_skill_local_campaign_interpreter",
+        lambda _skill_source: Path(sys.executable),
+    )
     units = (_unit(1), _unit(2), _unit(3))
     effective = {
         "candidate": {
@@ -6892,6 +9809,11 @@ def test_heavy_campaign_attributes_later_evidence_error_to_that_unit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     options = _options(tmp_path)
+    monkeypatch.setattr(
+        campaign,
+        "require_skill_local_campaign_interpreter",
+        lambda _skill_source: Path(sys.executable),
+    )
     units = (_unit(1), _unit(2), _unit(3))
     effective = {
         "candidate": {
@@ -7204,7 +10126,7 @@ def test_campaign_compound_import_oracle_projects_only_after_typed_validation(
         )
 
 
-def test_campaign_typed_compound_object_plan_binds_2025_recipe_lane() -> None:
+def _archive_test_campaign_typed_compound_object_plan_binds_2025_recipe_lane() -> None:
     from tests.semantic.support.codex_compound_heavy_v1 import (
         load_compound_heavy_profile,
     )
@@ -7260,6 +10182,167 @@ def test_campaign_typed_compound_object_plan_binds_2025_recipe_lane() -> None:
             expected_unit=replace(unit, version="2022.1"),
             provenance=SimpleNamespace(protocol=protocol),
         )
+
+
+def test_campaign_typed_profile_set03_plan_binds_exact_unit_metadata_lane(
+    tmp_path: Path,
+) -> None:
+    from tests.semantic.support.codex_typed_input_profile import (
+        load_typed_input_profile,
+    )
+
+    profile = load_typed_input_profile(
+        Path(__file__).resolve().parent
+        / "data"
+        / "typed-input-v1"
+        / "profile.json"
+    )
+    unit = next(
+        row
+        for row in profile.units
+        if row.unit_id == "TYP22-METADATA-OBJECT-SET"
+    )
+    recipe = build_object_heavy_v3_recipe(
+        unit.base_scenario_id,
+        version=unit.version,
+    )
+    protocol = build_transaction_protocol(
+        (recipe.request.as_dict(version=recipe.version),)
+    )
+    sections = compile_object_business_plan(
+        unit.scenario,
+        recipe,
+        protocol,
+        _synthetic_object_before(recipe),
+        (),
+        profile_unit_id=unit.unit_id,
+    )
+
+    parsed = campaign._validate_heavy_v3_typed_business_plan(
+        sections.writer_kwargs(),
+        expected_unit=unit,
+        provenance=SimpleNamespace(protocol=protocol),
+    )
+
+    assert parsed is not None
+    assert parsed.static_expectation["profile_unit_id"] == unit.unit_id
+    with pytest.raises(
+        ObjectBusinessPlanError,
+        match="static expectation differs",
+    ):
+        campaign._validate_heavy_v3_typed_business_plan(
+            sections.writer_kwargs(),
+            expected_unit=replace(unit, unit_id="TYP22-UNREVIEWED-SET03"),
+            provenance=SimpleNamespace(protocol=protocol),
+        )
+
+
+def _archive_test_campaign_typed_input_merge_replays_the_narrow_reviewed_recipe() -> None:
+    from tests.semantic.support.codex_object_business_plan_v3 import (
+        build_object_merge_query_protocol,
+    )
+    from tests.semantic.support.codex_typed_input_profile import (
+        load_typed_input_profile,
+    )
+
+    profile = load_typed_input_profile(
+        Path(__file__).resolve().parent
+        / "data"
+        / "typed-input-v1"
+        / "profile.json"
+    )
+    unit = next(
+        row
+        for row in profile.units
+        if row.unit_id == "TYP21-DEDICATED-OBJECT-CREATE"
+    )
+    recipe = typed_input_merge_recipe(
+        build_object_heavy_v3_recipe(
+            unit.base_scenario_id,
+            version=unit.version,
+        ),
+        unit_id=unit.unit_id,
+    )
+    protocol = build_object_merge_query_protocol(unit.scenario, recipe)
+    assert protocol is not None
+    sections = compile_object_business_plan(
+        unit.scenario,
+        recipe,
+        protocol,
+        _synthetic_object_before(recipe),
+        (),
+    )
+
+    parsed = campaign._validate_heavy_v3_typed_business_plan(
+        sections.writer_kwargs(),
+        expected_unit=unit,
+        provenance=SimpleNamespace(protocol=protocol),
+    )
+
+    assert parsed is not None
+    assert [
+        row["name"]
+        for row in parsed.static_expectation["request"]["value"]["arguments"][
+            "children"
+        ]
+    ] == ["Alert"]
+
+
+def _archive_test_campaign_typed_input_rename_replays_the_narrow_reviewed_recipe() -> None:
+    from tests.semantic.support.codex_object_business_plan_v3 import (
+        build_object_merge_query_protocol,
+    )
+    from tests.semantic.support.codex_typed_input_profile import (
+        load_typed_input_profile,
+    )
+
+    profile = load_typed_input_profile(
+        Path(__file__).resolve().parent
+        / "data"
+        / "typed-input-v1"
+        / "profile.json"
+    )
+    unit = next(
+        row
+        for row in profile.units
+        if row.unit_id == "TYP23-DEDICATED-OBJECT-CREATE"
+    )
+    recipe = typed_input_rename_recipe(
+        build_object_heavy_v3_recipe(
+            unit.base_scenario_id,
+            version=unit.version,
+        ),
+        unit_id=unit.unit_id,
+    )
+    base = build_transaction_protocol(
+        (recipe.request.as_dict(version=recipe.version),)
+    )
+    protocol = build_object_merge_query_protocol(
+        unit.scenario,
+        recipe,
+        base_protocol=base,
+        profile_unit_id=unit.unit_id,
+    )
+    assert protocol is not None
+    sections = compile_object_business_plan(
+        unit.scenario,
+        recipe,
+        protocol,
+        _synthetic_object_before(recipe),
+        (),
+        profile_unit_id=unit.unit_id,
+    )
+
+    parsed = campaign._validate_heavy_v3_typed_business_plan(
+        sections.writer_kwargs(),
+        expected_unit=unit,
+        provenance=SimpleNamespace(protocol=protocol),
+    )
+
+    assert parsed is not None
+    arguments = parsed.static_expectation["request"]["value"]["arguments"]
+    assert "properties" not in arguments
+    assert "children" not in arguments
 
 
 def test_campaign_object_recipe_fixture_fallback_binds_2025_lane() -> None:
@@ -7716,22 +10799,36 @@ def test_campaign_extracts_exact_media_pool_post_filter_protocol(
             "limit": 20,
         },
     }
+    direct_protocol = _expected_media_protocol(
+        staged.materialized,
+        oracle,
+        direct_business=True,
+    )
+    direct_evidence = SimpleNamespace(
+        provenance=_direct_typed_provenance(
+            scenario,
+            version="2025.1",
+            scenario_root=tmp_path / "direct-provenance",
+            protocol=direct_protocol,
+            visible_values={},
+        )
+    )
+    direct_step = campaign._heavy_v3_media_business_protocol_step(direct_evidence)
+    assert direct_step.name == "media.get"
+    assert direct_step.subcommand == "core-call"
 
     steps = list(protocol.steps)
-    media_step = steps[1]
+    media_index = next(
+        index
+        for index, step in enumerate(steps)
+        if step.subcommand == "draft-check"
+    )
+    media_step = steps[media_index]
     tampered_arguments = list(media_step.arguments)
     tampered_arguments[-2] = "--different-post-filter-flag"
-    steps[1] = replace(media_step, arguments=tuple(tampered_arguments))
-    tampered_protocol = replace(protocol, steps=tuple(steps))
-    tampered_provenance = replace(provenance, protocol=tampered_protocol)
-    with pytest.raises(
-        campaign.CampaignEvidenceError,
-        match="does not contain one exact call request",
-    ):
-        campaign._heavy_v3_protocol_call_request(
-            SimpleNamespace(provenance=tampered_provenance),
-            api="ak.wwise.core.mediaPool.get",
-        )
+    steps[media_index] = replace(media_step, arguments=tuple(tampered_arguments))
+    with pytest.raises(ValueError, match="closed Media Pool result filter"):
+        replace(protocol, steps=tuple(steps))
 
     archived = campaign._heavy_v3_plan_json_value(oracle)
     campaign._validate_media_pool_sealed_oracle(

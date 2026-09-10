@@ -12,17 +12,29 @@ from typing import Any
 import pytest
 
 from tests.support.platform_filesystem import create_symlink_or_skip
+from tests.semantic.support import codex_harness as codex_harness_module
 from tests.semantic.support.codex_business_oracle_plan_v3 import (
     write_business_oracle_plan,
 )
 from tests.semantic.support import codex_task_runner_v3 as task_runner
 from tests.semantic.support.codex_eval_protocol_v3 import (
     V3GatewayProtocol,
+    build_audio_import_composer_transaction_steps,
+    build_optional_query_schema_protocol,
+    build_optional_query_repair_protocol,
+    build_protocol_with_bounded_import_chunks,
     build_transaction_protocol,
+    build_workflow_operations_discovery_protocol,
+    build_workflow_query_schema_discovery_protocol,
+    query_object_step,
 )
 from tests.semantic.support.codex_gateway_broker import (
     ExpectedGatewayStep,
     GatewayBrokerReconciliation,
+)
+from tests.semantic.support.codex_gateway_contracts import (
+    TASK_LOCAL_RUNNER_POSIX,
+    TASK_LOCAL_RUNNER_WINDOWS,
 )
 from tests.semantic.support.codex_filesystem_security import write_utf8_text_bytes
 from tests.semantic.support.codex_harness import (
@@ -97,6 +109,516 @@ def test_common_grade_accepts_first_and_resumed_turn_shapes() -> None:
         assert all(gates.values())
 
 
+@pytest.mark.parametrize(
+    "selected_names",
+    (("query",), ("query-schema", "query")),
+)
+def test_optional_query_schema_terminal_accepts_only_complete_selected_protocol(
+    selected_names: tuple[str, ...],
+) -> None:
+    protocol = build_optional_query_schema_protocol(
+        query_object_step(
+            "query",
+            ("query-object", "--kind", "all-sounds", "--max-results", "12"),
+        )
+    )
+    evidence = SimpleNamespace(
+        expected_step_names=selected_names,
+        consumed_step_names=selected_names,
+        records=tuple(
+            SimpleNamespace(step_name=name, succeeded=True)
+            for name in selected_names
+        ),
+        rejected_records=(),
+        complete=True,
+        passed=True,
+        terminal_state="COMPLETE",
+    )
+
+    assert task_runner._broker_terminal_protocol_passed(protocol, evidence)
+
+    evidence.complete = False
+    assert not task_runner._broker_terminal_protocol_passed(protocol, evidence)
+
+
+@pytest.mark.parametrize(
+    "selected_names",
+    (
+        ("query",),
+        ("query-schema", "query"),
+        ("query-schema.advanced", "query"),
+        ("query-schema", "query-schema.advanced", "query"),
+    ),
+)
+def test_optional_query_disclosures_accept_only_the_selected_complete_lane(
+    selected_names: tuple[str, ...],
+) -> None:
+    protocol = build_optional_query_schema_protocol(
+        query_object_step(
+            "query",
+            ("query-object", "--kind", "all-sounds", "--max-results", "12"),
+        ),
+        allow_advanced=True,
+    )
+    evidence = SimpleNamespace(
+        expected_step_names=selected_names,
+        consumed_step_names=selected_names,
+        records=tuple(
+            SimpleNamespace(step_name=name, succeeded=True)
+            for name in selected_names
+        ),
+        rejected_records=(),
+        complete=True,
+        passed=True,
+        terminal_state="COMPLETE",
+    )
+
+    assert protocol.optional_query_schema_step_names == (
+        "query-schema",
+        "query-schema.advanced",
+    )
+    assert protocol.accepted_terminal_prefixes == (1, 2, 3)
+    assert task_runner._broker_terminal_protocol_passed(protocol, evidence)
+
+
+@pytest.mark.parametrize("include_schema", (False, True))
+def test_optional_query_repair_protocol_accepts_one_sealed_repair_chain(
+    include_schema: bool,
+) -> None:
+    protocol = build_optional_query_repair_protocol(
+        query_object_step(
+            "query",
+            ("query-object", "--kind", "all-sounds", "--max-results", "12"),
+        )
+    )
+    names = tuple(step.name for step in protocol.steps)
+    selected_names = names if include_schema else names[1:]
+    evidence = SimpleNamespace(
+        expected_step_names=selected_names,
+        consumed_step_names=selected_names,
+        records=tuple(
+            SimpleNamespace(step_name=name, succeeded=True)
+            for name in selected_names
+        ),
+        rejected_records=(),
+        complete=True,
+        passed=True,
+        terminal_state="COMPLETE",
+    )
+
+    assert protocol.optional_initial_query_schema is True
+    assert protocol.accepted_terminal_prefixes == (3, 4)
+    assert task_runner._broker_terminal_protocol_passed(protocol, evidence)
+
+
+def test_declared_short_terminal_prefix_is_complete_not_running() -> None:
+    steps = tuple(
+        ExpectedGatewayStep(name, "operations")
+        for name in ("one", "two", "optional-three")
+    )
+    protocol = V3GatewayProtocol(
+        steps=steps,
+        turn_prefix_counts=(3,),
+        allowed_turn_prefix_counts=((2, 3),),
+        terminal_prefix_counts=(2, 3),
+    )
+    assert protocol.optional_initial_operations_discovery is False
+    selected = ("one", "two")
+    evidence = SimpleNamespace(
+        expected_step_names=selected,
+        consumed_step_names=selected,
+        records=tuple(
+            SimpleNamespace(step_name=name, succeeded=True) for name in selected
+        ),
+        rejected_records=(),
+        complete=True,
+        passed=True,
+        terminal_state="COMPLETE",
+        commutative_read_only_step_groups=(),
+        commutative_composer_setup_step_groups=(),
+    )
+
+    assert task_runner._broker_terminal_protocol_passed(protocol, evidence)
+
+
+def test_optional_operations_terminal_accepts_commutative_composer_order() -> None:
+    steps = tuple(
+        SimpleNamespace(name=name, subcommand=subcommand, arguments=arguments)
+        for name, subcommand, arguments in (
+            ("tx01.operations", "operations", ()),
+            ("tx01.operation-schema", "operation-schema", ("object.set",)),
+            ("tx01.bind-a", "draft-bind-object", ()),
+            ("tx01.bind-b", "draft-bind-object", ()),
+            ("tx01.preview", "preview-from-draft", ()),
+        )
+    )
+    protocol = SimpleNamespace(
+        steps=steps,
+        accepted_terminal_prefixes=(4, 5),
+        optional_query_schema_step_names=(),
+        optional_initial_query_schema=False,
+        optional_initial_operations_discovery=True,
+        optional_topic_schema_step_groups=(),
+        commutative_read_only_step_groups=(),
+        commutative_composer_setup_step_groups=(("tx01.bind-a", "tx01.bind-b"),),
+    )
+    selected = tuple(step.name for step in steps[1:])
+    consumed = (
+        "tx01.operation-schema",
+        "tx01.bind-b",
+        "tx01.bind-a",
+        "tx01.preview",
+    )
+    evidence = SimpleNamespace(
+        expected_step_names=selected,
+        consumed_step_names=consumed,
+        records=tuple(
+            SimpleNamespace(step_name=name, succeeded=True) for name in consumed
+        ),
+        rejected_records=(),
+        complete=True,
+        passed=True,
+        terminal_state="COMPLETE",
+        commutative_read_only_step_groups=(),
+        commutative_composer_setup_step_groups=(("tx01.bind-a", "tx01.bind-b"),),
+    )
+
+    assert task_runner._broker_terminal_protocol_passed(protocol, evidence)
+
+
+def test_workflow_operations_terminal_accepts_any_reviewed_discovery_subset() -> None:
+    base = V3GatewayProtocol(
+        steps=(
+            ExpectedGatewayStep("diag.query", "query-object"),
+            ExpectedGatewayStep(
+                "tx01.operation-schema",
+                "operation-schema",
+                ("object.setReference",),
+            ),
+            ExpectedGatewayStep("tx01.verify", "verify"),
+            ExpectedGatewayStep(
+                "tx02.operation-schema",
+                "operation-schema",
+                ("switchContainer.removeAssignment",),
+            ),
+        ),
+        turn_prefix_counts=(2, 4),
+    )
+    protocol = build_workflow_operations_discovery_protocol(base)
+    selected = tuple(
+        step.name
+        for step in protocol.steps
+        if step.name != "routing.operations"
+    )
+    evidence = SimpleNamespace(
+        expected_step_names=selected,
+        consumed_step_names=selected,
+        records=tuple(
+            SimpleNamespace(step_name=name, succeeded=True) for name in selected
+        ),
+        rejected_records=(),
+        complete=True,
+        passed=True,
+        terminal_state="COMPLETE",
+        commutative_read_only_step_groups=(),
+        commutative_composer_setup_step_groups=(),
+    )
+
+    assert task_runner._broker_terminal_protocol_passed(protocol, evidence)
+
+
+def test_workflow_terminal_accepts_reviewed_query_and_revalidation_subset() -> None:
+    base = V3GatewayProtocol(
+        steps=(
+            ExpectedGatewayStep("diag.query", "query-object"),
+            ExpectedGatewayStep(
+                "revalidation.sound",
+                "query-object",
+                ("--exact-id", "sound"),
+            ),
+            ExpectedGatewayStep(
+                "tx01.operation-schema",
+                "operation-schema",
+                ("object.setReference",),
+            ),
+            ExpectedGatewayStep("tx01.verify", "verify"),
+        ),
+        turn_prefix_counts=(1, 3, 4),
+        allowed_turn_prefix_counts=((1,), (2, 3), (3, 4)),
+        terminal_prefix_counts=(3, 4),
+    )
+    protocol = build_workflow_operations_discovery_protocol(
+        build_workflow_query_schema_discovery_protocol(base)
+    )
+    selected = tuple(
+        step.name
+        for step in protocol.steps
+        if step.name
+        not in {
+            *protocol.optional_workflow_operations_discovery_step_names,
+            *protocol.optional_workflow_query_schema_step_names,
+            *protocol.optional_workflow_revalidation_step_names,
+        }
+    )
+    evidence = SimpleNamespace(
+        expected_step_names=selected,
+        consumed_step_names=selected,
+        records=tuple(
+            SimpleNamespace(step_name=name, succeeded=True) for name in selected
+        ),
+        rejected_records=(),
+        complete=True,
+        passed=True,
+        terminal_state="COMPLETE",
+        commutative_read_only_step_groups=(),
+        commutative_composer_setup_step_groups=(),
+    )
+
+    assert task_runner._broker_terminal_protocol_passed(protocol, evidence)
+
+
+def test_workflow_terminal_accepts_broker_proven_import_rebatching() -> None:
+    steps = build_audio_import_composer_transaction_steps(
+        {
+            "contract": "waapi-skill.operation-request/v1",
+            "version": "2022.1",
+            "operation": "audio.import",
+            "arguments": {
+                "imports": [
+                    {
+                        "object_path": (
+                            "\\Actor-Mixer Hierarchy\\Default Work Unit"
+                            f"\\<Sound SFX>Sound_{index}"
+                        ),
+                        "audio_file": f"/tmp/sound-{index}.wav",
+                        "object_type": "Sound SFX",
+                        "import_language": "SFX",
+                    }
+                    for index in range(1, 7)
+                ]
+            },
+        },
+        label="tx01",
+    )
+    base = build_protocol_with_bounded_import_chunks(
+        steps=steps,
+        turn_prefix_counts=(len(steps),),
+    )
+    protocol = build_workflow_operations_discovery_protocol(base)
+    declaration_names = tuple(
+        step.name
+        for step in protocol.steps
+        if step.subcommand == "draft-declare-import-batch"
+    )
+    selected = tuple(
+        step.name
+        for step in protocol.steps
+        if step.subcommand != "draft-declare-import-batch"
+        or step.name in declaration_names[:1]
+    )
+    evidence = SimpleNamespace(
+        expected_step_names=selected,
+        consumed_step_names=selected,
+        records=tuple(
+            SimpleNamespace(step_name=name, succeeded=True) for name in selected
+        ),
+        rejected_records=(),
+        complete=True,
+        passed=True,
+        terminal_state="COMPLETE",
+        commutative_read_only_step_groups=(),
+        commutative_composer_setup_step_groups=(),
+    )
+
+    assert task_runner._broker_terminal_protocol_passed(protocol, evidence)
+
+    for invalid_declarations in (
+        (),
+        (declaration_names[0], declaration_names[2]),
+    ):
+        invalid = tuple(
+            step.name
+            for step in protocol.steps
+            if step.subcommand != "draft-declare-import-batch"
+            or step.name in invalid_declarations
+        )
+        evidence.expected_step_names = invalid
+        evidence.consumed_step_names = invalid
+        evidence.records = tuple(
+            SimpleNamespace(step_name=name, succeeded=True) for name in invalid
+        )
+        assert not task_runner._broker_terminal_protocol_passed(protocol, evidence)
+
+
+def test_workflow_terminal_accepts_rebatch_before_dependency_ready_setup() -> None:
+    steps = tuple(
+        SimpleNamespace(name=name, subcommand=subcommand, arguments=())
+        for name, subcommand in (
+            ("routing.operations", "operations"),
+            ("tx01.operation-schema", "operation-schema"),
+            ("tx01.draft-start", "draft-start"),
+            ("tx01.bind-object.001", "draft-bind-object"),
+            ("tx01.bind-object.002", "draft-bind-object"),
+            ("tx01.bind-object.003", "draft-bind-object"),
+            *(
+                (
+                    "tx01.declare-batch"
+                    if index == 1
+                    else f"tx01.declare-batch-{index:02d}",
+                    "draft-declare-import-batch",
+                )
+                for index in range(1, 10)
+            ),
+            ("tx01.check", "draft-check"),
+            ("tx01.preview", "preview-from-draft"),
+            ("tx01.verify", "verify"),
+            ("routing.operations.tx02.operation-schema", "operations"),
+            ("tx02.operation-schema", "operation-schema"),
+            ("tx02.verify", "verify"),
+        )
+    )
+    selected = (
+        "routing.operations",
+        "tx01.operation-schema",
+        "tx01.draft-start",
+        "tx01.bind-object.001",
+        "tx01.bind-object.002",
+        "tx01.declare-batch",
+        "tx01.bind-object.003",
+        "tx01.declare-batch-02",
+        "tx01.check",
+        "tx01.preview",
+        "tx01.verify",
+        "tx02.operation-schema",
+        "tx02.verify",
+    )
+    protocol = SimpleNamespace(
+        steps=steps,
+        accepted_terminal_prefixes=(len(selected),),
+        optional_query_schema_step_names=(),
+        optional_initial_query_schema=False,
+        optional_initial_operations_discovery=False,
+        optional_workflow_operations_discovery_step_names=(
+            "routing.operations",
+            "routing.operations.tx02.operation-schema",
+        ),
+        optional_workflow_query_schema_step_names=(),
+        optional_workflow_revalidation_step_names=(),
+        optional_topic_schema_step_groups=(),
+        commutative_read_only_step_groups=(),
+        commutative_composer_setup_step_groups=(),
+    )
+    evidence = SimpleNamespace(
+        expected_step_names=selected,
+        consumed_step_names=selected,
+        records=tuple(
+            SimpleNamespace(step_name=name, succeeded=True) for name in selected
+        ),
+        rejected_records=(),
+        complete=True,
+        passed=True,
+        terminal_state="COMPLETE",
+        commutative_read_only_step_groups=(),
+        commutative_composer_setup_step_groups=(),
+    )
+
+    assert task_runner._broker_terminal_protocol_passed(protocol, evidence)
+
+
+def test_common_grade_ignores_one_identical_windows_preprocess_failure() -> None:
+    result = _result(turn=1, gateway_count=2)
+    successful = result.command_facts.command_records[0]
+    successful.status = "completed"
+    successful.exit_code = 0
+    successful.parse_error = ""
+    successful.has_shell_operators = False
+    successful.parser_kind = "windows-pwsh-command"
+    successful.argv = ("Get-Content", "-Raw", "-Encoding", "UTF8", "SKILL.md")
+    successful.aggregated_output = "skill"
+    failed = SimpleNamespace(
+        command=successful.command,
+        status="failed",
+        exit_code=-1,
+        parse_error="",
+        has_shell_operators=False,
+        parser_kind="windows-pwsh-command",
+        argv=successful.argv,
+        aggregated_output=(
+            "execution error: Io(windows sandbox: "
+            "CreateProcessAsUserW failed: 267)"
+        ),
+    )
+    result.command_facts.command_records = (
+        failed,
+        *result.command_facts.command_records,
+    )
+
+    errors, gates = _grade_common_turn(
+        result,
+        turn_index=1,
+        required_reference="references/waapi-operate.md",
+        expected_gateway_count=2,
+    )
+
+    assert errors == ()
+    assert all(gates.values())
+
+
+def test_exhausted_windows_267_after_only_skill_read_is_infrastructure() -> None:
+    skill_read = SimpleNamespace(
+        command="read-skill",
+        status="completed",
+        exit_code=0,
+        parser_kind="windows-pwsh-command",
+        argv=("Get-Content", "-Raw", "-Encoding", "UTF8", "SKILL.md"),
+        aggregated_output="skill",
+    )
+    failed_reference = SimpleNamespace(
+        command="read-query-reference",
+        status="failed",
+        exit_code=-1,
+        parse_error="",
+        has_shell_operators=False,
+        parser_kind="windows-pwsh-command",
+        argv=(
+            "Get-Content",
+            "-Raw",
+            "-Encoding",
+            "UTF8",
+            r".agents\skills\waapi-skill\references\waapi-query.md",
+        ),
+        aggregated_output=(
+            "execution error: Io(windows sandbox: "
+            "CreateProcessAsUserW failed: 267)"
+        ),
+    )
+    result = SimpleNamespace(
+        command_facts=SimpleNamespace(
+            skill_read=True,
+            skill_read_files=("SKILL.md",),
+            gateway_commands=(),
+            gateway_attempt_commands=(),
+            command_records=(skill_read, failed_reference, failed_reference),
+        ),
+        collab_call_count=0,
+        file_change_count=0,
+    )
+    broker_evidence = SimpleNamespace(records=(), consumed_step_names=())
+
+    assert task_runner._exhausted_windows_267_after_only_skill_read(
+        result,
+        broker_evidence=broker_evidence,
+        previous_broker_prefix=0,
+    )
+
+    broker_evidence.records = (SimpleNamespace(succeeded=True),)
+    assert not task_runner._exhausted_windows_267_after_only_skill_read(
+        result,
+        broker_evidence=broker_evidence,
+        previous_broker_prefix=0,
+    )
+
+
 def test_task_reconciliation_rejects_equivalent_requoted_continuation() -> None:
     full_argv = (
         "python",
@@ -112,6 +634,7 @@ def test_task_reconciliation_rejects_equivalent_requoted_continuation() -> None:
         "gateway_argv": list(full_argv[3:]),
         "full_argv": list(full_argv),
         "copy_exactly": True,
+        "shell_tool_timeout_ms": 30_000,
         "shell_family": "posix-sh",
         "copy_instruction": {
             "contract": "waapi-skill.gateway-command-copy-instruction/v2",
@@ -188,15 +711,22 @@ def test_reference_schedule_preserves_default_and_allows_alarm_lane_transition()
         prompt_count=3,
         required_reference="references/waapi-query.md",
         turn_reference_schedule=(
-            ("references/waapi-query.md",),
-            ("references/waapi-operate.md",),
+            (
+                "references/waapi-query.md",
+                "references/waapi-operate.md",
+            ),
+            (),
             (),
         ),
     )
 
     assert alarm_schedule == (
-        ("SKILL.md", "references/waapi-query.md"),
-        ("references/waapi-operate.md",),
+        (
+            "SKILL.md",
+            "references/waapi-query.md",
+            "references/waapi-operate.md",
+        ),
+        (),
         (),
     )
     for turn_index, expected_reads in enumerate(alarm_schedule, start=1):
@@ -215,6 +745,34 @@ def test_reference_schedule_preserves_default_and_allows_alarm_lane_transition()
         assert all(gates.values())
 
 
+def test_reference_schedule_allows_reviewed_skill_only_first_turn() -> None:
+    schedule = task_runner._normalize_turn_reference_schedule(
+        prompt_count=1,
+        required_reference=None,
+        turn_reference_schedule=None,
+    )
+
+    assert schedule == (("SKILL.md",),)
+    errors, gates = _grade_common_turn(
+        _result(turn=1, gateway_count=3, skill_reads=schedule[0]),
+        turn_index=1,
+        required_reference=None,
+        expected_skill_reads=schedule[0],
+        expected_gateway_count=3,
+    )
+    assert errors == ()
+    assert all(gates.values())
+    with pytest.raises(
+        task_runner.V3TaskRunnerError,
+        match="SKILL-only task must not schedule lane references",
+    ):
+        task_runner._normalize_turn_reference_schedule(
+            prompt_count=1,
+            required_reference=None,
+            turn_reference_schedule=(("references/waapi-query.md",),),
+        )
+
+
 @pytest.mark.parametrize(
     "schedule",
     (
@@ -223,11 +781,11 @@ def test_reference_schedule_preserves_default_and_allows_alarm_lane_transition()
         ("references/waapi-query.md", (), ()),
         ((None,), (), ()),
         (
+            ("references/waapi-query.md",),
             (
-                "references/waapi-query.md",
                 "references/waapi-operate.md",
+                "references/waapi-topics.md",
             ),
-            (),
             (),
         ),
         (
@@ -265,6 +823,108 @@ def test_common_grade_rejects_reference_reread_on_resume() -> None:
         expected_gateway_count=4,
     )
     assert "skill_reads_exact" in errors
+
+
+def test_common_grade_tolerates_one_early_operate_read_after_query() -> None:
+    result = _result(
+        turn=1,
+        gateway_count=4,
+        skill_reads=(
+            "SKILL.md",
+            "references/waapi-query.md",
+            "references/waapi-operate.md",
+        ),
+    )
+
+    errors, gates = _grade_common_turn(
+        result,
+        turn_index=1,
+        required_reference="references/waapi-query.md",
+        expected_skill_reads=("SKILL.md", "references/waapi-query.md"),
+        expected_gateway_count=4,
+    )
+
+    assert errors == ()
+    assert gates["skill_reads_exact"] is True
+
+
+def test_common_grade_carries_early_operate_read_into_later_turn() -> None:
+    result = _result(turn=2, gateway_count=4, skill_reads=())
+
+    errors, gates = _grade_common_turn(
+        result,
+        turn_index=2,
+        required_reference="references/waapi-query.md",
+        expected_skill_reads=("references/waapi-operate.md",),
+        previous_skill_reads=(
+            "SKILL.md",
+            "references/waapi-query.md",
+            "references/waapi-operate.md",
+        ),
+        expected_gateway_count=4,
+    )
+
+    assert errors == ()
+    assert gates["skill_reads_exact"] is True
+
+
+def test_common_grade_allows_selected_identity_reads_before_operate_reference() -> None:
+    result = _result(
+        turn=2,
+        gateway_count=5,
+        skill_reads=("references/waapi-operate.md",),
+    )
+    read = result.command_facts.allowed_read_commands[0]
+    gateway = tuple(f"gateway {index}" for index in range(5))
+    result.command_facts.command_records = tuple(
+        SimpleNamespace(command=command)
+        for command in (*gateway[:3], read, *gateway[3:])
+    )
+    result.command_facts.gateway_attempt_commands = gateway
+    result.command_facts.gateway_subcommands = (
+        "query-object",
+        "query-object",
+        "query-object",
+        "operation-schema",
+        "draft-start",
+    )
+
+    errors, gates = _grade_common_turn(
+        result,
+        turn_index=2,
+        required_reference="references/waapi-query.md",
+        expected_skill_reads=("references/waapi-operate.md",),
+        expected_gateway_count=5,
+    )
+
+    assert errors == ()
+    assert gates["read_prefix_exact"] is True
+
+
+def test_common_grade_rejects_mutation_command_before_operate_reference() -> None:
+    result = _result(
+        turn=2,
+        gateway_count=2,
+        skill_reads=("references/waapi-operate.md",),
+    )
+    read = result.command_facts.allowed_read_commands[0]
+    gateway = ("gateway operation-schema", "gateway draft-start")
+    result.command_facts.command_records = tuple(
+        SimpleNamespace(command=command) for command in (gateway[0], read, gateway[1])
+    )
+    result.command_facts.gateway_attempt_commands = gateway
+    result.command_facts.gateway_subcommands = ("operation-schema", "draft-start")
+
+    errors, gates = _grade_common_turn(
+        result,
+        turn_index=2,
+        required_reference="references/waapi-query.md",
+        expected_skill_reads=("references/waapi-operate.md",),
+        expected_gateway_count=2,
+    )
+
+    assert "read_prefix_exact" in errors
+    assert gates["read_prefix_exact"] is False
 
 
 def test_common_grade_allows_one_broker_proven_terminal_execute_exit_two() -> None:
@@ -682,6 +1342,7 @@ def _install_task_fakes(
     broker_action_on_failure: bool = False,
     broker_close_failure: bool = False,
     reconciliation_errors: tuple[str, ...] = (),
+    captured_developer_instructions: list[str] | None = None,
 ) -> tuple[CodexInfrastructureError, list[object]]:
     instances: list[object] = []
     expected_names = ("first", "second")
@@ -746,6 +1407,10 @@ def _install_task_fakes(
 
     class FakeTask:
         def __init__(self, config: object, *_: object, **__: object) -> None:
+            if captured_developer_instructions is not None:
+                captured_developer_instructions.append(
+                    str(getattr(config, "developer_instructions"))
+                )
             self.broker = instances[-1]
             workspace = Path(getattr(config, "workspace"))
             receipt_path = workspace.parent / task_runner.PROMPT_MATERIALIZATION_FILE
@@ -880,6 +1545,7 @@ def _run_infrastructure_task(
     prompts: tuple[str, ...],
     plan_tamper: str | None = None,
     protocol: V3GatewayProtocol | None = None,
+    developer_instructions: str = "",
 ) -> Path:
     skill_source = tmp_path / "skill"
     skill_source.mkdir()
@@ -986,6 +1652,7 @@ def _run_infrastructure_task(
         runner_environment={},
         required_reference="references/waapi-operate.md",
         business_oracle_plan=business_oracle_plan,
+        developer_instructions=developer_instructions,
     )
     return task_root
 
@@ -1035,6 +1702,104 @@ def test_v3_gateway_accounting_accepts_copy_then_candidate_runner(tmp_path: Path
         alternate_skill_sources=(candidate,),
         expected_wwise_version="2022.1",
     ) == tuple(record.argv for record in records)
+
+
+def test_v3_gateway_accounting_folds_one_identical_windows_267_retry(
+    tmp_path: Path,
+) -> None:
+    skill = tmp_path / "waapi-skill"
+    argv = (
+        "python",
+        str(skill / "scripts" / "run.py"),
+        "gateway.py",
+        "request-schema",
+        "ak.wwise.core.gameParameter.setRange",
+    )
+    command = "pwsh -Command project-setting-request-schema"
+    failed = SimpleNamespace(
+        argv=argv,
+        command=command,
+        status="failed",
+        exit_code=-1,
+        parse_error="",
+        has_shell_operators=False,
+        parser_kind="windows-pwsh-command",
+        aggregated_output=(
+            "execution error: Io(windows sandbox: "
+            "CreateProcessAsUserW failed: 267)"
+        ),
+    )
+    successful = SimpleNamespace(
+        argv=argv,
+        command=command,
+        status="completed",
+        exit_code=0,
+        parse_error="",
+        has_shell_operators=False,
+        parser_kind="windows-pwsh-command",
+        aggregated_output="{}",
+    )
+    result = SimpleNamespace(
+        command_facts=SimpleNamespace(command_records=(failed, successful))
+    )
+
+    assert task_runner._gateway_candidate_argvs(
+        result,
+        skill_source=skill,
+        expected_wwise_version="2025.1",
+    ) == (argv,)
+    assert task_runner._gateway_candidate_records(
+        result,
+        skill_source=skill,
+        expected_wwise_version="2025.1",
+    ) == (successful,)
+
+
+def test_v3_gateway_accounting_canonicalizes_exact_task_local_runner(
+    tmp_path: Path,
+) -> None:
+    installed = (
+        tmp_path
+        / "workspace"
+        / ".agents"
+        / "skills"
+        / "waapi-skill"
+    )
+    candidate = tmp_path / "candidate" / "waapi-skill"
+    relative_runner = (
+        TASK_LOCAL_RUNNER_WINDOWS if os.name == "nt" else TASK_LOCAL_RUNNER_POSIX
+    )
+    record = SimpleNamespace(
+        argv=(
+            "python",
+            relative_runner,
+            "gateway.py",
+            "status",
+        )
+    )
+    result = SimpleNamespace(
+        command_facts=SimpleNamespace(command_records=(record,))
+    )
+
+    assert task_runner._gateway_candidate_argvs(
+        result,
+        skill_source=installed,
+        alternate_skill_sources=(candidate,),
+        expected_wwise_version="2022.1",
+    ) == (
+        (
+            "python",
+            str(installed / "scripts" / "run.py"),
+            "gateway.py",
+            "status",
+        ),
+    )
+    assert task_runner._gateway_candidate_records(
+        result,
+        skill_source=installed,
+        alternate_skill_sources=(candidate,),
+        expected_wwise_version="2022.1",
+    ) == (record,)
 
 
 def test_task_runner_stops_at_exact_indeterminate_execute_without_verify(
@@ -1190,6 +1955,66 @@ def test_codex_infrastructure_failure_archives_closed_fixed_path_evidence(
     assert (failed_turn_root / "prompt.txt").read_text(encoding="utf-8") == (
         prompts[failure_turn - 1] + "\n"
     )
+
+
+def test_v3_task_seals_exact_task_local_skill_reads_and_runner(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: list[str] = []
+    _install_task_fakes(
+        monkeypatch,
+        failure_turn=1,
+        captured_developer_instructions=captured,
+    )
+    candidate_runner = tmp_path / "skill" / "scripts" / "run.py"
+    base = codex_harness_module.semantic_skill_bootstrap_developer_instructions(
+        candidate_runner
+    )
+
+    with pytest.raises(CodexInfrastructureError):
+        _run_infrastructure_task(
+            tmp_path,
+            prompts=("first natural prompt", "second natural prompt"),
+            developer_instructions=base,
+        )
+
+    assert len(captured) == 1
+    task_skill = (
+        tmp_path
+        / "scenario"
+        / "evidence"
+        / "codex-task"
+        / "agent-workspace"
+        / ".agents"
+        / "skills"
+        / "waapi-skill"
+    )
+    instructions = captured[0]
+    if os.name == "nt":
+        assert (
+            "Get-Content -Raw -Encoding UTF8 "
+            r"'.agents\skills\waapi-skill\SKILL.md'"
+        ) in instructions
+        assert (
+            "Get-Content -Raw -Encoding UTF8 "
+            r"'.agents\skills\waapi-skill\references\waapi-operate.md'"
+        ) in instructions
+        assert (
+            "python '.agents\\skills\\waapi-skill\\scripts\\run.py' "
+            "'gateway.py'"
+        ) in instructions
+    else:
+        assert "cat '.agents/skills/waapi-skill/SKILL.md'" in instructions
+        assert "cat '.agents/skills/waapi-skill/references/waapi-operate.md'" in (
+            instructions
+        )
+        assert (
+            "python .agents/skills/waapi-skill/scripts/run.py gateway.py"
+            in instructions
+        )
+    assert str(candidate_runner) not in instructions
+    assert str(task_skill) not in instructions
 
 
 def test_codex_infrastructure_archive_failure_masks_retryable_error(

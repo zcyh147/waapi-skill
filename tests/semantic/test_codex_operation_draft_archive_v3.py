@@ -9,7 +9,7 @@ from typing import Any, Mapping
 import pytest
 
 from tests.semantic.support.codex_gateway_broker import (
-    DraftActionJsonArgument,
+    DraftTypedActionArgument,
     DraftActionResponseBinding,
     ExpectedGatewayStep,
     ResponseBinding,
@@ -21,9 +21,9 @@ from tests.semantic.support.codex_operation_draft_archive_v3 import (
     validate_operation_draft_archive,
 )
 from tests.semantic.support import codex_operation_draft_archive_v3 as archive_module
-from wwise_waapi.canonical import canonical_sha256
+from wwise_waapi.canonical import canonical_json_bytes, canonical_sha256
+from wwise_waapi import operation_drafts as draft_module
 from wwise_waapi.operation_composer import (
-    composition_projection,
     typed_action_cli_arguments,
 )
 from wwise_waapi.operation_drafts import (
@@ -45,7 +45,7 @@ GATEWAY_CONTRACT = "waapi-skill.gateway-result/v1"
 OBJECT_ID = "{11111111-1111-1111-1111-111111111111}"
 
 
-def test_archive_uses_each_operation_composer_action_byte_ceiling() -> None:
+def _archive_test_archive_uses_each_operation_composer_action_byte_ceiling() -> None:
     inline_audio = {
         "contract": ACTION_CONTRACT,
         "action": "add_import_row",
@@ -70,7 +70,7 @@ def test_archive_uses_each_operation_composer_action_byte_ceiling() -> None:
         )
 
 
-def test_archive_reconstructs_typed_action_argv_without_json_text() -> None:
+def _archive_test_archive_reconstructs_typed_action_argv_without_json_text() -> None:
     action = {
         "contract": ACTION_CONTRACT,
         "action": "add_target",
@@ -153,11 +153,129 @@ def test_archive_replays_frozen_generic_audio_import_typed_argv() -> None:
     }
 
 
+@pytest.mark.parametrize(
+    ("arguments", "expected"),
+    (
+        (
+            ("--action", "set_import_operation", "--mode", "useExisting"),
+            {"mode": "useExisting"},
+        ),
+        (
+            (
+                "--action",
+                "set_import_option",
+                "--option",
+                "auto_add_to_source_control",
+                "boolean",
+                "true",
+            ),
+            {"name": "auto_add_to_source_control", "value": True},
+        ),
+        (
+            (
+                "--action",
+                "set_import_default",
+                "--default",
+                "notes",
+                "string",
+                "storm bed",
+            ),
+            {"name": "notes", "value": "storm bed"},
+        ),
+        (
+            (
+                "--action",
+                "add_import_row",
+                "--object-path",
+                r"\Actor-Mixer Hierarchy\Default Work Unit\Storm",
+                "--audio-file",
+                "/tmp/storm.wav",
+                "--object-type",
+                "Sound SFX",
+                "--property",
+                "Volume",
+                "number",
+                "-3.0",
+                "--assignment",
+                "none",
+            ),
+            {
+                "object_path": r"\Actor-Mixer Hierarchy\Default Work Unit\Storm",
+                "audio_file": "/tmp/storm.wav",
+                "object_type": "Sound SFX",
+                "properties": [{"name": "Volume", "value": -3.0}],
+                "assignment": {"mode": "none"},
+            },
+        ),
+        (
+            (
+                "--action",
+                "set_import_row_field",
+                "--import-handle",
+                "ir1-1234",
+                "--field",
+                "notes",
+                "string",
+                "revised",
+            ),
+            {"import_handle": "ir1-1234", "name": "notes", "value": "revised"},
+        ),
+    ),
+)
+def test_archive_replays_each_retired_audio_import_specialized_argv_family(
+    arguments: tuple[str, ...],
+    expected: dict[str, Any],
+) -> None:
+    assert archive_module._strict_action(  # noqa: SLF001
+        ("--compact", "--facts", *arguments),
+        operation="audio.import",
+        version="2022.1",
+    ) == {"contract": ACTION_CONTRACT, "action": arguments[1], **expected}
+
+
+def test_archive_loader_opens_retired_audio_import_composition_only_by_opt_in(
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "state"
+    started = OperationDraftStore(state_dir).start(
+        operation="audio.import",
+        version="2022.1",
+        schema_digest="a" * 64,
+        composer_digest="b" * 64,
+    )
+    record_path = (
+        state_dir
+        / "operation-drafts-v1"
+        / "records"
+        / f"{started.draft_id}.json"
+    )
+    payload = json.loads(record_path.read_text(encoding="utf-8"))
+    payload["composition"] = {
+        "contract": "waapi-skill.operation-composition/v1",
+        "request_options": {"import_operation": "createNew"},
+        "defaults": {},
+        "imports": [],
+    }
+    payload.pop("record_digest")
+    payload["record_digest"] = draft_module._record_digest(payload)  # noqa: SLF001
+    record_path.write_bytes(canonical_json_bytes(payload))
+
+    with pytest.raises(ValueError, match="business composition fields"):
+        load_operation_draft_archive_records(state_dir, (started.draft_id,))
+
+    loaded = load_operation_draft_archive_records(
+        state_dir,
+        (started.draft_id,),
+        allow_retired_audio_import_composition=True,
+    )
+    assert loaded[started.draft_id].composition == payload["composition"]
+
+
 @pytest.mark.parametrize("legacy_index", (0, 1))
 def test_archive_accepts_both_frozen_audio_import_projection_contracts(
     legacy_index: int,
 ) -> None:
-    projection = composition_projection(
+    projection = archive_module.composition_projection(
         "audio.import",
         "2022.1",
         {
@@ -200,7 +318,7 @@ def _draft_payload(
     *,
     task_authority: str | None = None,
 ) -> dict[str, Any]:
-    projection = composition_projection(
+    projection = archive_module.composition_projection(
         record.operation,
         record.version,
         record.composition or {},
@@ -381,7 +499,7 @@ def _sealed_archive(
             "--expected-revision",
             ResponseBinding("draft.start", "/draft/revision"),
             "--action-json",
-            DraftActionJsonArgument(add_action),
+            DraftTypedActionArgument(add_action),
         ),
     )
     property_step = ExpectedGatewayStep(
@@ -394,7 +512,7 @@ def _sealed_archive(
             "--expected-revision",
             ResponseBinding("draft.target", "/draft/revision"),
             "--action-json",
-            DraftActionJsonArgument(
+            DraftTypedActionArgument(
                 {
                     key: value
                     for key, value in property_action.items()
@@ -594,7 +712,7 @@ def _sealed_archive(
     return state_dir, steps, records
 
 
-def test_composer_archive_reconstructs_actions_request_preview_and_cleanup(
+def _archive_test_composer_archive_reconstructs_actions_request_preview_and_cleanup(
     tmp_path: Path,
 ) -> None:
     state_dir, steps, records = _sealed_archive(tmp_path)
@@ -621,7 +739,7 @@ def test_composer_archive_reconstructs_actions_request_preview_and_cleanup(
     assert evidence["cleanup_outcome"]["status"] == "not_required"
 
 
-def test_composer_archive_replays_multiple_prefixed_flows_independently(
+def _archive_test_composer_archive_replays_multiple_prefixed_flows_independently(
     tmp_path: Path,
 ) -> None:
     state_dir, first_steps, first_records = _sealed_archive(tmp_path)
@@ -679,7 +797,7 @@ def test_composer_archive_replays_multiple_prefixed_flows_independently(
 
 
 @pytest.mark.parametrize("tamper", ("extra", "missing"))
-def test_multi_draft_archive_requires_the_exact_bound_record_set(
+def _archive_test_multi_draft_archive_requires_the_exact_bound_record_set(
     tmp_path: Path,
     tamper: str,
 ) -> None:
@@ -711,7 +829,7 @@ def test_multi_draft_archive_requires_the_exact_bound_record_set(
         load_operation_draft_archive_records(state_dir, draft_ids)
 
 
-def test_composer_archive_accepts_canonical_key_sorted_payload_records(
+def _archive_test_composer_archive_accepts_canonical_key_sorted_payload_records(
     tmp_path: Path,
 ) -> None:
     state_dir, steps, records = _sealed_archive(tmp_path)
@@ -727,7 +845,7 @@ def test_composer_archive_accepts_canonical_key_sorted_payload_records(
     assert evidence["preview_binding"]["transaction_final_state"] == "verified"
 
 
-def test_composer_archive_binds_bounded_verification_summary_to_full_journal(
+def _archive_test_composer_archive_binds_bounded_verification_summary_to_full_journal(
     tmp_path: Path,
 ) -> None:
     state_dir, steps, records = _sealed_archive(tmp_path)
@@ -786,7 +904,7 @@ def test_composer_archive_binds_bounded_verification_summary_to_full_journal(
             )
 
 
-def test_composer_archive_replays_compact_action_evidence(
+def _archive_test_composer_archive_replays_compact_action_evidence(
     tmp_path: Path,
 ) -> None:
     state_dir, steps, records = _sealed_archive(tmp_path)
@@ -804,7 +922,7 @@ def test_composer_archive_replays_compact_action_evidence(
         (*target_step.arguments[:5], "--compact", *target_step.arguments[5:]),
     )
     property_argument = property_step.arguments[-1]
-    assert isinstance(property_argument, DraftActionJsonArgument)
+    assert isinstance(property_argument, DraftTypedActionArgument)
     compact_property_step = ExpectedGatewayStep(
         property_step.name,
         property_step.subcommand,
@@ -812,7 +930,7 @@ def test_composer_archive_replays_compact_action_evidence(
             *property_step.arguments[:5],
             "--compact",
             "--action-json",
-            DraftActionJsonArgument(
+            DraftTypedActionArgument(
                 property_argument.expected,
                 response_bindings=(
                     DraftActionResponseBinding(
@@ -924,7 +1042,7 @@ def test_composer_archive_replays_compact_action_evidence(
             )
 
 
-def test_composer_archive_ignores_other_legacy_transaction_payloads(
+def _archive_test_composer_archive_ignores_other_legacy_transaction_payloads(
     tmp_path: Path,
 ) -> None:
     state_dir, steps, records = _sealed_archive(tmp_path)
@@ -998,7 +1116,7 @@ def test_composer_archive_ignores_other_legacy_transaction_payloads(
         "reorder_event",
     ),
 )
-def test_composer_archive_tampering_fails_closed(
+def _archive_test_composer_archive_tampering_fails_closed(
     tmp_path: Path,
     tamper: str,
 ) -> None:

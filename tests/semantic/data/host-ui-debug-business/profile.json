@@ -1,0 +1,19 @@
+{
+  "contract": "waapi-skill.host-ui-debug-business-profile/v1",
+  "profile_id": "host_ui_debug_business_1",
+  "model": {
+    "name": "gpt-5.6-terra",
+    "reasoning_effort": "medium",
+    "service_tier": "default",
+    "memory": "disabled"
+  },
+  "units": [
+    {
+      "unit_id": "HOST25-TONE-PREVIEW",
+      "operation": "ak.wwise.debug.generateToneWAV",
+      "version": "2025.1",
+      "prompt": "请为测试生成一段 WAV 的操作预览：输出到 {output_file}，正弦波 440 Hz，立体声，16-bit PCM、48 kHz，左右声道都生成波形；起音 0.05 秒、持续 1 秒、释音 0.1 秒，持续段为 -6 dB，并把声道标记为匿名。只生成预览，不执行。",
+      "final_markers": ["WAV", "预览"]
+    }
+  ]
+}

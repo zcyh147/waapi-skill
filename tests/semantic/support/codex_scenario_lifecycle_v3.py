@@ -316,6 +316,7 @@ class ScenarioLifecycle:
                 "WWISE_SANDBOX_ROOT": str(sandbox.sandbox_root),
                 "WWISE_WAAPI_HOST": lifecycle.host,
                 "WWISE_WAAPI_PORT": str(lifecycle.port),
+                "PYTHONDONTWRITEBYTECODE": "1",
             }
             self.runtime = ScenarioRuntime(
                 scenario_id=self.scenario_id,

@@ -4,6 +4,7 @@ import os
 import subprocess
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Mapping, Sequence
 
 import pytest
@@ -29,6 +30,135 @@ from tests.semantic.support.codex_eval_suite import EvalSession, load_eval_suite
 
 _SCREENING = load_eval_suite(matrix.DEFAULT_SUITE).expand_profile("screening")
 _C1 = next(session for session in _SCREENING if session.case.id == "C1")
+
+
+def test_typed_input_profile_uses_a_bounded_long_form_turn_budget(
+    tmp_path: Path,
+) -> None:
+    options = campaign.parse_args(
+        [
+            "--campaign-root",
+            str(tmp_path / "typed-input"),
+            "--profile",
+            matrix.TYPED_INPUT_PROFILE_ID,
+        ]
+    )
+
+    assert options.timeout_seconds == matrix.TYPED_INPUT_CODEX_TIMEOUT_SECONDS
+    assert options.timeout_seconds == 360.0
+    assert options.max_pre_action_retries == 0
+
+
+def test_campaign_readiness_timeout_is_explicit_positive_and_finite(
+    tmp_path: Path,
+) -> None:
+    explicit = campaign.parse_args(
+        [
+            "--campaign-root",
+            str(tmp_path / "campaign"),
+            "--wwise-readiness-timeout",
+            "180",
+        ]
+    )
+
+    assert explicit.wwise_readiness_timeout_seconds == 180.0
+    for invalid in ("0", "-1", "nan", "inf"):
+        with pytest.raises(SystemExit):
+            campaign.parse_args(
+                [
+                    "--campaign-root",
+                    str(tmp_path / invalid),
+                    "--wwise-readiness-timeout",
+                    invalid,
+                ]
+            )
+
+
+@pytest.mark.parametrize(
+    "semantic_tree_sha256",
+    [
+        "b152de8c55f8cb1085321da3ec877507627352acb10bed43e2ba7dbfae8b37df",
+        "5100e2c672d2461fe0ce96dba4b0cf1536a43d48e100ad2ac3fc5dbc0203efdb",
+    ],
+)
+def test_reviewed_audio_import_harness_selects_sfx_protocol_revision(
+    semantic_tree_sha256: str,
+) -> None:
+    effective = {
+        "selection": {"profile": matrix.AUDIO_IMPORT_BUSINESS_PROFILE_ID},
+        "harness": {"semantic_tree_sha256": semantic_tree_sha256},
+    }
+
+    assert campaign._sealed_protocol_manifest_revision(effective) == (
+        campaign.AUDIO_IMPORT_DERIVED_SFX_PROTOCOL_REVISION
+    )
+
+
+def test_audio_import_batch_archive_accepts_only_one_exact_sfx_per_row() -> None:
+    step = SimpleNamespace(
+        subcommand="draft-declare-import-batch",
+        allow_explicit_derived_sfx_language=True,
+    )
+    valid = (
+        "draft-declare-import-batch",
+        "od1-example",
+        "--field",
+        "rifle",
+        "language",
+        "SFX",
+        "--field",
+        "tail",
+        "language",
+        "SFX",
+    )
+
+    campaign._validate_audio_import_business_declaration_language(step, valid)
+    for invalid in (
+        (*valid, "--field", "rifle", "language", "SFX"),
+        (
+            "draft-declare-import-batch",
+            "od1-example",
+            "--field",
+            "rifle",
+            "language",
+            "English(US)",
+        ),
+    ):
+        with pytest.raises(CampaignEvidenceError, match="contradictory"):
+            campaign._validate_audio_import_business_declaration_language(
+                step,
+                invalid,
+            )
+
+
+def test_unreviewed_harness_does_not_select_protocol_revision() -> None:
+    effective = {
+        "selection": {"profile": matrix.AUDIO_IMPORT_BUSINESS_PROFILE_ID},
+        "harness": {"semantic_tree_sha256": "0" * 64},
+    }
+
+    with pytest.raises(
+        CampaignEvidenceError,
+        match="historical harness hash is unreviewed",
+    ):
+        campaign._sealed_protocol_manifest_revision(effective)
+
+
+def test_current_audio_import_effective_selects_sealed_protocol_revision() -> None:
+    effective = {
+        "selection": {"profile": matrix.AUDIO_IMPORT_BUSINESS_PROFILE_ID},
+        "harness": {
+            "semantic_tree_sha256": "0" * 64,
+            "protocol_manifest_revision": (
+                campaign._CURRENT_AUDIO_IMPORT_PROTOCOL_REVISION
+            ),
+        },
+    }
+
+    assert campaign._sealed_protocol_manifest_revision(effective) == (
+        campaign._CURRENT_AUDIO_IMPORT_PROTOCOL_REVISION
+    )
+
 
 
 def _options(
@@ -199,6 +329,11 @@ def _install_synthetic_execution(
     child_calls: list[list[str]] = []
 
     monkeypatch.setattr(campaign, "WORKSPACE_ROOT", options.campaign_root.parent)
+    monkeypatch.setattr(
+        campaign,
+        "require_skill_local_campaign_interpreter",
+        lambda _skill_source: Path(campaign.sys.executable),
+    )
     monkeypatch.setattr(
         campaign,
         "build_effective_config",
@@ -425,6 +560,7 @@ def test_ordinary_effective_config_records_shell_policy(
         required_units={_C1.pair_id: (_C1.phase,)},
     )
 
+    assert effective["live_config"]["readiness_timeout_seconds"] == 60.0
     assert effective["codex"]["allow_login_shell"] is False
     if os.name == "nt":
         assert effective["codex"]["windows_shell_backend"] == (
@@ -506,6 +642,11 @@ def test_candidate_drift_during_child_is_sealed_as_blocked(
     monkeypatch.setattr(campaign, "WORKSPACE_ROOT", options.campaign_root.parent)
     monkeypatch.setattr(
         campaign,
+        "require_skill_local_campaign_interpreter",
+        lambda _skill_source: Path(campaign.sys.executable),
+    )
+    monkeypatch.setattr(
+        campaign,
         "build_effective_config",
         lambda _options, *, sessions, required_units: effective,
     )
@@ -558,7 +699,10 @@ def test_invalid_pair_exits_two_before_creating_campaign_root(
 
 
 def test_build_child_argv_never_requests_overwrite(tmp_path: Path) -> None:
-    options = _options(tmp_path)
+    options = replace(
+        _options(tmp_path),
+        wwise_readiness_timeout_seconds=180.0,
+    )
     group = campaign.ChildGroup(
         group_id="offline",
         version=None,
@@ -575,6 +719,7 @@ def test_build_child_argv_never_requests_overwrite(tmp_path: Path) -> None:
     assert "--overwrite" not in argv
     assert argv.count("--pair-id") == 1
     assert argv[argv.index("--pair-id") + 1] == _C1.pair_id
+    assert argv[argv.index("--wwise-readiness-timeout") + 1] == "180.0"
 
 
 def test_windows_shell_seal_round_trips_into_matrix_child_argv(

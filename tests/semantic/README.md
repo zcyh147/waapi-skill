@@ -22,7 +22,12 @@ named test documents plus closed adapter and request-mapping registries:
 - `adapter_registry.json` lists every fixture, topic publisher, independent
   oracle, and cleanup identifier referenced by the cases. The registry remains
   specification-only for the full V3 catalog; only the 16 heavy APIs named
-  below currently have closed executable adapters.
+  below currently have closed executable adapters in that review bundle. The
+  fixed `typed_input_cross_version_25` component profile additionally owns its
+  two direct representative seams (`getInfo` and Core Lua). The #60
+  `deep_business_cross_version_19` release profile composes reviewed component
+  tasks but grants no new per-API credit; neither profile broadens the heavy
+  inventory.
 - `request_mapping_registry.json` records natural-language values and complex
   request shapes that the current packaged resources cannot yet map reliably.
   Any listed scenario is blocked from real execution until all of its entries
@@ -86,12 +91,12 @@ them in versioned Skill resources or closed builders after prompt approval;
 never place internal enum integers into the natural user prompt.
 
 The 2022.1 review selection contains 326 scenarios for 142 APIs. It consists of
-116 single-turn cases and 210 cases using the preview/confirm protocol.
-Seventeen cases need more than one separately previewed call, so the selection
-requires 230 confirmation turns: 326 fresh tasks and 556 total user turns. The
+120 single-turn cases and 206 cases using the preview/confirm protocol.
+Fifteen cases need more than one separately previewed call, so the selection
+requires 224 confirmation turns: 326 fresh tasks and 550 total user turns. The
 representative later-version increments add 74 / 27 / 17 tasks for 2023.1 /
 2024.1 / 2025.1. The complete reviewed selection is therefore 444 fresh tasks
-and 792 user turns. This is intentionally not advertised as a “few dozen” run.
+and 783 user turns. This is intentionally not advertised as a “few dozen” run.
 Each case has exactly one primary API; reducing the task count later would
 require separately reviewed composite prompts and oracles rather than silently
 sharing coverage credit.
@@ -227,6 +232,145 @@ three frozen roots, not one root or one Git candidate with a 6/6 result. Every
 recorded source hash/mtime stayed unchanged; PASS sandboxes were removed, FAIL
 sandboxes were sealed/quarantined, and scoped residual-process checks were
 empty.
+
+Switch-assignment route candidate
+`d45f75f5e75190d5b4e607a02aee2dcf38e73ab9` passed the one-unit
+`switch_assignment_business_1` profile in macOS root
+`imac-sab-d45f75f-r2` and native-Windows root
+`iwin-sab-d45f75f-r2`; both roots then passed identical
+`--resume --verify-only`. Each Agent issued the exact
+`switchContainer.addAssignment` route, bound only the three natural object
+paths, and reached the Gateway-owned immutable Preview in eight accepted
+commands without Wwise or project changes. The earlier roots
+`imac-sab-d05f1ec-r1` and `iwin-sab-d05f1ec-r1` are frozen FAILs without
+verify-only because the Agents invented operation aliases rejected by the
+Broker before Gateway dispatch. This is focused routing evidence, not public
+`integration` acceptance or real-host execution credit.
+After the entry Skill was compacted, exact packaged-Skill candidate
+`b544197fb6b7455814fbb2079043a5a354daca59` repeated the same PASS plus
+identical verify-only in macOS root `imac-sab-b544197-r1` and native-Windows
+root `iwin-sab-b544197-r1`. Both roots retained sealed attempt manifests,
+started no Wwise process, executed no mutation, removed their temporary launch
+resources, and ended with zero scoped residual processes.
+
+Final deepened candidate `c874917220cb7723d60f86a14cea72c5d15cca52`
+passed the same one-unit profile fresh plus identical verify-only in macOS root
+`imac-sab-c874917-r1` and native-Windows root `iwin-sab-c874917-r1`. The
+public schema supplied a complete copy-ready `draft-start`; each later response
+supplied exactly one ordered role continuation for `switch_container`, `child`,
+and `state_or_switch`. Both Agents reached one immutable Preview without
+starting Wwise or modifying a project. Windows Fresh and replay ran through
+temporary `InteractiveToken`/`Limited` Scheduled Tasks. Both hosts ended with
+zero scoped residual processes and Windows retained zero matching tasks. Mac
+diagnostic root `imac-sab-d10dc23-r1` stopped after a successful schema result
+without issuing `draft-start`; it remains frozen without verify-only and has no
+PASS credit.
+
+The final #93 public-integration boundary is exact candidate
+`3a31a05dd3636319cd228c648d462b5e1799fef6`. The 2022.1 and 2025.1 Footsteps
+units each passed fresh plus identical `--resume --verify-only` on both hosts:
+macOS roots `imac-int-footsteps-3a31a05-r20-int22` and
+`imac-int-footsteps-3a31a05-r21-int25`, and native-Windows roots
+`iwin-int-footsteps-3a31a05-r23-int22` and
+`iwin-int-footsteps-3a31a05-r22-int25`. This is cumulative 2/2 evidence per
+host, not a single two-unit root. Each workflow separately previewed and
+executed the Snow import/assignment mutation and the obsolete Mud-assignment
+removal, then passed the runner-owned business oracle. Every source full-tree
+hash and project mtime was unchanged, each PASS sandbox was removed, lifecycle
+errors were empty, temporary launch resources were deleted, and scoped
+residual-process checks were empty. Earlier diagnostic and repair roots remain
+frozen without PASS credit. Native-Windows r20 reached the correct Wwise
+business state but failed the exact continuation-copy contract and therefore
+was not replayed or counted.
+
+The production business-declaration `audio.import` cutover has a later,
+single-candidate Fresh Agent result. Exact packaged-Skill candidate
+`4be64fd80fb14d800a8890012f65fca666ab98f4` passed all eight
+`audio_import_business_8` units in macOS root
+`imac-aib-4be64fd-r17-full` and native-Windows root
+`iwin-aib-4be64fd-r17-full`; both roots then passed identical
+`--resume --verify-only`. The units are two paraphrases each of Weather,
+Rifle, Footsteps, and custom-field Weapons. Each used a fresh memory-off
+`gpt-5.6-terra` task with medium reasoning and the default service tier, ended
+at immutable Preview, and started no Wwise process. All ten sealed files per
+host matched their hashes, scoped process checks were empty, and temporary
+LaunchAgent or `InteractiveToken`/`Limited` Scheduled Task launchers were
+deleted. Earlier r15/r16 semantic failures remain frozen without verify-only.
+
+Real-Wwise proof followed through the shared closed-workflow node on exact Git
+candidate `6251481c1dcafb362a52f25602e6023635e581a8`; commits after
+`4be64fd` changed only tests and the real-test Adapter, not the packaged Skill
+tree, Fresh suite, or semantic harness. Wwise 2022.1 and 2025.1 each passed the
+node once on macOS and once on native Windows. The business Draft compiled the
+canonical `Sound SFX` import, produced one immutable Preview, executed once
+after confirmation, and verified imported identity, path, notes, and source
+evidence before the broader workflow completed. Every one of the four retained
+category-evidence rows records equal source hash and tree metadata before and
+after, deleted sandbox, cleaned lifecycle, and zero residual processes.
+Configured WwiseConsole hosts explicitly block Authoring-UI credit.
+
+The post-review exact-identity repair has a later final acceptance boundary.
+Packaged-Skill candidate `9a4de1624bc11d24fe38b2e740b5a92cca3d271e`
+with semantic harness `3ebbf5fab24feacc5d3bf5adf2eddb2c949057e4`
+passed all eight units in macOS root
+`imac-aib-9a4de16-h3ebbf5f-r21-full` and native-Windows root
+`iwin-aib-9a4de16-h3ebbf5f-r22-full`; both roots then passed identical
+`--resume --verify-only`. Windows priority root
+`iwin-aib-9a4de16-h3ebbf5f-r21-rifle-a` separately passed the formerly
+failing Rifle paraphrase. The harness accepts omission of compiler-derived
+SFX language or one explicit exact `language=SFX`; it still rejects another
+language, duplication, or contradiction. Earlier macOS r18 and Windows
+r18-r20 failure roots remain frozen without verify-only because they stopped
+before Preview on a local shell start miss, corrupted Broker authority, or the
+superseded omission-only semantic rule. All full-profile tasks were fresh,
+memory-off Terra tasks and started no Wwise process or mutation. Temporary
+LaunchAgent and `InteractiveToken`/`Limited` Scheduled Task launchers were
+deleted, and scoped process checks were empty.
+
+The same packaged Skill then passed the shared real-Wwise destructive node on
+Wwise 2022.1 and 2025.1 on both macOS and native Windows. macOS category rows
+seal candidate `9a4de16`; Windows rows seal harness-only Git candidate
+`3ebbf5f`. In every row the operation-specific business categories pass,
+source hash and tree metadata remain equal before and after, the sandbox is
+deleted, lifecycle cleanup completes, and residual processes are empty.
+Authoring UI remains explicitly blocked because all configured hosts are
+WwiseConsole. The final development gates passed the focused protocol and
+campaign archive nodes, Program `3583 passed / 2 skipped`, and Non-live
+`8627 passed / 107 skipped / 27 deselected`. New campaigns seal
+`audio-import-business-agent/current-v1` in the immutable effective config;
+only that marker selects current semantics. For historical roots, only the
+exact `audio_import_business_8` profile plus either reviewed macOS/Windows
+`3ebbf5f` semantic-tree hash selects the legacy
+`audio-import-derived-sfx-language/v1` migration; it reconstructs true rows
+from the sealed `audio.import` request witness. Full-reader tests cover both
+the older false case and the candidate-bound true case, preserving historical
+replay without broadening current Broker behavior. An unmarked unknown
+historical harness hash blocks instead of inheriting current semantics. The
+profile-specific Agent campaign validator also rebuilds the reviewed requests
+from the sealed suite
+and fixed runtime media, then independently checks Broker topology, derived-SFX
+declarations, and the final GUID-bound Preview request. Its end-to-end
+`validate_heavy_v3_child_run` regression proves the selected legacy revision
+is consumed and that an unknown revision or harness hash blocks the unit.
+
+The final #78 object-graph candidate
+`1eeabb9878f18c554bdbd70f940f805e31b70570` has one complete current-v3
+Weather Fresh Agent PASS per host. macOS root
+`imac-object-graph-1eeabb9-r6` and native-Windows root
+`iwin-object-graph-1eeabb9-r6` each passed the single
+`object_graph_business_1` unit and then passed an identical
+`--resume --verify-only` audit. Both fresh memory-off Terra tasks stopped at
+one immutable Preview, reconciled 8/8 Broker records, executed nothing, and
+passed the business-facts-only, no-bypass, Skill-integrity, and workspace
+gates. The macOS LaunchAgent ran exactly once with exit 0; Windows ran as the
+active desktop user through an `InteractiveToken` / `Limited` temporary task
+with result 0. Both launchers were deleted and independent scoped-process
+checks were empty. Earlier r1-r4 blocked, semantic-failure, or integrity roots
+remain frozen without promotion. Separately, the same Git candidate passed the
+Weather graph, plug-in, bulk-set, and RTPC destructive proof on Wwise 2022.1
+and 2025.1 on both hosts. Every category row records equal source hash and tree
+metadata before and after, deleted sandbox, cleaned lifecycle, and no residual
+process; configured WwiseConsole hosts grant no Authoring-UI credit.
 
 The legacy internal `integration_workflows_cross_version_6` component is
 defined by `tests/semantic/data/integration-workflows-v1/profile.json`. It
@@ -413,8 +557,17 @@ The separately approved V3 executable profiles are:
 | --- | ---: | ---: | --- |
 | `heavy_cross_version_80` | 80 | 145 | Real sandboxed business-oracle coverage for the 16 implemented heavy APIs |
 | `compound_heavy_cross_version_24` | 24 | 48 | Complex batch composition and real business assertions on Wwise 2022.1 and 2025.1 |
+| `typed_input_cross_version_25` | 25 | 39 | Fixed representative typed-input profile: five fresh tasks per Wwise version, no same-root retries, and one public Gateway continuation at each step |
+| `deep_business_cross_version_19` | 19 | 21 | #60 release profile: one reviewed packaged-Skill task for every migration family from #54/#56/#57 across all five versions; mixed proportional real-Wwise and production-Gateway Preview evidence |
 | `integration` | 12 | 36 | Six cross-operation workflows on Wwise 2022.1 and 2025.1; 20 previewed transactions and no additional per-API coverage credit |
 | `modification_policy_9` | 9 | 15 | Three isolated repetitions of each canonical project-modification policy on one reviewed object.create business case |
+| `switch_assignment_business_1` | 1 | 1 | Preview-only routing proof for one independent Switch assignment through three opaque business-object handles and Gateway-owned native materialization |
+| `core_business_1` | 1 | 1 | Preview-only routing proof that a zero-input Core mutation follows `request-schema` into one Gateway-owned Core business plan and immutable Preview |
+| `project_setting_business_1` | 1 | 1 | Preview-only routing proof that one natural Game Parameter range request becomes a bound object handle and Gateway-owned project-setting plan |
+| `runtime_control_business_1` | 1 | 1 | Preview-only routing proof that one natural Profiler capture request becomes a Gateway-owned runtime-control plan and exact native data-type request |
+| `debug_control_business_1` | 1 | 1 | Preview-only proof that one named Debug boolean outcome becomes a Gateway-owned host-control request without native acknowledgement or retry mechanics |
+| `soundengine_business_4` | 4 | 4 | Preview-only routing proof for monitor, game-object registration, Event action, and listener spatialization parameter closure |
+| `compound_undo_business_1` | 1 | 1 | Preview-only routing proof that two checked child business changes become one Gateway-compiled Undo Group and one immutable Preview |
 
 The two older six-task integration profile IDs remain internal compatibility
 entrypoints for their exact sealed roots. They are deliberately absent from the
@@ -437,14 +590,106 @@ profile also supports the bounded pilot selection shown below:
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile heavy_cross_version_80 --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-heavy-v3-terra
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile heavy_cross_version_80 --case-id OBJ22-F-GET-01 --version 2022.1 --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-heavy-v3-pilot-object-get
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile compound_heavy_cross_version_24 --suite tests/semantic/data/compound-heavy-v1/profile.json --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-compound-heavy-v1
+skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile typed_input_cross_version_25 --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-typed-input-new-candidate-r1
+skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile deep_business_cross_version_19 --model gpt-5.6-terra --reasoning-effort medium --service-tier default --max-pre-action-retries 0 --campaign-root skills/waapi-skill-workspace/campaign-deep-business-new-candidate-r1
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile integration --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-integration-new-candidate-r1
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile modification_policy_9 --campaign-root skills/waapi-skill-workspace/campaign-modification-policy-9
+skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile switch_assignment_business_1 --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-switch-assignment-business
+skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile core_business_1 --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-core-business
+skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile project_setting_business_1 --offline-only --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-project-setting-business
+skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile runtime_control_business_1 --offline-only --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-runtime-control-business
+skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile soundengine_business_4 --offline-only --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-soundengine-business
+skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile compound_undo_business_1 --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-compound-undo-business
 ```
 
 `modification_policy_9` is one closed nine-task campaign; its public campaign
 entrypoint rejects case and version filters. The matrix receives internal unit
 IDs only when the same sealed campaign resumes pending or proven-retryable
 work.
+
+`typed_input_cross_version_25` contains exactly five tasks for each supported
+Wwise version and covers zero, inline, Draft, generic, dedicated, query, Topic,
+metadata, file/code, and weak-verifier UX. It is fixed to Terra/medium/default,
+starts one memory-off Agent per task, and forbids same-root pre-action retries.
+Freeze ordinary semantic failures and repair them only in a new campaign root
+and candidate. A fully passing fresh root may receive identical
+`--resume --verify-only` replay; a failed root remains frozen without replay.
+
+After any full profile completes, separate reproducible product/suite/oracle
+defects from one-off Agent deviations before spending another full campaign.
+Repair reproducible causes and run proportional regressions. Queue one-off
+Agent deviations on an otherwise unchanged exact candidate, rerun only those
+units in fresh targeted roots, and replay only passing roots with identical
+`--resume --verify-only`. Report the result as same-candidate cumulative
+coverage, never as a single-root pass. A new full root is required only when a
+candidate, suite, harness, immutable option, or explicit release criterion has
+made the already completed units stale.
+
+`deep_business_cross_version_19` is the stricter #60 release contract. It
+composes reviewed component runners into one immutable campaign and contains
+exactly one task for every migration family owned by #54, #56, and #57. It
+covers all five supported versions and explicitly includes type/path
+construction, live metadata handles, ordering, batching, structured query
+repair, Preview reading, Topics, Authoring UI, SoundEngine, CLI/Console,
+runtime control, named Debug control, and compound Undo. Component tasks that
+only need routing evidence use the production Gateway with a closed fixture and
+start no Wwise process; the real query/Topic/SoundBank/Lua/media tasks retain
+their normal sandboxed Wwise lifecycle. Every task still starts a fresh
+memory-off Terra Agent and reads only the packaged Skill. The full profile
+forbids same-root retry and is the acceptance profile that must pass on one
+frozen candidate on both hosts before public `integration`.
+
+`switch_assignment_business_1` is a single 2022.1 preview-only routing probe.
+It starts no Wwise process and grants no real-host coverage credit. The Agent
+receives only the Switch Container, direct child, and Switch paths; the
+production Gateway must bind all three identities and own the exact GUID
+relationship, opposite precondition, native request, and immutable Preview.
+
+`core_business_1` is a single 2025.1 preview-only routing probe. It starts no
+Wwise process and grants no real-host coverage credit. The prompt contains only
+the save intent and no Gateway mechanics. The Agent must follow the raw Core
+URI's `request-schema` continuation, declare the complete zero-input Core plan,
+and stop at one immutable Preview without `typed-call`, `draft-apply`, or
+execution.
+
+`runtime_control_business_1` is a single 2025.1 preview-only Profiler routing
+probe. It starts no Wwise process and grants no real-host coverage credit. The
+Agent receives only the intent to enable Voices capture; Gateway owns the exact
+`voices` data-type token, enable flag, native array/request shape, Draft, and
+immutable Preview. The profile rejects typed/native bypass, execution, and any
+additional runtime-control declaration.
+
+`soundengine_business_4` contains four 2022.1 preview-only SoundEngine routing
+probes: monitor-log message, game-object registration, Event Stop/fade, and
+listener 5.1 spatialization. It starts no Wwise process and grants no real-host
+coverage credit. Prompts contain only closed business values plus, for the
+listener case, one fixture-owned opaque game-object handle. The Agent must
+select the SoundEngine seam, bind the Event when required, preserve exact user
+values, and stop at one immutable Preview per task. Gateway owns native IDs,
+reserved sentinels, action/fade enums, channel masks and offsets, Draft
+lifecycle, and result-schema boundaries.
+
+Historical exact candidate `2363c44a650c2d5133e832a8241c4e16c34f565b`
+passed the predecessor one-unit `soundengine_business_1` monitor profile fresh
+plus identical verify-only in macOS root `imac-soundengine-2363c44-r1` and
+native-Windows root `iwin-soundengine-2363c44-r1`. That evidence remains one
+monitor unit only and is not promoted to the four-unit closure profile.
+
+`project_setting_business_1` is a single 2025.1 preview-only routing probe. It
+starts no Wwise process and grants no real-host coverage credit. The prompt
+names one Game Parameter and the requested range and curve-update outcome, but
+contains no WAAPI URI, object GUID, or Gateway mechanics. The Agent must select
+the project-setting route, bind the exact object, declare the closed business
+values, and stop at one immutable Preview.
+
+`compound_undo_business_1` is a single 2022.1 preview-only routing probe. It
+starts no Wwise process and grants no real-host coverage credit. The Agent
+receives one object path, two requested business outcomes, and the user's Undo
+display name. It must produce two checked child Drafts and exactly one compound
+parent Preview; the Gateway owns each bound child request, the fixed native
+begin/business-sequence/end dependency plan, cancellation boundary, and the
+aggregate verification contract. Child Previews and model-authored native
+dependency edges are rejected by the Broker protocol.
 
 Resume with the same profile, filters, candidate, model, reasoning, service
 tier, timeout, and retry policy plus `--resume`. Use `--resume --verify-only` to
@@ -536,6 +781,10 @@ PowerShell Core. The Skill requires exact
 `Get-Content -Raw -Encoding UTF8 <path>` reads. Evidence parsing accepts that
 form only from the sealed PowerShell Core wrapper, normalizes line endings, and
 tolerates only the single terminal newline added to otherwise complete text.
+Before PowerShell attestation or Codex launch, the native harness also sets and
+reads back Console input and output code page 65001. This is distinct from
+PowerShell's `$OutputEncoding`: the latter does not prevent an attached CP936
+Console from corrupting Unicode Skill output.
 
 ## Live prerequisites and evidence
 
@@ -624,6 +873,20 @@ child must have deleted its sandbox; failed or retryable evidence must retain
 the real sandbox. Matrix-created Skill symlinks are verified against the frozen
 candidate and replaced with regular attestations before the attempt manifest is
 sealed. No campaign cleanup uses a global Wwise kill.
+
+The targeted `authoring_ui_business_2` profile is proportional Agent-interface
+evidence for #81, not a full Authoring API matrix. On macOS, frozen predecessor
+root `imac-aui-f157f15-r8` passed capture plus SaveProject and its identical
+verify-only audit; exact candidate `cba7507` then passed SaveProject and replay
+in `imac-aui-cba7507-r9-save`. On native Windows, predecessor root
+`iwin-aui-f157f15-r1` passed capture but froze a semantic SaveProject failure;
+exact candidate root `iwin-aui-cba7507-r2-save` passed SaveProject and replay
+through an attested `InteractiveToken` / `Limited` task. These roots establish
+cumulative proportional route evidence, not one current-candidate 2/2 root.
+The Windows task and independent process audit ended cleanly. Separate real
+Authoring evidence passed capture, execute, register, and unregister on Windows
+2022.1; macOS 2022.1/2025.1 Authoring readiness remained BLOCKED and receives
+no behavior credit.
 
 ## CI-safe focused checks
 

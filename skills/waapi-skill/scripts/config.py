@@ -1,10 +1,16 @@
 """Central script configuration for the Wwise WAAPI skill scaffold."""
 
+import hashlib
+import json
+import os
+import tempfile
 from pathlib import Path
 
 
 SKILL_DIR = Path(__file__).resolve().parent.parent
 VENV_DIR = SKILL_DIR / ".venv"
+ENVIRONMENT_READY_MARKER_NAME = ".waapi-skill-ready-v1"
+ENVIRONMENT_READY_CONTRACT = "waapi-skill.environment-ready/v1"
 DATA_DIR = SKILL_DIR / "data"
 LOGS_DIR = SKILL_DIR / "logs"
 FIXTURES_DIR = SKILL_DIR / "fixtures"
@@ -18,6 +24,62 @@ PACKAGED_SCRIPT_ALLOWLIST = frozenset({"gateway.py", "setup_environment.py"})
 
 class PackagedScriptError(ValueError):
     """Raised when a runner target is not one immutable packaged entry point."""
+
+
+def environment_ready_marker_contents(skill_dir: Path) -> str:
+    requirements = Path(skill_dir) / "requirements.txt"
+    requirements_digest = (
+        hashlib.sha256(requirements.read_bytes()).hexdigest()
+        if requirements.is_file()
+        else None
+    )
+    return json.dumps(
+        {
+            "contract": ENVIRONMENT_READY_CONTRACT,
+            "requirements_sha256": requirements_digest,
+        },
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ) + "\n"
+
+
+def environment_is_ready(venv_dir: Path, skill_dir: Path) -> bool:
+    marker = Path(venv_dir) / ENVIRONMENT_READY_MARKER_NAME
+    try:
+        return (
+            not marker.is_symlink()
+            and marker.is_file()
+            and marker.read_text(encoding="utf-8")
+            == environment_ready_marker_contents(skill_dir)
+        )
+    except (OSError, UnicodeError):
+        return False
+
+
+def write_environment_ready_marker(venv_dir: Path, skill_dir: Path) -> Path:
+    root = Path(venv_dir)
+    root.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{ENVIRONMENT_READY_MARKER_NAME}.",
+        suffix=".tmp",
+        dir=root,
+    )
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(environment_ready_marker_contents(skill_dir))
+            handle.flush()
+            os.fsync(handle.fileno())
+        marker = root / ENVIRONMENT_READY_MARKER_NAME
+        os.replace(temporary, marker)
+        return marker
+    except BaseException:
+        try:
+            temporary.unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise
 
 
 def resolve_packaged_script(skill_dir: Path, script_name: str) -> Path:

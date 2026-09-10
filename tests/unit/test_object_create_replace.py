@@ -259,10 +259,10 @@ def test_public_create_schema_exposes_merge_query_and_2025_type_alias() -> None:
         type_description
     )
     assert "object.create request token remains ActorMixer" in type_description
-    assert "operation-schema must be followed by one exact-path query-object" in (
+    assert "exact-path query-object returning id, name, type, and path before operation-schema" in (
         constraints
     )
-    assert "returning id, name, type, and path before preview" in constraints
+    assert "sole continuation remains uninterrupted" in constraints
     assert (
         "Wwise 2025.1 PropertyContainer readback maps to the ActorMixer request token"
         in constraints

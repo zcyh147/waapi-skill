@@ -16,6 +16,7 @@ try:  # pragma: no cover - import path differs between CLI and tests
         PackagedScriptError,
         SKILL_DIR,
         VENV_DIR,
+        environment_is_ready,
         resolve_packaged_script,
     )
 except ImportError:  # pragma: no cover
@@ -23,6 +24,7 @@ except ImportError:  # pragma: no cover
         PackagedScriptError,
         SKILL_DIR,
         VENV_DIR,
+        environment_is_ready,
         resolve_packaged_script,
     )
 
@@ -102,10 +104,22 @@ def venv_python() -> Path:
 
 
 def bootstrap_if_needed() -> None:
-    if VENV_DIR.exists():
+    if environment_is_ready(VENV_DIR, SKILL_DIR):
         return
     setup_script = resolve_packaged_script(SKILL_DIR, "setup_environment.py")
-    subprocess.run([sys.executable, str(setup_script)], check=True)
+    # The launched Gateway owns stdout as one machine-readable JSON document.
+    # A first-run environment bootstrap may invoke pip and print the venv path;
+    # keep all of that progress visible on stderr so it cannot prefix the
+    # Gateway payload and break callers that parse stdout directly.
+    subprocess.run(
+        [sys.executable, str(setup_script)],
+        check=True,
+        stdout=sys.stderr,
+    )
+    if not environment_is_ready(VENV_DIR, SKILL_DIR):
+        raise PackagedScriptError(
+            "Skill-local environment setup returned without a complete readiness marker."
+        )
 
 
 def _wait_for_interrupted_child(

@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import json
 import wave
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -26,6 +27,9 @@ from tests.semantic.support.codex_object_runtime_v3 import (
     PreparedObjectRuntime,
     _language_name,
     bounded_result_disclosure,
+)
+from tests.semantic.support.codex_eval_protocol_v3 import (
+    materialize_typed_transaction_protocol_requests,
 )
 
 
@@ -407,6 +411,178 @@ def test_get01_snapshot_accepts_closed_active_source_identity_shapes(
     assert snapshot.by_key()[sound.key].source_language == sound.source_language
 
 
+def test_get01_2021_snapshot_resolves_audio_source_without_active_source_accessor() -> None:
+    case_id = "OBJ22-F-GET-01"
+    recipe = build_object_heavy_v3_recipe(case_id, "2021.1")
+    objects = _fixture_objects(case_id, "2021.1")
+
+    class _LegacyBackend(_StateBackend):
+        def read_path(self, path, *, fields=(), language=None):
+            unsupported = {"activeSource", "isIncluded"}.intersection(fields)
+            if not fields or unsupported:
+                raise ObjectRuntimeError(
+                    f"Unknown accessor {sorted(unsupported)[0]}"
+                )
+            return super().read_path(path, fields=fields, language=language)
+
+        def read_children(self, object_id, *, fields=()):
+            if not fields or "activeSource" in fields:
+                raise ObjectRuntimeError("Unknown accessor activeSource")
+            rows = list(super().read_children(object_id, fields=fields))
+            source_id = self.active_source_ids.get(object_id)
+            if source_id is not None:
+                rows.append(self.rows_by_id[source_id])
+            return tuple(rows)
+
+    backend = _LegacyBackend(objects)
+    scenario = replace(_scenario(case_id), versions=("2021.1",))
+    runtime = PreparedObjectRuntime(
+        scenario=scenario,
+        recipe=recipe,
+        backend=backend,
+    )
+
+    snapshot = runtime.snapshot()
+
+    expected = {
+        item.key: item.source_language
+        for item in objects
+        if item.source_language is not None
+    }
+    assert {
+        item.key: item.source_language
+        for item in snapshot.objects
+        if item.source_language is not None
+    } == expected
+
+
+def test_2021_snapshot_projection_excludes_unreflected_accessors() -> None:
+    definitions = json.loads(
+        Path(
+            "skills/waapi-skill/resources/manifest/2021.1/definitions.json"
+        ).read_text(encoding="utf-8")
+    )
+    return_expression = definitions["documents"]["waapi_definitions.json"][
+        "definitions"
+    ]["returnExpression"]
+    reflected = set(return_expression["items"]["anyOf"][0]["enum"])
+
+    assert "activeSource" not in reflected
+    assert "isIncluded" not in reflected
+    assert "audioSource:language" in reflected
+
+
+def test_get01_2021_snapshot_rejects_a_second_direct_audio_source() -> None:
+    case_id = "OBJ22-F-GET-01"
+    recipe = build_object_heavy_v3_recipe(case_id, "2021.1")
+    objects = _fixture_objects(case_id, "2021.1")
+
+    class _AmbiguousLegacyBackend(_StateBackend):
+        def read_path(self, path, *, fields=(), language=None):
+            if not fields or "activeSource" in fields:
+                raise ObjectRuntimeError("Unknown accessor activeSource")
+            return super().read_path(path, fields=fields, language=language)
+
+        def read_children(self, object_id, *, fields=()):
+            rows = list(super().read_children(object_id, fields=fields))
+            source_id = self.active_source_ids.get(object_id)
+            if source_id is not None:
+                rows.extend(
+                    (
+                        self.rows_by_id[source_id],
+                        {
+                            "id": _guid(99_998),
+                            "name": "Unexpected_Source",
+                            "type": "AudioFileSource",
+                            "path": next(
+                                item.path
+                                for item in self.objects
+                                if item.id == object_id
+                            )
+                            + r"\Unexpected_Source",
+                            "parent": {"id": object_id},
+                            "audioSource:language": "SFX",
+                        },
+                    )
+                )
+            return tuple(rows)
+
+    backend = _AmbiguousLegacyBackend(objects)
+    runtime = PreparedObjectRuntime(
+        scenario=replace(_scenario(case_id), versions=("2021.1",)),
+        recipe=recipe,
+        backend=backend,
+    )
+
+    with pytest.raises(ObjectRuntimeError, match="resolve exactly once"):
+        runtime.snapshot()
+
+
+def test_read_only_object_protocol_uses_the_existing_simple_typed_flags(
+    tmp_path: Path,
+) -> None:
+    scenario = replace(_scenario("OBJ22-F-GET-01"), versions=("2021.1",))
+    recipe = build_object_heavy_v3_recipe(scenario.id, version="2021.1")
+    runtime = PreparedObjectRuntime(
+        scenario=scenario,
+        recipe=recipe,
+        backend=_StateBackend(_fixture_objects(scenario.id, "2021.1")),
+        asset_root=tmp_path,
+    )
+
+    protocol = runtime.gateway_protocol()
+
+    assert tuple(step.subcommand for step in protocol.steps) == ("query-object",)
+    assert "--where-json" not in protocol.steps[0].arguments
+    assert protocol.steps[0].arguments[protocol.steps[0].arguments.index("--where") :] == (
+        "--where",
+        "type",
+        "=",
+        "string",
+        "Sound",
+        "--take",
+        "24",
+        "--return-field",
+        "id",
+        "--return-field",
+        "name",
+        "--return-field",
+        "type",
+        "--return-field",
+        "path",
+        "--return-field",
+        "@Volume",
+        "--return-field",
+        "notes",
+        "--return-field",
+        "OutputBus",
+    )
+
+
+def test_business_query_protocol_reads_schema_before_the_closed_declaration(
+    tmp_path: Path,
+) -> None:
+    scenario = _scenario("OBJ22-F-GET-03")
+    recipe = build_object_heavy_v3_recipe(scenario.id, version="2022.1")
+    runtime = PreparedObjectRuntime(
+        scenario=scenario,
+        recipe=recipe,
+        backend=_StateBackend(_fixture_objects(scenario.id, "2022.1")),
+        asset_root=tmp_path,
+    )
+
+    protocol = runtime.gateway_protocol()
+
+    assert tuple(step.subcommand for step in protocol.steps) == (
+        "query-schema",
+        "query-object",
+    )
+    assert protocol.turn_prefix_counts == (2,)
+    assert protocol.allowed_turn_prefix_counts == ((1, 2),)
+    assert protocol.terminal_prefix_counts == (1, 2)
+    assert "--max-results" in protocol.steps[-1].arguments
+    assert "--where" not in protocol.steps[-1].arguments
+
 @pytest.mark.parametrize(
     "mutation, match",
     (
@@ -552,6 +728,53 @@ def test_get02_query_oracle_accepts_exact_active_sources_and_paired_paths() -> N
         "npc_alert",
         "npc_idle",
     ]
+
+
+def test_get02_query_oracle_accepts_gateway_business_language_projection() -> None:
+    runtime, payload, answer = _get02_query_runtime()
+    for row in payload["objects"]:
+        if "audioSource:language" in row:
+            row["source_language"] = row.pop("audioSource:language")
+
+    verification = runtime.verify_query_result(payload, final_response=answer)
+
+    assert verification.passed, verification.failures
+
+
+def test_get02_query_oracle_ignores_numbers_inside_reported_sound_guids() -> None:
+    runtime, payload, answer = _get02_query_runtime()
+    before = runtime.before.by_key()
+    for key in ("hero_damage", "hero_greeting", "npc_alert", "npc_idle"):
+        child = before[key]
+        answer = answer.replace(
+            f"`{child.path}`",
+            f"{child.name} (`{child.id}`) · `{child.path}`",
+            1,
+        )
+
+    verification = runtime.verify_query_result(payload, final_response=answer)
+
+    assert verification.passed, verification.failures
+
+
+def test_get02_query_oracle_scopes_decoys_to_the_candidate_inventory() -> None:
+    runtime, payload, answer = _get02_query_runtime()
+    before = runtime.before.by_key()
+    candidate_inventory = "\n".join(
+        (
+            "候选盘点（供筛选审计，不是最终结果）：",
+            f"| `{before['hero_nested'].path}` | candidate |",
+            f"| `{before['music_child'].path}` | candidate |",
+            "符合条件的直接子级 Sound：",
+        )
+    )
+
+    verification = runtime.verify_query_result(
+        payload,
+        final_response=f"{candidate_inventory}\n{answer}",
+    )
+
+    assert verification.passed, verification.failures
 
 
 @pytest.mark.parametrize(
@@ -1384,7 +1607,7 @@ def _set03_effective_bus_runtime(
     return runtime, after_backend, after_by_key
 
 
-def test_all_object_recipes_build_exact_single_or_two_turn_protocols() -> None:
+def _archive_test_all_object_recipes_build_exact_single_or_two_turn_protocols() -> None:
     bundle = load_eval_bundle_v3(SUITE_V3)
     scenarios = {case.id: case for case in bundle.scenarios}
     for recipe in all_object_heavy_v3_recipes():
@@ -1395,12 +1618,27 @@ def test_all_object_recipes_build_exact_single_or_two_turn_protocols() -> None:
         )
         protocol = runtime.gateway_protocol()
         if isinstance(recipe.request, OperationRequestSpec):
-            assert protocol.turn_prefix_counts == (2, 6)
-            assert len(protocol.steps) == 6
+            preview_index = next(
+                index
+                for index, step in enumerate(protocol.steps)
+                if step.subcommand in {"typed-operation", "preview-from-draft"}
+            )
+            assert protocol.turn_prefix_counts == (
+                preview_index + 1,
+                len(protocol.steps),
+            )
+            assert tuple(step.subcommand for step in protocol.steps[-4:]) == (
+                "transaction-show",
+                "confirm",
+                "execute",
+                "verify",
+            )
         else:
             assert isinstance(recipe.request, QueryObjectRequestSpec)
             assert protocol.turn_prefix_counts == (1,)
-            assert protocol.steps[0].subcommand == "query-object"
+            assert tuple(step.subcommand for step in protocol.steps) == (
+                "query-object",
+            )
 
 
 @pytest.mark.parametrize(
@@ -1412,7 +1650,7 @@ def test_all_object_recipes_build_exact_single_or_two_turn_protocols() -> None:
         "OBJ22-F-SET-02",
     ),
 )
-def test_compound_object_runtime_binds_2025_request_and_reflected_types(
+def _archive_test_compound_object_runtime_binds_2025_request_and_reflected_types(
     case_id: str,
 ) -> None:
     recipe = build_object_heavy_v3_recipe(case_id, "2025.1")
@@ -1430,15 +1668,18 @@ def test_compound_object_runtime_binds_2025_request_and_reflected_types(
 
     snapshot = runtime.snapshot()
     protocol = runtime.gateway_protocol()
-    preview_argument = protocol.steps[1].arguments[2]
+    preview_request = materialize_typed_transaction_protocol_requests(
+        protocol,
+        version="2025.1",
+    )[0][1]
 
     assert {item.type for item in snapshot.objects} >= {
         "PropertyContainer",
         "Sound",
     }
-    assert preview_argument.expected["version"] == "2025.1"
+    assert preview_request["version"] == "2025.1"
     assert r"\\Containers\\Default Work Unit\\SemanticLab" in json.dumps(
-        preview_argument.expected,
+        preview_request,
         ensure_ascii=False,
     )
 

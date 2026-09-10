@@ -8,6 +8,7 @@ import uuid
 from dataclasses import replace
 from pathlib import Path, PureWindowsPath
 from types import SimpleNamespace
+from typing import Mapping
 
 import pytest
 
@@ -21,6 +22,13 @@ from tests.semantic.support.codex_audio_media_business_plan_v3 import (
     validate_media_pool_business_plan,
 )
 from tests.semantic.support.codex_eval_bundle_v3 import load_eval_bundle_v3
+from tests.semantic.support.codex_eval_protocol_v3 import (
+    media_pool_business_call_step,
+)
+from tests.semantic.support.codex_media_pool_business_oracle_v3 import (
+    MediaPoolBusinessOracleView,
+    verify_media_pool_business_projection,
+)
 from tests.semantic.support.codex_media_pool_runtime_v3 import (
     CUSTOM_DATABASE_CLEANUP_CONTRACT,
     MEDIA_POOL_CASE_IDS,
@@ -53,7 +61,6 @@ from tests.semantic.support.codex_media_pool_runtime_v3 import (
     custom_database_round_trip_evidence,
     expected_macos_wine_prefix,
     fingerprint_tree,
-    get_fields_gateway_argv,
     host_directory_to_wine_z_path,
     materialize_media_pool_case,
     media_pool_preflight,
@@ -75,6 +82,14 @@ from tests.semantic.support.codex_media_pool_runtime_v3 import (
     _parse_native_windows_absolute_path,
     _typed_audio_import_path,
 )
+
+
+def _plain(value):
+    if isinstance(value, Mapping):
+        return {str(key): _plain(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_plain(item) for item in value]
+    return value
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -131,21 +146,28 @@ def _public_request(tmp_path: Path, index: int, *, ixml: bool = False):
         case,
         bind_media_pool_fields(case, _fields(ixml=ixml)),
     )
-    argv = request.gateway_argv()
-    post_filter = json.loads(argv[7]) if len(argv) == 8 else None
-    return scenario, json.loads(argv[3]), json.loads(argv[5]), post_filter
+    return (
+        scenario,
+        _plain(request.args),
+        _plain(request.options),
+        (
+            None
+            if request.post_filter is None
+            else _plain(request.post_filter)
+        ),
+    )
 
 
 def _assert_public_media_mapping_is_documented() -> None:
     text = " ".join(QUERY_REFERENCE.read_text(encoding="utf-8").split())
     for required in (
-        "Do not run `describe` or `capabilities`",
+        "Use `request-schema` for each URI and follow only its typed continuation",
         '`{"type":"field","field":<bound field>,"operator":<operator>,"value":<value>}`',
         "Preserve database and predicate order",
-        "add `--post-filter-json`",
+        "use the `result_filter` fields disclosed by `request-schema`",
         "Between/from A to B",
         "Path`, `FileId`, `Db`, `Filename`, `WAV/Duration`, `WAV/Sample Rate`, `WAV/Bit Depth`, `WAV/Channels",
-        "query-object --type AudioFileSource --take 1000",
+        "never run the old unfiltered 1000-row AudioFileSource projection",
     ):
         assert required in text
 
@@ -480,7 +502,7 @@ def test_getfields_binding_is_exact_case_and_fails_closed_for_ixml(
         "BWFXML/USER/SCENE",
         "BWFXML/USER/TAKE",
     )
-    assert "{media_pool_fields." not in " ".join(request.gateway_argv())
+    assert "{media_pool_fields." not in repr((request.args, request.options))
 
     with pytest.raises(MediaPoolRuntimeError, match="not unique"):
         bind_media_pool_fields(
@@ -502,14 +524,6 @@ def test_case_01_public_prompt_reaches_exact_short_footstep_request(
     assert all(
         token in scenario.prompt
         for token in (r"\Databases\Project Originals", "小写 `footstep`", "0.8", "20")
-    )
-    assert get_fields_gateway_argv() == (
-        "call",
-        "ak.wwise.core.mediaPool.getFields",
-        "--args-json",
-        "{}",
-        "--options-json",
-        "{}",
     )
     assert args == {
         "databases": [r"\Databases\Project Originals"],
@@ -566,6 +580,263 @@ def test_case_01_seals_complete_raw_candidates_and_exact_business_result(
     ]
     missing_candidate = _result_for_keys(oracle, oracle.candidate_keys[:-1])
     assert not verify_media_pool_candidate_result(oracle, missing_candidate).ok
+
+
+def _case01_gateway_business_request(*, max_results: int, exact_name: bool) -> dict:
+    return {
+        "operation": "ak.wwise.core.mediaPool.get",
+        "database_scopes": [r"\Databases\Project Originals"],
+        "database_ids": [],
+        "search_text": None,
+        "filter_count": 2,
+        "max_results": max_results,
+        "return_field_meanings": [],
+        "exact_name_contains": "footstep" if exact_name else None,
+        "final_limit": 20 if exact_name else None,
+        "sort_rules": [
+            {"field_meaning": "duration", "direction": "ascending"},
+            {"field_meaning": "path", "direction": "ascending"},
+        ],
+    }
+
+
+def _case01_gateway_business_result(
+    oracle,
+    *,
+    keys: tuple[str, ...],
+    candidate_limit: int,
+    complete: bool,
+) -> dict:
+    items = []
+    for key in keys:
+        row = oracle.row(key)
+        items.append(
+            {
+                "database_id": row.db["id"].upper(),
+                "database_name": row.db["name"],
+                "file_id": row.file_id.upper(),
+                "path": row.path,
+                "values": {
+                    "duration": row.values["WAV/Duration"],
+                    "path": row.path,
+                },
+            }
+        )
+    return {
+        "contract": "waapi-skill.media-build-result/v1",
+        "kind": "media_pool_rows",
+        "complete": complete,
+        "candidate_count": len(oracle.candidate_keys),
+        "returned_count": len(items),
+        "candidate_limit": candidate_limit,
+        "incomplete_reason": (
+            None
+            if complete
+            else "candidate_limit_reached_before_exact_case_post_filter"
+        ),
+        "items": items,
+    }
+
+
+def _case01_business_step(oracle):
+    return media_pool_business_call_step(
+        "media.get",
+        scenario_id=oracle.scenario_id,
+        args=oracle.request.args,
+        options=oracle.request.options,
+        post_filter=oracle.request.post_filter,
+    )
+
+
+def test_case_01_verifies_the_closed_gateway_business_projection(
+    tmp_path: Path,
+) -> None:
+    _runtime, _staged, oracle = _sealed_case01(tmp_path)
+    result = _case01_gateway_business_result(
+        oracle,
+        keys=oracle.semantic_answer.ordered_keys,
+        candidate_limit=200,
+        complete=True,
+    )
+
+    assert verify_media_pool_business_projection(
+        oracle,
+        _case01_business_step(oracle),
+        result,
+        _case01_gateway_business_request(max_results=200, exact_name=True),
+    ).ok
+    tampered = json.loads(json.dumps(result))
+    tampered["items"][0]["values"]["duration"] = 99
+    assert not verify_media_pool_business_projection(
+        oracle,
+        _case01_business_step(oracle),
+        tampered,
+        _case01_gateway_business_request(max_results=200, exact_name=True),
+    ).ok
+    omitted_sort = _case01_gateway_business_request(
+        max_results=200,
+        exact_name=True,
+    )
+    omitted_sort["sort_rules"] = []
+    assert not verify_media_pool_business_projection(
+        oracle,
+        _case01_business_step(oracle),
+        result,
+        omitted_sort,
+    ).ok
+    for field, value in (("complete", 1), ("candidate_count", 3.0)):
+        malformed = json.loads(json.dumps(result))
+        malformed[field] = value
+        assert not verify_media_pool_business_projection(
+            oracle,
+            _case01_business_step(oracle),
+            malformed,
+            _case01_gateway_business_request(max_results=200, exact_name=True),
+        ).ok
+    boolean_duration = json.loads(json.dumps(result))
+    boolean_duration["items"][0]["values"]["duration"] = True
+    assert not verify_media_pool_business_projection(
+        oracle,
+        _case01_business_step(oracle),
+        boolean_duration,
+        _case01_gateway_business_request(max_results=200, exact_name=True),
+    ).ok
+
+
+def test_case_01_accepts_explicit_fixed_report_fields_as_projection_only(
+    tmp_path: Path,
+) -> None:
+    """Extra fixed report fields must not change candidate-selection semantics."""
+
+    _runtime, _staged, oracle = _sealed_case01(tmp_path)
+    items = []
+    for key in oracle.semantic_answer.ordered_keys:
+        row = oracle.row(key)
+        items.append(
+            {
+                "database_id": row.db["id"].upper(),
+                "database_name": row.db["name"],
+                "file_id": row.file_id.upper(),
+                "path": row.path,
+                "values": {
+                    "filename": row.values["Filename"],
+                    "wav_duration": row.values["WAV/Duration"],
+                    "path": row.path,
+                },
+            }
+        )
+    result = {
+        "contract": "waapi-skill.media-build-result/v1",
+        "kind": "media_pool_rows",
+        "complete": True,
+        "candidate_count": len(oracle.candidate_keys),
+        "returned_count": len(items),
+        "candidate_limit": 200,
+        "incomplete_reason": None,
+        "items": items,
+    }
+    request = _case01_gateway_business_request(max_results=200, exact_name=True)
+    request["return_field_meanings"] = ["Filename", "WAV/Duration"]
+    request["sort_rules"] = [
+        {"field_meaning": "WAV/Duration", "direction": "ascending"},
+        {"field_meaning": "Path", "direction": "ascending"},
+    ]
+
+    assert verify_media_pool_business_projection(
+        oracle,
+        _case01_business_step(oracle),
+        result,
+        request,
+    ).ok
+
+
+def test_case_01_archive_builds_an_explicit_business_oracle_view(
+    tmp_path: Path,
+) -> None:
+    _runtime, _staged, oracle = _sealed_case01(tmp_path)
+    archived = campaign._heavy_v3_plan_json_value(oracle)
+
+    view = MediaPoolBusinessOracleView.from_archive(
+        archived,
+        scenario_id=oracle.scenario_id,
+    )
+
+    assert view.candidate_keys == oracle.candidate_keys
+    assert view.exact_field("duration") == "WAV/Duration"
+    assert view.row("footstep_gravel_short").file_id == oracle.row(
+        "footstep_gravel_short"
+    ).file_id
+    malformed = json.loads(json.dumps(archived))
+    malformed["rows"][0]["values"] = []
+    with pytest.raises(ValueError, match="archived Media Pool row"):
+        MediaPoolBusinessOracleView.from_archive(
+            malformed,
+            scenario_id=oracle.scenario_id,
+        )
+
+
+def test_gateway_business_projection_at_limit_is_incomplete_with_exact_name(
+    tmp_path: Path,
+) -> None:
+    _runtime, _staged, oracle = _sealed_case01(tmp_path)
+    request = replace(
+        oracle.request,
+        args={**oracle.request.args, "maxResults": len(oracle.candidate_keys)},
+    )
+    limited = replace(oracle, request=request)
+    result = _case01_gateway_business_result(
+        limited,
+        keys=(),
+        candidate_limit=len(limited.candidate_keys),
+        complete=False,
+    )
+
+    assert verify_media_pool_business_projection(
+        limited,
+        _case01_business_step(limited),
+        result,
+        _case01_gateway_business_request(
+            max_results=len(limited.candidate_keys),
+            exact_name=True,
+        ),
+    ).ok
+
+
+def test_gateway_business_projection_at_limit_is_complete_without_exact_name(
+    tmp_path: Path,
+) -> None:
+    _runtime, _staged, oracle = _sealed_case01(tmp_path)
+    request = replace(
+        oracle.request,
+        args={**oracle.request.args, "maxResults": len(oracle.candidate_keys)},
+        post_filter=None,
+    )
+    unfiltered = replace(oracle, request=request)
+    ordered_keys = tuple(
+        sorted(
+            unfiltered.candidate_keys,
+            key=lambda key: (
+                unfiltered.row(key).values["WAV/Duration"],
+                unfiltered.row(key).path.casefold(),
+            ),
+        )
+    )
+    result = _case01_gateway_business_result(
+        unfiltered,
+        keys=ordered_keys,
+        candidate_limit=len(unfiltered.candidate_keys),
+        complete=True,
+    )
+
+    assert verify_media_pool_business_projection(
+        unfiltered,
+        _case01_business_step(unfiltered),
+        result,
+        _case01_gateway_business_request(
+            max_results=len(unfiltered.candidate_keys),
+            exact_name=False,
+        ),
+    ).ok
 
 
 def test_case_02_public_prompt_reaches_exact_voice_format_request(
@@ -1075,7 +1346,7 @@ def test_bound_probe_index_and_business_oracle_are_exact(tmp_path: Path) -> None
         ordered_keys=tuple(reversed(oracle.semantic_answer.ordered_keys)),
     ).ok
 
-    narrowed_args = json.loads(request.gateway_argv()[3])
+    narrowed_args = _plain(request.args)
     narrowed_args["filters"][-1]["value"] = 1.5
     narrowed = BoundMediaPoolRequest(
         scenario_id=request.scenario_id,

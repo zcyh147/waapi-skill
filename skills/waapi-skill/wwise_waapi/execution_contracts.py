@@ -27,7 +27,16 @@ from .authorization import (
     DEFAULT_TRANSACTION_AUTHORIZATION_MODES,
     accepted_authorization_modes_for_uri,
 )
+from .core_business_contracts import (
+    core_business_operations,
+    core_business_read_operations,
+)
 from .manifest import ManifestStore
+from .media_build_business_contracts import media_build_business_operations
+from .runtime_inspection_business_contracts import (
+    runtime_inspection_business_operations,
+    runtime_inspection_business_read_operations,
+)
 from .versions import SUPPORTED_WWISE_VERSION_KEYS
 
 
@@ -172,20 +181,18 @@ FIXED_COMMANDS_BY_URI: Mapping[str, tuple[str, ...]] = MappingProxyType(
             "project-default-work-units",
         ),
         "ak.wwise.core.object.get": ("query-object", "buses"),
-        "ak.wwise.core.object.getAttenuationCurve": ("metadata attenuation-curve",),
+        "ak.wwise.core.object.getAttenuationCurve": ("metadata attenuation",),
         "ak.wwise.core.object.getPropertyAndReferenceNames": (
-            "metadata names",
             "metadata discover",
         ),
         "ak.wwise.core.object.getPropertyInfo": (
-            "metadata property-info",
             "metadata discover",
         ),
         "ak.wwise.core.object.getTypes": (
             "metadata types",
             "metadata discover",
         ),
-        "ak.wwise.core.object.isPropertyEnabled": ("metadata property-enabled",),
+        "ak.wwise.core.object.isPropertyEnabled": ("metadata property-state",),
         "ak.wwise.core.profiler.getGameObjects": (
             "profiler-game-objects",
         ),
@@ -193,7 +200,9 @@ FIXED_COMMANDS_BY_URI: Mapping[str, tuple[str, ...]] = MappingProxyType(
             "profiler-voice-contributions",
         ),
         "ak.wwise.debug.getWalTree": ("debug-wal-tree",),
-        "ak.wwise.debug.validateCall": ("debug-validate-call",),
+        "ak.wwise.debug.validateCall": (
+            "debug-validate-call",
+        ),
         "ak.wwise.ui.getSelectedObjects": ("selected",),
     }
 )
@@ -210,16 +219,13 @@ TOPIC_TIMEOUT_OVERRIDES: Mapping[str, float] = MappingProxyType(
 )
 
 
-# These functions have a small, side-effect-free request/result contract and
-# may use ``gateway call`` directly. Broader reads intentionally use a reviewed
-# transaction so the operator sees and confirms their exact payload first.
+# These functions have a small, side-effect-free request/result contract. The
+# Core business reads add their closed identity seam to the same bounded lane;
+# broader reads intentionally use a reviewed transaction.
 BOUNDED_DIRECT_CALL_URIS = frozenset(
     {
         "ak.soundengine.getState",
         "ak.soundengine.getSwitch",
-        "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
-        "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion",
-        "ak.wwise.core.mediaPool.get",
         "ak.wwise.core.mediaPool.getFields",
         "ak.wwise.core.object.diff",
         "ak.wwise.core.object.isLinked",
@@ -232,6 +238,10 @@ BOUNDED_DIRECT_CALL_URIS = frozenset(
         "ak.wwise.waapi.getSchema",
         "ak.wwise.waapi.getTopics",
     }
+) | (
+    core_business_read_operations()
+    | media_build_business_operations()
+    | runtime_inspection_business_read_operations()
 )
 
 
@@ -291,10 +301,18 @@ POST_EXECUTION_PROJECT_GUARD_POLICIES = frozenset(
 )
 CONTEXT_RUNTIME_ONLY_POST_EXECUTION_URIS = frozenset(
     {
+        "ak.wwise.cli.addNewPlatform",
         "ak.wwise.cli.convertExternalSource",
+        "ak.wwise.cli.createNewProject",
+        "ak.wwise.cli.dumpObjects",
         "ak.wwise.cli.generateSoundbank",
         "ak.wwise.cli.migrate",
+        "ak.wwise.cli.moveMediaIdsToSingleFile",
+        "ak.wwise.cli.moveMediaIdsToWorkUnits",
         "ak.wwise.cli.tabDelimitedImport",
+        "ak.wwise.cli.updateMediaIdsInSingleFile",
+        "ak.wwise.cli.verify",
+        "ak.wwise.cli.waapiServer",
     }
 )
 POST_EXECUTION_PROJECT_GUARD_POLICY_BY_URI: Mapping[str, str] = MappingProxyType(
@@ -313,6 +331,7 @@ POST_EXECUTION_PROJECT_GUARD_POLICY_BY_URI: Mapping[str, str] = MappingProxyType
 MANAGED_SESSION_PREFIXES = (
     "ak.soundengine.",
     "ak.wwise.debug.",
+    "ak.wwise.core.log.",
     "ak.wwise.core.profiler.",
     "ak.wwise.core.remote.",
     "ak.wwise.core.transport.",
@@ -658,13 +677,23 @@ class ExecutionContractRegistry:
                 program_case="fixed-command-dispatch",
             )
         if uri in BOUNDED_DIRECT_CALL_URIS:
+            if uri == "ak.wwise.waapi.getSchema":
+                gateway_commands = ("request-schema", "waapi-schema")
+            elif uri in (
+                core_business_operations()
+                | media_build_business_operations()
+                | runtime_inspection_business_operations()
+            ):
+                gateway_commands = ("request-schema", "core-call")
+            else:
+                gateway_commands = ("request-schema",)
             return ExecutionContract(
                 version=version,
                 uri=uri,
                 item_type=item_type,
                 route="bounded_call",
                 effect="read",
-                gateway_commands=("call",),
+                gateway_commands=gateway_commands,
                 timeout_seconds=10.0,
                 result_limit_bytes=256 * 1024,
                 verification_strategy="result_schema",
@@ -700,7 +729,7 @@ class ExecutionContractRegistry:
             item_type=item_type,
             route=route,
             effect=effect,
-            gateway_commands=("preview", "confirm", "execute", "verify"),
+            gateway_commands=("request-schema",),
             timeout_seconds=120.0 if route == "isolated_transaction" else 30.0,
             result_limit_bytes=1024 * 1024,
             verification_strategy=(
@@ -764,7 +793,7 @@ def _build_authoring_ui_execution_contract(
             item_type=item_type,
             route="bounded_call",
             effect="read",
-            gateway_commands=("call",),
+            gateway_commands=("request-schema",),
             timeout_seconds=10.0,
             result_limit_bytes=256 * 1024,
             verification_strategy="result_schema",
@@ -796,7 +825,7 @@ def _build_authoring_ui_execution_contract(
         item_type=item_type,
         route="managed_transaction",
         effect="runtime_mutation",
-        gateway_commands=("preview", "confirm", "execute", "verify"),
+        gateway_commands=("operation-schema",),
         timeout_seconds=30.0,
         result_limit_bytes=1024 * 1024,
         verification_strategy=verification_strategy,
@@ -864,9 +893,9 @@ def validate_packaged_execution_contracts(
         == POST_EXECUTION_PROJECT_GUARD_CONTEXT_RUNTIME_ONLY
     )
     expected_context_runtime_only = {
-        (version, uri)
-        for version in SUPPORTED_WWISE_VERSION_KEYS
-        for uri in CONTEXT_RUNTIME_ONLY_POST_EXECUTION_URIS
+        (entry.version, entry.uri)
+        for entry in rows
+        if entry.uri in CONTEXT_RUNTIME_ONLY_POST_EXECUTION_URIS
     }
     actual_context_runtime_only = {
         (entry.version, entry.uri) for entry in context_runtime_only

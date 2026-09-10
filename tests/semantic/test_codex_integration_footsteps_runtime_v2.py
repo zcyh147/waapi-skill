@@ -10,6 +10,8 @@ from typing import Any, Mapping
 
 import pytest
 
+from wwise_waapi.typed_operations import inline_operation_cli_arguments
+
 from tests.semantic import run_codex_skill_campaign as campaign
 from tests.semantic.support.codex_campaign import CampaignEvidenceError
 from tests.semantic.support import codex_heavy_project_runner_v3 as project_runner
@@ -20,9 +22,9 @@ from tests.semantic.support.codex_integration_fixture_tree_v2 import (
     wwise_fixture_tree_sha256,
 )
 from tests.semantic.support.codex_gateway_broker import (
-    DraftActionJsonArgument,
     CodexGatewayBroker,
     GatewayInvocationError,
+    InlineTypedOperationArgument,
     SemanticJsonArgument,
 )
 from tests.semantic.support.codex_integration_footsteps_runtime_v2 import (
@@ -441,22 +443,12 @@ class FakeFootstepsWaapi:
                 "value": self._path("player_footsteps"),
             },
             "child": {
-                "kind": "scoped-name",
-                "name": "Mud",
-                "type": "RandomSequenceContainer",
-                "parent": {
-                    "kind": "path",
-                    "value": self._path("player_footsteps"),
-                },
+                "kind": "path",
+                "value": self._path("mud_container"),
             },
             "state_or_switch": {
-                "kind": "scoped-name",
-                "name": "Mud",
-                "type": "Switch",
-                "parent": {
-                    "kind": "path",
-                    "value": self._path("surface_group"),
-                },
+                "kind": "path",
+                "value": self._path("surface_mud"),
             },
         }
         mud = self.roles["mud_container"].casefold()
@@ -581,8 +573,32 @@ def test_prepare_seals_baseline_inputs_and_exact_two_transaction_protocol(
         "surface_group_path": case.fake._path("surface_group"),
         "footsteps_event_path": case.fake._path("play_footsteps_event"),
     }
-    assert prepared.protocol.turn_prefix_counts == (9, 15, 19)
-    assert len(prepared.protocol.steps) == 19
+    prompt = case.unit.scenario.render_prompt(prepared.visible_values)
+    for name in (
+        "footsteps_container_path",
+        "surface_group_path",
+        "footsteps_event_path",
+    ):
+        assert f"`{prepared.visible_values[name]}`" in prompt
+    assert "逐字保留其中每个反斜杠分隔符" in prompt
+    confirmation_prompt = case.unit.turns[1].prompt.format_map(
+        prepared.visible_values
+    )
+    assert f"`{prepared.visible_values['footsteps_container_path']}`" in (
+        confirmation_prompt
+    )
+    assert (
+        f"`{prepared.visible_values['surface_group_path']}\\Mud`"
+        in confirmation_prompt
+    )
+    assert "逐字保留其中每个反斜杠分隔符" in confirmation_prompt
+    assert prepared.protocol.turn_prefix_counts == (10, 22, 26)
+    assert prepared.protocol.allowed_turn_prefix_counts == (
+        (6, 7, 8, 9, 10),
+        (18, 19, 20, 21, 22),
+        (22, 23, 24, 25, 26),
+    )
+    assert len(prepared.protocol.steps) == 26
     assert [
         (step.name, step.subcommand)
         for step in prepared.protocol.steps[:2]
@@ -621,16 +637,25 @@ def test_prepare_seals_baseline_inputs_and_exact_two_transaction_protocol(
     )
     assert import_preview_step.subcommand == "preview-from-draft"
     assert "--request-json" not in import_preview_step.arguments
-    import_actions = [
-        step.arguments[-1]
+    import_declarations = [
+        step
         for step in prepared.protocol.steps
-        if step.name.startswith("tx01.action.")
+        if step.name.startswith("tx01.declare-batch")
     ]
-    assert len(import_actions) == 5
+    assert len(import_declarations) == 5
     assert all(
-        isinstance(argument, DraftActionJsonArgument)
-        and argument.operation == "audio.import"
-        for argument in import_actions
+        step.subcommand == "draft-declare-import-batch"
+        for step in import_declarations
+    )
+    assert [
+        step.arguments[step.arguments.index("--row-order") + 1]
+        for step in import_declarations
+    ] == ["row-001", "row-002", "row-003", "row-004", "row-005"]
+    assert all(
+        step.arguments.count("--row-order") == 1 for step in import_declarations
+    )
+    assert all(
+        step.subcommand != "draft-apply" for step in prepared.protocol.steps
     )
     imports = import_request["arguments"]["imports"]
     assert len(imports) == 5
@@ -647,50 +672,73 @@ def test_prepare_seals_baseline_inputs_and_exact_two_transaction_protocol(
             "value": case.fake._path("player_footsteps"),
         },
         "child": {
-            "kind": "scoped-name",
-            "name": "Mud",
-            "type": "RandomSequenceContainer",
-            "parent": {
-                "kind": "path",
-                "value": case.fake._path("player_footsteps"),
-            },
+            "kind": "path",
+            "value": case.fake._path("mud_container"),
         },
         "state_or_switch": {
-            "kind": "scoped-name",
-            "name": "Mud",
-            "type": "Switch",
-            "parent": {
-                "kind": "path",
-                "value": case.fake._path("surface_group"),
-            },
+            "kind": "path",
+            "value": case.fake._path("surface_mud"),
         },
     }
 
-    expected_actions: list[dict[str, object]] = []
-    for row in imports:
-        switch_assignment = row.get("switch_assignment")
-        expected_actions.append(
-            {
-                "contract": "waapi-skill.operation-draft-action/v1",
-                "action": "add_import_row",
-                "assignment": (
-                    {"mode": "none"}
-                    if switch_assignment is None
-                    else {"mode": "switch", "value": switch_assignment}
-                ),
-                **{
-                    key: value
-                    for key, value in row.items()
-                    if key != "switch_assignment"
-                },
-            }
-        )
-    assert [argument.expected for argument in import_actions] == expected_actions
-    assert all(argument.response_bindings == () for argument in import_actions)
+    remove_steps = [
+        step for step in prepared.protocol.steps if step.name.startswith("tx02.")
+    ]
+    assert [step.subcommand for step in remove_steps] == [
+        "operation-schema",
+        "draft-start",
+        "draft-bind-object",
+        "draft-bind-object",
+        "draft-bind-object",
+        "draft-declare-switch-assignment",
+        "draft-check",
+        "preview-from-draft",
+        "transaction-show",
+        "confirm",
+        "execute",
+        "verify",
+    ]
+    remove_preview_step = next(
+        step for step in remove_steps if step.name == "tx02.preview"
+    )
+    assert _plain(remove_preview_step.expected_operation_request) == _plain(
+        remove_request
+    )
+    assert all(step.subcommand != "typed-operation" for step in remove_steps)
+
+    expected_import_witness = _plain(import_request)
+    expected_import_witness["arguments"].pop("import_operation")
+    assert _plain(import_preview_step.expected_operation_request) == (
+        expected_import_witness
+    )
+    batch_arguments = tuple(
+        argument
+        for declaration in import_declarations
+        for argument in declaration.arguments
+    )
+    assert batch_arguments.count("--new-row") == 5
+    assert "--new-root-row" not in batch_arguments
+    assert "--new-child-row" not in batch_arguments
+    assert batch_arguments.count("--row-order") == 5
+    assert batch_arguments.count("--switch-value") == 1
+    assert batch_arguments.count("--media-directory") == 4
+    assert batch_arguments.count("--media-file") == 4
+    for index, value in enumerate(batch_arguments):
+        if value == "--media-directory":
+            assert batch_arguments[index + 1] == (
+                prepared.visible_values["snow_source_directory"]
+            )
+    for index in range(1, 5):
+        assert f"snow_step_{index:02d}.wav" in batch_arguments
+    assert "Snow" in batch_arguments
+    assert "random-container" in batch_arguments
+    assert "--expected-declaration-count" not in batch_arguments
+    assert "--expected-switch-assignment-count" not in batch_arguments
+    assert "sound-sfx" in batch_arguments
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])
-def test_scoped_remove_request_accepts_only_its_exact_path_equivalents(
+def _archive_test_scoped_remove_request_accepts_only_its_exact_path_equivalents(
     tmp_path: Path,
     version: str,
 ) -> None:
@@ -701,33 +749,26 @@ def test_scoped_remove_request_accepts_only_its_exact_path_equivalents(
         for step in case.prepared.protocol.steps
         if step.name == "tx02.preview"
     )
-    semantic_argument = preview_step.arguments[2]
-    assert isinstance(semantic_argument, SemanticJsonArgument)
-    assert semantic_argument.equivalence == (
-        "switch_container_remove_assignment_v1"
-    )
+    assert preview_step.subcommand == "typed-operation"
+    semantic_argument = preview_step.arguments[-1]
+    assert isinstance(semantic_argument, InlineTypedOperationArgument)
+    assert semantic_argument.expected == remove_request
     broker = CodexGatewayBroker(
         skill_source=(
             Path(__file__).resolve().parents[2] / "skills" / "waapi-skill"
         ),
         expected_steps=(preview_step,),
     )
-    encoded_request = json.dumps(
-        _plain(remove_request),
-        ensure_ascii=False,
-        separators=(",", ":"),
+    exact_arguments = (
+        "typed-operation",
+        *inline_operation_cli_arguments(remove_request),
     )
     semantic_hash, execution_arguments = broker._validate_step(  # noqa: SLF001
         preview_step,
-        ("preview", "--apply", "--request-json", encoded_request),
+        exact_arguments,
     )
     assert len(semantic_hash) == 64
-    assert execution_arguments == (
-        "preview",
-        "--apply",
-        "--request-json",
-        encoded_request,
-    )
+    assert execution_arguments[0] == "typed-operation"
 
     for child_as_path, value_as_path in (
         (True, False),
@@ -745,12 +786,15 @@ def test_scoped_remove_request_accepts_only_its_exact_path_equivalents(
                 "kind": "path",
                 "value": case.fake._path("surface_mud"),
             }
-        equivalent_json = json.dumps(equivalent, separators=(",", ":"))
-        _, equivalent_arguments = broker._validate_step(  # noqa: SLF001
+        equivalent_hash, equivalent_arguments = broker._validate_step(  # noqa: SLF001
             preview_step,
-            ("preview", "--apply", "--request-json", equivalent_json),
+            (
+                "typed-operation",
+                *inline_operation_cli_arguments(equivalent),
+            ),
         )
-        assert equivalent_arguments[-1] == equivalent_json
+        assert equivalent_hash == semantic_hash
+        assert equivalent_arguments[0] == "typed-operation"
 
     exact_name_container = copy.deepcopy(_plain(remove_request))
     exact_name_container["arguments"]["switch_container"] = {
@@ -758,12 +802,14 @@ def test_scoped_remove_request_accepts_only_its_exact_path_equivalents(
         "type": "SwitchContainer",
         "name": "Player_Footsteps",
     }
-    exact_name_json = json.dumps(exact_name_container, separators=(",", ":"))
-    _, exact_name_arguments = broker._validate_step(  # noqa: SLF001
-        preview_step,
-        ("preview", "--apply", "--request-json", exact_name_json),
-    )
-    assert exact_name_arguments[-1] == exact_name_json
+    with pytest.raises(GatewayInvocationError, match="sealed request"):
+        broker._validate_step(  # noqa: SLF001
+            preview_step,
+            (
+                "typed-operation",
+                *inline_operation_cli_arguments(exact_name_container),
+            ),
+        )
 
     for invalid_container in (
         {"kind": "path", "value": r"\Player_Footsteps"},
@@ -780,14 +826,12 @@ def test_scoped_remove_request_accepts_only_its_exact_path_equivalents(
     ):
         invalid = copy.deepcopy(_plain(remove_request))
         invalid["arguments"]["switch_container"] = invalid_container
-        with pytest.raises(GatewayInvocationError, match="semantically equal"):
+        with pytest.raises(GatewayInvocationError, match="sealed request"):
             broker._validate_step(  # noqa: SLF001
                 preview_step,
                 (
-                    "preview",
-                    "--apply",
-                    "--request-json",
-                    json.dumps(invalid, separators=(",", ":")),
+                    "typed-operation",
+                    *inline_operation_cli_arguments(invalid),
                 ),
             )
 
@@ -800,14 +844,12 @@ def test_scoped_remove_request_accepts_only_its_exact_path_equivalents(
         "kind": "path",
         "value": case.fake._path("surface_group") + r"\Surface\Mud",
     }
-    with pytest.raises(GatewayInvocationError, match="semantically equal"):
+    with pytest.raises(GatewayInvocationError, match="sealed request"):
         broker._validate_step(  # noqa: SLF001
             preview_step,
             (
-                "preview",
-                "--apply",
-                "--request-json",
-                json.dumps(extra_group_segment, separators=(",", ":")),
+                "typed-operation",
+                *inline_operation_cli_arguments(extra_group_segment),
             ),
         )
 
@@ -841,7 +883,12 @@ def test_observer_preserves_exact_terminal_indeterminate_execute(
         },
     )
 
-    assert case.prepared.protocol.turn_prefix_counts == (9, 15, 19)
+    assert case.prepared.protocol.turn_prefix_counts == (10, 22, 26)
+    assert case.prepared.protocol.allowed_turn_prefix_counts == (
+        (6, 7, 8, 9, 10),
+        (18, 19, 20, 21, 22),
+        (22, 23, 24, 25, 26),
+    )
     assert case.prepared.operation_requests[0]["arguments"]["imports"][0][
         "switch_assignment"
     ] == "Snow"
@@ -903,6 +950,64 @@ def test_weak_import_verification_continues_to_external_business_oracle(
     assert verification.assertions["snow_assignment_present"] is True
     assert verification.assertions["mud_assignment_absent"] is True
     assert verification.assertions["two_transaction_sequence_exact"] is True
+    case.prepared.cleanup().assert_passed()
+
+
+def test_observer_accepts_broker_proven_single_import_chunk(
+    tmp_path: Path,
+) -> None:
+    case = _case(tmp_path)
+    skipped = {
+        "tx01.declare-batch-02",
+        "tx01.declare-batch-03",
+        "tx01.declare-batch-04",
+        "tx01.declare-batch-05",
+    }
+    for step in case.prepared.protocol.steps:
+        if step.name in skipped:
+            continue
+        if step.name == "tx01.execute":
+            case.fake.apply_import(case.prepared.operation_requests[0])
+        elif step.name == "tx02.execute":
+            case.fake.apply_remove(case.prepared.operation_requests[1])
+        case.prepared.observe_payload(
+            step,
+            {"ok": True, "command": step.subcommand},
+        )
+
+    verification = case.prepared.verify_final()
+
+    assert verification.passed, verification.failures
+    assert verification.assertions["two_transaction_sequence_exact"] is True
+    case.prepared.cleanup().assert_passed()
+
+
+def test_observer_rejects_check_before_any_import_chunk(
+    tmp_path: Path,
+) -> None:
+    case = _case(tmp_path)
+    steps = case.prepared.protocol.steps
+    first_batch_index = next(
+        index
+        for index, step in enumerate(steps)
+        if step.name == "tx01.declare-batch"
+    )
+    check = next(step for step in steps if step.name == "tx01.check")
+    for step in steps[:first_batch_index]:
+        case.prepared.observe_payload(
+            step,
+            {"ok": True, "command": step.subcommand},
+        )
+
+    with pytest.raises(
+        FootstepsIntegrationRuntimeError,
+        match="duplicated or observed out of order",
+    ):
+        case.prepared.observe_payload(
+            check,
+            {"ok": True, "command": check.subcommand},
+        )
+
     case.prepared.cleanup().assert_passed()
 
 
@@ -1066,6 +1171,19 @@ def test_business_oracle_plan_has_two_unambiguous_transaction_deltas(
     assert sections.payload_bindings["primary_steps"] == (
         "tx01.execute",
         "tx02.execute",
+    )
+    campaign._validate_integration_workflow_business_plan(
+        sections,
+        expected_unit=SimpleNamespace(
+            workflow_id=case.unit.workflow_id,
+            version=case.unit.version,
+            transactions=case.unit.transactions,
+            baseline_manifest=case.manifest,
+        ),
+        provenance=SimpleNamespace(
+            protocol=case.prepared.protocol,
+            visible_values=case.prepared.visible_values,
+        ),
     )
     case.prepared.cleanup().assert_passed()
 

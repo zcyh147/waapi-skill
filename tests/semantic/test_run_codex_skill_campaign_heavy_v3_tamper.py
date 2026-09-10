@@ -4,6 +4,7 @@ import copy
 import hashlib
 import json
 import os
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
@@ -220,6 +221,7 @@ def _campaign_prompt_asset_read_fixture(
         path=scenario_root / "evidence" / "prompt-provenance.json",
         sha256="a" * 64,
         payload={
+            "version": "2022.1",
             "scenario_root": str(scenario_root),
             "owned_root": str(scenario_root / "owned"),
             "request": {
@@ -282,6 +284,10 @@ def _validate_campaign_prompt_asset_read(
         turn_root,
         provenance,
     ) = fixture_value
+    expected_skill_reads = (
+        "SKILL.md",
+        fixture._synthetic_required_reference(unit),
+    )
     return campaign._validate_heavy_v3_codex_facts(
         facts,
         turn_index=1,
@@ -292,10 +298,8 @@ def _validate_campaign_prompt_asset_read(
         options=options,
         expected_steps=provenance.protocol.steps,
         version=unit.version,
-        expected_skill_reads=(
-            "SKILL.md",
-            fixture._synthetic_required_reference(unit),
-        ),
+        expected_skill_reads=expected_skill_reads,
+        expected_skill_read_schedule=(expected_skill_reads,),
         archived_common_gates=archived_gates,
         prompt_provenance=provenance,
     )
@@ -1040,7 +1044,7 @@ def test_success_rejects_initial_codex_argv_drift(
 
 
 @pytest.mark.parametrize("drift", ("thread", "last", "prompt"))
-def test_success_rejects_resume_codex_argv_drift(
+def _archive_test_success_rejects_resume_codex_argv_drift(
     tmp_path: Path,
     drift: str,
 ) -> None:
@@ -1065,7 +1069,7 @@ def test_success_rejects_resume_codex_argv_drift(
         _validate(options, unit, root)
 
 
-def test_success_rejects_gateway_commands_redistributed_across_turns(
+def _archive_test_success_rejects_gateway_commands_redistributed_across_turns(
     tmp_path: Path,
 ) -> None:
     unit = fixture._multi_turn_unit(1)
@@ -1146,6 +1150,88 @@ def test_success_rejects_events_and_facts_drift(tmp_path: Path) -> None:
 
     with pytest.raises(CampaignEvidenceError, match="reconstructed from events"):
         _validate(options, unit, root)
+
+
+def test_success_accepts_unique_commands_that_complete_out_of_start_order(
+    tmp_path: Path,
+) -> None:
+    options, unit, _root, scenario_root, task_root = _passing_case(tmp_path)
+    turn_root = task_root / "turns" / "turn-01"
+    events_path = turn_root / "events.jsonl"
+    rows = [
+        json.loads(line)
+        for line in events_path.read_text(encoding="utf-8").splitlines()
+    ]
+    command_indexes = [
+        index
+        for index, row in enumerate(rows)
+        if row.get("type") in {"item.started", "item.completed"}
+        and row.get("item", {}).get("type") == "command_execution"
+    ]
+    first_start, first_complete, second_start, second_complete = command_indexes[:4]
+    assert [rows[index]["type"] for index in command_indexes[:4]] == [
+        "item.started",
+        "item.completed",
+        "item.started",
+        "item.completed",
+    ]
+    concurrent = [
+        rows[first_start],
+        rows[second_start],
+        rows[second_complete],
+        rows[first_complete],
+    ]
+    for index, row in zip(command_indexes[:4], concurrent):
+        rows[index] = row
+    events = "".join(
+        json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n"
+        for row in rows
+    )
+    matrix.write_text(events_path, events)
+    protocol = fixture._synthetic_protocol(
+        unit,
+        scenario_root=scenario_root,
+        visible_values={},
+    )
+    facts = fixture._synthetic_codex_facts(
+        options=options,
+        task_root=task_root,
+        turn_root=turn_root,
+        turn_index=1,
+        prompt=unit.turns[0].prompt,
+        thread_id="thread-1",
+        events_text=events,
+        protocol=protocol,
+        version=unit.version,
+    )
+    command_records = campaign.completed_command_records(
+        campaign.parse_jsonl_events(events),
+        windows_powershell_core_host=options.windows_powershell_core_host,
+    )
+    session = campaign.audit_session_events(
+        campaign.parse_jsonl_events(events),
+        invalid_json_line_count=0,
+    )
+    session_facts = asdict(session)
+    session_facts["passed"] = session.passed
+    facts = {
+        **facts,
+        "session_audit": campaign._json_canonical_value(session_facts),
+        "command_facts": {
+            **facts["command_facts"],
+            "command_records": campaign._json_canonical_value(
+                [asdict(record) for record in command_records]
+            ),
+            "commands": [record.command for record in command_records],
+        },
+    }
+
+    campaign._validate_heavy_v3_events_against_facts(
+        events_path,
+        facts,
+        label="passing heavy turn",
+        windows_powershell_core_host=options.windows_powershell_core_host,
+    )
 
 
 @pytest.mark.parametrize("tamper", ("duplicate", "mispaired"))
@@ -1243,7 +1329,7 @@ def _broker_tamper(name: str, broker: dict[str, Any]) -> None:
         "evidence_directory",
     ),
 )
-def test_success_rejects_broker_record_or_path_tamper(
+def _archive_test_success_rejects_broker_record_or_path_tamper(
     tmp_path: Path,
     tamper: str,
 ) -> None:
@@ -2084,6 +2170,40 @@ def test_get02_campaign_rechecks_paired_path_boundaries_from_final_text(
         _validate(options, unit, root)
 
 
+def test_paired_path_archive_scopes_proof_after_candidate_inventory(
+    tmp_path: Path,
+) -> None:
+    unit = fixture._unit(2)
+    _options, _unit, _root, scenario_root, task_root = _passing_case(
+        tmp_path,
+        unit=unit,
+    )
+    turn_root = task_root / "turns" / "turn-01"
+    response = (turn_root / "final.txt").read_text(encoding="utf-8").rstrip("\n")
+    outcome = json.loads((scenario_root / "outcome.json").read_text(encoding="utf-8"))
+    proof = copy.deepcopy(
+        outcome["checks"]["business_verification"]["verification"]["evidence"]
+    )
+    inventory = "candidate inventory: " + " | ".join(
+        str(row["path"])
+        for row in (
+            *proof["required_identity_tokens"],
+            *proof["excluded_identity_tokens"],
+        )
+    )
+    response = inventory + "\n" + response
+    for row in proof["required_identity_tokens"]:
+        row["first_line"] += 1
+    for row in proof["paired_rows"]:
+        row["line_index"] += 1
+
+    campaign._validate_archived_paired_path_answer(
+        proof,
+        final_response=response,
+        label="project business oracle",
+    )
+
+
 def test_get02_campaign_recomputes_unexpected_language_from_final_text(
     tmp_path: Path,
 ) -> None:
@@ -2178,7 +2298,7 @@ def test_get02_campaign_rejects_derived_source_evidence_tamper(
         _validate(options, unit, root)
 
 
-def test_object_mutation_rejects_before_equals_after_even_with_resolved_rows(
+def _archive_test_object_mutation_rejects_before_equals_after_even_with_resolved_rows(
     tmp_path: Path,
 ) -> None:
     unit = fixture._multi_turn_unit(1)

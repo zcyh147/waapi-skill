@@ -26,6 +26,12 @@ for Wwise Authoring. Read this file before changing the Skill or running tests.
 - Prefer deterministic code and structured results over prompt-only knowledge.
   When a capability is unavailable through the packaged interface, return a
   clear boundary instead of teaching the model how to synthesize a workaround.
+- Judge migration depth at the public Gateway interface. Every supported named
+  operation and non-named lane must expose the accepted Gateway-owned business
+  seam or an explicit prohibited/host/version boundary. Historical PASS
+  evidence, a small request, an existing dedicated route, or a syntactically
+  typed request does not establish that migration; generated inventories must
+  retain and assign those rows until their caller interface is uniformly deep.
 - Read-only work should be direct and bounded. Every project change uses an
   immutable preview, at most one execution, and verification. `read_only`
   blocks changes but still permits catalog-proven read transactions;
@@ -47,9 +53,9 @@ for Wwise Authoring. Read this file before changing the Skill or running tests.
     virtual environment.
 - `skills/waapi-skill/scripts/gateway.py`
   - the public CLI contract: offline catalog/config commands, bounded live
-    reads, the progressively disclosed structured and advanced `query-schema`
-    contracts behind `query-object`, subscriptions, transaction phases, result
-    ceilings, and `session_context`.
+    reads, the closed business-declaration and separately disclosed advanced
+    `query-schema` contracts behind `query-object`, subscriptions, transaction
+    phases, result ceilings, and `session_context`.
 - `skills/waapi-skill/wwise_waapi/`
   - implementation library. Important seams include `capabilities.py`,
     `execution_contracts.py`, `operation_registry.py`, `transactions.py`,
@@ -61,11 +67,15 @@ for Wwise Authoring. Read this file before changing the Skill or running tests.
     `operation_composer.py` owns typed operation-local actions and deterministic
     materialization. Neither replaces the immutable transaction preview or its
     authorization and verification.
-  - `operation_registry.py` is the authoritative Gateway entrypoint for
-    structured operation contracts. Builder or dispatcher support alone does
-    not expose an operation: its public request shape, version scope, safety
-    behavior, and verification boundary must be present through this registry
-    and the Gateway `operation-schema` path.
+  - `operation_registry.py` is the authoritative Gateway entrypoint for named
+    structured operation contracts. Reviewed exact reflected-URI business
+    lanes use their version-aware business contract registry (currently
+    `core_business_contracts.py`) and the Gateway `request-schema` path instead.
+    Builder or dispatcher support alone does not expose either kind of
+    operation: its public request shape, version scope, safety behavior, and
+    verification boundary must be present through the matching registry and
+    Gateway schema path. The reflected-URI lane still materializes its native
+    `args` and `options` inside the Gateway; callers never author them.
 - `skills/waapi-skill/resources/manifest/<version>/`
   - reflected Console functions, topics, schemas, immutable inventory
     metadata, and the narrow `authoring-ui-commands-supplement.json` and
@@ -117,15 +127,19 @@ it supported without proving the reflected and executable surfaces:
    scope.
 2. Add the versioned manifest inventory and required deferred, metadata,
    semantic, and WAQL resources, with immutable counts and digests derived from
-   the new reflection. Review the versioned structured-query schema and extend
-   the closed query Builder, compiler goldens, and negative grammar matrix when
-   the new version changes any supported source, transform, predicate,
-   accessor, literal, or result-bound rule.
+   the new reflection. Review the versioned business-query schema and extend
+   the Gateway-owned declaration compiler, advanced-contract goldens, and
+   fail-closed negative matrix when the new version changes any supported
+   source, relationship, business predicate, output, native expression, or
+   result-bound rule.
 3. Classify every new or changed route in its execution lane and update the
    capability, execution-contract, operation registry, adapter registry,
    request-mapping registry, and native-surface policy entries that actually
-   apply. A structured mutation is not public until `operation_registry.py`
-   exposes its closed contract.
+   apply. A named structured mutation is not public until
+   `operation_registry.py` exposes its closed contract. A reviewed exact
+   reflected-URI mutation is not public until its business contract registry
+   exposes the closed request through Gateway `request-schema`; raw native
+   `args` and `options` remain internal in both cases.
 4. Update README coverage and test-inventory documentation only from generated
    inventories and completed runs; distinguish a reflected route, a
    program-tested route, and real execution evidence.
@@ -165,11 +179,14 @@ user's approval.
   version-aware `operation-schema` or `describe` result; do not add per-API
   Markdown merely to repeat structured gateway contracts.
 - Keep mutation identities free of caller- or model-authored raw WAQL. Object
-  reads use three progressive layers: closed `query-object` flags, the
-  versioned `waapi-skill.object-query/v1` Builder from offline `query-schema`,
-  then—only when that schema cannot express a required read—the bounded
+  reads use two public layers: the closed business declaration returned by
+  offline `query-schema`, then—only when that declaration cannot express a
+  required server-side read semantic—the bounded
   `waapi-skill.advanced-object-query/v1` contract disclosed by
-  `query-schema --advanced`. The advanced contract fixes
+  `query-schema --advanced`. The business declaration subsumes the former
+  shortcut and structured-Builder inputs; do not restore a public
+  `waapi-skill.object-query/v1`, raw predicate/return grammar, or typed-
+  structured fallback. The advanced contract fixes
   `ak.wwise.core.object.get`, owns its return projection and final `take`, and
   never becomes a raw args/options or mutation path. Mutation identities remain
   limited to `id`, `path`, `exact-type-name`, `direct-child`, and
@@ -181,9 +198,9 @@ user's approval.
   name/type/path or the workflow stops. The advanced schema is explicit about
   UTF-8 byte limits and one trimmed, single-line frame: comments, semicolons,
   and unclosed string or slash-regex literals are rejected before dispatch.
-  The same per-object exact-ID readback applies when a broad ordinary or
-  structured query returns multiple candidates and the user later selects only
-  a subset for mutation. It does not apply to a canonical relationship GUID
+  The same per-object exact-ID readback applies when a broad business or
+  advanced query returns multiple candidates and the user later selects only a
+  subset for mutation. It does not apply to a canonical relationship GUID
   used directly as the next read-only hop.
 - Keep successful ordinary `query-object` replies compact by default. The
   compiled semantic preview and dispatch evidence are an explicit `--detail`
@@ -199,9 +216,9 @@ user's approval.
   property metadata by its exact object/class scope and field token, reset both
   caches for every new preview, and never let either replace execution-time or
   verification-time live state checks.
-- Generalize “shortcut flags → structured contract → controlled native
-  expression” only to fixed read-only APIs with a declarative DSL whose time,
-  row, and byte boundaries remain Gateway-owned. Do not copy the native
+- Generalize “business declaration → controlled native expression” only to
+  fixed read-only APIs with a declarative DSL whose time, row, and byte
+  boundaries remain Gateway-owned. Do not copy the native
   expression fallback to project mutations, SoundEngine commands, topics,
   SoundBanks, imports, UI commands, or Lua/code execution; extend their closed
   contracts instead.
@@ -266,10 +283,11 @@ ci/test.sh --mode program -- -q -ra
 This gate uses fake clients and must not start Codex, WwiseConsole, or
 a network client. For ordinary API-surface expansion, this is the required main
 gate; do not spend tokens on a full semantic matrix merely because rows were
-added to the same established mechanism. For the structured query Builder,
+added to the same established mechanism. For the business query compiler,
 five-version Python validation, compiler goldens, gateway fake-dispatch tests,
-and fail-closed negatives prove the compilation contract. They do not prove
-that a newly added WAQL construct has been accepted by a real Wwise process.
+and fail-closed negatives prove the closed declaration contract. They do not
+prove that a newly added advanced WAQL construct has been accepted by a real
+Wwise process.
 
 ### 2. Broad non-live regression
 
@@ -389,7 +407,9 @@ campaign seals its path, version, mode, and SHA-256, forces a profile-free shell
 and uses Broker-owned `python.ps1` / `python3.ps1` relays. Never restore the old
 `.cmd` relay: PowerShell intentionally uses legacy argument passing for batch
 files and can remove structural quotes from Gateway JSON before Broker
-authentication. Skill reads use the exact literal form
+authentication. Before PowerShell attestation or Codex launch, the native
+harness sets and reads back Console input and output code page 65001; a failure
+blocks before the Fresh turn. Skill reads use the exact literal form
 `Get-Content -Raw -Encoding UTF8 <path>` and receive credit only through the
 sealed PowerShell Core wrapper.
 
@@ -478,6 +498,44 @@ passed 462 / skipped 6 POSIX-only cases. Commit
 changes only domain/planning docs, one unit test, and the program manifest, so
 it does not replace the frozen Skill, suite, runner, or semantic harness.
 
+Pre-review public `integration` candidate
+`ebcfde245bcbcacd2b8842e5ec205e7111b86743` passed all 12 units in one fresh
+root on each host: macOS `imac-int-ebcfde2-r67-full12` and native Windows
+`iwin-int-ebcfde2-r56-full12`. Both roots then passed identical
+`--resume --verify-only`. Across the 24 PASS lifecycle records, source-project
+full hashes and mtimes remained unchanged, passing sandboxes were removed, and
+final scoped-process checks were empty. The macOS LaunchAgent and Windows
+`InteractiveToken` / `Limited` Scheduled Tasks were deleted. This is
+independent single-root 12/12 evidence on both hosts, not cumulative repair-root
+credit. Review-repair code candidate
+`170e8e8f01cd5e931933c6fe76baff47d0683f57` later hardened playing and
+transport capability stores against Windows reparse points and resolved
+non-stable object-set batch `--field` names through live metadata, so the
+earlier root remains truthful evidence but is not final-candidate acceptance
+for that successor. That successor passed macOS Program 4737 / 2 skipped,
+native Windows Program 4714 / 25 skipped, and macOS Non-live 10322 / 113
+skipped / 27 deselected. Batch-order repair candidate
+`fd2f9ed2c9fd2336e76545b1aef6f0ce4e99acfe` then passed macOS Program 4738 /
+2 skipped, native Windows Program 4715 / 25 skipped, and macOS Non-live 10325 /
+113 skipped / 27 deselected before its targeted Weapons reruns.
+
+Final semantic-harness candidate
+`0682c1a979f7ce5bfb648914914b7393148a6495` keeps the packaged Skill tree
+byte-identical to `0edaf1a` and accepts permutations of independent existing-
+object edit rows while still rejecting missing, extra, duplicate, or changed
+objects, fields, handles, and values. Native-Windows root
+`iwin-int-0682c1a-r63-full12` passed the public `integration` profile 12/12 in
+one root plus identical verify-only. MacOS root
+`imac-int-0682c1a-r73-full12` passed 11/12; only INT22 Rifle stopped before
+Preview after the Agent incorrectly called an explicit
+`complete=true, truncated=false` response truncated. Fresh queued root
+`imac-int-0682c1a-r74-int22-rifle` then passed that sole unit plus identical
+verify-only without any code, suite, harness, or option change. MacOS therefore
+has same-candidate cumulative 12/12 evidence, not a single-root 12/12 claim.
+Every source hash and project mtime remained unchanged, passing sandboxes were
+removed, the failed sandbox stayed sealed, and all temporary LaunchAgents,
+Scheduled Tasks, and Wwise processes were cleared.
+
 Composer migration evidence is focused Adapter evidence, not public
 `integration` acceptance. For `object.set`, candidate
 `68697244063e02304eea79da54da502270be3704` passed Weather and Weapons on
@@ -497,6 +555,47 @@ three frozen roots, not one root or one Git candidate with a 6/6 result. Every
 recorded source hash/mtime stayed unchanged; PASS sandboxes were removed, FAIL
 sandboxes were sealed/quarantined, and scoped residual-process checks were
 empty.
+
+For Switch assignments, runtime candidate
+`d05f1ecdc3b33fca83866e75669c65039877edd6` passed the final macOS and
+native-Windows Program gates, macOS Non-live, and the closed add/remove
+workflow on native Windows Wwise 2022.1/2025.1. Route-only candidate
+`d45f75f5e75190d5b4e607a02aee2dcf38e73ab9` then passed macOS Program and
+the same real workflow on macOS 2022.1/2025.1. Fresh roots
+`imac-sab-d45f75f-r2` and `iwin-sab-d45f75f-r2` each passed the one-unit
+`switch_assignment_business_1` profile plus identical
+`--resume --verify-only`. Earlier `d05f1ec` roots on both hosts remain
+frozen FAILs because the Agents invented operation aliases; the Broker rejected
+them before Gateway or Wwise dispatch. No Fresh root executed a mutation, all
+temporary launch resources were removed, and scoped residual-process checks
+were empty.
+After the entry Skill was compacted, exact packaged-Skill candidate
+`b544197fb6b7455814fbb2079043a5a354daca59` repeated the same one-unit PASS
+plus identical verify-only in macOS root `imac-sab-b544197-r1` and
+native-Windows root `iwin-sab-b544197-r1`. Both roots retained sealed attempt
+manifests, started no Wwise process, executed no mutation, removed their
+temporary launch resources, and ended with zero scoped residual processes.
+
+Final deepened Switch-assignment candidate
+`c874917220cb7723d60f86a14cea72c5d15cca52` passed the one-unit profile
+fresh plus identical `--resume --verify-only` in macOS root
+`imac-sab-c874917-r1` and native-Windows root `iwin-sab-c874917-r1`.
+Both Agents followed the Gateway-owned copy-ready `draft-start`, then the fixed
+`switch_container`, `child`, and `state_or_switch` role continuations into one
+Preview; no Wwise process or mutation occurred. The Windows Fresh and replay
+used temporary `InteractiveToken`/`Limited` Scheduled Tasks. Both hosts ended
+with zero scoped residual processes and Windows retained zero matching tasks.
+Exact Program candidate `4c55ba6b53eeb4beff97e7b590686d78da7e612e`
+passed macOS 3659 / 2 skipped and native Windows 3646 / 15 skipped; later
+`c874917` changes only semantic evidence/protocol tests. MacOS Non-live at
+`d10dc23c4dd95eb865a5a768ac8a4e0885e6a233` passed 8639 / 110 skipped /
+27 deselected. The later packaged diffs are bounded to copy-ready business
+start/role continuations and compact audio-import receipts, covered by exact
+focused regressions (410 passed at `4389b6c`, 452 / 4 skipped at `4c55ba6`,
+and 76 passed at `c874917`); Switch native dispatch and verification did not
+change. Frozen Mac diagnostic root `imac-sab-d10dc23-r1` stopped after a
+successful schema read without issuing `draft-start`, received no PASS credit,
+and was not replayed.
 
 The completed 2026-07-31 macOS integration evidence is cumulative across frozen
 campaign roots, not one final-candidate 6/6 run. The initial `a12` root passed

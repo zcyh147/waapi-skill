@@ -25,11 +25,12 @@ from typing import Any, Protocol
 from tests.semantic.support.codex_eval_protocol_v3 import (
     OPERATION_REQUEST_CONTRACT,
     V3GatewayProtocol,
-    build_transaction_protocol,
+    build_metadata_transaction_protocol,
 )
 from tests.semantic.support.codex_gateway_broker import (
     ExactArgumentAlternatives,
     ExpectedGatewayStep,
+    MetadataTokenProjection,
     ResponseBinding,
     ResponseBindingOrExactArgument,
 )
@@ -923,6 +924,35 @@ class _AlarmFixtureSession:
     ) -> None:
         """Validate every agent-visible diagnostic row against the sealed graph."""
 
+        if step.name == "revalidation.sound":
+            before = self._require_before()
+            objects = payload.get("objects")
+            sound = before.by_key()["sound"]
+            if (
+                step.subcommand != "query-object"
+                or payload.get("ok") is not True
+                or payload.get("command") != "query-object"
+                or payload.get("count") != 1
+                or not isinstance(objects, list)
+                or len(objects) != 1
+                or not isinstance(objects[0], Mapping)
+                or {
+                    "id": objects[0].get("id"),
+                    "name": objects[0].get("name"),
+                    "type": objects[0].get("type"),
+                    "path": objects[0].get("path"),
+                }
+                != {
+                    "id": sound.object_id,
+                    "name": sound.name,
+                    "type": sound.object_type,
+                    "path": sound.path,
+                }
+            ):
+                raise AlarmIntegrationRuntimeError(
+                    "optional Alarm Sound revalidation differs from the diagnosed identity"
+                )
+            return
         if not step.name.startswith("diag."):
             return
         before = self._require_before()
@@ -1118,7 +1148,7 @@ def _alarm_protocol(
             "diag.sound",
             source=(
                 "--object-id",
-                ResponseBinding("diag.action", "/objects/0/Target/id"),
+                ResponseBinding("diag.action", "/objects/0/target/id"),
             ),
             take=None,
             fields=_DIAGNOSTIC_SOUND_FIELDS,
@@ -1127,7 +1157,7 @@ def _alarm_protocol(
             "diag.source",
             source=(
                 "--object-id",
-                ResponseBinding("diag.sound", "/objects/0/activeSource/id"),
+                ResponseBinding("diag.sound", "/objects/0/active_source/id"),
             ),
             take=None,
             fields=_DIAGNOSTIC_SOURCE_FIELDS,
@@ -1136,7 +1166,7 @@ def _alarm_protocol(
             "diag.dead_bus",
             source=(
                 "--object-id",
-                ResponseBinding("diag.sound", "/objects/0/OutputBus/id"),
+                ResponseBinding("diag.sound", "/objects/0/output_bus/id"),
             ),
             take=None,
             fields=_DIAGNOSTIC_BUS_FIELDS,
@@ -1148,9 +1178,45 @@ def _alarm_protocol(
             fields=_DIAGNOSTIC_BUS_FIELDS,
         ),
     )
-    transaction = build_transaction_protocol((operation_request,))
-    steps = (*diagnostic_steps, *transaction.steps)
+    request_arguments = operation_request.get("arguments")
+    object_selector = (
+        request_arguments.get("object")
+        if isinstance(request_arguments, Mapping)
+        else None
+    )
+    object_identity = (
+        object_selector.get("value")
+        if isinstance(object_selector, Mapping)
+        and object_selector.get("kind") == "id"
+        else None
+    )
+    if not isinstance(object_identity, str) or not object_identity:
+        raise AlarmIntegrationRuntimeError(
+            "Alarm transaction metadata lacks its exact Sound identity"
+        )
+    transaction = build_metadata_transaction_protocol(
+        (operation_request,),
+        object_type="Sound",
+        object_identity=object_identity,
+        metadata_queries=("output bus",),
+        required_tokens=("OutputBus",),
+        expected_required_token_projection=(
+            MetadataTokenProjection("OutputBus", "reference", ""),
+        ),
+        schema_first=True,
+    )
+    revalidation = ExpectedGatewayStep(
+        name="revalidation.sound",
+        subcommand="query-object",
+        arguments=(
+            "--exact-id",
+            ResponseBinding("diag.sound", "/objects/0/id"),
+        ),
+    )
+    steps = (*diagnostic_steps, revalidation, *transaction.steps)
     diagnostic_count = len(diagnostic_steps)
+    preview_count = diagnostic_count + transaction.turn_prefix_counts[0]
+    complete_count = diagnostic_count + transaction.turn_prefix_counts[1]
     return V3GatewayProtocol(
         steps=steps,
         commutative_read_only_step_groups=(
@@ -1158,9 +1224,15 @@ def _alarm_protocol(
         ),
         turn_prefix_counts=(
             diagnostic_count,
-            diagnostic_count + transaction.turn_prefix_counts[0],
-            diagnostic_count + transaction.turn_prefix_counts[1],
+            preview_count + 1,
+            complete_count + 1,
         ),
+        allowed_turn_prefix_counts=(
+            (diagnostic_count,),
+            (preview_count, preview_count + 1),
+            (complete_count, complete_count + 1),
+        ),
+        terminal_prefix_counts=(complete_count, complete_count + 1),
     )
 
 
@@ -1648,49 +1720,107 @@ def _diagnostic_projection(
         "path": _wwise_path(row.get("path"), f"diagnostic {kind} path"),
     }
     if kind == "action":
+        native_action_type = row.get("ActionType")
+        business_action_type = row.get("action_type")
+        if (
+            native_action_type is not None
+            and business_action_type is not None
+            and native_action_type != business_action_type
+        ):
+            raise AlarmIntegrationRuntimeError(
+                "diagnostic ActionType aliases disagree"
+            )
+        native_target = row.get("Target")
+        business_target = row.get("target")
+        if (
+            native_target is not None
+            and business_target is not None
+            and native_target != business_target
+        ):
+            raise AlarmIntegrationRuntimeError(
+                "diagnostic Target aliases disagree"
+            )
         result.update(
             {
                 "action_type": _optional_plain_int(
-                    row.get("ActionType"),
+                    (
+                        native_action_type
+                        if native_action_type is not None
+                        else business_action_type
+                    ),
                     "diagnostic ActionType",
                 ),
                 "target_id": _optional_identity(
-                    row.get("Target"),
+                    native_target if native_target is not None else business_target,
                     "diagnostic Target",
                 ),
             }
         )
     elif kind == "sound":
+        native_override_output = _bool_alias(
+            row,
+            "OverrideOutput",
+            "@OverrideOutput",
+            "diagnostic OverrideOutput",
+        )
+        override_output = _coalesced_alias(
+            native_override_output,
+            _optional_bool(
+                row.get("override_output"),
+                "diagnostic override_output",
+            ),
+            "diagnostic OverrideOutput",
+        )
+        active_source = _coalesced_alias(
+            row.get("activeSource"),
+            row.get("active_source"),
+            "diagnostic activeSource",
+        )
+        output_bus = _coalesced_alias(
+            row.get("OutputBus"),
+            row.get("output_bus"),
+            "diagnostic OutputBus",
+        )
         result.update(
             {
-                "override_output": _bool_alias(
-                    row,
-                    "OverrideOutput",
-                    "@OverrideOutput",
-                    "diagnostic OverrideOutput",
-                ),
+                "override_output": override_output,
                 "active_source_id": _optional_identity(
-                    row.get("activeSource"),
+                    active_source,
                     "diagnostic activeSource",
                 ),
                 "output_bus_id": _optional_identity(
-                    row.get("OutputBus"),
+                    output_bus,
                     "diagnostic OutputBus",
                 ),
             }
         )
     elif kind == "source":
+        original_file_path = _coalesced_alias(
+            row.get("originalFilePath"),
+            row.get("original_file_path"),
+            "diagnostic originalFilePath",
+        )
+        source_language = _coalesced_alias(
+            row.get("audioSource:language"),
+            row.get("source_language"),
+            "diagnostic source language",
+        )
         result.update(
             {
                 "original_file_path": _optional_text(
-                    row.get("originalFilePath")
+                    original_file_path
                 ),
-                "language": _language(row.get("audioSource:language")),
+                "language": _language(source_language),
             }
         )
     elif kind == "bus":
-        result["volume"] = _optional_number(
+        volume = _coalesced_alias(
             row.get("@Volume"),
+            row.get("volume_db"),
+            "diagnostic Bus Volume",
+        )
+        result["volume"] = _optional_number(
+            volume,
             "diagnostic Bus Volume",
         )
     elif kind != "event":
@@ -1871,6 +2001,14 @@ def _bool_alias(
     if len(set(values)) != 1:
         raise AlarmIntegrationRuntimeError(f"{label} aliases disagree")
     return values[0]
+
+
+def _coalesced_alias(first: Any, second: Any, label: str) -> Any:
+    """Accept one native/business alias and reject contradictory dual values."""
+
+    if first is not None and second is not None and first != second:
+        raise AlarmIntegrationRuntimeError(f"{label} aliases disagree")
+    return first if first is not None else second
 
 
 def _file_proof(path: Path) -> AlarmFileProof:

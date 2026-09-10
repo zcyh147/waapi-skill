@@ -43,6 +43,9 @@ from tests.semantic.support.codex_import_runtime_v3 import (
     ImportRuntimeSnapshot,
     build_import_runtime_plan,
 )
+from tests.semantic.support.codex_typed_input_profile import (
+    load_typed_input_profile,
+)
 from tests.semantic.test_codex_import_runtime_v3 import (
     _compound_prepared,
     _sound_discovery,
@@ -52,6 +55,9 @@ from tests.semantic.test_codex_import_runtime_v3 import (
 ROOT = Path(__file__).resolve().parents[2]
 SUITE = ROOT / "skills" / "waapi-skill" / "evals" / "suite-v3.json"
 IMPORT_APIS = {"ak.wwise.core.audio.import", "ak.wwise.core.audio.importTabDelimited"}
+TYPED_PROFILE = (
+    ROOT / "tests" / "semantic" / "data" / "typed-input-v1" / "profile.json"
+)
 
 
 def _guid(number: int) -> str:
@@ -204,6 +210,134 @@ def test_all_ten_real_scenarios_compile_recompute_and_archive(tmp_path: Path) ->
             assert [request["operation"] for request in sections.static_expectation["operation_requests"]] == [
                 "audio.import" if current.api.endswith(".import") else "audio.importTabDelimited"
             ] * len(materialized.operation_requests)
+
+
+def test_reviewed_2021_profile_import_compiles_and_replays_its_business_plan(
+    tmp_path: Path,
+) -> None:
+    unit = next(
+        row
+        for row in load_typed_input_profile(TYPED_PROFILE).units
+        if row.unit_id == "TYP21-FILE-AUDIO-IMPORT"
+    )
+    assert "Rifle 和 Shotgun 两个 Random Container 已经存在" in unit.scenario.prompt
+    assert "只补齐缺少的 Sound" in unit.scenario.prompt
+    assert "缺少的层级" not in unit.scenario.prompt
+    project = tmp_path / "sandbox" / "SampleProject.wproj"
+    project.parent.mkdir(parents=True)
+    project.write_text("<WwiseDocument/>", encoding="utf-8")
+    materialized = materialize_import_case(
+        unit.scenario,
+        version=unit.version,
+        asset_root=tmp_path / "assets",
+    )
+    plan = build_import_runtime_plan(
+        unit.scenario,
+        materialized,
+        sandbox_project=project,
+    )
+    before = _snapshot(plan, before=True)
+    protocol = build_audio_import_composer_protocol(plan.operation_requests[0])
+
+    sections = compile_import_business_plan(
+        unit.scenario,
+        materialized,
+        plan,
+        before,
+        protocol,
+    )
+    validate_import_business_plan_archive(
+        sections,
+        scenario=unit.scenario,
+        protocol=protocol,
+        verify_files=True,
+    )
+    assert sections.static_expectation["version"] == "2021.1"
+
+    base_scenario = load_eval_bundle_v3(SUITE).scenario(unit.base_scenario_id)
+    with pytest.raises(ImportBusinessPlanError, match="identity is misbound"):
+        compile_import_business_plan(
+            base_scenario,
+            materialized,
+            plan,
+            before,
+            protocol,
+        )
+    with pytest.raises(ImportBusinessPlanError, match="identity is misbound"):
+        validate_import_business_plan_archive(
+            sections,
+            scenario=base_scenario,
+            protocol=protocol,
+            verify_files=True,
+        )
+
+    relabeled_static = _plain(sections.static_expectation)
+    relabeled_static["version"] = "2022.1"
+    live = _plain(sections.live_binding)
+    relabeled = replace(
+        sections,
+        static_expectation=MappingProxyType(relabeled_static),
+        delta_rules=tuple(
+            MappingProxyType(rule)
+            for rule in _rules(relabeled_static, live)
+        ),
+        fixture_spec=MappingProxyType(
+            {
+                "kind": "import_materialized_runtime_v1",
+                "sha256": _hash({"static": relabeled_static, "live": live}),
+            }
+        ),
+    )
+    with pytest.raises(ImportBusinessPlanError, match="request contract/version"):
+        validate_import_business_plan_archive(
+            relabeled,
+            scenario=replace(unit.scenario, versions=("2022.1",)),
+            protocol=protocol,
+            verify_files=True,
+        )
+
+
+def test_reviewed_2025_tab_import_replays_version_projected_fixture_paths(
+    tmp_path: Path,
+) -> None:
+    unit = next(
+        row
+        for row in load_typed_input_profile(TYPED_PROFILE).units
+        if row.unit_id == "TYP25-INLINE-TAB-IMPORT"
+    )
+    project = tmp_path / "sandbox" / "SampleProject.wproj"
+    project.parent.mkdir(parents=True)
+    project.write_text("<WwiseDocument/>", encoding="utf-8")
+    materialized = materialize_import_case(
+        unit.scenario,
+        version=unit.version,
+        asset_root=tmp_path / "assets",
+    )
+    plan = build_import_runtime_plan(
+        unit.scenario,
+        materialized,
+        sandbox_project=project,
+    )
+    before = _snapshot(plan, before=True)
+    protocol = build_transaction_protocol(plan.operation_requests)
+    sections = compile_import_business_plan(
+        unit.scenario,
+        materialized,
+        plan,
+        before,
+        protocol,
+    )
+
+    validate_import_business_plan_archive(
+        sections,
+        scenario=unit.scenario,
+        protocol=protocol,
+        verify_files=True,
+    )
+    assert sections.static_expectation["operation_requests"][0]["version"] == "2025.1"
+    assert sections.static_expectation["operation_requests"][0]["arguments"][
+        "import_location"
+    ]["value"].startswith(r"\Containers")
 
 
 @pytest.mark.parametrize(

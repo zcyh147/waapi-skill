@@ -21,6 +21,12 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any, Mapping, Sequence
 
+from wwise_waapi.operation_registry import (
+    BUSINESS_DECLARATION_INPUT_MODE,
+    COMPOSER_INPUT_MODE,
+    operation_input_mode,
+)
+
 
 WORKFLOW_BUSINESS_PLAN_SCHEMA = "waapi-skill.workflow-business-plan/v1"
 WORKFLOW_FIXTURE_KIND = "workflow_materialized_v1"
@@ -501,10 +507,83 @@ def _matches_transaction_step_sequence(
     ]
     if actual == legacy:
         return True
+    input_mode = operation_input_mode(
+        str(transaction.get("operation")),
+        str(transaction.get("version", "2022.1")),
+    )
+    soundbank_operations = {
+        "soundbank.convertExternalSources",
+        "soundbank.generate",
+        "soundbank.processDefinitionFiles",
+        "soundbank.setInclusions",
+    }
     if (
-        transaction.get("operation") not in {"object.set", "audio.import"}
-        or len(actual) < 9
+        input_mode == BUSINESS_DECLARATION_INPUT_MODE
+        and transaction.get("operation") in soundbank_operations
     ):
+        tail = [
+            (f"{transaction_id}.{suffix}", kind)
+            for suffix, kind in _OBJECT_SET_COMPOSER_TAIL_KINDS
+        ]
+        if len(actual) < len(tail) + 3 or actual[-len(tail) :] != tail:
+            return False
+        construction = actual[: -len(tail)]
+        if construction[0] != (
+            f"{transaction_id}.operation-schema",
+            "operation_schema",
+        ):
+            return False
+        cursor = 1
+        query_indexes: list[int] = []
+        while cursor < len(construction) and construction[cursor][0].startswith(
+            f"{transaction_id}.query-object."
+        ):
+            name, kind = construction[cursor]
+            if kind != "operation_compose":
+                return False
+            raw_index = name.rpartition(".")[2]
+            if len(raw_index) != 3 or not raw_index.isdigit():
+                return False
+            query_indexes.append(int(raw_index))
+            cursor += 1
+        if (
+            cursor >= len(construction)
+            or construction[cursor]
+            != (f"{transaction_id}.draft-start", "operation_compose")
+        ):
+            return False
+        cursor += 1
+        bind_indexes: list[int] = []
+        while cursor < len(construction) and construction[cursor][0].startswith(
+            f"{transaction_id}.bind-object."
+        ):
+            name, kind = construction[cursor]
+            if kind != "operation_compose":
+                return False
+            raw_index = name.rpartition(".")[2]
+            if len(raw_index) != 3 or not raw_index.isdigit():
+                return False
+            bind_indexes.append(int(raw_index))
+            cursor += 1
+        if construction[cursor:] != [
+            (
+                f"{transaction_id}.declare-soundbank-plan",
+                "operation_compose",
+            )
+        ]:
+            return False
+        if transaction.get("operation") in {
+            "soundbank.generate",
+            "soundbank.setInclusions",
+        } and not bind_indexes:
+            return False
+        return all(
+            indexes == list(range(1, len(indexes) + 1))
+            for indexes in (query_indexes, bind_indexes)
+        )
+    if input_mode not in {COMPOSER_INPUT_MODE, BUSINESS_DECLARATION_INPUT_MODE}:
+        return False
+    if len(actual) < 9:
         return False
     if actual[:2] != [
         (f"{transaction_id}.operation-schema", "operation_schema"),
@@ -517,11 +596,189 @@ def _matches_transaction_step_sequence(
     ]
     if actual[-len(tail) :] != tail:
         return False
-    actions = actual[2 : -len(tail)]
-    return actions == [
-        (f"{transaction_id}.action.{index:03d}", "operation_compose")
-        for index in range(1, len(actions) + 1)
+    construction = actual[2 : -len(tail)]
+    for name, kind in construction:
+        if kind != "operation_compose":
+            return False
+    prefixes = [
+        name.removeprefix(f"{transaction_id}.") for name, _kind in construction
     ]
+    if input_mode == BUSINESS_DECLARATION_INPUT_MODE:
+        if not prefixes:
+            return False
+        if transaction.get("operation") == "object.setRTPC":
+            return prefixes == [
+                "bind-owner",
+                "discover-property",
+                "bind-control-input",
+                "declare-rtpc",
+            ]
+        if transaction.get("operation") == "object.set":
+            phase = 0
+            saw_binding = False
+            saw_declaration = False
+            for prefix in prefixes:
+                if re.fullmatch(r"bind-(?:target|reference)-[0-9]{2}-[0-9]{2}", prefix):
+                    if phase > 0:
+                        return False
+                    saw_binding = True
+                    continue
+                if re.fullmatch(r"discover-field-[0-9]{2}", prefix):
+                    if phase > 1:
+                        return False
+                    phase = 1
+                    continue
+                if re.fullmatch(
+                    r"declare-(?:existing-(?:[0-9]{2}|batch)|child-[0-9]{2}(?:-[0-9]{2})+)",
+                    prefix,
+                ):
+                    phase = 2
+                    saw_declaration = True
+                    continue
+                return False
+            return saw_binding and saw_declaration
+        if transaction.get("operation") in {
+            "object.setLinked",
+            "object.setProperty",
+            "object.setReference",
+        }:
+            return prefixes in (
+                ["bind-object", "discover-field", "declare-field-change"],
+                [
+                    "bind-object",
+                    "discover-field",
+                    "bind-target",
+                    "declare-field-change",
+                ],
+            )
+        if transaction.get("operation") in {
+            "switchContainer.addAssignment",
+            "switchContainer.removeAssignment",
+        }:
+            return prefixes == [
+                "bind-switch-container",
+                "bind-child",
+                "bind-state-or-switch",
+                "declare-switch-assignment",
+            ]
+        if transaction.get("operation") == "audio.import":
+            try:
+                first_batch = prefixes.index("declare-batch")
+            except ValueError:
+                return False
+            batch_prefixes = prefixes[first_batch:]
+            expected_batch_prefixes = [
+                "declare-batch",
+                *(
+                    f"declare-batch-{index:02d}"
+                    for index in range(2, len(batch_prefixes) + 1)
+                ),
+            ]
+            if batch_prefixes != expected_batch_prefixes:
+                return False
+            setup_prefixes = prefixes[:first_batch]
+            configure_seen = False
+            counters = {"bind-object": [], "bind-field": []}
+            for prefix in setup_prefixes:
+                if prefix == "configure":
+                    if configure_seen:
+                        return False
+                    configure_seen = True
+                    continue
+                family, separator, raw_index = prefix.rpartition(".")
+                if (
+                    not separator
+                    or family not in counters
+                    or len(raw_index) != 3
+                    or not raw_index.isdigit()
+                    or configure_seen
+                ):
+                    return False
+                counters[family].append(int(raw_index))
+            return bool(counters["bind-object"]) and all(
+                indexes == list(range(1, len(indexes) + 1))
+                for indexes in counters.values()
+            )
+        counters = {"bind-object": [], "bind-field": [], "declare": []}
+        configure_seen = False
+        declaration_seen = False
+        for prefix in prefixes:
+            if prefix == "configure":
+                if configure_seen or declaration_seen:
+                    return False
+                configure_seen = True
+                continue
+            family, separator, raw_index = prefix.rpartition(".")
+            if (
+                not separator
+                or family not in counters
+                or len(raw_index) != 3
+                or not raw_index.isdigit()
+            ):
+                return False
+            if family in {"bind-object", "bind-field"} and (
+                configure_seen or declaration_seen
+            ):
+                return False
+            if family == "declare":
+                declaration_seen = True
+            counters[family].append(int(raw_index))
+        return (
+            bool(counters["bind-object"])
+            and bool(counters["declare"])
+            and all(
+                indexes == list(range(1, len(indexes) + 1))
+                for indexes in counters.values()
+            )
+        )
+    action_indexes: list[int] = []
+    disclosure_positions: list[int] = []
+    for position, prefix in enumerate(prefixes):
+        if prefix.startswith("action."):
+            raw_index = prefix.removeprefix("action.")
+            if len(raw_index) != 3 or not raw_index.isdigit():
+                return False
+            action_indexes.append(int(raw_index))
+        elif prefix.startswith("disclose."):
+            disclosure_positions.append(position)
+        else:
+            return False
+    if not action_indexes or sorted(action_indexes) != list(
+        range(1, len(action_indexes) + 1)
+    ):
+        return False
+    if not disclosure_positions:
+        return action_indexes == sorted(action_indexes)
+    cursor = 0
+    initial_actions: list[int] = []
+    while cursor < len(prefixes) and prefixes[cursor].startswith("action."):
+        initial_actions.append(int(prefixes[cursor].removeprefix("action.")))
+        cursor += 1
+    if initial_actions != sorted(initial_actions):
+        return False
+    disclosure_index = 1
+    while cursor < len(prefixes):
+        disclosed = 0
+        while cursor < len(prefixes) and prefixes[cursor].startswith("disclose."):
+            base = f"disclose.{disclosure_index:03d}"
+            if prefixes[cursor] == f"{base}.choices":
+                cursor += 1
+            if cursor >= len(prefixes) or prefixes[cursor] != base:
+                return False
+            cursor += 1
+            disclosure_index += 1
+            disclosed += 1
+        if disclosed == 0:
+            return False
+        dependent_actions: list[int] = []
+        while cursor < len(prefixes) and prefixes[cursor].startswith("action."):
+            dependent_actions.append(
+                int(prefixes[cursor].removeprefix("action."))
+            )
+            cursor += 1
+        if not dependent_actions or dependent_actions != sorted(dependent_actions):
+            return False
+    return True
 
 
 def _validate_diagnostic_evidence(

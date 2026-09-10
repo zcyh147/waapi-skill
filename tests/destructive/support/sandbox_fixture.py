@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 import shutil
+import sys
 import tempfile
 import time
 import uuid
@@ -15,7 +16,12 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Mapping
 
-from wwise_waapi.headless import HeadlessLifecycle, LifecycleTimeouts  # pyright: ignore[reportMissingImports]
+from wwise_waapi.headless import (  # pyright: ignore[reportMissingImports]
+    HeadlessLifecycle,
+    LifecycleTimeouts,
+    PortUnavailable,
+    assert_port_free,
+)
 from .live_environment import (  # pyright: ignore[reportMissingImports]
     ENV_WWISE_FIXTURE_PROJECT,
     ENV_WWISE_SANDBOX_ROOT,
@@ -51,10 +57,77 @@ REAL_LAUNCH_AUDIT_PATH = Path(".waapi-skill-state") / "evidence" / "waapi-test-r
 _LOCK_REGION_BYTES = 1
 _WINDOWS_LOCK_RETRY_SECONDS = 0.05
 _WINDOWS_LOCK_VIOLATION = 33
+_PORT_RELEASE_TIMEOUT_SECONDS = 15.0
+_PORT_RELEASE_POLL_SECONDS = 0.1
+_MACOS_WWISE_2022_VERSION = "2022.1"
+_WINE_COREAUDIO_OVERRIDE = "winecoreaudio.drv="
 
 
 class SandboxFixtureError(RuntimeError):
     """Raised when a sandbox copy would be unsafe or incomplete."""
+
+
+def prepare_headless_console_environment(
+    environment: Mapping[str, str],
+    *,
+    version: str,
+    platform_name: str | None = None,
+) -> dict[str, str]:
+    """Isolate the macOS Wwise 2022 Console from its hanging audio driver."""
+
+    prepared = dict(environment)
+    current_platform = sys.platform if platform_name is None else platform_name
+    if current_platform != "darwin" or version != _MACOS_WWISE_2022_VERSION:
+        return prepared
+
+    existing = prepared.get("WINEDLLOVERRIDES", "")
+    retained = [
+        item.strip()
+        for item in existing.split(";")
+        if item.strip()
+        and not item.strip().casefold().startswith("winecoreaudio.drv=")
+    ]
+    retained.append(_WINE_COREAUDIO_OVERRIDE)
+    prepared["WINEDLLOVERRIDES"] = ";".join(retained)
+
+    # Audiokinetic's Wwise 2022 launcher delegates to CrossOver's Perl
+    # ``wine`` wrapper.  That wrapper deliberately deletes the inherited
+    # WINEDLLOVERRIDES value, then reapplies variables supplied through its
+    # CX_ENV option.  Carry the same scoped override through that supported
+    # seam so the Windows child cannot initialize the hanging CoreAudio
+    # driver.  Appending makes this value authoritative if CX_ENV already
+    # contains a stale override.
+    crossover_override = f"WINEDLLOVERRIDES={_WINE_COREAUDIO_OVERRIDE}"
+    existing_crossover_env = prepared.get("CX_ENV", "").strip()
+    prepared["CX_ENV"] = " ".join(
+        item for item in (existing_crossover_env, crossover_override) if item
+    )
+    return prepared
+
+
+def wait_for_port_release(
+    host: str,
+    port: int,
+    *,
+    timeout_seconds: float = _PORT_RELEASE_TIMEOUT_SECONDS,
+    poll_interval_seconds: float = _PORT_RELEASE_POLL_SECONDS,
+) -> None:
+    """Wait until a stopped Wwise host has released its exact server port."""
+
+    if timeout_seconds <= 0 or poll_interval_seconds < 0:
+        raise SandboxFixtureError("port-release timing bounds are invalid")
+    deadline = time.monotonic() + timeout_seconds
+    while True:
+        try:
+            assert_port_free(host, port)
+            return
+        except PortUnavailable as exc:
+            if time.monotonic() >= deadline:
+                raise SandboxFixtureError(
+                    f"Wwise WAAPI port 0.0.0.0:{port} remained occupied after "
+                    f"the {timeout_seconds:g}-second release wait"
+                ) from exc
+            time.sleep(poll_interval_seconds)
 
 
 class _PosixLiveSandboxLockBackend:
@@ -424,6 +497,10 @@ def launch_sandboxed_wwise(
     contract = require_destructive_environment(env_map)
     if contract.active_destructive_project != sandbox.sandbox_project.resolve(strict=False):
         raise SandboxFixtureError("destructive environment did not select the sandbox project")
+    env_map = prepare_headless_console_environment(
+        env_map,
+        version=contract.version,
+    )
 
     launch_cwd = sandbox.sandbox_root.resolve(strict=True)
     lifecycle = HeadlessLifecycle(

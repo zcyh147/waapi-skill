@@ -23,6 +23,9 @@ from tests.semantic.support.codex_campaign import (
 )
 from tests.semantic.support.codex_eval_suite import EvalSession
 from tests.semantic.support.codex_filesystem_security import binary_file_open_flags
+from tests.semantic.support.codex_gateway_contracts import (
+    task_local_runner_matches_normalized,
+)
 from tests.semantic.support.codex_harness import (
     WORKSPACE_SKILL_EXCLUDED_NAMES,
     assert_detached_workspace_skill_copy,
@@ -1076,10 +1079,18 @@ def _command_record_matches_broker_raw_argv(
         or normalized_model_argv[2] != "gateway.py"
     ):
         return False
+    raw_runner_matches = (
+        _same_absolute_lexical_path(observed[1], model_argv[1])
+        and _same_absolute_lexical_path(model_argv[1], normalized_model_argv[1])
+        or observed[1] == model_argv[1]
+        and task_local_runner_matches_normalized(
+            model_argv[1],
+            normalized_model_argv[1],
+        )
+    )
     return (
         observed[0] in {model_argv[0], normalized_model_argv[0]}
-        and _same_absolute_lexical_path(observed[1], model_argv[1])
-        and _same_absolute_lexical_path(model_argv[1], normalized_model_argv[1])
+        and raw_runner_matches
         and observed[2:] == model_argv[2:]
     )
 

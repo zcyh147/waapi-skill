@@ -34,3 +34,16 @@ def pytest_collection_modifyitems(items):
                     reason="WWISE_LIVE=1 and WWISE_DESTRUCTIVE=1 are required for destructive tests"
                 )
             )
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    """Retain exact phase outcomes for real-evidence fixture finalizers."""
+
+    outcome = yield
+    report = outcome.get_result()
+    reports = getattr(item, "_waapi_phase_reports", None)
+    if reports is None:
+        reports = {}
+        setattr(item, "_waapi_phase_reports", reports)
+    reports[report.when] = report.outcome

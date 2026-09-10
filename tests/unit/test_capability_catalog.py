@@ -65,7 +65,7 @@ def test_catalog_separates_route_safety_and_evidence_without_overclaiming() -> N
     assert read.safety.requires_destructive_gate is False
     assert closed_mutation.preferred_route == "transaction_operation"
     assert closed_mutation.transaction_operations == ("object.create",)
-    assert closed_mutation.gateway_commands == ("preview", "confirm", "execute", "verify")
+    assert closed_mutation.gateway_commands == ("operation-schema",)
     assert closed_mutation.safety.interface_status == "available_via_transaction"
     assert mutation.semantic_family == "soundbank"
     assert mutation.safety.requires_destructive_gate is True
@@ -196,13 +196,13 @@ def test_selection_guidance_registry_contains_only_reflected_bounded_records() -
 def test_2025_media_pool_reads_use_the_bounded_direct_route() -> None:
     catalog = CapabilityCatalog()
 
-    for uri in (
-        "ak.wwise.core.mediaPool.get",
-        "ak.wwise.core.mediaPool.getFields",
-    ):
+    for uri, gateway_commands in {
+        "ak.wwise.core.mediaPool.get": ("request-schema", "core-call"),
+        "ak.wwise.core.mediaPool.getFields": ("request-schema",),
+    }.items():
         capability = catalog.describe("2025.1", uri)
         assert capability.preferred_route == "manifest_dispatch"
-        assert capability.gateway_commands == ("call",)
+        assert capability.gateway_commands == gateway_commands
         assert capability.safety.read_only is True
         assert capability.safety.requires_authorization is False
 
@@ -226,15 +226,15 @@ def test_catalog_keeps_specific_builder_boundaries_and_hides_generic_bypass() ->
         "object.setRTPC",
     )
     assert batch.transaction_boundaries == ()
-    assert copy.transaction_boundaries[0]["operation"] == "object.copy"
-    assert copy.transaction_operations == ("waapi.call",)
+    assert copy.transaction_boundaries == ()
+    assert copy.transaction_operations == ("object.copy",)
     assert audio_import.transaction_operations == ("audio.import",)
     assert audio_import.preferred_route == "transaction_operation"
     assert tab_import.transaction_operations == ("audio.importTabDelimited",)
     assert tab_import.transaction_boundaries == ()
     for generic in (batch, copy, tab_import):
         assert generic.preferred_route == "transaction_operation"
-        assert generic.gateway_commands == ("preview", "confirm", "execute", "verify")
+        assert generic.gateway_commands == ("operation-schema",)
         assert generic.safety.interface_status == "available_via_transaction"
         assert generic.safety.requires_authorization is True
 
@@ -279,7 +279,7 @@ def test_semantic_inventory_is_version_aware_and_bounded_reads_are_public() -> N
     assert linked.safety.read_only is True
     assert linked.safety.interface_status == "available"
     assert linked.preferred_route == "manifest_dispatch"
-    assert linked.gateway_commands == ("call",)
+    assert linked.gateway_commands == ("request-schema", "core-call")
     assert linked.execution_contract["timeout_seconds"] == 10.0
     assert linked.execution_contract["result_limit_bytes"] == 256 * 1024
 
@@ -292,15 +292,15 @@ def test_catalog_summary_reconciles_all_five_version_totals() -> None:
     assert summary["totals"]["total"] == 814
     assert summary["totals"]["schema_status"] == {"ok": 814}
     assert summary["totals"]["interface_status"] == {
-        "available": 268,
-        "available_via_transaction": 540,
+        "available": 319,
+        "available_via_transaction": 489,
         "unsupported_by_skill_interface": 6,
     }
     assert summary["totals"]["preferred_routes"] == {
         "bounded_topic_wait": 152,
         "fixed_command": 56,
-        "manifest_dispatch": 60,
-        "transaction_operation": 540,
+        "manifest_dispatch": 111,
+        "transaction_operation": 489,
         "unsupported_boundary": 6,
     }
     assert "semantic_builder" not in summary["totals"]["preferred_routes"]
@@ -335,8 +335,8 @@ def test_all_semantic_read_records_resolve_to_public_gateway_routes() -> None:
     assert len(semantic_reads) == 71
     assert sum(entry.preferred_route == "fixed_command" for entry in semantic_reads) == 30
     assert sum(entry.preferred_route == "bounded_topic_wait" for entry in semantic_reads) == 25
-    assert sum(entry.preferred_route == "manifest_dispatch" for entry in semantic_reads) == 6
-    assert sum(entry.preferred_route == "transaction_operation" for entry in semantic_reads) == 10
+    assert sum(entry.preferred_route == "manifest_dispatch" for entry in semantic_reads) == 16
+    assert sum(entry.preferred_route == "transaction_operation" for entry in semantic_reads) == 0
     assert all(entry.preferred_route != "semantic_builder" for entry in entries)
     assert all(
         entry.gateway_commands
@@ -349,16 +349,13 @@ def test_all_semantic_read_records_resolve_to_public_gateway_routes() -> None:
     imported = catalog.describe("2022.1", "ak.wwise.core.audio.imported")
     inclusions = catalog.describe("2022.1", "ak.wwise.core.soundbank.getInclusions")
     assert object_get.gateway_commands == ("query-object", "buses")
-    assert property_info.gateway_commands == (
-        "metadata property-info",
-        "metadata discover",
-    )
+    assert property_info.gateway_commands == ("metadata discover",)
     assert imported.gateway_commands == ("wait-topic", "stream-topic")
-    assert inclusions.gateway_commands == ("preview", "confirm", "execute", "verify")
-    assert inclusions.preferred_route == "transaction_operation"
-    assert inclusions.transaction_operations == ("waapi.call",)
+    assert inclusions.gateway_commands == ("request-schema", "core-call")
+    assert inclusions.preferred_route == "manifest_dispatch"
+    assert inclusions.transaction_operations == ()
     assert inclusions.safety.read_only is True
-    assert inclusions.safety.requires_authorization is True
+    assert inclusions.safety.requires_authorization is False
 
     public = object_get.as_dict(detail=True)["interface"]
     assert "semantic_builder_ref" not in public
@@ -378,13 +375,26 @@ def test_public_manifest_dispatch_is_exactly_the_immutable_reviewed_call_allowli
             "ak.soundengine.getSwitch",
             "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
             "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion",
+            "ak.wwise.core.blendContainer.getAssignments",
             "ak.wwise.core.mediaPool.get",
             "ak.wwise.core.mediaPool.getFields",
+            "ak.wwise.core.log.get",
             "ak.wwise.core.object.diff",
             "ak.wwise.core.object.isLinked",
             "ak.wwise.core.ping",
+            "ak.wwise.core.profiler.getAudioObjects",
+            "ak.wwise.core.profiler.getBusses",
+            "ak.wwise.core.profiler.getCpuUsage",
             "ak.wwise.core.profiler.getCursorTime",
+            "ak.wwise.core.profiler.getLoadedMedia",
+            "ak.wwise.core.profiler.getMeters",
+            "ak.wwise.core.profiler.getPerformanceMonitor",
+            "ak.wwise.core.profiler.getRTPCs",
+            "ak.wwise.core.profiler.getStreamedMedia",
+            "ak.wwise.core.profiler.getVoices",
             "ak.wwise.core.remote.getConnectionStatus",
+            "ak.wwise.core.soundbank.getInclusions",
+            "ak.wwise.core.switchContainer.getAssignments",
             "ak.wwise.core.transport.getState",
             "ak.wwise.ui.commands.getCommands",
             "ak.wwise.waapi.getFunctions",
@@ -397,7 +407,12 @@ def test_public_manifest_dispatch_is_exactly_the_immutable_reviewed_call_allowli
     assert public_topics == REVIEWED_TOPIC_URIS
     assert frozenset(FIXED_COMMANDS_BY_URI) == REVIEWED_FIXED_FUNCTION_URIS
     assert all(
-        entry.gateway_commands == ("call",)
+        entry.gateway_commands
+        in {
+            ("request-schema",),
+            ("request-schema", "core-call"),
+            ("request-schema", "waapi-schema"),
+        }
         for entry in entries
         if entry.preferred_route == "manifest_dispatch"
     )
@@ -518,9 +533,8 @@ def test_compact_capability_representation_is_stable_and_keeps_boundaries_visibl
     }
     assert compact["interface_status"] == "available_via_transaction"
     assert compact["preferred_route"] == "transaction_operation"
-    assert compact["transaction_operations"] == ["waapi.call"]
-    assert compact["transaction_boundaries"][0]["operation"] == "object.copy"
-    assert "returned copy GUID" in compact["transaction_boundaries"][0]["boundary"]
+    assert compact["transaction_operations"] == ["object.copy"]
+    assert compact["transaction_boundaries"] == []
     assert compact["execution_contract"]["contract"] == "waapi-skill.public-execution-contract/v2"
     assert compact["execution_contract"]["route"] == "transaction"
     assert compact["execution_contract"]["executable"] is True
@@ -540,7 +554,7 @@ def test_dump_objects_external_file_write_is_an_isolated_authorized_transaction(
     assert record.safety.requires_authorization is True
     assert record.preferred_route == "transaction_operation"
     assert record.execution_mode == "isolated_transaction"
-    assert record.gateway_commands == ("preview", "confirm", "execute", "verify")
+    assert record.gateway_commands == ("request-schema",)
     assert record.transaction_operations == ("waapi.call",)
     assert record.execution_contract["timeout_seconds"] == 120.0
     assert record.execution_contract["result_limit_bytes"] == 1024 * 1024

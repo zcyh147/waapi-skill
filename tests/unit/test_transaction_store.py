@@ -23,6 +23,7 @@ from wwise_waapi.transactions import (
     StateCorruptionError,
     StateDirectoryNotConfigured,
     TransactionNotFound,
+    TransactionRecreateRequired,
     TransactionState,
     TransactionStore,
     UnsafeTransactionId,
@@ -649,6 +650,22 @@ def test_rejected_indeterminate_and_repreview_paths(tmp_path) -> None:
     )
     assert store.mark_execution_indeterminate("tx-indeterminate").state is TransactionState.INDETERMINATE
 
+    created = store.create_preview("tx-execution-failed", {"x": 4})
+    store.submit_for_confirmation("tx-execution-failed")
+    store.confirm("tx-execution-failed", artifact_hash=created.artifact_hash)
+    store.begin_execution(
+        "tx-execution-failed",
+        expected_authorization=TransactionState.CONFIRMED,
+    )
+    failed = store.mark_execution_failed(
+        "tx-execution-failed",
+        details={"error_code": "CALL_REJECTED"},
+    )
+    assert failed.state is TransactionState.EXECUTION_FAILED
+    assert store.read_events("tx-execution-failed")[-1]["event_type"] == (
+        "execution_failed"
+    )
+
     created = store.create_preview("tx-repreview", {"x": 3})
     store.submit_for_confirmation("tx-repreview")
     store.confirm("tx-repreview", artifact_hash=created.artifact_hash)
@@ -714,7 +731,7 @@ def test_preview_artifact_tampering_is_detected_before_transition(tmp_path) -> N
 @pytest.mark.parametrize(
     ("field", "replacement", "error_type", "message"),
     [
-        ("schema_version", 999, StateCorruptionError, "Unsupported preview schema"),
+        ("schema_version", 999, TransactionRecreateRequired, "must be recreated"),
         ("transaction_id", "tx-other", ArtifactIntegrityError, "transaction id mismatch"),
         ("artifact", None, StateCorruptionError, "artifact fields are missing"),
         ("created_at", "", StateCorruptionError, "created_at is missing"),
@@ -739,7 +756,7 @@ def test_malformed_preview_envelopes_fail_closed(tmp_path, field, replacement, e
 @pytest.mark.parametrize(
     ("field", "replacement", "error_type", "message"),
     [
-        ("schema_version", 999, StateCorruptionError, "Unsupported transaction state schema"),
+        ("schema_version", 999, TransactionRecreateRequired, "must be recreated"),
         ("transaction_id", "tx-other", StateCorruptionError, "state id"),
         ("state", "unknown", StateCorruptionError, "recognized transaction state"),
         ("artifact_hash", "0" * 64, ArtifactIntegrityError, "does not match preview"),

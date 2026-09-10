@@ -1,0 +1,52 @@
+{
+  "audit": {
+    "duplicate_lanes": [],
+    "missing_continuations": [],
+    "missing_host_overlays": [],
+    "missing_lanes": [],
+    "missing_semantic_overlays": [],
+    "unexpected_lanes": [],
+    "unknown_schema_keywords": [],
+    "unresolved_references": []
+  },
+  "construction_shapes": {
+    "draft": 114,
+    "inline": 463,
+    "topic": 154,
+    "zero": 93
+  },
+  "contract": "waapi-skill.full-surface-release-report/v1",
+  "coverage": {
+    "construction_covered_lanes": 824,
+    "function_lanes": 670,
+    "topic_lanes": 154,
+    "total_lanes": 824,
+    "unique_function_uris": 167,
+    "unique_topic_uris": 33
+  },
+  "execution_routes": {
+    "bounded_call": 113,
+    "bounded_topic_wait": 154,
+    "compound_transaction_member": 15,
+    "fixed_command": 56,
+    "isolated_transaction": 141,
+    "managed_transaction": 232,
+    "transaction": 113
+  },
+  "host_lanes": {
+    "wwise-authoring": 25,
+    "wwise-console": 799
+  },
+  "intentionally_blocked_field_occurrences": 79,
+  "source_inventory": {
+    "contract": "waapi-skill.typed-request-surface/v1",
+    "inventory_sha256": "7cbe0a9ba6d9756c94ecea58bb1b2ac56da242059f17c5cdfdaf768271d133a8",
+    "versions": [
+      "2021.1",
+      "2022.1",
+      "2023.1",
+      "2024.1",
+      "2025.1"
+    ]
+  }
+}

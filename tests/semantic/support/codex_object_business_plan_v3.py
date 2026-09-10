@@ -29,6 +29,9 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_direct_protocol,
     build_metadata_transaction_protocol,
     build_modification_policy_protocol,
+    build_optional_query_repair_protocol,
+    build_optional_query_schema_protocol,
+    build_operations_discovery_protocol,
     build_schema_query_transaction_protocol,
     build_transaction_protocol,
     query_object_step,
@@ -38,12 +41,15 @@ from tests.semantic.support.codex_filesystem_security import (
     read_bounded_exclusive_regular_file,
 )
 from tests.semantic.support.codex_gateway_broker import (
-    MetadataBoundJsonArgument,
+    DraftActionMetadataBinding,
+    DraftTypedActionBatchArgument,
 )
 from tests.semantic.support.codex_object_heavy_v3 import (
+    OBJECT_COMPOUND_CROSS_VERSION_CASE_VERSIONS,
     ObjectHeavyRecipe,
     OperationRequestSpec,
     QueryObjectRequestSpec,
+    business_query_path_arguments,
 )
 from tests.semantic.support.codex_object_runtime_v3 import ObjectRuntimeSnapshot
 from tests.semantic.support.codex_prompt_provenance_v3 import serialize_protocol
@@ -59,6 +65,34 @@ OBJECT_APIS = frozenset(
         "ak.wwise.core.object.get",
         "ak.wwise.core.object.create",
         "ak.wwise.core.object.set",
+    }
+)
+TYPED_PROFILE_SET03_UNIT_ID = "TYP22-METADATA-OBJECT-SET"
+TYPED_PROFILE_QUERY_REPAIR_UNIT_ID = "TYP22-GENERIC-OBJECT-QUERY"
+TYPED_PROFILE_RENAME_UNIT_ID = "TYP23-DEDICATED-OBJECT-CREATE"
+TYPED_PROFILE_OBJECT_METADATA_UNITS = MappingProxyType(
+    {
+        TYPED_PROFILE_SET03_UNIT_ID: (
+            "OBJ22-F-SET-03",
+            "ak.wwise.core.object.set",
+            "2022.1",
+            ("volume", "pitch", "notes", "output bus"),
+            ("Volume", "Pitch", "OutputBus"),
+        ),
+        "TYP24-METADATA-OBJECT-SET": (
+            "OBJ22-F-SET-01",
+            "ak.wwise.core.object.set",
+            "2024.1",
+            ("volume",),
+            ("Volume",),
+        ),
+        "TYP25-METADATA-OBJECT-SET": (
+            "OBJ22-F-SET-02",
+            "ak.wwise.core.object.set",
+            "2025.1",
+            ("volume",),
+            ("Volume",),
+        ),
     }
 )
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -150,11 +184,18 @@ def compile_object_business_plan(
     protocol: V3GatewayProtocol,
     before: ObjectRuntimeSnapshot,
     input_file_manifest: Sequence[Mapping[str, Any]] = (),
+    *,
+    profile_unit_id: str | None = None,
 ) -> ObjectBusinessPlanSections:
     """Compile one exact object plan from reviewed and live runner inputs."""
 
     _validate_identity(scenario, recipe)
-    _validate_protocol(recipe, protocol, scenario=scenario)
+    _validate_protocol(
+        recipe,
+        protocol,
+        scenario=scenario,
+        profile_unit_id=profile_unit_id,
+    )
     before_value = _validate_before_snapshot(recipe, before)
     file_rows = _validate_input_manifest(
         input_file_manifest,
@@ -165,7 +206,11 @@ def compile_object_business_plan(
         },
         verify_files=True,
     )
-    static = _static_expectation(recipe, protocol)
+    static = _static_expectation(
+        recipe,
+        protocol,
+        profile_unit_id=profile_unit_id,
+    )
     live = _live_binding(before_value, file_rows)
     rules = _delta_rules(recipe, before_value)
     primary_steps, verification_steps = _step_partition(recipe, protocol)
@@ -240,6 +285,7 @@ def validate_object_business_plan(
     before: ObjectRuntimeSnapshot,
     input_file_manifest: Sequence[Mapping[str, Any]] = (),
     verify_files: bool = False,
+    profile_unit_id: str | None = None,
 ) -> None:
     """Recompile from live dataclasses and compare every persisted section."""
 
@@ -249,6 +295,7 @@ def validate_object_business_plan(
         protocol,
         before,
         input_file_manifest,
+        profile_unit_id=profile_unit_id,
     )
     if sections.writer_kwargs() != expected.writer_kwargs():
         raise ObjectBusinessPlanError(
@@ -269,13 +316,23 @@ def validate_archived_object_business_plan(
     recipe: ObjectHeavyRecipe,
     protocol: V3GatewayProtocol,
     verify_files: bool = False,
+    profile_unit_id: str | None = None,
 ) -> ObjectBusinessPlanSections:
     """Validate an archived plan after scenario-owned state may be removed."""
 
     _validate_identity(scenario, recipe)
-    _validate_protocol(recipe, protocol, scenario=scenario)
+    _validate_protocol(
+        recipe,
+        protocol,
+        scenario=scenario,
+        profile_unit_id=profile_unit_id,
+    )
     sections = parse_object_business_plan_sections(plan_payload)
-    static = _static_expectation(recipe, protocol)
+    static = _static_expectation(
+        recipe,
+        protocol,
+        profile_unit_id=profile_unit_id,
+    )
     if sections.static_expectation != static:
         raise ObjectBusinessPlanError(
             "object static expectation differs from reviewed recipe/protocol"
@@ -1540,7 +1597,47 @@ def _compound_metadata_protocol(
     scenario: Any,
     recipe: ObjectHeavyRecipe,
     protocol: V3GatewayProtocol,
+    *,
+    profile_unit_id: str | None,
 ) -> V3GatewayProtocol | None:
+    if profile_unit_id == TYPED_PROFILE_RENAME_UNIT_ID:
+        return None
+    if profile_unit_id == TYPED_PROFILE_QUERY_REPAIR_UNIT_ID:
+        if (
+            recipe.scenario_id,
+            recipe.api,
+            recipe.version,
+        ) != (
+            "OBJ22-F-GET-03",
+            "ak.wwise.core.object.get",
+            "2022.1",
+        ):
+            raise ObjectBusinessPlanError(
+                "query repair profile unit is outside its reviewed lane"
+            )
+        return None
+    if profile_unit_id is not None:
+        reviewed = TYPED_PROFILE_OBJECT_METADATA_UNITS.get(profile_unit_id)
+        if reviewed is None or (
+            recipe.scenario_id,
+            recipe.api,
+            recipe.version,
+        ) != reviewed[:3]:
+            raise ObjectBusinessPlanError(
+                "object metadata profile unit is outside its reviewed lane"
+            )
+        return None
+    else:
+        metadata_queries = ()
+        required_tokens = ()
+    if (
+        profile_unit_id is None
+        and isinstance(recipe.request, OperationRequestSpec)
+        and recipe.request.operation in {"object.create", "object.set"}
+        and all(step.subcommand != "metadata" for step in protocol.steps)
+    ):
+        return None
+
     fixture = getattr(scenario, "fixture", {})
     asset_spec = fixture.get("asset_spec") if isinstance(fixture, Mapping) else None
     value = (
@@ -1548,34 +1645,43 @@ def _compound_metadata_protocol(
         if isinstance(asset_spec, Mapping)
         else None
     )
-    if value is None:
+    if profile_unit_id is None and value is None:
         return None
-    if (
-        recipe.scenario_id
-        not in {
-            "OBJ22-F-CREATE-03",
-            "OBJ22-F-SET-01",
-            "OBJ22-F-SET-02",
-        }
-        or not isinstance(value, Mapping)
-        or set(value) != {"contract", "queries", "required_tokens"}
-        or value.get("contract") != "waapi-skill.compound-object-metadata/v1"
-        or value.get("queries") != ["volume"]
-        or value.get("required_tokens") != ["Volume"]
-    ):
-        raise ObjectBusinessPlanError(
-            "compound object metadata binding differs from the reviewed profile"
+    if profile_unit_id is None:
+        if (
+            recipe.scenario_id
+            not in {
+                "OBJ22-F-CREATE-03",
+                "OBJ22-F-SET-01",
+                "OBJ22-F-SET-02",
+            }
+            or not isinstance(value, Mapping)
+            or set(value) != {"contract", "queries", "required_tokens"}
+            or value.get("contract") != "waapi-skill.compound-object-metadata/v1"
+            or value.get("queries") != ["volume"]
+            or value.get("required_tokens") != ["Volume"]
+        ):
+            raise ObjectBusinessPlanError(
+                "compound object metadata binding differs from the reviewed profile"
+            )
+        metadata_queries = ("volume",)
+        required_tokens = ("Volume",)
+    metadata_bindings: list[DraftActionMetadataBinding] = []
+    for step in protocol.steps:
+        candidates: list[object] = [step.metadata_binding]
+        for argument in step.arguments:
+            candidates.append(getattr(argument, "metadata_binding", None))
+            if isinstance(argument, DraftTypedActionBatchArgument):
+                candidates.extend(action.metadata_binding for action in argument.actions)
+        metadata_bindings.extend(
+            binding
+            for binding in candidates
+            if isinstance(binding, DraftActionMetadataBinding)
         )
-    metadata_arguments = tuple(
-        argument
-        for step in protocol.steps
-        if step.subcommand == "preview"
-        for argument in step.arguments
-        if isinstance(argument, MetadataBoundJsonArgument)
-    )
+    metadata_arguments = tuple(dict.fromkeys(metadata_bindings))
     if (
         len(metadata_arguments) != 1
-        or metadata_arguments[0].expected_required_token_projection is None
+        or metadata_arguments[0].expected_projection is None
     ):
         raise ObjectBusinessPlanError(
             "compound object protocol omits its trusted live metadata projection"
@@ -1583,13 +1689,13 @@ def _compound_metadata_protocol(
     object_type = get_codex_version_layout_v3(recipe.version).reflected_type(
         "ActorMixer"
     )
-    return build_metadata_transaction_protocol(
+    metadata_protocol = build_metadata_transaction_protocol(
         (recipe.request.as_dict(version=recipe.version),),
         object_type=object_type,
-        metadata_queries=("volume",),
-        required_tokens=("Volume",),
+        metadata_queries=metadata_queries,
+        required_tokens=required_tokens,
         expected_required_token_projection=(
-            metadata_arguments[0].expected_required_token_projection
+            metadata_arguments[0].expected_projection
         ),
         equivalence=(
             "object_set_v1"
@@ -1598,13 +1704,17 @@ def _compound_metadata_protocol(
         ),
         schema_first=True,
     )
+    return metadata_protocol
 
 
 def build_object_merge_query_protocol(
     scenario: Any,
     recipe: ObjectHeavyRecipe,
+    *,
+    base_protocol: V3GatewayProtocol | None = None,
+    profile_unit_id: str | None = None,
 ) -> V3GatewayProtocol | None:
-    """Require exact live type evidence for the compound same-name merge."""
+    """Require exact live type evidence for one reviewed same-name create."""
 
     fixture = getattr(scenario, "fixture", {})
     asset_spec = fixture.get("asset_spec") if isinstance(fixture, Mapping) else None
@@ -1613,16 +1723,83 @@ def build_object_merge_query_protocol(
         if isinstance(asset_spec, Mapping)
         else None
     )
-    if binding is None:
+    typed_collision = profile_unit_id == TYPED_PROFILE_RENAME_UNIT_ID
+    if typed_collision:
+        if (
+            recipe.scenario_id != "OBJ22-F-CREATE-03"
+            or recipe.api != "ak.wwise.core.object.create"
+            or recipe.version != "2023.1"
+            or getattr(scenario, "id", None) != recipe.scenario_id
+            or getattr(scenario, "api", None) != recipe.api
+            or recipe.version not in tuple(getattr(scenario, "versions", ()))
+            or not isinstance(recipe.request, OperationRequestSpec)
+            or not isinstance(base_protocol, V3GatewayProtocol)
+        ):
+            raise ObjectBusinessPlanError(
+                "typed object collision identity binding differs from its reviewed lane"
+            )
+        roots = tuple(
+            item for item in recipe.fixture.objects if item.key == "old_impact"
+        )
+        if len(roots) != 1:
+            raise ObjectBusinessPlanError(
+                "typed object collision must identify one protected existing root"
+            )
+        root = roots[0]
+        if (
+            not base_protocol.steps
+            or base_protocol.steps[0].subcommand != "operation-schema"
+        ):
+            raise ObjectBusinessPlanError(
+                "typed object collision requires one schema-first transaction"
+            )
+        query = query_object_step(
+            "object.collision-root",
+            (
+                "query-object",
+                *business_query_path_arguments(root.path),
+            ),
+        )
+        return V3GatewayProtocol(
+            steps=(query, *base_protocol.steps),
+            turn_prefix_counts=tuple(
+                value + 1 for value in base_protocol.turn_prefix_counts
+            ),
+        )
+    if profile_unit_id is not None:
+        raise ObjectBusinessPlanError(
+            "object merge query profile unit is outside its reviewed lane"
+        )
+    if recipe.scenario_id != "OBJ22-F-CREATE-02":
+        if binding is not None:
+            raise ObjectBusinessPlanError(
+                "compound object merge identity binding differs from the reviewed profile"
+            )
+        return None
+    if binding is None and recipe.version != "2021.1":
         return None
     if (
-        recipe.scenario_id != "OBJ22-F-CREATE-02"
-        or not isinstance(binding, Mapping)
-        or dict(binding)
-        != {
-            "contract": "waapi-skill.compound-object-identity/v1",
-            "fixture_key": "robot",
-        }
+        getattr(scenario, "id", None) != recipe.scenario_id
+        or getattr(scenario, "api", None) != recipe.api
+        or recipe.version not in tuple(getattr(scenario, "versions", ()))
+        or (
+            binding is None
+            and recipe.version
+            not in OBJECT_COMPOUND_CROSS_VERSION_CASE_VERSIONS[
+                recipe.scenario_id
+            ]
+        )
+        or (
+            binding is not None
+            and (
+                not isinstance(binding, Mapping)
+                or dict(binding)
+                != {
+                    "contract": "waapi-skill.compound-object-identity/v1",
+                    "fixture_key": "robot",
+                }
+            )
+        )
         or not isinstance(recipe.request, OperationRequestSpec)
     ):
         raise ObjectBusinessPlanError(
@@ -1638,22 +1815,17 @@ def build_object_merge_query_protocol(
             "compound object merge must identify one existing request root"
         )
     root = roots[0]
+    if base_protocol is not None:
+        raise ObjectBusinessPlanError(
+            "compound object merge does not accept a foreign base protocol"
+        )
     return build_schema_query_transaction_protocol(
         (recipe.request.as_dict(version=recipe.version),),
         query_step=query_object_step(
             "object.merge-root",
             (
                 "query-object",
-                "--path",
-                root.path,
-                "--return-field",
-                "id",
-                "--return-field",
-                "name",
-                "--return-field",
-                "type",
-                "--return-field",
-                "path",
+                *business_query_path_arguments(root.path),
             ),
         ),
     )
@@ -1664,6 +1836,7 @@ def _validate_protocol(
     protocol: V3GatewayProtocol,
     *,
     scenario: Any,
+    profile_unit_id: str | None,
 ) -> None:
     if not isinstance(protocol, V3GatewayProtocol):
         raise ObjectBusinessPlanError("object protocol must be V3GatewayProtocol")
@@ -1673,6 +1846,7 @@ def _validate_protocol(
             scenario,
             recipe,
             protocol,
+            profile_unit_id=profile_unit_id,
         )
         if metadata_protocol is not None:
             expected_protocols = (metadata_protocol,)
@@ -1680,9 +1854,18 @@ def _validate_protocol(
             base = build_transaction_protocol(
                 [request.as_dict(version=recipe.version)]
             )
-            merge_protocol = build_object_merge_query_protocol(
-                scenario,
-                recipe,
+            merge_protocol = (
+                build_object_merge_query_protocol(
+                    scenario,
+                    recipe,
+                    base_protocol=base,
+                    profile_unit_id=profile_unit_id,
+                )
+                if profile_unit_id == TYPED_PROFILE_RENAME_UNIT_ID
+                else build_object_merge_query_protocol(
+                    scenario,
+                    recipe,
+                )
             )
             expected_protocols = (
                 (merge_protocol,)
@@ -1700,13 +1883,30 @@ def _validate_protocol(
                 )
             )
     elif isinstance(request, QueryObjectRequestSpec):
+        query = query_object_step("query-object", request.argv[3:])
+        base = (
+            build_optional_query_schema_protocol(query)
+            if "--max-results" in request.argv
+            else build_direct_protocol((query,))
+        )
         expected_protocols = (
-            build_direct_protocol(
-                [query_object_step("query-object", request.argv[3:])]
-            ),
+            build_optional_query_repair_protocol(query),
+        ) if profile_unit_id == TYPED_PROFILE_QUERY_REPAIR_UNIT_ID else (
+            base,
+            build_optional_query_schema_protocol(query, allow_advanced=True),
         )
     else:  # pragma: no cover - recipe union is closed
         raise ObjectBusinessPlanError("object recipe request type is unsupported")
+    if profile_unit_id is not None:
+        expected_protocols = tuple(
+            variant
+            for expected in expected_protocols
+            for variant in (
+                (expected, build_operations_discovery_protocol(expected))
+                if expected.steps[0].subcommand == "operation-schema"
+                else (expected,)
+            )
+        )
     if serialize_protocol(protocol) not in tuple(
         serialize_protocol(expected) for expected in expected_protocols
     ):
@@ -2027,10 +2227,12 @@ def _validate_input_manifest(
 def _static_expectation(
     recipe: ObjectHeavyRecipe,
     protocol: V3GatewayProtocol,
+    *,
+    profile_unit_id: str | None,
 ) -> dict[str, Any]:
     recipe_value = _json_value(recipe)
     request_value = _request_value(recipe)
-    return {
+    result = {
         "family_schema_version": OBJECT_BUSINESS_PLAN_SCHEMA,
         "family": "object",
         "api": recipe.api,
@@ -2042,6 +2244,9 @@ def _static_expectation(
         "request_sha256": _sha256_json(request_value),
         "protocol_projection_sha256": _sha256_json(serialize_protocol(protocol)),
     }
+    if profile_unit_id is not None:
+        result["profile_unit_id"] = profile_unit_id
+    return result
 
 
 def _request_value(recipe: ObjectHeavyRecipe) -> dict[str, Any]:

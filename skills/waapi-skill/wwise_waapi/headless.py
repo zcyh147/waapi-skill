@@ -29,7 +29,7 @@ DEFAULT_READINESS_TIMEOUT = 60.0
 DEFAULT_PROBE_INTERVAL = 0.25
 DEFAULT_PROBE_TIMEOUT = 5.0
 DEFAULT_SHUTDOWN_TIMEOUT = 10.0
-DEFAULT_KILL_TIMEOUT = 3.0
+DEFAULT_KILL_TIMEOUT = 10.0
 AUTO_WAAPI_PORT_FIRST = 30000
 AUTO_WAAPI_PORT_LAST = 32767
 WWISE_SERVER_BIND_HOST = "0.0.0.0"
@@ -430,6 +430,8 @@ class HeadlessLifecycle:
                 "stdout": subprocess.PIPE,
                 "stderr": subprocess.PIPE,
                 "text": True,
+                "encoding": "utf-8",
+                "errors": "replace",
                 "bufsize": 1,
             }
             if self.launch_cwd is not None:

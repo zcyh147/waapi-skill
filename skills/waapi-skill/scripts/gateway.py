@@ -8,6 +8,7 @@ import json
 import math
 import os
 import queue
+import re
 import shlex
 import stat
 import sys
@@ -42,12 +43,6 @@ from wwise_waapi.canonical import (  # noqa: E402  # pyright: ignore[reportMissi
 from wwise_waapi.builders.common import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     SemanticPreview,
     SemanticValidationError,
-)
-from wwise_waapi.builders.cli_request_templates import (  # noqa: E402  # pyright: ignore[reportMissingImports]
-    CLI_REQUEST_TEMPLATE_URIS,
-    build_cli_request_template,
-    build_cli_request_template_set,
-    is_cli_request_template_uri,
 )
 from wwise_waapi.builders.debug_lua import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     DebugLuaContractError,
@@ -86,6 +81,8 @@ from wwise_waapi.metadata_discovery import (  # noqa: E402  # pyright: ignore[re
     MAX_METADATA_DISCOVERY_QUERY_CHARS,
     MAX_METADATA_DISCOVERY_TOTAL_QUERY_CHARS,
     discover_metadata,
+    metadata_candidate_limit_contract,
+    metadata_typed_value_type,
 )
 from wwise_waapi.host_paths import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     HostPathError,
@@ -93,6 +90,7 @@ from wwise_waapi.host_paths import (  # noqa: E402  # pyright: ignore[reportMiss
     localize_waapi_host_path,
 )
 from wwise_waapi.platform_commands import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    GATEWAY_SHELL_TOOL_TIMEOUT_MS,
     PlatformCommandError,
     WINDOWS_MODEL_COMMAND_FAMILY,
     WINDOWS_POWERSHELL_ENCODED_FAMILY,
@@ -102,13 +100,9 @@ from wwise_waapi.platform_commands import (  # noqa: E402  # pyright: ignore[rep
 from wwise_waapi.builders.query import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     ADVANCED_QUERY_CONTRACT,
     MAX_QUERY_TAKE,
-    STRUCTURED_QUERY_CONTRACT,
-    SUPPORTED_SELECTS,
     advanced_query_schema,
     build_advanced_object_get_query,
     build_object_get_query,
-    build_structured_object_get_query,
-    structured_query_schema,
 )
 from wwise_waapi.builders.stable_reads import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     MAX_BUS_PIPELINE_IDS,
@@ -117,8 +111,51 @@ from wwise_waapi.builders.stable_reads import (  # noqa: E402  # pyright: ignore
     build_profiler_voice_contributions_request,
     build_project_default_work_units_request,
     normalize_profiler_game_objects_result,
+    normalize_profiler_time,
     normalize_profiler_voice_contributions_result,
     normalize_project_default_work_units_result,
+)
+from wwise_waapi.typed_requests import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    MAX_TYPED_ARRAY_ITEMS,
+    TYPED_REQUEST_COMPLEX_TRACER_URI,
+    TypedRequestContract,
+    TypedRequestError,
+    TypedRequestFact,
+    dynamic_array_item_choices,
+    dynamic_array_item_handle,
+    dynamic_container_disclosure,
+    dynamic_fixed_container_members,
+    dynamic_map_container_choices,
+    dynamic_map_entry_handle,
+    materialize_typed_request,
+    parse_typed_schema_lineage_token,
+    request_contract,
+    typed_schema_lineage_business_pointer,
+    typed_schema_lineage_root_fact,
+    typed_schema_lineage_root_business_pointer,
+    typed_schema_lineage_token,
+    typed_container_command_contract,
+)
+from wwise_waapi.typed_queries import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    ADVANCED_TYPED_QUERY_OPERATION,
+    STRUCTURED_TYPED_QUERY_OPERATION,
+)
+from wwise_waapi.typed_topics import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    TOPIC_MATCH_OPERATION_PREFIX,
+    TOPIC_OPTIONS_OPERATION_PREFIX,
+)
+from wwise_waapi.topic_business import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    TopicBusinessFact,
+    TopicBusinessEmptyFact,
+    TopicBusinessEmptyRowFact,
+    TopicBusinessEntryEmptyFact,
+    TopicBusinessEntryFact,
+    TopicBusinessEntryObjectFact,
+    TopicBusinessEntryRowFact,
+    TopicBusinessRowFact,
+    materialize_topic_business_inputs,
+    resolve_topic_business_value_choice,
+    topic_business_contract,
 )
 from wwise_waapi.builders.schema import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     validate_semantic_event,
@@ -156,43 +193,276 @@ from wwise_waapi.execution_contracts import (  # noqa: E402  # pyright: ignore[r
     PROJECT_GUARD_INVARIANT,
     PROJECT_GUARD_MODES,
     PROJECT_GUARD_TRANSITION_TO_PATH,
+    UNDO_GROUP_MEMBER_URIS,
 )
 from wwise_waapi.operation_registry import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    BUSINESS_DECLARATION_INPUT_MODE,
     COMPOSER_INPUT_MODE,
-    FORBIDDEN_MODEL_AUTHORED_COMMAND_FIELDS,
-    LEGACY_JSON_INPUT_MODE,
+    INLINE_TYPED_INPUT_MODE,
     OPERATION_REQUEST_CONTRACT,
     PACKAGED_TRANSACTION_READBACK_URIS,
     PREPARED_OPERATION_CONTRACT,
+    UNDO_GROUP_MAX_CALLS,
     UI_COMMAND_OPERATIONS,
     OperationContractError,
     VerificationResult,
+    audio_import_business_contract,
+    operation_business_contract,
     build_undo_group_execution_plan,
     describe_operation,
     list_operation_specs,
     operation_input_mode,
+    operation_uses_business_declaration,
     operation_request_schema_digest,
     parse_operation_request,
-    prepare_object_set_composer_check,
+    prepare_object_set_batch_check,
     validate_prepared_roles,
     verify_prepared_operation,
+)
+from wwise_waapi.operation_object import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    ObjectOperationContractError,
+    normalize_object_identity,
+)
+from wwise_waapi.waql import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    quote_waql_literal,
+)
+from wwise_waapi.typed_operations import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    DRAFT_TYPED_OPERATIONS,
+    INLINE_OPERATIONS,
+    TypedOperationInputError,
+    compound_business_child_operations,
+    draft_operation_request_contract,
+    inline_operation_contract,
+    materialize_inline_operation_request,
 )
 from wwise_waapi.operation_drafts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     OPERATION_DRAFT_CONTRACT,
     OperationDraftBindingDrift,
     OperationDraftCheckRequired,
+    OperationDraftNotAvailable,
     OperationDraftRecord,
     OperationDraftSealReplayMismatch,
     OperationDraftState,
     OperationDraftStore,
 )
+from wwise_waapi.business_declaration_state import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    BusinessDeclarationSession,
+)
+from wwise_waapi.business_adapters import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    business_adapter,
+)
+from wwise_waapi.audio_import_business_contracts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS,
+)
+from wwise_waapi.cli_console_business_contracts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    CLI_CONSOLE_BUSINESS_OPERATIONS,
+    cli_console_business_catalog_rows,
+    cli_console_business_contract_data,
+    cli_console_business_versions,
+)
+from wwise_waapi.cli_console_business_cli import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    CliConsoleBusinessCliError,
+    add_cli_console_plan_arguments,
+    cli_console_plan_from_namespace,
+)
+from wwise_waapi.host_ui_debug_business_contracts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    HOST_UI_DEBUG_BUSINESS_OPERATIONS,
+    host_ui_debug_business_catalog_rows,
+    host_ui_debug_business_contract_data,
+    host_ui_debug_business_versions,
+)
+from wwise_waapi.host_ui_debug_business_cli import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    HostUiDebugBusinessCliError,
+    add_host_ui_debug_plan_arguments,
+    host_ui_debug_plan_from_namespace,
+)
+from wwise_waapi.host_ui_debug_business import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    materialize_waapi_schema_read_args,
+)
+from wwise_waapi.core_business_contracts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    core_business_catalog_rows,
+    core_business_contract_data,
+    core_business_operations,
+    core_business_versions,
+)
+from wwise_waapi.core_business import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    materialize_core_business_request,
+)
+from wwise_waapi.project_setting_business_contracts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    project_setting_business_catalog_rows,
+    project_setting_business_contract_data,
+    project_setting_business_operations,
+    project_setting_business_versions,
+)
+from wwise_waapi.source_control_business_contracts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    SOURCE_CONTROL_GET_SOURCE_FILES_URI,
+    SOURCE_CONTROL_SET_PROVIDER_URI,
+    source_control_business_catalog_rows,
+    source_control_business_contract_data,
+    source_control_business_draft_operations,
+    source_control_business_operations,
+    source_control_business_versions,
+)
+from wwise_waapi.source_control_business import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    project_source_control_result,
+)
+from wwise_waapi.source_control_business_cli import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    SourceControlBusinessCliError,
+    add_source_control_arguments,
+    source_control_plan_from_namespace,
+)
+from wwise_waapi.media_build_business_contracts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    MEDIA_POOL_GET_URI,
+    PEAKS_REGION_URI,
+    PEAKS_TRIMMED_URI,
+    SOUNDBANK_GET_INCLUSIONS_URI,
+    media_build_business_catalog_rows,
+    media_build_business_contract_data,
+    media_build_business_operations,
+    media_build_business_versions,
+)
+from wwise_waapi.media_build_business import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    MediaBuildBusinessError,
+    materialize_media_build_business_request,
+    normalize_media_build_result,
+)
+from wwise_waapi.media_build_business_cli import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    MediaBuildBusinessCliError,
+    add_media_build_read_arguments,
+    media_build_fields_supplied,
+    media_build_input_from_namespace,
+)
+from wwise_waapi.runtime_inspection_business_contracts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    TRANSPORT_CREATE_URI,
+    TRANSPORT_DESTROY_URI,
+    TRANSPORT_EXECUTE_ACTION_URI,
+    TRANSPORT_GET_STATE_URI,
+    runtime_inspection_business_catalog_rows,
+    runtime_inspection_business_contract_data,
+    runtime_inspection_business_operations,
+    runtime_inspection_business_read_operations,
+    runtime_inspection_business_versions,
+)
+from wwise_waapi.runtime_inspection_business import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    RuntimeInspectionBusinessError,
+    materialize_runtime_inspection_business_request,
+    normalize_runtime_inspection_result,
+    profiler_pipeline_id_from_handle,
+)
+from wwise_waapi.runtime_transport_handles import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    RuntimeTransportContext,
+    RuntimeTransportHandleError,
+    RuntimeTransportHandleStore,
+    validate_runtime_transport_handle,
+)
+from wwise_waapi.soundengine_business_contracts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    EXECUTE_ACTION_ON_EVENT_URI,
+    GET_STATE_URI,
+    GET_SWITCH_URI,
+    LOAD_BANK_URI,
+    POST_EVENT_URI,
+    POST_TRIGGER_URI,
+    REGISTER_GAME_OBJECT_URI,
+    RESET_GAME_PARAMETER_URI,
+    SEEK_ON_EVENT_URI,
+    SET_DEFAULT_LISTENERS_URI,
+    SET_AUX_SENDS_URI,
+    SET_LISTENERS_URI,
+    SET_LISTENER_SPATIALIZATION_URI,
+    SET_MULTIPLE_POSITIONS_URI,
+    SET_OBSTRUCTION_OCCLUSION_URI,
+    SET_OUTPUT_BUS_VOLUME_URI,
+    SET_POSITION_URI,
+    SET_SCALING_FACTOR_URI,
+    SET_STATE_URI,
+    SET_SWITCH_URI,
+    SET_GAME_PARAMETER_URI,
+    STOP_ALL_URI,
+    STOP_PLAYING_ID_URI,
+    UNLOAD_BANK_URI,
+    UNREGISTER_GAME_OBJECT_URI,
+    soundengine_control_business_contract_data,
+    soundengine_control_business_catalog_rows,
+    soundengine_control_business_operations,
+    soundengine_control_business_read_operations,
+    soundengine_control_business_versions,
+)
+from wwise_waapi.runtime_game_object_handles import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    RuntimeGameObjectContext,
+    RuntimeGameObjectHandleError,
+    RuntimeGameObjectHandleStore,
+    validate_runtime_game_object_handle,
+)
+from wwise_waapi.runtime_playing_handles import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    RuntimePlayingHandleError,
+    RuntimePlayingHandleStore,
+)
+from wwise_waapi.business_declarations import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    MAX_BUSINESS_NAME_BYTES,
+    MAX_BUSINESS_PATH_BYTES,
+    SUPPORTED_BUSINESS_KINDS,
+    BusinessContext,
+    BusinessDeclarationError,
+    BusinessHandleRegistry,
+    BoundFieldHandle,
+    ExistingObjectTarget,
+    NewDescendantTarget,
+    bind_live_field,
+    business_repair,
+    normalize_live_object_identity,
+    revalidate_live_field,
+    revalidate_live_objects,
+    revalidate_live_types,
+    resolve_semantic_kind,
+    semantic_kind_for_live_type,
+    semantic_kinds_for_live_type,
+    stable_bound_business_kind_for_live_type,
+)
+from wwise_waapi.soundbank_business_cli import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    SoundBankBusinessCliError,
+    add_soundbank_plan_arguments,
+    soundbank_plan_from_namespace,
+)
+from wwise_waapi.exact_artifact_business_cli import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    ExactArtifactBusinessCliError,
+    add_exact_artifact_plan_arguments,
+    exact_artifact_plan_from_namespace,
+)
+from wwise_waapi.exact_artifact_business import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    exact_artifact_evidence_from_request,
+)
+from wwise_waapi.authoring_ui_business_cli import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    AuthoringUiBusinessCliError,
+    add_authoring_ui_command_arguments,
+    add_authoring_ui_plan_arguments,
+    authoring_ui_command_from_namespace,
+    authoring_ui_plan_from_namespace,
+)
+from wwise_waapi.authoring_ui_business import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    append_authoring_ui_command,
+    validate_authoring_ui_business_session,
+)
+from wwise_waapi.debug_business_cli import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    DebugBusinessCliError,
+    add_debug_intent_arguments,
+    debug_intent_from_namespace,
+)
+from wwise_waapi.compound_undo_business import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    CheckedChildDraftBinding,
+    CompoundParentDraftBinding,
+    CompoundUndoSnapshotScope,
+    snapshot_checked_compound_undo_children,
+)
 from wwise_waapi.operation_composer import (  # noqa: E402  # pyright: ignore[reportMissingImports]
-    OBJECT_SET_COMPOSER_OPERATION,
+    MAX_TYPED_ACTIONS_PER_APPLY,
     OperationComposerError,
     composition_projection,
+    operation_draft_public_projection,
+    operation_draft_construction_boundary,
     operation_composer_contract,
     operation_composer_digest,
     parse_typed_action_cli_arguments,
+    parse_typed_action_cli_argument_sequence,
 )
 from wwise_waapi.platform_paths import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     WWISE_WIRE_PATH_INPUT_AUDIT_CONTRACT,
@@ -249,15 +519,18 @@ DEFAULT_HOST = "127.0.0.1"
 DEFAULT_TIMEOUT = 10.0
 DEFAULT_METADATA_DISCOVERY_TIMEOUT = 30.0
 DEFAULT_TRANSACTION_TIMEOUT = 150.0
+DRAFT_METADATA_DISCOVERY_COMMANDS = frozenset(
+    {"draft-bind-field", "draft-discover-fields", "draft-discover-types"}
+)
+PROJECT_TRANSITION_SETTLE_POLL_SECONDS = 0.1
 TRANSPORT_CLEANUP_GRACE_SECONDS = 0.05
 UNBOUNDED_TOPIC_CLEANUP_TIMEOUT_SECONDS = 1.0
 TOPIC_CLEANUP_RESERVE_MAX_SECONDS = 0.25
-TOPIC_CLEANUP_RESERVE_RATIO = 0.20
+TOPIC_CLEANUP_RESERVE_RATIO = 0.50
 GET_INFO_URI = "ak.wwise.core.getInfo"
 GET_PROJECT_INFO_URI = "ak.wwise.core.getProjectInfo"
 OBJECT_GET_URI = "ak.wwise.core.object.get"
 GET_SELECTED_URI = "ak.wwise.ui.getSelectedObjects"
-MEDIA_POOL_GET_URI = "ak.wwise.core.mediaPool.get"
 ENV_HOST = "WWISE_WAAPI_HOST"
 ENV_PORT = "WWISE_WAAPI_PORT"
 ENV_VERSION = "WWISE_VERSION"
@@ -268,13 +541,29 @@ OFFLINE_COMMANDS = frozenset(
         "describe",
         "operations",
         "operation-schema",
-        "legacy-operation-schema",
+        "request-schema",
+        "request-map-container",
+        "request-array-item",
+        "topic-schema",
         "query-schema",
         "object-types",
         "config-show",
         "config-set",
         "draft-start",
+        "draft-start-undo-child",
         "draft-apply",
+        "draft-add-media",
+        "draft-business-configure",
+        "draft-clear-object-list",
+        "draft-declare-field-change",
+        "draft-declare-import-batch",
+        "draft-declare-object-change",
+        "draft-declare-switch-assignment",
+        "draft-declare-rtpc",
+        "draft-declare-existing",
+        "draft-declare-new",
+        "draft-remove-declaration",
+        "draft-revise-declaration",
         "draft-inspect",
         "draft-cancel",
         "transaction-show",
@@ -287,15 +576,9 @@ TOPIC_STREAM_RECORD_CONTRACT = "waapi-skill.topic-stream/v1"
 GATEWAY_CONFIG_CONTRACT = "waapi-skill.config/v2"
 GATEWAY_SESSION_CONTEXT_CONTRACT = "waapi-skill.session-context/v2"
 GATEWAY_SESSION_INTRODUCTION_CONTRACT = "waapi-skill.session-introduction/v2"
-GATEWAY_OPERATION_SCHEMA_DIRECT_FAST_ROUTE_CONTRACT = (
-    "waapi-skill.operation-schema-direct-fast-route/v1"
-)
-LEGACY_OPERATION_JSON_ADAPTER_CONTRACT = (
-    "waapi-skill.legacy-operation-json-adapter/v1"
-)
 GATEWAY_DEADLINE_PROVENANCE = "waapi-skill.gateway-deadline/v1"
 GATEWAY_RESULT_CEILING_PROVENANCE = "waapi-skill.gateway-live-result-json-ceiling/v1"
-MEDIA_POOL_POST_FILTER_CONTRACT = "waapi-skill.media-pool-post-filter/v1"
+MAX_METADATA_PLATFORM_NAME_CHARS = 256
 ORIGINAL_FILE_REFERENCE_MATCH_CONTRACT = (
     "waapi-skill.original-file-reference-match/v1"
 )
@@ -314,6 +597,12 @@ PROJECT_IDENTITY_FIELDS = ("id", "name", "path")
 EXPANDING_QUERY_SELECTS = frozenset({"descendants", "ancestors", "referencesTo", "children"})
 MAX_GATEWAY_RESULT_JSON_BYTES = 1024 * 1024
 MAX_METADATA_DISCOVERY_GATEWAY_RESULT_BYTES = 32 * 1024
+OBJECT_SET_BUSINESS_BATCH_MAX_ROWS = 8
+MAX_TOPIC_SCHEMA_GATEWAY_RESULT_BYTES = 32 * 1024
+TOPIC_STREAM_EVENT_OUTPUT_LIMIT_BYTES = MAX_GATEWAY_RESULT_JSON_BYTES
+TOPIC_STREAM_TOTAL_OUTPUT_LIMIT_BYTES = (
+    TOPIC_STREAM_EVENT_OUTPUT_LIMIT_BYTES + MAX_GATEWAY_RESULT_JSON_BYTES
+)
 TOPIC_STREAM_POLL_SECONDS = 0.05
 TOPIC_STREAM_HEALTH_INTERVAL_SECONDS = 5.0
 MAX_GATEWAY_JSON_INPUT_BYTES = 256 * 1024
@@ -325,6 +614,26 @@ MAX_GATEWAY_JSON_STRING_BYTES = 64 * 1024
 # 180 KiB decoded WAV (roughly 240 KiB of canonical Base64).
 MAX_PREVIEW_JSON_INPUT_BYTES = 384 * 1024
 MAX_PREVIEW_JSON_STRING_BYTES = 256 * 1024
+
+
+class TopicStreamCancelled(KeyboardInterrupt):
+    """Cancellation carrying the already-attempted subscription cleanup."""
+
+    def __init__(
+        self,
+        *,
+        event_count: int,
+        elapsed_seconds: float,
+        cleanup: str,
+        cleanup_failure: Mapping[str, Any] | None,
+    ) -> None:
+        super().__init__("topic stream cancelled")
+        self.event_count = event_count
+        self.elapsed_seconds = elapsed_seconds
+        self.cleanup = cleanup
+        self.cleanup_failure = (
+            dict(cleanup_failure) if cleanup_failure is not None else None
+        )
 # ``transaction-show --summary-only`` must carry the exact immutable request,
 # but every other review field has a closed projection.  This ceiling bounds
 # that summary fragment independently of request complexity; the small outer
@@ -339,6 +648,9 @@ TRANSACTION_SHOW_SUMMARY_CONTRACT = "waapi-skill.transaction-show-summary/v1"
 TRANSACTION_NEXT_COMMAND_CONTRACT = "waapi-skill.gateway-next-command/v2"
 TRANSACTION_COMMAND_COPY_INSTRUCTION_CONTRACT = (
     "waapi-skill.gateway-command-copy-instruction/v2"
+)
+OPERATION_DRAFT_COMMAND_COPY_INSTRUCTION_CONTRACT = (
+    "waapi-skill.operation-draft-command-copy-instruction/v1"
 )
 TRANSACTION_CONFIRMATION_BINDING_CONTRACT = (
     "waapi-skill.confirmation-binding/v1"
@@ -365,6 +677,7 @@ TRANSACTION_ROLE_VALIDATION_SUMMARY_CONTRACT = (
 # Projection is intentionally delayed until transport cleanup succeeds.
 TRANSACTION_VERIFY_SUCCESS_STDOUT_BUDGET_BYTES = 24 * 1024
 TRANSACTION_VERIFY_SUCCESS_ENVELOPE_RESERVE_BYTES = 2 * 1024
+TRANSACTION_VERIFY_AGENT_VIEW_TARGET_BYTES = 12 * 1024
 TRANSACTION_VERIFY_SUCCESS_SUMMARY_CONTRACT = (
     "waapi-skill.transaction-verify-success-summary/v1"
 )
@@ -379,8 +692,97 @@ MAX_MEDIA_POOL_SEARCH_TEXT_CHARS = 1024
 MAX_MEDIA_POOL_FILTER_TOKEN_CHARS = 256
 MAX_MEDIA_POOL_FILTER_VALUE_CHARS = 4096
 SELECTED_REQUIRED_RETURN_FIELDS = ("id", "name", "type", "path")
-MAX_SELECTED_RETURN_FIELDS = 32
-MAX_SELECTED_RETURN_FIELD_CHARS = 256
+QUERY_BUSINESS_PREDICATES: Mapping[str, tuple[str, str, str]] = {
+    "name-is": ("name", "=", "string"),
+    "name-contains": ("name", ":", "string"),
+    "notes-contain": ("notes", ":", "string"),
+    "volume-db-at-most": ("@Volume", "<=", "number"),
+    "volume-db-at-least": ("@Volume", ">=", "number"),
+    "included-is": ("isIncluded", "=", "boolean"),
+    "playable-is": ("isPlayable", "=", "boolean"),
+    "explicitly-muted-is": ("isExplicitMute", "=", "boolean"),
+    "explicitly-soloed-is": ("isExplicitSolo", "=", "boolean"),
+    "children-at-least": ("childrenCount", ">=", "integer"),
+    "plugin-name-is": ("pluginName", "=", "string"),
+    "category-is": ("category", "=", "string"),
+}
+QUERY_BUSINESS_KIND_PREDICATE = "kind-is"
+QUERY_FIXED_KIND_TYPES: Mapping[str, str] = {
+    "all-sounds": "Sound",
+    "sound": "Sound",
+    "project": "Project",
+    "saved-query": "Query",
+}
+QUERY_BUSINESS_KINDS = tuple(
+    sorted({*SUPPORTED_BUSINESS_KINDS, *QUERY_FIXED_KIND_TYPES})
+)
+QUERY_BUSINESS_RELATIONSHIPS: Mapping[str, str] = {
+    "descendants": "descendants",
+    "ancestors": "ancestors",
+    "references-to": "referencesTo",
+    "children": "children",
+    "event-actions": "children",
+    "parent": "parent",
+}
+QUERY_BUSINESS_VIEWS: Mapping[str, tuple[str, ...]] = {
+    "sound-routing-diagnostics": (
+        "override-output",
+        "active-source",
+        "output-bus",
+    ),
+}
+SOUNDBANK_GENERATED_TOPIC_URI = "ak.wwise.core.soundbank.generated"
+SOUNDBANK_TOPIC_IDENTITY_FIELDS = ("id", "name", "type", "path")
+QUERY_BUSINESS_OUTPUTS: Mapping[str, tuple[str, str]] = {
+    "notes": ("notes", "notes"),
+    "volume-db": ("@Volume", "volume_db"),
+    "pitch-cents": ("@Pitch", "pitch_cents"),
+    "output-bus": ("OutputBus", "output_bus"),
+    "source-language": ("audioSource:language", "source_language"),
+    "parent": ("parent", "parent"),
+    "owner": ("owner", "owner"),
+    "included": ("isIncluded", "included"),
+    "playable": ("isPlayable", "playable"),
+    "explicitly-muted": ("isExplicitMute", "explicitly_muted"),
+    "explicitly-soloed": ("isExplicitSolo", "explicitly_soloed"),
+    "child-count": ("childrenCount", "child_count"),
+    "plugin-name": ("pluginName", "plugin_name"),
+    "category": ("category", "category"),
+    "file-path": ("filePath", "file_path"),
+    "original-file-path": ("originalFilePath", "original_file_path"),
+    "active-source": ("activeSource", "active_source"),
+    "override-output": ("OverrideOutput", "override_output"),
+    "action-type": ("ActionType", "action_type"),
+    "target": ("Target", "target"),
+    "work-unit": ("workunit", "work_unit"),
+    "source-duration": ("audioSource:playbackDuration", "source_duration"),
+    "max-radius": ("audioSource:maxRadiusAttenuation", "max_radius"),
+}
+MAX_QUERY_BUSINESS_OUTPUTS = 32
+MAX_QUERY_CUSTOM_OUTPUTS = 16
+MAX_QUERY_CUSTOM_FIELD_CHARS = 128
+BUSINESS_QUERY_CONTRACT = "waapi-skill.object-query-business/v1"
+BUSINESS_QUERY_SCHEMA_CONTRACT = "waapi-skill.object-query-business-schema/v1"
+ADVANCED_QUERY_SCHEMA_CONTRACT = (
+    "waapi-skill.advanced-object-query-business-schema/v1"
+)
+METADATA_CURVE_ROLES: Mapping[str, str] = {
+    "volume-dry": "VolumeDryUsage",
+    "game-defined-aux-send-volume": "VolumeAuxGameDef",
+    "user-defined-aux-send-volume": "VolumeAuxUserDef",
+    "low-pass-filter": "LowPassFilter",
+    "high-pass-filter": "HighPassFilter",
+    "spread": "Spread",
+    "focus": "Focus",
+}
+PROFILER_PIPELINE_IDENTITY_RETURN_FIELDS = (
+    "pipelineID",
+    "gameObjectID",
+    "objectGUID",
+    "objectName",
+    "gameObjectName",
+)
+MAX_PROFILER_PIPELINE_IDENTITY_ROWS = 4096
 MEDIA_POOL_FLOAT_FILTER_FIELDS_BY_VERSION: Mapping[str, frozenset[str]] = {
     "2025.1": frozenset({"WAV/Duration"}),
 }
@@ -390,6 +792,8 @@ ORIGINAL_FILE_REFERENCE_RETURN_FIELDS = ("id", "path", "originalFilePath")
 MAX_ORIGINAL_FILE_PATH_CANDIDATES = 64
 MAX_ORIGINAL_FILE_PATH_BYTES = 1024
 MAX_ORIGINAL_FILE_REFERENCE_PATH_BYTES = 512
+MAX_BUSINESS_OBJECT_PATH_SEGMENTS = 64
+MAX_QUERY_MUTATION_SELECTION_CANDIDATES = 8
 _METADATA_SESSION_CACHE = SessionMetadataCache()
 MAX_ORIGINAL_FILE_REFERENCE_DETAILS_PER_CANDIDATE = 4
 MAX_ORIGINAL_FILE_REFERENCE_DETAILS = (
@@ -594,6 +998,49 @@ class GatewayConnection:
     def url(self) -> str:
         return f"ws://{self.host}:{self.port}/waapi"
 
+
+def _add_business_draft_binding_arguments(
+    parser: argparse.ArgumentParser,
+) -> None:
+    parser.add_argument("draft_id")
+    parser.add_argument("--task-authority", required=True)
+    parser.add_argument("--expected-revision", required=True, type=int)
+
+
+def _add_business_declaration_arguments(
+    parser: argparse.ArgumentParser,
+) -> None:
+    _add_business_draft_binding_arguments(parser)
+    parser.add_argument("--declaration-id", required=True)
+    parser.add_argument(
+        "--field",
+        action="append",
+        nargs=2,
+        default=[],
+        metavar=("FIELD", "VALUE"),
+        help="Set one stable high-level field; repeat for additional fields",
+    )
+    parser.add_argument(
+        "--field-value",
+        action="append",
+        nargs=2,
+        default=[],
+        metavar=("FIELD_HANDLE", "VALUE"),
+        help="Set one live-bound custom property or reference by opaque handle",
+    )
+    parser.add_argument(
+        "--switch-value",
+        help=(
+            "Assign this import declaration to one exact user-requested Switch "
+            "value without encoding it as a generic field pair"
+        ),
+    )
+    parser.add_argument("--event-parent-handle")
+    parser.add_argument("--event-name")
+    parser.add_argument(
+        "--event-action",
+        choices=("Play", "Stop", "Pause", "Resume", "Break", "Seek"),
+    )
 
 ClientFactory = Callable[[str], Any]
 
@@ -979,8 +1426,16 @@ def _unsubscribe_event_handler(client: Any, handler: Any) -> Any:
     raise RuntimeError("WAAPI subscription handler cannot be unsubscribed")
 
 
+class _ExactOptionArgumentParser(argparse.ArgumentParser):
+    """Require complete public option names for every nested Gateway command."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        kwargs.setdefault("allow_abbrev", False)
+        super().__init__(*args, **kwargs)
+
+
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
+    parser = _ExactOptionArgumentParser(
         prog="gateway.py",
         description=(
             "Call the manifest-backed WAAPI Skill gateway and print one JSON result, "
@@ -1022,15 +1477,6 @@ def build_parser() -> argparse.ArgumentParser:
         "selected",
         help="Return current UI selection or a clear command-line/UI boundary",
     )
-    selected.add_argument(
-        "--return-field",
-        action="append",
-        dest="return_fields",
-        help=(
-            "Add one bounded object accessor to the selected-object projection; "
-            "id, name, type, and path are always retained"
-        ),
-    )
     subparsers.add_parser(
         "project-default-work-units",
         help="Report version-aware default project Work Units without fabricating unavailable fields",
@@ -1040,31 +1486,302 @@ def build_parser() -> argparse.ArgumentParser:
         "profiler-game-objects",
         help="Return profiler game objects through a cross-version registration-time projection",
     )
-    profiler_game_objects.add_argument(
-        "--time",
-        required=True,
-        help="Non-negative capture time in milliseconds, or the exact cursor token user/capture",
+    profiler_game_objects_capture = profiler_game_objects.add_mutually_exclusive_group(
+        required=True
     )
+    profiler_game_objects_capture.add_argument(
+        "--capture",
+        choices=("latest", "user-cursor"),
+        help="Choose the latest capture or the user-positioned profiler cursor",
+    )
+    profiler_game_objects_capture.add_argument(
+        "--capture-ms",
+        help="Exact non-negative capture time in milliseconds",
+    )
+    profiler_game_objects.set_defaults(time=None)
 
     profiler_voice_contributions = subparsers.add_parser(
         "profiler-voice-contributions",
         help="Return one bounded voice contribution tree with version-aware DSF availability",
     )
-    profiler_voice_contributions.add_argument(
-        "--time",
-        required=True,
-        help="Non-negative capture time in milliseconds, or the exact cursor token user/capture",
+    profiler_voice_capture = profiler_voice_contributions.add_mutually_exclusive_group(
+        required=True
+    )
+    profiler_voice_capture.add_argument(
+        "--capture",
+        choices=("latest", "user-cursor"),
+        help="Choose the latest capture or the user-positioned profiler cursor",
+    )
+    profiler_voice_capture.add_argument(
+        "--capture-ms",
+        help="Exact non-negative capture time in milliseconds",
+    )
+    profiler_voice_identity = profiler_voice_contributions.add_mutually_exclusive_group(
+        required=True
+    )
+    profiler_voice_identity.add_argument(
+        "--voice-object-id",
+        help="Exact canonical Wwise object GUID for the requested active voice",
+    )
+    profiler_voice_identity.add_argument(
+        "--voice-instance-handle",
+        help="Copy-ready handle returned by a bounded Profiler voice result",
     )
     profiler_voice_contributions.add_argument(
-        "--voice-pipeline-id",
-        required=True,
-        help="Unsigned 32-bit voice pipeline identifier",
+        "--game-object-id",
+        help="Optional exact runtime game-object ID used only to disambiguate voices",
     )
     profiler_voice_contributions.add_argument(
-        "--bus-pipeline-id",
+        "--bus-object-id",
         action="append",
         default=[],
-        help="Repeat in voice-path order; omit all values for the dry path",
+        help=(
+            "Repeat exact canonical Wwise Bus GUIDs in the requested voice-path "
+            "order; omit for the dry path"
+        ),
+    )
+    profiler_voice_contributions.add_argument(
+        "--bus-instance-handle",
+        action="append",
+        default=[],
+        help=(
+            "Repeat copy-ready handles from bounded Profiler bus results in the "
+            "requested voice-path order; omit for the dry path"
+        ),
+    )
+    profiler_voice_contributions.set_defaults(
+        time=None,
+        voice_pipeline_id=None,
+        bus_pipeline_id=[],
+    )
+
+    request_schema = subparsers.add_parser(
+        "request-schema",
+        help="Return the one typed construction continuation for a migrated WAAPI API",
+    )
+    request_schema.add_argument("api")
+
+    waapi_schema = subparsers.add_parser(
+        "waapi-schema",
+        help="Read one exact WAAPI schema through a bounded business route",
+    )
+    waapi_schema.add_argument("target_uri")
+    waapi_schema_examples = waapi_schema.add_mutually_exclusive_group()
+    waapi_schema_examples.add_argument(
+        "--include-examples",
+        dest="include_examples",
+        action="store_true",
+    )
+    waapi_schema_examples.add_argument(
+        "--exclude-examples",
+        dest="include_examples",
+        action="store_false",
+    )
+    waapi_schema.set_defaults(include_examples=None)
+
+    core_call = subparsers.add_parser(
+        "core-call",
+        help="Run one reviewed generic Core read from closed business identities",
+    )
+    core_call.add_argument(
+        "api",
+        choices=tuple(
+            sorted(
+                core_business_operations()
+                | media_build_business_operations()
+                | runtime_inspection_business_read_operations()
+                | soundengine_control_business_read_operations()
+            )
+        ),
+    )
+    core_call.add_argument("--source-id")
+    core_call.add_argument("--target-id")
+    core_call.add_argument("--object-id")
+    core_call.add_argument("--field-meaning")
+    core_call.add_argument("--platform-name")
+    core_call.add_argument("--log-channel")
+    core_call.add_argument("--profiler-position")
+    core_call.add_argument("--profiler-cursor")
+    core_call.add_argument(
+        "--result-view",
+        choices=("summary", "identity", "diagnostics"),
+    )
+    core_call.add_argument("--bus-instance-handle")
+    core_call.add_argument("--voice-instance-handle")
+    core_call.add_argument("--transport-handle")
+    core_call.add_argument("--state-group-id")
+    core_call.add_argument("--switch-group-id")
+    core_call.add_argument("--game-object-handle")
+    add_media_build_read_arguments(core_call)
+
+    typed_zero_call = subparsers.add_parser(
+        "typed-zero-call",
+        help="Run one reflected function whose exact schema accepts no business input",
+    )
+    typed_zero_call.add_argument("api")
+    typed_zero_call.add_argument("--schema-digest", required=True)
+    typed_zero_call.add_argument(
+        "--apply",
+        action="store_true",
+        help="Enter the existing Preview authorization lifecycle for a change",
+    )
+    typed_zero_call.add_argument(
+        "--ttl",
+        type=int,
+        default=DEFAULT_PREVIEW_TTL_SECONDS,
+    )
+
+    request_map_container = subparsers.add_parser(
+        "request-map-container",
+        help="Issue a schema-bound child handle for one open-map key",
+    )
+    request_map_container.add_argument("api")
+    request_map_container.add_argument("--schema-digest")
+    request_map_container.add_argument("--map-handle", required=True)
+    request_map_container.add_argument("--key", required=True)
+    request_map_container.add_argument("--shape", choices=("object", "array"), required=True)
+    request_map_container.add_argument(
+        "--choice-handle",
+        help="Gateway-disclosed opaque branch choice for an ambiguous map member",
+    )
+    request_map_container.add_argument(
+        "--member-key",
+        help="Exact child-object key whose opaque branch choices must be disclosed",
+    )
+    request_map_container.add_argument("--parent-schema-token")
+
+    request_array_item = subparsers.add_parser(
+        "request-array-item",
+        help="Issue a schema-bound child handle for one ordered complex array item",
+    )
+    request_array_item.add_argument("api")
+    request_array_item.add_argument("--schema-digest")
+    request_array_item.add_argument("--array-handle", required=True)
+    request_array_item.add_argument("--index", required=True, type=int)
+    request_array_item.add_argument("--shape", choices=("object", "array"), required=True)
+    request_array_item.add_argument(
+        "--choice-handle",
+        help="Gateway-disclosed opaque branch choice for an ambiguous complex item",
+    )
+    request_array_item.add_argument(
+        "--member-key",
+        help="Exact child-object key whose opaque branch choices must be disclosed",
+    )
+    request_array_item.add_argument("--parent-schema-token")
+
+    typed_call = subparsers.add_parser(
+        "typed-call",
+        help="Run one migrated API from Gateway-owned typed field handles",
+    )
+    typed_call.add_argument("api")
+    typed_call.add_argument("--schema-digest", required=True)
+    typed_call.add_argument(
+        "--io-root",
+        help="Absolute caller-owned I/O authority for an isolated typed route",
+    )
+    typed_call.add_argument(
+        "--apply",
+        action="store_true",
+        help="Enter the existing Preview authorization lifecycle for a change",
+    )
+    typed_call.add_argument(
+        "--ttl",
+        type=int,
+        default=DEFAULT_PREVIEW_TTL_SECONDS,
+    )
+    typed_call.add_argument(
+        "--set",
+        action="append",
+        nargs=3,
+        metavar=("FIELD_HANDLE", "TYPE", "VALUE"),
+        default=[],
+        dest="typed_set_facts",
+    )
+    typed_call.add_argument(
+        "--append",
+        action="append",
+        nargs=3,
+        metavar=("FIELD_HANDLE", "TYPE", "VALUE"),
+        default=[],
+        dest="typed_append_facts",
+    )
+    typed_call.add_argument(
+        "--present",
+        action="append",
+        metavar="CONTAINER_HANDLE",
+        default=[],
+        dest="typed_present_facts",
+    )
+    typed_call.add_argument(
+        "--choose",
+        action="append",
+        nargs=2,
+        metavar=("BRANCH_HANDLE", "CHOICE_HANDLE"),
+        default=[],
+        dest="typed_branch_facts",
+    )
+
+    typed_operation = subparsers.add_parser(
+        "typed-operation",
+        help="Preview one concise dedicated operation from typed business values",
+    )
+    typed_operation.add_argument("operation", choices=tuple(sorted(INLINE_OPERATIONS)))
+    typed_operation.add_argument("--schema-digest", required=True)
+    typed_operation.add_argument("--apply", action="store_true", required=True)
+    typed_operation.add_argument("--ttl", type=int, default=DEFAULT_PREVIEW_TTL_SECONDS)
+    typed_operation.add_argument("--object", nargs="+", dest="typed_object")
+    typed_operation.add_argument("--text")
+    typed_operation.add_argument("--property")
+    typed_operation.add_argument("--reference")
+    typed_operation.add_argument("--value", nargs=2, metavar=("TYPE", "VALUE"))
+    typed_operation.add_argument("--platform")
+    typed_operation.add_argument("--target", nargs="+")
+    typed_operation.add_argument("--clear", action="store_true")
+    typed_operation.add_argument("--linked", choices=("true", "false"))
+    typed_operation.add_argument("--parent", nargs="+")
+    typed_operation.add_argument("--on-name-conflict", choices=("fail", "rename", "replace"))
+    typed_operation.add_argument("--auto-check-out", choices=("true", "false"))
+    typed_operation.add_argument("--auto-add", choices=("true", "false"))
+    typed_operation.add_argument("--import-file")
+    typed_operation.add_argument("--import-location", nargs="+")
+    typed_operation.add_argument("--import-language")
+    typed_operation.add_argument(
+        "--import-operation",
+        choices=("createNew", "useExisting", "replaceExisting"),
+    )
+    typed_operation.add_argument("--file", action="append", dest="files")
+    typed_operation.add_argument("--io-root")
+    typed_operation.add_argument("--view-name")
+    typed_operation.add_argument("--view-channel")
+    typed_operation.add_argument("--rect", nargs=4, metavar=("X", "Y", "WIDTH", "HEIGHT"))
+    typed_operation.add_argument("--command", dest="typed_ui_command")
+    typed_operation.add_argument("--command-object", action="append", dest="command_objects")
+    typed_operation.add_argument("--command-platform", action="append", dest="command_platforms")
+    typed_operation.add_argument("--enable", choices=("true", "false"))
+    typed_call.add_argument(
+        "--choose-dynamic",
+        action="append",
+        nargs=3,
+        metavar=("OBJECT_HANDLE", "KEY", "CHOICE_HANDLE"),
+        default=[],
+        dest="typed_dynamic_branch_facts",
+    )
+    for action_name in ("map-put", "map-correct"):
+        typed_call.add_argument(
+            f"--{action_name}",
+            action="append",
+            nargs=4,
+            metavar=("MAP_HANDLE", "KEY", "TYPE", "VALUE"),
+            default=[],
+            dest=f"typed_{action_name.replace('-', '_')}_facts",
+        )
+    typed_call.add_argument(
+        "--map-remove",
+        action="append",
+        nargs=2,
+        metavar=("MAP_HANDLE", "KEY"),
+        default=[],
+        dest="typed_map_remove_facts",
     )
 
     debug_wal_tree = subparsers.add_parser(
@@ -1072,63 +1789,139 @@ def build_parser() -> argparse.ArgumentParser:
         help="Return a bounded deterministic projection of the private WAL tree",
     )
     debug_wal_tree.add_argument(
-        "--take",
+        "--max-nodes",
         type=int,
         default=128,
+        dest="max_nodes",
         metavar=f"1..{MAX_WAL_TREE_NODES}",
         help=(
             "Maximum WAL nodes returned after the complete bounded call; "
             f"defaults to 128 and is capped at {MAX_WAL_TREE_NODES}"
         ),
     )
-
     debug_validate_call = subparsers.add_parser(
         "debug-validate-call",
-        help="Validate bounded args/options/result documents without invoking the target function",
+        help=(
+            "Validate one exact reflected function and, optionally, a bounded "
+            "user-owned call artifact without executing that function"
+        ),
     )
     debug_validate_call.add_argument(
         "api",
         help="Exact reflected WAAPI function URI to validate",
     )
-    debug_validate_call.add_argument("--args-json")
-    debug_validate_call.add_argument("--options-json")
-    debug_validate_call.add_argument("--result-json")
+    debug_validate_call.add_argument(
+        "--artifact-file",
+        help=(
+            "Absolute path to a user-owned strict JSON object containing only "
+            "optional args, options, and result objects"
+        ),
+    )
 
     query_object = subparsers.add_parser(
         "query-object",
         help="Run a source-grounded read-only object query without composing WAAPI code",
     )
-    query_source = query_object.add_mutually_exclusive_group(required=True)
-    query_source.add_argument("--path")
-    query_source.add_argument("--object-id")
-    query_source.add_argument("--type", dest="object_type")
-    query_source.add_argument("--search")
+    query_source = query_object.add_mutually_exclusive_group()
     query_source.add_argument(
-        "--query",
-        metavar="QUERY_PATH_OR_GUID",
+        "--path-segment",
+        action="append",
+        dest="path_segments",
         help=(
-            "Query Editor object specifier: canonical {GUID} or absolute "
-            r"\Queries\... path; raw WAQL is not accepted"
+            "Repeat one user-visible hierarchy name per level; the Gateway "
+            "constructs the exact Wwise path and separators"
+        ),
+    )
+    query_object.set_defaults(
+        path=None,
+        object_id=None,
+        object_type=None,
+        search=None,
+        query=None,
+        where=None,
+        select=None,
+        take=None,
+        all_results=False,
+    )
+    query_source.add_argument("--exact-id", dest="object_id")
+    query_source.add_argument(
+        "--kind",
+        choices=QUERY_BUSINESS_KINDS,
+        dest="semantic_kind",
+        help=(
+            "Stable Wwise business kind; the Gateway derives the native type "
+            "and any required Sound SFX/Voice predicate"
         ),
     )
     query_source.add_argument(
-        "--request-json",
-        metavar="OBJECT_QUERY_JSON",
+        "--custom-kind",
+        dest="custom_kind_meaning",
         help=(
-            "Closed waapi-skill.object-query/v1 document obtained from "
-            "query-schema; raw WAQL and expression strings are not accepted"
+            "User-facing custom object/plug-in kind meaning; the Gateway binds "
+            "it to one exact live Wwise type before constructing WAQL"
+        ),
+    )
+    query_source.add_argument("--search-text", dest="search")
+    query_source.add_argument(
+        "--query-id",
+        dest="query_id",
+        metavar="QUERY_GUID",
+        help=(
+            "Exact Query Editor object GUID; raw WAQL is not accepted"
         ),
     )
     query_source.add_argument(
-        "--advanced-request-json",
-        metavar="ADVANCED_OBJECT_QUERY_JSON",
+        "--query-path-segment",
+        action="append",
+        dest="query_path_segments",
         help=(
-            "Bounded waapi-skill.advanced-object-query/v1 document obtained "
-            "from query-schema --advanced; available only when the closed "
-            "structured query contract cannot express the requested read"
+            "Repeat one Query Editor folder/name below the Queries root; the "
+            "Gateway constructs the exact path and separators"
         ),
     )
-    query_object.add_argument("--where-json")
+    query_source.add_argument(
+        "--advanced-waql",
+        dest="advanced_waql",
+        metavar="BOUNDED_WAQL",
+        help=(
+            "One exact bounded read-only domain expression disclosed only by "
+            "query-schema --advanced; the Gateway owns URI, projection, and cap"
+        ),
+    )
+    query_object.add_argument("--max-results", type=int)
+    query_object.add_argument(
+        "--include",
+        action="append",
+        choices=tuple(QUERY_BUSINESS_OUTPUTS),
+        default=[],
+        dest="business_outputs",
+        help=(
+            "Repeat one business result field; the Gateway derives the native "
+            "projection and returns a stable business key"
+        ),
+    )
+    query_object.add_argument(
+        "--include-field",
+        action="append",
+        default=[],
+        dest="custom_field_meanings",
+        help=(
+            "Repeat one user-facing custom property/reference meaning; the Gateway "
+            "discovers and binds the exact live field before object.get"
+        ),
+    )
+    query_object.add_argument(
+        "--predicate",
+        nargs=2,
+        action="append",
+        default=[],
+        metavar=("BUSINESS_CONDITION", "VALUE"),
+        dest="business_predicates",
+        help=(
+            "Repeat one closed business condition and value; the Gateway "
+            "derives the native accessor, operator, and wire type"
+        ),
+    )
     query_object.add_argument(
         "--match-original-file-path",
         action="append",
@@ -1136,28 +1929,28 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="ABSOLUTE_PATH",
         help=(
             "Repeat for 1..64 absolute Media Pool candidate paths; only the fixed "
-            "2025.1 AudioFileSource take-1000 reference-match mode accepts this option"
+            "2025.1 AudioFileSource max-1000 reference-match mode accepts this option"
         ),
     )
     query_object.add_argument(
-        "--select",
+        "--relationship",
         action="append",
-        choices=SUPPORTED_SELECTS,
-        help="Append one supported read-only WAQL select transform",
+        choices=tuple(QUERY_BUSINESS_RELATIONSHIPS),
+        dest="relationships",
+        help=(
+            "Repeat one user-requested object relationship; the Gateway "
+            "derives the exact WAQL select token and order"
+        ),
     )
-    query_bound = query_object.add_mutually_exclusive_group()
-    query_bound.add_argument(
-        "--take",
-        type=int,
-        metavar=f"0..{MAX_QUERY_TAKE}",
-        help=f"Bound returned rows to at most {MAX_QUERY_TAKE}; larger values fail closed",
+    query_object.add_argument(
+        "--view",
+        choices=tuple(QUERY_BUSINESS_VIEWS),
+        dest="business_view",
+        help=(
+            "Select one Gateway-owned diagnostic view; the Gateway owns its "
+            "complete native projection and stable business result keys"
+        ),
     )
-    query_bound.add_argument(
-        "--all-results",
-        action="store_true",
-        help="Explicitly allow an unbounded broad query; otherwise broad sources/selects require --take",
-    )
-    query_object.add_argument("--return-field", action="append", dest="return_fields")
     query_object.add_argument(
         "--detail",
         action="store_true",
@@ -1176,60 +1969,80 @@ def build_parser() -> argparse.ArgumentParser:
         "operation",
         choices=(
             "types",
-            "names",
-            "property-info",
-            "property-enabled",
-            "attenuation-curve",
             "discover",
+            "property-state",
+            "attenuation",
         ),
     )
-    metadata.add_argument("--object")
-    metadata.add_argument("--class-id", type=int)
-    metadata.add_argument(
-        "--object-type",
-        help=(
-            "Exact live Wwise object type name for metadata discover; resolved "
-            "through getTypes before class-scoped discovery"
-        ),
-    )
-    metadata.add_argument("--property")
-    metadata.add_argument("--platform")
-    metadata.add_argument("--curve-type")
-    metadata.add_argument(
-        "--query",
+    metadata_scope = metadata.add_mutually_exclusive_group()
+    metadata_scope.add_argument(
+        "--path-segment",
         action="append",
-        dest="queries",
-        metavar="SEARCH_PHRASE",
+        dest="metadata_path_segments",
         help=(
-            "Repeat 1..8 natural-language search phrases for metadata discover; "
-            "the gateway returns live lexical candidates without selecting one"
+            "Repeat one user-visible object hierarchy name per level; the "
+            "Gateway constructs the exact Wwise object scope"
         ),
     )
-    metadata.add_argument(
-        "--limit",
-        type=int,
-        metavar=f"1..{MAX_METADATA_DISCOVERY_LIMIT}",
+    metadata_scope.add_argument(
+        "--kind",
+        choices=QUERY_BUSINESS_KINDS,
+        dest="metadata_semantic_kind",
         help=(
-            "Maximum candidates returned per discovery phrase; defaults to "
-            f"{DEFAULT_METADATA_DISCOVERY_LIMIT}"
+            "Closed business kind for class-scoped field discovery; the Gateway "
+            "derives the exact versioned metadata type"
         ),
     )
-    metadata.add_argument(
-        "--detail",
-        action="store_true",
+    metadata_scope.add_argument(
+        "--custom-kind",
+        dest="metadata_custom_kind_meaning",
         help=(
-            "For metadata discover only, opt into the larger legacy-v1 full "
-            "live-metadata audit view; ordinary mutation selection uses the "
-            "compact v2 default"
+            "User-facing custom object/plug-in kind meaning; the Gateway binds "
+            "it to one exact live Wwise metadata type"
         ),
     )
+    metadata_scope.add_argument(
+        "--exact-id",
+        dest="metadata_exact_id",
+        help="Exact canonical object GUID returned by a prior bounded query",
+    )
     metadata.add_argument(
-        "--summary-only",
-        action="store_true",
+        "--meaning",
+        action="append",
+        dest="metadata_meanings",
+        metavar="USER_FACING_FIELD_MEANING",
         help=(
-            "For metadata types only, omit the normalized type inventory and return "
-            "the packaged count/ActorMixer projection"
+            "Repeat one user-facing property/reference meaning; the Gateway "
+            "discovers the exact live field metadata"
         ),
+    )
+    metadata.add_argument("--platform")
+    metadata.add_argument(
+        "--curve-role",
+        choices=(
+            "volume-dry",
+            "game-defined-aux-send-volume",
+            "user-defined-aux-send-volume",
+            "low-pass-filter",
+            "high-pass-filter",
+            "spread",
+            "focus",
+        ),
+        dest="curve_role",
+        help=(
+            "User-facing attenuation curve role; the Gateway derives Wwise's "
+            "exact curveType token"
+        ),
+    )
+    metadata.set_defaults(
+        object=None,
+        class_id=None,
+        object_type=None,
+        property=None,
+        curve_type=None,
+        queries=None,
+        limit=None,
+        detail=False,
     )
 
     wait_topic = subparsers.add_parser(
@@ -1237,8 +2050,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Collect a bounded count of manifest topic events, with optional payload match and guaranteed cleanup",
     )
     wait_topic.add_argument("api")
-    wait_topic.add_argument("--options-json", default="{}")
-    wait_topic.add_argument("--match-json", default="{}")
+    add_topic_business_input_arguments(wait_topic)
     wait_topic.add_argument(
         "--event-count",
         type=int,
@@ -1267,8 +2079,52 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     stream_topic.add_argument("api")
-    stream_topic.add_argument("--options-json", default="{}")
-    stream_topic.add_argument("--match-json", default="{}")
+    add_topic_business_input_arguments(stream_topic)
+    stream_topic.add_argument(
+        "--event-count",
+        type=int,
+        default=None,
+        metavar=f"1..{MAX_WAIT_EVENT_COUNT}",
+        help=(
+            "Explicit maximum matching-event count before unsubscribe; required "
+            f"for finite and no-time-limit streams and capped at {MAX_WAIT_EVENT_COUNT}"
+        ),
+    )
+
+    topic_schema = subparsers.add_parser(
+        "topic-schema",
+        help="Describe exact-version business subscription options and event matching offline",
+    )
+    topic_schema.add_argument("api")
+    topic_schema.add_argument(
+        "--catalog",
+        action="store_true",
+        help=(
+            "Disclose the complete bounded complex row and exact-entry catalogs; "
+            "the SoundBank-generated shortcut view omits them by default"
+        ),
+    )
+    topic_schema.add_argument(
+        "--row",
+        help=(
+            "Disclose the stable scalar fields for one business event-row "
+            "collection"
+        ),
+    )
+    topic_schema.add_argument(
+        "--row-field-group",
+        help="Disclose one field group within the selected event-row collection",
+    )
+    topic_schema.add_argument(
+        "--entry",
+        help=(
+            "Disclose object/list fields for one exact event-entry scope"
+        ),
+    )
+    topic_schema.add_argument(
+        "--match-group",
+        help="Disclose stable scalar fields for one event-match root",
+    )
 
     capabilities = subparsers.add_parser(
         "capabilities",
@@ -1351,20 +2207,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="Describe one closed operation request shape, versioned CLI templates when applicable, and its execution boundary offline",
     )
     operation_schema.add_argument("operation")
-    legacy_operation_schema = subparsers.add_parser(
-        "legacy-operation-schema",
-        help=(
-            "Compatibility-only description of the deprecated full-JSON "
-            "operation request adapter"
-        ),
-    )
-    legacy_operation_schema.add_argument("operation")
-
     query_schema = subparsers.add_parser(
         "query-schema",
         help=(
-            "Describe the closed structured object-query contract offline; "
-            "use it only when the simple query-object flags are insufficient"
+            "Describe the closed business object-query declaration offline"
         ),
     )
     query_schema.add_argument("--all-versions", action="store_true")
@@ -1372,8 +2218,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--advanced",
         action="store_true",
         help=(
-            "Disclose the third-layer bounded native WAQL contract instead "
-            "of the preferred structured object-query contract"
+            "Disclose the bounded native WAQL fallback when the business "
+            "declaration cannot express a required server-side read semantic"
         ),
     )
 
@@ -1438,6 +2284,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
     draft_start.add_argument("operation")
 
+    draft_start_undo_child = subparsers.add_parser(
+        "draft-start-undo-child",
+        help=(
+            "Start one parent-owned Business Draft child without exposing an "
+            "independent child Preview"
+        ),
+    )
+    draft_start_undo_child.add_argument("draft_id")
+    draft_start_undo_child.add_argument("--task-authority", required=True)
+    draft_start_undo_child.add_argument(
+        "--expected-revision", required=True, type=int
+    )
+    draft_start_undo_child.add_argument("--operation", required=True)
+
     draft_apply = subparsers.add_parser(
         "draft-apply",
         help="Apply one closed typed action to an authorized Operation Draft offline",
@@ -1453,6 +2313,761 @@ def build_parser() -> argparse.ArgumentParser:
             "use draft-inspect for the complete current facts"
         ),
     )
+
+    draft_business_configure = subparsers.add_parser(
+        "draft-business-configure",
+        help="Set complete high-level audio import batch behavior offline",
+    )
+    _add_business_draft_binding_arguments(draft_business_configure)
+    draft_business_configure.add_argument(
+        "--mode", choices=("create", "reimport", "replace")
+    )
+    draft_business_configure.add_argument(
+        "--name-conflict",
+        choices=("fail", "rename", "merge", "replace"),
+    )
+    draft_business_configure.add_argument("--replace-owner-handle")
+    draft_business_configure.add_argument("--platform")
+    draft_business_configure.add_argument(
+        "--list-behavior",
+        choices=("append", "replace-all"),
+    )
+    source_control = draft_business_configure.add_mutually_exclusive_group()
+    source_control.add_argument(
+        "--add-to-source-control",
+        dest="add_to_source_control",
+        action="store_true",
+    )
+    source_control.add_argument(
+        "--no-add-to-source-control",
+        dest="add_to_source_control",
+        action="store_false",
+    )
+    draft_business_configure.set_defaults(add_to_source_control=None)
+    check_out = draft_business_configure.add_mutually_exclusive_group()
+    check_out.add_argument(
+        "--check-out-from-source-control",
+        dest="check_out_from_source_control",
+        action="store_true",
+    )
+    check_out.add_argument(
+        "--no-check-out-from-source-control",
+        dest="check_out_from_source_control",
+        action="store_false",
+    )
+    draft_business_configure.set_defaults(check_out_from_source_control=None)
+    draft_business_configure.add_argument(
+        "--default",
+        action="append",
+        nargs=2,
+        default=[],
+        metavar=("FIELD", "VALUE"),
+    )
+    draft_business_configure.add_argument(
+        "--default-field-value",
+        action="append",
+        nargs=2,
+        default=[],
+        metavar=("FIELD_HANDLE", "VALUE"),
+    )
+    draft_business_configure.add_argument("--default-event-parent-handle")
+    draft_business_configure.add_argument("--default-event-name")
+    draft_business_configure.add_argument(
+        "--default-event-action",
+        choices=("Play", "Stop", "Pause", "Resume", "Break", "Seek"),
+    )
+
+    draft_declare_import_batch = subparsers.add_parser(
+        "draft-declare-import-batch",
+        help=(
+            "Append one bounded high-level audio import chunk without native "
+            "WAAPI rows or JSON shell quoting"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_declare_import_batch)
+    draft_declare_import_batch.add_argument(
+        "--row-order",
+        action="append",
+        nargs="+",
+        required=True,
+        metavar="ID",
+        help=(
+            "Supply one to six IDs in exact requested import order; the option "
+            "may also be repeated with one ID each"
+        ),
+    )
+    draft_declare_import_batch.add_argument(
+        "--new-root-row",
+        action="append",
+        nargs=4,
+        default=[],
+        metavar=("ID", "PARENT_HANDLE", "NAME", "KIND"),
+    )
+    draft_declare_import_batch.add_argument(
+        "--new-child-row",
+        action="append",
+        nargs=4,
+        default=[],
+        metavar=("ID", "PARENT_ID", "NAME", "KIND"),
+    )
+    draft_declare_import_batch.add_argument(
+        "--new-row",
+        action="append",
+        nargs=4,
+        default=[],
+        metavar=("ID", "PARENT_HANDLE_OR_ID", "NAME", "KIND"),
+    )
+    draft_declare_import_batch.add_argument(
+        "--existing-row",
+        action="append",
+        nargs=2,
+        default=[],
+        metavar=("ID", "OBJECT_HANDLE"),
+    )
+    draft_declare_import_batch.add_argument(
+        "--field",
+        action="append",
+        nargs=3,
+        default=[],
+        metavar=("ID", "FIELD", "VALUE"),
+    )
+    draft_declare_import_batch.add_argument(
+        "--field-value",
+        action="append",
+        nargs=3,
+        default=[],
+        metavar=("ID", "FIELD_HANDLE", "VALUE"),
+    )
+    draft_declare_import_batch.add_argument(
+        "--media-directory",
+        metavar="ABSOLUTE_DIRECTORY",
+    )
+    draft_declare_import_batch.add_argument(
+        "--media-file",
+        action="append",
+        nargs=2,
+        default=[],
+        metavar=("ID", "FILE_NAME"),
+    )
+    draft_declare_import_batch.add_argument(
+        "--switch-value",
+        action="append",
+        nargs=2,
+        default=[],
+        metavar=("ID", "VALUE"),
+    )
+    draft_declare_import_batch.add_argument(
+        "--event",
+        action="append",
+        nargs=4,
+        default=[],
+        metavar=("ID", "PARENT_HANDLE", "NAME", "ACTION"),
+    )
+
+    draft_declare_object_change = subparsers.add_parser(
+        "draft-declare-object-change",
+        help=(
+            "Declare one simple existing-object business outcome using only "
+            "operation-specific scalar facts; bound object roles stay inside the Draft"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_declare_object_change)
+    draft_declare_object_change.add_argument("--new-name")
+    draft_declare_object_change.add_argument("--notes")
+    draft_declare_object_change.add_argument(
+        "--name-conflict",
+        choices=("fail", "rename"),
+    )
+    add_source = draft_declare_object_change.add_mutually_exclusive_group()
+    add_source.add_argument(
+        "--add-to-source-control",
+        dest="add_to_source_control",
+        action="store_true",
+    )
+    add_source.add_argument(
+        "--no-add-to-source-control",
+        dest="add_to_source_control",
+        action="store_false",
+    )
+    check_out_change = draft_declare_object_change.add_mutually_exclusive_group()
+    check_out_change.add_argument(
+        "--check-out-from-source-control",
+        dest="check_out_from_source_control",
+        action="store_true",
+    )
+    check_out_change.add_argument(
+        "--no-check-out-from-source-control",
+        dest="check_out_from_source_control",
+        action="store_false",
+    )
+    draft_declare_object_change.set_defaults(
+        add_to_source_control=None,
+        check_out_from_source_control=None,
+    )
+
+    draft_declare_switch_assignment = subparsers.add_parser(
+        "draft-declare-switch-assignment",
+        help=(
+            "Declare one Switch Container child and Switch/State value "
+            "relationship using only live-bound object handles"
+        ),
+    )
+    _add_business_draft_binding_arguments(
+        draft_declare_switch_assignment
+    )
+    draft_declare_switch_assignment.add_argument(
+        "--switch-container-handle",
+        required=True,
+    )
+    draft_declare_switch_assignment.add_argument(
+        "--child-handle",
+        required=True,
+    )
+    draft_declare_switch_assignment.add_argument(
+        "--state-or-switch-handle",
+        required=True,
+    )
+
+    draft_declare_soundbank_plan = subparsers.add_parser(
+        "draft-declare-soundbank-plan",
+        help=(
+            "Declare one complete high-level SoundBank plan using bound "
+            "objects, stable business choices, and exact caller artifacts"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_declare_soundbank_plan)
+    add_soundbank_plan_arguments(draft_declare_soundbank_plan)
+
+    draft_declare_artifact_plan = subparsers.add_parser(
+        "draft-declare-artifact-plan",
+        help=(
+            "Declare one complete tabular or Lua artifact plan while the "
+            "Gateway owns native loader fields and source authority"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_declare_artifact_plan)
+    add_exact_artifact_plan_arguments(draft_declare_artifact_plan)
+    draft_declare_cli_console_plan = subparsers.add_parser(
+        "draft-declare-cli-console-plan",
+        help=(
+            "Declare one complete project/build outcome while the Gateway owns "
+            "native Wwise CLI and Console request construction"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_declare_cli_console_plan)
+    add_cli_console_plan_arguments(draft_declare_cli_console_plan)
+    draft_declare_host_plan = subparsers.add_parser(
+        "draft-declare-host-plan",
+        help=(
+            "Declare one complete test-tone or Authoring-project outcome while "
+            "the Gateway owns native host request construction"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_declare_host_plan)
+    add_host_ui_debug_plan_arguments(draft_declare_host_plan)
+
+    draft_declare_ui_plan = subparsers.add_parser(
+        "draft-declare-ui-plan",
+        help=(
+            "Declare one closed Authoring UI capture, execute, register header, "
+            "or unregister business plan"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_declare_ui_plan)
+    add_authoring_ui_plan_arguments(draft_declare_ui_plan)
+
+    draft_add_ui_command = subparsers.add_parser(
+        "draft-add-ui-command",
+        help=(
+            "Append the next complete high-level command descriptor to a "
+            "count-bound Authoring UI registration plan"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_add_ui_command)
+    add_authoring_ui_command_arguments(draft_add_ui_command)
+
+    draft_declare_debug_intent = subparsers.add_parser(
+        "draft-declare-debug-intent",
+        help=(
+            "Declare one stable Debug mode outcome or one zero-value "
+            "deliberate host-control intent"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_declare_debug_intent)
+    add_debug_intent_arguments(draft_declare_debug_intent)
+
+    draft_declare_undo_plan = subparsers.add_parser(
+        "draft-declare-undo-plan",
+        help=(
+            "Declare one display name and an ordered list of checked child "
+            "Business Draft snapshots"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_declare_undo_plan)
+    draft_declare_undo_plan.add_argument("--display-name", required=True)
+    draft_declare_undo_plan.add_argument(
+        "--child-draft",
+        action="append",
+        nargs=2,
+        required=True,
+        metavar=("DRAFT_ID", "TASK_AUTHORITY"),
+    )
+
+    draft_declare_core_plan = subparsers.add_parser(
+        "draft-declare-core-plan",
+        help=(
+            "Declare one complete reviewed Core business plan while the "
+            "Gateway owns the native request"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_declare_core_plan)
+    draft_declare_core_plan.add_argument(
+        "--role",
+        action="append",
+        nargs=2,
+        default=[],
+        metavar=("ROLE", "BOUND_OBJECT_HANDLE"),
+    )
+    draft_declare_core_plan.add_argument(
+        "--field",
+        action="append",
+        nargs=2,
+        default=[],
+        metavar=("BUSINESS_FIELD", "BOUND_FIELD_HANDLE"),
+    )
+    draft_declare_core_plan.add_argument(
+        "--value",
+        action="append",
+        nargs=2,
+        default=[],
+        metavar=("BUSINESS_FIELD", "VALUE"),
+    )
+    draft_declare_core_plan.add_argument(
+        "--item",
+        action="append",
+        nargs=2,
+        default=[],
+        metavar=("BUSINESS_COLLECTION", "VALUE"),
+    )
+    draft_declare_core_plan.add_argument(
+        "--curve-point",
+        action="append",
+        nargs=3,
+        default=[],
+        metavar=("X", "Y", "SHAPE"),
+    )
+    draft_declare_core_plan.add_argument(
+        "--blend-edge",
+        action="append",
+        nargs=4,
+        default=[],
+        metavar=("EDGE_POSITION", "FADE_MODE", "FADE_POSITION_OR_NONE", "SHAPE"),
+    )
+
+    draft_declare_project_setting_plan = subparsers.add_parser(
+        "draft-declare-project-setting-plan",
+        help=(
+            "Declare one complete Game Parameter range or Sound active-source "
+            "outcome while the Gateway owns the native request"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_declare_project_setting_plan)
+    draft_declare_project_setting_plan.add_argument(
+        "--sound-handle",
+        help="Opaque handle returned for the exact Sound role",
+    )
+    draft_declare_project_setting_plan.add_argument(
+        "--source-handle",
+        help="Opaque handle returned for the exact AudioFileSource role",
+    )
+    draft_declare_project_setting_plan.add_argument(
+        "--game-parameter-handle",
+        help="Opaque handle returned for the exact Game Parameter role",
+    )
+    draft_declare_project_setting_plan.add_argument(
+        "--minimum",
+        help="Requested finite Game Parameter minimum",
+    )
+    draft_declare_project_setting_plan.add_argument(
+        "--maximum",
+        help="Requested finite Game Parameter maximum",
+    )
+    draft_declare_project_setting_plan.add_argument(
+        "--curve-update-outcome",
+        choices=("stretch", "preserve-x"),
+        help="How existing Game Parameter curves respond to the new range",
+    )
+    draft_declare_project_setting_plan.add_argument(
+        "--platform-name",
+        help="Optional exact installed platform for the active source",
+    )
+    draft_declare_runtime_control_plan = subparsers.add_parser(
+        "draft-declare-runtime-control-plan",
+        help=(
+            "Declare one complete runtime inspection/control outcome while the "
+            "Gateway owns native enums, handles, and request construction"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_declare_runtime_control_plan)
+    draft_declare_runtime_control_plan.add_argument(
+        "--cursor-move",
+        choices=(
+            "first-frame",
+            "last-frame",
+            "next-frame",
+            "previous-frame",
+        ),
+    )
+    draft_declare_runtime_control_plan.add_argument(
+        "--cursor-target-ms",
+        type=int,
+    )
+    draft_declare_runtime_control_plan.add_argument(
+        "--capture-data",
+        action="append",
+        nargs=2,
+        default=[],
+        metavar=("DATA_SET", "ENABLE_OR_DISABLE"),
+    )
+    draft_declare_runtime_control_plan.add_argument("--message")
+    draft_declare_runtime_control_plan.add_argument("--log-channel")
+    draft_declare_runtime_control_plan.add_argument(
+        "--severity",
+        choices=("message", "warning", "error", "fatal"),
+    )
+    draft_declare_runtime_control_plan.add_argument("--remote-host")
+    draft_declare_runtime_control_plan.add_argument("--application-name")
+    draft_declare_runtime_control_plan.add_argument("--command-port", type=int)
+    draft_declare_runtime_control_plan.add_argument(
+        "--notification-port",
+        type=int,
+    )
+    draft_declare_runtime_control_plan.add_argument("--target-handle")
+    draft_declare_runtime_control_plan.add_argument("--game-object-id", type=int)
+    draft_declare_runtime_control_plan.add_argument("--transport-handle")
+    draft_declare_runtime_control_plan.add_argument(
+        "--audition-action",
+        choices=("play", "stop", "pause", "toggle-play-stop", "play-directly"),
+    )
+    draft_declare_runtime_control_plan.add_argument(
+        "--transport-scope",
+        choices=("one-transport", "all-active"),
+    )
+    draft_declare_runtime_control_plan.add_argument(
+        "--audition-media",
+        choices=("originals", "converted"),
+    )
+    draft_declare_runtime_control_plan.add_argument("--meter-object-handle")
+    draft_declare_runtime_control_plan.add_argument("--capture-output-directory")
+    draft_declare_runtime_control_plan.add_argument("--capture-name")
+    draft_declare_soundengine_plan = subparsers.add_parser(
+        "draft-declare-soundengine-plan",
+        help=(
+            "Declare one complete SoundEngine outcome while the Gateway owns "
+            "native IDs, overloads, arrays, and request construction"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_declare_soundengine_plan)
+    draft_declare_soundengine_plan.add_argument("--monitor-message")
+    draft_declare_soundengine_plan.add_argument("--game-object-name")
+    draft_declare_soundengine_plan.add_argument("--game-object-handle")
+    draft_declare_soundengine_plan.add_argument("--event-handle")
+    draft_declare_soundengine_plan.add_argument("--action")
+    draft_declare_soundengine_plan.add_argument("--playing-handle")
+    draft_declare_soundengine_plan.add_argument("--fade-duration-ms", type=int)
+    draft_declare_soundengine_plan.add_argument("--fade-curve")
+    draft_declare_soundengine_plan.add_argument("--position-ms", type=int)
+    draft_declare_soundengine_plan.add_argument("--position-percent", type=float)
+    draft_declare_soundengine_plan.add_argument(
+        "--nearest-marker",
+        action="store_true",
+        default=None,
+    )
+    draft_declare_soundengine_plan.add_argument("--state-group-handle")
+    draft_declare_soundengine_plan.add_argument("--state-handle")
+    draft_declare_soundengine_plan.add_argument("--switch-group-handle")
+    draft_declare_soundengine_plan.add_argument("--switch-handle")
+    draft_declare_soundengine_plan.add_argument("--trigger-handle")
+    draft_declare_soundengine_plan.add_argument("--game-parameter-handle")
+    draft_declare_soundengine_plan.add_argument("--value", type=float)
+    draft_declare_soundengine_plan.add_argument("--sound-bank-handle")
+    draft_declare_soundengine_plan.add_argument("--emitter-handle")
+    draft_declare_soundengine_plan.add_argument(
+        "--listener-handle",
+        action="append",
+    )
+    draft_declare_soundengine_plan.add_argument(
+        "--clear-listeners",
+        action="store_true",
+        default=None,
+    )
+    draft_declare_soundengine_plan.add_argument(
+        "--position-frame",
+        type=float,
+        nargs=9,
+        action="append",
+    )
+    draft_declare_soundengine_plan.add_argument("--obstruction-percent", type=float)
+    draft_declare_soundengine_plan.add_argument("--occlusion-percent", type=float)
+    draft_declare_soundengine_plan.add_argument(
+        "--attenuation-scale-percent",
+        type=float,
+    )
+    draft_declare_soundengine_plan.add_argument("--volume-db", type=float)
+    draft_declare_soundengine_plan.add_argument("--multi-position-mode")
+    draft_declare_soundengine_plan.add_argument("--spatialization")
+    draft_declare_soundengine_plan.add_argument("--channel-layout")
+    draft_declare_soundengine_plan.add_argument("--channel-layout-kind")
+    draft_declare_soundengine_plan.add_argument(
+        "--channel-speaker",
+        action="append",
+    )
+    draft_declare_soundengine_plan.add_argument("--channel-count", type=int)
+    draft_declare_soundengine_plan.add_argument(
+        "--speaker-offset-db",
+        nargs=2,
+        action="append",
+    )
+    draft_declare_soundengine_plan.add_argument(
+        "--channel-offset-db",
+        nargs=2,
+        action="append",
+    )
+    draft_declare_soundengine_plan.add_argument(
+        "--aux-send",
+        nargs=3,
+        action="append",
+    )
+    draft_declare_soundengine_plan.add_argument(
+        "--clear-aux-sends",
+        action="store_true",
+        default=None,
+    )
+    draft_declare_source_control_plan = subparsers.add_parser(
+        "draft-declare-source-control-plan",
+        help=(
+            "Declare one complete source-control file action or bounded external "
+            "read while the Gateway owns native path construction"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_declare_source_control_plan)
+    add_source_control_arguments(
+        draft_declare_source_control_plan,
+        include_max_results=True,
+    )
+
+    draft_declare_field_change = subparsers.add_parser(
+        "draft-declare-field-change",
+        help=(
+            "Declare one bound property, reference, or platform-link business "
+            "outcome without naming its native Wwise token"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_declare_field_change)
+    draft_declare_field_change.add_argument("--object-handle", required=True)
+    draft_declare_field_change.add_argument("--field-handle", required=True)
+    outcome = draft_declare_field_change.add_mutually_exclusive_group(required=True)
+    outcome.add_argument("--business-value")
+    outcome.add_argument("--target-handle")
+    outcome.add_argument("--clear-reference", action="store_true")
+    outcome.add_argument("--link-state", choices=("linked", "unlinked"))
+
+    draft_declare_rtpc = subparsers.add_parser(
+        "draft-declare-rtpc",
+        help=(
+            "Declare one bound RTPC property, Control Input, and ordered "
+            "business curve"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_declare_rtpc)
+    draft_declare_rtpc.add_argument("--object-handle", required=True)
+    draft_declare_rtpc.add_argument("--field-handle", required=True)
+    draft_declare_rtpc.add_argument("--control-input-handle", required=True)
+    draft_declare_rtpc.add_argument(
+        "--point",
+        action="append",
+        nargs=3,
+        required=True,
+        metavar=("X", "Y", "WWISE_SHAPE"),
+    )
+    draft_declare_rtpc.add_argument(
+        "--mode",
+        choices=("add-only", "add-or-update"),
+        default="add-or-update",
+    )
+    draft_declare_rtpc.add_argument("--notes")
+
+    draft_declare_new = subparsers.add_parser(
+        "draft-declare-new",
+        help="Declare one new Wwise descendant using only high-level business facts",
+    )
+    _add_business_declaration_arguments(draft_declare_new)
+    draft_declare_new.add_argument("--parent-handle", required=True)
+    draft_declare_new.add_argument("--name", required=True)
+    draft_declare_new.add_argument("--kind", required=True)
+
+    draft_declare_existing = subparsers.add_parser(
+        "draft-declare-existing",
+        help="Declare one change to an exact bound existing Wwise object",
+    )
+    _add_business_declaration_arguments(draft_declare_existing)
+    draft_declare_existing.add_argument("--object-handle", required=True)
+
+    draft_declare_existing_batch = subparsers.add_parser(
+        "draft-declare-existing-batch",
+        help=(
+            "Atomically declare bounded changes to several exact existing "
+            "objects while the Gateway resolves and revalidates each field meaning"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_declare_existing_batch)
+    draft_declare_existing_batch.add_argument(
+        "--row-order", action="append", required=True, metavar="DECLARATION_ID"
+    )
+    draft_declare_existing_batch.add_argument(
+        "--row",
+        action="append",
+        nargs=2,
+        required=True,
+        metavar=("DECLARATION_ID", "OBJECT_HANDLE"),
+    )
+    draft_declare_existing_batch.add_argument(
+        "--field",
+        action="append",
+        nargs=3,
+        default=[],
+        metavar=("DECLARATION_ID", "STABLE_FIELD", "VALUE"),
+    )
+    draft_declare_existing_batch.add_argument(
+        "--field-meaning-value",
+        action="append",
+        nargs=3,
+        default=[],
+        metavar=("DECLARATION_ID", "FIELD_MEANING", "VALUE"),
+    )
+
+    draft_add_media = subparsers.add_parser(
+        "draft-add-media",
+        help=(
+            "Append one exact media artifact to an existing high-level object.set "
+            "declaration without accepting a native import fragment"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_add_media)
+    draft_add_media.add_argument("--declaration-id", required=True)
+    media_source = draft_add_media.add_mutually_exclusive_group(required=True)
+    media_source.add_argument("--media-file")
+    media_source.add_argument("--inline-wav")
+    draft_add_media.add_argument("--kind")
+    draft_add_media.add_argument("--language")
+    draft_add_media.add_argument("--originals-subfolder")
+
+    draft_clear_object_list = subparsers.add_parser(
+        "draft-clear-object-list",
+        help=(
+            "Declare one exact Wwise object-list clear through a bound owner "
+            "without accepting an empty native list row"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_clear_object_list)
+    draft_clear_object_list.add_argument("--declaration-id", required=True)
+    draft_clear_object_list.add_argument("--object-handle", required=True)
+    draft_clear_object_list.add_argument("--list-name", required=True)
+
+    draft_revise_declaration = subparsers.add_parser(
+        "draft-revise-declaration",
+        help="Replace the complete high-level field set of one declaration",
+    )
+    _add_business_declaration_arguments(draft_revise_declaration)
+
+    draft_remove_declaration = subparsers.add_parser(
+        "draft-remove-declaration",
+        help="Remove one high-level declaration from an editable Draft",
+    )
+    _add_business_draft_binding_arguments(draft_remove_declaration)
+    draft_remove_declaration.add_argument("--declaration-id", required=True)
+
+    draft_bind_object = subparsers.add_parser(
+        "draft-bind-object",
+        help="Resolve one exact live Wwise object into a task-local opaque handle",
+    )
+    _add_business_draft_binding_arguments(draft_bind_object)
+    object_selector = draft_bind_object.add_mutually_exclusive_group(required=True)
+    object_selector.add_argument("--object-id")
+    object_selector.add_argument("--object-path-segment", action="append")
+    object_selector.add_argument(
+        "--exact-type-name",
+        nargs=2,
+        metavar=("TYPE", "NAME"),
+    )
+    object_selector.add_argument("--scoped-child-name")
+    object_selector.add_argument("--direct-child-type")
+    object_selector.add_argument(
+        "--event-action-of-path-segment",
+        action="append",
+        help=(
+            "Repeat the exact Event path root-to-leaf; the Gateway resolves its "
+            "single direct Action child"
+        ),
+    )
+    parent_selector = draft_bind_object.add_mutually_exclusive_group()
+    parent_selector.add_argument("--parent-id")
+    parent_selector.add_argument("--parent-path-segment", action="append")
+    draft_bind_object.add_argument("--role")
+
+    draft_bind_field = subparsers.add_parser(
+        "draft-bind-field",
+        help="Bind one exact live property or reference into an opaque typed handle",
+    )
+    _add_business_draft_binding_arguments(draft_bind_field)
+    field_scope = draft_bind_field.add_mutually_exclusive_group(required=True)
+    field_scope.add_argument("--object-handle")
+    field_scope.add_argument("--class-name")
+    draft_bind_field.add_argument("--token", required=True)
+    draft_bind_field.add_argument("--platform")
+
+    draft_discover_fields = subparsers.add_parser(
+        "draft-discover-fields",
+        help=(
+            "Resolve user-facing field meaning into bounded live candidate handles"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_discover_fields)
+    discovery_scope = draft_discover_fields.add_mutually_exclusive_group(
+        required=True
+    )
+    discovery_scope.add_argument("--object-handle")
+    discovery_scope.add_argument("--type-handle")
+    discovery_scope.add_argument("--semantic-kind")
+    draft_discover_fields.add_argument(
+        "--meaning",
+        action="append",
+        dest="meanings",
+        required=True,
+        metavar="SEARCH_PHRASE",
+    )
+    draft_discover_fields.add_argument("--platform")
+
+    draft_discover_types = subparsers.add_parser(
+        "draft-discover-types",
+        help=(
+            "Resolve a user-facing object or plug-in kind into bounded live "
+            "type handles"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_discover_types)
+    draft_discover_types.add_argument(
+        "--meaning",
+        action="append",
+        dest="meanings",
+        required=True,
+        metavar="SEARCH_PHRASE",
+    )
+    draft_discover_types.add_argument(
+        "--role",
+        choices=("object", "source", "effect"),
+        required=True,
+    )
     draft_apply.add_argument(
         "--facts",
         nargs=argparse.REMAINDER,
@@ -1461,7 +3076,6 @@ def build_parser() -> argparse.ArgumentParser:
             "option-looking strings as data"
         ),
     )
-    draft_apply.add_argument("--action-json", help=argparse.SUPPRESS)
 
     draft_check = subparsers.add_parser(
         "draft-check",
@@ -1473,6 +3087,11 @@ def build_parser() -> argparse.ArgumentParser:
     draft_check.add_argument("draft_id")
     draft_check.add_argument("--task-authority", required=True)
     draft_check.add_argument("--expected-revision", required=True, type=int)
+    draft_check.add_argument(
+        "--detail",
+        action="store_true",
+        help="Include complete validation and dispatch evidence",
+    )
 
     preview_from_draft = subparsers.add_parser(
         "preview-from-draft",
@@ -1522,51 +3141,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Bind explicit confirmation to one immutable preview without connecting to Wwise",
     )
     confirm.add_argument("transaction_id")
-    confirmation_binding = confirm.add_mutually_exclusive_group(required=True)
-    confirmation_binding.add_argument("--confirmation-token")
-    confirmation_binding.add_argument(
-        "--artifact-hash",
-        help="Legacy compatibility spelling using the complete immutable preview hash",
-    )
+    confirm.add_argument("--confirmation-token", required=True)
 
     reject = subparsers.add_parser("reject", help="Reject one awaiting transaction without connecting to Wwise")
     reject.add_argument("transaction_id")
     reject.add_argument("--reason", default="rejected by user")
-
-    for preview_command, preview_help in (
-        (
-            "preview",
-            "Live-resolve the operation's sole normal input mode and persist "
-            "an immutable preview",
-        ),
-        (
-            "legacy-preview",
-            "Compatibility-only submission of one deprecated full-JSON "
-            "operation request to the canonical preview ingress",
-        ),
-    ):
-        preview = subparsers.add_parser(
-            preview_command,
-            help=(
-                f"{preview_help}; --apply marks an explicit request to carry "
-                "out the change under the configured project modification policy"
-            ),
-        )
-        preview.add_argument(
-            "--apply",
-            action="store_true",
-            help=(
-                "Mark this as an explicit change request. read_only blocks it, "
-                "ask_before_changes waits for later confirmation, and allow_changes "
-                "policy-authorizes the immutable preview for same-turn execution."
-            ),
-        )
-        preview.add_argument("--request-json", required=True)
-        preview.add_argument(
-            "--ttl",
-            type=int,
-            default=DEFAULT_PREVIEW_TTL_SECONDS,
-        )
 
     execute = subparsers.add_parser(
         "execute",
@@ -1583,25 +3162,164 @@ def build_parser() -> argparse.ArgumentParser:
     )
     verify.add_argument("transaction_id")
 
-    call = subparsers.add_parser(
-        "call",
-        help="Dispatch one reviewed manifest-dispatch read-only WAAPI function",
-    )
-    call.add_argument("api")
-    call.add_argument("--args-json", default="{}")
-    call.add_argument("--options-json", default="{}")
-    call.add_argument(
-        "--post-filter-json",
+    return parser
+
+
+def add_topic_business_input_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add the one closed business Topic vocabulary to a subscription command."""
+
+    parser.add_argument(
+        "--topic-contract-digest",
         help=(
-            "Apply the closed Media Pool Filename case-sensitive contains "
-            "post-filter after a complete bounded candidate read"
+            "Exact contract digest copied from topic-schema; execution rejects "
+            "a missing or stale business vocabulary before connecting"
         ),
     )
-    call.add_argument("--dry-run", action="store_true")
-    call.add_argument("--allow-destructive", action="store_true", help=argparse.SUPPRESS)
-    call.add_argument("--topic-mode", default="wait")
-    call.add_argument("--live-behavior", action="store_true")
-    return parser
+    parser.add_argument(
+        "--include-object-identity",
+        action="store_true",
+        help=(
+            "For soundbank.generated, return the SoundBank id, name, type, and "
+            "path as one Gateway-owned business projection"
+        ),
+    )
+    parser.add_argument(
+        "--match-platform-name",
+        help=(
+            "For soundbank.generated, match the exact platform name without "
+            "copying a reflected value-choice handle"
+        ),
+    )
+    parser.add_argument(
+        "--match-soundbank-name",
+        help="For soundbank.generated, match the exact SoundBank object name",
+    )
+    parser.add_argument(
+        "--topic-option",
+        action="append",
+        nargs=2,
+        metavar=("FIELD", "VALUE"),
+        default=[],
+    )
+    parser.add_argument(
+        "--topic-option-empty",
+        action="append",
+        metavar="FIELD",
+        default=[],
+    )
+    parser.add_argument(
+        "--topic-option-as",
+        action="append",
+        nargs=3,
+        metavar=("FIELD", "VALUE_CHOICE", "VALUE"),
+        default=[],
+    )
+    parser.add_argument(
+        "--event-match",
+        action="append",
+        nargs=2,
+        metavar=("FIELD", "VALUE"),
+        default=[],
+    )
+    parser.add_argument(
+        "--event-empty",
+        action="append",
+        metavar="FIELD",
+        default=[],
+    )
+    parser.add_argument(
+        "--event-match-as",
+        action="append",
+        nargs=3,
+        metavar=("FIELD", "VALUE_CHOICE", "VALUE"),
+        default=[],
+    )
+    parser.add_argument(
+        "--event-row",
+        action="append",
+        nargs=4,
+        metavar=("COLLECTION", "INDICES", "FIELD", "VALUE"),
+        default=[],
+    )
+    parser.add_argument(
+        "--event-row-as",
+        action="append",
+        nargs=5,
+        metavar=("COLLECTION", "INDICES", "FIELD", "VALUE_CHOICE", "VALUE"),
+        default=[],
+    )
+    parser.add_argument(
+        "--event-row-empty",
+        action="append",
+        nargs=2,
+        metavar=("COLLECTION", "PARENT_INDICES"),
+        default=[],
+    )
+    parser.add_argument(
+        "--event-entry",
+        action="append",
+        nargs=4,
+        metavar=("SCOPE", "INDICES", "KEY", "VALUE"),
+        default=[],
+    )
+    parser.add_argument(
+        "--event-entry-as",
+        action="append",
+        nargs=5,
+        metavar=("SCOPE", "INDICES", "KEY", "VALUE_CHOICE", "VALUE"),
+        default=[],
+    )
+    parser.add_argument(
+        "--event-entry-empty",
+        action="append",
+        nargs=4,
+        metavar=("SCOPE", "INDICES", "KEY", "OBJECT_OR_LIST"),
+        default=[],
+    )
+    parser.add_argument(
+        "--event-entry-object",
+        action="append",
+        nargs=5,
+        metavar=("SCOPE", "INDICES", "KEY", "FIELD", "VALUE"),
+        default=[],
+    )
+    parser.add_argument(
+        "--event-entry-object-as",
+        action="append",
+        nargs=6,
+        metavar=(
+            "SCOPE",
+            "INDICES",
+            "KEY",
+            "FIELD",
+            "VALUE_CHOICE",
+            "VALUE",
+        ),
+        default=[],
+    )
+    parser.add_argument(
+        "--event-entry-row",
+        action="append",
+        nargs=6,
+        metavar=("SCOPE", "INDICES", "KEY", "ITEM_INDEX", "FIELD", "VALUE"),
+        default=[],
+    )
+    parser.add_argument(
+        "--event-entry-row-as",
+        action="append",
+        nargs=7,
+        metavar=(
+            "SCOPE",
+            "INDICES",
+            "KEY",
+            "ITEM_INDEX",
+            "FIELD",
+            "VALUE_CHOICE",
+            "VALUE",
+        ),
+        default=[],
+    )
+
 
 
 def execute_gateway(
@@ -1661,12 +3379,16 @@ def _execute_gateway_unconstrained(
             enriched["endpoint"] = dict(runtime_endpoint)
         if runtime_detected_version is not None and "detected_version" not in enriched:
             enriched["detected_version"] = runtime_detected_version
-        if args.command == "draft-apply" and getattr(args, "compact", False):
-            # The Draft start response has already supplied the bounded
-            # conversation/session introduction. Repeating that complete
-            # projection after every typed edit makes a long composition grow
-            # the model transcript without adding action-local facts. Compact
-            # edits therefore return only their durable delta and continuation.
+        if (
+            (args.command.startswith("draft-") and args.command != "draft-start")
+            or args.command == "transaction-show"
+        ):
+            # Draft and transaction continuations require opaque state emitted
+            # by an earlier Gateway result in this conversation. That earlier
+            # result already supplied the one-time session introduction.
+            # Repeating it can push a complete continuation past the Agent's
+            # visible shell frame, so return only the durable delta/review and
+            # its exact next action.
             return exit_code, enriched
         return exit_code, attach_gateway_session_context(
             enriched,
@@ -1685,9 +3407,10 @@ def _execute_gateway_unconstrained(
         if args.command == "execute":
             require_transaction_preconnection_policy(args, env=source_env)
         elif args.command in {
-            "preview",
-            "legacy-preview",
             "preview-from-draft",
+            "typed-zero-call",
+            "typed-call",
+            "typed-operation",
         } and args.apply:
             require_project_modification_policy(
                 env=source_env,
@@ -1697,21 +3420,31 @@ def _execute_gateway_unconstrained(
         if route_boundary is not None:
             return finish(2, route_boundary)
         preflight_json_inputs(args)
-        if args.command == "selected":
-            args.return_fields = list(
-                normalize_selected_return_fields(args.return_fields)
-            )
         if args.command == "query-object":
             preflight_query_object_input(args, env=source_env)
+        if args.command in {"wait-topic", "stream-topic"}:
+            preflight_typed_topic_input(args, env=source_env)
         if args.command == "metadata":
-            preflight_metadata_input(args)
+            preflight_metadata_input(args, env=source_env)
         if args.command in {
             "profiler-game-objects",
             "profiler-voice-contributions",
         }:
             preflight_stable_read_input(args, env=source_env)
+        if args.command == "typed-call":
+            preflight_typed_request_input(args, env=source_env)
+        if args.command == "core-call":
+            preflight_core_business_input(args, env=source_env)
+        if args.command in {"draft-apply", "draft-check", "preview-from-draft"}:
+            preflight_retired_media_build_draft(args, env=source_env)
+        if args.command == "typed-operation":
+            preflight_typed_operation_input(args, env=source_env)
+        if args.command == "typed-zero-call":
+            preflight_typed_zero_input(args, env=source_env)
         if args.command in {"debug-wal-tree", "debug-validate-call"}:
-            preflight_debug_read_input(args)
+            preflight_debug_read_input(args, env=source_env)
+        if args.command == "draft-bind-object":
+            preflight_business_object_binding_input(args)
         if args.command in OFFLINE_COMMANDS:
             payload = dispatch_offline_command(args, env=source_env)
             return finish(0 if payload.get("ok") else 2, payload)
@@ -1724,16 +3457,33 @@ def _execute_gateway_unconstrained(
         factory = client_factory or default_client_factory
         transport = GatewayTransport(connection.url, factory, deadline=connection.deadline)
         try:
-            version_detection_timeout = connection.deadline.require_remaining(
-                "version_detection.getInfo"
+            wait_for_project_transition = _verify_is_executed_project_transition(
+                args,
+                env=source_env,
             )
-            if math.isinf(version_detection_timeout):
-                version_detection_timeout = DEFAULT_TIMEOUT
-            live_info = transport.call_with_timeout(
-                GET_INFO_URI,
-                timeout=version_detection_timeout,
-                phase="version_detection.getInfo",
-            )
+            while True:
+                version_detection_timeout = connection.deadline.require_remaining(
+                    "version_detection.getInfo"
+                )
+                if math.isinf(version_detection_timeout):
+                    version_detection_timeout = DEFAULT_TIMEOUT
+                try:
+                    live_info = transport.call_with_timeout(
+                        GET_INFO_URI,
+                        timeout=version_detection_timeout,
+                        phase="version_detection.getInfo",
+                    )
+                    break
+                except Exception as exc:
+                    if not (
+                        wait_for_project_transition
+                        and _is_transient_project_transition_lock(exc)
+                    ):
+                        raise
+                    connection.deadline.require_remaining(
+                        "wait for Authoring project transition"
+                    )
+                    time.sleep(PROJECT_TRANSITION_SETTLE_POLL_SECONDS)
             detected_version = version_key_from_get_info(require_mapping(live_info, "getInfo response"))
             runtime_detected_version = detected_version
             if connection.version_hint and connection.version_hint != detected_version:
@@ -1756,7 +3506,7 @@ def _execute_gateway_unconstrained(
             )
             if payload.get("ok"):
                 connection.deadline.require_remaining(f"finalize {args.command}")
-        except KeyboardInterrupt:
+        except KeyboardInterrupt as cancellation:
             cancellation_cleanup: dict[str, Any]
             try:
                 transport.close()
@@ -1803,6 +3553,23 @@ def _execute_gateway_unconstrained(
                         },
                     }
                 )
+            if isinstance(cancellation, TopicStreamCancelled):
+                cancelled_payload.update(
+                    {
+                        "contract": TOPIC_STREAM_RECORD_CONTRACT,
+                        "record_type": "terminal",
+                        "topic_contract_digest": args.topic_contract_digest,
+                        "match": dict(args.typed_topic_input.match) or None,
+                        "event_count": cancellation.event_count,
+                        "elapsed_seconds": cancellation.elapsed_seconds,
+                        "cleanup": cancellation.cleanup,
+                        "transport_cleanup": cancellation_cleanup,
+                    }
+                )
+                if cancellation.cleanup_failure is not None:
+                    cancelled_payload["details"] = {
+                        "cleanup_failure": cancellation.cleanup_failure,
+                    }
             return finish(130, cancelled_payload)
         except Exception as primary_exc:
             try:
@@ -1840,6 +3607,15 @@ def _execute_gateway_unconstrained(
         if (
             args.command == "query-object"
             and not original_file_reference_match_requested(args)
+            and not post_result_cleanup_failed
+        ):
+            payload = project_successful_query_object_payload(
+                payload,
+                detail=args.detail,
+            )
+        if (
+            args.command == "draft-check"
+            and payload.get("query_layer") == "structured-builder"
             and not post_result_cleanup_failed
         ):
             payload = project_successful_query_object_payload(
@@ -1968,12 +3744,399 @@ def gateway_json_document_size(
     return observed + 1  # print() appends one newline
 
 
+def _typed_container_response_end() -> dict[str, Any]:
+    """Return the final visible completeness sentinel for typed containers."""
+
+    return {
+        "contract": "waapi-skill.gateway-response-end/v1",
+        "marker": "WAAPI_TYPED_CONTAINER_RESPONSE_END",
+        "complete": True,
+        "truncated": False,
+        "agent_action": "continue_same_turn",
+    }
+
+
+def gateway_stdout_payload(value: Any) -> Any:
+    """Return the compact public projection for one terminal stdout document."""
+
+    if (
+        not isinstance(value, Mapping)
+        or value.get("contract") != "waapi-skill.typed-container-handle/v1"
+    ):
+        return value
+    compact_recursive_object = value.get("uri") == "object.create"
+    compact_recursive_audit_fields = (
+        {"schema_digest", "parent_handle", "key", "shape"}
+        if compact_recursive_object
+        else set()
+    )
+    projected = {
+        key: item
+        for key, item in value.items()
+        if key
+        not in (
+            {
+                "business_value_scope",
+                "schema_lineage_authority",
+                "construction_state",
+                "session_context",
+                "child_contract",
+                "continuation",
+                "response_integrity",
+            }
+            | compact_recursive_audit_fields
+        )
+    }
+    projected["response_integrity"] = {
+        "complete": True,
+        "truncated": False,
+    }
+    raw_child_contract = value.get("child_contract")
+    projected_child_contract: dict[str, Any] | None = None
+    if isinstance(raw_child_contract, Mapping):
+        projected_child_contract = {
+            key: item
+            for key, item in raw_child_contract.items()
+            if key not in {"fact_literal_policy", "fixed_container_members"}
+            and item not in (None, False, [], {})
+        }
+        scalar_table = projected_child_contract.get(
+            "fixed_scalar_member_fact_table"
+        )
+        if compact_recursive_object and isinstance(scalar_table, Mapping):
+            columns = scalar_table.get("columns")
+            rows = scalar_table.get("rows")
+            kept_columns = (
+                "key",
+                "required",
+                "accepted_types",
+            )
+            if (
+                isinstance(columns, list)
+                and all(name in columns for name in kept_columns)
+                and isinstance(rows, list)
+                and all(isinstance(row, list) for row in rows)
+                and isinstance(value.get("handle"), str)
+            ):
+                kept_indexes = [columns.index(name) for name in kept_columns]
+                if all(
+                    all(index < len(row) for index in kept_indexes)
+                    for row in rows
+                ):
+                    business_pointer_index = columns.index(
+                        "business_value_pointer"
+                    )
+                    business_pointers = [
+                        row[business_pointer_index] for row in rows
+                    ]
+                    business_object_pointers = {
+                        pointer.rsplit("/", 1)[0]
+                        for pointer in business_pointers
+                        if isinstance(pointer, str) and "/" in pointer
+                    }
+                    if len(business_object_pointers) != 1:
+                        raise GatewayInputError(
+                            "Recursive object scalar rows do not share one "
+                            "business object pointer."
+                        )
+                    compact_scalar_table: dict[str, Any] = {
+                        "columns": list(kept_columns),
+                        "business_object_pointer": next(
+                            iter(business_object_pointers)
+                        ),
+                        "exact_type_tokens": {
+                            "Actor Mixer": "ActorMixer",
+                            "Random Container": "RandomSequenceContainer",
+                            "随机容器": "RandomSequenceContainer",
+                            "Blend Container": "BlendContainer",
+                            "混合容器": "BlendContainer",
+                            "Sound": "Sound",
+                            "forbidden": ["RandomContainer"],
+                        },
+                    }
+                    compact_scalar_table["row_policy"] = (
+                        "all_present_rows_in_order_skip_absent_optional"
+                    )
+                    compact_scalar_table.update(
+                        {
+                            "rows": [
+                                [row[index] for index in kept_indexes]
+                                for row in rows
+                            ],
+                            "fact_command_assembly": {
+                                "fixed_argv_prefix": [
+                                    "--action",
+                                    "add_typed_fact",
+                                    "--fact-action",
+                                    "map-put",
+                                    "--field-handle",
+                                    value["handle"],
+                                ],
+                                "append_for_each_business_present_row": [
+                                    "--value-type",
+                                    "<selected-accepted-type>",
+                                    "--fact-value",
+                                    "<business-value>",
+                                "--key",
+                                "<row-key>",
+                            ],
+                            },
+                        }
+                    )
+                    projected_child_contract[
+                        "fixed_scalar_member_fact_table"
+                    ] = compact_scalar_table
+    raw_continuation = value.get("continuation")
+    if not isinstance(raw_continuation, Mapping):
+        projected["response_end"] = _typed_container_response_end()
+        return projected
+    raw_decision = raw_continuation.get("next_command_decision")
+    raw_root_anchor = raw_continuation.get("root_fact_queue_anchor")
+    raw_deferred_fact = raw_continuation.get("deferred_fact")
+    include_root_anchor = isinstance(raw_root_anchor, Mapping) and (
+        raw_continuation.get("subcommand") != "draft-apply"
+        or not isinstance(raw_deferred_fact, Mapping)
+        or raw_root_anchor.get("first_fact_argv") == raw_deferred_fact.get("argv")
+    )
+    continuation: dict[str, Any] = {}
+    candidate_keys: list[str] = []
+    if include_root_anchor:
+        candidate_keys.append("root_fact_queue_anchor")
+    if isinstance(raw_decision, Mapping):
+        if compact_recursive_object:
+            boundary = raw_decision.get("preview_construction_boundary")
+            decision = {
+                **(
+                    {
+                        "construction_boundary": {
+                            key: boundary[key]
+                            for key in (
+                                "complete",
+                                "required_terminal",
+                                "same_turn_requirement",
+                            )
+                            if key in boundary
+                        }
+                    }
+                    if isinstance(boundary, Mapping)
+                    else {}
+                ),
+                **{
+                    key: raw_decision[key]
+                    for key in (
+                        "evaluate_in_order",
+                        "first_true_candidate_is_the_only_next_action",
+                        "draft_check_or_cancel_with_remaining_candidate_or_deferred_fact",
+                    )
+                    if key in raw_decision
+                },
+            }
+        else:
+            decision = {
+                key: raw_decision[key]
+                for key in (
+                    "preview_construction_boundary",
+                    "evaluate_in_order",
+                    "first_true_candidate_is_the_only_next_action",
+                    "draft_check_or_cancel_with_remaining_candidate_or_deferred_fact",
+                )
+                if key in raw_decision
+            }
+        evaluate = decision.get("evaluate_in_order")
+        if isinstance(evaluate, list):
+            if compact_recursive_object:
+                command_key_by_candidate = {
+                    "branch_disclosure": "branch_disclosure",
+                    "deferred_fact_queue": "deferred_fact",
+                    "nested_container_disclosures": (
+                        "nested_container_disclosures"
+                    ),
+                    "next_item_disclosure": "next_item_disclosure",
+                    "business_sibling_transition": (
+                        "business_sibling_transition"
+                    ),
+                }
+                compact_evaluate: list[dict[str, Any]] = []
+                for row in evaluate:
+                    if not isinstance(row, Mapping):
+                        continue
+                    candidate = row.get("candidate")
+                    if not isinstance(candidate, str) or candidate not in (
+                        command_key_by_candidate
+                    ):
+                        continue
+                    compact_row: dict[str, Any] = {
+                        "candidate": candidate,
+                        "command_key": command_key_by_candidate[candidate],
+                    }
+                    if "after_success" in row:
+                        compact_row["after_success"] = (
+                            "re_evaluate_same_response"
+                        )
+                    compact_evaluate.append(compact_row)
+                decision["evaluate_in_order"] = compact_evaluate
+            else:
+                decision["evaluate_in_order"] = list(evaluate)
+            candidate_key_by_name = {
+                "branch_disclosure": "branch_disclosure",
+                "nested_container_disclosures": "nested_container_disclosures",
+                "next_item_disclosure": "next_item_disclosure",
+                "business_sibling_transition": "business_sibling_transition",
+                "deferred_fact_queue": "deferred_fact",
+            }
+            for row in decision["evaluate_in_order"]:
+                if not isinstance(row, Mapping):
+                    continue
+                name = row.get("candidate")
+                if not isinstance(name, str) or name not in candidate_key_by_name:
+                    continue
+                if row.get("first_command_pointer") == (
+                    "/continuation/root_fact_queue_anchor/first_fact_argv"
+                ):
+                    candidate_keys.append("root_fact_queue_anchor")
+                candidate_keys.append(candidate_key_by_name[name])
+        continuation["next_command_decision"] = decision
+    for key in candidate_keys:
+        if key in raw_continuation and key not in continuation:
+            item = raw_continuation[key]
+            if (
+                key == "deferred_fact"
+                and raw_continuation.get("subcommand") == "draft-apply"
+                and not include_root_anchor
+                and isinstance(item, Mapping)
+            ):
+                item = {
+                    **item,
+                    "complete_command_assembly": {
+                        "fixed_argv_prefix_source": (
+                            "latest_draft_response.next_action_binding."
+                            "fixed_argv_prefix"
+                        ),
+                        "append_this_fact_argv_exactly": True,
+                    },
+                }
+            if compact_recursive_object and key == "deferred_fact" and isinstance(
+                item, Mapping
+            ):
+                item = {
+                    candidate: item[candidate]
+                    for candidate in (
+                        "argv",
+                        "complete_command_assembly",
+                        "must_precede",
+                        "consume_once",
+                    )
+                    if candidate in item
+                }
+            if (
+                compact_recursive_object
+                and key == "business_sibling_transition"
+                and isinstance(item, Mapping)
+            ):
+                compact_candidates = (
+                    ("copy_command_by_shape",)
+                    if "copy_command_by_shape" in item
+                    else ("argv_by_shape",)
+                )
+                item = {
+                    candidate: item[candidate]
+                    for candidate in compact_candidates
+                    if candidate in item
+                }
+                if isinstance(
+                    raw_continuation[key].get("when_absent"), Mapping
+                ):
+                    item["when_absent"] = "nearest_ancestor_business_sibling"
+            if (
+                compact_recursive_object
+                and key == "nested_container_disclosures"
+                and isinstance(item, list)
+                and item
+                and all(isinstance(row, Mapping) for row in item)
+            ):
+                argv_rows = [row.get("argv") for row in item]
+                if (
+                    all(
+                        isinstance(argv, list)
+                        and len(argv) >= 10
+                        and all(isinstance(token, str) for token in argv)
+                        for argv in argv_rows
+                    )
+                    and all(argv[:4] == argv_rows[0][:4] for argv in argv_rows)
+                    and all(argv[-2:] == argv_rows[0][-2:] for argv in argv_rows)
+                    and all(
+                        argv[4:-2]
+                        == [
+                            "--key",
+                            row.get("key"),
+                            "--shape",
+                            row.get("shape"),
+                        ]
+                        for row, argv in zip(item, argv_rows, strict=True)
+                    )
+                ):
+                    nested_object_pointers = {
+                        str(row.get("business_value_pointer")).rsplit("/", 1)[0]
+                        for row in item
+                        if isinstance(row.get("business_value_pointer"), str)
+                        and "/" in str(row.get("business_value_pointer"))
+                    }
+                    if len(nested_object_pointers) != 1:
+                        raise GatewayInputError(
+                            "Recursive object container rows do not share one "
+                            "business object pointer."
+                        )
+                    item = {
+                        "business_object_pointer": next(
+                            iter(nested_object_pointers)
+                        ),
+                        "selection": (
+                            "first_row_with_present_business_value_pointer_"
+                            "in_queue_order"
+                        ),
+                        "absent_business_values": (
+                            "skip_without_gateway_command"
+                        ),
+                        "allowed_members": [row.get("key") for row in item],
+                        "shape": "array",
+                        "argv_template": [
+                            *argv_rows[0][:4],
+                            "--key",
+                            "<selected-business-member>",
+                            "--shape",
+                            "array",
+                            *argv_rows[0][-2:],
+                        ],
+                        "replace_only": ["<selected-business-member>"],
+                    }
+            continuation[key] = item
+    for key, item in raw_continuation.items():
+        if key in {
+            "draft_fact_execution",
+            "nested_container_order",
+            "next_business_present_nested_disclosure",
+            "next_command_decision",
+            "request_wide_order",
+        } or key in continuation or (
+            key == "root_fact_queue_anchor" and not include_root_anchor
+        ):
+            continue
+        continuation[key] = item
+    # Recursive-object compaction intentionally rewrites several verbose
+    # continuation rows.  Re-derive the exact model-facing command only after
+    # that rewrite so a concrete public argv can never lose its copy authority.
+    projected["continuation"] = _dynamic_disclosure_copy_commands(continuation)
+    if projected_child_contract is not None:
+        projected["child_contract"] = projected_child_contract
+    projected["response_end"] = _typed_container_response_end()
+    return projected
+
+
 def gateway_stdout_json_encoder(value: Any | None = None) -> json.JSONEncoder:
     """Build the strict, insertion-ordered encoder used for gateway stdout.
 
-    Named operation schemas retain their complete payload but use compact JSON
-    so the terminal document stays visible within bounded agent tool output.
-    Other gateway documents retain the existing pretty representation.
+    Schema-discovery payloads use compact JSON to reduce output size. Other
+    gateway documents retain the existing pretty representation.
     """
 
     options: dict[str, Any] = {
@@ -1985,7 +4148,14 @@ def gateway_stdout_json_encoder(value: Any | None = None) -> json.JSONEncoder:
     if (
         isinstance(value, Mapping)
         and value.get("command")
-        in {"operation-schema", "legacy-operation-schema", "query-schema"}
+        in {
+            "operations",
+            "operation-schema",
+            "query-schema",
+            "topic-schema",
+            "request-map-container",
+            "request-array-item",
+        }
     ):
         options["separators"] = (",", ":")
     else:
@@ -2019,6 +4189,12 @@ def cleanup_failure_evidence(exc: BaseException) -> dict[str, Any]:
 def normalize_gateway_exception(exc: BaseException) -> dict[str, Any]:
     """Normalize one gateway exception without trusting its string or metadata hooks."""
 
+    if isinstance(exc, BusinessDeclarationError):
+        return {
+            "error_code": exc.error_code,
+            "message": exc.error_code,
+            "details": {"repair": dict(exc.repair)},
+        }
     if isinstance(exc, SemanticValidationError):
         error_code = safe_type_name(exc, "Exception")
     elif isinstance(exc, TimeoutError):
@@ -2104,8 +4280,9 @@ def query_object_required_payload(*, common: Mapping[str, Any] | None = None) ->
         "error_code": "QUERY_OBJECT_REQUIRED",
         "message": (
             "The public generic call path does not accept ak.wwise.core.object.get. "
-            "Use query-object so simple flags, the structured Builder, or the "
-            "bounded advanced WAQL contract retain Gateway-owned result limits."
+            "Use query-object with the closed business declaration, or the bounded "
+            "advanced WAQL contract only when that declaration cannot express the "
+            "required server-side read semantic; both retain Gateway-owned result limits."
         ),
         "required_command": "query-object",
         "executed": False,
@@ -2362,6 +4539,61 @@ def authoring_host_required_payload(
     return payload
 
 
+def runtime_authoring_host_required_payload(
+    *,
+    api: str,
+    command: str,
+    live_info: Mapping[str, Any],
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Return the explicit Authoring boundary for Remote and audition routes."""
+
+    payload = authoring_host_required_payload(
+        api=api,
+        command=command,
+        live_info=live_info,
+        common=common,
+        operation=api,
+    )
+    payload["message"] = (
+        "Remote connections and Authoring audition transports require a live "
+        "Wwise Authoring host; WwiseConsole cannot execute them."
+    )
+    return payload
+
+
+def command_line_host_required_payload(
+    *,
+    command: str,
+    live_info: Mapping[str, Any],
+    common: Mapping[str, Any] | None = None,
+    operation: str,
+) -> dict[str, Any]:
+    """Return the closed boundary for Console-only operations."""
+
+    payload: dict[str, Any] = {
+        "contract": GATEWAY_RESULT_CONTRACT,
+        "ok": False,
+        "status": "command_line_host_required",
+        "command": command,
+        "error_code": "COMMAND_LINE_HOST_REQUIRED",
+        "message": (
+            "This operation requires WwiseConsole; Wwise Authoring cannot "
+            "preview or execute it."
+        ),
+        "details": {
+            "is_command_line": live_info.get("isCommandLine"),
+            "required_host": "wwise-console",
+        },
+        "operation": operation,
+        "executed": False,
+        "verified": False,
+    }
+    if common is not None:
+        payload.update(dict(common))
+    return payload
+
+
 def authoring_host_platform(live_info: Mapping[str, Any]) -> str:
     """Map only the official live getInfo platform values used by Authoring."""
 
@@ -2416,7 +4648,34 @@ def live_authoring_transaction_boundary(
     common: Mapping[str, Any],
 ) -> dict[str, Any] | None:
     operation = request_payload.get("operation")
-    if operation not in UI_COMMAND_OPERATIONS:
+    arguments = request_payload.get("arguments")
+    native_api = (
+        arguments.get("api")
+        if operation == "waapi.call" and isinstance(arguments, Mapping)
+        else None
+    )
+    if native_api in {
+        "ak.wwise.ui.project.close",
+        "ak.wwise.ui.project.create",
+        "ak.wwise.ui.project.open",
+    }:
+        if live_info.get("isCommandLine") is not False:
+            return authoring_host_required_payload(
+                api=str(native_api),
+                command=command,
+                live_info=live_info,
+                common=common,
+                operation=str(native_api),
+            )
+        return None
+    if operation == "lua.executeCliFile" and live_info.get("isCommandLine") is not True:
+        return command_line_host_required_payload(
+            command=command,
+            live_info=live_info,
+            common=common,
+            operation=operation,
+        )
+    if operation not in {*UI_COMMAND_OPERATIONS, "ui.captureScreen"}:
         return None
     if live_info.get("isCommandLine") is not False:
         return authoring_host_required_payload(
@@ -2426,7 +4685,6 @@ def live_authoring_transaction_boundary(
             common=common,
             operation=str(operation),
         )
-    arguments = request_payload.get("arguments")
     owned_unregister = (
         operation == "ui.commands.unregister"
         and isinstance(arguments, Mapping)
@@ -2503,7 +4761,7 @@ def preflight_public_route(
 ) -> dict[str, Any] | None:
     """Fail closed before connecting when the requested public route is already known."""
 
-    if args.command not in {"call", "wait-topic", "stream-topic"}:
+    if args.command not in {"wait-topic", "stream-topic"}:
         return None
     api = args.api
 
@@ -2528,15 +4786,7 @@ def preflight_public_route(
                 else catalog.describe(str(version), api)
             )
         except CapabilityNotFoundError:
-            safety_context = None
-            if args.command == "call":
-                safety_context = (
-                    EXPLICIT_UNSUPPORTED_LIVE_URIS.get(api)
-                    or BOUNDED_CALL_CANDIDATES.get(api)
-                    or EXPLICIT_UNSUPPORTED_TOPIC_URIS.get(api)
-                )
-            elif args.command in {"wait-topic", "stream-topic"}:
-                safety_context = EXPLICIT_UNSUPPORTED_TOPIC_URIS.get(api)
+            safety_context = EXPLICIT_UNSUPPORTED_TOPIC_URIS.get(api)
             return unreflected_interface_payload(
                 api,
                 str(version),
@@ -2554,69 +4804,602 @@ def preflight_public_route(
             capability,
             command=args.command,
         )
-    if args.command == "call":
-        if api == OBJECT_GET_URI:
-            return query_object_required_payload()
-        fixed_commands = FIXED_COMMANDS_BY_URI.get(api)
-        if fixed_commands is not None:
-            return fixed_command_required_payload(api, fixed_commands)
-        explicit_function_boundary = (
-            EXPLICIT_UNSUPPORTED_LIVE_URIS.get(api)
-            or BOUNDED_CALL_CANDIDATES.get(api)
+    explicit_topic_boundary = EXPLICIT_UNSUPPORTED_TOPIC_URIS.get(api)
+    if explicit_topic_boundary is not None:
+        return unsupported_interface_payload(
+            api,
+            explicit_topic_boundary,
+            command=args.command,
         )
-        if explicit_function_boundary is not None:
-            return unsupported_interface_payload(
-                api,
-                explicit_function_boundary,
-                command="call",
-            )
-        if api in REVIEWED_TOPIC_URIS:
-            return wait_topic_required_payload(api)
-        explicit_topic_boundary = EXPLICIT_UNSUPPORTED_TOPIC_URIS.get(api)
-        if explicit_topic_boundary is not None:
-            return unsupported_interface_payload(
-                api,
-                explicit_topic_boundary,
-                command="call",
-            )
-    else:
-        explicit_topic_boundary = EXPLICIT_UNSUPPORTED_TOPIC_URIS.get(api)
-        if explicit_topic_boundary is not None:
-            return unsupported_interface_payload(
-                api,
-                explicit_topic_boundary,
-                command=args.command,
-            )
     return None
+
+
+def preflight_typed_request_input(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+) -> None:
+    """Bind all typed facts to one exact packaged schema before connecting."""
+
+    versions = resolve_catalog_versions(args, env=env)
+    if len(versions) != 1:
+        raise GatewayInputError("typed-call requires one exact Wwise version")
+    if core_business_route_available(args.api, versions[0]):
+        raise GatewayInputError(
+            f"{args.api} uses request-schema and its closed Core business continuation"
+        )
+    capability = CapabilityCatalog().describe(versions[0], args.api)
+    if (
+        capability.preferred_route == "fixed_command"
+        and "typed-call" not in capability.fixed_commands
+    ):
+        raise GatewayInputError(
+            f"{args.api} uses its Gateway-owned fixed command: "
+            f"{', '.join(capability.fixed_commands)}"
+        )
+    contract = request_contract(versions[0], args.api)
+    if contract.as_gateway_payload()["input_shape"] == "draft":
+        raise GatewayInputError(
+            "This complex typed request must use its single draft-start entry."
+        )
+    facts = [
+        TypedRequestFact("set", handle, value_type, value)
+        for handle, value_type, value in args.typed_set_facts
+    ]
+    facts.extend(
+        TypedRequestFact("append", handle, value_type, value)
+        for handle, value_type, value in args.typed_append_facts
+    )
+    facts.extend(
+        TypedRequestFact("present", handle, "null", "null")
+        for handle in args.typed_present_facts
+    )
+    facts.extend(
+        TypedRequestFact("choose", handle, "branch", choice)
+        for handle, choice in args.typed_branch_facts
+    )
+    facts.extend(
+        TypedRequestFact("choose-dynamic", handle, "choice", choice, key=key)
+        for handle, key, choice in args.typed_dynamic_branch_facts
+    )
+    for action_name in ("map_put", "map_correct"):
+        facts.extend(
+            TypedRequestFact(
+                action_name.replace("_", "-"),
+                handle,
+                value_type,
+                value,
+                key=key,
+            )
+            for handle, key, value_type, value in getattr(
+                args, f"typed_{action_name}_facts"
+            )
+        )
+    facts.extend(
+        TypedRequestFact("map-remove", handle, "null", "null", key=key)
+        for handle, key in args.typed_map_remove_facts
+    )
+    args.typed_request = materialize_typed_request(
+        contract,
+        schema_digest=args.schema_digest,
+        facts=facts,
+    )
+    isolated = capability.execution_contract["route"] == "isolated_transaction"
+    if isolated and not isinstance(args.io_root, str):
+        raise GatewayInputError(
+            "isolated typed-call requires --io-root for caller-owned file authority"
+        )
+    if not isolated and args.io_root is not None:
+        raise GatewayInputError(
+            "typed-call --io-root is accepted only for isolated routes"
+        )
+    args.typed_io_root = args.io_root if isolated else None
+    requires_preview = capability.execution_contract["effect"] != "read"
+    if not requires_preview and args.apply:
+        raise GatewayInputError("typed-call --apply is reserved for changes")
+    if requires_preview and not args.apply:
+        raise GatewayInputError(
+            "typed-call requires --apply to enter the Preview lifecycle for this API"
+        )
+    args.typed_requires_preview = requires_preview
+    args.typed_read_timeout = (
+        float(capability.execution_contract["timeout_seconds"])
+        if not requires_preview
+        else None
+    )
+
+
+def preflight_core_business_input(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+) -> None:
+    """Validate one closed Core business read before opening WAAPI."""
+
+    versions = resolve_catalog_versions(args, env=env)
+    if len(versions) != 1:
+        raise GatewayInputError("core-call requires one exact Wwise version")
+    if args.api in soundengine_control_business_read_operations():
+        contract = soundengine_control_business_contract_data(args.api, versions[0])
+        identity_field = (
+            "state_group_id" if args.api == GET_STATE_URI else "switch_group_id"
+        )
+        identity = getattr(args, identity_field)
+        if not isinstance(identity, str) or not _canonical_guid(identity):
+            raise GatewayInputError(
+                f"core-call --{identity_field.replace('_', '-')} requires one exact "
+                "GUID copied from Gateway object evidence"
+            )
+        other_identity = (
+            args.switch_group_id if args.api == GET_STATE_URI else args.state_group_id
+        )
+        if other_identity is not None:
+            raise GatewayInputError(
+                "SoundEngine state/switch read accepts only its matching group identity"
+            )
+        required = set(contract["declaration"]["required_fields"])
+        if "game_object_handle" in required and args.game_object_handle is None:
+            raise GatewayInputError(
+                "This Wwise version requires --game-object-handle for getSwitch"
+            )
+        if args.game_object_handle is not None:
+            validate_runtime_game_object_handle(args.game_object_handle)
+            if args.api != GET_SWITCH_URI:
+                raise GatewayInputError("getState does not accept a game object handle")
+        args.soundengine_read_business_request = {
+            identity_field: identity.upper(),
+            **(
+                {"game_object_handle": args.game_object_handle}
+                if args.game_object_handle is not None
+                else {}
+            ),
+        }
+        args.core_business_version = versions[0]
+        return
+    if args.api in runtime_inspection_business_read_operations():
+        try:
+            runtime_inspection_business_contract_data(args.api, versions[0])
+            if args.api == TRANSPORT_GET_STATE_URI:
+                validate_runtime_transport_handle(args.transport_handle)
+                if any(
+                    value is not None
+                    for value in (
+                        args.log_channel,
+                        args.max_results,
+                        args.profiler_position,
+                        args.profiler_cursor,
+                        args.result_view,
+                        args.bus_instance_handle,
+                        args.voice_instance_handle,
+                    )
+                ):
+                    raise RuntimeInspectionBusinessError(
+                        "transport.getState accepts only transport_handle"
+                    )
+                args.runtime_inspection_request = None
+                args.runtime_inspection_limit = 1
+                args.runtime_inspection_business_request = {
+                    "transport_handle": args.transport_handle,
+                }
+                args.core_business_version = versions[0]
+                return
+            request, limit, business_request = materialize_runtime_inspection_business_request(
+                args.api,
+                versions[0],
+                log_channel=args.log_channel,
+                max_results=args.max_results,
+                profiler_position=args.profiler_position,
+                profiler_cursor=args.profiler_cursor,
+                result_view=args.result_view,
+                bus_instance_handle=args.bus_instance_handle,
+                voice_instance_handle=args.voice_instance_handle,
+                transport_handle=args.transport_handle,
+            )
+        except (RuntimeInspectionBusinessError, ValueError) as exc:
+            raise GatewayInputError(str(exc)) from exc
+        args.runtime_inspection_request = request
+        args.runtime_inspection_limit = limit
+        args.runtime_inspection_business_request = business_request
+        args.core_business_version = versions[0]
+        return
+    if args.api in media_build_business_operations():
+        try:
+            media_input = media_build_input_from_namespace(
+                args,
+                operation=args.api,
+                version=versions[0],
+            )
+        except MediaBuildBusinessCliError as exc:
+            raise GatewayInputError(str(exc)) from exc
+        args.media_build_request = media_input.materialized_request
+        args.media_build_plan = media_input.deferred_media_pool_plan
+        args.core_business_version = versions[0]
+        return
+    if media_build_fields_supplied(args):
+        raise GatewayInputError(
+            "This Core business read does not accept media/build fields"
+        )
+    contract = core_business_contract_data(args.api, versions[0])
+    if contract["execution_shape"] != "bounded_read":
+        raise GatewayInputError(
+            "This Core business operation requires its Gateway-owned Draft continuation"
+        )
+    if args.api == "ak.wwise.core.object.diff":
+        for field in ("source_id", "target_id"):
+            value = getattr(args, field)
+            if not isinstance(value, str) or not _canonical_guid(value):
+                raise GatewayInputError(
+                    f"core-call --{field.replace('_', '-')} requires one exact GUID "
+                    "copied from Gateway object evidence"
+                )
+        if args.source_id.upper() == args.target_id.upper():
+            raise GatewayInputError("object.diff requires two distinct objects")
+        if any(
+            value is not None
+            for value in (args.object_id, args.field_meaning, args.platform_name)
+        ):
+            raise GatewayInputError(
+                "object.diff accepts only source and target business identities"
+            )
+    elif args.api in {
+        "ak.wwise.core.switchContainer.getAssignments",
+        "ak.wwise.core.blendContainer.getAssignments",
+    }:
+        if not isinstance(args.object_id, str) or not _canonical_guid(args.object_id):
+            raise GatewayInputError(
+                "This relationship read requires --object-id copied from Gateway evidence"
+            )
+        if any(
+            value is not None
+            for value in (
+                args.source_id,
+                args.target_id,
+                args.field_meaning,
+                args.platform_name,
+            )
+        ):
+            raise GatewayInputError(
+                "This relationship read accepts only its one object identity"
+            )
+    elif args.api == "ak.wwise.core.object.isLinked":
+        if not isinstance(args.object_id, str) or not _canonical_guid(args.object_id):
+            raise GatewayInputError(
+                "object.isLinked requires --object-id copied from Gateway evidence"
+            )
+        if not isinstance(args.field_meaning, str) or not args.field_meaning.strip():
+            raise GatewayInputError("object.isLinked requires --field-meaning")
+        if not isinstance(args.platform_name, str) or not args.platform_name.strip():
+            raise GatewayInputError("object.isLinked requires --platform-name")
+        if args.source_id is not None or args.target_id is not None:
+            raise GatewayInputError(
+                "object.isLinked accepts one object, field meaning, and platform"
+            )
+    else:  # pragma: no cover - contract registry invariant
+        raise GatewayInputError("Unsupported Core business read")
+    args.core_business_version = versions[0]
+
+
+def preflight_retired_media_build_draft(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+) -> None:
+    """Reject archived shallow media/build Drafts before any live connection."""
+
+    try:
+        record = OperationDraftStore(
+            resolve_transaction_state_directory(args, env=env)
+        ).inspect(
+            args.draft_id,
+            task_authority=args.task_authority,
+        )
+    except OperationDraftNotAvailable:
+        return
+    if record.operation in media_build_business_operations():
+        raise GatewayInputError(
+            f"{record.operation} uses its closed Core business continuation; "
+            "the retired typed Draft cannot continue"
+        )
+
+
+def preflight_typed_operation_input(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+) -> None:
+    """Materialize one exact dedicated operation before opening WAAPI."""
+
+    versions = resolve_catalog_versions(args, env=env)
+    if len(versions) != 1:
+        raise GatewayInputError("typed-operation requires one configured Wwise version")
+    version = versions[0]
+    if operation_input_mode(args.operation, version) != INLINE_TYPED_INPUT_MODE:
+        raise GatewayInputError(
+            "This operation is not available through the concise typed-operation entry"
+        )
+    if operation_request_schema_digest(args.operation, version) != args.schema_digest:
+        raise GatewayInputError("Typed operation schema digest is stale")
+    values: dict[str, object] = {}
+    if args.typed_object is not None:
+        values["object"] = tuple(args.typed_object)
+    for field in ("text", "property", "reference", "platform", "linked"):
+        value = getattr(args, field)
+        if value is not None:
+            values[field] = value
+    if args.enable is not None:
+        values["enable"] = args.enable
+    if args.parent is not None:
+        values["parent"] = tuple(args.parent)
+    if args.on_name_conflict is not None:
+        values["on_name_conflict"] = args.on_name_conflict
+    if args.auto_check_out is not None:
+        values["auto_check_out_to_source_control"] = args.auto_check_out
+    if args.auto_add is not None:
+        values["auto_add_to_source_control"] = args.auto_add
+    if args.import_file is not None:
+        values["import_file"] = args.import_file
+    if args.import_location is not None:
+        values["import_location"] = tuple(args.import_location)
+    if args.import_language is not None:
+        values["import_language"] = args.import_language
+    if args.import_operation is not None:
+        values["import_operation"] = args.import_operation
+    if args.files is not None:
+        values["files"] = tuple(args.files)
+    if args.io_root is not None:
+        values["io_root"] = args.io_root
+    if args.view_name is not None:
+        values["view_name"] = args.view_name
+    if args.view_channel is not None:
+        values["view_channel"] = args.view_channel
+    if args.rect is not None:
+        values["rect"] = tuple(args.rect)
+    if args.typed_ui_command is not None:
+        values["command"] = args.typed_ui_command
+    if args.command_objects is not None:
+        values["objects"] = tuple(args.command_objects)
+    if args.command_platforms is not None:
+        values["platforms"] = tuple(args.command_platforms)
+    if args.value is not None:
+        values["value_type"], values["value"] = args.value
+    if args.target is not None:
+        values["target"] = tuple(args.target)
+    if args.clear:
+        values["clear"] = True
+    try:
+        args.typed_operation_request = materialize_inline_operation_request(
+            args.operation,
+            version,
+            values,
+        )
+    except TypedOperationInputError as exc:
+        raise GatewayInputError(str(exc)) from exc
+
+
+def preflight_typed_zero_input(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+) -> None:
+    """Bind a zero-input read to its exact generated schema before connecting."""
+
+    versions = resolve_catalog_versions(args, env=env)
+    if len(versions) != 1:
+        raise GatewayInputError("typed-zero-call requires one configured Wwise version")
+    contract = request_contract(versions[0], args.api)
+    dedicated_zero = {
+        "ak.wwise.debug.restartWaapiServers": "debug.restartWaapiServers",
+        "ak.wwise.debug.testAssert": "debug.testAssert",
+        "ak.wwise.debug.testCrash": "debug.testCrash",
+    }.get(args.api)
+    if dedicated_zero is not None:
+        raise GatewayInputError(
+            "This dangerous host control uses operation-schema "
+            f"{dedicated_zero} and its Gateway-owned business Draft as its single entry."
+        )
+    if contract.schema_digest != args.schema_digest:
+        raise GatewayInputError("Typed request schema digest is stale")
+    if contract.fields:
+        raise GatewayInputError("typed-zero-call is available only for zero-input schemas")
+    execution = {
+        "effect": contract.effect,
+        "route": contract.route,
+    }
+    if contract.route == "fixed_command":
+        raise GatewayInputError(
+            "This zero-input API retains its packaged fixed command: "
+            + ", ".join(contract.gateway_commands)
+        )
+    requires_preview = execution.get("effect") != "read"
+    if not requires_preview and execution.get("effect") == "read" and args.apply:
+        raise GatewayInputError("typed-zero-call --apply is reserved for changes")
+    if execution.get("effect") != "read" and not args.apply:
+        raise GatewayInputError(
+            "typed-zero-call requires --apply to enter the Preview lifecycle for this API"
+        )
+    args.typed_zero_requires_preview = requires_preview
+    args.typed_zero_read_timeout = (
+        float(contract.timeout_seconds)
+        if not requires_preview
+        else None
+    )
+    args.typed_request = materialize_typed_request(
+        contract,
+        schema_digest=contract.schema_digest,
+        facts=(),
+    )
+
+
+def _query_kind_predicates(
+    name: str,
+    *,
+    version: str,
+) -> tuple[tuple[str, str, str, str], ...]:
+    """Compile one closed query kind into exact native type discriminators."""
+
+    fixed_type = QUERY_FIXED_KIND_TYPES.get(name)
+    if fixed_type is not None:
+        return (("type", "=", "string", fixed_type),)
+    kind = resolve_semantic_kind(name, version=version)
+    native_type = (
+        "Sound" if name in {"sound-sfx", "sound-voice"} else kind.native_object_type
+    )
+    predicates: list[tuple[str, str, str, str]] = [
+        ("type", "=", "string", native_type)
+    ]
+    if name in {"sound-sfx", "sound-voice"}:
+        predicates.append(
+            (
+                "@IsVoice",
+                "=",
+                "boolean",
+                "true" if name == "sound-voice" else "false",
+            )
+        )
+    return tuple(predicates)
 
 
 def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, str]) -> None:
     """Reject closed query input errors before opening a WAAPI transport."""
 
-    if advanced_query_requested(args):
-        _require_advanced_query_option_exclusivity(args)
-        request = parse_json_object(
-            args.advanced_request_json,
-            "--advanced-request-json",
+    relationships = tuple(getattr(args, "relationships", ()) or ())
+    business_view = getattr(args, "business_view", None)
+    if business_view is not None:
+        if not (
+            getattr(args, "path_segments", None)
+            or getattr(args, "object_id", None)
+        ):
+            raise GatewayInputError(
+                "query-object --view requires one exact object path or GUID."
+            )
+        if any(
+            (
+                relationships,
+                getattr(args, "business_outputs", None),
+                getattr(args, "custom_field_meanings", None),
+                getattr(args, "business_predicates", None),
+                args.max_results is not None,
+            )
+        ):
+            raise GatewayInputError(
+                "query-object --view owns its complete projection and exact-object "
+                "bound; do not combine it with relationship, include, predicate, "
+                "custom-field, or max-results options."
+            )
+    if "event-actions" in relationships:
+        if relationships != ("event-actions",):
+            raise GatewayInputError(
+                "--relationship event-actions cannot be combined with another "
+                "relationship."
+            )
+        if not (
+            getattr(args, "path_segments", None)
+            or getattr(args, "object_id", None)
+        ):
+            raise GatewayInputError(
+                "--relationship event-actions requires one exact Event path or GUID."
+            )
+        if args.max_results not in {None, 100}:
+            raise GatewayInputError(
+                "--relationship event-actions owns the fixed 100-row bound; omit "
+                "--max-results or pass exactly 100."
+            )
+        args.max_results = 100
+    _compile_query_business_projection(args)
+    args.where = []
+    args.select = [
+        QUERY_BUSINESS_RELATIONSHIPS[value]
+        for value in getattr(args, "relationships", ()) or ()
+    ]
+    if getattr(args, "path_segments", None):
+        args.path = _business_object_path_from_segments(args.path_segments)
+    if getattr(args, "query_id", None):
+        args.query = args.query_id
+    if getattr(args, "query_path_segments", None):
+        args.query = _business_object_path_from_segments(
+            ["Queries", *args.query_path_segments]
         )
-        (preflight_version,) = resolve_catalog_versions(args, env=env)
-        build_advanced_object_get_query(
-            request,
-            version=preflight_version,
+    if getattr(args, "semantic_kind", None):
+        (kind_version,) = resolve_catalog_versions(args, env=env)
+        kind_predicates = _query_kind_predicates(
+            args.semantic_kind,
+            version=kind_version,
+        )
+        args.object_type = kind_predicates[0][3]
+        args.where.extend(kind_predicates[1:])
+    custom_kind_meaning = getattr(args, "custom_kind_meaning", None)
+    if custom_kind_meaning is not None and (
+        not isinstance(custom_kind_meaning, str)
+        or not custom_kind_meaning
+        or custom_kind_meaning != custom_kind_meaning.strip()
+        or len(custom_kind_meaning) > MAX_METADATA_DISCOVERY_NAME_CHARS
+    ):
+        raise GatewayInputError(
+            "--custom-kind must be one bounded, trimmed user-facing type meaning"
+        )
+    for intent, value in getattr(args, "business_predicates", ()):
+        if intent == QUERY_BUSINESS_KIND_PREDICATE:
+            (kind_version,) = resolve_catalog_versions(args, env=env)
+            if value not in QUERY_BUSINESS_KINDS:
+                raise GatewayInputError(
+                    "--predicate kind-is must use one disclosed business kind"
+                )
+            args.where.extend(_query_kind_predicates(value, version=kind_version))
+            continue
+        native = QUERY_BUSINESS_PREDICATES.get(intent)
+        if native is None:
+            raise GatewayInputError(
+                "--predicate BUSINESS_CONDITION must be one of: "
+                + ", ".join(sorted(QUERY_BUSINESS_PREDICATES))
+            )
+        field, operator, value_type = native
+        args.where.append((field, operator, value_type, value))
+    if getattr(args, "advanced_waql", None) is not None:
+        if args.custom_field_meanings:
+            raise GatewayInputError(
+                "--advanced-waql does not accept --include-field because an exact "
+                "live metadata scope cannot be derived; use a scoped business query"
+            )
+        if args.business_predicates or args.relationships:
+            raise GatewayInputError(
+                "--advanced-waql cannot be combined with --predicate or "
+                "--relationship"
+            )
+        if args.max_results is None:
+            raise GatewayInputError(
+                "--advanced-waql requires --max-results"
+            )
+        (advanced_version,) = resolve_catalog_versions(args, env=env)
+        args.advanced_query_preview = build_advanced_object_get_query(
+            {
+                "contract": ADVANCED_QUERY_CONTRACT,
+                "waql": args.advanced_waql,
+                "return": list(args.query_return_fields),
+                "max_results": args.max_results,
+            },
+            version=advanced_version,
         )
         return
 
-    if structured_query_requested(args):
-        _require_structured_query_option_exclusivity(args)
-        request = parse_json_object(args.request_json, "--request-json")
-        (preflight_version,) = resolve_catalog_versions(args, env=env)
-        preview = build_structured_object_get_query(
-            request,
-            version=preflight_version,
+    if args.query_custom_field_meanings:
+        exact_object_scope = args.path is not None or args.object_id is not None
+        type_scope = (
+            args.object_type is not None or custom_kind_meaning is not None
         )
-        _require_structured_exact_identity_return_field(preview)
-        return
+        if args.select:
+            raise GatewayInputError(
+                "--include-field cannot be combined with --relationship because "
+                "the post-traversal result type is not one exact metadata scope; "
+                "use a closed --include business field"
+            )
+        if not (type_scope or exact_object_scope):
+            raise GatewayInputError(
+                "--include-field requires a --kind/--custom-kind source or one exact "
+                "path/GUID source so the Gateway can "
+                "bind one live metadata scope"
+            )
 
+    args.take = args.max_results
     if original_file_reference_match_requested(args):
         (preflight_version,) = resolve_catalog_versions(args, env=env)
         validate_original_file_reference_match_input(
@@ -2631,23 +5414,102 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
         )
         return
 
-    where = parse_optional_json(args.where_json, "--where-json")
-    return_fields = tuple(args.return_fields or ("id", "name", "type", "path"))
-    _require_exact_identity_return_field(args, return_fields)
-    (preflight_version,) = resolve_catalog_versions(args, env=env)
-    build_object_get_query(
-        path=args.path,
-        object_id=args.object_id,
-        type=args.object_type,
-        search=args.search,
-        query=args.query,
-        where=where,
-        select=tuple(args.select or ()),
-        take=args.take,
-        return_fields=return_fields,
-        version=preflight_version,
-    )
+    if not any(
+        (
+            args.path is not None,
+            args.object_id is not None,
+            args.object_type is not None,
+            args.search is not None,
+            args.query is not None,
+            custom_kind_meaning is not None,
+        )
+    ):
+        raise GatewayInputError(
+            "query-object requires one business source or --advanced-waql"
+        )
+
+    if custom_kind_meaning is None:
+        where = typed_query_predicates(args)
+        return_fields = args.query_return_fields
+        _require_exact_identity_return_field(args, return_fields)
+        (preflight_version,) = resolve_catalog_versions(args, env=env)
+        build_object_get_query(
+            path=args.path,
+            object_id=args.object_id,
+            type=args.object_type,
+            search=args.search,
+            query=args.query,
+            where=where,
+            select=tuple(args.select or ()),
+            take=args.take,
+            return_fields=return_fields,
+            version=preflight_version,
+        )
     _require_explicit_query_bound(args)
+
+
+def _compile_query_business_projection(args: argparse.Namespace) -> None:
+    """Compile stable business output names into exact object.get accessors."""
+
+    requested = list(getattr(args, "business_outputs", ()) or ())
+    business_view = getattr(args, "business_view", None)
+    if business_view is not None:
+        requested.extend(QUERY_BUSINESS_VIEWS[business_view])
+    if "event-actions" in tuple(getattr(args, "relationships", ()) or ()):
+        requested.extend(
+            output
+            for output in ("action-type", "target")
+            if output not in requested
+        )
+    custom_meanings = list(getattr(args, "custom_field_meanings", ()) or ())
+    if len(requested) > MAX_QUERY_BUSINESS_OUTPUTS:
+        raise GatewayInputError(
+            f"query-object accepts at most {MAX_QUERY_BUSINESS_OUTPUTS} --include values"
+        )
+    if len(custom_meanings) > MAX_QUERY_CUSTOM_OUTPUTS:
+        raise GatewayInputError(
+            "query-object accepts at most "
+            f"{MAX_QUERY_CUSTOM_OUTPUTS} custom field meanings"
+        )
+    if len(set(requested)) != len(requested):
+        raise GatewayInputError("query-object --include values must be unique")
+
+    bindings: list[tuple[str, str, str]] = []
+    for name in requested:
+        native, output = QUERY_BUSINESS_OUTPUTS[name]
+        bindings.append(("business", native, output))
+
+    def bounded_custom_meaning(value: Any) -> str:
+        if (
+            not isinstance(value, str)
+            or not value
+            or value != value.strip()
+            or len(value) > MAX_QUERY_CUSTOM_FIELD_CHARS
+            or any(ord(character) < 32 or ord(character) == 127 for character in value)
+            or any(character in value for character in ('"', "'", "\\", ";"))
+        ):
+            raise GatewayInputError(
+                "--include-field must be one bounded user-facing field meaning"
+            )
+        return value
+
+    normalized_meanings = [bounded_custom_meaning(value) for value in custom_meanings]
+    if len({" ".join(value.split()).casefold() for value in normalized_meanings}) != len(
+        normalized_meanings
+    ):
+        raise GatewayInputError("query-object --include-field meanings must be unique")
+    args.query_custom_field_meanings = tuple(normalized_meanings)
+
+    native_fields = [binding[1] for binding in bindings]
+    if len(set(native_fields)) != len(native_fields):
+        raise GatewayInputError(
+            "query-object requested the same native result field more than once"
+        )
+    args.query_output_bindings = tuple(bindings)
+    args.query_return_fields = (
+        *SELECTED_REQUIRED_RETURN_FIELDS,
+        *native_fields,
+    )
 
 
 def original_file_reference_match_requested(args: argparse.Namespace) -> bool:
@@ -2668,32 +5530,36 @@ def validate_original_file_reference_match_input(
             "--match-original-file-path is currently supported only for Wwise "
             f"{ORIGINAL_FILE_REFERENCE_MATCH_VERSION}"
         )
-    if args.object_type != ORIGINAL_FILE_REFERENCE_MATCH_TYPE:
-        raise GatewayInputError(
-            "--match-original-file-path requires exactly "
-            f"--type {ORIGINAL_FILE_REFERENCE_MATCH_TYPE}"
+    if any(
+        (
+            args.path is not None,
+            args.object_id is not None,
+            args.object_type is not None,
+            getattr(args, "custom_kind_meaning", None) is not None,
+            args.search is not None,
+            args.query is not None,
         )
-    if args.where_json is not None:
+    ):
         raise GatewayInputError(
-            "--match-original-file-path cannot be combined with --where-json"
+            "--match-original-file-path owns its Audio File Source query and "
+            "cannot be combined with another query source"
+        )
+    if args.where:
+        raise GatewayInputError(
+            "--match-original-file-path cannot be combined with --where"
         )
     if args.select:
         raise GatewayInputError(
-            "--match-original-file-path cannot be combined with --select"
+            "--match-original-file-path cannot be combined with --relationship"
         )
     if args.all_results:
         raise GatewayInputError(
             "--match-original-file-path cannot be combined with --all-results"
         )
-    if args.return_fields:
-        raise GatewayInputError(
-            "--match-original-file-path uses the fixed id, path, originalFilePath "
-            "projection and cannot be combined with --return-field"
-        )
-    if args.take != MAX_QUERY_TAKE:
+    if args.max_results != MAX_QUERY_TAKE:
         raise GatewayInputError(
             "--match-original-file-path requires exactly "
-            f"--take {MAX_QUERY_TAKE}"
+            f"--max-results {MAX_QUERY_TAKE}"
         )
     normalized_original_file_candidates(args)
 
@@ -2753,112 +5619,174 @@ def normalize_original_file_system_path(value: Any) -> tuple[str, ...]:
     return host_path_comparison_key(value)
 
 
-def preflight_metadata_input(args: argparse.Namespace) -> None:
-    """Reject metadata projection modes that have no packaged result contract."""
+def preflight_metadata_input(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+) -> None:
+    """Compile business metadata scope and meaning into fixed live reads."""
 
-    if args.summary_only and args.operation != "types":
-        raise GatewayInputError("metadata --summary-only is supported only for the types operation")
-    discovery_only_supplied = (
-        args.object_type is not None
-        or args.queries is not None
-        or args.limit is not None
-        or args.detail
-    )
-    if args.operation != "discover":
-        if discovery_only_supplied:
+    path_segments = getattr(args, "metadata_path_segments", None)
+    semantic_kind = getattr(args, "metadata_semantic_kind", None)
+    custom_kind_meaning = getattr(args, "metadata_custom_kind_meaning", None)
+    exact_id = getattr(args, "metadata_exact_id", None)
+    meanings = list(getattr(args, "metadata_meanings", None) or ())
+    if path_segments:
+        args.object = _business_object_path_from_segments(path_segments)
+    if semantic_kind is not None:
+        (version,) = resolve_catalog_versions(args, env=env)
+        if semantic_kind in QUERY_FIXED_KIND_TYPES:
+            args.object_type = QUERY_FIXED_KIND_TYPES[semantic_kind]
+        else:
+            args.object_type = resolve_semantic_kind(
+                semantic_kind,
+                version=version,
+            ).metadata_object_type
+    if custom_kind_meaning is not None and (
+        not isinstance(custom_kind_meaning, str)
+        or not custom_kind_meaning
+        or custom_kind_meaning != custom_kind_meaning.strip()
+        or len(custom_kind_meaning) > MAX_METADATA_DISCOVERY_NAME_CHARS
+    ):
+        raise GatewayInputError(
+            "metadata --custom-kind must be one bounded, trimmed user-facing meaning"
+        )
+    if exact_id is not None:
+        if not _canonical_guid(exact_id):
+            raise GatewayInputError("metadata --exact-id must be a canonical GUID")
+        args.object = exact_id
+    args.queries = meanings or None
+    args.limit = DEFAULT_METADATA_DISCOVERY_LIMIT
+    args.detail = False
+
+    if args.operation == "types":
+        if (
+            path_segments
+            or semantic_kind is not None
+            or custom_kind_meaning is not None
+            or exact_id is not None
+            or meanings
+            or args.platform
+            or args.curve_role
+        ):
+            raise GatewayInputError("metadata types accepts no business input")
+        return
+
+    if args.operation in {"discover", "property-state"}:
+        if not 1 <= len(meanings) <= MAX_METADATA_DISCOVERY_QUERIES:
             raise GatewayInputError(
-                "metadata --object-type, --query, --limit, and --detail are "
-                "supported only for the discover operation"
+                f"metadata {args.operation} requires 1.."
+                f"{MAX_METADATA_DISCOVERY_QUERIES} --meaning values"
+            )
+        total_chars = 0
+        seen: set[str] = set()
+        for meaning in meanings:
+            if (
+                not isinstance(meaning, str)
+                or not meaning.strip()
+                or meaning != meaning.strip()
+                or len(meaning) > MAX_METADATA_DISCOVERY_QUERY_CHARS
+            ):
+                raise GatewayInputError(
+                    "each metadata --meaning must be non-empty, trimmed, and "
+                    f"contain at most {MAX_METADATA_DISCOVERY_QUERY_CHARS} characters"
+                )
+            total_chars += len(meaning)
+            folded = " ".join(meaning.split()).casefold()
+            if folded in seen:
+                raise GatewayInputError("metadata --meaning values must be distinct")
+            seen.add(folded)
+        if total_chars > MAX_METADATA_DISCOVERY_TOTAL_QUERY_CHARS:
+            raise GatewayInputError(
+                "metadata meaning text exceeds the combined "
+                f"{MAX_METADATA_DISCOVERY_TOTAL_QUERY_CHARS}-character limit"
+            )
+
+    if args.operation == "discover":
+        if sum(
+            value is not None
+            for value in (path_segments, semantic_kind, custom_kind_meaning, exact_id)
+        ) != 1:
+            raise GatewayInputError(
+                "metadata discover requires exactly one --path-segment, --kind, "
+                "--custom-kind, or --exact-id scope"
+            )
+        if args.platform is not None or args.curve_role is not None:
+            raise GatewayInputError(
+                "metadata discover does not accept --platform or --curve-role"
             )
         return
 
-    if any(
-        value is not None
-        for value in (args.property, args.platform, args.curve_type)
-    ):
-        raise GatewayInputError(
-            "metadata discover does not accept --property, --platform, or --curve-type"
-        )
-    supplied_scopes = sum(
-        value is not None
-        for value in (args.object_type, args.class_id, args.object)
-    )
-    if supplied_scopes != 1:
-        raise GatewayInputError(
-            "metadata discover requires exactly one of --object-type, --class-id, "
-            "or --object"
-        )
-    if args.object_type is not None and (
-        not args.object_type.strip()
-        or args.object_type != args.object_type.strip()
-        or len(args.object_type) > MAX_METADATA_DISCOVERY_NAME_CHARS
-    ):
-        raise GatewayInputError(
-            "metadata discover --object-type must be non-empty, have no outer "
-            "whitespace, and contain at most "
-            f"{MAX_METADATA_DISCOVERY_NAME_CHARS} characters"
-        )
-    if args.class_id is not None and not 0 <= args.class_id <= 0xFFFFFFFF:
-        raise GatewayInputError(
-            "metadata discover --class-id must be a uint32 integer"
-        )
-    if args.object is not None and (
-        not args.object.strip()
-        or args.object != args.object.strip()
-        or len(args.object) > MAX_METADATA_DISCOVERY_NAME_CHARS * 8
-    ):
-        raise GatewayInputError(
-            "metadata discover --object must be non-empty, have no outer "
-            "whitespace, and remain within the bounded identifier length"
-        )
-    queries = args.queries
-    if not isinstance(queries, list) or not (
-        1 <= len(queries) <= MAX_METADATA_DISCOVERY_QUERIES
-    ):
-        raise GatewayInputError(
-            "metadata discover requires 1.."
-            f"{MAX_METADATA_DISCOVERY_QUERIES} --query values"
-        )
-    total_query_chars = 0
-    seen_queries: set[str] = set()
-    for query in queries:
+    if args.operation == "property-state":
         if (
-            not isinstance(query, str)
-            or not query.strip()
-            or query != query.strip()
-            or len(query) > MAX_METADATA_DISCOVERY_QUERY_CHARS
+            (path_segments is None) == (exact_id is None)
+            or semantic_kind is not None
+            or custom_kind_meaning is not None
         ):
             raise GatewayInputError(
-                "each metadata discover --query must be non-empty, have no outer "
-                "whitespace, and contain at most "
-                f"{MAX_METADATA_DISCOVERY_QUERY_CHARS} characters"
+                "metadata property-state requires one object --path-segment or "
+                "--exact-id scope"
             )
-        total_query_chars += len(query)
-        folded_query = " ".join(query.split()).casefold()
-        if folded_query in seen_queries:
+        if len(meanings) != 1:
             raise GatewayInputError(
-                "metadata discover --query values must be distinct"
+                "metadata property-state requires exactly one --meaning"
             )
-        seen_queries.add(folded_query)
-    if total_query_chars > MAX_METADATA_DISCOVERY_TOTAL_QUERY_CHARS:
-        raise GatewayInputError(
-            "metadata discover query text exceeds the combined "
-            f"{MAX_METADATA_DISCOVERY_TOTAL_QUERY_CHARS}-character limit"
+        args.platform = validate_metadata_platform_name(args.platform)
+        if args.curve_role is not None:
+            raise GatewayInputError(
+                "metadata property-state does not accept --curve-role"
+            )
+        return
+
+    if args.operation == "attenuation":
+        if (
+            (path_segments is None) == (exact_id is None)
+            or semantic_kind is not None
+            or custom_kind_meaning is not None
+        ):
+            raise GatewayInputError(
+                "metadata attenuation requires one object --path-segment or "
+                "--exact-id scope"
+            )
+        if meanings:
+            raise GatewayInputError("metadata attenuation does not accept --meaning")
+        if args.curve_role not in METADATA_CURVE_ROLES:
+            raise GatewayInputError(
+                "metadata attenuation requires one disclosed --curve-role"
+            )
+        args.curve_type = METADATA_CURVE_ROLES[args.curve_role]
+        if args.platform is not None:
+            args.platform = validate_metadata_platform_name(args.platform)
+        return
+
+    raise GatewayInputError(f"unsupported metadata operation: {args.operation}")
+
+
+def validate_metadata_platform_name(value: Any) -> str:
+    """Return one exact bounded project-platform name before live dispatch."""
+
+    invalid = (
+        not isinstance(value, str)
+        or not value
+        or value != value.strip()
+        or len(value) > MAX_METADATA_PLATFORM_NAME_CHARS
+        or any(
+            ord(character) < 32
+            or ord(character) == 127
+            or character in {"\u2028", "\u2029"}
+            for character in value
         )
-    limit = (
-        DEFAULT_METADATA_DISCOVERY_LIMIT
-        if args.limit is None
-        else args.limit
     )
-    if (
-        isinstance(limit, bool)
-        or not isinstance(limit, int)
-        or not 1 <= limit <= MAX_METADATA_DISCOVERY_LIMIT
-    ):
+    try:
+        value.encode("utf-8") if isinstance(value, str) else None
+    except UnicodeEncodeError:
+        invalid = True
+    if invalid:
         raise GatewayInputError(
-            "metadata discover --limit must be between 1 and "
-            f"{MAX_METADATA_DISCOVERY_LIMIT}"
+            "metadata requires one bounded, trimmed, control-free --platform "
+            f"name of at most {MAX_METADATA_PLATFORM_NAME_CHARS} characters"
         )
+    return value
 
 
 def preflight_stable_read_input(
@@ -2866,66 +5794,174 @@ def preflight_stable_read_input(
     *,
     env: Mapping[str, str],
 ) -> None:
-    """Validate closed profiler scalars before opening a WAAPI transport."""
+    """Compile profiler capture and object intent before opening WAAPI."""
 
     (version,) = resolve_catalog_versions(args, env=env)
+    capture = getattr(args, "capture", None)
+    capture_ms = getattr(args, "capture_ms", None)
+    args.time = (
+        "capture"
+        if capture == "latest"
+        else "user"
+        if capture == "user-cursor"
+        else capture_ms
+    )
     if args.command == "profiler-game-objects":
         build_profiler_game_objects_request(
             version=version,
             time=args.time,
         )
         return
-    if len(args.bus_pipeline_id) > MAX_BUS_PIPELINE_IDS:
+    if args.voice_instance_handle is not None:
+        try:
+            args.voice_pipeline_id = profiler_pipeline_id_from_handle(
+                args.voice_instance_handle,
+                kind="voice",
+            )
+        except RuntimeInspectionBusinessError as exc:
+            raise GatewayInputError(str(exc)) from exc
+        if args.game_object_id is not None:
+            raise GatewayInputError(
+                "--game-object-id is only used with --voice-object-id; a voice "
+                "instance handle is already exact"
+            )
+    elif not _canonical_guid(args.voice_object_id):
+        raise GatewayInputError(
+            "profiler-voice-contributions --voice-object-id must be a canonical GUID"
+        )
+    bus_object_ids = tuple(args.bus_object_id)
+    bus_instance_handles = tuple(args.bus_instance_handle)
+    if bus_object_ids and bus_instance_handles:
+        raise GatewayInputError(
+            "profiler-voice-contributions accepts either Bus object identities or "
+            "Gateway Bus instance handles, not both"
+        )
+    if max(len(bus_object_ids), len(bus_instance_handles)) > MAX_BUS_PIPELINE_IDS:
         raise GatewayInputError(
             "profiler-voice-contributions accepts at most "
-            f"{MAX_BUS_PIPELINE_IDS} --bus-pipeline-id values"
+            f"{MAX_BUS_PIPELINE_IDS} ordered Bus identities"
         )
-    build_profiler_voice_contributions_request(
-        version=version,
-        time=args.time,
-        voice_pipeline_id=args.voice_pipeline_id,
-        bus_pipeline_ids=tuple(args.bus_pipeline_id),
-    )
+    if (
+        any(not _canonical_guid(value) for value in bus_object_ids)
+        or len({value.casefold() for value in bus_object_ids}) != len(bus_object_ids)
+    ):
+        raise GatewayInputError(
+            "profiler-voice-contributions --bus-object-id values must be unique "
+            "canonical GUIDs"
+        )
+    if bus_instance_handles:
+        try:
+            args.bus_pipeline_id = [
+                profiler_pipeline_id_from_handle(value, kind="bus")
+                for value in bus_instance_handles
+            ]
+        except RuntimeInspectionBusinessError as exc:
+            raise GatewayInputError(str(exc)) from exc
+        if len(set(args.bus_pipeline_id)) != len(args.bus_pipeline_id):
+            raise GatewayInputError(
+                "profiler-voice-contributions Bus instance handles must be unique"
+            )
+    if args.game_object_id is not None:
+        if re.fullmatch(r"[0-9]+", args.game_object_id) is None:
+            raise GatewayInputError(
+                "profiler-voice-contributions --game-object-id must be an "
+                "unsigned 64-bit integer"
+            )
+        game_object_id = int(args.game_object_id)
+        if not 0 <= game_object_id <= (1 << 64) - 1:
+            raise GatewayInputError(
+                "profiler-voice-contributions --game-object-id must be an "
+                "unsigned 64-bit integer"
+            )
+        args.game_object_id = game_object_id
+    # Validate the shared capture value now; pipeline IDs are derived from the
+    # bounded getVoices/getBusses reads after connection.
+    args.time = normalize_profiler_time(args.time)
 
 
-def preflight_debug_read_input(args: argparse.Namespace) -> None:
+def preflight_debug_read_input(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+) -> None:
     """Reject fixed debug-read scalar boundaries before opening WAAPI."""
 
     if args.command == "debug-wal-tree":
         if (
-            isinstance(args.take, bool)
-            or not isinstance(args.take, int)
-            or not 1 <= args.take <= MAX_WAL_TREE_NODES
+            isinstance(args.max_nodes, bool)
+            or not isinstance(args.max_nodes, int)
+            or not 1 <= args.max_nodes <= MAX_WAL_TREE_NODES
         ):
             raise GatewayInputError(
-                f"debug-wal-tree --take must be between 1 and {MAX_WAL_TREE_NODES}"
+                "debug-wal-tree --max-nodes must be between 1 and "
+                f"{MAX_WAL_TREE_NODES}"
             )
         return
-    if args.command == "debug-validate-call":
-        if not isinstance(args.api, str) or not args.api.startswith("ak."):
+    if args.command != "debug-validate-call":
+        raise GatewayInputError(f"unsupported debug-read command: {args.command}")
+
+    (version,) = resolve_catalog_versions(args, env=env)
+    try:
+        target = CapabilityCatalog().describe(version, args.api)
+    except CapabilityNotFoundError as exc:
+        raise GatewayInputError(
+            f"debug-validate-call target is not reflected in Wwise {version}: {args.api}"
+        ) from exc
+    if target.item_type != "function":
+        raise GatewayInputError("debug-validate-call target must be a WAAPI function")
+
+    call_args: dict[str, Any] = {"id": target.uri}
+    if args.artifact_file is not None:
+        artifact = Path(args.artifact_file).expanduser()
+        if not artifact.is_absolute():
             raise GatewayInputError(
-                "debug-validate-call api must be an exact reflected ak.* function URI"
+                "debug-validate-call --artifact-file must be an absolute path"
             )
+        try:
+            artifact_stat = artifact.lstat()
+        except OSError as exc:
+            raise GatewayInputError(
+                "debug-validate-call --artifact-file must exist"
+            ) from exc
+        if stat.S_ISLNK(artifact_stat.st_mode) or not stat.S_ISREG(artifact_stat.st_mode):
+            raise GatewayInputError(
+                "debug-validate-call --artifact-file must be a regular non-symlink file"
+            )
+        if artifact_stat.st_size > MAX_GATEWAY_JSON_INPUT_BYTES:
+            raise GatewayInputError(
+                "debug-validate-call --artifact-file exceeds the "
+                f"{MAX_GATEWAY_JSON_INPUT_BYTES}-byte input limit"
+            )
+        try:
+            text = artifact.read_text(encoding="utf-8")
+        except (OSError, UnicodeError) as exc:
+            raise GatewayInputError(
+                "debug-validate-call --artifact-file must be readable UTF-8"
+            ) from exc
+        envelope = parse_json_object(text, "--artifact-file")
+        unknown = sorted(set(envelope) - {"args", "options", "result"})
+        if unknown:
+            raise GatewayInputError(
+                "debug-validate-call --artifact-file accepts only args, options, "
+                f"and result objects; unknown keys: {', '.join(unknown)}"
+            )
+        for section, value in envelope.items():
+            if not isinstance(value, dict):
+                raise GatewayInputError(
+                    f"debug-validate-call artifact {section} must be a JSON object"
+                )
+            call_args[section] = value
+        args.artifact_digest = canonical_sha256(envelope)
+        args.artifact_file = str(artifact)
+    else:
+        args.artifact_digest = None
+    args.debug_validation_args = call_args
 
 
 def preflight_json_inputs(args: argparse.Namespace) -> None:
-    """Validate every command-line JSON document before opening WAAPI."""
+    """Validate the remaining typed command-line documents before WAAPI."""
 
-    if args.command == "call":
-        request_args = parse_json_object(args.args_json, "--args-json")
-        request_options = parse_json_object(args.options_json, "--options-json")
-        post_filter = parse_media_pool_post_filter_spec(args.post_filter_json)
-        if post_filter is not None:
-            validate_media_pool_post_filter_request(
-                api=args.api,
-                spec=post_filter,
-                request_args=request_args,
-                request_options=request_options,
-                dry_run=args.dry_run,
-            )
-    elif args.command in {"wait-topic", "stream-topic"}:
-        parse_json_object(args.options_json, "--options-json")
-        parse_json_object(args.match_json, "--match-json")
+    if args.command in {"wait-topic", "stream-topic"}:
         if (
             args.command == "wait-topic"
             and args.no_timeout
@@ -2934,28 +5970,316 @@ def preflight_json_inputs(args: argparse.Namespace) -> None:
             raise GatewayInputError(
                 "wait-topic --no-timeout cannot be combined with global --timeout"
             )
-        if (
-            args.command == "wait-topic"
-            and not 1 <= args.event_count <= MAX_WAIT_EVENT_COUNT
-        ):
+        if args.event_count is None:
             raise GatewayInputError(
-                f"wait-topic --event-count must be between 1 and {MAX_WAIT_EVENT_COUNT}"
+                f"{args.command} --event-count must be explicitly set between "
+                f"1 and {MAX_WAIT_EVENT_COUNT}"
+            )
+        if not 1 <= args.event_count <= MAX_WAIT_EVENT_COUNT:
+            raise GatewayInputError(
+                f"{args.command} --event-count must be between 1 and "
+                f"{MAX_WAIT_EVENT_COUNT}"
             )
     elif args.command == "draft-apply":
-        parse_operation_draft_cli_action(args)
-    elif args.command in {"preview", "legacy-preview"}:
-        request_payload = parse_preview_request_object(args.request_json)
-        if args.command == "preview":
-            require_normal_legacy_preview_input_mode(request_payload)
-    elif args.command == "debug-validate-call":
-        for field_name, option_name in (
-            ("args_json", "--args-json"),
-            ("options_json", "--options-json"),
-            ("result_json", "--result-json"),
-        ):
-            value = getattr(args, field_name)
-            if value is not None:
-                parse_json_object(value, option_name)
+        # The authorized Draft binding decides the operation-local typed
+        # Composer grammar. Dispatch performs that state-bound decision before
+        # parsing any action facts.
+        return
+
+
+def preflight_typed_topic_input(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+) -> None:
+    """Materialize exact Topic options and subset match before connecting."""
+
+    (version,) = resolve_catalog_versions(args, env=env)
+    business = topic_business_contract(version, args.api)
+    supplied_digest = args.topic_contract_digest
+    if supplied_digest is None:
+        raise GatewayInputError(
+            "Topic execution requires --topic-contract-digest copied exactly "
+            "from topic-schema. Run topic-schema for this topic and version first."
+        )
+    if supplied_digest != business.contract_digest:
+        raise GatewayInputError(
+            "The supplied Topic business contract is stale or belongs to a "
+            "different topic/version. Run topic-schema again and copy its exact "
+            "--topic-contract-digest value."
+        )
+    shortcut_requested = (
+        args.include_object_identity
+        or args.match_platform_name is not None
+        or args.match_soundbank_name is not None
+    )
+    if shortcut_requested and args.api != SOUNDBANK_GENERATED_TOPIC_URI:
+        raise GatewayInputError(
+            "SoundBank Topic business shortcuts are accepted only for "
+            f"{SOUNDBANK_GENERATED_TOPIC_URI}."
+        )
+    option_facts = list(
+        _topic_business_facts(
+            args,
+            business,
+            "topic_option",
+            channel="topic-option",
+        )
+    )
+    if args.include_object_identity:
+        option_facts.extend(
+            TopicBusinessFact("include", field_name)
+            for field_name in SOUNDBANK_TOPIC_IDENTITY_FIELDS
+        )
+    match_facts = list(
+        _topic_business_facts(
+            args,
+            business,
+            "event_match",
+            channel="event-match",
+        )
+    )
+    if args.match_soundbank_name is not None:
+        match_facts.append(
+            TopicBusinessFact("soundbank-name", args.match_soundbank_name)
+        )
+    entry_facts = list(_topic_business_entry_facts(args, business))
+    if args.match_platform_name is not None:
+        entry_facts.append(
+            TopicBusinessEntryFact(
+                "platform",
+                (),
+                "name",
+                args.match_platform_name,
+                kind="text",
+            )
+        )
+    args.typed_topic_input = materialize_topic_business_inputs(
+        version=version,
+        topic=args.api,
+        option_facts=tuple(option_facts),
+        match_facts=tuple(match_facts),
+        option_empty_facts=tuple(
+            TopicBusinessEmptyFact(field_name)
+            for field_name in args.topic_option_empty
+        ),
+        match_empty_facts=tuple(
+            TopicBusinessEmptyFact(field_name)
+            for field_name in args.event_empty
+        ),
+        row_facts=_topic_business_row_facts(args, business),
+        empty_row_facts=tuple(
+            TopicBusinessEmptyRowFact(
+                collection,
+                _parse_topic_row_indices(parent_indices),
+            )
+            for collection, parent_indices in args.event_row_empty
+        ),
+        entry_facts=tuple(entry_facts),
+        entry_empty_facts=tuple(
+            TopicBusinessEntryEmptyFact(
+                scope,
+                _parse_topic_row_indices(indices),
+                key,
+                shape,
+            )
+            for scope, indices, key, shape in args.event_entry_empty
+        ),
+        entry_object_facts=_topic_business_entry_object_facts(args, business),
+        entry_row_facts=_topic_business_entry_row_facts(args, business),
+    )
+
+
+def _topic_business_facts(
+    args: argparse.Namespace,
+    business: Any,
+    prefix: str,
+    *,
+    channel: str,
+) -> tuple[TopicBusinessFact, ...]:
+    facts = [
+        TopicBusinessFact(field_name, value)
+        for field_name, value in getattr(args, prefix)
+    ]
+    facts.extend(
+        TopicBusinessFact(
+            field_name,
+            value,
+            kind=resolve_topic_business_value_choice(
+                business,
+                channel=channel,
+                owner=(field_name,),
+                handle=value_choice,
+            ),
+        )
+        for field_name, value_choice, value in getattr(args, f"{prefix}_as")
+    )
+    return tuple(facts)
+
+
+def _topic_business_row_facts(
+    args: argparse.Namespace,
+    business: Any,
+) -> tuple[TopicBusinessRowFact, ...]:
+    facts = [
+        TopicBusinessRowFact(
+            collection,
+            _parse_topic_row_indices(indices),
+            field_name,
+            value,
+        )
+        for collection, indices, field_name, value in args.event_row
+    ]
+    facts.extend(
+        TopicBusinessRowFact(
+            collection,
+            _parse_topic_row_indices(indices),
+            field_name,
+            value,
+            kind=resolve_topic_business_value_choice(
+                business,
+                channel="event-row",
+                owner=(collection, field_name),
+                handle=value_choice,
+            ),
+        )
+        for collection, indices, field_name, value_choice, value in args.event_row_as
+    )
+    return tuple(facts)
+
+
+def _parse_topic_row_indices(value: str) -> tuple[int, ...]:
+    if value == "-":
+        return ()
+    try:
+        return tuple(int(part) for part in value.split(","))
+    except ValueError as exc:
+        raise GatewayInputError(
+            "Topic event row indices must be comma-separated integers"
+        ) from exc
+
+
+def _topic_business_entry_facts(
+    args: argparse.Namespace,
+    business: Any,
+) -> tuple[TopicBusinessEntryFact, ...]:
+    facts = [
+        TopicBusinessEntryFact(
+            scope,
+            _parse_topic_row_indices(indices),
+            key,
+            value,
+        )
+        for scope, indices, key, value in args.event_entry
+    ]
+    facts.extend(
+        TopicBusinessEntryFact(
+            scope,
+            _parse_topic_row_indices(indices),
+            key,
+            value,
+            kind=resolve_topic_business_value_choice(
+                business,
+                channel="event-entry",
+                owner=(scope,),
+                handle=value_choice,
+            ),
+        )
+        for scope, indices, key, value_choice, value in args.event_entry_as
+    )
+    return tuple(facts)
+
+
+def _topic_business_entry_object_facts(
+    args: argparse.Namespace,
+    business: Any,
+) -> tuple[TopicBusinessEntryObjectFact, ...]:
+    facts = [
+        TopicBusinessEntryObjectFact(
+            scope,
+            _parse_topic_row_indices(indices),
+            key,
+            field_name,
+            value,
+        )
+        for scope, indices, key, field_name, value in args.event_entry_object
+    ]
+    facts.extend(
+        TopicBusinessEntryObjectFact(
+            scope,
+            _parse_topic_row_indices(indices),
+            key,
+            field_name,
+            value,
+            kind=resolve_topic_business_value_choice(
+                business,
+                channel="event-entry-object",
+                owner=(scope, field_name),
+                handle=value_choice,
+            ),
+        )
+        for (
+            scope,
+            indices,
+            key,
+            field_name,
+            value_choice,
+            value,
+        ) in args.event_entry_object_as
+    )
+    return tuple(facts)
+
+
+def _topic_business_entry_row_facts(
+    args: argparse.Namespace,
+    business: Any,
+) -> tuple[TopicBusinessEntryRowFact, ...]:
+    facts = [
+        TopicBusinessEntryRowFact(
+            scope,
+            _parse_topic_row_indices(indices),
+            key,
+            _parse_topic_entry_item_index(item_index),
+            field_name,
+            value,
+        )
+        for scope, indices, key, item_index, field_name, value in args.event_entry_row
+    ]
+    facts.extend(
+        TopicBusinessEntryRowFact(
+            scope,
+            _parse_topic_row_indices(indices),
+            key,
+            _parse_topic_entry_item_index(item_index),
+            field_name,
+            value,
+            kind=resolve_topic_business_value_choice(
+                business,
+                channel="event-entry-row",
+                owner=(scope, field_name),
+                handle=value_choice,
+            ),
+        )
+        for (
+            scope,
+            indices,
+            key,
+            item_index,
+            field_name,
+            value_choice,
+            value,
+        ) in args.event_entry_row_as
+    )
+    return tuple(facts)
+
+
+def _parse_topic_entry_item_index(value: str) -> int:
+    try:
+        return int(value)
+    except ValueError as exc:
+        raise GatewayInputError(
+            "Topic exact event entry row index must be an integer"
+        ) from exc
 
 
 _LEGACY_OPERATION_PROJECTION_FIELDS = frozenset(
@@ -2979,11 +6303,35 @@ def composer_operation_projection(
     *,
     version: str | None,
 ) -> dict[str, Any]:
-    """Return normal discovery without a copyable Legacy request shape."""
+    """Return normal discovery without a copyable Legacy request shape.
+
+    Descriptive constraints remain useful model-facing routing facts.  Only
+    the machine request document and its duplicated field schema are removed;
+    the typed operation/Composer contract below owns executable construction.
+    """
 
     projection = spec.as_dict(version=version)
     for field in _LEGACY_OPERATION_PROJECTION_FIELDS:
         projection.pop(field, None)
+    modes = (
+        {operation_input_mode(spec.name, version)}
+        if version is not None and version in spec.supported_versions
+        else {
+            operation_input_mode(spec.name, supported_version)
+            for supported_version in spec.supported_versions
+        }
+    )
+    if modes != {BUSINESS_DECLARATION_INPUT_MODE}:
+        for field in ("constraints", "identity_contract", "parent_child_contract"):
+            value = spec.as_dict(version=version).get(field)
+            if value is not None:
+                projection[field] = value
+    if spec.name in {
+        "debug.restartWaapiServers",
+        "debug.testAssert",
+        "debug.testCrash",
+    }:
+        projection.pop("constraints", None)
     return projection
 
 
@@ -2997,10 +6345,19 @@ def operation_composer_input_contract(
 
     contract = operation_composer_contract(operation, version)
     if inventory:
-        fragments = require_mapping(
-            contract.get("registry_fragments"),
-            "operation Composer registry fragments",
-        )
+        fragments = contract.get("registry_fragments")
+        if fragments is not None:
+            fragments = require_mapping(
+                fragments,
+                "operation Composer registry fragments",
+            )
+            source_schema_digest = fragments["source_schema_digest"]
+        else:
+            source_schema_digest = contract.get("typed_request_schema_digest")
+            if not isinstance(source_schema_digest, str) or not source_schema_digest:
+                raise GatewayInputError(
+                    "operation Composer typed request schema digest must be a non-empty string"
+                )
         return {
             "contract": contract["contract"],
             "operation": operation,
@@ -3008,21 +6365,109 @@ def operation_composer_input_contract(
             "action_contract": contract["action_contract"],
             "actions": list(contract["actions"]),
             "limits": dict(contract["limits"]),
-            "registry_source_schema_digest": fragments["source_schema_digest"],
+            "registry_source_schema_digest": source_schema_digest,
             "inspect_with": f"operation-schema {operation}",
         }
-    audio_import_option_names = (
-        contract.get("action_shapes", {})
-        .get("set_import_option", {})
-        .get("allowed_names", [])
-    )
-    if operation == "audio.import" and (
-        not isinstance(audio_import_option_names, list)
-        or not audio_import_option_names
-        or not all(isinstance(name, str) and name for name in audio_import_option_names)
-    ):
-        raise RuntimeError("audio.import source-control option projection is invalid")
-    audio_import_option_choice = "(" + "|".join(audio_import_option_names) + ")"
+    start_preconditions = contract.get("start_preconditions")
+    fragments = contract.get("registry_fragments")
+    if isinstance(start_preconditions, Mapping):
+        exact_preconditions = dict(start_preconditions)
+        if exact_preconditions.get("dynamic_metadata_before_draft_start") is True:
+            exact_preconditions["next_step_decision"] = (
+                "metadata discover when required; otherwise draft-start"
+            )
+            contract = {**contract, "start_preconditions": exact_preconditions}
+    if isinstance(start_preconditions, Mapping) and isinstance(fragments, Mapping):
+        default_container = next(
+            (
+                fragments.get(key)
+                for key in (
+                    "default_container_target_contract",
+                    "default_container_parent_contract",
+                )
+                if isinstance(fragments.get(key), Mapping)
+            ),
+            None,
+        )
+        metadata_scope = (
+            default_container.get("dynamic_actor_mixer_metadata_scope")
+            if isinstance(default_container, Mapping)
+            else None
+        )
+        actor_mixer_type = (
+            metadata_scope.get("actor_mixer_object_type")
+            if isinstance(metadata_scope, Mapping)
+            else None
+        )
+        if isinstance(actor_mixer_type, str) and actor_mixer_type:
+            exact_preconditions = dict(contract["start_preconditions"])
+            exact_preconditions["reviewed_default_container_metadata_argv"] = {
+                "applies_when": (
+                    "all requested targets use the Registry-resolved default "
+                    "Actor-Mixer container scope"
+                ),
+                "gateway_argv_template": [
+                    "metadata",
+                    "discover",
+                    "--object-type",
+                    actor_mixer_type,
+                    "--query",
+                    "<requested-field-name>",
+                    "--limit",
+                    "<derived-from-query-count>",
+                ],
+                "replace_only": ["<requested-field-name>"],
+                "query_policy": {
+                    "include_only_requested_dynamic_property_or_reference_tokens": True,
+                    "known_target_fields_are_not_queries": [
+                        "name",
+                        "notes",
+                        "platform",
+                        "list_mode",
+                        "on_name_conflict",
+                    ],
+                },
+                "limit_by_query_count": metadata_candidate_limit_contract(),
+            }
+            contract = {**contract, "start_preconditions": exact_preconditions}
+    generic_typed_action_argv = {
+        "add_typed_fact": [
+            "--fact-action", "ACTION", "--field-handle", "HANDLE",
+            "[--value-type TYPE]", "[--fact-value VALUE]", "[--key KEY]",
+        ],
+        "correct_typed_fact": [
+            "--fact-handle", "HANDLE", "--fact-action", "ACTION",
+            "--field-handle", "HANDLE", "[--value-type TYPE]",
+            "[--fact-value VALUE]", "[--key KEY]",
+        ],
+        "remove_typed_fact": ["--fact-handle", "HANDLE"],
+    }
+    fact_action_argv = {
+        "set": [
+            "--fact-action", "set", "--field-handle", "HANDLE",
+            "--value-type", "TYPE", "--fact-value", "VALUE",
+        ],
+        "append": [
+            "--fact-action", "append", "--field-handle", "HANDLE",
+            "--value-type", "TYPE", "--fact-value", "VALUE",
+        ],
+        "present": [
+            "--fact-action", "present", "--field-handle", "HANDLE",
+        ],
+        "choose": [
+            "--fact-action", "choose", "--field-handle", "HANDLE",
+            "--fact-value", "CHOICE_HANDLE",
+        ],
+        "choose-dynamic": [
+            "--fact-action", "choose-dynamic", "--field-handle", "HANDLE",
+            "--key", "KEY", "--fact-value", "CHOICE_HANDLE",
+        ],
+        "map-put": [
+            "--fact-action", "map-put", "--field-handle", "HANDLE",
+            "--key", "KEY", "--value-type", "TYPE",
+            "--fact-value", "VALUE",
+        ],
+    }
     action_argv_by_operation = {
         "object.set": {
             "set_request_option": ["--option", "NAME", "TYPE", "VALUE"],
@@ -3080,41 +6525,9 @@ def operation_composer_input_contract(
             "clear_import_option": ["--owner-handle", "HANDLE", "--option", "NAME"],
             "remove_import": ["--owner-handle", "HANDLE"],
         },
-        "audio.import": {
-            "set_import_operation": ["--mode", "MODE"],
-            "set_import_option": [
-                "--option",
-                audio_import_option_choice,
-                "boolean",
-                "VALUE",
-            ],
-            "clear_import_option": [
-                "--option",
-                audio_import_option_choice,
-            ],
-            "set_import_default": [
-                "(--default NAME TYPE VALUE | --import-location SELECTOR_KIND SELECTOR_VALUES... | --event ACTION PATH | --event-path PATH | --property NAME TYPE VALUE... | --empty-properties | --reference NAME SELECTOR_KIND SELECTOR_VALUES... | --empty-references)"
-            ],
-            "clear_import_default": ["--default", "NAME"],
-            "add_import_row": [
-                "--object-path", "PATH", "--object-type", "TYPE",
-                "[--audio-file PATH]", "[--audio-file-base64 DATA]",
-                "[--audio-source-notes VALUE]", "[--dialogue-event VALUE]",
-                "[(--event ACTION PATH | --event-path PATH)]", "[--import-language VALUE]",
-                "[--import-location SELECTOR_KIND SELECTOR_VALUES...]", "[--notes VALUE]",
-                "[--originals-subfolder VALUE]",
-                "[--property NAME TYPE VALUE]...",
-                "[--empty-properties]",
-                "[--reference NAME SELECTOR_KIND SELECTOR_VALUES...]...",
-                "[--empty-references]",
-                "(--assignment none | --assignment switch VALUE)",
-            ],
-            "set_import_row_field": [
-                "--import-handle", "HANDLE",
-                "(--field NAME TYPE VALUE | --import-location SELECTOR_KIND SELECTOR_VALUES... | --event ACTION PATH | --event-path PATH | --property NAME TYPE VALUE... | --empty-properties | --reference NAME SELECTOR_KIND SELECTOR_VALUES... | --empty-references)",
-            ],
-            "clear_import_row_field": ["--import-handle", "HANDLE", "--field", "NAME"],
-            "remove_import_row": ["--import-handle", "HANDLE"],
+        **{
+            operation_name: generic_typed_action_argv
+            for operation_name in DRAFT_TYPED_OPERATIONS
         },
     }
     operation_argv = action_argv_by_operation[operation]
@@ -3124,62 +6537,157 @@ def operation_composer_input_contract(
         action_name: operation_argv[action_name]
         for action_name in contract["actions"]
     }
-    return {
-        **contract,
-        "start": {
-            "subcommand": "draft-start",
-            "gateway_argv": ["draft-start", operation],
-            **(
-                {"preconditions": dict(contract["start_preconditions"])}
-                if "start_preconditions" in contract
-                else {}
-            ),
-        },
-        "apply": {
-            "subcommand": "draft-apply",
-            "action_flag": "--action",
-            "gateway_argv": [
-                "draft-apply",
-                "<draft_id>",
-                "--task-authority",
-                "<task_authority>",
-                "--expected-revision",
-                "<revision>",
-                "--compact",
-                "--facts",
+    selector_kinds = [
+        "id-string VALUE",
+        "id-integer VALUE",
+        "path VALUE",
+        "exact-type-name TYPE NAME",
+        "direct-child TYPE PARENT_SELECTOR...",
+        "scoped-name TYPE NAME PARENT_SELECTOR...",
+    ]
+    apply_contract = {
+        "subcommand": "draft-apply",
+        "action_flag": "--action",
+        "gateway_argv": [
+            "draft-apply",
+            "<draft_id>",
+            "--task-authority",
+            "<task_authority>",
+            "--expected-revision",
+            "<revision>",
+            "--compact",
+            "--facts",
+            "--action",
+            "<action-name>",
+            "<typed-fact-arguments>",
+        ],
+        "action_argv": action_argv,
+        **(
+            {"fact_action_argv": fact_action_argv}
+            if "add_typed_fact" in action_argv
+            else {}
+        ),
+        "scalar_types": ["string", "number", "integer", "boolean"],
+        **(
+            {
+                "scalar_type_discipline": {
+                    "cli_type_source": "scalar_types",
+                    "metadata_type_tokens_as_cli_types": "invalid",
+                    "metadata_examples": {"Real64": "number", "int16": "integer"},
+                }
+            }
+            if operation in {"audio.import", "object.set"}
+            else {}
+        ),
+        **(
+            {"selector_kinds": selector_kinds}
+            if any(
+                "SELECTOR" in token
+                for tokens in action_argv.values()
+                for token in tokens
+            )
+            else {}
+        ),
+        "bind_from_prior_response": [
+            "draft_id",
+            "task_authority",
+            "revision",
+        ],
+        "revision_discipline": {
+            "mode": "one_ordered_atomic_batch_then_read",
+            "action_count": {
+                "minimum": 1,
+                "maximum": MAX_TYPED_ACTIONS_PER_APPLY,
+            },
+            "batch_fill": {
+                "mode": "greedy_schema_order",
+                "rule": (
+                    "append the next complete handle-independent action while it "
+                    "fits; execute a shorter batch only when the next action "
+                    "depends on a returned handle or no action remains"
+                ),
+                "split_one_complete_action": "forbidden",
+            },
+            "repeat_complete_action_group": [
                 "--action",
                 "<action-name>",
                 "<typed-fact-arguments>",
             ],
-            "action_argv": action_argv,
-            "scalar_types": ["string", "number", "integer", "boolean"],
-            "selector_kinds": [
-                "id-string VALUE",
-                "id-integer VALUE",
-                "path VALUE",
-                "exact-type-name TYPE NAME",
-                "direct-child TYPE PARENT_SELECTOR...",
-                "scoped-name TYPE NAME PARENT_SELECTOR...",
-            ],
-            "bind_from_prior_response": [
-                "draft_id",
-                "task_authority",
-                "revision",
-            ],
-            "revision_discipline": {
-                "mode": "one_action_then_read_next_response",
-                "expected_revision_source": "/draft/revision",
-                "next_action_template_source": (
-                    "/draft/next_action_binding/fixed_argv_prefix"
-                ),
-                "replace_only": [
-                    "<task-authority-from-draft-start>",
-                    "<action-name>",
-                    "<typed-fact-arguments>",
-                ],
-                "precompute_or_increment_revision": False,
-            },
+            "revision_delta": "action_count",
+            "failure": "unchanged",
+            "expected_revision_source": "/draft/revision",
+            "next_action_template_source": (
+                "/draft/next_action_binding/fixed_argv_prefix"
+            ),
+            "precompute_or_increment_revision": False,
         },
+    }
+    public_contract = {
+        key: value
+        for key, value in contract.items()
+        if key != "start_preconditions"
+    }
+    has_start_preconditions = "start_preconditions" in contract
+    lock_draft_start = has_start_preconditions and operation in {
+        "audio.import",
+        "object.set",
+    }
+    start: dict[str, Any] = {}
+    if has_start_preconditions:
+        start["preconditions"] = dict(contract["start_preconditions"])
+    subcommand_key = (
+        "subcommand_after_preconditions" if lock_draft_start else "subcommand"
+    )
+    gateway_argv_key = (
+        "gateway_argv_after_preconditions" if lock_draft_start else "gateway_argv"
+    )
+    start[subcommand_key] = "draft-start"
+    start[gateway_argv_key] = ["draft-start", operation]
+    if not has_start_preconditions:
+        start["copy_instruction"] = {
+            "contract": OPERATION_DRAFT_COMMAND_COPY_INSTRUCTION_CONTRACT,
+            "source_field": "gateway_argv",
+            "action": "append_to_packaged_gateway_prefix_and_execute_verbatim",
+            "forbidden_transformations": [
+                "reconstruct",
+                "shorten",
+                "normalize",
+                "substitute_path_segments",
+                "select_another_field",
+            ],
+        }
+        start["precondition_discipline"] = {
+            "metadata_discover_allowed_only_when": (
+                "preconditions is present and selects metadata"
+            ),
+            "when_preconditions_absent": "execute_gateway_argv_now",
+            "infer_metadata_from_operation_constraints": False,
+        }
+    return {
+        "start": start,
+        **public_contract,
+        "dynamic_container_commands": {
+            "map_value": "request-map-container",
+            "array_item": "request-array-item",
+            "schema_digest": contract.get("typed_request_schema_digest"),
+            **typed_container_command_contract(
+                operation,
+                str(contract.get("typed_request_schema_digest")),
+            ),
+            "draft_binding": False,
+            "scalar_map_entry_action": (
+                "use draft-apply add_typed_fact with fact-action map-put directly; "
+                "request-map-container is only for an object or array value"
+            ),
+            "sequence": (
+                "root argv is only for top-level handles; returned children use the "
+                "matching nested argv unchanged; then append/map-put that child; "
+                "disclosure never consumes or changes the Draft revision; never "
+                "mix schema digest with parent lineage; add --member-key only when "
+                "branch_disclosure returns it"
+            ),
+        },
+        "apply": apply_contract,
         "check": {
             "subcommand": "draft-check",
             "gateway_argv": [
@@ -3221,18 +6729,2426 @@ def operation_composer_input_contract(
     }
 
 
+def operation_draft_schema_digest(operation: str, version: str) -> str:
+    """Bind named-operation and exact-URI Drafts to their owning schema."""
+
+    if operation.startswith("ak."):
+        return request_contract(version, operation).schema_digest
+    if operation in DRAFT_TYPED_OPERATIONS:
+        return draft_operation_request_contract(operation, version).schema_digest
+    return operation_request_schema_digest(operation, version)
+
+
+def public_typed_contract(version: str, api: str) -> Any:
+    """Resolve one function or query construction contract by exact public key."""
+
+    if api in DRAFT_TYPED_OPERATIONS:
+        return draft_operation_request_contract(api, version)
+    return request_contract(version, api)
+
+
+def fixed_command_route_payload(capability: CapabilityRecord) -> dict[str, Any]:
+    """Describe one deep fixed route without exposing its native request schema."""
+
+    def command_requires_business_values(command: str) -> bool:
+        return (
+            command.split()[0]
+            in {
+            "query-object",
+            "metadata",
+            "profiler-game-objects",
+            "profiler-voice-contributions",
+            "debug-validate-call",
+            }
+            and command != "metadata types"
+        )
+
+    commands = [
+        {
+            "subcommand": command.split()[0],
+            "arguments": command.split()[1:],
+            "business_values_required": command_requires_business_values(command),
+        }
+        for command in capability.fixed_commands
+    ]
+    return {
+        "contract": "waapi-skill.fixed-command-route/v1",
+        "ok": True,
+        "status": "ok",
+        "command": "request-schema",
+        "version": capability.version,
+        "uri": capability.uri,
+        "input_shape": "fixed_business_command",
+        "native_request_fields_disclosed": False,
+        "commands": commands,
+        "continuation": (
+            commands[0]
+            if len(commands) == 1
+            else {
+                "choose_by_business_intent": commands,
+                "business_values_required": "depends_on_command",
+            }
+        ),
+    }
+
+
+def core_business_route_payload(version: str, api: str) -> dict[str, Any]:
+    """Expose one reviewed Core declaration without reflected typed fields."""
+
+    contract = (
+        host_ui_debug_business_contract_data(api, version)
+        if api in HOST_UI_DEBUG_BUSINESS_OPERATIONS
+        else cli_console_business_contract_data(api, version)
+        if api in CLI_CONSOLE_BUSINESS_OPERATIONS
+        else media_build_business_contract_data(api, version)
+        if api in media_build_business_operations()
+        else soundengine_control_business_contract_data(api, version)
+        if api in soundengine_control_business_operations()
+        else runtime_inspection_business_contract_data(api, version)
+        if api in runtime_inspection_business_operations()
+        else project_setting_business_contract_data(api, version)
+        if api in project_setting_business_operations()
+        else source_control_business_contract_data(api, version)
+        if api in source_control_business_operations()
+        else core_business_contract_data(api, version)
+    )
+    start = contract["start"]
+    bounded_read = contract["execution_shape"] == "bounded_read"
+    argv_key = "gateway_argv_prefix" if bounded_read else "gateway_argv"
+    continuation_argv = start.get(argv_key)
+    if not isinstance(continuation_argv, list):
+        raise GatewayInputError("Core business contract lacks its continuation")
+    return {
+        "contract": "waapi-skill.core-business-route/v1",
+        "ok": True,
+        "status": "ok",
+        "command": "request-schema",
+        "offline": True,
+        "version": version,
+        "uri": api,
+        "input_shape": "business_declaration",
+        "native_request_fields_disclosed": False,
+        "business_adapter": contract,
+        "continuation": {
+            "subcommand": start.get(
+                "subcommand",
+                "core-call" if bounded_read else "draft-start",
+            ),
+            argv_key: list(continuation_argv),
+            **(
+                {"append_only_disclosed_business_fields": True}
+                if bounded_read
+                else {"copy_exactly": True, "append_arguments": "forbidden"}
+            ),
+        },
+    }
+
+
+def core_business_route_available(api: str, version: str) -> bool:
+    if api in HOST_UI_DEBUG_BUSINESS_OPERATIONS:
+        return version in host_ui_debug_business_versions(api)
+    if api in CLI_CONSOLE_BUSINESS_OPERATIONS:
+        return version in cli_console_business_versions(api)
+    if api in media_build_business_operations():
+        return version in media_build_business_versions(api)
+    if api in soundengine_control_business_operations():
+        return version in soundengine_control_business_versions(api)
+    if api in runtime_inspection_business_operations():
+        return version in runtime_inspection_business_versions(api)
+    if api in project_setting_business_operations():
+        return version in project_setting_business_versions(api)
+    if api in source_control_business_operations():
+        return version in source_control_business_versions(api)
+    if api in core_business_operations():
+        return version in core_business_versions(api)
+    return False
+
+
+
+
+def _container_schema_binding_argv(
+    contract: TypedRequestContract,
+    *,
+    parent_schema_token: str | None,
+) -> list[str]:
+    """Bind a root container by digest or a nested container by exact lineage."""
+
+    return (
+        []
+        if parent_schema_token is not None
+        else ["--schema-digest", contract.schema_digest]
+    )
+
+
+def _dynamic_branch_disclosure_continuation(
+    args: argparse.Namespace,
+    *,
+    contract: Any,
+    child_handle: str,
+    child_contract: Mapping[str, Any],
+    lineage_token: str,
+) -> dict[str, Any]:
+    """Return the sole next disclosure for one newly issued object handle."""
+
+    if args.member_key is not None or args.shape != "object":
+        return {}
+    branch_rows = child_contract.get("branch_choices")
+    if not isinstance(branch_rows, list):
+        branch_rows = []
+    has_container_choice = any(
+        isinstance(row, Mapping)
+        and isinstance(row.get("choices"), list)
+        and any(
+            isinstance(choice, Mapping)
+            and isinstance(choice.get("accepted_types"), list)
+            and any(
+                value_type in {"object", "array"}
+                for value_type in choice["accepted_types"]
+            )
+            for choice in row["choices"]
+        )
+        for row in branch_rows
+    )
+    if child_contract.get("member_key_disclosure_required"):
+        command = [
+            args.command,
+            args.api,
+            *_container_schema_binding_argv(
+                contract,
+                parent_schema_token=args.parent_schema_token,
+            ),
+            *(
+                ["--map-handle", args.map_handle, "--key", args.key]
+                if args.command == "request-map-container"
+                else ["--array-handle", args.array_handle, "--index", str(args.index)]
+            ),
+            "--shape",
+            args.shape,
+            *(
+                ["--choice-handle", args.choice_handle]
+                if args.choice_handle is not None
+                else []
+            ),
+            "--member-key",
+            "<exact-key>",
+            *(
+                ["--parent-schema-token", args.parent_schema_token]
+                if args.parent_schema_token is not None
+                else []
+            ),
+        ]
+    elif has_container_choice:
+        command = [
+            "request-map-container",
+            args.api,
+            "--map-handle",
+            child_handle,
+            "--key",
+            "<exact-key>",
+            "--shape",
+            "object",
+            "--parent-schema-token",
+            lineage_token,
+            "--choice-handle",
+            "<selected-choice-handle-from-child_contract>",
+        ]
+    else:
+        return {}
+    return {"branch_disclosure": command}
+
+
+def _fixed_nested_container_disclosures(
+    args: argparse.Namespace,
+    *,
+    contract: Any,
+    child_handle: str,
+    child_contract: Mapping[str, Any],
+    lineage_token: str,
+) -> list[dict[str, Any]]:
+    """Return direct schema-owned child containers in canonical property order."""
+
+    if args.member_key is not None or args.shape != "object":
+        return []
+    rows = child_contract.get("fixed_container_members")
+    if not isinstance(rows, list):
+        return []
+    branch_rows = child_contract.get("branch_choices")
+    branch_keys: set[Any] = set()
+    if isinstance(branch_rows, list):
+        branch_keys = {
+            row.get("key")
+            for row in branch_rows
+            if isinstance(row, Mapping)
+            and isinstance(row.get("key"), str)
+            and isinstance(row.get("choices"), list)
+            and row["choices"]
+        }
+    result: list[dict[str, Any]] = []
+    for queue_index, row in enumerate(rows, start=1):
+        if (
+            not isinstance(row, Mapping)
+            or not isinstance(row.get("key"), str)
+            or row.get("shape") not in {"object", "array"}
+        ):
+            continue
+        key = str(row["key"])
+        shape = str(row["shape"])
+        if key in branch_keys:
+            continue
+        result.append(
+            {
+                "key": key,
+                "shape": shape,
+                "required": row.get("required") is True,
+                "condition": "current_business_request_contains_member",
+                "queue_index": queue_index,
+                "is_next_command": False,
+                "argv": [
+                    "request-map-container",
+                    args.api,
+                    "--map-handle",
+                    child_handle,
+                    "--key",
+                    key,
+                    "--shape",
+                    shape,
+                    "--parent-schema-token",
+                    lineage_token,
+                ],
+            }
+        )
+    return result
+
+
+def _dynamic_deferred_queue_contract() -> dict[str, Any]:
+    """Return the one request-wide ordering contract for returned-handle facts."""
+
+    return {
+        "scope": "current_disclosed_node",
+        "root_boundary": (
+            "current_node_parent_and_member_facts_before_descendant_or_sibling_disclosure"
+        ),
+        "drain_after": "current_container_disclosure",
+        "traversal": "response_tree_preorder",
+        "node_steps": [
+            "deferred_parent_fact",
+            "child_contract_facts",
+            "descendant_response_nodes",
+        ],
+        "parent_dependency": (
+            "deferred_parent_fact_before_every_fact_using_response_handle"
+        ),
+        "array_traversal": "response_tree_preorder_within_current_root",
+        "sibling_order": "ascending_business_present_index",
+    }
+
+
+def _bind_dynamic_branch_facts(
+    child_contract: dict[str, Any],
+    *,
+    child_handle: str,
+    draft_shape: bool,
+    query_shape: bool,
+    topic_prefix: str | None,
+) -> None:
+    """Attach exact public facts for schema-owned child values and choices."""
+
+    scalar_rows = child_contract.pop("fixed_scalar_members", None)
+    if isinstance(scalar_rows, list):
+        bound_scalar_rows: list[dict[str, Any]] = []
+        for row in scalar_rows:
+            if not isinstance(row, Mapping) or not isinstance(row.get("key"), str):
+                continue
+            accepted_types = row.get("accepted_types")
+            if not isinstance(accepted_types, list) or not all(
+                isinstance(value_type, str) for value_type in accepted_types
+            ):
+                continue
+            argv_by_type: dict[str, list[str]] = {}
+            for value_type in accepted_types:
+                deferred = _deferred_dynamic_fact_payload(
+                    [
+                        "--map-put",
+                        child_handle,
+                        str(row["key"]),
+                        value_type,
+                        "<business-value>",
+                    ],
+                    draft_shape=draft_shape,
+                    query_shape=query_shape,
+                    topic_prefix=topic_prefix,
+                )
+                payload = deferred.get("deferred_fact")
+                if isinstance(payload, Mapping) and isinstance(payload.get("argv"), list):
+                    argv_by_type[value_type] = list(payload["argv"])
+            if not argv_by_type:
+                continue
+            bound = dict(row)
+            bound.update(
+                {
+                    "fact_argv_by_type": argv_by_type,
+                    "execute_after": "deferred_parent_fact",
+                    "is_next_command": False,
+                    "consume_once": True,
+                    "replay_allowed": False,
+                }
+            )
+            bound_scalar_rows.append(bound)
+        if bound_scalar_rows:
+            child_contract["fixed_scalar_member_facts"] = bound_scalar_rows
+
+    constant_rows = child_contract.get("constant_field_facts")
+    if isinstance(constant_rows, list):
+        for row in constant_rows:
+            if not isinstance(row, dict):
+                continue
+            typed_fact = row.get("typed_fact")
+            if not isinstance(typed_fact, Mapping):
+                continue
+            key = typed_fact.get("key")
+            value_type = typed_fact.get("value_type")
+            value = typed_fact.get("value")
+            if not all(isinstance(item, str) for item in (key, value_type, value)):
+                continue
+            deferred = _deferred_dynamic_fact_payload(
+                ["--map-put", child_handle, key, value_type, value],
+                draft_shape=draft_shape,
+                query_shape=query_shape,
+                topic_prefix=topic_prefix,
+            )
+            if isinstance(deferred.get("deferred_fact"), dict):
+                deferred["deferred_fact"].pop("must_precede", None)
+                deferred["deferred_fact"].update(
+                    {
+                        "execute_after": "deferred_parent_fact",
+                        "queue_phase": "child_contract",
+                        "queue_order_ref": (
+                            "/continuation/request_wide_order/deferred_fact_queue"
+                        ),
+                        "is_next_command": False,
+                        "consume_once": True,
+                        "replay_allowed": False,
+                    }
+                )
+            row.update(deferred)
+
+    rows = child_contract.get("branch_choices")
+    if not isinstance(rows, list) or not rows:
+        return
+    child_contract["branch_fact_group_policy"] = {
+        "actions": ["choose_dynamic_argv", "map_put_argv"],
+        "group_size": 2,
+        "split_across_apply_batches": "forbidden",
+        "insufficient_remaining_slots": "start_group_in_next_batch",
+        "greedy_batching": {
+            "parent_fact_action_count": 1,
+            "maximum_groups_with_parent_fact": 2,
+            "maximum_groups_without_parent_fact": 3,
+            "exact_group_count": (
+                "with the parent fact use min(2,business-present queued groups); "
+                "without it use min(3,remaining business-present queued groups)"
+            ),
+            "early_execute_with_a_business_present_group_unpacked": "invalid",
+            "rule": (
+                "start with the deferred parent fact, append exactly the next up "
+                "to two business-present complete branch groups, execute, read the "
+                "new revision, then pack exactly the next up to three remaining "
+                "business-present complete groups per later batch"
+            ),
+        },
+    }
+    for queue_index, row in enumerate(rows, start=1):
+        if not isinstance(row, dict) or not isinstance(row.get("key"), str):
+            continue
+        key = str(row["key"])
+        row.update(
+            {
+                "queue_index": queue_index,
+                "fact_sequence": (
+                    "choose_one_then_map_put_same_key_before_next_branch"
+                ),
+                "next_branch_blocked_until_complete": True,
+            }
+        )
+        if draft_shape and not query_shape and topic_prefix is None:
+            action_prefix = [
+                "--action",
+                "add_typed_fact",
+            ]
+            choose_argv = [
+                *action_prefix,
+                "--fact-action",
+                "choose-dynamic",
+                "--field-handle",
+                child_handle,
+                "--fact-value",
+                "<selected-choice-handle>",
+                "--key",
+                key,
+            ]
+            map_put_argv = [
+                *action_prefix,
+                "--fact-action",
+                "map-put",
+                "--field-handle",
+                child_handle,
+                "--key",
+                key,
+                "--value-type",
+                "<selected-accepted-type>",
+                "--fact-value",
+                "<selected-choice-enum-or-business-value>",
+            ]
+        elif query_shape:
+            choose_argv = [
+                "--typed-choose-dynamic",
+                child_handle,
+                key,
+                "<selected-choice-handle>",
+            ]
+            map_put_argv = [
+                "--typed-map-put",
+                child_handle,
+                key,
+                "<selected-accepted-type>",
+                "<selected-choice-enum-or-business-value>",
+            ]
+        elif topic_prefix is not None:
+            choose_argv = [
+                f"--{topic_prefix}-choose-dynamic",
+                child_handle,
+                key,
+                "<selected-choice-handle>",
+            ]
+            map_put_argv = [
+                f"--{topic_prefix}-map-put",
+                child_handle,
+                key,
+                "<selected-accepted-type>",
+                "<selected-choice-enum-or-business-value>",
+            ]
+        else:
+            choose_argv = [
+                "--choose-dynamic",
+                child_handle,
+                key,
+                "<selected-choice-handle>",
+            ]
+            map_put_argv = [
+                "--map-put",
+                child_handle,
+                key,
+                "<selected-accepted-type>",
+                "<selected-choice-enum-or-business-value>",
+            ]
+        row["fact_construction"] = {
+            "choose_dynamic_argv": choose_argv,
+            "map_put_argv": map_put_argv,
+            "selected_choice_source": "choices/<selected-by-business-value>",
+            "execute_after": "deferred_parent_fact",
+            "queue_phase": "child_contract",
+            "queue_order_ref": (
+                "/continuation/request_wide_order/deferred_fact_queue"
+            ),
+            "consume_each_fact_once": True,
+            "replay_allowed": False,
+        }
+        choices = row.get("choices")
+        if not isinstance(choices, list):
+            continue
+        for choice in choices:
+            if not isinstance(choice, dict) or not isinstance(
+                choice.get("handle"), str
+            ):
+                continue
+            enum_values = choice.get("enum")
+            choice["map_put_required"] = True
+            choice["map_put_value_source"] = (
+                "sole_enum"
+                if isinstance(enum_values, list) and len(enum_values) == 1
+                else "business_value"
+            )
+
+
+def _bind_dynamic_scalar_array_facts(
+    child_contract: dict[str, Any],
+    *,
+    child_handle: str,
+    draft_shape: bool,
+    query_shape: bool,
+    topic_prefix: str | None,
+) -> None:
+    """Attach exact append facts for business-present scalar array items."""
+
+    item_contract = child_contract.pop("scalar_array_item_contract", None)
+    if not isinstance(item_contract, Mapping):
+        return
+    accepted_types = item_contract.get("accepted_types")
+    if not isinstance(accepted_types, list) or not all(
+        isinstance(value_type, str) for value_type in accepted_types
+    ):
+        return
+    argv_by_type: dict[str, list[str]] = {}
+    for value_type in accepted_types:
+        deferred = _deferred_dynamic_fact_payload(
+            ["--append", child_handle, value_type, "<business-value>"],
+            draft_shape=draft_shape,
+            query_shape=query_shape,
+            topic_prefix=topic_prefix,
+        ).get("deferred_fact")
+        if isinstance(deferred, Mapping) and isinstance(deferred.get("argv"), list):
+            argv_by_type[value_type] = list(deferred["argv"])
+    if not argv_by_type:
+        return
+    scalar_array_item_facts = {
+        **dict(item_contract),
+        "fact_argv_by_type": argv_by_type,
+    }
+    enum_values = item_contract.get("enum")
+    if (
+        len(accepted_types) == 1
+        and isinstance(enum_values, list)
+        and 0 < len(enum_values) <= MAX_TYPED_ACTIONS_PER_APPLY
+        and all(isinstance(value, str) for value in enum_values)
+        and len(set(enum_values)) == len(enum_values)
+    ):
+        template = argv_by_type[accepted_types[0]]
+        scalar_array_item_facts.update(
+            {
+                "fact_argv_by_enum_value": {
+                    value: [
+                        value if token == "<business-value>" else token
+                        for token in template
+                    ]
+                    for value in enum_values
+                },
+                "enum_fact_selection": (
+                    "copy_exact_argv_for_each_business_item_in_order"
+                ),
+            }
+        )
+    scalar_array_item_facts.update(
+        {
+            "repeat_for_each_business_item_in_order": True,
+            "execute_after": "deferred_parent_fact",
+            "queue_phase": "child_contract",
+            "queue_order_ref": (
+                "/continuation/request_wide_order/deferred_fact_queue"
+            ),
+            "consume_each_item_once": True,
+            "replay_allowed": False,
+        }
+    )
+    child_contract["scalar_array_item_facts"] = scalar_array_item_facts
+
+
+def _compact_fixed_scalar_member_facts(child_contract: dict[str, Any]) -> None:
+    """Table repeated scalar fact policy without losing any public fact argv."""
+
+    rows = child_contract.get("fixed_scalar_member_facts")
+    if not isinstance(rows, list) or len(rows) < 3:
+        return
+    columns = [
+        "key",
+        "required",
+        "accepted_types",
+        "business_value_pointer",
+        "fact_argv_by_type",
+        "description",
+    ]
+    table_rows: list[list[Any]] = []
+    for row in rows:
+        if not isinstance(row, Mapping):
+            return
+        table_rows.append(
+            [
+                row.get("key"),
+                row.get("required") is True,
+                row.get("accepted_types", []),
+                row.get("business_value_pointer"),
+                row.get("fact_argv_by_type", {}),
+                row.get("description"),
+            ]
+        )
+    child_contract.pop("fixed_scalar_member_facts")
+    child_contract["fixed_scalar_member_fact_table"] = {
+        "columns": columns,
+        "rows": table_rows,
+        "shared_policy": {
+            "condition": "current_business_request_contains_member",
+            "execute_after": "deferred_parent_fact",
+            "queue_phase": "child_contract",
+            "queue_order_ref": (
+                "/continuation/request_wide_order/deferred_fact_queue"
+            ),
+            "must_precede": "all_descendant_response_facts",
+            "is_next_command": False,
+            "consume_once": True,
+            "replay_allowed": False,
+        },
+    }
+
+
+def _deferred_dynamic_fact_payload(
+    fact: Sequence[str],
+    *,
+    draft_shape: bool,
+    query_shape: bool,
+    topic_prefix: str | None,
+) -> dict[str, Any]:
+    """Describe one returned-handle fact without presenting it as the next command."""
+
+    if draft_shape and not query_shape and topic_prefix is None:
+        argv = [
+            "--action", "add_typed_fact",
+            "--fact-action", fact[0].removeprefix("--"),
+            "--field-handle", str(fact[1]),
+            "--value-type", str(fact[-2]),
+            "--fact-value", str(fact[-1]),
+            *(["--key", str(fact[2])] if fact[0] == "--map-put" else []),
+        ]
+    else:
+        argv = [
+            (
+                f"--typed-{fact[0].removeprefix('--')}"
+                if query_shape
+                else f"--{topic_prefix}-{fact[0].removeprefix('--')}"
+                if topic_prefix is not None
+                else fact[0]
+            ),
+            *fact[1:],
+        ]
+    return {
+        "deferred_fact": {
+            "argv": argv,
+            "execute_after": "current_container_disclosure",
+            "queue_phase": "parent_response",
+            "queue_order_ref": (
+                "/continuation/request_wide_order/deferred_fact_queue"
+            ),
+            "must_precede": {
+                "all_facts_with_field_handle": str(fact[-1]),
+                "reason": "attach_returned_handle_to_its_parent_first",
+            },
+            "is_next_command": False,
+            "consume_once": True,
+            "replay_allowed": False,
+        }
+    }
+
+
+def _selected_parent_branch_fact_payload(
+    args: argparse.Namespace,
+    *,
+    parent_handle: str,
+    draft_shape: bool,
+    query_shape: bool,
+    topic_prefix: str | None,
+) -> dict[str, Any]:
+    """Preserve the exact selected branch fact on its disclosed child response."""
+
+    choice_handle = getattr(args, "choice_handle", None)
+    if (
+        args.command != "request-map-container"
+        or not isinstance(choice_handle, str)
+    ):
+        return {}
+    if draft_shape and not query_shape and topic_prefix is None:
+        argv = [
+            "--action", "add_typed_fact",
+            "--fact-action", "choose-dynamic",
+            "--field-handle", parent_handle,
+            "--fact-value", choice_handle,
+            "--key", args.key,
+        ]
+    elif query_shape:
+        argv = [
+            "--typed-choose-dynamic", parent_handle, args.key, choice_handle,
+        ]
+    elif topic_prefix is not None:
+        argv = [
+            f"--{topic_prefix}-choose-dynamic",
+            parent_handle,
+            args.key,
+            choice_handle,
+        ]
+    else:
+        argv = ["--choose-dynamic", parent_handle, args.key, choice_handle]
+    return {
+        "selected_parent_branch_fact": {
+            "argv": argv,
+            "execute_after": (
+                "all_pending_ancestor_facts_in_response_tree_preorder"
+            ),
+            "must_precede": "deferred_fact",
+            "queue_phase": "selected_parent_branch",
+            "queue_order_ref": (
+                "/continuation/request_wide_order/deferred_fact_queue"
+            ),
+            "is_next_command": False,
+            "consume_once": True,
+            "replay_allowed": False,
+        }
+    }
+
+
+def _root_fact_queue_anchor(
+    *,
+    contract: TypedRequestContract,
+    child_handle: str,
+    lineage_token: str,
+    outermost_disclosed_root_pointer: str | None,
+    draft_shape: bool,
+    query_shape: bool,
+    topic_prefix: str | None,
+) -> dict[str, Any]:
+    """Repeat the exact first fact on every descendant response.
+
+    The response-local child tables remain authoritative for later facts.  The
+    anchor removes the only cross-response inference: which ancestor fact must
+    begin the first batch for this disclosed root.
+    """
+
+    if outermost_disclosed_root_pointer is None:
+        return {}
+    try:
+        action, parent_handle, key, shape, root_child_handle = (
+            typed_schema_lineage_root_fact(
+                contract,
+                child_handle=child_handle,
+                token=lineage_token,
+            )
+        )
+    except TypedRequestError:
+        return {}
+    fact = (
+        ["--append", parent_handle, shape, root_child_handle]
+        if action == "append"
+        else ["--map-put", parent_handle, key, shape, root_child_handle]
+    )
+    payload = _deferred_dynamic_fact_payload(
+        fact,
+        draft_shape=draft_shape,
+        query_shape=query_shape,
+        topic_prefix=topic_prefix,
+    ).get("deferred_fact")
+    if not isinstance(payload, Mapping) or not isinstance(payload.get("argv"), list):
+        return {}
+    return {
+        "root_fact_queue_anchor": {
+            "outermost_disclosed_root_pointer": outermost_disclosed_root_pointer,
+            "first_fact_argv": list(payload["argv"]),
+            "first_batch_must_start_with_first_fact": True,
+            "batch_limit": MAX_TYPED_ACTIONS_PER_APPLY,
+        }
+    }
+
+
+def _next_array_item_disclosure(
+    args: argparse.Namespace,
+    *,
+    contract: TypedRequestContract,
+    child_handle: str,
+    lineage_token: str,
+) -> dict[str, Any]:
+    """Expose the sole nested-array continuation after its parent fact."""
+
+    if args.shape != "array":
+        return {}
+    try:
+        lineage = parse_typed_schema_lineage_token(
+            contract,
+            token=lineage_token,
+            parent_handle=child_handle,
+        )
+    except TypedRequestError:
+        # A legacy caller may mint a nested container without replaying its
+        # parent lineage. Preserve that bounded response, but do not advertise
+        # a descendant continuation that the Gateway cannot revalidate.
+        return {}
+    if lineage is None:
+        return {}
+    child_schema, child_section = lineage
+    argv_by_shape: dict[str, list[str]] = {}
+    for shape in ("object", "array"):
+        if not dynamic_array_item_choices(
+            contract,
+            array_handle=child_handle,
+            index=0,
+            shape=shape,
+            parent_schema=child_schema,
+            parent_section=child_section,
+        ):
+            continue
+        argv_by_shape[shape] = [
+            "request-array-item",
+            args.api,
+            "--array-handle",
+            child_handle,
+            "--index",
+            "<zero_based_business_present_index>",
+            "--shape",
+            shape,
+            "--parent-schema-token",
+            lineage_token,
+        ]
+    if not argv_by_shape:
+        return {}
+    return {
+        "next_item_disclosure": {
+            "condition": "for_each_business_present_item",
+            "index_order": "ascending_zero_based_index",
+            "after_current_node_fact_apply_success": True,
+            "is_next_command": False,
+            "business_cardinality_authority": {
+                "source": "current_business_request",
+                "schema_does_not_require_another_item": True,
+                "do_not_disclose_absent_index": True,
+            },
+            "argv_by_shape": argv_by_shape,
+        }
+    }
+
+
+def _next_array_sibling_disclosure(
+    args: argparse.Namespace,
+    *,
+    contract: TypedRequestContract,
+    parent_schema: Mapping[str, Any] | None,
+    parent_section: str | None,
+    current_business_value_pointer: str | None,
+) -> dict[str, Any]:
+    """Expose the exact conditional next complex sibling for one array item."""
+
+    if args.command != "request-array-item":
+        return {}
+    if args.parent_schema_token is None and not any(
+        field.handle == args.array_handle for field in contract.fields
+    ):
+        # A legacy caller may use a dynamic child handle without its lineage.
+        # The current item remains bounded, but no sibling command can be
+        # rederived safely from the root contract alone.
+        return {}
+    next_index = args.index + 1
+    argv_by_shape: dict[str, list[str]] = {}
+    for shape in ("object", "array"):
+        if not dynamic_array_item_choices(
+            contract,
+            array_handle=args.array_handle,
+            index=next_index,
+            shape=shape,
+            parent_schema=parent_schema,
+            parent_section=parent_section,
+        ):
+            continue
+        argv_by_shape[shape] = [
+            "request-array-item",
+            args.api,
+            *_container_schema_binding_argv(
+                contract,
+                parent_schema_token=args.parent_schema_token,
+            ),
+            "--array-handle",
+            args.array_handle,
+            "--index",
+            str(next_index),
+            "--shape",
+            shape,
+            *(
+                ["--parent-schema-token", args.parent_schema_token]
+                if args.parent_schema_token is not None
+                else []
+            ),
+        ]
+    if not argv_by_shape:
+        return {}
+    if current_business_value_pointer is None:
+        return {}
+    nested_sibling = args.parent_schema_token is not None
+    transition: dict[str, Any] = {
+        "condition": "current_business_request_contains_next_complex_item",
+        "business_value_pointer": (
+            f"{current_business_value_pointer.rsplit('/', 1)[0]}/{next_index}"
+        ),
+        "index": next_index,
+        **(
+            {
+                "first_when_current_business_object_is_leaf": True,
+                "leaf_nested_container_disclosures": "forbidden",
+                "otherwise_after": (
+                    "current_node_fact_apply_success_then_all_business_present_"
+                    "current_item_descendant_nodes_if_any"
+                ),
+                "after_current_node_facts": True,
+                "when_absent": {
+                    "next_action": (
+                        "finish_current_node_then_use_nearest_ancestor_business_"
+                        "sibling_exact_argv"
+                    )
+                },
+            }
+            if nested_sibling
+            else {"after": "current_root_fact_apply_success"}
+        ),
+        "absent_or_scalar_next_item_forbidden": True,
+        "is_next_command": False,
+        "argv_by_shape": argv_by_shape,
+    }
+    return {"business_sibling_transition": transition}
+
+
+def _next_map_sibling_disclosure(
+    args: argparse.Namespace,
+    *,
+    contract: TypedRequestContract,
+    parent_schema: Mapping[str, Any] | None,
+    parent_section: str | None,
+    current_business_value_pointer: str | None,
+) -> dict[str, Any]:
+    """Expose the next schema-ordered complex member after one map branch."""
+
+    if (
+        args.command != "request-map-container"
+        or args.parent_schema_token is None
+        or parent_schema is None
+        or parent_section is None
+        or current_business_value_pointer is None
+    ):
+        return {}
+    members = dynamic_fixed_container_members(
+        contract,
+        parent_schema=parent_schema,
+        parent_section=parent_section,
+    )
+    current_indexes = tuple(
+        index
+        for index, row in enumerate(members)
+        if row.get("key") == args.key and row.get("shape") == args.shape
+    )
+    if len(current_indexes) != 1:
+        return {}
+    for row in members[current_indexes[0] + 1 :]:
+        key = row.get("key")
+        shape = row.get("shape")
+        if not isinstance(key, str) or shape not in {"object", "array"}:
+            continue
+        if not dynamic_map_container_choices(
+            contract,
+            map_handle=args.map_handle,
+            key=key,
+            shape=shape,
+            parent_schema=parent_schema,
+            parent_section=parent_section,
+        ):
+            continue
+        argv_by_shape = {
+            shape: [
+                "request-map-container",
+                args.api,
+                "--map-handle",
+                args.map_handle,
+                "--key",
+                key,
+                "--shape",
+                shape,
+                "--parent-schema-token",
+                args.parent_schema_token,
+            ]
+        }
+        return {
+            "business_sibling_transition": {
+                "condition": "current_business_request_contains_next_complex_member",
+                "business_value_pointer": (
+                    f"{current_business_value_pointer.rsplit('/', 1)[0]}/"
+                    f"{key.replace('~', '~0').replace('/', '~1')}"
+                ),
+                "key": key,
+                "after": "current_branch_descendant_disclosures",
+                "after_current_node_facts": True,
+                "absent_member_forbidden": True,
+                "is_next_command": False,
+                "argv_by_shape": argv_by_shape,
+            }
+        }
+    return {}
+
+
+def _root_dynamic_disclosure_commands(
+    contract: TypedRequestContract,
+) -> dict[str, Any]:
+    """Return exact copy-ready commands for every complex root array."""
+
+    rows: list[dict[str, Any]] = []
+    for field in contract.fields:
+        if field.parent_handle is not None or field.shape != "array":
+            continue
+        argv_by_shape: dict[str, list[str]] = {}
+        for shape in ("object", "array"):
+            if not dynamic_array_item_choices(
+                contract,
+                array_handle=field.handle,
+                index=0,
+                shape=shape,
+            ):
+                continue
+            argv_by_shape[shape] = [
+                "request-array-item",
+                contract.uri,
+                "--schema-digest",
+                contract.schema_digest,
+                "--array-handle",
+                field.handle,
+                "--index",
+                "0",
+                "--shape",
+                shape,
+            ]
+        if not argv_by_shape:
+            continue
+        rows.append(
+            {
+                "name": field.name,
+                "field_handle": field.handle,
+                "business_value_pointer": (
+                    f"/{field.section}/" + "/".join(field.path)
+                ),
+                "argv_by_shape": argv_by_shape,
+            }
+        )
+    projected = _dynamic_disclosure_copy_commands({
+        "selection": "first unsubmitted business-present root in schema order",
+        "activation_gate": {
+            "source": "/draft/next_action_binding/next_phase_decision",
+            "required_selected_candidate": "dynamic_disclosure",
+            "while_remaining_top_level_fact_batch_is_selected": (
+                "do_not_execute_any_row"
+            ),
+        },
+        "rows": rows,
+        "copy_selected_argv_exactly": True,
+        "copy_selected_command_exactly": True,
+        "reconstruct_schema_digest_or_handle": "invalid",
+    })
+    for row in projected["rows"]:
+        copy_by_shape = row.get("copy_command_by_shape")
+        if isinstance(copy_by_shape, Mapping) and len(copy_by_shape) == 1:
+            selected_shape = next(iter(copy_by_shape))
+            row["copy_instruction"] = {
+                "contract": OPERATION_DRAFT_COMMAND_COPY_INSTRUCTION_CONTRACT,
+                "source_field": f"copy_command_by_shape.{selected_shape}",
+                "action": "execute_verbatim_as_one_shell_tool_call",
+                "forbidden_transformations": [
+                    "reconstruct",
+                    "shorten",
+                    "normalize",
+                    "substitute_path_segments",
+                    "select_another_field",
+                ],
+            }
+    return projected
+
+
+def _dynamic_disclosure_copy_commands(value: Any) -> Any:
+    """Add host-native copy commands only to concrete container disclosures."""
+
+    if isinstance(value, list):
+        return [_dynamic_disclosure_copy_commands(item) for item in value]
+    if not isinstance(value, Mapping):
+        return value
+    projected = {
+        key: _dynamic_disclosure_copy_commands(item)
+        for key, item in value.items()
+    }
+
+    def concrete_disclosure_argv(candidate: Any) -> list[str] | None:
+        if (
+            not isinstance(candidate, list)
+            or not candidate
+            or candidate[0] not in {"request-map-container", "request-array-item"}
+            or any(not isinstance(token, str) or "<" in token for token in candidate)
+        ):
+            return None
+        return candidate
+
+    argv_by_shape = value.get("argv_by_shape")
+    if isinstance(argv_by_shape, Mapping):
+        copy_by_shape: dict[str, str] = {}
+        for shape, candidate in argv_by_shape.items():
+            argv = concrete_disclosure_argv(candidate)
+            if not isinstance(shape, str) or argv is None:
+                continue
+            copy_by_shape[shape] = operation_draft_copy_command(
+                ["python", str(GATEWAY_RUNNER_PATH), "gateway.py", *argv]
+            )
+        if copy_by_shape:
+            projected["copy_command_by_shape"] = copy_by_shape
+
+    argv = concrete_disclosure_argv(value.get("argv"))
+    if argv is not None:
+        projected["copy_command"] = operation_draft_copy_command(
+            ["python", str(GATEWAY_RUNNER_PATH), "gateway.py", *argv]
+        )
+    return projected
+
+
+def _next_nested_disclosure_selector(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    next_sibling_disclosure: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Tell the caller how to select the next exact business-present child."""
+
+    if not rows:
+        return {}
+    return {
+        "next_business_present_nested_disclosure": {
+            "candidate_pointer": "/continuation/nested_container_disclosures",
+            "selection": "first_business_present_member_by_queue_index",
+            "repeat_for_descendants": True,
+            "when_none": (
+                "follow_business_sibling_transition_then_drain_deferred_fact_queue"
+                if next_sibling_disclosure.get(
+                    "business_sibling_transition", {}
+                ).get("is_next_command") is True
+                else (
+                    "drain_deferred_fact_queue_then_follow_"
+                    "business_sibling_transition"
+                )
+            ),
+            "is_next_command": False,
+            "becomes_next_command_only_after_exact_business_pointer_match": True,
+            "absent_business_pointer": "forbidden",
+        }
+    }
+
+
+def _dynamic_next_command_decision(
+    *,
+    draft_shape: bool,
+    outermost_disclosed_root_pointer: str | None,
+    branch_continuation: Mapping[str, Any],
+    nested_container_disclosures: Sequence[Mapping[str, Any]],
+    next_item_disclosure: Mapping[str, Any],
+    next_sibling_disclosure: Mapping[str, Any],
+    deferred_fact: Mapping[str, Any],
+    selected_parent_branch_fact: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Return one ordered, machine-readable decision for the next action."""
+
+    candidates: list[dict[str, Any]] = []
+    current_object_pointers = {
+        str(row["business_value_pointer"]).rsplit("/", 1)[0]
+        for row in nested_container_disclosures
+        if isinstance(row.get("business_value_pointer"), str)
+        and "/" in str(row["business_value_pointer"])
+    }
+    current_object_pointer = (
+        next(iter(current_object_pointers))
+        if len(current_object_pointers) == 1
+        else None
+    )
+    if branch_continuation:
+        candidates.append(
+            {
+                "candidate": "branch_disclosure",
+                "condition": "current_business_value_requires_disclosed_branch",
+                "command_pointer": "/continuation/branch_disclosure",
+            }
+        )
+    sibling = next_sibling_disclosure.get("business_sibling_transition", {})
+    nested_sibling = (
+        isinstance(sibling, Mapping) and sibling.get("is_next_command") is True
+    )
+    sibling_candidate = (
+        {
+            "candidate": "business_sibling_transition",
+            "condition": (
+                "explicit_leaf_or_no_business_nested_member_and_sibling_present"
+            ),
+            "business_value_pointer": sibling.get("business_value_pointer"),
+            "command_pointer": (
+                "/continuation/business_sibling_transition/argv_by_shape/"
+                "<exact-business-shape>"
+            ),
+            "explicit_leaf_rule": {
+                "user_says_no_properties_references_children": (
+                    "copy_exact_command_now"
+                ),
+                "nested_disclosures": "forbidden",
+            },
+        }
+        if isinstance(sibling, Mapping) and sibling
+        else None
+    )
+    deferred_candidate = (
+        {
+            "candidate": "deferred_fact_queue",
+            "condition": "current_disclosed_node_has_unapplied_business_facts",
+            "action": (
+                "apply_pending_ancestor_facts_then_selected_parent_branch_fact_"
+                "then_current_node_parent_fact_then_business_present_child_"
+                "contract_facts_in_schema_order"
+                if selected_parent_branch_fact
+                and outermost_disclosed_root_pointer is not None
+                else "apply_selected_parent_branch_fact_then_current_node_parent_"
+                "fact_then_business_present_child_contract_facts_in_schema_order"
+                if selected_parent_branch_fact
+                else "apply_current_node_parent_fact_then_business_present_"
+                "child_contract_facts_in_schema_order"
+            ),
+            "start_at": "current_disclosed_node_response",
+            "batch_facts": (
+                "current_disclosed_node_only_up_to_"
+                f"{MAX_TYPED_ACTIONS_PER_APPLY}_facts_in_queue_order"
+            ),
+            "stop_before": "first_descendant_or_sibling_parent_fact",
+            "after_success": "re_evaluate_remaining_candidates_from_this_response",
+            "first_fact_only": "valid_only_when_current_node_has_no_other_business_facts",
+            "first_command_pointer": (
+                "/continuation/root_fact_queue_anchor/first_fact_argv"
+                if selected_parent_branch_fact
+                and outermost_disclosed_root_pointer is not None
+                else "/continuation/selected_parent_branch_fact/argv"
+                if selected_parent_branch_fact
+                else "/continuation/deferred_fact/argv"
+            ),
+        }
+        if deferred_fact
+        else None
+    )
+    if draft_shape and deferred_candidate is not None:
+        candidates.append(deferred_candidate)
+    if not draft_shape and nested_sibling and sibling_candidate is not None:
+        candidates.append(sibling_candidate)
+    if nested_container_disclosures:
+        candidates.append(
+            {
+                "candidate": "nested_container_disclosures",
+                "condition": (
+                    "first_business_present_member_by_queue_index_on_exact_current_object"
+                ),
+                "business_value_pointers": [
+                    str(row["business_value_pointer"])
+                    for row in nested_container_disclosures
+                    if isinstance(row.get("business_value_pointer"), str)
+                ],
+                "command_pointer": (
+                    "/continuation/nested_container_disclosures/<selected>/argv"
+                ),
+            }
+        )
+    if next_item_disclosure:
+        candidates.append(
+            {
+                "candidate": "next_item_disclosure",
+                "condition": "next_business_present_item_by_ascending_index",
+                "command_pointer": (
+                    "/continuation/next_item_disclosure/argv_by_shape/"
+                    "<exact-business-shape>"
+                ),
+            }
+        )
+
+    if not draft_shape and deferred_candidate is not None:
+        candidates.append(deferred_candidate)
+    if sibling_candidate is not None and (draft_shape or not nested_sibling):
+        candidates.append(sibling_candidate)
+
+    return {
+        "next_command_decision": {
+            "business_presence_source": "current_user_business_request",
+            **(
+                {"current_business_object_pointer": current_object_pointer}
+                if current_object_pointer is not None
+                else {}
+            ),
+            "schema_members_are_not_business_facts": True,
+            "candidate_without_its_exact_business_pointer": "forbidden",
+            "conditional_candidates_do_not_block_when_absent": True,
+            **(
+                {
+                    "preview_construction_boundary": {
+                        "complete": False,
+                        "confirmation_before_preview": "invalid",
+                        "final_response_before_preview": "invalid",
+                        "ask_user_to_continue_before_preview": "invalid",
+                        "same_turn_requirement": (
+                            "continue_until_preview_or_structured_gateway_error"
+                        ),
+                    }
+                }
+                if draft_shape
+                else {}
+            ),
+            **(
+                {
+                    "deferred_fact_root_barrier": {
+                        "outermost_disclosed_root_pointer": (
+                            outermost_disclosed_root_pointer
+                        ),
+                        "start_at_response_with_current_value_pointer": (
+                            outermost_disclosed_root_pointer
+                        ),
+                        "descendant_facts_before_root_parent_and_child_facts": (
+                            "forbidden"
+                        ),
+                    }
+                }
+                if outermost_disclosed_root_pointer is not None
+                else {}
+            ),
+            "evaluate_in_order": candidates,
+            "first_true_candidate_is_the_only_next_action": True,
+            **(
+                {
+                    "draft_check_or_cancel_with_remaining_candidate_or_deferred_fact": (
+                        "invalid"
+                    )
+                }
+                if draft_shape
+                else {
+                    "terminal_command_with_remaining_candidate_or_deferred_fact": (
+                        "invalid"
+                    )
+                }
+            ),
+        }
+    }
+
+
+def query_business_schema_payload(
+    version: str,
+    *,
+    advanced: bool,
+) -> dict[str, Any]:
+    """Describe the one deep direct-read continuation for an object query."""
+
+    if advanced:
+        advanced_schema = advanced_query_schema(version=version)
+        waql_schema = advanced_schema["properties"]["waql"]
+        return {
+            "contract": ADVANCED_QUERY_SCHEMA_CONTRACT,
+            "ok": True,
+            "status": "ok",
+            "command": "query-schema",
+            "version": version,
+            "query_layer": "advanced-native-waql",
+            "query_contract": ADVANCED_QUERY_CONTRACT,
+            "input_shape": "business_declaration",
+            "identity_projection": list(SELECTED_REQUIRED_RETURN_FIELDS),
+            "business_outputs": list(QUERY_BUSINESS_OUTPUTS),
+            "custom_outputs": {
+                "available": False,
+                "reason": "advanced WAQL has no Gateway-provable live metadata scope",
+            },
+            "continuation": {
+                "subcommand": "query-object",
+                "query_layer": "advanced-native-waql",
+                "exact_expression": (
+                    "--advanced-waql <one bounded exact WAQL expression>"
+                ),
+                "exact_expression_limits": {
+                    "max_utf8_bytes": waql_schema["x-maxUtf8Bytes"],
+                    "framing": dict(waql_schema["x-framing"]),
+                    "description": waql_schema["description"],
+                },
+                "result_bound": f"--max-results <1..{MAX_QUERY_TAKE}>",
+                "business_output": "--include <business-field> (repeat)",
+            },
+            "boundary": {
+                "fixed_api": OBJECT_GET_URI,
+                "read_only": True,
+                "gateway_appends_final_take": True,
+                "all_results_available": False,
+                "return_projection": "gateway_compiled_business_projection",
+                "arbitrary_uri_args_or_options_accepted": False,
+                "fallback_or_retry_on_invalid_query": False,
+            },
+        }
+    return {
+        "contract": BUSINESS_QUERY_SCHEMA_CONTRACT,
+        "ok": True,
+        "status": "ok",
+        "command": "query-schema",
+        "version": version,
+        "query_layer": "business-declaration",
+        "query_contract": BUSINESS_QUERY_CONTRACT,
+        "input_shape": "business_declaration",
+        "identity_projection": list(SELECTED_REQUIRED_RETURN_FIELDS),
+        "business_outputs": list(QUERY_BUSINESS_OUTPUTS),
+        "custom_outputs": {
+            "field_meaning": "--include-field <user-facing property/reference meaning>",
+            "authority": "live WAAPI metadata bound by the Gateway before object.get",
+            "repair": "refine the meaning when live discovery is not unique",
+        },
+        "sources": {
+            "object_path": "--path-segment <one literal name> (repeat)",
+            "exact_object_id": "--exact-id <canonical GUID>",
+            "common_kind": "--kind <closed business kind>",
+            "custom_kind": "--custom-kind <user-facing type meaning>",
+            "search": "--search-text <literal text>",
+            "query_id": "--query-id <canonical GUID>",
+            "query_path": "--query-path-segment <one literal name> (repeat)",
+        },
+        "kind_semantics": {
+            "all-sounds": "every Wwise Sound, including SFX and Voice",
+            "sound": "alias of all-sounds; every Wwise Sound, including SFX and Voice",
+            "sound-sfx": "only Sound objects whose source language is SFX",
+            "sound-voice": "only Sound objects whose source language is not SFX",
+        },
+        "source_rules": {
+            "exactly_one_source": True,
+            "common_kind_is_a_source": (
+                "--kind is valid only when no path, id, search, or Query Editor "
+                "source is present"
+            ),
+            "kind_filter_after_another_source": (
+                "--predicate kind-is <business-kind>"
+            ),
+        },
+        "predicates": {
+            name: {"value_type": value_type}
+            for name, (_field, _operator, value_type) in sorted(
+                QUERY_BUSINESS_PREDICATES.items()
+            )
+        }
+        | {
+            QUERY_BUSINESS_KIND_PREDICATE: {
+                "value_type": "business-kind",
+                "choices": list(QUERY_BUSINESS_KINDS),
+            }
+        },
+        "relationships": list(QUERY_BUSINESS_RELATIONSHIPS),
+        "views": {
+            "sound-routing-diagnostics": {
+                "source": "one exact Sound path or GUID",
+                "automatic_outputs": [
+                    "override-output",
+                    "active-source",
+                    "output-bus",
+                ],
+                "native_projection_owned_by_gateway": True,
+            }
+        },
+        "relationship_presets": {
+            "event-actions": {
+                "source": "one exact Event path or GUID",
+                "native_relationship": "children",
+                "fixed_max_results": 100,
+                "automatic_outputs": ["action-type", "target"],
+            }
+        },
+        "continuation": {
+            "subcommand": "query-object",
+            "predicate": "--predicate <business-condition> <value>",
+            "relationship": "--relationship <business-relationship>",
+            "diagnostic_view": "--view <business-view>",
+            "result_bound": f"--max-results <1..{MAX_QUERY_TAKE}>",
+            "business_output": "--include <business-field> (repeat)",
+        },
+        "presentation_boundary": {
+            "sort_or_group_complete_result": "agent-owned presentation",
+            "advanced_required_only_when": (
+                "server-side ordering, skip, distinct, regex, or another native "
+                "construct changes which rows enter the bounded result"
+            ),
+        },
+        "advanced_fallback": {
+            "available": True,
+            "disclose_with": "query-schema --advanced",
+            "use_only_when": (
+                "server-side query semantics require a read-only WAQL construct "
+                "that the business declaration cannot express; final answer sorting "
+                "or grouping does not qualify"
+            ),
+        },
+    }
+
+
 def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]) -> dict[str, Any]:
     """Run catalog commands without requiring a WAAPI port or live Wwise."""
 
+    if args.command == "topic-schema":
+        (version,) = resolve_catalog_versions(args, env=env)
+        business = topic_business_contract(version, args.api)
+        payload = {
+            "contract": "waapi-skill.topic-business-envelope/v1",
+            "ok": True,
+            "status": "ok",
+            "command": "topic-schema",
+            "offline": True,
+            "version": version,
+            "topic": args.api,
+            "bounds": {
+                "stdout_utf8_bytes": MAX_TOPIC_SCHEMA_GATEWAY_RESULT_BYTES,
+            },
+            "continuation": {
+                "subcommands": ["wait-topic", "stream-topic"],
+                "default_input": "business",
+                "contract_binding": {
+                    "flag": "--topic-contract-digest",
+                    "value": business.contract_digest,
+                    "copy_exactly": True,
+                },
+                "wait_argv_prefix": [
+                    "--timeout",
+                    "<positive-seconds>",
+                    "wait-topic",
+                    args.api,
+                    "--event-count",
+                    "<exact-count:1..64>",
+                    "--topic-contract-digest",
+                    business.contract_digest,
+                ],
+                "stream_argv_prefix": [
+                    "stream-topic",
+                    args.api,
+                    "--event-count",
+                    "<maximum-events:1..64>",
+                    "--topic-contract-digest",
+                    business.contract_digest,
+                ],
+                "business_fact_argv": {
+                    "topic_option": "--topic-option <field> <value>",
+                    "empty_topic_option": "--topic-option-empty <field>",
+                    "typed_topic_option": (
+                        "--topic-option-as <field> "
+                        "<value-choice-handle> <value>"
+                    ),
+                    "event_match": "--event-match <field> <value>",
+                    "empty_event_field": "--event-empty <field>",
+                    "typed_event_match": (
+                        "--event-match-as <field> "
+                        "<value-choice-handle> <value>"
+                    ),
+                    "event_row": (
+                        "--event-row <collection> <comma-separated-indices> "
+                        "<field> <value>"
+                    ),
+                    "typed_event_row": (
+                        "--event-row-as <collection> <comma-separated-indices> "
+                        "<field> <value-choice-handle> <value>"
+                    ),
+                    "empty_event_row": (
+                        "--event-row-empty <collection> "
+                        "<comma-separated-parent-indices-or-dash>"
+                    ),
+                    "exact_entry": (
+                        "--event-entry <scope> <indices-or-dash> <exact-key> "
+                        "<value>"
+                    ),
+                    "typed_exact_entry": (
+                        "--event-entry-as <scope> <indices-or-dash> "
+                        "<exact-key> <value-choice-handle> <value>"
+                    ),
+                    "empty_exact_entry": (
+                        "--event-entry-empty <scope> <indices-or-dash> "
+                        "<exact-key> <object|list>"
+                    ),
+                    "exact_entry_object": (
+                        "--event-entry-object <scope> <indices-or-dash> "
+                        "<exact-key> <field> <value>"
+                    ),
+                    "typed_exact_entry_object": (
+                        "--event-entry-object-as <scope> <indices-or-dash> "
+                        "<exact-key> <field> "
+                        "<value-choice-handle> <value>"
+                    ),
+                    "exact_entry_row": (
+                        "--event-entry-row <scope> <indices-or-dash> "
+                        "<exact-key> <item-index> <field> <value>"
+                    ),
+                    "typed_exact_entry_row": (
+                        "--event-entry-row-as <scope> <indices-or-dash> "
+                        "<exact-key> <item-index> <field> "
+                        "<value-choice-handle> <value>"
+                    ),
+                },
+                **(
+                    {
+                        "business_shortcuts": {
+                            "include_object_identity": "--include-object-identity",
+                            "match_platform_name": (
+                                "--match-platform-name <exact-name>"
+                            ),
+                            "match_soundbank_name": (
+                                "--match-soundbank-name <exact-name>"
+                            ),
+                        }
+                    }
+                    if args.api == SOUNDBANK_GENERATED_TOPIC_URI
+                    else {}
+                ),
+                "value_choice_policy": {
+                    "choice_on_disclosure": {
+                        "disclose_first": True,
+                        "field_disclosure_source": "business_input",
+                        "untyped_fact_forms_allowed": False,
+                        "typed_fact_suffix": "-as",
+                        "value_choice_handle": "copy_exactly_from_disclosure",
+                    }
+                },
+                "event_row_field_disclosure": (
+                    "topic-schema <topic-uri> --row <collection> "
+                    "--row-field-group <group>"
+                ),
+                "exact_entry_field_disclosure": (
+                    "topic-schema <topic-uri> --entry <scope>"
+                ),
+                "event_match_field_disclosure": (
+                    "topic-schema <topic-uri> --match-group <group>"
+                ),
+                "advanced_field_catalog": (
+                    "topic-schema <topic-uri> --catalog"
+                ),
+                "lifecycle": {
+                    "wait-topic": "bounded; unsubscribe",
+                    "stream-topic": (
+                        "explicit event-count bound plus optional timeout; unsubscribe"
+                    ),
+                },
+            },
+            "business_input": business.as_gateway_dict(
+                selected_row=args.row,
+                selected_entry=args.entry,
+                selected_match_group=args.match_group,
+                selected_row_field_group=args.row_field_group,
+                include_catalog=(
+                    args.catalog
+                    or args.api != SOUNDBANK_GENERATED_TOPIC_URI
+                ),
+            ),
+        }
+        final_payload = attach_gateway_session_context(
+            payload,
+            args=args,
+            env=env,
+        )
+        observed = gateway_json_document_size(
+            final_payload,
+            stop_after_bytes=MAX_TOPIC_SCHEMA_GATEWAY_RESULT_BYTES,
+        )
+        if observed > MAX_TOPIC_SCHEMA_GATEWAY_RESULT_BYTES:
+            raise ValueError(
+                "Topic business schema exceeds its fixed 32 KiB public "
+                "output ceiling"
+            )
+        return payload
+    if args.command in {"request-schema", "request-map-container", "request-array-item"}:
+        versions = resolve_catalog_versions(args, env=env)
+        if len(versions) != 1:
+            raise GatewayInputError(f"{args.command} requires one exact Wwise version")
+        if args.api in {
+            STRUCTURED_TYPED_QUERY_OPERATION,
+            ADVANCED_TYPED_QUERY_OPERATION,
+        }:
+            raise GatewayInputError(
+                "Object queries use query-schema and its business continuation; "
+                "archived typed query pseudo-operations are not public routes."
+            )
+        if args.api.startswith(
+            (TOPIC_OPTIONS_OPERATION_PREFIX, TOPIC_MATCH_OPERATION_PREFIX)
+        ):
+            raise GatewayInputError(
+                "Topic subscriptions use the handle-free business topic-schema "
+                "and do not expose typed request handles or fragments."
+            )
+        capability: CapabilityRecord | None = None
+        if args.api.startswith("ak."):
+            try:
+                catalog = CapabilityCatalog()
+                capability = (
+                    catalog.authoring_ui_describe(versions[0], args.api)
+                    if args.api in AUTHORING_UI_COMMAND_URIS
+                    else catalog.describe(versions[0], args.api)
+                )
+            except CapabilityNotFoundError:
+                capability = None
+        if (
+            args.command == "request-schema"
+            and capability is not None
+            and capability.preferred_route == "fixed_command"
+        ):
+            return fixed_command_route_payload(capability)
+        if args.command == "request-schema" and args.api == SOURCE_CONTROL_SET_PROVIDER_URI:
+            boundary = source_control_business_contract_data(args.api, versions[0])[
+                "boundary"
+            ]
+            raise GatewayInputError(
+                "Source-control provider selection and credentials require a "
+                "human-owned Wwise Project Settings or approved local credential "
+                f"workflow ({boundary['error_code']}); credentials are forbidden "
+                "in Gateway arguments."
+            )
+        if args.command == "request-schema" and args.api in UNDO_GROUP_MEMBER_URIS:
+            raise GatewayInputError(
+                f"{args.api} is a compound Undo member and has no standalone "
+                "public request; use operation-schema waapi.undoGroup."
+            )
+        if (
+            args.command == "request-schema"
+            and core_business_route_available(args.api, versions[0])
+        ):
+            return core_business_route_payload(versions[0], args.api)
+        if core_business_route_available(args.api, versions[0]):
+            raise GatewayInputError(
+                f"{args.api} uses its closed Core business declaration; "
+                "typed field and container construction are not public"
+            )
+        if args.command != "request-schema" and args.api.startswith("ak."):
+            if (
+                capability is not None
+                and capability.preferred_route == "fixed_command"
+                and args.command not in capability.fixed_commands
+            ):
+                raise GatewayInputError(
+                    f"{args.api} uses its Gateway-owned fixed command: "
+                    f"{', '.join(capability.fixed_commands)}"
+                )
+        contract = public_typed_contract(versions[0], args.api)
+        if args.command == "request-schema":
+            dedicated_zero = {
+                "ak.wwise.debug.restartWaapiServers": "debug.restartWaapiServers",
+                "ak.wwise.debug.testAssert": "debug.testAssert",
+                "ak.wwise.debug.testCrash": "debug.testCrash",
+            }.get(args.api)
+            if dedicated_zero is not None:
+                raise GatewayInputError(
+                    "This dangerous host control uses operation-schema "
+                    f"{dedicated_zero} as its single business entry."
+                )
+        if args.command == "request-schema":
+            return contract.as_gateway_payload()
+        draft_shape = contract.as_gateway_payload()["input_shape"] == "draft"
+        query_shape = False
+        topic_prefix = (
+            "option"
+            if args.api.startswith(TOPIC_OPTIONS_OPERATION_PREFIX)
+            else "match"
+            if args.api.startswith(TOPIC_MATCH_OPERATION_PREFIX)
+            else None
+        )
+        if args.schema_digest is None and args.parent_schema_token is None:
+            raise GatewayInputError(
+                "A root typed container requires its exact schema digest"
+            )
+        if (
+            args.schema_digest is not None
+            and args.schema_digest != contract.schema_digest
+        ):
+            raise GatewayInputError("Typed request schema digest is stale")
+        parent_handle = (
+            args.map_handle
+            if args.command == "request-map-container"
+            else args.array_handle
+        )
+        parent_lineage = parse_typed_schema_lineage_token(
+            contract,
+            parent_handle=parent_handle,
+            token=args.parent_schema_token,
+        )
+        parent_schema = parent_lineage[0] if parent_lineage is not None else None
+        parent_section = parent_lineage[1] if parent_lineage is not None else None
+        if args.command == "request-map-container":
+            map_choices = dynamic_map_container_choices(
+                contract,
+                map_handle=args.map_handle,
+                key=args.key,
+                shape=args.shape,
+                parent_schema=parent_schema,
+                parent_section=parent_section,
+            )
+            if len(map_choices) > 1 and args.choice_handle is None:
+                return {
+                    "contract": "waapi-skill.typed-map-container-choices/v1",
+                    "ok": True,
+                    "status": "choice_required",
+                    "command": args.command,
+                    "version": contract.version,
+                    "uri": contract.uri,
+                    "schema_digest": contract.schema_digest,
+                    "map_handle": args.map_handle,
+                    "key": args.key,
+                    "shape": args.shape,
+                    "choices": [
+                        {
+                            "handle": choice_handle,
+                            "accepted_type": str(variant.get("type")),
+                            "required_keys": list(variant.get("required", ())),
+                        }
+                        for choice_handle, _variant_index, variant in map_choices
+                    ],
+                    "continuation": {
+                        "subcommand": "request-map-container",
+                        "choice_flag": "--choice-handle <choice_handle>",
+                        "choice_argv": [
+                            "request-map-container",
+                            args.api,
+                            *_container_schema_binding_argv(
+                                contract,
+                                parent_schema_token=args.parent_schema_token,
+                            ),
+                            "--map-handle",
+                            args.map_handle,
+                            "--key",
+                            args.key,
+                            "--shape",
+                            args.shape,
+                            *(
+                                ["--parent-schema-token", args.parent_schema_token]
+                                if args.parent_schema_token is not None
+                                else []
+                            ),
+                            "--choice-handle",
+                            "<choice_handle_from_this_response>",
+                        ],
+                    },
+                }
+            child_handle = dynamic_map_entry_handle(
+                contract,
+                map_handle=args.map_handle,
+                key=args.key,
+                shape=args.shape,
+                choice_handle=args.choice_handle,
+                parent_schema=parent_schema,
+                parent_section=parent_section,
+            )
+            key: str | int = args.key
+            fact = ["--map-put", args.map_handle, args.key, args.shape, child_handle]
+        else:
+            array_choices = (
+                dynamic_array_item_choices(
+                    contract,
+                    array_handle=args.array_handle,
+                    index=args.index,
+                    shape=args.shape,
+                    parent_schema=parent_schema,
+                    parent_section=parent_section,
+                )
+                if args.array_handle in contract.fields_by_handle
+                or parent_schema is not None
+                else ()
+            )
+            if len(array_choices) > 1 and args.choice_handle is None:
+                return {
+                    "contract": "waapi-skill.typed-array-item-choices/v1",
+                    "ok": True,
+                    "status": "choice_required",
+                    "command": args.command,
+                    "version": contract.version,
+                    "uri": contract.uri,
+                    "schema_digest": contract.schema_digest,
+                    "array_handle": args.array_handle,
+                    "index": args.index,
+                    "shape": args.shape,
+                    "choices": [
+                        {
+                            "handle": choice_handle,
+                            "accepted_type": str(variant.get("type")),
+                            "required_keys": list(variant.get("required", ())),
+                        }
+                        for choice_handle, _variant_index, variant in array_choices
+                    ],
+                    "continuation": {
+                        "subcommand": "request-array-item",
+                        "choice_flag": "--choice-handle <choice_handle>",
+                        "choice_argv": [
+                            "request-array-item",
+                            args.api,
+                            *_container_schema_binding_argv(
+                                contract,
+                                parent_schema_token=args.parent_schema_token,
+                            ),
+                            "--array-handle",
+                            args.array_handle,
+                            "--index",
+                            str(args.index),
+                            "--shape",
+                            args.shape,
+                            *(
+                                ["--parent-schema-token", args.parent_schema_token]
+                                if args.parent_schema_token is not None
+                                else []
+                            ),
+                            "--choice-handle",
+                            "<choice_handle_from_this_response>",
+                        ],
+                    },
+                }
+            child_handle = dynamic_array_item_handle(
+                contract,
+                array_handle=args.array_handle,
+                index=args.index,
+                shape=args.shape,
+                choice_handle=args.choice_handle,
+                parent_schema=parent_schema,
+                parent_section=parent_section,
+            )
+            key = args.index
+            fact = ["--append", args.array_handle, args.shape, child_handle]
+        child_contract = dynamic_container_disclosure(
+            contract,
+            parent_handle=parent_handle,
+            key=str(key),
+            shape=args.shape,
+            child_handle=child_handle,
+            member_key=args.member_key,
+            parent_schema=parent_schema,
+            parent_section=parent_section,
+            choice_handle=getattr(args, "choice_handle", None),
+        )
+        child_contract.pop("schema_lineage")
+        _bind_dynamic_branch_facts(
+            child_contract,
+            child_handle=child_handle,
+            draft_shape=draft_shape,
+            query_shape=query_shape,
+            topic_prefix=topic_prefix,
+        )
+        _bind_dynamic_scalar_array_facts(
+            child_contract,
+            child_handle=child_handle,
+            draft_shape=draft_shape,
+            query_shape=query_shape,
+            topic_prefix=topic_prefix,
+        )
+        child_contract["fact_literal_policy"] = {
+            "copy_handles_and_choice_handles_exactly": True,
+            "placeholder_or_added_punctuation": "invalid",
+            "business_value_placeholders_must_be_replaced": True,
+        }
+        lineage_token = typed_schema_lineage_token(
+            contract,
+            child_handle=child_handle,
+            parent_token=args.parent_schema_token,
+            parent_handle=parent_handle,
+            key=str(key),
+            shape=args.shape,
+            choice_handle=getattr(args, "choice_handle", None),
+        )
+        try:
+            current_business_value_pointer = typed_schema_lineage_business_pointer(
+                contract,
+                child_handle=child_handle,
+                token=lineage_token,
+            )
+            outermost_disclosed_root_pointer = (
+                typed_schema_lineage_root_business_pointer(
+                    contract,
+                    child_handle=child_handle,
+                    token=lineage_token,
+                )
+            )
+        except TypedRequestError:
+            # Legacy unlineaged dynamic parents remain usable for their bounded
+            # current response, but cannot claim a canonical business pointer.
+            current_business_value_pointer = None
+            outermost_disclosed_root_pointer = None
+        nested_container_disclosures = _fixed_nested_container_disclosures(
+            args,
+            contract=contract,
+            child_handle=child_handle,
+            child_contract=child_contract,
+            lineage_token=lineage_token,
+        )
+        if current_business_value_pointer is not None:
+            scalar_array_item_facts = child_contract.get(
+                "scalar_array_item_facts"
+            )
+            if isinstance(scalar_array_item_facts, dict):
+                scalar_array_item_facts["business_values_pointer"] = (
+                    current_business_value_pointer
+                )
+            scalar_member_facts = child_contract.get("fixed_scalar_member_facts")
+            if isinstance(scalar_member_facts, list):
+                for row in scalar_member_facts:
+                    if not isinstance(row, dict):
+                        continue
+                    member_key = row.get("key")
+                    if not isinstance(member_key, str):
+                        continue
+                    escaped_key = member_key.replace("~", "~0").replace("/", "~1")
+                    row["business_value_pointer"] = (
+                        f"{current_business_value_pointer}/{escaped_key}"
+                    )
+                    row["condition"] = (
+                        "current_business_request_contains_member"
+                    )
+            branch_choices = child_contract.get("branch_choices")
+            if isinstance(branch_choices, list):
+                for row in branch_choices:
+                    if not isinstance(row, dict):
+                        continue
+                    member_key = row.get("key")
+                    if not isinstance(member_key, str):
+                        continue
+                    escaped_key = member_key.replace("~", "~0").replace("/", "~1")
+                    row["business_value_pointer"] = (
+                        f"{current_business_value_pointer}/{escaped_key}"
+                    )
+                    row["condition"] = (
+                        "current_business_request_contains_member"
+                    )
+            for row in nested_container_disclosures:
+                key_value = str(row["key"]).replace("~", "~0").replace("/", "~1")
+                row["business_value_pointer"] = (
+                    f"{current_business_value_pointer}/{key_value}"
+                )
+        _compact_fixed_scalar_member_facts(child_contract)
+        branch_continuation = _dynamic_branch_disclosure_continuation(
+            args,
+            contract=contract,
+            child_handle=child_handle,
+            child_contract=child_contract,
+            lineage_token=lineage_token,
+        )
+        if branch_continuation:
+            # A branch response owns the sole next container command. Direct
+            # schema siblings are disclosed by the selected branch response,
+            # after the Gateway has revalidated that exact parent lineage.
+            nested_container_disclosures = []
+        next_item_disclosure = _next_array_item_disclosure(
+            args,
+            contract=contract,
+            child_handle=child_handle,
+            lineage_token=lineage_token,
+        )
+        next_sibling_disclosure = _next_array_sibling_disclosure(
+            args,
+            contract=contract,
+            parent_schema=parent_schema,
+            parent_section=parent_section,
+            current_business_value_pointer=current_business_value_pointer,
+        )
+        if not next_sibling_disclosure:
+            next_sibling_disclosure = _next_map_sibling_disclosure(
+                args,
+                contract=contract,
+                parent_schema=parent_schema,
+                parent_section=parent_section,
+                current_business_value_pointer=current_business_value_pointer,
+            )
+        deferred_fact = _deferred_dynamic_fact_payload(
+            fact,
+            draft_shape=draft_shape,
+            query_shape=query_shape,
+            topic_prefix=topic_prefix,
+        )
+        selected_parent_branch_fact = _selected_parent_branch_fact_payload(
+            args,
+            parent_handle=parent_handle,
+            draft_shape=draft_shape,
+            query_shape=query_shape,
+            topic_prefix=topic_prefix,
+        )
+        if "deferred_fact" in deferred_fact:
+            blocked_by: list[str] = []
+            if branch_continuation:
+                blocked_by.append("branch_disclosure")
+            if blocked_by:
+                deferred_fact["deferred_fact"]["blocked_by"] = blocked_by
+        response = {
+            "contract": "waapi-skill.typed-container-handle/v1",
+            "ok": True,
+            "status": "ok",
+            "command": args.command,
+            "version": contract.version,
+            "uri": contract.uri,
+            "schema_digest": contract.schema_digest,
+            "parent_handle": parent_handle,
+            "key": key,
+            "shape": args.shape,
+            "handle": child_handle,
+            **(
+                {
+                    "business_value_scope": {
+                        "current_value_pointer": current_business_value_pointer,
+                        "outermost_disclosed_root_pointer": (
+                            outermost_disclosed_root_pointer
+                        ),
+                        "current_value_only": True,
+                        "unrelated_prompt_objects_do_not_satisfy_member_conditions": True,
+                    }
+                }
+                if current_business_value_pointer is not None
+                else {}
+            ),
+            "schema_lineage_token": lineage_token,
+            "schema_lineage_authority": {
+                "returned_token_scope": (
+                    "direct_descendants_of_this_handle_only"
+                ),
+                "returned_token_handle": child_handle,
+                "not_valid_for": "sibling_items_in_parent_array",
+                **(
+                    {
+                        "sibling_item_parent": {
+                            "array_handle": parent_handle,
+                            "parent_schema_token": args.parent_schema_token,
+                            "copy_parent_schema_token_exactly": True,
+                            "index_source": (
+                                "next_business_present_sibling_index"
+                            ),
+                            "disclosure_condition": (
+                                "current_business_request_contains_that_index"
+                            ),
+                            "allowed_after": (
+                                "current_node_fact_apply_success_then_all_"
+                                "business_present_current_item_descendant_nodes_if_any"
+                                if args.parent_schema_token is not None
+                                else "current_root_fact_apply_success"
+                            ),
+                            "absent_index_forbidden": True,
+                            "is_next_command": False,
+                        }
+                    }
+                    if args.command == "request-array-item"
+                    and args.parent_schema_token is not None
+                    else {}
+                ),
+            },
+            "continuation": {
+                **next_sibling_disclosure,
+                # Copy-ready nested commands are the current response's
+                # actionable continuation. Keep the complete schema-ordered
+                # list before repeated queue and request-wide guidance so
+                # every exact candidate remains visible in a bounded
+                # shell-tool prefix.
+                **(
+                    {
+                        "nested_container_disclosures": (
+                            nested_container_disclosures
+                        ),
+                        "nested_container_order": (
+                            "branch_then_current_node_facts_then_schema_members_"
+                            "then_descendants"
+                            if branch_continuation
+                            else "current_node_facts_then_schema_members_then_descendants"
+                        ),
+                    }
+                    if nested_container_disclosures
+                    else {}
+                ),
+                **_root_fact_queue_anchor(
+                    contract=contract,
+                    child_handle=child_handle,
+                    lineage_token=lineage_token,
+                    outermost_disclosed_root_pointer=(
+                        outermost_disclosed_root_pointer
+                    ),
+                    draft_shape=draft_shape,
+                    query_shape=query_shape,
+                    topic_prefix=topic_prefix,
+                ),
+                **selected_parent_branch_fact,
+                **_dynamic_next_command_decision(
+                    draft_shape=(
+                        draft_shape and not query_shape and topic_prefix is None
+                    ),
+                    outermost_disclosed_root_pointer=(
+                        outermost_disclosed_root_pointer
+                    ),
+                    branch_continuation=branch_continuation,
+                    nested_container_disclosures=nested_container_disclosures,
+                    next_item_disclosure=next_item_disclosure,
+                    next_sibling_disclosure=next_sibling_disclosure,
+                    deferred_fact=deferred_fact,
+                    selected_parent_branch_fact=selected_parent_branch_fact,
+                ),
+                "request_wide_order": {
+                    "phase": "node_local_disclosure_then_facts",
+                    "root_boundary": (
+                        "finish_current_root_nodes_before_next_root"
+                    ),
+                    "traversal": "response_tree_preorder",
+                    "nested_member_order": "schema_property_order",
+                    "child_fact_order": "child_contract_schema_order",
+                    "deferred_fact_queue": {
+                        "traversal": "response_tree_preorder",
+                        "node_steps": [
+                            *(
+                                ["selected_parent_branch_fact"]
+                                if selected_parent_branch_fact
+                                else []
+                            ),
+                            "deferred_parent_fact",
+                            "child_contract_facts",
+                            "then_descendant_response_nodes",
+                        ],
+                        "forbidden": [
+                            "descendant_fact_before_current_node_parent_or_child_facts",
+                            "next_outer_sibling_disclosure_before_current_root_facts",
+                            "one_fact_apply_batch_spanning_disclosed_nodes",
+                        ],
+                    },
+                    "this_handle_is_not_a_complete_request": True,
+                },
+                "subcommand": (
+                    "query-object"
+                    if query_shape
+                    else "topic-input-fact" if topic_prefix is not None
+                    else "draft-apply" if draft_shape else "typed-call"
+                ),
+                **(
+                    {
+                        "draft_fact_execution": {
+                            "prefix_source": (
+                                "latest_draft_response.next_action_binding."
+                                "fixed_argv_prefix"
+                            ),
+                            "complete_command_formula": [
+                                "copy_every_prefix_argv_from_prefix_source",
+                                (
+                                    "append_current_node_deferred_parent_fact_"
+                                    "when_present"
+                                ),
+                                (
+                                    "append_every_business_present_child_contract_"
+                                    "fact_in_schema_order"
+                                ),
+                                "execute_once_as_one_shell_tool_call",
+                            ],
+                            "runner_only_or_prefix_only_command": "invalid",
+                            "batch_scope": "current_disclosed_node_only",
+                            "complete_action_groups_in_queue_order": True,
+                            "maximum_actions": MAX_TYPED_ACTIONS_PER_APPLY,
+                            "count_each_literal_action_flag": True,
+                            "seventh_action": (
+                                "stop_before_it_execute_first_six_then_read_response"
+                            ),
+                            "copy_returned_handles_exactly": True,
+                        }
+                    }
+                    if draft_shape
+                    and not query_shape
+                    and topic_prefix is None
+                    else {}
+                ),
+                **next_item_disclosure,
+                **deferred_fact,
+                **(
+                    {
+                        "valid_subscription_subcommands": [
+                            "wait-topic",
+                            "stream-topic",
+                        ]
+                    }
+                    if topic_prefix is not None
+                    else {}
+                ),
+                **branch_continuation,
+                **_next_nested_disclosure_selector(
+                    nested_container_disclosures,
+                    next_sibling_disclosure=next_sibling_disclosure,
+                ),
+            },
+            # Keep the control-flow contract before the potentially large
+            # schema table. Fresh agents must see the exact next-action
+            # decision even when a shell tool renders only an output prefix.
+            "child_contract": child_contract,
+        }
+        if draft_shape:
+            read_only_draft = (
+                args.api.startswith("ak.")
+                and contract.effect == "read"
+            )
+            response["construction_state"] = {
+                "complete": False,
+                "disclosure_replay_allowed": False,
+                "next_phase": (
+                    "apply_current_node_facts_then_continue_dynamic_disclosures"
+                ),
+                "completion_boundary": (
+                    "draft-check" if read_only_draft else "draft-check_then_preview"
+                ),
+                "construction_boundary": (
+                    operation_draft_construction_boundary(
+                        read_only=read_only_draft
+                    )
+                ),
+            }
+        response["continuation"] = _dynamic_disclosure_copy_commands(
+            response["continuation"]
+        )
+        return response
+    if args.command == "draft-start-undo-child":
+        store = OperationDraftStore(
+            resolve_transaction_state_directory(args, env=env)
+        )
+        parent = store.inspect(
+            args.draft_id,
+            task_authority=args.task_authority,
+        )
+        if parent.operation != "waapi.undoGroup":
+            raise GatewayInputError(
+                "Compound Undo children require one waapi.undoGroup parent Draft"
+            )
+        if parent.state is not OperationDraftState.EDITABLE:
+            raise GatewayInputError(
+                "Compound Undo parent Draft is no longer editable"
+            )
+        if parent.revision != args.expected_revision:
+            raise GatewayInputError(
+                "Compound Undo parent revision changed; inspect it before starting a child"
+            )
+        parent_session = (
+            parent.composition.get("business_session")
+            if parent.composition is not None
+            else None
+        )
+        if parent.check is not None or parent_session is not None:
+            raise GatewayInputError(
+                "Compound Undo parent already owns a declared plan"
+            )
+        if args.operation not in compound_business_child_operations(
+            parent.version
+        ):
+            raise GatewayInputError(
+                f"{args.operation} is not an eligible closed Compound Undo child "
+                f"for Wwise {parent.version}"
+            )
+        started = store.start(
+            operation=args.operation,
+            version=parent.version,
+            schema_digest=operation_draft_schema_digest(
+                args.operation,
+                parent.version,
+            ),
+            composer_digest=operation_composer_digest(
+                args.operation,
+                parent.version,
+            ),
+            compound_parent=CompoundParentDraftBinding(
+                draft_id=parent.draft_id,
+                task_authority=args.task_authority,
+                expected_revision=parent.revision,
+            ).as_dict(),
+        )
+        payload = operation_draft_payload(
+            args.command,
+            started.record,
+            state_dir=args.state_dir,
+            task_authority=started.task_authority,
+        )
+        payload["task_authority"] = started.task_authority
+        return payload
     if args.command == "draft-start":
         request_version = resolve_operation_schema_version(args, env=env)
         if request_version is None:
             raise GatewayInputError(
                 "draft-start requires an explicit or configured Wwise version."
             )
-        schema_digest = operation_request_schema_digest(
-            args.operation,
-            request_version,
+        if args.operation in (
+            media_build_business_operations()
+            | runtime_inspection_business_read_operations()
+            | soundengine_control_business_read_operations()
+        ):
+            raise GatewayInputError(
+                f"{args.operation} uses request-schema and its closed Core business "
+                "continuation; the retired typed Draft is not public"
+            )
+        schema_digest = operation_draft_schema_digest(
+            args.operation, request_version
         )
         composer_digest = operation_composer_digest(
             args.operation,
@@ -3247,7 +9163,12 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             schema_digest=schema_digest,
             composer_digest=composer_digest,
         )
-        payload = operation_draft_payload(args.command, started.record)
+        payload = operation_draft_payload(
+            args.command,
+            started.record,
+            state_dir=args.state_dir,
+            task_authority=started.task_authority,
+        )
         payload["task_authority"] = started.task_authority
         return payload
     if args.command == "draft-apply":
@@ -3258,29 +9179,53 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             args.draft_id,
             task_authority=args.task_authority,
         )
-        schema_digest = operation_request_schema_digest(
+        if operation_uses_business_declaration(
             inspected.operation,
             inspected.version,
+        ):
+            raise GatewayInputError(
+                f"{inspected.operation} no longer accepts shallow draft-apply actions; "
+                "use the Gateway-owned business declaration commands from draft-start"
+            )
+        schema_digest = operation_draft_schema_digest(
+            inspected.operation, inspected.version
         )
         composer_digest = operation_composer_digest(
             inspected.operation,
             inspected.version,
         )
-        parsed_action = parse_operation_draft_cli_action(args)
-        record = store.apply_action(
+        parsed_actions = parse_operation_draft_cli_actions(args)
+        record = store.apply_actions(
             args.draft_id,
             task_authority=args.task_authority,
             expected_revision=args.expected_revision,
             schema_digest=schema_digest,
             composer_digest=composer_digest,
-            action=parsed_action,
+            actions=parsed_actions,
         )
         return operation_draft_payload(
             args.command,
             record,
-            compact_action=parsed_action if args.compact else None,
+            state_dir=args.state_dir,
+            compact_actions=parsed_actions if args.compact else None,
             prior_record=inspected if args.compact else None,
+            task_authority=args.task_authority,
         )
+    if args.command in {
+        "draft-add-media",
+        "draft-business-configure",
+        "draft-clear-object-list",
+        "draft-declare-field-change",
+        "draft-declare-import-batch",
+        "draft-declare-object-change",
+        "draft-declare-switch-assignment",
+        "draft-declare-rtpc",
+        "draft-declare-existing",
+        "draft-declare-new",
+        "draft-remove-declaration",
+        "draft-revise-declaration",
+    }:
+        return dispatch_offline_business_draft_update(args, env=env)
     if args.command in {"draft-inspect", "draft-cancel"}:
         store = OperationDraftStore(
             resolve_transaction_state_directory(args, env=env)
@@ -3299,6 +9244,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
         return operation_draft_payload(
             args.command,
             record,
+            state_dir=args.state_dir,
         )
 
     if args.command == "config-show":
@@ -3412,16 +9358,6 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     "available": True,
                     "capability": entry.as_dict(detail=bool(args.full_schema)),
                 }
-                if is_cli_request_template_uri(args.api):
-                    version_row["request_template"] = build_cli_request_template(
-                        version=version,
-                        uri=args.api,
-                        schema=entry.schema,
-                        forbidden_fields=FORBIDDEN_MODEL_AUTHORED_COMMAND_FIELDS.get(
-                            args.api,
-                            (),
-                        ),
-                    )
                 availability[version] = version_row
         if found == 0:
             raise CapabilityNotFoundError(
@@ -3517,32 +9453,13 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
         }
     if args.command == "query-schema":
         versions = resolve_catalog_versions(args, env=env)
-        if args.advanced:
+        if len(versions) == 1:
             return {
-                "contract": GATEWAY_RESULT_CONTRACT,
-                "ok": True,
-                "status": "ok",
-                "command": "query-schema",
+                **query_business_schema_payload(
+                    versions[0], advanced=args.advanced
+                ),
                 "offline": True,
-                "query_layer": "advanced-native-waql",
-                "query_contract": ADVANCED_QUERY_CONTRACT,
                 "versions": list(versions),
-                "schemas": {
-                    version: advanced_query_schema(version=version)
-                    for version in versions
-                },
-                "boundary": {
-                    "fixed_api": OBJECT_GET_URI,
-                    "read_only": True,
-                    "native_waql_accepted": True,
-                    "gateway_appends_final_take": True,
-                    "all_results_available": False,
-                    "arbitrary_uri_args_or_options_accepted": False,
-                    "gateway_json_input_bytes": MAX_GATEWAY_JSON_INPUT_BYTES,
-                    "gateway_result_bytes": MAX_GATEWAY_RESULT_JSON_BYTES,
-                    "version_specific_syntax_validated_by": "connected Wwise",
-                    "fallback_or_retry_on_invalid_query": False,
-                },
             }
         return {
             "contract": GATEWAY_RESULT_CONTRACT,
@@ -3550,51 +9467,56 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             "status": "ok",
             "command": "query-schema",
             "offline": True,
-            "query_layer": "structured-builder",
-            "query_contract": STRUCTURED_QUERY_CONTRACT,
+            "query_layer": (
+                "advanced-native-waql" if args.advanced else "business-declaration"
+            ),
+            "query_contract": (
+                ADVANCED_QUERY_CONTRACT if args.advanced else BUSINESS_QUERY_CONTRACT
+            ),
             "versions": list(versions),
-            "schemas": {
-                version: structured_query_schema(version=version)
+            "contracts": {
+                version: query_business_schema_payload(
+                    version,
+                    advanced=args.advanced,
+                )
                 for version in versions
-            },
-            "boundary": {
-                "raw_waql_accepted": False,
-                "raw_expression_accepted": False,
-                "result_limit_required_for": [
-                    "broad sources",
-                    "multiple object sources",
-                    "select transforms",
-                ],
-                "deferred_syntax": [
-                    "skip",
-                    "orderby",
-                    "distinct",
-                    "regular-expression literals",
-                    "WAQL 2.0 list functions",
-                ],
-                "advanced_fallback": {
-                    "available": True,
-                    "disclose_with": "query-schema --advanced",
-                    "execute_with": "query-object --advanced-request-json",
-                    "use_only_when": (
-                        "the structured schema cannot express the requested "
-                        "read-only WAQL construct"
-                    ),
-                },
             },
         }
     if args.command == "operations":
         operations: list[dict[str, Any]] = []
         for spec in list_operation_specs():
-            if not args.detail:
-                operations.append(spec.as_compact_dict())
+            if spec.name == "waapi.call":
                 continue
             modes = {
                 version: operation_input_mode(spec.name, version)
                 for version in spec.supported_versions
             }
+            if not args.detail:
+                operations.append(
+                    {
+                        "name": spec.name,
+                        "summary": spec.summary,
+                        "next_command": ["operation-schema", spec.name],
+                    }
+                )
+                continue
+            if BUSINESS_DECLARATION_INPUT_MODE in modes.values():
+                projection = composer_operation_projection(spec, version=None)
+                projection["input_modes_by_version"] = modes
+                projection["business_contracts_by_version"] = {
+                    version: operation_business_contract(spec.name, version)
+                    for version, mode in modes.items()
+                    if mode == BUSINESS_DECLARATION_INPUT_MODE
+                }
+                operations.append(projection)
+                continue
             if COMPOSER_INPUT_MODE not in modes.values():
-                operations.append(spec.as_dict())
+                if INLINE_TYPED_INPUT_MODE in modes.values():
+                    projection = composer_operation_projection(spec, version=None)
+                    projection["input_modes_by_version"] = modes
+                    operations.append(projection)
+                else:
+                    operations.append(spec.as_dict())
                 continue
             projection = composer_operation_projection(spec, version=None)
             projection["composer_contracts_by_version"] = {
@@ -3607,166 +9529,247 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 if mode == COMPOSER_INPUT_MODE
             }
             operations.append(projection)
-        return {
+        request_schema_routes = list(
+            (
+                *cli_console_business_catalog_rows(),
+                *host_ui_debug_business_catalog_rows(),
+                *core_business_catalog_rows(),
+                *media_build_business_catalog_rows(),
+                *runtime_inspection_business_catalog_rows(),
+                *soundengine_control_business_catalog_rows(),
+                *project_setting_business_catalog_rows(),
+                *source_control_business_catalog_rows(),
+            )
+        )
+        payload = {
             "contract": GATEWAY_RESULT_CONTRACT,
             "ok": True,
             "status": "ok",
             "command": "operations",
             "offline": True,
+            "routing_precedence": {
+                "primary_media_import": {
+                    "match_terms": [
+                        "import media",
+                        "reimport media",
+                        "replace existing media",
+                        "replace media source",
+                        "导入媒体",
+                        "重新导入",
+                        "替换媒体",
+                    ],
+                    "choose": ["operation-schema", "audio.import"],
+                    "takes_precedence_over": [
+                        "operation-schema",
+                        "object.set",
+                    ],
+                    "rule": (
+                        "a primary media import, reimport, or media "
+                        "replacement uses audio.import even when it also "
+                        "updates properties, references, Events, or Switch "
+                        "assignments"
+                    ),
+                },
+                "explicit_cli_soundbank_generation": {
+                    "match_terms": [
+                        "WwiseConsole",
+                        "CLI",
+                        "command-line",
+                        "命令行",
+                    ],
+                    "choose": [
+                        "request-schema",
+                        "ak.wwise.cli.generateSoundbank",
+                    ],
+                    "takes_precedence_over": [
+                        "operation-schema",
+                        "soundbank.generate",
+                    ],
+                    "rule": (
+                        "explicit command-line SoundBank generation uses the "
+                        "exact reflected CLI URI"
+                    ),
+                },
+                "exact_authoring_ui_command_id": {
+                    "match_example": "SaveProject",
+                    "choose": ["operation-schema", "ui.commands.execute"],
+                    "takes_precedence_over": [
+                        "request-schema",
+                        "ak.wwise.core.project.save",
+                    ],
+                    "rule": (
+                        "an exact CamelCase Wwise Authoring command ID named "
+                        "by the user is not a generic connected-project action"
+                    ),
+                },
+                "single_existing_object_edit": {
+                    "choose_by_outcome": {
+                        "rename": ["operation-schema", "object.setName"],
+                        "notes": ["operation-schema", "object.setNotes"],
+                        "scalar_property": [
+                            "operation-schema",
+                            "object.setProperty",
+                        ],
+                        "reference": [
+                            "operation-schema",
+                            "object.setReference",
+                        ],
+                    },
+                    "takes_precedence_over": [
+                        "operation-schema",
+                        "object.set",
+                    ],
+                    "rule": (
+                        "one existing object's one requested edit uses its "
+                        "dedicated route; object.set is only for a larger "
+                        "atomic outcome"
+                    ),
+                },
+            },
             "count": len(operations),
-            "implemented_count": sum(item["implemented"] is True for item in operations),
+            "implemented_count": sum(
+                spec.implemented is True
+                for spec in list_operation_specs()
+                if spec.name != "waapi.call"
+            ),
             "operations": operations,
+            "request_schema_route_count": len(request_schema_routes),
+            "request_schema_command_template": ["request-schema", "<api>"],
+            "detail_available": True,
+            "selection_guidance": {
+                "connected_project_save": {
+                    "choose": [
+                        "request-schema",
+                        "ak.wwise.core.project.save",
+                    ],
+                    "use_when": (
+                        "the user asks to save the connected project without "
+                        "naming a UI command ID"
+                    ),
+                    "never_substitute": [
+                        "operation-schema",
+                        "ui.commands.execute",
+                    ],
+                },
+                "game_parameter_range": {
+                    "choose": [
+                        "request-schema",
+                        "ak.wwise.core.gameParameter.setRange",
+                    ],
+                    "use_when": (
+                        "the user asks to set one Game Parameter minimum and "
+                        "maximum"
+                    ),
+                    "never_substitute": [
+                        "operation-schema",
+                        "object.setProperty",
+                        "object.set",
+                    ],
+                },
+                "profiler_data_capture": {
+                    "choose": [
+                        "request-schema",
+                        "ak.wwise.core.profiler.enableProfilerData",
+                    ],
+                    "use_when": (
+                        "the user asks to enable or disable named Profiler "
+                        "capture data"
+                    ),
+                    "never_guess_uri": True,
+                },
+                "runtime_event_action": {
+                    "choose": [
+                        "request-schema",
+                        "ak.soundengine.executeActionOnEvent",
+                    ],
+                    "use_when": (
+                        "the user asks to stop, pause, resume, or break one "
+                        "runtime Event"
+                    ),
+                    "never_substitute": [
+                        "operation-schema",
+                        "object.set",
+                    ],
+                },
+            },
         }
-    if args.command in {"operation-schema", "legacy-operation-schema"}:
-        legacy_compatibility = args.command == "legacy-operation-schema"
+        if args.detail:
+            payload["request_schema_routes"] = request_schema_routes
+        return payload
+    if args.command == "operation-schema":
+        if args.operation == "waapi.call":
+            raise OperationContractError(
+                "INTERNAL_CANONICAL_OPERATION",
+                "waapi.call is an internal canonical transaction representation; "
+                "use request-schema with the exact reflected WAAPI URI.",
+                details={
+                    "operation": "waapi.call",
+                    "next_command": "request-schema <exact-waapi-uri>",
+                },
+            )
         spec = describe_operation(args.operation)
         request_version = resolve_operation_schema_version(args, env=env)
-        direct_fast_route_contract = build_operation_schema_direct_fast_route_contract(
-            operation=spec.name,
-            version=request_version,
-        )
-        argument_names = list(
-            dict.fromkeys((*spec.required_arguments, *spec.optional_arguments))
-        )
-        if not spec.implemented:
-            request_envelope = None
-            request_envelope_status = "operation_not_implemented"
-        elif request_version is None:
-            request_envelope = None
-            request_envelope_status = "version_required"
-        elif request_version not in spec.supported_versions:
-            request_envelope = None
-            request_envelope_status = "unsupported_version"
-        else:
-            request_envelope = {
-                "contract": OPERATION_REQUEST_CONTRACT,
-                "version": request_version,
-                "operation": spec.name,
-                "arguments": {},
-            }
-            request_envelope_status = "ready"
         input_mode = (
             operation_input_mode(spec.name, request_version)
             if request_version in spec.supported_versions
             else None
         )
-        normal_composer = (
-            not legacy_compatibility and input_mode == COMPOSER_INPUT_MODE
+        normal_composer = input_mode == COMPOSER_INPUT_MODE
+        normal_business = input_mode == BUSINESS_DECLARATION_INPUT_MODE
+        normal_inline = input_mode == INLINE_TYPED_INPUT_MODE
+        unsupported_version = (
+            request_version is not None
+            and request_version not in spec.supported_versions
         )
-        operation_projection = (
-            composer_operation_projection(spec, version=request_version)
-            if normal_composer
-            else spec.as_dict(version=request_version)
-        )
-        if legacy_compatibility:
-            # Compatibility automation needs the complete machine request
-            # shape, not duplicated normal-Agent routing prose.  Both
-            # projections still derive from this exact Registry spec.
-            operation_projection.pop("summary", None)
-            operation_projection.pop("selection_guidance", None)
-            if input_mode == COMPOSER_INPUT_MODE:
-                operation_projection["input_mode"] = LEGACY_JSON_INPUT_MODE
-        if normal_composer:
-            request_envelope = None
-            request_envelope_status = "composer_ready"
+        if unsupported_version:
+            operation_projection = spec.as_compact_dict()
+            operation_projection.pop("required_arguments", None)
+            operation_projection.pop("optional_arguments", None)
+            operation_projection["availability"] = {
+                "status": "unsupported_version",
+                "requested_version": request_version,
+                "supported_versions": list(spec.supported_versions),
+            }
+        else:
+            operation_projection = (
+                composer_operation_projection(spec, version=request_version)
+                if normal_composer or normal_business or normal_inline
+                else spec.as_dict(version=request_version)
+            )
         payload = {
             "contract": GATEWAY_RESULT_CONTRACT,
             "ok": True,
             "status": "ok" if spec.implemented else "unsupported_boundary",
             "command": args.command,
             "offline": True,
-            "operation": operation_projection,
-            "request_envelope": request_envelope,
-            "request_envelope_policy": (
-                {
-                    "status": "composer_ready",
-                    "complete_request_authored_by_gateway": True,
-                }
-                if normal_composer
-                else {
-                    "status": request_envelope_status,
-                    "required_top_level_keys": [
-                        "contract",
-                        "version",
-                        "operation",
-                        "arguments",
-                    ],
-                    "copy_top_level_exactly": True,
-                    "replace_only": "arguments",
-                    "argument_container_path": "$.arguments",
-                    "argument_paths": {
-                        name: f"$.arguments.{name}" for name in argument_names
-                    },
-                    "shell_transport": {
-                        "outer_quoting": "single_quote_entire_compact_json",
-                        "json_string_serialization": "exactly_once",
-                        "decoded_value_rules": {
-                            "embedded_quotes": (
-                                "ordinary quotation marks with no preceding "
-                                "backslash"
-                            ),
-                            "wwise_path_separator": "one backslash",
-                        },
-                        "forbidden": [
-                            "double_escape_json_string_contents",
-                            "leave_json_escape_backslashes_in_decoded_values",
-                            "repair_or_retry_invalid_json_in_the_same_turn",
-                        ],
-                    },
-                    "preview_invocation": {
-                        "intended_change": {
-                            "subcommand": (
-                                "legacy-preview"
-                                if legacy_compatibility
-                                else "preview"
-                            ),
-                            "required_flag": "--apply",
-                            "effect": (
-                                "required even when the user asks to see only a "
-                                "preview; creates a durable confirmation-bound "
-                                "preview and does not execute the change"
-                            ),
-                            "includes_later_ordered_transactions": True,
-                        },
-                        "omit_apply_only_when": [
-                            "hypothetical",
-                            "design_only",
-                            "explicitly_non_executable",
-                        ],
-                    },
-                }
-            ),
         }
         if normal_composer and request_version is not None:
             payload["composer"] = operation_composer_input_contract(
                 spec.name,
                 request_version,
             )
-        if legacy_compatibility:
-            payload["compatibility"] = {
-                "contract": LEGACY_OPERATION_JSON_ADAPTER_CONTRACT,
-                "deprecation_status": "deprecated",
-                "input_mode": LEGACY_JSON_INPUT_MODE,
-                "submit_command": "legacy-preview",
-            }
-        if direct_fast_route_contract is not None:
-            # Keep the version/API-specific product contract prominent at the
-            # end of the offline result.  ``finish`` appends only the bounded
-            # session context after it, so the Agent sees this exact template
-            # immediately before constructing the preview request.
-            payload["direct_fast_route_contract"] = direct_fast_route_contract
-        if spec.name == "waapi.call":
-            cli_schemas: dict[str, Mapping[str, Any]] | None = None
-            if request_version is not None:
-                cli_schemas = {
-                    entry.uri: entry.schema
-                    for entry in CapabilityCatalog().entries(request_version)
-                    if entry.uri in CLI_REQUEST_TEMPLATE_URIS
-                }
-            payload["cli_request_templates"] = build_cli_request_template_set(
-                version=request_version,
-                schemas=cli_schemas,
-                forbidden_fields_by_uri=FORBIDDEN_MODEL_AUTHORED_COMMAND_FIELDS,
+        if normal_business and request_version is not None:
+            business_contract = operation_business_contract(
+                spec.name,
+                request_version
+            )
+            start = dict(business_contract["start"])
+            gateway_argv = start.pop("gateway_argv", None)
+            if gateway_argv is not None:
+                start.pop("copy_instruction", None)
+                start["next_command"] = transaction_next_command(
+                    "draft-start",
+                    gateway_argv,
+                    state_dir=args.state_dir,
+                )
+            business_contract["start"] = start
+            payload["business_adapter"] = business_contract
+        payload["operation"] = operation_projection
+        if normal_inline and request_version is not None:
+            operation_projection["input_mode"] = INLINE_TYPED_INPUT_MODE
+            payload["typed_operation"] = inline_operation_contract(
+                spec.name,
+                request_version,
             )
         return payload
     if args.command in {"transaction-show", "confirm", "reject"}:
@@ -3831,6 +9834,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                         "--confirmation-token",
                         confirmation_token,
                     ],
+                    state_dir=args.state_dir,
                     requires_explicit_user_confirmation=True,
                 )
             elif record.state is TransactionState.POLICY_AUTHORIZED:
@@ -3847,6 +9851,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     payload["next_command"] = transaction_next_command(
                         "execute",
                         ["execute", transaction_id],
+                        state_dir=args.state_dir,
                     )
                 else:
                     payload["policy_execution_blocked"] = True
@@ -3861,11 +9866,20 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             record = store.confirm(
                 transaction_id,
                 confirmation_token=args.confirmation_token,
-                artifact_hash=args.artifact_hash,
             )
-            return transaction_state_payload("confirm", record, offline=True)
+            return transaction_state_payload(
+                "confirm",
+                record,
+                offline=True,
+                state_dir=args.state_dir,
+            )
         record = store.reject(transaction_id, details={"reason": args.reason})
-        return transaction_state_payload("reject", record, offline=True)
+        return transaction_state_payload(
+            "reject",
+            record,
+            offline=True,
+            state_dir=args.state_dir,
+        )
     raise GatewayInputError(f"unsupported offline command: {args.command}")
 
 
@@ -4183,6 +10197,51 @@ def require_transaction_preconnection_policy(
     return policy
 
 
+def _verify_is_executed_project_transition(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+) -> bool:
+    """Recognize the one verify lane allowed to wait for Authoring to settle."""
+
+    if args.command != "verify":
+        return False
+    try:
+        store = resolve_transaction_store(args, env=env)
+        if store.load(args.transaction_id).state is not TransactionState.EXECUTED_UNVERIFIED:
+            return False
+        artifact = store.load_preview(args.transaction_id).artifact
+        request = require_mapping(artifact.get("request"), "transaction request")
+        version = request.get("version")
+        if not isinstance(version, str):
+            return False
+        mode, _target = transaction_project_guard_spec(request, version=version)
+    except (GatewayInputError, TransactionNotFound, InvalidTransition, ValueError):
+        return False
+    return mode != PROJECT_GUARD_INVARIANT
+
+
+def _is_transient_project_transition_lock(exc: BaseException) -> bool:
+    """Accept only Wwise's explicit project transition lock reasons."""
+
+    normalized = normalize_gateway_exception(exc)
+    if normalized.get("waapi_error_uri") != "ak.wwise.locked":
+        return False
+    metadata = normalized.get("waapi_error_details")
+    details = metadata.get("details") if isinstance(metadata, Mapping) else None
+    reasons = details.get("reasons") if isinstance(details, Mapping) else None
+    allowed = {
+        "Closing project in progress",
+        "Opening project in progress",
+        "Loading project in progress",
+    }
+    return (
+        isinstance(reasons, list)
+        and bool(reasons)
+        and all(isinstance(reason, str) and reason in allowed for reason in reasons)
+    )
+
+
 def require_transaction_confirmation_policy(
     *,
     store: TransactionStore,
@@ -4386,96 +10445,6 @@ def resolve_operation_schema_version(
     return str(version)
 
 
-def build_operation_schema_direct_fast_route_contract(
-    *,
-    operation: str,
-    version: str | None,
-) -> dict[str, Any] | None:
-    """Return one exact version/API product contract, never a generic override."""
-
-    if operation != "waapi.call" or version not in {"2024.1", "2025.1"}:
-        return None
-
-    return {
-        "contract": GATEWAY_OPERATION_SCHEMA_DIRECT_FAST_ROUTE_CONTRACT,
-        "scope": {
-            "operation": "waapi.call",
-            "version": version,
-            "exact_api": "ak.wwise.core.audio.convert",
-            "activation": "exact_api_intent_only",
-            "applies_to_other_waapi_call_uris": False,
-        },
-        "canonical_request_template": {
-            "contract": OPERATION_REQUEST_CONTRACT,
-            "version": version,
-            "operation": "waapi.call",
-            "arguments": {
-                "api": "ak.wwise.core.audio.convert",
-                "args": {
-                    "objects": ["<exact-wwise-object-path>"],
-                    "platforms": ["<platform>"],
-                    "languages": ["SFX"],
-                },
-                "options": {},
-                "io_root": "<absolute-allowed-conversion-root>",
-            },
-        },
-        "template_policy": {
-            "copy_outer_shape_exactly": True,
-            "replace_only": [
-                "$.arguments.args.objects",
-                "$.arguments.args.platforms",
-                "$.arguments.args.languages",
-                "$.arguments.io_root",
-            ],
-            "array_replacement": {
-                "paths": [
-                    "$.arguments.args.objects",
-                    "$.arguments.args.platforms",
-                    "$.arguments.args.languages",
-                ],
-                "replace_entire_array": True,
-                "non_empty": True,
-                "preserve_user_order": True,
-            },
-            "placeholders_must_all_be_replaced": True,
-            "missing_or_ambiguous_input": "ask_before_preview",
-        },
-        "rules": {
-            "required_ordered_string_arrays": {
-                "paths": [
-                    "$.arguments.args.objects",
-                    "$.arguments.args.platforms",
-                    "$.arguments.args.languages",
-                ],
-                "min_items": 1,
-                "preserve_user_order": True,
-                "scalar_form_allowed": False,
-                "object_record_items_allowed": False,
-            },
-            "language_mapping": {
-                "natural_sfx_target_without_explicit_localized_languages": [
-                    "SFX"
-                ],
-                "explicit_localized_languages": (
-                    "replace SFX with the stated non-empty ordered string array"
-                ),
-                "languages_must_never_be_omitted": True,
-            },
-            "options": {
-                "path": "$.arguments.options",
-                "exact_value": {},
-            },
-            "io_root": {
-                "path": "$.arguments.io_root",
-                "type": "string",
-                "shape": "scalar",
-                "absolute": True,
-            },
-        },
-    }
-
-
 def resolve_catalog_versions(args: argparse.Namespace, *, env: Mapping[str, str]) -> tuple[str, ...]:
     if bool(getattr(args, "all_versions", False)):
         return tuple(SUPPORTED_WWISE_VERSION_KEYS)
@@ -4540,14 +10509,35 @@ def resolve_connection(args: argparse.Namespace, *, env: Mapping[str, str]) -> G
                 DEFAULT_TRANSACTION_TIMEOUT
                 if args.command
                 in {
-                    "preview",
-                    "legacy-preview",
                     "preview-from-draft",
                     "execute",
                     "verify",
                 }
+                or (
+                    args.command == "typed-zero-call"
+                    and bool(getattr(args, "typed_zero_requires_preview", False))
+                )
+                or (
+                    args.command == "typed-call"
+                    and bool(getattr(args, "typed_requires_preview", False))
+                )
+                or args.command == "typed-operation"
+                else float(args.typed_zero_read_timeout)
+                if (
+                    args.command == "typed-zero-call"
+                    and getattr(args, "typed_zero_read_timeout", None) is not None
+                )
+                else float(args.typed_read_timeout)
+                if (
+                    args.command == "typed-call"
+                    and getattr(args, "typed_read_timeout", None) is not None
+                )
                 else DEFAULT_METADATA_DISCOVERY_TIMEOUT
-                if args.command == "metadata" and args.operation == "discover"
+                if (
+                    args.command == "metadata"
+                    and args.operation == "discover"
+                )
+                or args.command in DRAFT_METADATA_DISCOVERY_COMMANDS
                 else DEFAULT_TIMEOUT
             )
         )
@@ -4574,6 +10564,2140 @@ def resolve_connection(args: argparse.Namespace, *, env: Mapping[str, str]) -> G
     )
 
 
+def resolve_profiler_voice_path(
+    args: argparse.Namespace,
+    *,
+    connection: GatewayConnection,
+    detected_version: str,
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> tuple[int, tuple[int, ...]] | dict[str, Any]:
+    """Resolve semantic voice/Bus identities to one live pipeline path."""
+
+    def read_rows(api: str) -> tuple[list[dict[str, Any]], Mapping[str, Any]]:
+        request_args = {"time": args.time}
+        request_options = {
+            "return": list(PROFILER_PIPELINE_IDENTITY_RETURN_FIELDS)
+        }
+        validation = validate_semantic_payload(
+            api,
+            request_args,
+            request_options,
+            version=detected_version,
+        )
+        result = dispatch(
+            dispatcher,
+            api,
+            connection=connection,
+            version=detected_version,
+            args=request_args,
+            options=request_options,
+            # These are read-only implementation dependencies of the closed
+            # voice-contribution Adapter. Their separate public routes now use
+            # the same Gateway-owned runtime-inspection business contracts.
+            allow_destructive=True,
+            result_limit_bytes=STABLE_READ_RESULT_LIMIT_BYTES,
+        )
+        if not result.get("ok"):
+            return [], {
+                "ok": False,
+                "status": "error",
+                **dict(common),
+                "api_attempted": api,
+                "schema_validation": {
+                    "request": validation.as_dict(),
+                    "result": None,
+                },
+                "call": dispatch_call_summary(result),
+            }
+        payload = result.get("result")
+        rows = payload.get("return") if isinstance(payload, Mapping) else None
+        if not isinstance(rows, list) or len(rows) > MAX_PROFILER_PIPELINE_IDENTITY_ROWS:
+            raise GatewayResultShapeError(
+                "Profiler identity lookup returned an invalid bounded row array.",
+                details={
+                    "api": api,
+                    "maximum_rows": MAX_PROFILER_PIPELINE_IDENTITY_ROWS,
+                },
+                error_code="INVALID_STABLE_READ_RESULT",
+            )
+        required = set(PROFILER_PIPELINE_IDENTITY_RETURN_FIELDS)
+        normalized: list[dict[str, Any]] = []
+        for index, row in enumerate(rows):
+            if not isinstance(row, Mapping) or not required <= set(row):
+                raise GatewayResultShapeError(
+                    "Profiler identity lookup returned a malformed row.",
+                    details={"api": api, "row_index": index},
+                    error_code="INVALID_STABLE_READ_RESULT",
+                )
+            pipeline_id = row.get("pipelineID")
+            game_object_id = row.get("gameObjectID")
+            object_guid = row.get("objectGUID")
+            if (
+                isinstance(pipeline_id, bool)
+                or not isinstance(pipeline_id, int)
+                or not 0 <= pipeline_id <= 0xFFFFFFFF
+                or isinstance(game_object_id, bool)
+                or not isinstance(game_object_id, int)
+                or not 0 <= game_object_id <= (1 << 64) - 1
+                or not _canonical_guid(object_guid)
+            ):
+                raise GatewayResultShapeError(
+                    "Profiler identity lookup returned invalid identity values.",
+                    details={"api": api, "row_index": index},
+                    error_code="INVALID_STABLE_READ_RESULT",
+                )
+            normalized.append(dict(row))
+        return normalized, result
+
+    if args.voice_pipeline_id is not None:
+        voices, voice_result = read_rows("ak.wwise.core.profiler.getVoices")
+        if not voice_result.get("ok", True):
+            return dict(voice_result)
+        voice_matches = [
+            row for row in voices if row["pipelineID"] == args.voice_pipeline_id
+        ]
+        if len(voice_matches) != 1:
+            return {
+                "ok": True,
+                "status": "needs_clarification",
+                **dict(common),
+                "operation": "profiler-voice-contributions",
+                "agent_result": {
+                    "voice_instance_handle": args.voice_instance_handle,
+                    "matching_voice_count": len(voice_matches),
+                    "repair": "refresh the bounded Profiler voice result and copy its current handle",
+                },
+            }
+        if args.bus_pipeline_id:
+            busses, bus_result = read_rows("ak.wwise.core.profiler.getBusses")
+            if not bus_result.get("ok", True):
+                return dict(bus_result)
+            voice_game_object = voice_matches[0]["gameObjectID"]
+            for handle, pipeline_id in zip(
+                args.bus_instance_handle,
+                args.bus_pipeline_id,
+                strict=True,
+            ):
+                matches = [
+                    row
+                    for row in busses
+                    if row["pipelineID"] == pipeline_id
+                    and row["gameObjectID"] == voice_game_object
+                ]
+                if len(matches) != 1:
+                    return {
+                        "ok": True,
+                        "status": "needs_clarification",
+                        **dict(common),
+                        "operation": "profiler-voice-contributions",
+                        "agent_result": {
+                            "bus_instance_handle": handle,
+                            "matching_bus_count": len(matches),
+                            "repair": (
+                                "refresh the bounded Profiler bus result for the "
+                                "selected voice and copy its current handle"
+                            ),
+                        },
+                    }
+        return int(args.voice_pipeline_id), tuple(args.bus_pipeline_id)
+
+    voices_or_rows = read_rows("ak.wwise.core.profiler.getVoices")
+    voices, voice_result = voices_or_rows
+    if not voice_result.get("ok", True):
+        return dict(voice_result)
+    voice_matches = [
+        row
+        for row in voices
+        if str(row["objectGUID"]).casefold() == args.voice_object_id.casefold()
+        and (
+            args.game_object_id is None
+            or row["gameObjectID"] == args.game_object_id
+        )
+    ]
+    if len(voice_matches) != 1:
+        return {
+            "ok": True,
+            "status": "needs_clarification",
+            **dict(common),
+            "operation": "profiler-voice-contributions",
+            "agent_result": {
+                "requested_voice_object_id": args.voice_object_id,
+                "matching_voice_count": len(voice_matches),
+                "candidates": [
+                    {
+                        "object_name": row["objectName"],
+                        "game_object_id": row["gameObjectID"],
+                        "game_object_name": row["gameObjectName"],
+                    }
+                    for row in voice_matches
+                ],
+                "repair": (
+                    "provide --game-object-id when more than one active voice matches"
+                ),
+            },
+        }
+    voice = voice_matches[0]
+    bus_pipeline_ids: list[int] = []
+    if args.bus_object_id:
+        busses, bus_result = read_rows("ak.wwise.core.profiler.getBusses")
+        if not bus_result.get("ok", True):
+            return dict(bus_result)
+        for requested in args.bus_object_id:
+            matches = [
+                row
+                for row in busses
+                if str(row["objectGUID"]).casefold() == requested.casefold()
+                and row["gameObjectID"] == voice["gameObjectID"]
+            ]
+            if len(matches) != 1:
+                return {
+                    "ok": True,
+                    "status": "needs_clarification",
+                    **dict(common),
+                    "operation": "profiler-voice-contributions",
+                    "agent_result": {
+                        "requested_bus_object_id": requested,
+                        "matching_bus_count": len(matches),
+                        "repair": (
+                            "choose one Bus identity active for the selected game object"
+                        ),
+                    },
+                }
+            bus_pipeline_ids.append(int(matches[0]["pipelineID"]))
+    return int(voice["pipelineID"]), tuple(bus_pipeline_ids)
+
+
+def dispatch_profiler_voice_contributions_request(
+    request: Any,
+    *,
+    connection: GatewayConnection,
+    detected_version: str,
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Run the one existing bounded voice-contribution read adapter."""
+
+    request_validation = validate_semantic_payload(
+        request.uri,
+        request.args,
+        request.options,
+        version=detected_version,
+    )
+    result = dispatch(
+        dispatcher,
+        request.uri,
+        connection=connection,
+        version=detected_version,
+        args=request.args,
+        options=request.options,
+        result_limit_bytes=STABLE_READ_RESULT_LIMIT_BYTES,
+    )
+    if not result.get("ok"):
+        return {
+            "ok": False,
+            "status": "error",
+            **dict(common),
+            "semantic_preview": request.as_dict(),
+            "schema_validation": {
+                "request": request_validation.as_dict(),
+                "result": None,
+            },
+            "call": dispatch_call_summary(result),
+        }
+    raw_result = result.get("result")
+    result_validation = validate_semantic_result(
+        request.uri,
+        raw_result,
+        version=detected_version,
+    )
+    projection = normalize_profiler_voice_contributions_result(
+        version=detected_version,
+        result=raw_result,
+    )
+    return {
+        "ok": True,
+        "status": "ok",
+        **dict(common),
+        "semantic_preview": request.as_dict(),
+        "schema_validation": {
+            "request": request_validation.as_dict(),
+            "result": result_validation.as_dict(),
+        },
+        "call": dispatch_call_summary(result),
+        "agent_result": projection,
+    }
+
+
+def dispatch_debug_validation(
+    call_args: Mapping[str, Any],
+    *,
+    connection: GatewayConnection,
+    detected_version: str,
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Validate one Gateway-owned exact Debug call envelope."""
+
+    api = TYPED_REQUEST_COMPLEX_TRACER_URI
+    capability = CapabilityCatalog().describe(detected_version, api)
+    normalized_args = dict(call_args)
+    supplied_sections = [
+        name for name in ("args", "options", "result") if name in normalized_args
+    ]
+    request_validation = validate_semantic_payload(
+        api, normalized_args, {}, version=detected_version
+    )
+    result = dispatch(
+        dispatcher,
+        api,
+        connection=connection,
+        version=detected_version,
+        args=normalized_args,
+        options={},
+        result_limit_bytes=int(capability.execution_contract["result_limit_bytes"]),
+        operation_timeout=float(capability.execution_contract["timeout_seconds"]),
+    )
+    if result.get("waapi_error_uri") == "ak.wwise.invalid_procedure_uri":
+        return {
+            "ok": True,
+            "status": "unsupported_boundary",
+            **dict(common),
+            "api_attempted": api,
+            "validated_api": normalized_args["id"],
+            "supplied_sections": supplied_sections,
+            "error_code": "DEBUG_BUILD_REQUIRED",
+            "message": (
+                "The running Wwise build does not register this Debug read; "
+                "use a matching Debug-capable Authoring build for live execution proof."
+            ),
+            "executed": False,
+            "call": dispatch_call_summary(result),
+            "agent_result": None,
+        }
+    result_validation = (
+        validate_semantic_result(api, result.get("result"), version=detected_version)
+        if result.get("ok")
+        else None
+    )
+    return {
+        "ok": bool(result.get("ok")),
+        "status": "ok" if result.get("ok") else "error",
+        **dict(common),
+        "api_attempted": api,
+        "validated_api": normalized_args["id"],
+        "supplied_sections": supplied_sections,
+        "call": dispatch_call_summary(result),
+        "schema_validation": {
+            "request": request_validation.as_dict(),
+            "result": result_validation.as_dict() if result_validation else None,
+        },
+        "agent_result": (
+            {
+                "validated_api": normalized_args["id"],
+                "supplied_sections": supplied_sections,
+                "accepted_by_wwise": True,
+            }
+            if result.get("ok")
+            else None
+        ),
+    }
+
+
+def dispatch_soundengine_business_read(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Read one live State or Switch through closed business identities."""
+
+    project, project_call = current_project(
+        dispatcher,
+        connection=connection,
+        version=detected_version,
+    )
+    assert project is not None
+    business_request = args.soundengine_read_business_request
+    identity_field = (
+        "state_group_id" if args.api == GET_STATE_URI else "switch_group_id"
+    )
+    group_id = business_request[identity_field]
+    required_type = "StateGroup" if args.api == GET_STATE_URI else "SwitchGroup"
+    read_call = transaction_read_call(
+        dispatcher,
+        connection=connection,
+        version=detected_version,
+    )
+    identity_result = read_call(
+        OBJECT_GET_URI,
+        {"from": {"id": [group_id]}},
+        {"return": ["id", "name", "type", "path"]},
+    )
+    identity_rows = identity_result.get("return")
+    identity = (
+        identity_rows[0]
+        if isinstance(identity_rows, list) and len(identity_rows) == 1
+        else None
+    )
+    try:
+        normalized_identity = normalize_live_object_identity(identity)
+    except ValueError:
+        normalized_identity = None
+    if (
+        normalized_identity is None
+        or normalized_identity.object_id != group_id
+        or normalized_identity.object_type != required_type
+    ):
+        raise GatewayResultShapeError(
+            f"SoundEngine read requires one exact live {required_type} identity.",
+            details={"requested_id": group_id, "actual_rows": identity_rows},
+            error_code="SOUNDENGINE_READ_IDENTITY_MISMATCH",
+        )
+    native_args = {
+        "stateGroup" if args.api == GET_STATE_URI else "switchGroup": group_id,
+    }
+    game_object_record = None
+    handle = business_request.get("game_object_handle")
+    if handle is not None:
+        state_dir = resolve_transaction_state_directory(args, env=env)
+        require_runtime_directory_outside_project(state_dir, project=project)
+        try:
+            game_object_record = RuntimeGameObjectHandleStore(state_dir).resolve(
+                handle,
+                context=_runtime_game_object_context_from_live(
+                    endpoint=common["endpoint"],
+                    project=project,
+                    detected_version=detected_version,
+                    live_info=live_info,
+                ),
+            )
+        except RuntimeGameObjectHandleError as exc:
+            raise GatewayResultShapeError(
+                str(exc),
+                error_code=exc.error_code,
+            ) from exc
+        native_args["gameObject"] = game_object_record.game_object_id
+    request_validation = validate_semantic_payload(
+        args.api,
+        native_args,
+        {},
+        version=detected_version,
+    )
+    capability = live_capability(
+        detected_version,
+        args.api,
+        live_info=live_info,
+    )
+    result = dispatch(
+        dispatcher,
+        args.api,
+        connection=connection,
+        version=detected_version,
+        args=native_args,
+        options={},
+        allow_destructive=True,
+        result_limit_bytes=int(capability.execution_contract["result_limit_bytes"]),
+        operation_timeout=float(capability.execution_contract["timeout_seconds"]),
+    )
+    result_validation = (
+        validate_semantic_result(
+            args.api,
+            result.get("result"),
+            version=detected_version,
+        )
+        if result.get("ok")
+        else None
+    )
+    raw_result = result.get("result") if result.get("ok") else None
+    returned_object = (
+        raw_result.get("return") if isinstance(raw_result, Mapping) else None
+    )
+    if (
+        result.get("ok")
+        and (
+            not isinstance(returned_object, Mapping)
+            or not _canonical_guid(returned_object.get("id"))
+            or not isinstance(returned_object.get("name"), str)
+            or not returned_object["name"]
+        )
+    ):
+        raise GatewayResultShapeError(
+            "SoundEngine state/switch result must contain one bounded returned "
+            "object with an exact id and name.",
+            details={"actual_result": raw_result},
+            error_code="SOUNDENGINE_READ_RESULT_INVALID",
+        )
+    agent_result = (
+        {"id": returned_object["id"], "name": returned_object["name"]}
+        if result.get("ok")
+        else None
+    )
+    return {
+        "ok": bool(result.get("ok")),
+        "status": "ok" if result.get("ok") else "error",
+        **dict(common),
+        "api_attempted": args.api,
+        "business_request": dict(business_request),
+        "project_call": dispatch_call_summary(project_call),
+        "identity_read": {
+            "count": 1,
+            "exact": True,
+            "required_type": required_type,
+        },
+        "game_object_binding": (
+            {
+                "game_object_handle": game_object_record.handle,
+                "active": True,
+            }
+            if game_object_record is not None
+            else None
+        ),
+        "call": dispatch_call_summary(result),
+        "schema_validation": {
+            "request": request_validation.as_dict(),
+            "result": result_validation.as_dict() if result_validation else None,
+        },
+        "agent_result": agent_result,
+    }
+
+
+def dispatch_core_business_read(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Resolve business identities and run one bounded reviewed Core read."""
+
+    if args.core_business_version != detected_version:
+        raise GatewayInputError(
+            "Core business version changed after preflight; request-schema must be rerun"
+        )
+    if args.api in soundengine_control_business_read_operations():
+        return dispatch_soundengine_business_read(
+            args,
+            env=env,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+        )
+    if args.api in media_build_business_operations():
+        return dispatch_media_build_business_read(
+            args,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+        )
+    if args.api in runtime_inspection_business_operations():
+        return dispatch_runtime_inspection_business_read(
+            args,
+            env=env,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+        )
+    project, project_call = current_project(
+        dispatcher,
+        connection=connection,
+        version=detected_version,
+    )
+    assert project is not None
+    if args.api == "ak.wwise.core.object.diff":
+        requested = {
+            "source": args.source_id,
+            "target": args.target_id,
+        }
+        plan_fields = {
+            "source": "source_handle",
+            "target": "target_handle",
+        }
+    elif args.api == "ak.wwise.core.switchContainer.getAssignments":
+        requested = {"switch_container": args.object_id}
+        plan_fields = {"switch_container": "switch_container_handle"}
+    elif args.api == "ak.wwise.core.blendContainer.getAssignments":
+        requested = {"blend_track": args.object_id}
+        plan_fields = {"blend_track": "blend_track_handle"}
+    elif args.api == "ak.wwise.core.object.isLinked":
+        requested = {"object": args.object_id}
+        plan_fields = {"object": "object_handle"}
+    else:  # pragma: no cover - preflight registry invariant
+        raise GatewayInputError("Unsupported Core business read")
+    read_call = transaction_read_call(
+        dispatcher,
+        connection=connection,
+        version=detected_version,
+    )
+    raw = read_call(
+        OBJECT_GET_URI,
+        {"from": {"id": list(requested.values())}},
+        {"return": ["id", "name", "type", "path"]},
+    )
+    rows = raw.get("return")
+    if not isinstance(rows, list) or len(rows) != len(requested):
+        raise GatewayResultShapeError(
+            "Core business read requires both exact live object identities.",
+            details={
+                "actual_count": len(rows) if isinstance(rows, list) else None,
+                "expected_count": len(requested),
+            },
+            error_code="CORE_BUSINESS_IDENTITY_MISMATCH",
+        )
+    by_id: dict[str, Mapping[str, Any]] = {}
+    for row in rows:
+        try:
+            identity = normalize_live_object_identity(row)
+        except ValueError as exc:
+            raise GatewayResultShapeError(
+                "Core business identity row is malformed.",
+                error_code="CORE_BUSINESS_IDENTITY_MISMATCH",
+            ) from exc
+        key = identity.object_id
+        if key in by_id:
+            raise GatewayResultShapeError(
+                "Core business identity read returned a duplicate object.",
+                error_code="CORE_BUSINESS_IDENTITY_MISMATCH",
+            )
+        by_id[key] = {
+            **row,
+            "id": identity.object_id,
+            "name": identity.name,
+            "type": identity.object_type,
+            "path": identity.path,
+        }
+    if set(by_id) != {value.upper() for value in requested.values()}:
+        raise GatewayResultShapeError(
+            "Core business identity read did not match the requested objects.",
+            error_code="CORE_BUSINESS_IDENTITY_MISMATCH",
+        )
+    authority = "da1-" + canonical_sha256(
+        {"operation": args.api, "roles": requested}
+    )[:40]
+    session = BusinessDeclarationSession.create(
+        _business_context_from_live(
+            task_authority=authority,
+            project=project,
+            detected_version=detected_version,
+            live_info=live_info,
+        )
+    )
+    handles: dict[str, str] = {}
+    for role, object_id in requested.items():
+        row = by_id[object_id.upper()]
+        bound = session.handles.bind_object(
+            object_id=str(row["id"]),
+            name=str(row["name"]),
+            object_type=str(row["type"]),
+            path=str(row["path"]),
+            role=role,
+        )
+        handles[plan_fields[role]] = bound.handle
+    if args.api == "ak.wwise.core.object.isLinked":
+        discovery = discover_metadata(
+            read_call=read_call,
+            queries=(args.field_meaning,),
+            object=args.object_id,
+            limit=2,
+        )
+        eligible = [
+            candidate
+            for candidate in discovery.candidates
+            if candidate.get("kind") in {"property", "reference"}
+            and isinstance(candidate.get("metadata"), Mapping)
+        ]
+        if len(eligible) != 1:
+            raise GatewayResultShapeError(
+                "Core field meaning requires one live metadata candidate.",
+                details={
+                    "candidate_count": len(eligible),
+                    "candidates": [
+                        {
+                            "label": candidate.get("name"),
+                            "kind": candidate.get("kind"),
+                        }
+                        for candidate in eligible[:2]
+                    ],
+                },
+                error_code="CORE_BUSINESS_FIELD_AMBIGUOUS",
+            )
+        bound_field = bind_live_field(
+            session.handles,
+            read_call=read_call,
+            scope_kind="object",
+            scope_value=args.object_id,
+            token=str(eligible[0]["name"]),
+            platform=args.platform_name,
+        )
+        handles["field_handle"] = bound_field.handle
+        handles["platform_name"] = args.platform_name
+    session = session.with_settings({"core_plan": handles})
+    request = materialize_core_business_request(args.api, session)
+    request_validation = validate_semantic_payload(
+        request["api"],
+        request["args"],
+        request["options"],
+        version=detected_version,
+    )
+    capability = live_capability(
+        detected_version,
+        args.api,
+        live_info=live_info,
+    )
+    result = dispatch(
+        dispatcher,
+        request["api"],
+        connection=connection,
+        version=detected_version,
+        args=request["args"],
+        options=request["options"],
+        allow_destructive=True,
+        result_limit_bytes=int(
+            capability.execution_contract["result_limit_bytes"]
+        ),
+        operation_timeout=float(capability.execution_contract["timeout_seconds"]),
+    )
+    result_validation = (
+        validate_semantic_result(
+            request["api"],
+            result.get("result"),
+            version=detected_version,
+        )
+        if result.get("ok")
+        else None
+    )
+    return {
+        "ok": bool(result.get("ok")),
+        "status": "ok" if result.get("ok") else "error",
+        **common,
+        "api_attempted": args.api,
+        "business_request": {
+            "operation": args.api,
+            "roles": requested,
+            **(
+                {
+                    "field_meaning": args.field_meaning,
+                    "platform_name": args.platform_name,
+                }
+                if args.api == "ak.wwise.core.object.isLinked"
+                else {}
+            ),
+        },
+        "project_call": dispatch_call_summary(project_call),
+        "identity_read": {
+            "count": len(requested),
+            "exact": True,
+        },
+        "call": dispatch_call_summary(result),
+        "schema_validation": {
+            "request": request_validation.as_dict(),
+            "result": (
+                result_validation.as_dict() if result_validation else None
+            ),
+        },
+        "agent_result": result.get("result") if result.get("ok") else None,
+    }
+
+
+def dispatch_runtime_inspection_business_read(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Execute one bounded runtime-inspection read from business values."""
+
+    if (
+        args.api.startswith("ak.wwise.core.transport.")
+        and live_info.get("isCommandLine") is not False
+    ):
+        return runtime_authoring_host_required_payload(
+            api=args.api,
+            command=args.command,
+            live_info=live_info,
+            common=common,
+        )
+
+    project_call = None
+    transport_record = None
+    if args.api == TRANSPORT_GET_STATE_URI:
+        project, project_call = current_project(
+            dispatcher,
+            connection=connection,
+            version=detected_version,
+        )
+        assert project is not None
+        context = _runtime_transport_context_from_live(
+            endpoint=common["endpoint"],
+            project=project,
+            detected_version=detected_version,
+            live_info=live_info,
+        )
+        state_dir = resolve_transaction_state_directory(args, env=env)
+        require_runtime_directory_outside_project(state_dir, project=project)
+        try:
+            transport_record = RuntimeTransportHandleStore(state_dir).resolve(
+                args.runtime_inspection_business_request["transport_handle"],
+                context=context,
+            )
+        except RuntimeTransportHandleError as exc:
+            raise GatewayResultShapeError(
+                str(exc),
+                details=exc.details,
+                error_code=exc.error_code,
+            ) from exc
+        try:
+            request, _limit, _business_request = (
+                materialize_runtime_inspection_business_request(
+                    args.api,
+                    detected_version,
+                    log_channel=None,
+                    max_results=None,
+                    transport_handle=transport_record.handle,
+                    transport_binding=transport_record.binding_dict(),
+                )
+            )
+        except RuntimeInspectionBusinessError as exc:  # pragma: no cover - store invariant
+            raise GatewayResultShapeError(
+                str(exc),
+                error_code="TRANSPORT_HANDLE_STORE_CORRUPT",
+            ) from exc
+    else:
+        request = args.runtime_inspection_request
+    if not isinstance(request, Mapping):  # pragma: no cover - preflight invariant
+        raise GatewayInputError("Runtime-inspection request was not materialized")
+    request_validation = validate_semantic_payload(
+        request["api"],
+        request["args"],
+        request["options"],
+        version=detected_version,
+    )
+    capability = live_capability(
+        detected_version,
+        args.api,
+        live_info=live_info,
+    )
+    transport_binding_call = None
+    if args.api == TRANSPORT_GET_STATE_URI:
+        transport_id = request["args"].get("transport")
+        list_capability = live_capability(
+            detected_version,
+            "ak.wwise.core.transport.getList",
+            live_info=live_info,
+        )
+        transport_binding_call = dispatch(
+            dispatcher,
+            "ak.wwise.core.transport.getList",
+            connection=connection,
+            version=detected_version,
+            args={},
+            options={},
+            allow_destructive=True,
+            result_limit_bytes=int(
+                list_capability.execution_contract["result_limit_bytes"]
+            ),
+            operation_timeout=float(
+                list_capability.execution_contract["timeout_seconds"]
+            ),
+        )
+        list_payload = transport_binding_call.get("result")
+        rows = list_payload.get("list") if isinstance(list_payload, Mapping) else None
+        matches = (
+            [
+                row
+                for row in rows
+                if isinstance(row, Mapping) and row.get("transport") == transport_id
+            ]
+            if isinstance(rows, list)
+            else []
+        )
+        if (
+            transport_binding_call.get("ok") is not True
+            or not isinstance(rows, list)
+            or any(not isinstance(row, Mapping) for row in rows)
+            or len(matches) != 1
+        ):
+            raise GatewayResultShapeError(
+                "Transport handle does not resolve to exactly one live Authoring transport.",
+                details={
+                    "transport_handle": args.runtime_inspection_business_request.get(
+                        "transport_handle"
+                    ),
+                    "match_count": len(matches),
+                },
+                error_code="TRANSPORT_HANDLE_NOT_LIVE",
+            )
+        assert transport_record is not None
+        try:
+            RuntimeTransportHandleStore.validate_live_row(
+                transport_record,
+                matches[0],
+            )
+        except RuntimeTransportHandleError as exc:
+            raise GatewayResultShapeError(
+                str(exc),
+                details=exc.details,
+                error_code=exc.error_code,
+            ) from exc
+    result = dispatch(
+        dispatcher,
+        request["api"],
+        connection=connection,
+        version=detected_version,
+        args=request["args"],
+        options=request["options"],
+        # The dispatcher flag admits this reviewed runtime family; callers still
+        # cross only the bounded Gateway-owned request and result contracts.
+        allow_destructive=True,
+        result_limit_bytes=int(capability.execution_contract["result_limit_bytes"]),
+        operation_timeout=float(capability.execution_contract["timeout_seconds"]),
+    )
+    result_validation = (
+        validate_semantic_result(
+            request["api"],
+            result.get("result"),
+            version=detected_version,
+        )
+        if result.get("ok")
+        else None
+    )
+    try:
+        normalized = (
+            normalize_runtime_inspection_result(
+                args.api,
+                result.get("result"),
+                business_request=args.runtime_inspection_business_request,
+                max_results=args.runtime_inspection_limit,
+            )
+            if result.get("ok")
+            else None
+        )
+    except RuntimeInspectionBusinessError as exc:
+        raise GatewayResultShapeError(
+            str(exc),
+            details={
+                "api": args.api,
+                "observed_result": result.get("result"),
+            },
+            error_code="RUNTIME_INSPECTION_RESULT_INVALID",
+        ) from exc
+    return {
+        "ok": bool(result.get("ok")),
+        "status": "ok" if result.get("ok") else "error",
+        **dict(common),
+        "api_attempted": args.api,
+        "business_request": {
+            "operation": args.api,
+            **args.runtime_inspection_business_request,
+            "max_results": args.runtime_inspection_limit,
+        },
+        "call": dispatch_call_summary(result),
+        **(
+            {"project_call": dispatch_call_summary(project_call)}
+            if project_call is not None
+            else {}
+        ),
+        **(
+            {"transport_binding_call": dispatch_call_summary(transport_binding_call)}
+            if transport_binding_call is not None
+            else {}
+        ),
+        "schema_validation": {
+            "request": request_validation.as_dict(),
+            "result": result_validation.as_dict() if result_validation else None,
+        },
+        "agent_result": normalized,
+    }
+
+
+def dispatch_media_build_business_read(
+    args: argparse.Namespace,
+    *,
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Revalidate and execute one closed media/build business read."""
+
+    project, project_call = current_project(
+        dispatcher,
+        connection=connection,
+        version=detected_version,
+    )
+    assert project is not None
+    read_call = transaction_read_call(
+        dispatcher,
+        connection=connection,
+        version=detected_version,
+    )
+    field_discovery_call = None
+    if args.api == MEDIA_POOL_GET_URI:
+        field_api = "ak.wwise.core.mediaPool.getFields"
+        field_capability = live_capability(
+            detected_version,
+            field_api,
+            live_info=live_info,
+        )
+        field_discovery_call = dispatch(
+            dispatcher,
+            field_api,
+            connection=connection,
+            version=detected_version,
+            args={},
+            options={},
+            result_limit_bytes=int(
+                field_capability.execution_contract["result_limit_bytes"]
+            ),
+            operation_timeout=float(
+                field_capability.execution_contract["timeout_seconds"]
+            ),
+        )
+        if not field_discovery_call.get("ok"):
+            return {
+                "ok": False,
+                "status": "error",
+                **dict(common),
+                "api_attempted": args.api,
+                "field_discovery_call": dispatch_call_summary(field_discovery_call),
+                "agent_result": None,
+            }
+        field_result = field_discovery_call.get("result")
+        available_fields = (
+            field_result.get("return")
+            if isinstance(field_result, Mapping)
+            else None
+        )
+        if not isinstance(available_fields, list):
+            raise GatewayResultShapeError(
+                "Media Pool field discovery must return an exact-case field list.",
+                details={"result_type": type(field_result).__name__},
+                error_code="MEDIA_BUILD_FIELD_DISCOVERY_INVALID",
+            )
+        try:
+            request = materialize_media_build_business_request(
+                args.api,
+                detected_version,
+                args.media_build_plan,
+                available_media_fields=available_fields,
+            )
+        except MediaBuildBusinessError as exc:
+            raise GatewayInputError(str(exc)) from exc
+    else:
+        request = args.media_build_request
+    if args.api == MEDIA_POOL_GET_URI:
+        required_type = None
+        identity_rows = None
+    else:
+        identity_id = request["business_request"].get(
+            "audio_source_id"
+            if args.api in {PEAKS_REGION_URI, PEAKS_TRIMMED_URI}
+            else "soundbank_id"
+        )
+        required_type = (
+            "AudioFileSource"
+            if args.api in {PEAKS_REGION_URI, PEAKS_TRIMMED_URI}
+            else "SoundBank"
+        )
+        if not isinstance(identity_id, str):  # pragma: no cover - preflight invariant
+            raise GatewayInputError("Media/build request lacks its object identity")
+        identity_result = read_call(
+            OBJECT_GET_URI,
+            {"from": {"id": [identity_id]}},
+            {"return": ["id", "name", "type", "path"]},
+        )
+        identity_rows = identity_result.get("return")
+        identity = (
+            identity_rows[0]
+            if isinstance(identity_rows, list) and len(identity_rows) == 1
+            else None
+        )
+        try:
+            normalized_identity = normalize_live_object_identity(identity)
+        except ValueError:
+            normalized_identity = None
+        if (
+            normalized_identity is None
+            or normalized_identity.object_id != identity_id.upper()
+            or normalized_identity.object_type != required_type
+        ):
+            raise GatewayResultShapeError(
+                f"Media/build read requires one exact live {required_type} identity.",
+                details={
+                    "requested_id": identity_id,
+                    "required_type": required_type,
+                    "actual_rows": identity_rows,
+                },
+                error_code="MEDIA_BUILD_IDENTITY_MISMATCH",
+            )
+    request_validation = validate_semantic_payload(
+        request["api"],
+        request["args"],
+        request["options"],
+        version=detected_version,
+    )
+    capability = live_capability(
+        detected_version,
+        args.api,
+        live_info=live_info,
+    )
+    result = dispatch(
+        dispatcher,
+        request["api"],
+        connection=connection,
+        version=detected_version,
+        args=request["args"],
+        options=request["options"],
+        allow_destructive=True,
+        result_limit_bytes=int(capability.execution_contract["result_limit_bytes"]),
+        operation_timeout=float(capability.execution_contract["timeout_seconds"]),
+    )
+    result_validation = (
+        validate_semantic_result(
+            request["api"],
+            result.get("result"),
+            version=detected_version,
+        )
+        if result.get("ok")
+        else None
+    )
+    normalized = None
+    result_identity_rows: list[Mapping[str, Any]] = []
+    if result.get("ok"):
+        if args.api == SOUNDBANK_GET_INCLUSIONS_URI:
+            raw_result = result.get("result")
+            raw_inclusions = (
+                raw_result.get("inclusions")
+                if isinstance(raw_result, Mapping)
+                else None
+            )
+            if not isinstance(raw_inclusions, list):
+                raise GatewayResultShapeError(
+                    "SoundBank inclusion result lacks its inclusion list.",
+                    details={"result_type": type(raw_result).__name__},
+                    error_code="MEDIA_BUILD_RESULT_INVALID",
+                )
+            if len(raw_inclusions) > 500:
+                raise GatewayResultShapeError(
+                    "SoundBank inclusion result exceeds 500 rows.",
+                    details={"count": len(raw_inclusions), "limit": 500},
+                    error_code="MEDIA_BUILD_RESULT_LIMIT_EXCEEDED",
+                )
+            inclusion_ids = []
+            for row in raw_inclusions:
+                object_id = row.get("object") if isinstance(row, Mapping) else None
+                if not isinstance(object_id, str) or not _canonical_guid(object_id):
+                    raise GatewayResultShapeError(
+                        "SoundBank inclusion result contains a malformed object identity.",
+                        details={"row": row},
+                        error_code="MEDIA_BUILD_RESULT_INVALID",
+                    )
+                inclusion_ids.append(object_id)
+            if len({value.upper() for value in inclusion_ids}) != len(inclusion_ids):
+                raise GatewayResultShapeError(
+                    "SoundBank inclusion result contains duplicate object identities.",
+                    details={"count": len(inclusion_ids)},
+                    error_code="MEDIA_BUILD_RESULT_INVALID",
+                )
+            if inclusion_ids:
+                resolved = read_call(
+                    OBJECT_GET_URI,
+                    {"from": {"id": inclusion_ids}},
+                    {"return": ["id", "name", "type", "path"]},
+                )
+                raw_rows = resolved.get("return")
+                if not isinstance(raw_rows, list):
+                    raise GatewayResultShapeError(
+                        "SoundBank inclusion identity read is malformed.",
+                        details={"result_type": type(raw_rows).__name__},
+                        error_code="MEDIA_BUILD_RESULT_INVALID",
+                    )
+                result_identity_rows = raw_rows
+        try:
+            normalized = normalize_media_build_result(
+                request,
+                result.get("result"),
+                identity_rows=result_identity_rows,
+            )
+        except MediaBuildBusinessError as exc:
+            raise GatewayResultShapeError(
+                str(exc),
+                details={"media_build_error_code": exc.code},
+                error_code=exc.code,
+            ) from exc
+    incomplete_media_pool = (
+        args.api == MEDIA_POOL_GET_URI
+        and isinstance(normalized, Mapping)
+        and normalized.get("complete") is False
+    )
+    effective_ok = bool(result.get("ok")) and not incomplete_media_pool
+    return {
+        "ok": effective_ok,
+        "status": (
+            "incomplete_boundary"
+            if incomplete_media_pool
+            else "ok"
+            if result.get("ok")
+            else "error"
+        ),
+        **dict(common),
+        "api_attempted": args.api,
+        **(
+            {
+                "error_code": "MEDIA_POOL_POST_FILTER_INCOMPLETE",
+                "message": (
+                    "The Media Pool candidate response reached maxResults, so "
+                    "the exact-case post-filter cannot prove completeness."
+                ),
+            }
+            if incomplete_media_pool
+            else {}
+        ),
+        "business_request": {
+            "operation": args.api,
+            **dict(request["business_request"]),
+        },
+        "project_call": dispatch_call_summary(project_call),
+        "identity_read": {
+            "count": (0 if required_type is None else 1) + len(result_identity_rows),
+            "exact": True,
+            "required_type": required_type,
+        },
+        **(
+            {
+                "field_discovery": {
+                    "api": "ak.wwise.core.mediaPool.getFields",
+                    "field_count": len(available_fields),
+                    "exact_case": True,
+                    "call": dispatch_call_summary(field_discovery_call),
+                }
+            }
+            if field_discovery_call is not None
+            else {}
+        ),
+        "call": dispatch_call_summary(result),
+        "schema_validation": {
+            "request": request_validation.as_dict(),
+            "result": result_validation.as_dict() if result_validation else None,
+        },
+        "agent_result": None if incomplete_media_pool else normalized,
+    }
+
+
+def dispatch_business_core_plan(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Record one complete Core business plan without native request fields."""
+
+    binding = _open_business_binding(
+        args,
+        env=env,
+        connection=connection,
+        detected_version=detected_version,
+        live_info=live_info,
+        dispatcher=dispatcher,
+    )
+    adapter = business_adapter(binding.record.operation)
+    if adapter.family != "core-project-object" or not adapter.accepts_update_command(
+        args.command
+    ):
+        raise GatewayInputError(
+            f"{binding.record.operation} does not expose {args.command}"
+        )
+    raw_session = (
+        binding.record.composition.get("business_session")
+        if binding.record.composition is not None
+        else None
+    )
+    session = (
+        BusinessDeclarationSession.create(binding.context)
+        if raw_session is None
+        else BusinessDeclarationSession.from_dict(raw_session)
+    )
+    if session.context != binding.context:
+        raise OperationDraftBindingDrift(
+            "Live project or Wwise build differs from the Core plan binding."
+        )
+    contract = core_business_contract_data(
+        binding.record.operation,
+        detected_version,
+    )
+    field_types = contract["declaration"]["field_types"]
+    plan: dict[str, Any] = {}
+
+    def put_scalar(name: str, value: Any, *, accepted: set[str]) -> None:
+        value_type = field_types.get(name)
+        if value_type not in accepted:
+            raise GatewayInputError(
+                f"Core business field {name!r} is unavailable through this input form"
+            )
+        if name in plan:
+            raise GatewayInputError(f"Core business field {name!r} was supplied twice")
+        plan[name] = value
+
+    def append_item(name: str, value: Any, *, accepted: set[str]) -> None:
+        value_type = field_types.get(name)
+        if value_type not in accepted:
+            raise GatewayInputError(
+                f"Core business collection {name!r} is unavailable through this input form"
+            )
+        current = plan.setdefault(name, [])
+        if not isinstance(current, list):  # pragma: no cover - local invariant
+            raise GatewayInputError(f"Core business field {name!r} has conflicting forms")
+        current.append(value)
+
+    for name, handle in args.role:
+        value_type = field_types.get(name)
+        if value_type == "bound_object_handle":
+            put_scalar(name, handle, accepted={value_type})
+        elif value_type == "bound_object_handle_list":
+            append_item(name, handle, accepted={value_type})
+        else:
+            raise GatewayInputError(
+                f"Core business role {name!r} is not disclosed for this operation"
+            )
+    for name, handle in args.field:
+        value_type = field_types.get(name)
+        if value_type == "bound_field_handle":
+            put_scalar(name, handle, accepted={value_type})
+        elif value_type == "bound_field_handle_list":
+            append_item(name, handle, accepted={value_type})
+        else:
+            raise GatewayInputError(
+                f"Core business field role {name!r} is not disclosed for this operation"
+            )
+    for name, raw in args.value:
+        value_type = field_types.get(name)
+        if value_type == "boolean":
+            value = _parse_business_value("boolean", raw, field=name)
+        elif value_type in {"finite_number_lte_zero", "finite_number_gte_zero"}:
+            value = _parse_business_value("number", raw, field=name)
+        elif value_type == "nonnegative_integer":
+            value = _parse_business_value("integer", raw, field=name)
+        elif value_type in {
+            "attenuation_curve_kind",
+            "attenuation_curve_source",
+            "installed_conversion_plugin_name",
+            "paste_list_mode",
+            "platform_name",
+            "wwise_object_name",
+            "exact_user_io_root",
+        }:
+            value = raw
+        else:
+            raise GatewayInputError(
+                f"Core business value {name!r} is not disclosed for this operation"
+            )
+        put_scalar(name, value, accepted={str(value_type)})
+    for name, raw in args.item:
+        append_item(
+            name,
+            raw,
+            accepted={"platform_name_list", "language_name_list"},
+        )
+    if args.curve_point:
+        if field_types.get("points") != "attenuation_curve_points":
+            raise GatewayInputError("Curve points are unavailable for this Core operation")
+        points: list[dict[str, Any]] = []
+        for index, (raw_x, raw_y, shape) in enumerate(args.curve_point):
+            try:
+                x = float(raw_x)
+                y = float(raw_y)
+            except ValueError as exc:
+                raise GatewayInputError(
+                    f"Curve point {index} requires finite numeric X and Y values"
+                ) from exc
+            if not math.isfinite(x) or not math.isfinite(y):
+                raise GatewayInputError(
+                    f"Curve point {index} requires finite numeric X and Y values"
+                )
+            points.append({"x": x, "y": y, "shape": shape})
+        plan["points"] = points
+    if args.blend_edge:
+        if field_types.get("edges") != "blend_assignment_edges":
+            raise GatewayInputError("Blend edges are unavailable for this Core operation")
+        edges: list[dict[str, Any]] = []
+        for index, (raw_edge, mode, raw_fade, shape) in enumerate(args.blend_edge):
+            try:
+                edge_position = float(raw_edge)
+                fade_position = None if raw_fade == "none" else float(raw_fade)
+            except ValueError as exc:
+                raise GatewayInputError(
+                    f"Blend edge {index} requires finite numeric positions"
+                ) from exc
+            if not math.isfinite(edge_position) or (
+                fade_position is not None and not math.isfinite(fade_position)
+            ):
+                raise GatewayInputError(
+                    f"Blend edge {index} requires finite numeric positions"
+                )
+            edge = {
+                "edge_position": edge_position,
+                "fade_mode": mode,
+                "shape": shape,
+            }
+            if fade_position is not None:
+                edge["fade_position"] = fade_position
+            edges.append(edge)
+        plan["edges"] = edges
+
+    def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
+        candidate = current.with_settings({"core_plan": plan})
+        adapter.materialize(candidate)
+        return candidate
+
+    record = binding.store.apply_business_update(
+        args.draft_id,
+        task_authority=args.task_authority,
+        expected_revision=args.expected_revision,
+        schema_digest=operation_draft_schema_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        composer_digest=operation_composer_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        context=binding.context,
+        update=update,
+        event_type="settings.revised",
+    )
+    payload = operation_draft_payload(
+        args.command,
+        record,
+        offline=False,
+        state_dir=args.state_dir,
+        task_authority=args.task_authority,
+    )
+    payload.update(
+        {
+            "endpoint": dict(common["endpoint"]),
+            "detected_version": detected_version,
+            "project_call": dispatch_call_summary(binding.project_call),
+        }
+    )
+    return payload
+
+
+def dispatch_business_project_setting_plan(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Record one complete project-setting plan without native request fields."""
+
+    binding = _open_business_binding(
+        args,
+        env=env,
+        connection=connection,
+        detected_version=detected_version,
+        live_info=live_info,
+        dispatcher=dispatcher,
+    )
+    adapter = business_adapter(binding.record.operation)
+    if adapter.family != "project-setting-business" or not adapter.accepts_update_command(
+        args.command
+    ):
+        raise GatewayInputError(
+            f"{binding.record.operation} does not expose {args.command}"
+        )
+    raw_session = (
+        binding.record.composition.get("business_session")
+        if binding.record.composition is not None
+        else None
+    )
+    session = (
+        BusinessDeclarationSession.create(binding.context)
+        if raw_session is None
+        else BusinessDeclarationSession.from_dict(raw_session)
+    )
+    if session.context != binding.context:
+        raise OperationDraftBindingDrift(
+            "Live project or Wwise build differs from the project-setting binding."
+        )
+    contract = project_setting_business_contract_data(
+        binding.record.operation,
+        detected_version,
+    )
+    field_types = contract["declaration"]["field_types"]
+    plan: dict[str, Any] = {}
+    supplied = {
+        "sound_handle": args.sound_handle,
+        "source_handle": args.source_handle,
+        "game_parameter_handle": args.game_parameter_handle,
+        "minimum": args.minimum,
+        "maximum": args.maximum,
+        "curve_update_outcome": args.curve_update_outcome,
+        "platform_name": args.platform_name,
+    }
+    for name, raw in supplied.items():
+        if raw is None:
+            continue
+        value_type = field_types.get(name)
+        if value_type in {
+            "bound_sound_handle",
+            "bound_audio_file_source_handle",
+            "bound_game_parameter_handle",
+        }:
+            value: Any = raw
+        elif value_type == "finite_number":
+            try:
+                value = float(raw)
+            except ValueError as exc:
+                raise GatewayInputError(
+                    f"Project-setting field {name!r} requires one finite number"
+                ) from exc
+            if not math.isfinite(value):
+                raise GatewayInputError(
+                    f"Project-setting field {name!r} requires one finite number"
+                )
+        elif value_type in {"platform_name", "range_curve_update_outcome"}:
+            value = raw
+        else:
+            raise GatewayInputError(
+                f"Project-setting field {name!r} is not disclosed for this operation"
+            )
+        plan[name] = value
+
+    def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
+        candidate = current.with_settings({"project_setting_plan": plan})
+        adapter.materialize(candidate)
+        return candidate
+
+    record = binding.store.apply_business_update(
+        args.draft_id,
+        task_authority=args.task_authority,
+        expected_revision=args.expected_revision,
+        schema_digest=operation_draft_schema_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        composer_digest=operation_composer_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        context=binding.context,
+        update=update,
+        event_type="settings.revised",
+    )
+    payload = operation_draft_payload(
+        args.command,
+        record,
+        offline=False,
+        state_dir=args.state_dir,
+        task_authority=args.task_authority,
+    )
+    payload.update(
+        {
+            "endpoint": dict(common["endpoint"]),
+            "detected_version": detected_version,
+            "project_call": dispatch_call_summary(binding.project_call),
+        }
+    )
+    return payload
+
+
+def dispatch_business_runtime_control_plan(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Record one complete runtime control outcome without native fields."""
+
+    state_dir = resolve_transaction_state_directory(args, env=env)
+    pending = OperationDraftStore(state_dir).inspect(
+        args.draft_id,
+        task_authority=args.task_authority,
+    )
+    if (
+        pending.operation == "ak.wwise.core.remote.connect"
+        or pending.operation.startswith("ak.wwise.core.transport.")
+    ) and live_info.get("isCommandLine") is not False:
+        return runtime_authoring_host_required_payload(
+            api=pending.operation,
+            command=args.command,
+            live_info=live_info,
+            common=common,
+        )
+
+    binding = _open_business_binding(
+        args,
+        env=env,
+        connection=connection,
+        detected_version=detected_version,
+        live_info=live_info,
+        dispatcher=dispatcher,
+    )
+    adapter = business_adapter(binding.record.operation)
+    if adapter.family != "runtime-control-business" or not adapter.accepts_update_command(
+        args.command
+    ):
+        raise GatewayInputError(
+            f"{binding.record.operation} does not expose {args.command}"
+        )
+    raw_session = (
+        binding.record.composition.get("business_session")
+        if binding.record.composition is not None
+        else None
+    )
+    session = (
+        BusinessDeclarationSession.create(binding.context)
+        if raw_session is None
+        else BusinessDeclarationSession.from_dict(raw_session)
+    )
+    if session.context != binding.context:
+        raise OperationDraftBindingDrift(
+            "Live project or Wwise build differs from the runtime-control binding."
+        )
+    contract = adapter.contract(detected_version)
+    field_types = contract["declaration"]["field_types"]
+    supplied = {
+        "cursor_move": args.cursor_move,
+        "cursor_target_ms": args.cursor_target_ms,
+        "capture_data_changes": args.capture_data or None,
+        "message": args.message,
+        "log_channel": args.log_channel,
+        "severity": args.severity,
+        "remote_host": args.remote_host,
+        "application_name": args.application_name,
+        "command_port": args.command_port,
+        "notification_port": args.notification_port,
+        "target_handle": args.target_handle,
+        "game_object_id": args.game_object_id,
+        "transport_handle": args.transport_handle,
+        "audition_action": args.audition_action,
+        "transport_scope": args.transport_scope,
+        "audition_media": args.audition_media,
+        "meter_object_handle": args.meter_object_handle,
+        "capture_output_directory": args.capture_output_directory,
+        "capture_name": args.capture_name,
+    }
+    plan = {
+        name: value
+        for name, value in supplied.items()
+        if value is not None and name in field_types
+    }
+    undisclosed = [
+        name
+        for name, value in supplied.items()
+        if value is not None and name not in field_types
+    ]
+    if undisclosed:
+        raise GatewayInputError(
+            "Runtime-control fields are not disclosed for this operation: "
+            + ", ".join(sorted(undisclosed))
+        )
+    transport_record = None
+    requires_transport_binding = (
+        binding.record.operation == TRANSPORT_DESTROY_URI
+        or (
+            binding.record.operation == TRANSPORT_EXECUTE_ACTION_URI
+            and plan.get("transport_scope") == "one-transport"
+        )
+    )
+    if "transport_handle" in plan and requires_transport_binding:
+        context = _runtime_transport_context_from_live(
+            endpoint=common["endpoint"],
+            project=binding.project,
+            detected_version=detected_version,
+            live_info=live_info,
+        )
+        try:
+            transport_record = RuntimeTransportHandleStore(
+                binding.state_dir
+            ).resolve(
+                plan["transport_handle"],
+                context=context,
+            )
+        except RuntimeTransportHandleError as exc:
+            raise GatewayResultShapeError(
+                str(exc),
+                details=exc.details,
+                error_code=exc.error_code,
+            ) from exc
+    candidate_settings = {
+        "runtime_control_plan": plan,
+        **(
+            {"runtime_transport_binding": transport_record.binding_dict()}
+            if transport_record is not None
+            else {}
+        ),
+    }
+    candidate = session.with_settings(candidate_settings)
+    materialized = adapter.materialize(candidate)
+    arguments = materialized.get("arguments")
+    native_args = arguments.get("args") if isinstance(arguments, Mapping) else None
+    transport_id = (
+        native_args.get("transport") if isinstance(native_args, Mapping) else None
+    )
+    transport_binding_call = None
+    if transport_id is not None:
+        transport_rows = binding.read_call(
+            "ak.wwise.core.transport.getList",
+            {},
+            {},
+        ).get("list")
+        matches = (
+            [
+                row
+                for row in transport_rows
+                if isinstance(row, Mapping) and row.get("transport") == transport_id
+            ]
+            if isinstance(transport_rows, list)
+            else []
+        )
+        if (
+            not isinstance(transport_rows, list)
+            or any(not isinstance(row, Mapping) for row in transport_rows)
+            or len(matches) != 1
+        ):
+            raise GatewayResultShapeError(
+                "Transport handle does not resolve to exactly one live Authoring transport.",
+                details={
+                    "transport_handle": plan.get("transport_handle"),
+                    "match_count": len(matches),
+                },
+                error_code="TRANSPORT_HANDLE_NOT_LIVE",
+            )
+        if transport_record is not None:
+            try:
+                RuntimeTransportHandleStore.validate_live_row(
+                    transport_record,
+                    matches[0],
+                )
+            except RuntimeTransportHandleError as exc:
+                raise GatewayResultShapeError(
+                    str(exc),
+                    details=exc.details,
+                    error_code=exc.error_code,
+                ) from exc
+        transport_binding_call = {
+            "transport_handle": plan.get("transport_handle"),
+            "live_match": True,
+        }
+
+    def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
+        candidate = current.with_settings(candidate_settings)
+        adapter.materialize(candidate)
+        return candidate
+
+    record = binding.store.apply_business_update(
+        args.draft_id,
+        task_authority=args.task_authority,
+        expected_revision=args.expected_revision,
+        schema_digest=operation_draft_schema_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        composer_digest=operation_composer_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        context=binding.context,
+        update=update,
+        event_type="settings.revised",
+    )
+    payload = operation_draft_payload(
+        args.command,
+        record,
+        offline=False,
+        state_dir=args.state_dir,
+        task_authority=args.task_authority,
+    )
+    payload.update(
+        {
+            "endpoint": dict(common["endpoint"]),
+            "detected_version": detected_version,
+            "project_call": dispatch_call_summary(binding.project_call),
+            **(
+                {"transport_binding": transport_binding_call}
+                if transport_binding_call is not None
+                else {}
+            ),
+        }
+    )
+    return payload
+
+
+def dispatch_business_soundengine_plan(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Record one complete SoundEngine outcome without native request fields."""
+
+    binding = _open_business_binding(
+        args,
+        env=env,
+        connection=connection,
+        detected_version=detected_version,
+        live_info=live_info,
+        dispatcher=dispatcher,
+    )
+    adapter = business_adapter(binding.record.operation)
+    if (
+        adapter.family != "soundengine-control-business"
+        or not adapter.accepts_update_command(args.command)
+    ):
+        raise GatewayInputError(
+            f"{binding.record.operation} does not expose {args.command}"
+        )
+    raw_session = (
+        binding.record.composition.get("business_session")
+        if binding.record.composition is not None
+        else None
+    )
+    session = (
+        BusinessDeclarationSession.create(binding.context)
+        if raw_session is None
+        else BusinessDeclarationSession.from_dict(raw_session)
+    )
+    if session.context != binding.context:
+        raise OperationDraftBindingDrift(
+            "Live project or Wwise build differs from the SoundEngine binding."
+        )
+    contract = soundengine_control_business_contract_data(
+        binding.record.operation,
+        detected_version,
+    )
+    field_types = contract["declaration"]["field_types"]
+    supplied = {
+        "monitor_message": args.monitor_message,
+        "game_object_name": args.game_object_name,
+        "game_object_handle": args.game_object_handle,
+        "event_handle": args.event_handle,
+        "action": args.action,
+        "playing_handle": args.playing_handle,
+        "fade_duration_ms": args.fade_duration_ms,
+        "fade_curve": args.fade_curve,
+        "position_ms": args.position_ms,
+        "position_percent": args.position_percent,
+        "nearest_marker": args.nearest_marker,
+        "state_group_handle": args.state_group_handle,
+        "state_handle": args.state_handle,
+        "switch_group_handle": args.switch_group_handle,
+        "switch_handle": args.switch_handle,
+        "trigger_handle": args.trigger_handle,
+        "game_parameter_handle": args.game_parameter_handle,
+        "value": args.value,
+        "sound_bank_handle": args.sound_bank_handle,
+        "emitter_handle": args.emitter_handle,
+        "obstruction_percent": args.obstruction_percent,
+        "occlusion_percent": args.occlusion_percent,
+        "attenuation_scale_percent": args.attenuation_scale_percent,
+        "volume_db": args.volume_db,
+        "clear_listeners": args.clear_listeners,
+        "multi_position_mode": args.multi_position_mode,
+        "spatialization": args.spatialization,
+        "channel_layout": args.channel_layout,
+        "channel_layout_kind": args.channel_layout_kind,
+        "channel_speakers": args.channel_speaker,
+        "channel_count": args.channel_count,
+        "speaker_offsets_db": args.speaker_offset_db,
+        "channel_offsets_db": args.channel_offset_db,
+        "aux_sends": args.aux_send,
+        "clear_aux_sends": args.clear_aux_sends,
+    }
+    if args.listener_handle is not None:
+        if "listener_handles" in field_types:
+            supplied["listener_handles"] = args.listener_handle
+        else:
+            supplied["listener_handle"] = (
+                args.listener_handle[0]
+                if len(args.listener_handle) == 1
+                else args.listener_handle
+            )
+    if args.position_frame is not None:
+        if "position_frames" in field_types:
+            supplied["position_frames"] = args.position_frame
+        else:
+            supplied["position_frame"] = (
+                args.position_frame[0]
+                if len(args.position_frame) == 1
+                else args.position_frame
+            )
+    plan = {
+        name: value
+        for name, value in supplied.items()
+        if value is not None and name in field_types
+    }
+    undisclosed = [
+        name
+        for name, value in supplied.items()
+        if value is not None and name not in field_types
+    ]
+    if undisclosed:
+        raise GatewayInputError(
+            "SoundEngine fields are not disclosed for this operation: "
+            + ", ".join(sorted(undisclosed))
+        )
+
+    game_object_record = None
+    if "game_object_handle" in plan:
+        game_object_record = RuntimeGameObjectHandleStore(binding.state_dir).resolve(
+            plan["game_object_handle"],
+            context=_runtime_game_object_context_from_live(
+                endpoint=common["endpoint"],
+                project=binding.project,
+                detected_version=detected_version,
+                live_info=live_info,
+            ),
+        )
+    playing_record = None
+    if "playing_handle" in plan:
+        playing_record = RuntimePlayingHandleStore(binding.state_dir).resolve(
+            plan["playing_handle"],
+            context=_runtime_game_object_context_from_live(
+                endpoint=common["endpoint"],
+                project=binding.project,
+                detected_version=detected_version,
+                live_info=live_info,
+            ),
+        )
+    runtime_context = _runtime_game_object_context_from_live(
+        endpoint=common["endpoint"],
+        project=binding.project,
+        detected_version=detected_version,
+        live_info=live_info,
+    )
+    runtime_game_object_records = {}
+    runtime_handle_values: list[str] = []
+    for field in ("emitter_handle", "listener_handle"):
+        value = plan.get(field)
+        if isinstance(value, str):
+            runtime_handle_values.append(value)
+    listener_handles = plan.get("listener_handles")
+    if isinstance(listener_handles, list):
+        runtime_handle_values.extend(listener_handles)
+    aux_sends = plan.get("aux_sends")
+    if isinstance(aux_sends, list):
+        runtime_handle_values.extend(
+            row[0]
+            for row in aux_sends
+            if isinstance(row, list) and len(row) == 3 and isinstance(row[0], str)
+        )
+    for handle in dict.fromkeys(runtime_handle_values):
+        record = RuntimeGameObjectHandleStore(binding.state_dir).resolve(
+            handle,
+            context=runtime_context,
+        )
+        runtime_game_object_records[handle] = record.as_dict()
+
+    def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
+        candidate = current.with_settings(
+            {
+                "soundengine_plan": plan,
+                **(
+                    {"runtime_game_object_binding": game_object_record.as_dict()}
+                    if game_object_record is not None
+                    else {}
+                ),
+                **(
+                    {"runtime_playing_binding": playing_record.as_dict()}
+                    if playing_record is not None
+                    else {}
+                ),
+                **(
+                    {"runtime_game_object_bindings": runtime_game_object_records}
+                    if runtime_game_object_records
+                    else {}
+                ),
+            }
+        )
+        adapter.materialize(candidate)
+        return candidate
+
+    record = binding.store.apply_business_update(
+        args.draft_id,
+        task_authority=args.task_authority,
+        expected_revision=args.expected_revision,
+        schema_digest=operation_draft_schema_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        composer_digest=operation_composer_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        context=binding.context,
+        update=update,
+        event_type="settings.revised",
+    )
+    payload = operation_draft_payload(
+        args.command,
+        record,
+        offline=False,
+        state_dir=args.state_dir,
+        task_authority=args.task_authority,
+    )
+    payload.update(
+        {
+            "endpoint": dict(common["endpoint"]),
+            "detected_version": detected_version,
+            "project_call": dispatch_call_summary(binding.project_call),
+        }
+    )
+    return payload
+
+
+def _source_control_roots_from_project(
+    project: Mapping[str, Any],
+) -> dict[str, str]:
+    directories = project.get("directories")
+    if not isinstance(directories, Mapping):
+        raise GatewayResultShapeError(
+            "Live project information lacks source-control directory roots.",
+            error_code="SOURCE_CONTROL_ROOTS_UNAVAILABLE",
+        )
+    project_root = directories.get("root")
+    originals_root = directories.get("originals")
+    if not all(
+        isinstance(value, str) and bool(value)
+        for value in (project_root, originals_root)
+    ):
+        raise GatewayResultShapeError(
+            "Live project information contains invalid source-control roots.",
+            error_code="SOURCE_CONTROL_ROOTS_UNAVAILABLE",
+        )
+    return {
+        "project": str(project_root),
+        "originals": str(originals_root),
+    }
+
+
+def dispatch_business_source_control_plan(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Record one closed external source-control plan and sealed live roots."""
+
+    binding = _open_business_binding(
+        args,
+        env=env,
+        connection=connection,
+        detected_version=detected_version,
+        live_info=live_info,
+        dispatcher=dispatcher,
+    )
+    adapter = business_adapter(binding.record.operation)
+    if adapter.family != "source-control-business" or not adapter.accepts_update_command(
+        args.command
+    ):
+        raise GatewayInputError(
+            f"{binding.record.operation} does not expose {args.command}"
+        )
+    raw_session = (
+        binding.record.composition.get("business_session")
+        if binding.record.composition is not None
+        else None
+    )
+    session = (
+        BusinessDeclarationSession.create(binding.context)
+        if raw_session is None
+        else BusinessDeclarationSession.from_dict(raw_session)
+    )
+    if session.context != binding.context:
+        raise OperationDraftBindingDrift(
+            "Live project or Wwise build differs from the source-control binding."
+        )
+    try:
+        plan = source_control_plan_from_namespace(
+            args,
+            operation=binding.record.operation,
+        )
+    except SourceControlBusinessCliError as exc:
+        raise GatewayInputError(str(exc)) from exc
+    roots = _source_control_roots_from_project(binding.project)
+
+    def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
+        candidate = current.with_settings(
+            {
+                "source_control_roots": roots,
+                "source_control_plan": plan,
+            }
+        )
+        adapter.materialize(candidate)
+        return candidate
+
+    record = binding.store.apply_business_update(
+        args.draft_id,
+        task_authority=args.task_authority,
+        expected_revision=args.expected_revision,
+        schema_digest=operation_draft_schema_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        composer_digest=operation_composer_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        context=binding.context,
+        update=update,
+        event_type="settings.revised",
+    )
+    payload = operation_draft_payload(
+        args.command,
+        record,
+        offline=False,
+        state_dir=args.state_dir,
+        task_authority=args.task_authority,
+    )
+    payload.update(
+        {
+            "endpoint": dict(common["endpoint"]),
+            "detected_version": detected_version,
+            "project_call": dispatch_call_summary(binding.project_call),
+        }
+    )
+    return payload
+
+
 def dispatch_command(
     args: argparse.Namespace,
     *,
@@ -4591,8 +12715,188 @@ def dispatch_command(
         "detected_version": detected_version,
         "is_command_line": bool(live_info.get("isCommandLine")),
     }
+    if args.command == "core-call":
+        return dispatch_core_business_read(
+            args,
+            env=env,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+        )
+    if args.command == "draft-declare-core-plan":
+        return dispatch_business_core_plan(
+            args,
+            env=env,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+        )
+    if args.command == "draft-declare-project-setting-plan":
+        return dispatch_business_project_setting_plan(
+            args,
+            env=env,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+        )
+    if args.command == "draft-declare-runtime-control-plan":
+        return dispatch_business_runtime_control_plan(
+            args,
+            env=env,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+        )
+    if args.command == "draft-declare-soundengine-plan":
+        return dispatch_business_soundengine_plan(
+            args,
+            env=env,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+        )
+    if args.command == "draft-declare-source-control-plan":
+        return dispatch_business_source_control_plan(
+            args,
+            env=env,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+        )
     if args.command == "draft-check":
         return dispatch_operation_draft_check(
+            args,
+            env=env,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+        )
+    if args.command == "draft-bind-object":
+        return dispatch_business_object_binding(
+            args,
+            env=env,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+        )
+    if args.command == "draft-declare-soundbank-plan":
+        return dispatch_business_soundbank_plan(
+            args,
+            env=env,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+        )
+    if args.command == "draft-declare-artifact-plan":
+        return dispatch_business_exact_artifact_plan(
+            args,
+            env=env,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+        )
+    if args.command == "draft-declare-cli-console-plan":
+        return dispatch_business_cli_console_plan(
+            args,
+            env=env,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+        )
+    if args.command == "draft-declare-host-plan":
+        return dispatch_business_host_ui_debug_plan(
+            args,
+            env=env,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+        )
+    if args.command in {"draft-declare-ui-plan", "draft-add-ui-command"}:
+        return dispatch_business_authoring_ui_update(
+            args,
+            env=env,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+        )
+    if args.command == "draft-declare-debug-intent":
+        return dispatch_business_debug_intent(
+            args,
+            env=env,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+        )
+    if args.command == "draft-declare-undo-plan":
+        return dispatch_business_compound_undo_plan(
+            args,
+            env=env,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+        )
+    if args.command == "draft-bind-field":
+        return dispatch_business_field_binding(
+            args,
+            env=env,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+        )
+    if args.command == "draft-discover-fields":
+        return dispatch_business_field_discovery(
+            args,
+            env=env,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+        )
+    if args.command == "draft-declare-existing-batch":
+        return dispatch_business_existing_batch(
+            args,
+            env=env,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+        )
+    if args.command == "draft-discover-types":
+        return dispatch_business_type_discovery(
             args,
             env=env,
             connection=connection,
@@ -4611,6 +12915,99 @@ def dispatch_command(
             dispatcher=dispatcher,
             common=common,
         )
+    if args.command == "waapi-schema":
+        api = "ak.wwise.waapi.getSchema"
+        try:
+            capability = live_capability(
+                detected_version,
+                api,
+                live_info=live_info,
+            )
+        except CapabilityNotFoundError:
+            return unreflected_interface_payload(
+                api,
+                detected_version,
+                command=args.command,
+                common=common,
+            )
+        if (
+            capability.execution_contract.get("route") != "bounded_call"
+            or args.command not in capability.gateway_commands
+        ):
+            raise GatewayInputError(
+                f"{api} is not bound to the packaged {args.command} route in "
+                f"Wwise {detected_version}"
+            )
+        try:
+            schema_args = materialize_waapi_schema_read_args(
+                detected_version,
+                target_uri=args.target_uri,
+                include_examples=args.include_examples,
+            )
+        except ValueError as exc:
+            raise GatewayInputError(str(exc)) from exc
+        request_validation = validate_semantic_payload(
+            api,
+            schema_args,
+            {},
+            version=detected_version,
+        )
+        result = dispatch(
+            dispatcher,
+            api,
+            connection=connection,
+            version=detected_version,
+            args=schema_args,
+            options={},
+        )
+        if not result.get("ok"):
+            return {
+                "ok": False,
+                "status": "error",
+                **common,
+                "api_attempted": api,
+                "schema_target": args.target_uri,
+                "call": dispatch_call_summary(result),
+                "schema_validation": {
+                    "request": request_validation.as_dict(),
+                    "result": None,
+                },
+            }
+        raw_result = strict_call_result_mapping(
+            result,
+            command="waapi-schema",
+            error_code="INVALID_SCHEMA_RESULT",
+        )
+        result_validation = validate_semantic_result(
+            api,
+            raw_result,
+            version=detected_version,
+        )
+        return {
+            "ok": True,
+            "status": "ok",
+            **common,
+            "api_attempted": api,
+            "schema_target": args.target_uri,
+            "semantic_preview": {
+                "uri": api,
+                "business_request": {
+                    "target_uri": args.target_uri,
+                    **(
+                        {"include_examples": args.include_examples}
+                        if args.include_examples is not None
+                        else {}
+                    ),
+                },
+                "native_request_fields": "gateway_owned",
+            },
+            "call": dispatch_call_summary(result),
+            "schema_validation": {
+                "request": request_validation.as_dict(),
+                "result": result_validation.as_dict(),
+            },
+            "agent_result": raw_result,
+        }
     if args.command == "status":
         info = dispatch(
             dispatcher,
@@ -4759,6 +13156,230 @@ def dispatch_command(
             "call": dispatch_call_summary(result),
             "agent_result": projection,
         }
+    if args.command == "typed-call":
+        typed_request = args.typed_request
+        if typed_request.version != detected_version:
+            raise GatewayInputError(
+                "Typed request version changed after preflight; request-schema must be rerun"
+            )
+        capability = live_capability(
+            detected_version,
+            typed_request.uri,
+            live_info=live_info,
+        )
+        if capability.execution_contract["effect"] != "read":
+            request_payload = {
+                "contract": OPERATION_REQUEST_CONTRACT,
+                "version": detected_version,
+                "operation": "waapi.call",
+                "arguments": {
+                    "api": typed_request.uri,
+                    "args": dict(typed_request.args),
+                    "options": dict(typed_request.options),
+                    **(
+                        {"io_root": args.typed_io_root}
+                        if args.typed_io_root is not None
+                        else {}
+                    ),
+                },
+            }
+            return create_transaction_preview(
+                request_payload,
+                args=args,
+                env=env,
+                connection=connection,
+                detected_version=detected_version,
+                live_info=live_info,
+                dispatcher=dispatcher,
+                common={
+                    **common,
+                    "typed_request": {
+                        "contract": typed_request.as_dict()["contract"],
+                        "schema_digest": typed_request.schema_digest,
+                    },
+                },
+            )
+        request_validation = validate_semantic_payload(
+            typed_request.uri,
+            typed_request.args,
+            typed_request.options,
+            version=detected_version,
+            authoring_ui_profile=live_info.get("isCommandLine") is False,
+        )
+        result = dispatch(
+            dispatcher,
+            typed_request.uri,
+            connection=connection,
+            version=detected_version,
+            args=typed_request.args,
+            options=typed_request.options,
+            allow_destructive=True,
+            result_limit_bytes=int(
+                capability.execution_contract["result_limit_bytes"]
+            ),
+            operation_timeout=float(
+                capability.execution_contract["timeout_seconds"]
+            ),
+        )
+        result_validation = (
+            validate_semantic_result(
+                typed_request.uri,
+                result.get("result"),
+                version=detected_version,
+                authoring_ui_profile=live_info.get("isCommandLine") is False,
+            )
+            if result.get("ok")
+            else None
+        )
+        return {
+            "ok": bool(result.get("ok")),
+            "status": "ok" if result.get("ok") else "error",
+            **common,
+            "api_attempted": typed_request.uri,
+            "typed_request": {
+                "contract": typed_request.as_dict()["contract"],
+                "schema_digest": typed_request.schema_digest,
+            },
+            "call": dispatch_call_summary(result),
+            "schema_validation": {
+                "request": request_validation.as_dict(),
+                "result": (
+                    result_validation.as_dict() if result_validation else None
+                ),
+            },
+            "agent_result": result.get("result") if result.get("ok") else None,
+        }
+    if args.command == "typed-operation":
+        return create_transaction_preview(
+            args.typed_operation_request,
+            args=args,
+            env=env,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common={
+                **common,
+                "typed_operation": {
+                    "operation": args.operation,
+                    "schema_digest": args.schema_digest,
+                },
+            },
+        )
+    if args.command == "typed-zero-call":
+        typed_request = args.typed_request
+        if typed_request.version != detected_version:
+            raise GatewayInputError(
+                "Typed request version changed after preflight; request-schema must be rerun"
+            )
+        authoring_boundary = live_authoring_api_boundary(
+            typed_request.uri,
+            command="typed-zero-call",
+            live_info=live_info,
+            common=common,
+        )
+        if authoring_boundary is not None:
+            return authoring_boundary
+        capability = live_capability(
+            detected_version,
+            typed_request.uri,
+            live_info=live_info,
+        )
+        if capability.execution_contract["effect"] != "read":
+            if tuple(capability.transaction_operations) == ("waapi.call",):
+                request_payload = {
+                    "contract": OPERATION_REQUEST_CONTRACT,
+                    "version": detected_version,
+                    "operation": "waapi.call",
+                    "arguments": {
+                        "api": typed_request.uri,
+                        "args": {},
+                        "options": {},
+                    },
+                }
+            else:
+                raise GatewayInputError(
+                    "This zero-input API does not have an executable typed Preview route"
+                )
+            return create_transaction_preview(
+                request_payload,
+                args=args,
+                env=env,
+                connection=connection,
+                detected_version=detected_version,
+                live_info=live_info,
+                dispatcher=dispatcher,
+                common={
+                    **common,
+                    "typed_request": {
+                        "contract": typed_request.as_dict()["contract"],
+                        "schema_digest": typed_request.schema_digest,
+                        "business_values_required": False,
+                        "gateway_owned_acknowledgement": False,
+                    },
+                },
+            )
+        request_validation = validate_semantic_payload(
+            typed_request.uri,
+            typed_request.args,
+            typed_request.options,
+            version=detected_version,
+            authoring_ui_profile=live_info.get("isCommandLine") is False,
+        )
+        result = dispatch(
+            dispatcher,
+            typed_request.uri,
+            connection=connection,
+            version=detected_version,
+            args=typed_request.args,
+            options=typed_request.options,
+            allow_destructive=(
+                capability.execution_contract["effect"] == "read"
+            ),
+            result_limit_bytes=int(capability.execution_contract["result_limit_bytes"]),
+            operation_timeout=float(capability.execution_contract["timeout_seconds"]),
+        )
+        result_validation = (
+            validate_semantic_result(
+                typed_request.uri,
+                result.get("result"),
+                version=detected_version,
+                authoring_ui_profile=live_info.get("isCommandLine") is False,
+            )
+            if result.get("ok")
+            else None
+        )
+        inventory = (
+            normalize_reflection_inventory_result(
+                typed_request.uri,
+                result,
+                version=detected_version,
+            )
+            if result.get("ok") and typed_request.uri in REFLECTION_INVENTORY_CALLS
+            else None
+        )
+        return {
+            "ok": bool(result.get("ok")),
+            "status": "ok" if result.get("ok") else "error",
+            **common,
+            "api_attempted": typed_request.uri,
+            "typed_request": {
+                "contract": typed_request.as_dict()["contract"],
+                "schema_digest": typed_request.schema_digest,
+                "business_values_required": False,
+            },
+            "call": dispatch_call_summary(result),
+            "schema_validation": {
+                "request": request_validation.as_dict(),
+                "result": result_validation.as_dict() if result_validation else None,
+            },
+            "inventory": inventory,
+            "agent_result": (
+                inventory
+                if inventory is not None
+                else result.get("result") if result.get("ok") else None
+            ),
+        }
     if args.command == "profiler-game-objects":
         request = build_profiler_game_objects_request(
             version=detected_version,
@@ -4814,61 +13435,29 @@ def dispatch_command(
             "agent_result": projection,
         }
     if args.command == "profiler-voice-contributions":
+        resolved = resolve_profiler_voice_path(
+            args,
+            connection=connection,
+            detected_version=detected_version,
+            dispatcher=dispatcher,
+            common=common,
+        )
+        if isinstance(resolved, dict):
+            return resolved
+        voice_pipeline_id, bus_pipeline_ids = resolved
         request = build_profiler_voice_contributions_request(
             version=detected_version,
             time=args.time,
-            voice_pipeline_id=args.voice_pipeline_id,
-            bus_pipeline_ids=tuple(args.bus_pipeline_id),
+            voice_pipeline_id=voice_pipeline_id,
+            bus_pipeline_ids=bus_pipeline_ids,
         )
-        request_validation = validate_semantic_payload(
-            request.uri,
-            request.args,
-            request.options,
-            version=detected_version,
-        )
-        result = dispatch(
-            dispatcher,
-            request.uri,
+        return dispatch_profiler_voice_contributions_request(
+            request,
             connection=connection,
-            version=detected_version,
-            args=request.args,
-            options=request.options,
-            result_limit_bytes=STABLE_READ_RESULT_LIMIT_BYTES,
+            detected_version=detected_version,
+            dispatcher=dispatcher,
+            common=common,
         )
-        if not result.get("ok"):
-            return {
-                "ok": False,
-                "status": "error",
-                **common,
-                "semantic_preview": request.as_dict(),
-                "schema_validation": {
-                    "request": request_validation.as_dict(),
-                    "result": None,
-                },
-                "call": dispatch_call_summary(result),
-            }
-        raw_result = result.get("result")
-        result_validation = validate_semantic_result(
-            request.uri,
-            raw_result,
-            version=detected_version,
-        )
-        projection = normalize_profiler_voice_contributions_result(
-            version=detected_version,
-            result=raw_result,
-        )
-        return {
-            "ok": True,
-            "status": "ok",
-            **common,
-            "semantic_preview": request.as_dict(),
-            "schema_validation": {
-                "request": request_validation.as_dict(),
-                "result": result_validation.as_dict(),
-            },
-            "call": dispatch_call_summary(result),
-            "agent_result": projection,
-        }
     if args.command == "debug-wal-tree":
         api = "ak.wwise.debug.getWalTree"
         try:
@@ -4907,6 +13496,25 @@ def dispatch_command(
                 capability.execution_contract["timeout_seconds"]
             ),
         )
+        if result.get("waapi_error_uri") == "ak.wwise.invalid_procedure_uri":
+            return {
+                "ok": True,
+                "status": "unsupported_boundary",
+                **common,
+                "api_attempted": api,
+                "error_code": "DEBUG_BUILD_REQUIRED",
+                "message": (
+                    "The running Wwise build does not register this Debug read; "
+                    "use a matching Debug-capable Authoring build for live execution proof."
+                ),
+                "executed": False,
+                "call": dispatch_call_summary(result),
+                "schema_validation": {
+                    "request": request_validation.as_dict(),
+                    "result": None,
+                },
+                "agent_result": None,
+            }
         if not result.get("ok"):
             return {
                 "ok": False,
@@ -4927,7 +13535,7 @@ def dispatch_command(
         try:
             projection = normalize_wal_tree_result(
                 result.get("result"),
-                take=args.take,
+                take=args.max_nodes,
             )
         except DebugLuaContractError as exc:
             raise GatewayResultShapeError(
@@ -4948,7 +13556,7 @@ def dispatch_command(
             "agent_result": projection,
         }
     if args.command == "debug-validate-call":
-        api = "ak.wwise.debug.validateCall"
+        api = TYPED_REQUEST_COMPLEX_TRACER_URI
         try:
             capability = CapabilityCatalog().describe(detected_version, api)
         except CapabilityNotFoundError:
@@ -4958,19 +13566,6 @@ def dispatch_command(
                 command=args.command,
                 common=common,
             )
-        try:
-            target = CapabilityCatalog().describe(detected_version, args.api)
-        except CapabilityNotFoundError:
-            return unreflected_interface_payload(
-                args.api,
-                detected_version,
-                command=args.command,
-                common=common,
-            )
-        if target.item_type != "function":
-            raise GatewayInputError(
-                "debug-validate-call accepts only a reflected WAAPI function URI"
-            )
         if (
             capability.preferred_route != "fixed_command"
             or args.command not in capability.fixed_commands
@@ -4978,72 +13573,22 @@ def dispatch_command(
             raise GatewayInputError(
                 f"{api} is not bound to the packaged {args.command} route in Wwise {detected_version}"
             )
-        call_args: dict[str, Any] = {"id": args.api}
-        supplied_sections: list[str] = []
-        for source, target_name, option_name in (
-            (args.args_json, "args", "--args-json"),
-            (args.options_json, "options", "--options-json"),
-            (args.result_json, "result", "--result-json"),
-        ):
-            if source is None:
-                continue
-            call_args[target_name] = parse_json_object(source, option_name)
-            supplied_sections.append(target_name)
-        request_validation = validate_semantic_payload(
-            api,
-            call_args,
-            {},
-            version=detected_version,
-        )
-        result = dispatch(
-            dispatcher,
-            api,
-            connection=connection,
-            version=detected_version,
-            args=call_args,
-            options={},
-            result_limit_bytes=int(
-                capability.execution_contract["result_limit_bytes"]
-            ),
-            operation_timeout=float(
-                capability.execution_contract["timeout_seconds"]
-            ),
-        )
-        result_validation = (
-            validate_semantic_result(
-                api,
-                result.get("result"),
-                version=detected_version,
-            )
-            if result.get("ok")
+        artifact = (
+            {
+                "path": args.artifact_file,
+                "digest": args.artifact_digest,
+                "authority": "user_owned_exact_artifact",
+            }
+            if args.artifact_file is not None
             else None
         )
-        return {
-            "ok": bool(result.get("ok")),
-            "status": "ok" if result.get("ok") else "error",
-            **common,
-            "api_attempted": api,
-            "validated_api": args.api,
-            "supplied_sections": supplied_sections,
-            "call": dispatch_call_summary(result),
-            "schema_validation": {
-                "request": request_validation.as_dict(),
-                "result": (
-                    result_validation.as_dict()
-                    if result_validation is not None
-                    else None
-                ),
-            },
-            "agent_result": (
-                {
-                    "validated_api": args.api,
-                    "supplied_sections": supplied_sections,
-                    "accepted_by_wwise": True,
-                }
-                if result.get("ok")
-                else None
-            ),
-        }
+        return dispatch_debug_validation(
+            args.debug_validation_args,
+            connection=connection,
+            detected_version=detected_version,
+            dispatcher=dispatcher,
+            common={**common, "artifact": artifact},
+        )
     if args.command == "buses":
         preview = build_object_get_query(
             type="Bus",
@@ -5086,9 +13631,10 @@ def dispatch_command(
             "possibly_truncated": (
                 len(rows) == MAX_QUERY_TAKE if result.get("ok") else None
             ),
+            "agent_result": rows if result.get("ok") else None,
         }
     if args.command == "selected":
-        return_fields = normalize_selected_return_fields(args.return_fields)
+        return_fields = SELECTED_REQUIRED_RETURN_FIELDS
         request_validation = None
         try:
             selected_capability = CapabilityCatalog().describe(
@@ -5181,30 +13727,15 @@ def dispatch_command(
             },
             "count": len(rows) if result.get("ok") else None,
             "objects": rows if result.get("ok") else None,
+            "agent_result": rows if result.get("ok") else None,
         }
     if args.command == "query-object":
-        if original_file_reference_match_requested(args):
-            return dispatch_original_file_reference_match(
-                args,
-                connection=connection,
-                detected_version=detected_version,
-                dispatcher=dispatcher,
-                common=common,
+        advanced_preview = getattr(args, "advanced_query_preview", None)
+        if advanced_preview is not None:
+            envelope = advanced_preview.envelope
+            maximum_rows = int(
+                advanced_preview.envelope.metadata["query_bound"]["value"]
             )
-        if advanced_query_requested(args):
-            _require_advanced_query_option_exclusivity(args)
-            request = parse_json_object(
-                args.advanced_request_json,
-                "--advanced-request-json",
-            )
-            preview = build_advanced_object_get_query(
-                request,
-                version=detected_version,
-            )
-            envelope = preview.envelope
-            query_bound = _advanced_query_bound(preview)
-            maximum_rows = query_bound["value"]
-            assert isinstance(maximum_rows, int) and not isinstance(maximum_rows, bool)
             result = dispatch(
                 dispatcher,
                 envelope.uri,
@@ -5217,11 +13748,19 @@ def dispatch_command(
             rows = (
                 strict_object_get_rows(
                     result,
-                    command="query-object --advanced-request-json",
+                    command="query-object --advanced-waql",
                     maximum_rows=maximum_rows,
                 )
                 if result.get("ok")
                 else []
+            )
+            business_rows = (
+                _project_query_business_rows(args, rows) if result.get("ok") else []
+            )
+            mutation_selection = (
+                _query_mutation_selection(args, business_rows)
+                if result.get("ok")
+                else None
             )
             return {
                 "ok": bool(result.get("ok")),
@@ -5229,65 +13768,62 @@ def dispatch_command(
                 **common,
                 "query_layer": "advanced-native-waql",
                 "query_contract": ADVANCED_QUERY_CONTRACT,
-                "semantic_preview": preview.as_dict(),
-                "query_bound": query_bound,
+                "semantic_preview": advanced_preview.as_dict(),
+                "query_bound": {
+                    "mode": "gateway-appended-take",
+                    "value": maximum_rows,
+                },
                 "call": dispatch_call_summary(result),
                 "count": len(rows) if result.get("ok") else None,
                 "limit_reached": (
                     len(rows) == maximum_rows if result.get("ok") else None
                 ),
-                "objects": rows if result.get("ok") else None,
+                "objects": business_rows if result.get("ok") else None,
+                **(
+                    {"mutation_selection": mutation_selection}
+                    if mutation_selection is not None
+                    else {}
+                ),
+                "agent_result": business_rows if result.get("ok") else None,
             }
-        if structured_query_requested(args):
-            _require_structured_query_option_exclusivity(args)
-            request = parse_json_object(args.request_json, "--request-json")
-            preview = build_structured_object_get_query(
-                request,
-                version=detected_version,
-            )
-            _require_structured_exact_identity_return_field(preview)
-            envelope = preview.envelope
-            exact_identity = _structured_query_exact_identity(preview)
-            query_bound = _structured_query_bound(preview)
-            result = dispatch(
-                dispatcher,
-                envelope.uri,
+        if original_file_reference_match_requested(args):
+            return dispatch_original_file_reference_match(
+                args,
                 connection=connection,
-                version=detected_version,
-                args=envelope.args,
-                options=envelope.options,
-                exact_object_lookup=exact_identity is not None,
+                detected_version=detected_version,
+                dispatcher=dispatcher,
+                common=common,
             )
-            rows = (
-                strict_object_get_rows(
-                    result,
-                    command="query-object",
-                    maximum_rows=_structured_query_result_maximum(
-                        query_bound,
-                        exact_identity=exact_identity,
-                    ),
-                )
-                if result.get("ok")
-                else []
-            )
-            if result.get("ok"):
-                validate_structured_exact_query_identity(
-                    exact_identity,
-                    rows,
-                )
+        custom_kind_clarification = _bind_custom_kind_from_live_types(
+            args,
+            connection=connection,
+            detected_version=detected_version,
+            dispatcher=dispatcher,
+        )
+        if custom_kind_clarification is not None:
             return {
-                "ok": bool(result.get("ok")),
-                "status": "ok" if result.get("ok") else "error",
+                "ok": True,
+                "status": "needs_clarification",
                 **common,
-                "query_contract": STRUCTURED_QUERY_CONTRACT,
-                "semantic_preview": preview.as_dict(),
-                "query_bound": query_bound,
-                "call": dispatch_call_summary(result),
-                "count": len(rows) if result.get("ok") else None,
-                "objects": rows if result.get("ok") else None,
+                "query_layer": "business-declaration",
+                "agent_result": custom_kind_clarification,
             }
-        where = parse_optional_json(args.where_json, "--where-json")
-        return_fields = tuple(args.return_fields or ("id", "name", "type", "path"))
+        custom_field_clarification = _bind_query_custom_fields_from_live_metadata(
+            args,
+            connection=connection,
+            detected_version=detected_version,
+            dispatcher=dispatcher,
+        )
+        if custom_field_clarification is not None:
+            return {
+                "ok": True,
+                "status": "needs_clarification",
+                **common,
+                "query_layer": "business-declaration",
+                "agent_result": custom_field_clarification,
+            }
+        where = typed_query_predicates(args)
+        return_fields = args.query_return_fields
         _require_exact_identity_return_field(args, return_fields)
         preview = build_object_get_query(
             path=args.path,
@@ -5323,6 +13859,20 @@ def dispatch_command(
         )
         if result.get("ok"):
             validate_exact_query_identity(args, rows)
+            validate_query_business_view_result(args, rows)
+        business_rows = (
+            _project_query_business_rows(args, rows) if result.get("ok") else []
+        )
+        continuations = (
+            _query_business_continuations(args, business_rows)
+            if result.get("ok")
+            else []
+        )
+        mutation_selection = (
+            _query_mutation_selection(args, business_rows)
+            if result.get("ok")
+            else None
+        )
         return {
             "ok": bool(result.get("ok")),
             "status": "ok" if result.get("ok") else "error",
@@ -5331,14 +13881,38 @@ def dispatch_command(
             "query_bound": _query_bound_summary(args),
             "call": dispatch_call_summary(result),
             "count": len(rows) if result.get("ok") else None,
-            "objects": rows if result.get("ok") else None,
+            "objects": business_rows if result.get("ok") else None,
+            **({"continuations": continuations} if continuations else {}),
+            **(
+                {"mutation_selection": mutation_selection}
+                if mutation_selection is not None
+                else {}
+            ),
+            "agent_result": business_rows if result.get("ok") else None,
         }
     if args.command == "metadata":
-        if args.operation == "discover":
+        if args.operation in {"discover", "property-state"}:
+            custom_kind_clarification = _bind_custom_kind_from_live_types(
+                args,
+                connection=connection,
+                detected_version=detected_version,
+                dispatcher=dispatcher,
+            )
+            if custom_kind_clarification is not None:
+                return {
+                    "ok": True,
+                    "status": "needs_clarification",
+                    **common,
+                    "operation": args.operation,
+                    "metadata_authority": "live-waapi",
+                    "agent_result": custom_kind_clarification,
+                }
+            metadata_calls: list[dict[str, Any]] = []
             read_call = transaction_read_call(
                 dispatcher,
                 connection=connection,
                 version=detected_version,
+                call_sink=metadata_calls,
             )
             project: Mapping[str, Any] | None
             try:
@@ -5382,15 +13956,116 @@ def dispatch_command(
                     else args.limit
                 ),
             )
-            payload = {
-                "ok": True,
-                "status": "ok",
+            if args.operation == "discover":
+                payload = {
+                    "ok": True,
+                    "status": "ok",
+                    **common,
+                    "operation": args.operation,
+                    "metadata_authority": "live-waapi",
+                    **metadata_call_evidence_projection(metadata_calls),
+                }
+                payload["agent_result"] = discovery.as_dict(detail=False)
+                return payload
+            candidates = tuple(discovery.candidates)
+            if len(candidates) != 1:
+                return {
+                    "ok": True,
+                    "status": "needs_clarification",
+                    **common,
+                    "operation": args.operation,
+                    "metadata_authority": "live-waapi",
+                    **metadata_call_evidence_projection(metadata_calls),
+                    "agent_result": {
+                        "meaning": args.queries[0],
+                        "candidate_count": len(candidates),
+                        "candidates": [
+                            {
+                                "field": candidate.get("name"),
+                                "display_name": (
+                                    candidate.get("metadata", {})
+                                    .get("display", {})
+                                    .get("name")
+                                    if isinstance(candidate.get("metadata"), Mapping)
+                                    else None
+                                ),
+                            }
+                            for candidate in candidates
+                        ],
+                        "repair": (
+                            "refine --meaning until exactly one live field matches"
+                        ),
+                    },
+                }
+            field_name = candidates[0].get("name")
+            field_kind = candidates[0].get("kind")
+            if not isinstance(field_name, str) or not field_name:
+                raise GatewayResultShapeError(
+                    "metadata property-state discovery returned an invalid field.",
+                    details={"operation": args.operation},
+                    error_code="INVALID_METADATA_RESULT",
+                )
+            if field_kind != "property":
+                return {
+                    "ok": True,
+                    "status": "needs_clarification",
+                    **common,
+                    "operation": args.operation,
+                    "metadata_authority": "live-waapi",
+                    **metadata_call_evidence_projection(metadata_calls),
+                    "agent_result": {
+                        "meaning": args.queries[0],
+                        "candidate_count": 1,
+                        "candidates": [
+                            {
+                                "field": field_name,
+                                "kind": field_kind,
+                            }
+                        ],
+                        "repair": (
+                            "request a property meaning; references do not have "
+                            "an enabled-state query"
+                        ),
+                    },
+                }
+            preview = MetadataBuilder(version=detected_version).is_property_enabled(
+                object=args.object,
+                property=field_name,
+                platform=args.platform,
+            )
+            envelope = preview.envelope
+            result = dispatch(
+                dispatcher,
+                envelope.uri,
+                connection=connection,
+                version=detected_version,
+                args=envelope.args,
+                options=envelope.options,
+            )
+            normalized = (
+                parse_is_property_enabled_result(result.get("result")).as_dict()
+                if result.get("ok")
+                else None
+            )
+            return {
+                "ok": bool(result.get("ok")),
+                "status": "ok" if result.get("ok") else "error",
                 **common,
                 "operation": args.operation,
                 "metadata_authority": "live-waapi",
+                **metadata_call_evidence_projection(metadata_calls),
+                "semantic_preview": preview.as_dict(),
+                "call": dispatch_call_summary(result),
+                "agent_result": (
+                    {
+                        "meaning": args.queries[0],
+                        "platform": args.platform,
+                        "enabled": normalized["enabled"],
+                    }
+                    if normalized is not None
+                    else None
+                ),
             }
-            payload["agent_result"] = discovery.as_dict(detail=args.detail)
-            return payload
         preview = build_metadata_command_preview(args, version=detected_version)
         envelope = preview.envelope
         result = dispatch(
@@ -5410,22 +14085,16 @@ def dispatch_command(
             "semantic_preview": preview.as_dict(),
             "call": dispatch_call_summary(result),
         }
-        if args.summary_only:
-            payload["summary_only"] = True
-            if result.get("ok"):
-                if not isinstance(normalized, list):
-                    raise GatewayResultShapeError(
-                        "metadata types summary requires a normalized type array.",
-                        details={"operation": args.operation},
-                        error_code="INVALID_METADATA_RESULT",
-                    )
-                payload["agent_result"] = {
-                    "count": len(normalized),
-                    "contains_actor_mixer": any(
-                        row.get("name") == "ActorMixer" or row.get("type") == "ActorMixer"
-                        for row in normalized
-                    ),
+        if args.operation == "attenuation":
+            payload["agent_result"] = (
+                {
+                    "curve_role": args.curve_role,
+                    "use": normalized["use"],
+                    "points": normalized["points"],
                 }
+                if normalized is not None
+                else None
+            )
             return payload
         payload["normalized"] = normalized
         return payload
@@ -5441,8 +14110,9 @@ def dispatch_command(
             stream_sink=stream_sink,
         )
     if args.command == "wait-topic":
-        request_options = parse_json_object(args.options_json, "--options-json")
-        match = parse_json_object(args.match_json, "--match-json")
+        typed_topic_input = args.typed_topic_input
+        request_options = dict(typed_topic_input.options)
+        match = dict(typed_topic_input.match)
         authoring_boundary = live_authoring_api_boundary(
             args.api,
             command="wait-topic",
@@ -5488,6 +14158,7 @@ def dispatch_command(
             "status": "ok" if result.get("ok") else "error",
             **common,
             "topic": args.api,
+            "topic_contract_digest": args.topic_contract_digest,
             "match": match or None,
             "subscription_timeout": {
                 "mode": "unbounded" if unbounded_timeout else "finite",
@@ -5550,7 +14221,7 @@ def dispatch_command(
         payload["event_validations"] = event_validations
         payload["cleanup"] = cleanup
         return payload
-    if args.command in {"preview", "legacy-preview", "execute", "verify"}:
+    if args.command in {"execute", "verify"}:
         return dispatch_transaction_command(
             args,
             env=env,
@@ -5560,162 +14231,6 @@ def dispatch_command(
             dispatcher=dispatcher,
             common=common,
         )
-    if args.command == "call":
-        request_args = parse_json_object(args.args_json, "--args-json")
-        request_options = parse_json_object(args.options_json, "--options-json")
-        post_filter = parse_media_pool_post_filter_spec(args.post_filter_json)
-        if post_filter is not None:
-            validate_media_pool_post_filter_request(
-                api=args.api,
-                spec=post_filter,
-                request_args=request_args,
-                request_options=request_options,
-                dry_run=args.dry_run,
-            )
-        authoring_boundary = live_authoring_api_boundary(
-            args.api,
-            command="call",
-            live_info=live_info,
-            common=common,
-        )
-        if authoring_boundary is not None:
-            return authoring_boundary
-        try:
-            capability = live_capability(
-                detected_version,
-                args.api,
-                live_info=live_info,
-            )
-        except CapabilityNotFoundError:
-            return unreflected_interface_payload(
-                args.api,
-                detected_version,
-                command="call",
-                common=common,
-            )
-        route_boundary = catalog_route_boundary_payload(
-            capability,
-            command="call",
-            common=common,
-        )
-        if route_boundary is not None:
-            return route_boundary
-        validation = validate_semantic_payload(
-            args.api,
-            request_args,
-            request_options,
-            version=detected_version,
-            authoring_ui_profile=live_info.get("isCommandLine") is False,
-        )
-        request_args = canonicalize_bounded_direct_call_request(
-            args.api,
-            detected_version,
-            request_args,
-        )
-        validate_bounded_direct_call_request(args.api, request_args, request_options)
-        result = dispatch(
-            dispatcher,
-            args.api,
-            connection=connection,
-            version=detected_version,
-            args=request_args,
-            options=request_options,
-            dry_run=args.dry_run,
-            allow_destructive=False,
-            topic_mode=args.topic_mode,
-            live_behavior=args.live_behavior,
-            operation_timeout=float(capability.execution_contract["timeout_seconds"]),
-            result_limit_bytes=int(capability.execution_contract["result_limit_bytes"]),
-        )
-        result_validation = (
-            validate_semantic_result(
-                args.api,
-                result.get("result"),
-                version=detected_version,
-                authoring_ui_profile=live_info.get("isCommandLine") is False,
-            )
-            if result.get("ok") and not args.dry_run
-            else None
-        )
-        inventory = (
-            normalize_reflection_inventory_result(
-                args.api,
-                result,
-                version=detected_version,
-            )
-            if result.get("ok") and args.api in REFLECTION_INVENTORY_CALLS
-            else None
-        )
-        if post_filter is None:
-            return {
-                "ok": bool(result.get("ok")),
-                "status": "ok" if result.get("ok") else "error",
-                **common,
-                "call": dispatch_call_summary(result),
-                "schema_validation": validation.as_dict(),
-                "result_validation": result_validation.as_dict() if result_validation is not None else None,
-                "agent_result": inventory if inventory is not None else result.get("result"),
-                "inventory": inventory,
-            }
-
-        if not result.get("ok"):
-            return {
-                "ok": False,
-                "status": "error",
-                **common,
-                "call": dispatch_call_summary(result),
-                "schema_validation": validation.as_dict(),
-                "result_validation": None,
-                "post_filter": media_pool_post_filter_audit(
-                    post_filter,
-                    request_max_results=request_args["maxResults"],
-                    status="not_applied",
-                ),
-                "inventory": inventory,
-            }
-
-        filtered_result, post_filter_audit = apply_media_pool_post_filter(
-            result.get("result"),
-            spec=post_filter,
-            request_max_results=request_args["maxResults"],
-            evidence_path=result.get("evidence_path"),
-        )
-        if filtered_result is None:
-            return {
-                "ok": False,
-                "status": "incomplete_boundary",
-                **common,
-                "error_code": "MEDIA_POOL_POST_FILTER_INCOMPLETE",
-                "message": (
-                    "The Media Pool candidate response reached maxResults, so the "
-                    "case-sensitive post-filter cannot prove that its result is complete."
-                ),
-                "details": {
-                    "raw_count": post_filter_audit["raw_count"],
-                    "request_max_results": post_filter_audit["request_max_results"],
-                    "evidence_path": result.get("evidence_path"),
-                },
-                "call": dispatch_call_summary(result),
-                "schema_validation": validation.as_dict(),
-                "result_validation": (
-                    result_validation.as_dict() if result_validation is not None else None
-                ),
-                "post_filter": post_filter_audit,
-                "inventory": inventory,
-            }
-
-        payload = {
-            "ok": bool(result.get("ok")),
-            "status": "ok" if result.get("ok") else "error",
-            **common,
-            "call": dispatch_call_summary(result),
-            "schema_validation": validation.as_dict(),
-            "result_validation": result_validation.as_dict() if result_validation is not None else None,
-            "post_filter": post_filter_audit,
-            "inventory": inventory,
-        }
-        payload["agent_result"] = filtered_result
-        return payload
     raise GatewayInputError(f"unsupported command: {args.command}")
 
 
@@ -5732,8 +14247,9 @@ def dispatch_topic_stream(
 ) -> dict[str, Any]:
     """Keep one reviewed topic subscription open and publish events immediately."""
 
-    request_options = parse_json_object(args.options_json, "--options-json")
-    match = parse_json_object(args.match_json, "--match-json")
+    typed_topic_input = args.typed_topic_input
+    request_options = dict(typed_topic_input.options)
+    match = dict(typed_topic_input.match)
     authoring_boundary = live_authoring_api_boundary(
         args.api,
         command="stream-topic",
@@ -5789,6 +14305,7 @@ def dispatch_topic_stream(
         "contract": TOPIC_STREAM_RECORD_CONTRACT,
         "command": "stream-topic",
         "topic": args.api,
+        "topic_contract_digest": args.topic_contract_digest,
         "match": match or None,
         "subscription_timeout": timeout_policy,
     }
@@ -5799,21 +14316,30 @@ def dispatch_topic_stream(
             "ok": True,
             "status": "streaming",
             "buffer_limit_events": DEFAULT_LISTENER_QUEUE_SIZE,
+            "event_count_limit": args.event_count,
             "event_result_limit_bytes": result_limit_bytes,
+            "event_records_output_limit_bytes": (
+                TOPIC_STREAM_EVENT_OUTPUT_LIMIT_BYTES
+            ),
+            "total_output_limit_bytes": TOPIC_STREAM_TOTAL_OUTPUT_LIMIT_BYTES,
         },
         args=args,
         env=env,
     )
 
     event_count = 0
+    agent_events: list[dict[str, Any]] = []
     primary_error: Exception | None = None
     cleanup_status = "unknown"
     cleanup_failure: dict[str, Any] | None = None
+    streamed_output_bytes = 0
     try:
-        emit_topic_stream_record(
+        streamed_output_bytes += emit_topic_stream_record(
             started_record,
             sink=stream_sink,
             limit_bytes=MAX_GATEWAY_RESULT_JSON_BYTES,
+            cumulative_bytes=streamed_output_bytes,
+            cumulative_limit_bytes=TOPIC_STREAM_EVENT_OUTPUT_LIMIT_BYTES,
         )
         collection_timeout = (
             math.inf
@@ -5878,7 +14404,7 @@ def dispatch_topic_stream(
                 authoring_ui_profile=live_info.get("isCommandLine") is False,
             )
             sequence = event_count + 1
-            emit_topic_stream_record(
+            streamed_output_bytes += emit_topic_stream_record(
                 {
                     "contract": TOPIC_STREAM_RECORD_CONTRACT,
                     "record_type": "event",
@@ -5889,14 +14415,41 @@ def dispatch_topic_stream(
                 },
                 sink=stream_sink,
                 limit_bytes=result_limit_bytes,
+                cumulative_bytes=streamed_output_bytes,
+                cumulative_limit_bytes=TOPIC_STREAM_EVENT_OUTPUT_LIMIT_BYTES,
             )
+            if (
+                args.api == SOUNDBANK_GENERATED_TOPIC_URI
+                and args.include_object_identity
+            ):
+                agent_events.append(dict(event.payload))
             event_count = sequence
-    except KeyboardInterrupt:
+            if event_count >= args.event_count:
+                break
+    except KeyboardInterrupt as cancellation:
         try:
-            event_stream.close()
-        except BaseException:
-            pass
-        raise
+            cleanup_succeeded = event_stream.close()
+        except BaseException as cleanup_exc:  # noqa: BLE001 - cancellation preserves cleanup truth
+            cleanup_status = SUBSCRIPTION_CLEANUP_FAILED
+            cleanup_failure = cleanup_failure_evidence(cleanup_exc)
+        else:
+            cleanup_status = (
+                SUBSCRIPTION_CLEANUP_UNSUBSCRIBED
+                if cleanup_succeeded
+                else SUBSCRIPTION_CLEANUP_FAILED
+            )
+            if not cleanup_succeeded:
+                cleanup_failure = {
+                    "error_code": "SUBSCRIPTION_CLEANUP_FAILED",
+                    "message": "Subscription cleanup returned false and remains active",
+                    "details": {"reason": "unsubscribe_returned_false"},
+                }
+        raise TopicStreamCancelled(
+            event_count=event_count,
+            elapsed_seconds=max(0.0, time.monotonic() - stream_started_at),
+            cleanup=cleanup_status,
+            cleanup_failure=cleanup_failure,
+        ) from cancellation
     except Exception as exc:  # noqa: BLE001 - terminal record preserves the structured error
         primary_error = exc
 
@@ -5960,9 +14513,19 @@ def dispatch_topic_stream(
         {
             "ok": True,
             "status": "completed",
-            "completion_reason": "duration_elapsed",
+            "completion_reason": (
+                "event_count_reached"
+                if event_count >= args.event_count
+                else "duration_elapsed"
+            ),
         }
     )
+    if args.api == SOUNDBANK_GENERATED_TOPIC_URI and args.include_object_identity:
+        terminal["agent_result"] = {
+            "contract": "waapi-skill.topic-stream-agent-result/v1",
+            "event_count": event_count,
+            "events": agent_events,
+        }
     return terminal
 
 
@@ -6010,7 +14573,9 @@ def emit_topic_stream_record(
     *,
     sink: Callable[[Mapping[str, Any]], None] | None,
     limit_bytes: int,
-) -> None:
+    cumulative_bytes: int = 0,
+    cumulative_limit_bytes: int | None = None,
+) -> int:
     """Validate one compact stream record's size before exposing it."""
 
     encoder = topic_stream_stdout_json_encoder()
@@ -6027,6 +14592,18 @@ def emit_topic_stream_record(
                     },
                     error_code="RESULT_TOO_LARGE",
                 )
+            if (
+                cumulative_limit_bytes is not None
+                and cumulative_bytes + observed > cumulative_limit_bytes
+            ):
+                raise GatewayResultShapeError(
+                    "stream-topic cumulative event output exceeded its JSON boundary.",
+                    details={
+                        "limit_bytes": cumulative_limit_bytes,
+                        "observed_at_least_bytes": cumulative_limit_bytes + 1,
+                    },
+                    error_code="RESULT_TOO_LARGE",
+                )
     except GatewayResultShapeError:
         raise
     except (RecursionError, TypeError, UnicodeEncodeError, ValueError) as exc:
@@ -6037,6 +14614,7 @@ def emit_topic_stream_record(
         ) from exc
     if sink is not None:
         sink(record)
+    return observed
 
 
 def _validated_tab_import_wire_path_input_audit(
@@ -6145,14 +14723,14 @@ def prepared_wire_path_io_audit(
             "The authorized preview lacks sealed execution state for path adaptation.",
         )
     import_guard: Mapping[str, Any] | None = None
-    if operation == "waapi.call" and call_uri.startswith("ak.wwise.cli."):
+    if operation == "waapi.call" and requires_wwise_wire_path_adaptation(call_uri):
         execution_contract = pre_state.get("execution_contract")
         io_audit = (
             execution_contract.get("io_audit")
             if isinstance(execution_contract, Mapping)
             else None
         )
-        context = "CLI"
+        context = "CLI or Console"
     else:
         expected_uri = NAMED_OPERATION_WIRE_PATH_URIS.get(operation)
         if expected_uri != call_uri:
@@ -6233,9 +14811,8 @@ def dispatch_operation_draft_check(
         args.draft_id,
         task_authority=args.task_authority,
     )
-    schema_digest = operation_request_schema_digest(
-        inspected.operation,
-        inspected.version,
+    schema_digest = operation_draft_schema_digest(
+        inspected.operation, inspected.version
     )
     composer_digest = operation_composer_digest(
         inspected.operation,
@@ -6257,6 +14834,83 @@ def dispatch_operation_draft_check(
             },
         )
     request_payload = dict(materialized.request)
+    if inspected.operation.startswith("ak."):
+        capability = live_capability(
+            detected_version,
+            inspected.operation,
+            live_info=live_info,
+        )
+        if capability.execution_contract["effect"] == "read":
+            arguments = require_mapping(
+                request_payload.get("arguments"),
+                "typed Draft request arguments",
+            )
+            request_args = require_mapping(
+                arguments.get("args"), "typed Draft request args"
+            )
+            request_options = require_mapping(
+                arguments.get("options"), "typed Draft request options"
+            )
+            validation = validate_semantic_payload(
+                inspected.operation,
+                request_args,
+                request_options,
+                version=detected_version,
+                authoring_ui_profile=live_info.get("isCommandLine") is False,
+            )
+            result = dispatch(
+                dispatcher,
+                inspected.operation,
+                connection=connection,
+                version=detected_version,
+                args=request_args,
+                options=request_options,
+                result_limit_bytes=int(
+                    capability.execution_contract["result_limit_bytes"]
+                ),
+                operation_timeout=float(
+                    capability.execution_contract["timeout_seconds"]
+                ),
+            )
+            result_validation = (
+                validate_semantic_result(
+                    inspected.operation,
+                    result.get("result"),
+                    version=detected_version,
+                    authoring_ui_profile=live_info.get("isCommandLine") is False,
+                )
+                if result.get("ok")
+                else None
+            )
+            agent_result = result.get("result") if result.get("ok") else None
+            payload = {
+                "contract": GATEWAY_RESULT_CONTRACT,
+                "ok": bool(result.get("ok")),
+                "status": "ok" if result.get("ok") else "error",
+                "command": args.command,
+                "offline": False,
+                **common,
+                "api_attempted": inspected.operation,
+                "typed_request": {
+                    "contract": "waapi-skill.typed-request/v1",
+                    "schema_digest": schema_digest,
+                },
+                "call": dispatch_call_summary(result),
+                "schema_validation": {
+                    "request": validation.as_dict(),
+                    "result": (
+                        result_validation.as_dict()
+                        if result_validation is not None
+                        else None
+                    ),
+                },
+                "agent_result": agent_result,
+            }
+            return payload
+    canonical_request = parse_operation_request(
+        request_payload,
+        expected_version=detected_version,
+    )
     authoring_boundary = live_authoring_transaction_boundary(
         request_payload,
         command=args.command,
@@ -6311,12 +14965,80 @@ def dispatch_operation_draft_check(
         project=project,
         state_dir=state_dir,
     )
-    canonical_request = parse_operation_request(
-        request_payload,
-        expected_version=detected_version,
+    compiled_business = None
+    raw_business_session = (
+        materialized.record.composition.get("business_session")
+        if materialized.record.composition is not None
+        else None
     )
-    if canonical_request.operation == OBJECT_SET_COMPOSER_OPERATION:
-        read_call = prepare_object_set_composer_check(
+    business_operation = materialized.record.operation
+    if raw_business_session is not None and operation_uses_business_declaration(
+        business_operation,
+        canonical_request.version,
+    ):
+        adapter = business_adapter(business_operation)
+        business_session = BusinessDeclarationSession.from_dict(raw_business_session)
+        bound_objects = tuple(
+            business_session.handles.resolve_object(row["handle"])
+            for row in business_session.handles.as_dict()["objects"]
+        )
+        revalidate_live_objects(
+            business_session.handles,
+            bound_objects,
+            read_call=read_call,
+        )
+        if adapter.supports_field_binding or adapter.supports_field_discovery:
+            for row in business_session.handles.as_dict()["fields"]:
+                bound_field = business_session.handles.bound_field(row["handle"])
+                revalidate_live_field(
+                    business_session.handles,
+                    bound_field,
+                    read_call=read_call,
+                )
+        if adapter.supports_type_discovery:
+            bound_types = tuple(
+                business_session.handles.resolve_type(row["handle"])
+                for row in business_session.handles.as_dict()["types"]
+            )
+            revalidate_live_types(
+                business_session.handles,
+                bound_types,
+                read_call=read_call,
+            )
+
+        def build_business_continuation(
+            _request: Mapping[str, Any],
+            _request_digest: str,
+            deadline: Any,
+        ) -> Mapping[str, Any]:
+            deadline.checkpoint()
+            return transaction_next_command(
+                "preview-from-draft",
+                [
+                    "preview-from-draft",
+                    materialized.record.draft_id,
+                    "--task-authority",
+                    args.task_authority,
+                    "--expected-revision",
+                    str(materialized.record.revision + 1),
+                ],
+                state_dir=args.state_dir,
+            )
+
+        compiled_business = adapter.compile_preview(
+            business_session,
+            build_continuation=build_business_continuation,
+        )
+        if compiled_business is not None:
+            if (
+                compiled_business.request != materialized.request
+                or compiled_business.request_digest != materialized.request_digest
+            ):
+                raise OperationDraftBindingDrift(
+                    "Compiled business Preview differs from the Draft canonical request."
+                )
+    if canonical_request.operation == "object.set":
+        read_call = prepare_object_set_batch_check(
             canonical_request,
             read_call=read_call,
         )
@@ -6349,11 +15071,16 @@ def dispatch_operation_draft_check(
         project_guard=project_guard,
         runtime_guard_fingerprint=runtime_fingerprint,
         prepared_digest=canonical_sha256(prepared),
+        business_preview=(
+            None if compiled_business is None else compiled_business.preview
+        ),
     )
     payload = operation_draft_payload(
         args.command,
         record,
         offline=False,
+        state_dir=args.state_dir,
+        task_authority=args.task_authority,
     )
     payload.update(
         {
@@ -6363,17 +15090,3243 @@ def dispatch_operation_draft_check(
             "project_call": dispatch_call_summary(project_call),
         }
     )
+    if (
+        record.composition is not None
+        and record.composition.get("compound_parent") is not None
+    ):
+        return payload
+    preview_arguments = [
+        "preview-from-draft",
+        record.draft_id,
+        "--task-authority",
+        args.task_authority,
+        "--expected-revision",
+        str(record.revision),
+    ]
+    if not (
+        operation_uses_business_declaration(
+            business_operation,
+            canonical_request.version,
+        )
+        and business_adapter(business_operation).auto_apply_preview
+    ):
+        preview_arguments.append("--apply")
     payload["next_command"] = transaction_next_command(
         "preview-from-draft",
-        [
-            "preview-from-draft",
-            record.draft_id,
-            "--task-authority",
-            args.task_authority,
-            "--expected-revision",
-            str(record.revision),
-            "--apply",
-        ],
+        preview_arguments,
+        state_dir=args.state_dir,
+    )
+    return payload
+
+
+def _parse_business_value(value_type: str, raw: str, *, field: str) -> Any:
+    if value_type in {"string", "reference"}:
+        return raw
+    if value_type == "boolean":
+        if raw not in {"true", "false"}:
+            raise GatewayInputError(f"{field} requires true or false")
+        return raw == "true"
+    if value_type == "integer":
+        try:
+            value = int(raw)
+        except ValueError as exc:
+            raise GatewayInputError(f"{field} requires an integer") from exc
+        if str(value) != raw and not (value == 0 and raw == "-0"):
+            raise GatewayInputError(f"{field} requires a canonical integer")
+        return value
+    if value_type == "number":
+        try:
+            value = float(raw)
+        except ValueError as exc:
+            raise GatewayInputError(f"{field} requires a number") from exc
+        if not math.isfinite(value):
+            raise GatewayInputError(f"{field} requires a finite number")
+        return value
+    raise GatewayInputError(f"{field} has an unsupported business value type")
+
+
+def _parse_bound_field_business_value(
+    bound: BoundFieldHandle,
+    raw: str,
+    *,
+    field: str,
+) -> Any:
+    """Parse one live field value, retaining only reviewed business units."""
+
+    if bound.value_type == "number" and bound.token in {"FadeTime", "Delay"}:
+        matched = re.fullmatch(
+            r"([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)\s*"
+            r"(ms|millisecond|milliseconds|s|sec|secs|second|seconds|秒)",
+            raw.strip(),
+            flags=re.IGNORECASE,
+        )
+        if matched is not None:
+            value = float(matched.group(1))
+            if matched.group(2).casefold() in {"ms", "millisecond", "milliseconds"}:
+                value /= 1000.0
+            if not math.isfinite(value):
+                raise GatewayInputError(f"{field} requires a finite time value")
+            return value
+    return _parse_business_value(bound.value_type, raw, field=field)
+
+
+def _parse_audio_import_business_fields(
+    session: BusinessDeclarationSession,
+    pairs: Sequence[Sequence[str]],
+    *,
+    switch_value: str | None = None,
+    allow_switch_value_pair: bool = True,
+    field_value_pairs: Sequence[Sequence[str]] = (),
+    event_parent_handle: str | None = None,
+    event_name: str | None = None,
+    event_action: str | None = None,
+) -> dict[str, Any]:
+    raw_field_types = audio_import_business_contract(
+        session.context.wwise_version
+    )["field_value_types"]
+    if not isinstance(raw_field_types, Mapping):  # pragma: no cover - Registry invariant
+        raise GatewayInputError("audio import business field contract is invalid")
+    field_types = dict(raw_field_types)
+    fields: dict[str, Any] = {}
+    literal_pairs = [*pairs]
+    if switch_value is not None:
+        literal_pairs.append(("switch_value", switch_value))
+    generic_pair_count = len(pairs)
+    for index, pair in enumerate(literal_pairs):
+        if len(pair) != 2:
+            raise GatewayInputError("business --field requires FIELD VALUE")
+        name, raw = pair
+        if (
+            name == "switch_value"
+            and not allow_switch_value_pair
+            and index < generic_pair_count
+        ):
+            raise GatewayInputError(
+                "Per-declaration switch_value requires the dedicated "
+                "--switch-value business argument"
+            )
+        value_type = field_types.get(name)
+        if value_type is None:
+            raise GatewayInputError(
+                f"Unknown audio import business field {name!r}; use a disclosed stable field"
+            )
+        if name in fields:
+            raise GatewayInputError(f"Business field {name!r} was supplied twice")
+        fields[name] = _parse_business_value(value_type, raw, field=name)
+    if field_value_pairs:
+        dynamic: dict[str, Any] = {}
+        for pair in field_value_pairs:
+            if len(pair) != 2:
+                raise GatewayInputError(
+                    "business --field-value requires FIELD_HANDLE VALUE"
+                )
+            handle, raw = pair
+            if handle in dynamic:
+                raise GatewayInputError("One Field Handle was supplied twice")
+            bound = session.handles.bound_field(handle)
+            dynamic[handle] = _parse_business_value(
+                bound.value_type,
+                raw,
+                field=bound.token,
+            )
+        fields["field_values"] = dynamic
+    event_parts = (event_parent_handle, event_name, event_action)
+    if any(value is not None for value in event_parts):
+        if event_parent_handle is None or event_name is None:
+            raise GatewayInputError(
+                "Event creation requires --event-parent-handle and --event-name together"
+            )
+        fields["event"] = {
+            "parent_handle": event_parent_handle,
+            "name": event_name,
+            "action": event_action or "Play",
+        }
+    return fields
+
+
+def _parse_object_graph_business_fields(
+    session: BusinessDeclarationSession,
+    operation: str,
+    pairs: Sequence[Sequence[str]],
+    *,
+    field_value_pairs: Sequence[Sequence[str]] = (),
+) -> dict[str, Any]:
+    declaration = operation_business_contract(operation, session.context.wwise_version)[
+        "declaration"
+    ]
+    raw_field_types = declaration.get("field_value_types")
+    if not isinstance(raw_field_types, Mapping):
+        raise GatewayInputError("object graph business field contract is invalid")
+    fields: dict[str, Any] = {}
+    for pair in pairs:
+        if len(pair) != 2:
+            raise GatewayInputError("business --field requires FIELD VALUE")
+        name, raw = pair
+        value_type = raw_field_types.get(name)
+        if not isinstance(value_type, str):
+            raise GatewayInputError(
+                f"Unknown object graph business field {name!r}; use a disclosed stable field"
+            )
+        if name in fields:
+            raise GatewayInputError(f"Business field {name!r} was supplied twice")
+        fields[name] = _parse_business_value(value_type, raw, field=name)
+    if field_value_pairs:
+        dynamic: dict[str, Any] = {}
+        for pair in field_value_pairs:
+            if len(pair) != 2:
+                raise GatewayInputError(
+                    "business --field-value requires FIELD_HANDLE VALUE"
+                )
+            handle, raw = pair
+            if handle in dynamic:
+                raise GatewayInputError("One Field Handle was supplied twice")
+            bound = session.handles.bound_field(handle)
+            dynamic[handle] = _parse_business_value(
+                bound.value_type,
+                raw,
+                field="bound business field",
+            )
+        fields["field_values"] = dynamic
+    return fields
+
+
+def dispatch_offline_business_draft_update(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+) -> dict[str, Any]:
+    store = OperationDraftStore(resolve_transaction_state_directory(args, env=env))
+    inspected = store.inspect(
+        args.draft_id,
+        task_authority=args.task_authority,
+    )
+    if not operation_uses_business_declaration(
+        inspected.operation,
+        inspected.version,
+    ):
+        raise GatewayInputError("This Draft has no Business Declaration Adapter")
+    adapter = business_adapter(inspected.operation)
+    if not adapter.accepts_update_command(args.command):
+        raise GatewayInputError(
+            f"{inspected.operation} does not expose {args.command}"
+        )
+    if (
+        getattr(args, "switch_value", None) is not None
+        and adapter.family != "audio-import"
+    ):
+        raise GatewayInputError(
+            "--switch-value is available only for audio.import business declarations"
+        )
+    raw_session = (
+        inspected.composition.get("business_session")
+        if inspected.composition is not None
+        else None
+    )
+    if raw_session is None:
+        raise GatewayInputError(
+            "Bind one exact live project object before adding business declarations"
+        )
+    session = BusinessDeclarationSession.from_dict(raw_session)
+    role_declaration = adapter.role_declaration
+    if args.command == "draft-declare-import-batch":
+        if adapter.family != "audio-import":
+            raise GatewayInputError(
+                "draft-declare-import-batch is available only for audio.import"
+            )
+        row_specs: dict[str, tuple[str, tuple[str, ...]]] = {}
+
+        def add_row(
+            declaration_id: str,
+            form: str,
+            values: tuple[str, ...],
+        ) -> None:
+            if declaration_id in row_specs:
+                raise GatewayInputError(
+                    f"Import batch declaration id {declaration_id!r} was supplied twice"
+                )
+            row_specs[declaration_id] = (form, values)
+
+        for declaration_id, parent_handle, name, kind in args.new_root_row:
+            add_row(
+                declaration_id,
+                "new-root",
+                (parent_handle, name, kind),
+            )
+        for declaration_id, parent_id, name, kind in args.new_child_row:
+            add_row(
+                declaration_id,
+                "new-child",
+                (parent_id, name, kind),
+            )
+        for declaration_id, parent_reference, name, kind in args.new_row:
+            add_row(
+                declaration_id,
+                "new-auto",
+                (parent_reference, name, kind),
+            )
+        for declaration_id, object_handle in args.existing_row:
+            add_row(declaration_id, "existing", (object_handle,))
+
+        row_order = [
+            declaration_id
+            for group in args.row_order
+            for declaration_id in (
+                group if isinstance(group, list) else [group]
+            )
+        ]
+        if (
+            len(row_order) != len(set(row_order))
+            or set(row_order) != set(row_specs)
+        ):
+            raise GatewayInputError(
+                "Import batch row order must name every supplied declaration exactly once"
+            )
+        if len(row_order) > AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS:
+            raise GatewayInputError(
+                "Import batch commands accept at most "
+                f"{AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS} rows; append another "
+                "bounded chunk with the next response revision"
+            )
+        available_parent_ids = {
+            row.declaration_id for row in session.declarations
+        } | set(row_specs)
+        for declaration_id, (form, values) in tuple(row_specs.items()):
+            if form != "new-auto":
+                continue
+            parent_reference, name, kind = values
+            row_specs[declaration_id] = (
+                (
+                    "new-child"
+                    if parent_reference in available_parent_ids
+                    else "new-root"
+                ),
+                (parent_reference, name, kind),
+            )
+
+        fields_by_id: dict[str, list[tuple[str, str]]] = {}
+        field_values_by_id: dict[str, list[tuple[str, str]]] = {}
+        switch_values: dict[str, str] = {}
+        events: dict[str, tuple[str, str, str]] = {}
+        for declaration_id, field_name, value in args.field:
+            fields_by_id.setdefault(declaration_id, []).append(
+                (field_name, value)
+            )
+        resolved_media_directory: Path | None = None
+        if args.media_file and args.media_directory is None:
+            prior_media_directories = {
+                Path(str(row.fields["media_file"])).parent
+                for row in session.declarations
+                if "media_file" in row.fields
+            }
+            if len(prior_media_directories) != 1:
+                raise GatewayInputError(
+                    "Import batch media files require one absolute media directory "
+                    "unless this Draft already has exactly one media directory"
+                )
+            resolved_media_directory = next(iter(prior_media_directories))
+        if args.media_directory is not None and not args.media_file:
+            raise GatewayInputError(
+                "Import batch media directory requires at least one media file"
+            )
+        media_file_ids: set[str] = set()
+        if args.media_file:
+            media_directory = resolved_media_directory or Path(args.media_directory)
+            if (
+                not media_directory.is_absolute()
+                or ".." in media_directory.parts
+                or not media_directory.is_dir()
+            ):
+                raise GatewayInputError(
+                    "Import batch media directory must be one existing absolute directory without traversal"
+                )
+            for declaration_id, file_name in args.media_file:
+                if (
+                    not file_name
+                    or file_name in {".", ".."}
+                    or "/" in file_name
+                    or "\\" in file_name
+                    or "\x00" in file_name
+                ):
+                    raise GatewayInputError(
+                        "Import batch media file name must be one leaf name without separators or traversal"
+                    )
+                if declaration_id in media_file_ids:
+                    raise GatewayInputError(
+                        f"Import batch media file for {declaration_id!r} was supplied twice"
+                    )
+                if any(
+                    field_name == "media_file"
+                    for field_name, _value in fields_by_id.get(
+                        declaration_id,
+                        [],
+                    )
+                ):
+                    raise GatewayInputError(
+                        f"Import batch media file for {declaration_id!r} has two transports"
+                    )
+                media_file_ids.add(declaration_id)
+                fields_by_id.setdefault(declaration_id, []).append(
+                    ("media_file", str(media_directory / file_name))
+                )
+        for declaration_id, field_handle, value in args.field_value:
+            field_values_by_id.setdefault(declaration_id, []).append(
+                (field_handle, value)
+            )
+        for declaration_id, value in args.switch_value:
+            if declaration_id in switch_values:
+                raise GatewayInputError(
+                    f"Import batch Switch value for {declaration_id!r} was supplied twice"
+                )
+            switch_values[declaration_id] = value
+        for declaration_id, parent_handle, name, action in args.event:
+            if declaration_id in events:
+                raise GatewayInputError(
+                    f"Import batch Event for {declaration_id!r} was supplied twice"
+                )
+            if action not in {"Play", "Stop", "Pause", "Resume", "Break", "Seek"}:
+                raise GatewayInputError(
+                    f"Import batch Event action {action!r} is not supported"
+                )
+            events[declaration_id] = (parent_handle, name, action)
+
+        supplied_fact_ids = (
+            set(fields_by_id)
+            | set(field_values_by_id)
+            | set(switch_values)
+            | set(events)
+        )
+        unknown_fact_ids = supplied_fact_ids - set(row_specs)
+        if unknown_fact_ids:
+            raise GatewayInputError(
+                "Import batch fields reference an unknown declaration id"
+            )
+
+        def update(
+            current: BusinessDeclarationSession,
+        ) -> BusinessDeclarationSession:
+            candidate = current
+            for declaration_id in row_order:
+                form, values = row_specs[declaration_id]
+                event = events.get(declaration_id)
+                fields = _parse_audio_import_business_fields(
+                    candidate,
+                    fields_by_id.get(declaration_id, []),
+                    switch_value=switch_values.get(declaration_id),
+                    allow_switch_value_pair=False,
+                    field_value_pairs=field_values_by_id.get(
+                        declaration_id,
+                        [],
+                    ),
+                    event_parent_handle=None if event is None else event[0],
+                    event_name=None if event is None else event[1],
+                    event_action=None if event is None else event[2],
+                )
+                if form == "new-root":
+                    parent_handle, name, kind = values
+                    target = NewDescendantTarget(
+                        parent_handle=parent_handle,
+                        name=name,
+                        kind=kind,
+                    )
+                    candidate = candidate.with_new_declaration(
+                        declaration_id=declaration_id,
+                        target=target,
+                        fields=fields,
+                    )
+                elif form == "new-child":
+                    parent_id, name, kind = values
+                    parent_matches = [
+                        row
+                        for row in candidate.declarations
+                        if row.declaration_id == parent_id
+                    ]
+                    if len(parent_matches) != 1:
+                        raise business_repair(
+                            "BATCH_PARENT_NOT_AVAILABLE",
+                            field="parent_declaration_id",
+                            draft_revision=current.revision,
+                            action=(
+                                "put each parent before its children in --row-order"
+                            ),
+                        )
+                    candidate = candidate.with_new_declaration(
+                        declaration_id=declaration_id,
+                        target=NewDescendantTarget(
+                            parent_handle=parent_matches[0].result_handle,
+                            name=name,
+                            kind=kind,
+                        ),
+                        fields=fields,
+                    )
+                else:
+                    (object_handle,) = values
+                    candidate = candidate.with_existing_declaration(
+                        declaration_id=declaration_id,
+                        target=ExistingObjectTarget(object_handle),
+                        fields=fields,
+                    )
+            adapter.materialize(candidate)
+            return candidate
+
+        event_type = "declaration.batch-added"
+    elif args.command == "draft-add-media":
+        media_row = {
+            name: value
+            for name, value in (
+                ("media_file", args.media_file),
+                ("inline_wav", args.inline_wav),
+                ("kind", args.kind),
+                ("language", args.language),
+                ("originals_subfolder", args.originals_subfolder),
+            )
+            if value is not None
+        }
+
+        def update(
+            current: BusinessDeclarationSession,
+        ) -> BusinessDeclarationSession:
+            matches = [
+                row
+                for row in current.declarations
+                if row.declaration_id == args.declaration_id
+            ]
+            if len(matches) != 1:
+                raise business_repair(
+                    "DECLARATION_NOT_AVAILABLE",
+                    field="declaration_id",
+                    draft_revision=current.revision,
+                    action="use one declaration id from the current task",
+                )
+            fields = dict(matches[0].fields)
+            raw_media = fields.get("media_files", [])
+            if not isinstance(raw_media, list):  # pragma: no cover - state invariant
+                raise RuntimeError("business media_files state must be a list")
+            fields["media_files"] = [*raw_media, media_row]
+            candidate = current.revise_declaration(
+                declaration_id=args.declaration_id,
+                fields=fields,
+            )
+            adapter.materialize(candidate)
+            return candidate
+
+        event_type = "declaration.revised"
+    elif args.command == "draft-clear-object-list":
+        existing = [
+            row
+            for row in session.declarations
+            if row.declaration_id == args.declaration_id
+        ]
+        if len(existing) > 1:  # pragma: no cover - session invariant
+            raise RuntimeError("business declaration id is not unique")
+
+        def update(
+            current: BusinessDeclarationSession,
+        ) -> BusinessDeclarationSession:
+            matches = [
+                row
+                for row in current.declarations
+                if row.declaration_id == args.declaration_id
+            ]
+            if not matches:
+                candidate = current.with_existing_declaration(
+                    declaration_id=args.declaration_id,
+                    target=ExistingObjectTarget(args.object_handle),
+                    fields={
+                        "clear_object_lists": [args.list_name],
+                        "list_behavior": "replace-all",
+                    },
+                )
+            else:
+                row = matches[0]
+                if (
+                    not isinstance(row.target, ExistingObjectTarget)
+                    or row.target.object_handle != args.object_handle
+                ):
+                    raise business_repair(
+                        "DECLARATION_TARGET_MISMATCH",
+                        field="object_handle",
+                        draft_revision=current.revision,
+                        action="reuse this declaration id only for its exact bound owner",
+                    )
+                fields = dict(row.fields)
+                raw_names = fields.get("clear_object_lists", [])
+                if not isinstance(raw_names, list):  # pragma: no cover
+                    raise RuntimeError("clear_object_lists state must be a list")
+                fields["clear_object_lists"] = [*raw_names, args.list_name]
+                fields["list_behavior"] = "replace-all"
+                candidate = current.revise_declaration(
+                    declaration_id=args.declaration_id,
+                    fields=fields,
+                )
+            adapter.materialize(candidate)
+            return candidate
+
+        event_type = "declaration.revised" if existing else "declaration.added"
+    elif args.command == "draft-declare-field-change":
+        bound_field = session.handles.bound_field(args.field_handle)
+        fields: dict[str, Any] = {"field_handle": args.field_handle}
+        if args.business_value is not None:
+            fields["business_value"] = _parse_business_value(
+                bound_field.value_type,
+                args.business_value,
+                field="business_value",
+            )
+        elif args.target_handle is not None:
+            fields["reference_outcome"] = args.target_handle
+        elif args.clear_reference:
+            fields["reference_outcome"] = "clear"
+        elif args.link_state is not None:
+            fields["link_state"] = args.link_state
+        else:  # pragma: no cover - argparse requires one outcome
+            raise GatewayInputError("Field change requires one business outcome")
+
+        def update(
+            current: BusinessDeclarationSession,
+        ) -> BusinessDeclarationSession:
+            candidate = current.with_existing_declaration(
+                declaration_id="change",
+                target=ExistingObjectTarget(args.object_handle),
+                fields=fields,
+            )
+            adapter.materialize(candidate)
+            return candidate
+
+        event_type = "declaration.added"
+    elif args.command == "draft-declare-rtpc":
+        points: list[dict[str, Any]] = []
+        for index, (raw_x, raw_y, shape) in enumerate(args.point):
+            try:
+                x = float(raw_x)
+                y = float(raw_y)
+            except ValueError as exc:
+                raise GatewayInputError(
+                    f"RTPC point {index} requires finite numeric X and Y values"
+                ) from exc
+            if not math.isfinite(x) or not math.isfinite(y):
+                raise GatewayInputError(
+                    f"RTPC point {index} requires finite numeric X and Y values"
+                )
+            points.append(
+                {
+                    "x": int(x) if x.is_integer() else x,
+                    "y": int(y) if y.is_integer() else y,
+                    "shape": shape,
+                }
+            )
+        fields = {
+            "control_input_handle": args.control_input_handle,
+            "curve_points": points,
+            "field_handle": args.field_handle,
+            "mode": args.mode,
+            **({} if args.notes is None else {"notes": args.notes}),
+        }
+
+        def update(
+            current: BusinessDeclarationSession,
+        ) -> BusinessDeclarationSession:
+            candidate = current.with_existing_declaration(
+                declaration_id="rtpc",
+                target=ExistingObjectTarget(args.object_handle),
+                fields=fields,
+            )
+            adapter.materialize(candidate)
+            return candidate
+
+        event_type = "declaration.added"
+    elif args.command == "draft-declare-object-change":
+        lifecycle_contract = adapter.contract(inspected.version)
+        lifecycle_roles = list(lifecycle_contract["binding"]["roles"])
+        lifecycle_handles = _object_lifecycle_handles_by_role(
+            session,
+            lifecycle_roles,
+        )
+        missing_roles = [
+            role for role in lifecycle_roles if role not in lifecycle_handles
+        ]
+        if missing_roles:
+            raise GatewayInputError(
+                "Bind every disclosed object-lifecycle role before declaration: "
+                + ", ".join(missing_roles)
+            )
+        fields = {
+            name: value
+            for name, value in (
+                ("new_name", args.new_name),
+                ("notes", args.notes),
+                ("name_conflict", args.name_conflict),
+                ("add_to_source_control", args.add_to_source_control),
+                (
+                    "check_out_from_source_control",
+                    args.check_out_from_source_control,
+                ),
+            )
+            if value is not None
+        }
+        if "parent" in lifecycle_handles:
+            fields["parent_handle"] = lifecycle_handles["parent"]
+
+        def update(
+            current: BusinessDeclarationSession,
+        ) -> BusinessDeclarationSession:
+            candidate = current.with_existing_declaration(
+                declaration_id="change",
+                target=ExistingObjectTarget(lifecycle_handles["object"]),
+                fields=fields,
+            )
+            adapter.materialize(candidate)
+            return candidate
+
+        event_type = "declaration.added"
+    elif (
+        role_declaration is not None
+        and args.command == role_declaration.command
+    ):
+        values = {
+            name: getattr(args, name)
+            for name in role_declaration.required_fields
+        }
+
+        def update(
+            current: BusinessDeclarationSession,
+        ) -> BusinessDeclarationSession:
+            candidate = role_declaration.update(current, values)
+            adapter.materialize(candidate)
+            return candidate
+
+        event_type = "declaration.added"
+    elif args.command == "draft-business-configure":
+        settings: dict[str, Any] = {}
+        if adapter.family == "object-creation-graph":
+            names = (
+                (
+                    "add_to_source_control",
+                    "list_behavior",
+                    "name_conflict",
+                )
+                if inspected.operation == "object.set"
+                else (
+                    "add_to_source_control",
+                    "name_conflict",
+                    "platform",
+                    "replace_owner_handle",
+                )
+            )
+            for name in names:
+                value = getattr(args, name)
+                if value is not None:
+                    settings[name] = value
+        else:
+            defaults = _parse_audio_import_business_fields(
+                session,
+                args.default,
+                field_value_pairs=args.default_field_value,
+                event_parent_handle=args.default_event_parent_handle,
+                event_name=args.default_event_name,
+                event_action=args.default_event_action,
+            )
+            if args.mode is not None:
+                settings["mode"] = args.mode
+            if args.add_to_source_control is not None:
+                settings["add_to_source_control"] = args.add_to_source_control
+            if args.check_out_from_source_control is not None:
+                settings["check_out_from_source_control"] = (
+                    args.check_out_from_source_control
+                )
+            if defaults:
+                settings["defaults"] = defaults
+        if not settings:
+            raise GatewayInputError(
+                "Business configuration requires at least one explicit batch setting"
+            )
+        def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
+            candidate = current.with_settings(settings)
+            if adapter.family == "object-creation-graph" and candidate.declarations:
+                adapter.materialize(candidate)
+            return candidate
+
+        event_type = "settings.revised"
+    elif args.command == "draft-remove-declaration":
+        def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
+            candidate = current.remove_declaration(args.declaration_id)
+            if adapter.family == "object-creation-graph":
+                adapter.materialize(candidate)
+            return candidate
+
+        event_type = "declaration.removed"
+    else:
+        fields = (
+            _parse_object_graph_business_fields(
+                session,
+                inspected.operation,
+                args.field,
+                field_value_pairs=args.field_value,
+            )
+            if adapter.family == "object-creation-graph"
+            else _parse_audio_import_business_fields(
+                session,
+                args.field,
+                switch_value=args.switch_value,
+                allow_switch_value_pair=False,
+                field_value_pairs=args.field_value,
+                event_parent_handle=args.event_parent_handle,
+                event_name=args.event_name,
+                event_action=args.event_action,
+            )
+        )
+        if args.command == "draft-declare-new":
+            def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
+                candidate = current.with_new_declaration(
+                    declaration_id=args.declaration_id,
+                    target=NewDescendantTarget(
+                        parent_handle=args.parent_handle,
+                        name=args.name,
+                        kind=args.kind,
+                    ),
+                    fields=fields,
+                )
+                if adapter.family == "object-creation-graph":
+                    adapter.materialize(candidate)
+                return candidate
+
+            event_type = "declaration.added"
+        elif args.command == "draft-declare-existing":
+            def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
+                candidate = current.with_existing_declaration(
+                    declaration_id=args.declaration_id,
+                    target=ExistingObjectTarget(args.object_handle),
+                    fields=fields,
+                )
+                if adapter.family == "object-creation-graph":
+                    adapter.materialize(candidate)
+                return candidate
+
+            event_type = "declaration.added"
+        else:
+            def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
+                candidate = current.revise_declaration(
+                    declaration_id=args.declaration_id,
+                    fields=fields,
+                )
+                if adapter.family == "object-creation-graph":
+                    adapter.materialize(candidate)
+                return candidate
+
+            event_type = "declaration.revised"
+    schema_digest = operation_draft_schema_digest(
+        inspected.operation,
+        inspected.version,
+    )
+    composer_digest = operation_composer_digest(
+        inspected.operation,
+        inspected.version,
+    )
+    record = store.apply_business_update(
+        args.draft_id,
+        task_authority=args.task_authority,
+        expected_revision=args.expected_revision,
+        schema_digest=schema_digest,
+        composer_digest=composer_digest,
+        context=session.context,
+        update=update,
+        event_type=event_type,
+    )
+    return operation_draft_payload(
+        args.command,
+        record,
+        state_dir=args.state_dir,
+        prior_record=inspected,
+        task_authority=args.task_authority,
+    )
+
+
+def dispatch_business_soundbank_plan(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Bind and validate one complete SoundBank plan without dispatching it."""
+
+    binding = _open_business_binding(
+        args,
+        env=env,
+        connection=connection,
+        detected_version=detected_version,
+        live_info=live_info,
+        dispatcher=dispatcher,
+    )
+    adapter = business_adapter(binding.record.operation)
+    if not adapter.accepts_update_command(args.command):
+        raise GatewayInputError(
+            f"{binding.record.operation} does not expose {args.command}"
+        )
+    raw_session = (
+        binding.record.composition.get("business_session")
+        if binding.record.composition is not None
+        else None
+    )
+    session = (
+        BusinessDeclarationSession.create(binding.context)
+        if raw_session is None
+        else BusinessDeclarationSession.from_dict(raw_session)
+    )
+    if session.context != binding.context:
+        raise OperationDraftBindingDrift(
+            "Live project or Wwise build differs from the SoundBank plan binding."
+        )
+    try:
+        plan = soundbank_plan_from_namespace(
+            args,
+            operation=binding.record.operation,
+        )
+    except SoundBankBusinessCliError as exc:
+        raise GatewayInputError(str(exc)) from exc
+
+    def update(
+        current: BusinessDeclarationSession,
+    ) -> BusinessDeclarationSession:
+        candidate = current.with_settings({"soundbank_plan": plan})
+        adapter.materialize(candidate)
+        return candidate
+
+    record = binding.store.apply_business_update(
+        args.draft_id,
+        task_authority=args.task_authority,
+        expected_revision=args.expected_revision,
+        schema_digest=operation_draft_schema_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        composer_digest=operation_composer_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        context=binding.context,
+        update=update,
+        event_type="settings.revised",
+    )
+    payload = operation_draft_payload(
+        args.command,
+        record,
+        offline=False,
+        state_dir=args.state_dir,
+        task_authority=args.task_authority,
+    )
+    payload.update(
+        {
+            "endpoint": dict(common["endpoint"]),
+            "detected_version": detected_version,
+            "project_call": dispatch_call_summary(binding.project_call),
+        }
+    )
+    return payload
+
+
+def dispatch_business_exact_artifact_plan(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Bind one exact artifact plan without exposing its native loader."""
+
+    state_dir = resolve_transaction_state_directory(args, env=env)
+    pending = OperationDraftStore(state_dir).inspect(
+        args.draft_id,
+        task_authority=args.task_authority,
+    )
+    if (
+        pending.operation == "lua.executeCliFile"
+        and live_info.get("isCommandLine") is not True
+    ):
+        return command_line_host_required_payload(
+            command=args.command,
+            live_info=live_info,
+            common=common,
+            operation=pending.operation,
+        )
+
+    binding = _open_business_binding(
+        args,
+        env=env,
+        connection=connection,
+        detected_version=detected_version,
+        live_info=live_info,
+        dispatcher=dispatcher,
+    )
+    adapter = business_adapter(binding.record.operation)
+    if not adapter.accepts_update_command(args.command):
+        raise GatewayInputError(
+            f"{binding.record.operation} does not expose {args.command}"
+        )
+    raw_session = (
+        binding.record.composition.get("business_session")
+        if binding.record.composition is not None
+        else None
+    )
+    session = (
+        BusinessDeclarationSession.create(binding.context)
+        if raw_session is None
+        else BusinessDeclarationSession.from_dict(raw_session)
+    )
+    if session.context != binding.context:
+        raise OperationDraftBindingDrift(
+            "Live project or Wwise build differs from the artifact plan binding."
+        )
+    try:
+        plan = exact_artifact_plan_from_namespace(
+            args,
+            operation=binding.record.operation,
+        )
+    except ExactArtifactBusinessCliError as exc:
+        raise GatewayInputError(str(exc)) from exc
+
+    def update(
+        current: BusinessDeclarationSession,
+    ) -> BusinessDeclarationSession:
+        provisional = current.with_settings({"artifact_plan": plan})
+        request = adapter.materialize(provisional)
+        settings: dict[str, Any] = {"artifact_plan": plan}
+        evidence = exact_artifact_evidence_from_request(
+            binding.record.operation,
+            request,
+        )
+        if evidence is not None:
+            settings["artifact_evidence"] = evidence
+        candidate = current.with_settings(settings)
+        adapter.materialize(candidate)
+        return candidate
+
+    record = binding.store.apply_business_update(
+        args.draft_id,
+        task_authority=args.task_authority,
+        expected_revision=args.expected_revision,
+        schema_digest=operation_draft_schema_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        composer_digest=operation_composer_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        context=binding.context,
+        update=update,
+        event_type="settings.revised",
+    )
+    payload = operation_draft_payload(
+        args.command,
+        record,
+        offline=False,
+        state_dir=args.state_dir,
+        task_authority=args.task_authority,
+    )
+    payload.update(
+        {
+            "endpoint": dict(common["endpoint"]),
+            "detected_version": detected_version,
+            "project_call": dispatch_call_summary(binding.project_call),
+        }
+    )
+    return payload
+
+
+def dispatch_business_cli_console_plan(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Bind one complete high-level CLI/Console plan to the live host."""
+
+    state_dir = resolve_transaction_state_directory(args, env=env)
+    pending = OperationDraftStore(state_dir).inspect(
+        args.draft_id,
+        task_authority=args.task_authority,
+    )
+    if live_info.get("isCommandLine") is not True:
+        return command_line_host_required_payload(
+            command=args.command,
+            live_info=live_info,
+            common=common,
+            operation=pending.operation,
+        )
+    binding = _open_business_binding(
+        args,
+        env=env,
+        connection=connection,
+        detected_version=detected_version,
+        live_info=live_info,
+        dispatcher=dispatcher,
+    )
+    adapter = business_adapter(binding.record.operation)
+    if adapter.family != "cli-console-business" or not adapter.accepts_update_command(
+        args.command
+    ):
+        raise GatewayInputError(
+            f"{binding.record.operation} does not expose {args.command}"
+        )
+    raw_session = (
+        binding.record.composition.get("business_session")
+        if binding.record.composition is not None
+        else None
+    )
+    session = (
+        BusinessDeclarationSession.create(binding.context)
+        if raw_session is None
+        else BusinessDeclarationSession.from_dict(raw_session)
+    )
+    if session.context != binding.context:
+        raise OperationDraftBindingDrift(
+            "Live project or Wwise build differs from the CLI/Console plan binding."
+        )
+    try:
+        plan = cli_console_plan_from_namespace(
+            args,
+            operation=binding.record.operation,
+            version=detected_version,
+        )
+    except CliConsoleBusinessCliError as exc:
+        raise GatewayInputError(str(exc)) from exc
+
+    def update(
+        current: BusinessDeclarationSession,
+    ) -> BusinessDeclarationSession:
+        candidate = current.with_settings({"cli_console_plan": plan})
+        adapter.materialize(candidate)
+        return candidate
+
+    record = binding.store.apply_business_update(
+        args.draft_id,
+        task_authority=args.task_authority,
+        expected_revision=args.expected_revision,
+        schema_digest=operation_draft_schema_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        composer_digest=operation_composer_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        context=binding.context,
+        update=update,
+        event_type="settings.revised",
+    )
+    payload = operation_draft_payload(
+        args.command,
+        record,
+        offline=False,
+        state_dir=args.state_dir,
+        task_authority=args.task_authority,
+    )
+    payload.update(
+        {
+            "endpoint": dict(common["endpoint"]),
+            "detected_version": detected_version,
+            "project_call": dispatch_call_summary(binding.project_call),
+        }
+    )
+    return payload
+
+
+def dispatch_business_host_ui_debug_plan(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Bind one complete test-tone or Authoring-project business plan."""
+
+    state_dir = resolve_transaction_state_directory(args, env=env)
+    pending = OperationDraftStore(state_dir).inspect(
+        args.draft_id,
+        task_authority=args.task_authority,
+    )
+    if (
+        pending.operation.startswith("ak.wwise.ui.project.")
+        and live_info.get("isCommandLine") is not False
+    ):
+        return authoring_host_required_payload(
+            api=None,
+            command=args.command,
+            live_info=live_info,
+            common=common,
+            operation=pending.operation,
+        )
+    binding = _open_business_binding(
+        args,
+        env=env,
+        connection=connection,
+        detected_version=detected_version,
+        live_info=live_info,
+        dispatcher=dispatcher,
+        allow_no_project=pending.operation in {
+            "ak.wwise.ui.project.create",
+            "ak.wwise.ui.project.open",
+        },
+    )
+    adapter = business_adapter(binding.record.operation)
+    if adapter.family != "host-ui-debug-business" or not adapter.accepts_update_command(
+        args.command
+    ):
+        raise GatewayInputError(
+            f"{binding.record.operation} does not expose {args.command}"
+        )
+    raw_session = (
+        binding.record.composition.get("business_session")
+        if binding.record.composition is not None
+        else None
+    )
+    session = (
+        BusinessDeclarationSession.create(binding.context)
+        if raw_session is None
+        else BusinessDeclarationSession.from_dict(raw_session)
+    )
+    if session.context != binding.context:
+        raise OperationDraftBindingDrift(
+            "Live project or Wwise build differs from the host/UI/Debug plan binding."
+        )
+    try:
+        plan = host_ui_debug_plan_from_namespace(
+            args,
+            operation=binding.record.operation,
+            version=detected_version,
+        )
+    except HostUiDebugBusinessCliError as exc:
+        raise GatewayInputError(str(exc)) from exc
+
+    def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
+        candidate = current.with_settings({"host_ui_debug_plan": plan})
+        parse_operation_request(
+            adapter.materialize(candidate),
+            expected_version=detected_version,
+        )
+        return candidate
+
+    record = binding.store.apply_business_update(
+        args.draft_id,
+        task_authority=args.task_authority,
+        expected_revision=args.expected_revision,
+        schema_digest=operation_draft_schema_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        composer_digest=operation_composer_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        context=binding.context,
+        update=update,
+        event_type="settings.revised",
+    )
+    payload = operation_draft_payload(
+        args.command,
+        record,
+        offline=False,
+        state_dir=args.state_dir,
+        task_authority=args.task_authority,
+    )
+    payload.update(
+        {
+            "endpoint": dict(common["endpoint"]),
+            "detected_version": detected_version,
+            "project_call": dispatch_call_summary(binding.project_call),
+        }
+    )
+    return payload
+
+
+def dispatch_business_authoring_ui_update(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Record one closed Authoring UI plan stage on an Authoring host."""
+
+    state_dir = resolve_transaction_state_directory(args, env=env)
+    pending = OperationDraftStore(state_dir).inspect(
+        args.draft_id,
+        task_authority=args.task_authority,
+    )
+    if live_info.get("isCommandLine") is not False:
+        return authoring_host_required_payload(
+            api=None,
+            command=args.command,
+            live_info=live_info,
+            common=common,
+            operation=pending.operation,
+        )
+    binding = _open_business_binding(
+        args,
+        env=env,
+        connection=connection,
+        detected_version=detected_version,
+        live_info=live_info,
+        dispatcher=dispatcher,
+    )
+    adapter = business_adapter(binding.record.operation)
+    if adapter.family != "authoring-ui-business" or not adapter.accepts_update_command(
+        args.command
+    ):
+        raise GatewayInputError(
+            f"{binding.record.operation} does not expose {args.command}"
+        )
+    raw_session = (
+        binding.record.composition.get("business_session")
+        if binding.record.composition is not None
+        else None
+    )
+    session = (
+        BusinessDeclarationSession.create(binding.context)
+        if raw_session is None
+        else BusinessDeclarationSession.from_dict(raw_session)
+    )
+    if session.context != binding.context:
+        raise OperationDraftBindingDrift(
+            "Live project or Wwise build differs from the Authoring UI plan binding."
+        )
+    try:
+        if args.command == "draft-declare-ui-plan":
+            plan = authoring_ui_plan_from_namespace(
+                args,
+                operation=binding.record.operation,
+            )
+
+            def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
+                candidate = current.with_settings({"ui_plan": plan})
+                validate_authoring_ui_business_session(
+                    binding.record.operation,
+                    candidate,
+                )
+                if adapter.is_complete(candidate):
+                    parse_operation_request(
+                        adapter.materialize(candidate),
+                        expected_version=detected_version,
+                    )
+                return candidate
+
+        else:
+            if binding.record.operation != "ui.commands.register":
+                raise GatewayInputError(
+                    "draft-add-ui-command is available only for ui.commands.register"
+                )
+            command = authoring_ui_command_from_namespace(args)
+
+            def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
+                candidate = append_authoring_ui_command(current, command)
+                validate_authoring_ui_business_session(
+                    binding.record.operation,
+                    candidate,
+                )
+                if adapter.is_complete(candidate):
+                    parse_operation_request(
+                        adapter.materialize(candidate),
+                        expected_version=detected_version,
+                    )
+                return candidate
+
+    except AuthoringUiBusinessCliError as exc:
+        raise GatewayInputError(str(exc)) from exc
+    record = binding.store.apply_business_update(
+        args.draft_id,
+        task_authority=args.task_authority,
+        expected_revision=args.expected_revision,
+        schema_digest=operation_draft_schema_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        composer_digest=operation_composer_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        context=binding.context,
+        update=update,
+        event_type="settings.revised",
+    )
+    payload = operation_draft_payload(
+        args.command,
+        record,
+        offline=False,
+        state_dir=args.state_dir,
+        task_authority=args.task_authority,
+    )
+    payload.update(
+        {
+            "endpoint": dict(common["endpoint"]),
+            "detected_version": detected_version,
+            "project_call": dispatch_call_summary(binding.project_call),
+        }
+    )
+    return payload
+
+
+def dispatch_business_debug_intent(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Record one closed Debug business intent without native request fields."""
+
+    binding = _open_business_binding(
+        args,
+        env=env,
+        connection=connection,
+        detected_version=detected_version,
+        live_info=live_info,
+        dispatcher=dispatcher,
+    )
+    adapter = business_adapter(binding.record.operation)
+    if adapter.family != "debug-host-control" or not adapter.accepts_update_command(
+        args.command
+    ):
+        raise GatewayInputError(
+            f"{binding.record.operation} does not expose {args.command}"
+        )
+    raw_session = (
+        binding.record.composition.get("business_session")
+        if binding.record.composition is not None
+        else None
+    )
+    session = (
+        BusinessDeclarationSession.create(binding.context)
+        if raw_session is None
+        else BusinessDeclarationSession.from_dict(raw_session)
+    )
+    if session.context != binding.context:
+        raise OperationDraftBindingDrift(
+            "Live project or Wwise build differs from the Debug intent binding."
+        )
+    try:
+        intent = debug_intent_from_namespace(
+            args,
+            operation=binding.record.operation,
+        )
+    except DebugBusinessCliError as exc:
+        raise GatewayInputError(str(exc)) from exc
+
+    def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
+        candidate = current.with_settings({"debug_intent": intent})
+        parse_operation_request(
+            adapter.materialize(candidate),
+            expected_version=detected_version,
+        )
+        return candidate
+
+    record = binding.store.apply_business_update(
+        args.draft_id,
+        task_authority=args.task_authority,
+        expected_revision=args.expected_revision,
+        schema_digest=operation_draft_schema_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        composer_digest=operation_composer_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        context=binding.context,
+        update=update,
+        event_type="settings.revised",
+    )
+    payload = operation_draft_payload(
+        args.command,
+        record,
+        offline=False,
+        state_dir=args.state_dir,
+        task_authority=args.task_authority,
+    )
+    payload.update(
+        {
+            "endpoint": dict(common["endpoint"]),
+            "detected_version": detected_version,
+            "project_call": dispatch_call_summary(binding.project_call),
+        }
+    )
+    return payload
+
+
+def dispatch_business_compound_undo_plan(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Snapshot one ordered list of already checked child Business Drafts."""
+
+    binding = _open_business_binding(
+        args,
+        env=env,
+        connection=connection,
+        detected_version=detected_version,
+        live_info=live_info,
+        dispatcher=dispatcher,
+    )
+    adapter = business_adapter(binding.record.operation)
+    if adapter.family != "compound-undo-business" or not adapter.accepts_update_command(
+        args.command
+    ):
+        raise GatewayInputError(
+            f"{binding.record.operation} does not expose {args.command}"
+        )
+    child_bindings = args.child_draft
+    if (
+        not isinstance(child_bindings, list)
+        or not 1 <= len(child_bindings) <= UNDO_GROUP_MAX_CALLS
+    ):
+        raise GatewayInputError(
+            "Compound Undo requires between 1 and "
+            f"{UNDO_GROUP_MAX_CALLS} checked child Drafts"
+        )
+    current_project_guard = build_project_guard(
+        endpoint=common["endpoint"],
+        version=detected_version,
+        live_info=live_info,
+        project=binding.project,
+    )
+    try:
+        checked_child_bindings = tuple(
+            CheckedChildDraftBinding.from_cli_pair(pair, index=index)
+            for index, pair in enumerate(child_bindings)
+        )
+    except ValueError as exc:
+        raise GatewayInputError(str(exc)) from exc
+    try:
+        snapshots = snapshot_checked_compound_undo_children(
+            CompoundUndoSnapshotScope(
+                store=binding.store,
+                parent_draft_id=binding.record.draft_id,
+                parent_task_authority=args.task_authority,
+                parent_revision=binding.record.revision,
+                parent_context=binding.context,
+                project_guard=current_project_guard,
+                version=detected_version,
+                schema_digest_for=operation_draft_schema_digest,
+                composer_digest_for=operation_composer_digest,
+            ),
+            checked_child_bindings,
+        )
+    except ValueError as exc:
+        raise GatewayInputError(str(exc)) from exc
+
+    def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
+        candidate = current.with_settings(
+            {
+                "undo_plan": {
+                    "display_name": args.display_name,
+                    "children": snapshots,
+                }
+            }
+        )
+        parse_operation_request(
+            adapter.materialize(candidate),
+            expected_version=detected_version,
+        )
+        return candidate
+
+    record = binding.store.apply_business_update(
+        args.draft_id,
+        task_authority=args.task_authority,
+        expected_revision=args.expected_revision,
+        schema_digest=operation_draft_schema_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        composer_digest=operation_composer_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        context=binding.context,
+        update=update,
+        event_type="settings.revised",
+    )
+    payload = operation_draft_payload(
+        args.command,
+        record,
+        offline=False,
+        state_dir=args.state_dir,
+        task_authority=args.task_authority,
+    )
+    payload.update(
+        {
+            "endpoint": dict(common["endpoint"]),
+            "detected_version": detected_version,
+            "project_call": dispatch_call_summary(binding.project_call),
+        }
+    )
+    return payload
+
+
+def _business_context_from_live(
+    *,
+    task_authority: str,
+    project: Mapping[str, Any],
+    detected_version: str,
+    live_info: Mapping[str, Any],
+) -> BusinessContext:
+    version = live_info.get("version")
+    display_name = version.get("displayName") if isinstance(version, Mapping) else None
+    if not isinstance(display_name, str) or not display_name:
+        raise GatewayResultShapeError(
+            "Live Wwise build identity is unavailable for business handle binding.",
+            details={"required_field": "version.displayName"},
+            error_code="INVALID_STATUS_RESULT",
+        )
+    return BusinessContext.create(
+        task_authority=task_authority,
+        project_id=str(project["id"]),
+        project_path=str(project["path"]),
+        wwise_version=detected_version,
+        wwise_build=display_name,
+    )
+
+
+def _business_context_without_project(
+    *,
+    task_authority: str,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+) -> BusinessContext:
+    """Bind a project-transition-only declaration while no project is open.
+
+    The host/UI project adapters do not expose object or field handles. Their
+    immutable transaction Preview captures the real ``state=none`` project
+    guard later, so this private sentinel cannot stand in for live project
+    identity in a mutation or verifier.
+    """
+
+    version = live_info.get("version")
+    display_name = version.get("displayName") if isinstance(version, Mapping) else None
+    if not isinstance(display_name, str) or not display_name:
+        raise GatewayResultShapeError(
+            "Live Wwise build identity is unavailable for business handle binding.",
+            details={"required_field": "version.displayName"},
+            error_code="INVALID_STATUS_RESULT",
+        )
+    return BusinessContext.create(
+        task_authority=task_authority,
+        project_id="waapi-skill:no-current-project",
+        project_path="waapi-skill:no-current-project",
+        wwise_version=detected_version,
+        wwise_build=display_name,
+    )
+
+
+def _runtime_transport_context_from_live(
+    *,
+    endpoint: Mapping[str, Any],
+    project: Mapping[str, Any],
+    detected_version: str,
+    live_info: Mapping[str, Any],
+) -> RuntimeTransportContext:
+    version = live_info.get("version")
+    display_name = version.get("displayName") if isinstance(version, Mapping) else None
+    endpoint_url = endpoint.get("url")
+    if not isinstance(endpoint_url, str) or not endpoint_url:
+        host = endpoint.get("host")
+        port = endpoint.get("port")
+        if not isinstance(host, str) or isinstance(port, bool) or not isinstance(port, int):
+            raise GatewayResultShapeError(
+                "Live endpoint identity is unavailable for transport handle binding.",
+                error_code="INVALID_STATUS_RESULT",
+            )
+        endpoint_url = f"ws://{host}:{port}/waapi"
+    if not isinstance(display_name, str) or not display_name:
+        raise GatewayResultShapeError(
+            "Live Wwise build identity is unavailable for transport handle binding.",
+            error_code="INVALID_STATUS_RESULT",
+        )
+    return RuntimeTransportContext(
+        endpoint_url=endpoint_url,
+        project_id=str(project["id"]),
+        project_path=str(project["path"]),
+        wwise_version=detected_version,
+        wwise_build=display_name,
+    )
+
+
+def _runtime_game_object_context_from_live(
+    *,
+    endpoint: Mapping[str, Any],
+    project: Mapping[str, Any],
+    detected_version: str,
+    live_info: Mapping[str, Any],
+) -> RuntimeGameObjectContext:
+    transport_context = _runtime_transport_context_from_live(
+        endpoint=endpoint,
+        project=project,
+        detected_version=detected_version,
+        live_info=live_info,
+    )
+    return RuntimeGameObjectContext(
+        endpoint_url=transport_context.endpoint_url,
+        project_id=transport_context.project_id,
+        project_path=transport_context.project_path,
+        wwise_version=transport_context.wwise_version,
+        wwise_build=transport_context.wwise_build,
+    )
+
+
+def _business_object_path_from_segments(values: Any) -> str:
+    if (
+        not isinstance(values, list)
+        or not 1 <= len(values) <= MAX_BUSINESS_OBJECT_PATH_SEGMENTS
+    ):
+        raise GatewayInputError(
+            "Business object path requires 1.."
+            f"{MAX_BUSINESS_OBJECT_PATH_SEGMENTS} ordered path segments."
+        )
+    segments: list[str] = []
+    for value in values:
+        if (
+            not isinstance(value, str)
+            or not value
+            or value != value.strip()
+            or len(value.encode("utf-8")) > MAX_BUSINESS_NAME_BYTES
+            or "\\" in value
+            or "/" in value
+            or '"' in value
+            or "<" in value
+            or ">" in value
+            or any(
+                ord(character) < 32
+                or ord(character) == 127
+                or character in {"\u2028", "\u2029"}
+                for character in value
+            )
+        ):
+            raise GatewayInputError(
+                "Each business object path segment must be one bounded literal name "
+                "without a path separator or Wwise type syntax."
+            )
+        segments.append(value)
+    path = "\\" + "\\".join(segments)
+    if len(path.encode("utf-8")) > MAX_BUSINESS_PATH_BYTES:
+        raise GatewayInputError(
+            "Business object path segments exceed the fixed path byte limit."
+        )
+    return path
+
+
+@dataclass(frozen=True, slots=True)
+class _BusinessObjectSelector:
+    request: Mapping[str, Any]
+    kind: str
+    expected_id: str | None = None
+    expected_path: str | None = None
+    expected_type: str | None = None
+    expected_name: str | None = None
+
+
+def _business_object_selector_from_namespace(
+    args: argparse.Namespace,
+) -> _BusinessObjectSelector:
+    parent_supplied = (
+        args.parent_id is not None or args.parent_path_segment is not None
+    )
+    if (
+        args.direct_child_type is None
+        and args.scoped_child_name is None
+        and parent_supplied
+    ):
+        raise GatewayInputError(
+            "Business object parent selectors require --direct-child-type or "
+            "--scoped-child-name."
+        )
+    if args.scoped_child_name is not None:
+        if args.parent_path_segment is None or args.parent_id is not None:
+            raise GatewayInputError(
+                "Business scoped-child binding requires one complete parent path."
+            )
+        complete_path = _business_object_path_from_segments(
+            [*args.parent_path_segment, args.scoped_child_name]
+        )
+        return _BusinessObjectSelector(
+            request={"from": {"path": [complete_path]}},
+            kind="scoped-child",
+            expected_path=complete_path,
+            expected_name=args.scoped_child_name,
+        )
+    if args.object_id is not None:
+        if not _canonical_guid(args.object_id):
+            raise GatewayInputError(
+                "Business object --object-id must be one canonical Wwise GUID."
+            )
+        return _BusinessObjectSelector(
+            request={"from": {"id": [args.object_id]}},
+            kind="id",
+            expected_id=args.object_id,
+        )
+    if args.object_path_segment is not None:
+        raw_identity = {
+            "kind": "path",
+            "value": _business_object_path_from_segments(
+                args.object_path_segment
+            ),
+        }
+    elif args.exact_type_name is not None:
+        raw_identity = {
+            "kind": "exact-type-name",
+            "type": args.exact_type_name[0],
+            "name": args.exact_type_name[1],
+        }
+    elif args.event_action_of_path_segment is not None:
+        raw_identity = {
+            "kind": "direct-child",
+            "type": "Action",
+            "parent": {
+                "kind": "path",
+                "value": _business_object_path_from_segments(
+                    args.event_action_of_path_segment
+                ),
+            },
+        }
+    elif args.direct_child_type is not None:
+        if args.parent_id is not None:
+            if not _canonical_guid(args.parent_id):
+                raise GatewayInputError(
+                    "Business direct-child --parent-id must be one canonical Wwise GUID."
+                )
+            parent = {"kind": "id", "value": args.parent_id}
+        elif args.parent_path_segment is not None:
+            parent = {
+                "kind": "path",
+                "value": _business_object_path_from_segments(
+                    args.parent_path_segment
+                ),
+            }
+        else:
+            raise GatewayInputError(
+                "Business direct-child binding requires one parent id or path."
+            )
+        raw_identity = {
+            "kind": "direct-child",
+            "type": args.direct_child_type,
+            "parent": parent,
+        }
+    else:  # pragma: no cover - argparse requires exactly one selector
+        raise GatewayInputError(
+            "Business object binding requires an exact GUID, literal path "
+            "segments, typed name, or direct-child type plus parent"
+        )
+    try:
+        identity = normalize_object_identity(
+            raw_identity,
+            path="draft-bind-object.selector",
+        )
+    except ObjectOperationContractError as exc:
+        raise GatewayInputError(str(exc)) from exc
+    if identity.kind == "path":
+        assert identity.value is not None
+        request: Mapping[str, Any] = {"from": {"path": [identity.value]}}
+    elif identity.kind == "direct-child":
+        assert identity.type is not None and identity.parent is not None
+        parent_literal = identity.parent.value
+        assert isinstance(parent_literal, (str, int)) and not isinstance(
+            parent_literal, bool
+        )
+        try:
+            request = {
+                "waql": (
+                    f"from object {quote_waql_literal(str(parent_literal))} "
+                    "select children where type = "
+                    f"{quote_waql_literal(identity.type)} take 2"
+                )
+            }
+        except ValueError as exc:
+            raise GatewayInputError(
+                "Business direct-child selector contains an unsupported literal."
+            ) from exc
+    else:
+        assert identity.type is not None and identity.name is not None
+        request = {
+            "waql": (
+                f"from type {identity.type} where name = "
+                f"{quote_waql_literal(identity.name)} take 2"
+            )
+        }
+    return _BusinessObjectSelector(
+        request=request,
+        kind=identity.kind,
+        expected_path=(
+            str(identity.value) if identity.kind == "path" else None
+        ),
+        expected_type=identity.type,
+        expected_name=identity.name,
+    )
+
+
+def preflight_business_object_binding_input(args: argparse.Namespace) -> None:
+    """Materialize one closed identity before opening a live client."""
+
+    args._business_object_selector = (  # noqa: SLF001 - argparse namespace cache
+        _business_object_selector_from_namespace(args)
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class _BusinessBinding:
+    state_dir: Path
+    store: OperationDraftStore
+    record: OperationDraftRecord
+    project: Mapping[str, Any]
+    project_call: Any
+    context: BusinessContext
+    read_call: Callable[[str, Mapping[str, Any], Mapping[str, Any]], Mapping[str, Any]]
+
+
+def _open_business_binding(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    allow_no_project: bool = False,
+) -> _BusinessBinding:
+    state_dir = resolve_transaction_state_directory(args, env=env)
+    store = OperationDraftStore(state_dir)
+    record = store.inspect(args.draft_id, task_authority=args.task_authority)
+    if not operation_uses_business_declaration(
+        record.operation,
+        record.version,
+    ):
+        raise GatewayInputError("This Draft has no Business Declaration Adapter")
+    if record.version != detected_version:
+        raise OperationDraftBindingDrift(
+            "Operation Draft version does not match the connected Wwise version."
+        )
+    project, project_call = current_project(
+        dispatcher,
+        connection=connection,
+        version=detected_version,
+        allow_none=allow_no_project,
+    )
+    if project is None:
+        if not allow_no_project:  # pragma: no cover - current_project is strict above
+            raise GatewayInputError("A live Wwise project is required")
+        context = _business_context_without_project(
+            task_authority=args.task_authority,
+            detected_version=detected_version,
+            live_info=live_info,
+        )
+        # Only project open/create business adapters can reach this sentinel,
+        # and neither consumes ``binding.project``. Keeping the dataclass shape
+        # closed avoids making project identity optional for every other adapter.
+        bound_project: Mapping[str, Any] = {
+            "id": context.project_id,
+            "path": context.project_path,
+        }
+    else:
+        context = _business_context_from_live(
+            task_authority=args.task_authority,
+            project=project,
+            detected_version=detected_version,
+            live_info=live_info,
+        )
+        bound_project = project
+    return _BusinessBinding(
+        state_dir=state_dir,
+        store=store,
+        record=record,
+        project=bound_project,
+        project_call=project_call,
+        context=context,
+        read_call=transaction_read_call(
+            dispatcher,
+            connection=connection,
+            version=detected_version,
+        ),
+    )
+
+
+def dispatch_business_object_binding(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    binding = _open_business_binding(
+        args,
+        env=env,
+        connection=connection,
+        detected_version=detected_version,
+        live_info=live_info,
+        dispatcher=dispatcher,
+    )
+    adapter = business_adapter(binding.record.operation)
+    role_declaration = adapter.role_declaration
+    if role_declaration is None:
+        business_contract = adapter.contract(detected_version)
+        contract_binding = business_contract.get("binding")
+        contract_roles = (
+            tuple(contract_binding.get("roles", ()))
+            if isinstance(contract_binding, Mapping)
+            else ()
+        )
+        role_required = (
+            contract_binding.get("role_required") is True
+            if isinstance(contract_binding, Mapping)
+            else False
+        )
+        if (
+            isinstance(contract_binding, Mapping)
+            and contract_binding.get("available") is False
+        ):
+            raise GatewayInputError(
+                f"Business object roles are unavailable for {binding.record.operation}"
+            )
+        if args.role is not None and not contract_roles:
+            raise GatewayInputError(
+                f"Business object roles are unavailable for {binding.record.operation}"
+            )
+        if args.role is not None and args.role not in contract_roles:
+            raise GatewayInputError(
+                "Business object binding requires one disclosed role: "
+                + ", ".join(contract_roles)
+            )
+        if role_required and args.role is None:
+            raise GatewayInputError(
+                "Business object binding requires one disclosed role: "
+                + ", ".join(contract_roles)
+            )
+    else:
+        raw_session = (
+            binding.record.composition.get("business_session")
+            if binding.record.composition is not None
+            else None
+        )
+        bound_count = (
+            0
+            if raw_session is None
+            else len(
+                BusinessDeclarationSession.from_dict(raw_session).handles.as_dict()[
+                    "objects"
+                ]
+            )
+        )
+        if bound_count >= len(role_declaration.roles):
+            raise GatewayInputError(
+                "Every business object role is already bound; submit the declaration"
+            )
+        expected_role = role_declaration.roles[bound_count]
+        if args.role != expected_role:
+            raise GatewayInputError(
+                f"The next business object binding requires --role {expected_role}"
+            )
+    closed_selector = getattr(args, "_business_object_selector", None)
+    if not isinstance(closed_selector, _BusinessObjectSelector):
+        raise GatewayInputError(
+            "Business object selector preflight evidence is unavailable."
+        )
+    raw = binding.read_call(
+        OBJECT_GET_URI,
+        closed_selector.request,
+        {"return": ["id", "name", "type", "path"]},
+    )
+    rows = raw.get("return")
+    if not isinstance(rows, list) or len(rows) != 1 or not isinstance(rows[0], Mapping):
+        candidates = [
+            {
+                field: row[field]
+                for field in ("id", "name", "type", "path")
+                if field in row
+            }
+            for row in (rows[:2] if isinstance(rows, list) else [])
+            if isinstance(row, Mapping)
+        ]
+        raise GatewayResultShapeError(
+            "Exact business object binding requires one live Wwise object row.",
+            details={
+                "actual_count": len(rows) if isinstance(rows, list) else None,
+                "candidates": candidates,
+            },
+            error_code="BUSINESS_OBJECT_NOT_UNIQUE",
+        )
+    row = dict(rows[0])
+    try:
+        identity = normalize_live_object_identity(row)
+    except ValueError as exc:
+        raise GatewayResultShapeError(
+            "Exact business object binding returned a malformed live identity.",
+            details={"required_fields": ["id", "name", "type", "path"]},
+            error_code="BUSINESS_OBJECT_BINDING_MISMATCH",
+        ) from exc
+    row.update(
+        {
+            "id": identity.object_id,
+            "name": identity.name,
+            "type": identity.object_type,
+            "path": identity.path,
+        }
+    )
+    if (
+        (
+            closed_selector.expected_id is not None
+            and identity.object_id != closed_selector.expected_id.upper()
+        )
+        or (
+            closed_selector.expected_path is not None
+            and identity.path != closed_selector.expected_path
+        )
+        or (
+            closed_selector.expected_type is not None
+            and identity.object_type != closed_selector.expected_type
+        )
+        or (
+            closed_selector.expected_name is not None
+            and identity.name != closed_selector.expected_name
+        )
+    ):
+        raise GatewayResultShapeError(
+            "Live business object row does not match its exact selector.",
+            details={"required_fields": ["id", "name", "type", "path"]},
+            error_code="BUSINESS_OBJECT_BINDING_MISMATCH",
+        )
+    compatible_business_kinds = semantic_kinds_for_live_type(
+        str(row["type"]),
+        version=detected_version,
+    )
+    semantic_kind: str | None = None
+    business_kind_source: str | None = None
+    if adapter.requires_sound_subtype and str(row["type"]).casefold() == "sound":
+        subtype_raw = binding.read_call(
+            OBJECT_GET_URI,
+            {"from": {"id": [str(row["id"])]}},
+            {"return": ["id", "@IsVoice"]},
+        )
+        subtype_rows = subtype_raw.get("return")
+        if (
+            not isinstance(subtype_rows, list)
+            or len(subtype_rows) != 1
+            or not isinstance(subtype_rows[0], Mapping)
+            or str(subtype_rows[0].get("id", "")).upper()
+            != str(row["id"]).upper()
+            or type(subtype_rows[0].get("@IsVoice")) is not bool
+        ):
+            raise GatewayResultShapeError(
+                "Live Sound binding requires one exact IsVoice readback.",
+                details={"required_fields": ["id", "@IsVoice"]},
+                error_code="BUSINESS_OBJECT_SUBTYPE_UNRESOLVED",
+            )
+        semantic_kind = (
+            "sound-voice" if subtype_rows[0]["@IsVoice"] else "sound-sfx"
+        )
+        business_kind_source = "live_sound_voice_discriminator"
+    elif set(compatible_business_kinds) == {
+        "random-container",
+        "sequence-container",
+    }:
+        subtype_raw = binding.read_call(
+            OBJECT_GET_URI,
+            {"from": {"id": [str(row["id"])]}},
+            {"return": ["id", "@RandomOrSequence"]},
+        )
+        subtype_rows = subtype_raw.get("return")
+        if (
+            not isinstance(subtype_rows, list)
+            or len(subtype_rows) != 1
+            or not isinstance(subtype_rows[0], Mapping)
+            or str(subtype_rows[0].get("id", "")).upper()
+            != str(row["id"]).upper()
+            or type(subtype_rows[0].get("@RandomOrSequence")) is not int
+            or subtype_rows[0]["@RandomOrSequence"] not in {0, 1}
+        ):
+            raise GatewayResultShapeError(
+                "Live Random/Sequence binding requires one exact discriminator readback.",
+                details={"required_fields": ["id", "@RandomOrSequence"]},
+                error_code="BUSINESS_OBJECT_KIND_UNRESOLVED",
+            )
+        semantic_kind = (
+            "random-container"
+            if subtype_rows[0]["@RandomOrSequence"] == 1
+            else "sequence-container"
+        )
+        business_kind_source = "live_random_or_sequence_discriminator"
+    business_kind_candidates = compatible_business_kinds
+    business_kind = (
+        semantic_kind
+        or (
+            business_kind_candidates[0]
+            if len(business_kind_candidates) == 1
+            else None
+        )
+    )
+    if (
+        business_kind is None
+        and isinstance(args.role, str)
+        and closed_selector.expected_type is not None
+    ):
+        business_kind = args.role
+        business_kind_source = "closed_role_exact_type_selector"
+    if business_kind is None:
+        business_kind = stable_bound_business_kind_for_live_type(
+            str(row["type"]),
+            version=detected_version,
+        )
+        if business_kind is not None:
+            business_kind_source = "stable_live_type"
+    captured: list[Any] = []
+
+    def bind(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
+        handles = BusinessHandleRegistry.from_dict(current.handles.as_dict())
+        bound = handles.bind_object(
+            object_id=str(row["id"]),
+            name=str(row["name"]),
+            object_type=str(row["type"]),
+            path=str(row["path"]),
+            semantic_kind=semantic_kind,
+            role=args.role,
+        )
+        captured.append(bound)
+        return current.with_handle_registry(handles)
+
+    schema_digest = operation_draft_schema_digest(
+        binding.record.operation,
+        detected_version,
+    )
+    composer_digest = operation_composer_digest(
+        binding.record.operation,
+        detected_version,
+    )
+    record = binding.store.apply_business_update(
+        args.draft_id,
+        task_authority=args.task_authority,
+        expected_revision=args.expected_revision,
+        schema_digest=schema_digest,
+        composer_digest=composer_digest,
+        context=binding.context,
+        update=bind,
+        event_type="handles.bound",
+    )
+    bound = captured[0]
+    payload = operation_draft_payload(
+        args.command,
+        record,
+        offline=False,
+        state_dir=args.state_dir,
+        task_authority=args.task_authority,
+    )
+    payload.update(
+        {
+            "endpoint": dict(common["endpoint"]),
+            "detected_version": detected_version,
+            "project_call": dispatch_call_summary(binding.project_call),
+            "bound_object": {
+                "handle": bound.handle,
+                "name": bound.name,
+                "type": bound.object_type,
+                "business_kind": business_kind,
+                "business_kind_resolution": {
+                    "status": (
+                        "resolved" if business_kind is not None else "ambiguous"
+                    ),
+                    "candidates": list(business_kind_candidates),
+                    "reflected_type": str(row["type"]),
+                    **(
+                        {}
+                        if business_kind_source is None
+                        else {"source": business_kind_source}
+                    ),
+                },
+                "semantic_kind": bound.semantic_kind,
+                **({} if bound.role is None else {"role": bound.role}),
+            },
+        }
+    )
+    if binding.record.operation == "object.set":
+        bound_payload = payload.get("bound_object")
+        if isinstance(bound_payload, dict):
+            bound_payload["path"] = bound.path
+        draft = payload.get("draft")
+        continuation = (
+            draft.get("next_action_binding")
+            if isinstance(draft, Mapping)
+            else None
+        )
+        routes = (
+            continuation.get("object_binding")
+            if isinstance(continuation, dict)
+            else None
+        )
+        selector_route = (
+            "by_id"
+            if args.object_id is not None
+            else "by_path_segments"
+            if args.object_path_segment is not None
+            else "event_action_by_event_path_segments"
+            if args.event_action_of_path_segment is not None
+            else None
+        )
+        if isinstance(continuation, dict):
+            continuation.pop("declare_new", None)
+            if (
+                isinstance(routes, Mapping)
+                and selector_route is not None
+                and selector_route in routes
+            ):
+                continuation["object_binding"] = {
+                    "repeat_selector_form": selector_route,
+                    selector_route: routes[selector_route],
+                }
+            else:
+                continuation.pop("object_binding", None)
+    return payload
+
+
+def dispatch_business_field_binding(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    binding = _open_business_binding(
+        args,
+        env=env,
+        connection=connection,
+        detected_version=detected_version,
+        live_info=live_info,
+        dispatcher=dispatcher,
+    )
+    adapter = business_adapter(binding.record.operation)
+    if not adapter.supports_field_binding:
+        raise GatewayInputError(
+            f"Custom field binding is unavailable for {binding.record.operation}"
+        )
+    raw_session = (
+        binding.record.composition.get("business_session")
+        if binding.record.composition is not None
+        else None
+    )
+    if raw_session is None:
+        raise GatewayInputError("Bind one exact object before binding custom fields")
+    session = BusinessDeclarationSession.from_dict(raw_session)
+    if binding.context != session.context:
+        raise OperationDraftBindingDrift(
+            "Live project or Wwise build differs from the business declaration binding."
+        )
+    if args.object_handle is not None:
+        scope_kind = "object"
+        scope_value: str | int = session.handles.resolve_object(
+            args.object_handle
+        ).object_id
+    else:
+        scope_kind = "class"
+        scope_value = args.class_name
+    read_call = metadata_cached_read_call(
+        binding.read_call,
+        connection=connection,
+        version=detected_version,
+        live_info=live_info,
+        project=binding.project,
+        state_dir=binding.state_dir,
+    )
+    captured: list[Any] = []
+
+    def bind(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
+        handles = BusinessHandleRegistry.from_dict(current.handles.as_dict())
+        bound = bind_live_field(
+            handles,
+            read_call=read_call,
+            scope_kind=scope_kind,
+            scope_value=scope_value,
+            token=args.token,
+            platform=args.platform,
+        )
+        captured.append(bound)
+        return current.with_handle_registry(handles)
+
+    schema_digest = operation_draft_schema_digest(
+        binding.record.operation,
+        detected_version,
+    )
+    composer_digest = operation_composer_digest(
+        binding.record.operation,
+        detected_version,
+    )
+    record = binding.store.apply_business_update(
+        args.draft_id,
+        task_authority=args.task_authority,
+        expected_revision=args.expected_revision,
+        schema_digest=schema_digest,
+        composer_digest=composer_digest,
+        context=binding.context,
+        update=bind,
+        event_type="handles.bound",
+    )
+    bound = captured[0]
+    payload = operation_draft_payload(
+        args.command,
+        record,
+        offline=False,
+        state_dir=args.state_dir,
+        task_authority=args.task_authority,
+    )
+    payload.update(
+        {
+            "endpoint": dict(common["endpoint"]),
+            "detected_version": detected_version,
+            "project_call": dispatch_call_summary(binding.project_call),
+            "bound_field": {
+                "handle": bound.handle,
+                "token": bound.token,
+                "field_kind": bound.field_kind,
+                "value_type": bound.value_type,
+                "platform": bound.platform,
+                "restrictions": dict(bound.restrictions),
+            },
+        }
+    )
+    return payload
+
+
+def _normalized_business_field_meaning(value: str) -> str:
+    return "".join(
+        character for character in value.casefold() if character.isalnum()
+    )
+
+
+def _unique_exact_business_field_candidates(
+    candidates: Sequence[Mapping[str, Any]],
+    meaning: str,
+) -> list[Mapping[str, Any]]:
+    """Return one exact live token/display match, or no preferred candidate."""
+
+    normalized_meaning = _normalized_business_field_meaning(meaning)
+    exact: list[Mapping[str, Any]] = []
+    for candidate in candidates:
+        metadata = candidate.get("metadata")
+        display = metadata.get("display") if isinstance(metadata, Mapping) else None
+        labels = [candidate.get("name")]
+        if isinstance(display, Mapping):
+            labels.append(display.get("name"))
+        if any(
+            isinstance(label, str)
+            and _normalized_business_field_meaning(label) == normalized_meaning
+            for label in labels
+        ):
+            exact.append(candidate)
+    return exact if len(exact) == 1 else []
+
+
+def dispatch_business_field_discovery(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Bind bounded live candidates without accepting a model-authored token."""
+
+    meanings = tuple(args.meanings)
+    if (
+        not 1 <= len(meanings) <= MAX_METADATA_DISCOVERY_QUERIES
+        or any(
+            not isinstance(value, str)
+            or not value.strip()
+            or value != value.strip()
+            or len(value) > MAX_METADATA_DISCOVERY_QUERY_CHARS
+            for value in meanings
+        )
+        or len({" ".join(value.split()).casefold() for value in meanings})
+        != len(meanings)
+        or sum(len(value) for value in meanings)
+        > MAX_METADATA_DISCOVERY_TOTAL_QUERY_CHARS
+    ):
+        raise GatewayInputError(
+            "Business field meanings must be 1..8 distinct bounded search phrases"
+        )
+
+    binding = _open_business_binding(
+        args,
+        env=env,
+        connection=connection,
+        detected_version=detected_version,
+        live_info=live_info,
+        dispatcher=dispatcher,
+    )
+    adapter = business_adapter(binding.record.operation)
+    if not adapter.supports_field_discovery:
+        raise GatewayInputError(
+            f"Business field discovery is unavailable for {binding.record.operation}"
+        )
+    if adapter.family == "core-project-object":
+        field_types = adapter.contract(detected_version)["declaration"]["field_types"]
+        if not any(
+            value_type in {"bound_field_handle", "bound_field_handle_list"}
+            for value_type in field_types.values()
+        ):
+            raise GatewayInputError(
+                f"Business field discovery is unavailable for {binding.record.operation}"
+            )
+    raw_session = (
+        binding.record.composition.get("business_session")
+        if binding.record.composition is not None
+        else None
+    )
+    if raw_session is None:
+        raise GatewayInputError("Bind the exact target object before field discovery")
+    session = BusinessDeclarationSession.from_dict(raw_session)
+    if binding.context != session.context:
+        raise OperationDraftBindingDrift(
+            "Live project or Wwise build differs from the business declaration binding."
+        )
+    source = None
+    if args.object_handle is not None:
+        source = session.handles.resolve_object(args.object_handle)
+        scope_kind = "object"
+        scope_value: str | int = source.object_id
+        discovery_scope = {"object": source.object_id}
+    elif args.type_handle is not None:
+        bound_type = session.handles.resolve_type(args.type_handle)
+        scope_kind = "class"
+        scope_value = bound_type.class_id
+        discovery_scope = {"class_id": bound_type.class_id}
+    else:
+        kind = resolve_semantic_kind(
+            args.semantic_kind,
+            version=detected_version,
+        )
+        scope_kind = "class"
+        scope_value = kind.metadata_object_type
+        discovery_scope = {"object_type": kind.metadata_object_type}
+    if (
+        binding.record.operation
+        in {"object.setLinked", "object.setProperty", "object.setReference", "object.setRTPC"}
+        or adapter.family == "core-project-object"
+    ) and source is None:
+        raise GatewayInputError(
+            f"{binding.record.operation} field discovery requires its exact bound object"
+        )
+    if binding.record.operation == "object.setLinked" and args.platform is None:
+        raise GatewayInputError(
+            "object.setLinked field discovery requires one explicit platform"
+        )
+    read_call = metadata_cached_read_call(
+        binding.read_call,
+        connection=connection,
+        version=detected_version,
+        live_info=live_info,
+        project=binding.project,
+        state_dir=binding.state_dir,
+    )
+    discovery = discover_metadata(
+        read_call=read_call,
+        queries=meanings,
+        **discovery_scope,
+        limit=MAX_METADATA_DISCOVERY_LIMIT,
+    )
+    eligible: list[Mapping[str, Any]] = []
+    for candidate in discovery.candidates:
+        kind = candidate.get("kind")
+        metadata = candidate.get("metadata")
+        if not isinstance(metadata, Mapping):
+            continue
+        value_type = metadata_typed_value_type(str(metadata.get("type", "")))
+        if binding.record.operation == "object.setProperty":
+            accepted = kind == "property" and value_type is not None
+        elif binding.record.operation == "object.setReference":
+            accepted = kind == "reference"
+        elif binding.record.operation == "object.setRTPC":
+            supports = metadata.get("supports")
+            rtpc = supports.get("rtpc") if isinstance(supports, Mapping) else None
+            accepted = (
+                kind == "property"
+                and value_type in {"number", "integer"}
+                and rtpc not in {None, False, "", "None", "none"}
+            )
+        elif binding.record.operation == "object.set":
+            accepted = (
+                (kind == "property" and value_type is not None)
+                or kind == "reference"
+            )
+        elif binding.record.operation == "object.createPlugin":
+            accepted = kind == "property" and value_type is not None
+        elif binding.record.operation == "object.create":
+            accepted = (
+                (kind == "property" and value_type is not None)
+                or kind == "reference"
+            )
+        elif adapter.family == "core-project-object":
+            accepted = (
+                kind == "property" and value_type is not None
+                if binding.record.operation
+                in {
+                    "ak.wwise.core.object.setRandomizer",
+                    "ak.wwise.core.object.setStateProperties",
+                }
+                else (
+                    (kind == "property" and value_type is not None)
+                    or kind == "reference"
+                )
+            )
+        else:
+            supports = metadata.get("supports")
+            accepted = (
+                kind in {"property", "reference"}
+                and (kind == "reference" or value_type is not None)
+                and isinstance(supports, Mapping)
+                and supports.get("unlink") is True
+            )
+        if accepted:
+            eligible.append(candidate)
+    if not eligible:
+        raise GatewayInputError(
+            "Live field discovery found no candidate compatible with this operation"
+        )
+    missing_meanings = [
+        meaning
+        for meaning in meanings
+        if not any(
+            any(
+                isinstance(matched, str)
+                and " ".join(matched.split()).casefold()
+                == " ".join(meaning.split()).casefold()
+                for matched in candidate.get("matched_queries", [])
+            )
+            for candidate in eligible
+        )
+    ]
+    if missing_meanings:
+        raise GatewayInputError(
+            "Live field discovery found no compatible candidate for every requested meaning"
+        )
+    narrowed: list[Mapping[str, Any]] = []
+    for meaning in meanings:
+        matching = [
+            candidate
+            for candidate in eligible
+            if any(
+                isinstance(matched, str)
+                and " ".join(matched.split()).casefold()
+                == " ".join(meaning.split()).casefold()
+                for matched in candidate.get("matched_queries", [])
+            )
+        ]
+        preferred = _unique_exact_business_field_candidates(matching, meaning)
+        for candidate in preferred or matching:
+            if candidate not in narrowed:
+                narrowed.append(candidate)
+    eligible = narrowed
+
+    captured: list[Any] = []
+    rejected: list[Mapping[str, Any]] = []
+    rejected_errors: list[BusinessDeclarationError] = []
+
+    def bind(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
+        handles = BusinessHandleRegistry.from_dict(current.handles.as_dict())
+        for candidate in eligible:
+            try:
+                captured.append(
+                    bind_live_field(
+                        handles,
+                        read_call=read_call,
+                        scope_kind=scope_kind,
+                        scope_value=scope_value,
+                        token=str(candidate["name"]),
+                        platform=args.platform,
+                    )
+                )
+            except BusinessDeclarationError as exc:
+                rejected_errors.append(exc)
+                rejected.append(
+                    {
+                        "error_code": exc.error_code,
+                        "field_kind": candidate.get("kind"),
+                    }
+                )
+        if not captured:
+            raise rejected_errors[0]
+        captured_tokens = {bound.token for bound in captured}
+        if any(
+            not any(
+                str(candidate.get("name")) in captured_tokens
+                and any(
+                    isinstance(matched, str)
+                    and " ".join(matched.split()).casefold()
+                    == " ".join(meaning.split()).casefold()
+                    for matched in candidate.get("matched_queries", [])
+                )
+                for candidate in eligible
+            )
+            for meaning in meanings
+        ):
+            raise rejected_errors[0]
+        return current.with_handle_registry(handles)
+
+    schema_digest = operation_draft_schema_digest(
+        binding.record.operation,
+        detected_version,
+    )
+    composer_digest = operation_composer_digest(
+        binding.record.operation,
+        detected_version,
+    )
+    record = binding.store.apply_business_update(
+        args.draft_id,
+        task_authority=args.task_authority,
+        expected_revision=args.expected_revision,
+        schema_digest=schema_digest,
+        composer_digest=composer_digest,
+        context=binding.context,
+        update=bind,
+        event_type="handles.bound",
+    )
+    metadata_by_name = {
+        str(candidate["name"]): candidate
+        for candidate in eligible
+    }
+    field_candidates: list[dict[str, Any]] = []
+    for bound in captured:
+        candidate = metadata_by_name[bound.token]
+        metadata = candidate.get("metadata")
+        display = metadata.get("display") if isinstance(metadata, Mapping) else None
+        label = (
+            display.get("name")
+            if isinstance(display, Mapping)
+            and isinstance(display.get("name"), str)
+            and display["name"].strip()
+            else bound.token
+        )
+        field_candidates.append(
+            {
+                "handle": bound.handle,
+                "label": label,
+                "field_kind": bound.field_kind,
+                "value_type": bound.value_type,
+                "platform": bound.platform,
+                "restrictions": dict(bound.restrictions),
+                "matched_meanings": list(candidate.get("matched_queries", [])),
+            }
+        )
+    meaning_results: list[dict[str, Any]] = []
+    for meaning in meanings:
+        matching = [
+            candidate
+            for candidate in field_candidates
+            if any(
+                isinstance(matched, str)
+                and " ".join(matched.split()).casefold()
+                == " ".join(meaning.split()).casefold()
+                for matched in candidate["matched_meanings"]
+            )
+        ]
+        meaning_results.append(
+            {
+                "meaning": meaning,
+                "candidates": matching,
+                "candidate_count": len(matching),
+            }
+        )
+    selection_required = any(
+        result["candidate_count"] != 1 for result in meaning_results
+    )
+    payload = operation_draft_payload(
+        args.command,
+        record,
+        offline=False,
+        state_dir=args.state_dir,
+        task_authority=args.task_authority,
+    )
+    payload.update(
+        {
+            "endpoint": dict(common["endpoint"]),
+            "detected_version": detected_version,
+            "project_call": dispatch_call_summary(binding.project_call),
+            "field_candidates": field_candidates,
+            "candidate_count": len(field_candidates),
+            "meaning_results": meaning_results,
+            "meaning_count": len(meaning_results),
+            "rejected_candidate_count": len(rejected),
+            "selection_required": selection_required,
+            "selection_rule": (
+                "copy_exactly_one_candidate.handle_per_requested_meaning"
+            ),
+        }
+    )
+    if binding.record.operation == "object.set":
+        payload.pop("field_candidates", None)
+        for result in meaning_results:
+            result["candidates"] = [
+                {
+                    key: value
+                    for key, value in candidate.items()
+                    if key != "matched_meanings"
+                }
+                for candidate in result["candidates"]
+            ]
+        payload["candidate_projection"] = (
+            "meaning_results[].candidates_without_duplicate_top_level_rows"
+        )
+    return payload
+
+
+def dispatch_business_existing_batch(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Declare a bounded object.set batch from meanings, with exact-scope checks."""
+
+    binding = _open_business_binding(
+        args,
+        env=env,
+        connection=connection,
+        detected_version=detected_version,
+        live_info=live_info,
+        dispatcher=dispatcher,
+    )
+    if binding.record.operation != "object.set":
+        raise GatewayInputError(
+            "draft-declare-existing-batch is available only for object.set"
+        )
+    raw_session = (
+        binding.record.composition.get("business_session")
+        if binding.record.composition is not None
+        else None
+    )
+    if raw_session is None:
+        raise GatewayInputError("Bind every exact target before declaring the batch")
+    session = BusinessDeclarationSession.from_dict(raw_session)
+    if binding.context != session.context:
+        raise OperationDraftBindingDrift(
+            "Live project or Wwise build differs from the business declaration binding."
+        )
+    declaration_contract = operation_business_contract(
+        binding.record.operation,
+        detected_version,
+    ).get("declaration", {})
+    raw_stable_field_types = (
+        declaration_contract.get("field_value_types")
+        if isinstance(declaration_contract, Mapping)
+        else None
+    )
+    stable_field_names = (
+        frozenset(raw_stable_field_types)
+        if isinstance(raw_stable_field_types, Mapping)
+        else frozenset()
+    )
+
+    row_order = list(args.row_order)
+    rows: dict[str, str] = {}
+    for first, second in args.row:
+        first_is_handle = re.fullmatch(r"boh1-[0-9a-f]{32}", first) is not None
+        second_is_handle = re.fullmatch(r"boh1-[0-9a-f]{32}", second) is not None
+        if first_is_handle and not second_is_handle:
+            declaration_id, object_handle = second, first
+        else:
+            declaration_id, object_handle = first, second
+        if declaration_id in rows:
+            raise GatewayInputError(
+                f"Object-set batch declaration id {declaration_id!r} was supplied twice"
+            )
+        rows[declaration_id] = object_handle
+    if (
+        not 1 <= len(row_order) <= OBJECT_SET_BUSINESS_BATCH_MAX_ROWS
+        or len(row_order) != len(set(row_order))
+        or set(row_order) != set(rows)
+    ):
+        raise GatewayInputError(
+            "Object-set batch row order must name each of 1..8 supplied rows exactly once"
+        )
+
+    stable_by_id: dict[str, list[tuple[str, str]]] = {}
+    meanings_by_id: dict[str, list[tuple[str, str]]] = {}
+    for declaration_id, field_name, value in args.field:
+        target = (
+            stable_by_id if field_name in stable_field_names else meanings_by_id
+        )
+        target.setdefault(declaration_id, []).append((field_name, value))
+    for declaration_id, meaning, value in args.field_meaning_value:
+        meanings_by_id.setdefault(declaration_id, []).append((meaning, value))
+    if (set(stable_by_id) | set(meanings_by_id)) - set(rows):
+        raise GatewayInputError(
+            "Object-set batch fields reference an unknown declaration id"
+        )
+    if any(
+        declaration_id not in stable_by_id and declaration_id not in meanings_by_id
+        for declaration_id in row_order
+    ):
+        raise GatewayInputError("Every object-set batch row requires one business outcome")
+    for declaration_id, pairs in meanings_by_id.items():
+        meanings = [meaning for meaning, _value in pairs]
+        normalized = [" ".join(meaning.split()).casefold() for meaning in meanings]
+        if (
+            not 1 <= len(meanings) <= MAX_METADATA_DISCOVERY_QUERIES
+            or any(
+                not meaning.strip()
+                or meaning != meaning.strip()
+                or len(meaning) > MAX_METADATA_DISCOVERY_QUERY_CHARS
+                for meaning in meanings
+            )
+            or len(normalized) != len(set(normalized))
+            or sum(len(meaning) for meaning in meanings)
+            > MAX_METADATA_DISCOVERY_TOTAL_QUERY_CHARS
+        ):
+            raise GatewayInputError(
+                f"Object-set batch row {declaration_id!r} requires 1..8 distinct bounded field meanings"
+            )
+
+    read_call = metadata_cached_read_call(
+        binding.read_call,
+        connection=connection,
+        version=detected_version,
+        live_info=live_info,
+        project=binding.project,
+        state_dir=binding.state_dir,
+    )
+    meaning_field_count = sum(len(pairs) for pairs in meanings_by_id.values())
+    field_count = sum(len(pairs) for pairs in stable_by_id.values()) + meaning_field_count
+    adapter = business_adapter(binding.record.operation)
+
+    def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
+        handles = BusinessHandleRegistry.from_dict(current.handles.as_dict())
+        dynamic_by_id: dict[str, dict[str, Any]] = {}
+        for declaration_id in row_order:
+            object_handle = rows[declaration_id]
+            source = handles.resolve_object(object_handle)
+            meaning_pairs = meanings_by_id.get(declaration_id, [])
+            dynamic: dict[str, Any] = {}
+            if meaning_pairs:
+                discovery = discover_metadata(
+                    read_call=read_call,
+                    queries=[meaning for meaning, _value in meaning_pairs],
+                    object=source.object_id,
+                    limit=MAX_METADATA_DISCOVERY_LIMIT,
+                )
+                for meaning, raw_value in meaning_pairs:
+                    normalized_meaning = " ".join(meaning.split()).casefold()
+                    matches: list[Mapping[str, Any]] = []
+                    for discovered in discovery.candidates:
+                        metadata = discovered.get("metadata")
+                        kind = discovered.get("kind")
+                        value_type = (
+                            metadata_typed_value_type(str(metadata.get("type", "")))
+                            if isinstance(metadata, Mapping)
+                            else None
+                        )
+                        matched_queries = discovered.get("matched_queries", [])
+                        if (
+                            ((kind == "property" and value_type is not None) or kind == "reference")
+                            and any(
+                                isinstance(item, str)
+                                and " ".join(item.split()).casefold()
+                                == normalized_meaning
+                                for item in matched_queries
+                            )
+                        ):
+                            matches.append(discovered)
+                    exact_matches = _unique_exact_business_field_candidates(
+                        matches,
+                        meaning,
+                    )
+                    if exact_matches:
+                        matches = exact_matches
+                    if len(matches) != 1:
+                        raise GatewayInputError(
+                            "Each object-set batch field meaning must resolve to exactly one compatible live field"
+                        )
+                    bound = bind_live_field(
+                        handles,
+                        read_call=read_call,
+                        scope_kind="object",
+                        scope_value=source.object_id,
+                        token=str(matches[0]["name"]),
+                    )
+                    if bound.handle in dynamic:
+                        raise GatewayInputError(
+                            "Distinct object-set batch meanings cannot select the same live field"
+                        )
+                    dynamic[bound.handle] = _parse_bound_field_business_value(
+                        bound,
+                        raw_value,
+                        field=meaning,
+                    )
+            dynamic_by_id[declaration_id] = dynamic
+        candidate_session = (
+            current.with_handle_registry(handles)
+            if meaning_field_count
+            else current
+        )
+        for declaration_id in row_order:
+            object_handle = rows[declaration_id]
+            fields = _parse_object_graph_business_fields(
+                candidate_session,
+                binding.record.operation,
+                stable_by_id.get(declaration_id, []),
+            )
+            dynamic = dynamic_by_id[declaration_id]
+            if dynamic:
+                fields["field_values"] = dynamic
+            candidate_session = candidate_session.with_existing_declaration(
+                declaration_id=declaration_id,
+                target=ExistingObjectTarget(object_handle),
+                fields=fields,
+            )
+        adapter.materialize(candidate_session)
+        return candidate_session
+
+    record = binding.store.apply_business_update(
+        args.draft_id,
+        task_authority=args.task_authority,
+        expected_revision=args.expected_revision,
+        schema_digest=operation_draft_schema_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        composer_digest=operation_composer_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        context=binding.context,
+        update=update,
+        event_type="declaration.batch-added",
+    )
+    payload = operation_draft_payload(
+        args.command,
+        record,
+        offline=False,
+        state_dir=args.state_dir,
+        task_authority=args.task_authority,
+    )
+    payload.update(
+        {
+            "endpoint": dict(common["endpoint"]),
+            "detected_version": detected_version,
+            "project_call": dispatch_call_summary(binding.project_call),
+            "batch_receipt": {
+                "row_count": len(row_order),
+                "field_count": field_count,
+                "metadata_scope": "each_exact_bound_object",
+                "applied_atomically": True,
+            },
+        }
+    )
+    return payload
+
+
+def dispatch_business_type_discovery(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Issue opaque handles for bounded live object or plug-in type matches."""
+
+    binding = _open_business_binding(
+        args,
+        env=env,
+        connection=connection,
+        detected_version=detected_version,
+        live_info=live_info,
+        dispatcher=dispatcher,
+    )
+    adapter = business_adapter(binding.record.operation)
+    if not adapter.supports_type_discovery:
+        raise GatewayInputError(
+            f"Business type discovery is unavailable for {binding.record.operation}"
+        )
+    raw_session = (
+        binding.record.composition.get("business_session")
+        if binding.record.composition is not None
+        else None
+    )
+    if raw_session is None:
+        raise GatewayInputError(
+            "Bind the exact object or parent before type discovery"
+        )
+    session = BusinessDeclarationSession.from_dict(raw_session)
+    if binding.context != session.context:
+        raise OperationDraftBindingDrift(
+            "Live project or Wwise build differs from the business declaration binding."
+        )
+    meanings = tuple(args.meanings)
+    if (
+        not 1 <= len(meanings) <= MAX_METADATA_DISCOVERY_QUERIES
+        or any(
+            not isinstance(value, str)
+            or not value.strip()
+            or len(value) > MAX_METADATA_DISCOVERY_QUERY_CHARS
+            for value in meanings
+        )
+        or sum(len(value) for value in meanings)
+        > MAX_METADATA_DISCOVERY_TOTAL_QUERY_CHARS
+    ):
+        raise GatewayInputError("Business type meanings exceed their fixed bounds")
+    read_call = metadata_cached_read_call(
+        binding.read_call,
+        connection=connection,
+        version=detected_version,
+        live_info=live_info,
+        project=binding.project,
+        state_dir=binding.state_dir,
+    )
+    try:
+        rows = parse_get_types_result(read_call(CACHE_GET_TYPES_URI, {}, {}))
+    except (TypeError, ValueError) as exc:
+        raise GatewayResultShapeError(
+            "Live object type discovery returned an invalid catalog.",
+            error_code="INVALID_METADATA_RESULT",
+        ) from exc
+    role = str(args.role)
+
+    def role_matches(type_category: str) -> bool:
+        category = type_category.casefold()
+        if role == "source":
+            return category == "source"
+        if role == "effect":
+            return category == "effect"
+        return category not in {"source", "effect"}
+
+    def score(meaning: str, *, name: str, category: str) -> int:
+        query = meaning.strip().casefold()
+        candidate = name.casefold()
+        if query == candidate:
+            return 1_000
+        if query in candidate:
+            return 700 + len(query)
+        tokens = tuple(
+            token
+            for token in "".join(
+                character if character.isalnum() else " "
+                for character in query
+            ).split()
+            if token
+        )
+        searchable = f"{candidate} {category.casefold()}"
+        matched = sum(token in searchable for token in tokens)
+        return 100 * matched if matched and matched == len(tokens) else 0
+
+    ranked: list[tuple[Any, list[str], int]] = []
+    for row in rows:
+        if not role_matches(row.type):
+            continue
+        scores = {
+            meaning: score(meaning, name=row.name, category=row.type)
+            for meaning in meanings
+        }
+        matched = [meaning for meaning in meanings if scores[meaning] > 0]
+        if matched:
+            ranked.append((row, matched, sum(scores.values())))
+    ranked.sort(
+        key=lambda item: (-item[2], item[0].name.casefold(), item[0].class_id)
+    )
+    selected = ranked[:MAX_METADATA_DISCOVERY_LIMIT]
+    if not selected:
+        raise GatewayInputError(
+            "Live type discovery found no candidate compatible with this role"
+        )
+    catalog_digest = canonical_sha256(
+        {"return": [row.as_dict() for row in rows]}
+    )
+    captured: list[Any] = []
+
+    def bind(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
+        handles = BusinessHandleRegistry.from_dict(current.handles.as_dict())
+        for row, _matched, _score in selected:
+            captured.append(
+                handles.bind_type(
+                    class_id=row.class_id,
+                    name=row.name,
+                    type_category=row.type,
+                    catalog_digest=catalog_digest,
+                )
+            )
+        return current.with_handle_registry(handles)
+
+    schema_digest = operation_draft_schema_digest(
+        binding.record.operation,
+        detected_version,
+    )
+    composer_digest = operation_composer_digest(
+        binding.record.operation,
+        detected_version,
+    )
+    record = binding.store.apply_business_update(
+        args.draft_id,
+        task_authority=args.task_authority,
+        expected_revision=args.expected_revision,
+        schema_digest=schema_digest,
+        composer_digest=composer_digest,
+        context=binding.context,
+        update=bind,
+        event_type="handles.bound",
+    )
+    candidates = [
+        {
+            "handle": bound.handle,
+            "label": bound.name,
+            "role": role,
+            "matched_meanings": list(selected[index][1]),
+        }
+        for index, bound in enumerate(captured)
+    ]
+    payload = operation_draft_payload(
+        args.command,
+        record,
+        offline=False,
+        state_dir=args.state_dir,
+        task_authority=args.task_authority,
+    )
+    payload.update(
+        {
+            "endpoint": dict(common["endpoint"]),
+            "detected_version": detected_version,
+            "project_call": dispatch_call_summary(binding.project_call),
+            "type_candidates": candidates,
+            "candidate_count": len(candidates),
+            "selection_required": True,
+            "selection_rule": "copy_one_returned_type_candidate.handle",
+        }
     )
     return payload
 
@@ -6396,9 +18349,16 @@ def dispatch_operation_draft_preview(
         args.draft_id,
         task_authority=args.task_authority,
     )
-    schema_digest = operation_request_schema_digest(
-        inspected.operation,
-        inspected.version,
+    if (
+        inspected.composition is not None
+        and inspected.composition.get("compound_parent") is not None
+    ):
+        raise GatewayInputError(
+            "Compound Undo child Drafts return to their parent and cannot be "
+            "previewed independently"
+        )
+    schema_digest = operation_draft_schema_digest(
+        inspected.operation, inspected.version
     )
     composer_digest = operation_composer_digest(
         inspected.operation,
@@ -6412,6 +18372,19 @@ def dispatch_operation_draft_preview(
                 "live_version": detected_version,
             },
         )
+    # Some checked Business Drafts are themselves closed requests to preview a
+    # project change.  Do not make the caller restate that fact with the easily
+    # misread generic ``--apply`` transport flag.
+    inspected_adapter = (
+        business_adapter(inspected.operation)
+        if operation_uses_business_declaration(
+            inspected.operation,
+            inspected.version,
+        )
+        else None
+    )
+    if inspected_adapter is not None and inspected_adapter.auto_apply_preview:
+        args.apply = True
     policy = load_gateway_config(env).config.project_modification_policy
     reservation: Any | None = None
     reserve_transaction_id: Callable[[], str] | None = None
@@ -6709,6 +18682,7 @@ def create_transaction_preview(
                 policy=current_policy,
                 common=common,
                 project_call=project_call,
+                continuation_state_dir=args.state_dir,
                 expected_prepared_digest=expected_prepared_digest,
                 expected_runtime_guard_fingerprint=(
                     expected_runtime_guard_fingerprint
@@ -6801,6 +18775,7 @@ def create_transaction_preview(
             policy=current_policy,
             common=common,
             project_call=project_call,
+            continuation_state_dir=args.state_dir,
             candidate_artifact=artifact,
             expected_prepared_digest=expected_prepared_digest,
             expected_runtime_guard_fingerprint=(
@@ -6825,6 +18800,7 @@ def create_transaction_preview(
         next_command = transaction_next_command(
             "execute",
             ["execute", transaction_id],
+            state_dir=args.state_dir,
         )
         status = TransactionState.POLICY_AUTHORIZED.value
     else:
@@ -6841,6 +18817,7 @@ def create_transaction_preview(
         next_command = transaction_next_command(
             "transaction-show",
             ["transaction-show", transaction_id, "--summary-only"],
+            state_dir=args.state_dir,
             requires_later_user_message=True,
         )
         status = TransactionState.AWAITING_CONFIRMATION.value
@@ -6904,6 +18881,7 @@ def _resume_reserved_transaction_preview(
     policy: str,
     common: Mapping[str, Any],
     project_call: Mapping[str, Any],
+    continuation_state_dir: str | Path | None = None,
     candidate_artifact: Mapping[str, Any] | None = None,
     expected_prepared_digest: str | None = None,
     expected_runtime_guard_fingerprint: str | None = None,
@@ -7007,6 +18985,7 @@ def _resume_reserved_transaction_preview(
         next_command = transaction_next_command(
             "execute",
             ["execute", transaction_id],
+            state_dir=continuation_state_dir,
         )
     else:
         authorization = {
@@ -7021,6 +19000,7 @@ def _resume_reserved_transaction_preview(
         next_command = transaction_next_command(
             "transaction-show",
             ["transaction-show", transaction_id, "--summary-only"],
+            state_dir=continuation_state_dir,
             requires_later_user_message=True,
         )
     cleanup = transaction_cleanup_payload(prepared, phase="preview")
@@ -7125,19 +19105,6 @@ def dispatch_transaction_command(
     dispatcher: WwiseDispatcher,
     common: Mapping[str, Any],
 ) -> dict[str, Any]:
-    if args.command in {"preview", "legacy-preview"}:
-        request_payload = parse_preview_request_object(args.request_json)
-        return create_transaction_preview(
-            request_payload,
-            args=args,
-            env=env,
-            connection=connection,
-            detected_version=detected_version,
-            live_info=live_info,
-            dispatcher=dispatcher,
-            common=common,
-        )
-
     read_call = transaction_read_call(
         dispatcher,
         connection=connection,
@@ -7348,7 +19315,7 @@ def dispatch_transaction_command(
                     "INVALID_PREVIEW",
                     "Immutable waapi.undoGroup request lacks its arguments object.",
                 )
-            execution_plan = build_undo_group_execution_plan(
+            request_plan = build_undo_group_execution_plan(
                 detected_version,
                 request_arguments,
             )
@@ -7358,11 +19325,36 @@ def dispatch_transaction_command(
                 if isinstance(stored_pre_state, Mapping)
                 else None
             )
-            if stored_plan != execution_plan:
+            if not isinstance(stored_plan, Mapping):
+                raise OperationContractError(
+                    "PREVIEW_DISPATCH_MISMATCH",
+                    "Immutable waapi.undoGroup execution plan is missing.",
+                )
+            stored_calls = stored_plan.get("calls")
+            request_calls = request_plan.get("calls")
+            binding_keys = (
+                "child_operation", "child_request", "child_schema_digest", "api",
+                "timeout_seconds", "result_limit_bytes",
+            )
+            plan_bound = (
+                isinstance(stored_calls, list)
+                and isinstance(request_calls, list)
+                and len(stored_calls) == len(request_calls)
+                and stored_plan.get("begin") == request_plan.get("begin")
+                and stored_plan.get("end") == request_plan.get("end")
+                and stored_plan.get("cancel") == request_plan.get("cancel")
+                and all(
+                    isinstance(stored, Mapping)
+                    and all(stored.get(key) == requested.get(key) for key in binding_keys)
+                    for stored, requested in zip(stored_calls, request_calls, strict=True)
+                )
+            )
+            if not plan_bound:
                 raise OperationContractError(
                     "PREVIEW_DISPATCH_MISMATCH",
                     "Immutable waapi.undoGroup execution plan no longer matches its request.",
                 )
+            execution_plan = stored_plan
             role_validation_output = undo_group_role_validation_summary(role_validation)
             authorization = require_transaction_execution_authorization(
                 record=record,
@@ -7505,6 +19497,7 @@ def dispatch_transaction_command(
                 "next_command": transaction_next_command(
                     "verify",
                     ["verify", transaction_id],
+                    state_dir=args.state_dir,
                 ),
             }
         call_args = require_mapping(dispatch_payload.get("args", {}), "prepared dispatch args")
@@ -7541,6 +19534,291 @@ def dispatch_transaction_command(
                 project_call=project_call,
                 verification_plan=verification_plan,
             )
+        transport_binding_validation = None
+        transport_id = (
+            call_args.get("transport")
+            if call_uri in {TRANSPORT_DESTROY_URI, TRANSPORT_EXECUTE_ACTION_URI}
+            else None
+        )
+        if isinstance(transport_id, int) and not isinstance(transport_id, bool):
+            try:
+                if project is None:
+                    raise RuntimeTransportHandleError(
+                        "TRANSPORT_HANDLE_CONTEXT_DRIFT",
+                        "Transport execution lacks its live project identity.",
+                    )
+                transport_context = _runtime_transport_context_from_live(
+                    endpoint=common["endpoint"],
+                    project=project,
+                    detected_version=detected_version,
+                    live_info=live_info,
+                )
+                handle_store = RuntimeTransportHandleStore(store.state_dir)
+                transport_record = handle_store.resolve_native_id(
+                    transport_id,
+                    context=transport_context,
+                )
+                transport_list = read_call(
+                    "ak.wwise.core.transport.getList",
+                    {},
+                    {},
+                ).get("list")
+                matches = (
+                    [
+                        row
+                        for row in transport_list
+                        if isinstance(row, Mapping)
+                        and row.get("transport") == transport_id
+                    ]
+                    if isinstance(transport_list, list)
+                    else []
+                )
+                if len(matches) != 1:
+                    raise RuntimeTransportHandleError(
+                        "TRANSPORT_HANDLE_NOT_LIVE",
+                        "Transport handle no longer resolves to exactly one live row.",
+                        details={"match_count": len(matches)},
+                    )
+                RuntimeTransportHandleStore.validate_live_row(
+                    transport_record,
+                    matches[0],
+                )
+                transport_binding_validation = {
+                    "transport_handle": transport_record.handle,
+                    "live_match": True,
+                    "row_identity_match": True,
+                }
+            except RuntimeTransportHandleError as exc:
+                repreview = store.require_repreview(
+                    transaction_id,
+                    expected_authorization=record.state,
+                    details={
+                        "error_code": exc.error_code,
+                        "transport_binding": exc.details,
+                    },
+                )
+                return {
+                    "ok": False,
+                    "status": "repreview_required",
+                    **common,
+                    "transaction_id": transaction_id,
+                    "state": repreview.state.value,
+                    "artifact_hash": preview.artifact_hash,
+                    "error_code": exc.error_code,
+                    "message": str(exc),
+                    "details": exc.details,
+                    "role_validation": role_validation,
+                    "guard_validation": guard_validation,
+                    "project_call": project_call,
+                    "executed": False,
+                    "verified": False,
+                    "cleanup": transaction_cleanup_payload(prepared, phase="preview"),
+                    "automatic_retry": False,
+                }
+        game_object_binding_validation = None
+        game_object_id = (
+            call_args.get("gameObject")
+            if call_uri
+            in {
+                UNREGISTER_GAME_OBJECT_URI,
+                POST_EVENT_URI,
+                EXECUTE_ACTION_ON_EVENT_URI,
+                SEEK_ON_EVENT_URI,
+                SET_SWITCH_URI,
+                POST_TRIGGER_URI,
+                SET_GAME_PARAMETER_URI,
+                RESET_GAME_PARAMETER_URI,
+                STOP_ALL_URI,
+                SET_POSITION_URI,
+                SET_MULTIPLE_POSITIONS_URI,
+                SET_SCALING_FACTOR_URI,
+                SET_AUX_SENDS_URI,
+            }
+            else None
+        )
+        if (
+            isinstance(game_object_id, int)
+            and not isinstance(game_object_id, bool)
+            and 0 <= game_object_id <= 0xFFFFFFFFFFFFFFDF
+        ):
+            try:
+                if project is None:
+                    raise RuntimeGameObjectHandleError(
+                        "GAME_OBJECT_HANDLE_CONTEXT_DRIFT",
+                        "SoundEngine execution lacks its live project identity.",
+                    )
+                game_object_record = RuntimeGameObjectHandleStore(
+                    store.state_dir
+                ).resolve_native_id(
+                    game_object_id,
+                    context=_runtime_game_object_context_from_live(
+                        endpoint=common["endpoint"],
+                        project=project,
+                        detected_version=detected_version,
+                        live_info=live_info,
+                    ),
+                )
+                game_object_binding_validation = {
+                    "game_object_handle": game_object_record.handle,
+                    "active": True,
+                    "native_observability": "gateway_registration_lifecycle_only",
+                }
+            except RuntimeGameObjectHandleError as exc:
+                repreview = store.require_repreview(
+                    transaction_id,
+                    expected_authorization=record.state,
+                    details={"error_code": exc.error_code},
+                )
+                return {
+                    "ok": False,
+                    "status": "repreview_required",
+                    **common,
+                    "transaction_id": transaction_id,
+                    "state": repreview.state.value,
+                    "artifact_hash": preview.artifact_hash,
+                    "error_code": exc.error_code,
+                    "message": str(exc),
+                    "role_validation": role_validation,
+                    "guard_validation": guard_validation,
+                    "project_call": project_call,
+                    "executed": False,
+                    "verified": False,
+                    "cleanup": transaction_cleanup_payload(prepared, phase="preview"),
+                    "automatic_retry": False,
+                }
+        game_object_collection_validation = None
+        runtime_game_object_ids: list[int] = []
+        for field in ("emitter", "listener"):
+            value = call_args.get(field)
+            if (
+                isinstance(value, int)
+                and not isinstance(value, bool)
+                and 0 <= value <= 0xFFFFFFFFFFFFFFDF
+            ):
+                runtime_game_object_ids.append(value)
+        listeners = call_args.get("listeners")
+        if isinstance(listeners, list):
+            runtime_game_object_ids.extend(
+                value
+                for value in listeners
+                if isinstance(value, int)
+                and not isinstance(value, bool)
+                and 0 <= value <= 0xFFFFFFFFFFFFFFDF
+            )
+        aux_send_values = call_args.get("auxSendValues")
+        if isinstance(aux_send_values, list):
+            runtime_game_object_ids.extend(
+                listener_id
+                for row in aux_send_values
+                if isinstance(row, Mapping)
+                and isinstance((listener_id := row.get("listener")), int)
+                and not isinstance(listener_id, bool)
+                and 0 <= listener_id <= 0xFFFFFFFFFFFFFFDF
+            )
+        if runtime_game_object_ids:
+            try:
+                if project is None:
+                    raise RuntimeGameObjectHandleError(
+                        "GAME_OBJECT_HANDLE_CONTEXT_DRIFT",
+                        "SoundEngine execution lacks its live project identity.",
+                    )
+                context = _runtime_game_object_context_from_live(
+                    endpoint=common["endpoint"],
+                    project=project,
+                    detected_version=detected_version,
+                    live_info=live_info,
+                )
+                resolved = [
+                    RuntimeGameObjectHandleStore(store.state_dir).resolve_native_id(
+                        native_id,
+                        context=context,
+                    )
+                    for native_id in dict.fromkeys(runtime_game_object_ids)
+                ]
+                game_object_collection_validation = {
+                    "game_object_handles": [record.handle for record in resolved],
+                    "active": True,
+                    "native_observability": "gateway_registration_lifecycle_only",
+                }
+            except RuntimeGameObjectHandleError as exc:
+                repreview = store.require_repreview(
+                    transaction_id,
+                    expected_authorization=record.state,
+                    details={"error_code": exc.error_code},
+                )
+                return {
+                    "ok": False,
+                    "status": "repreview_required",
+                    **common,
+                    "transaction_id": transaction_id,
+                    "state": repreview.state.value,
+                    "artifact_hash": preview.artifact_hash,
+                    "error_code": exc.error_code,
+                    "message": str(exc),
+                    "role_validation": role_validation,
+                    "guard_validation": guard_validation,
+                    "project_call": project_call,
+                    "executed": False,
+                    "verified": False,
+                    "cleanup": transaction_cleanup_payload(prepared, phase="preview"),
+                    "automatic_retry": False,
+                }
+        playing_binding_validation = None
+        playing_id = (
+            call_args.get("playingId")
+            if call_uri in {STOP_PLAYING_ID_URI, SEEK_ON_EVENT_URI}
+            else None
+        )
+        if (
+            isinstance(playing_id, int)
+            and not isinstance(playing_id, bool)
+            and 1 <= playing_id <= 0xFFFFFFFF
+        ):
+            try:
+                if project is None:
+                    raise RuntimePlayingHandleError(
+                        "PLAYING_HANDLE_CONTEXT_DRIFT",
+                        "SoundEngine execution lacks its live project identity.",
+                    )
+                playing_record = RuntimePlayingHandleStore(
+                    store.state_dir
+                ).resolve_native_id(
+                    playing_id,
+                    context=_runtime_game_object_context_from_live(
+                        endpoint=common["endpoint"],
+                        project=project,
+                        detected_version=detected_version,
+                        live_info=live_info,
+                    ),
+                )
+                playing_binding_validation = {
+                    "playing_handle": playing_record.handle,
+                    "active": True,
+                    "native_observability": "gateway_post_event_lifecycle_only",
+                }
+            except RuntimePlayingHandleError as exc:
+                repreview = store.require_repreview(
+                    transaction_id,
+                    expected_authorization=record.state,
+                    details={"error_code": exc.error_code},
+                )
+                return {
+                    "ok": False,
+                    "status": "repreview_required",
+                    **common,
+                    "transaction_id": transaction_id,
+                    "state": repreview.state.value,
+                    "artifact_hash": preview.artifact_hash,
+                    "error_code": exc.error_code,
+                    "message": str(exc),
+                    "role_validation": role_validation,
+                    "guard_validation": guard_validation,
+                    "project_call": project_call,
+                    "executed": False,
+                    "verified": False,
+                    "cleanup": transaction_cleanup_payload(prepared, phase="preview"),
+                    "automatic_retry": False,
+                }
         runtime_call_args = call_args
         runtime_call_options = call_options
         wire_path_adaptation: Mapping[str, Any] | None = None
@@ -7684,6 +19962,10 @@ def dispatch_transaction_command(
                     "role_validation": role_validation,
                     "guard_validation": guard_validation,
                     "project_call": project_call,
+                    "transport_binding_validation": transport_binding_validation,
+                    "game_object_binding_validation": game_object_binding_validation,
+                    "playing_binding_validation": playing_binding_validation,
+                    "game_object_collection_validation": game_object_collection_validation,
                     "automatic_retry": False,
                     **wire_path_output,
                 },
@@ -7704,6 +19986,10 @@ def dispatch_transaction_command(
                     "role_validation": role_validation,
                     "guard_validation": guard_validation,
                     "project_call": project_call,
+                    "transport_binding_validation": transport_binding_validation,
+                    "game_object_binding_validation": game_object_binding_validation,
+                    "playing_binding_validation": playing_binding_validation,
+                    "game_object_collection_validation": game_object_collection_validation,
                     **wire_path_output,
                 }
             )
@@ -7721,6 +20007,10 @@ def dispatch_transaction_command(
             "role_validation": role_validation,
             "guard_validation": guard_validation,
             "project_call": project_call,
+            "transport_binding_validation": transport_binding_validation,
+            "game_object_binding_validation": game_object_binding_validation,
+            "playing_binding_validation": playing_binding_validation,
+            "game_object_collection_validation": game_object_collection_validation,
             "executed": True,
             "verified": False,
             "cleanup": transaction_cleanup_payload(
@@ -7730,11 +20020,21 @@ def dispatch_transaction_command(
             ),
             "automatic_retry": False,
         }
-        if call_uri != "ak.wwise.cli.migrate":
-            execute_payload["next_command"] = transaction_next_command(
-                "verify",
-                ["verify", transaction_id],
-            )
+        execute_payload["agent_control"] = {
+            "terminal": False,
+            "required_outcome_before_reply": (
+                "verified_or_structured_verification_failure"
+            ),
+            "next": (
+                "execute next_command.copy_instruction.source_field in same turn"
+            ),
+            "reply_before_next_command": "invalid",
+        }
+        execute_payload["next_command"] = transaction_next_command(
+            "verify",
+            ["verify", transaction_id],
+            state_dir=args.state_dir,
+        )
         return project_successful_transaction_execute_payload(execute_payload)
 
     if args.command == "verify":
@@ -7927,8 +20227,12 @@ def dispatch_transaction_command(
             "automatic_retry": False,
         }
         if verification.ok:
+            transaction_request = require_mapping(
+                artifact.get("request"),
+                "transaction request",
+            )
             agent_result = transaction_agent_result(
-                request=require_mapping(artifact.get("request"), "transaction request"),
+                request=transaction_request,
                 transaction_id=transaction_id,
                 artifact_hash=preview.artifact_hash,
                 state=final_record.state.value,
@@ -7936,8 +20240,332 @@ def dispatch_transaction_command(
                 verified=verification.business_state_verified,
                 cleanup=payload["cleanup"],
             )
+            transaction_arguments = transaction_request.get("arguments")
+            transaction_api = (
+                transaction_arguments.get("api")
+                if isinstance(transaction_arguments, Mapping)
+                else None
+            )
+            if transaction_api in {TRANSPORT_CREATE_URI, TRANSPORT_DESTROY_URI}:
+                if project is None:  # pragma: no cover - invariant project guard
+                    raise GatewayResultShapeError(
+                        "Transport verification lacks its live project identity.",
+                        error_code="INVALID_STATUS_RESULT",
+                    )
+                transport_context = _runtime_transport_context_from_live(
+                    endpoint=common["endpoint"],
+                    project=project,
+                    detected_version=detected_version,
+                    live_info=live_info,
+                )
+                handle_store = RuntimeTransportHandleStore(store.state_dir)
+                try:
+                    if transaction_api == TRANSPORT_CREATE_URI:
+                        execution_payload = execution_result.get("result")
+                        transport_id = (
+                            execution_payload.get("transport")
+                            if isinstance(execution_payload, Mapping)
+                            else None
+                        )
+                        list_readbacks = [
+                            row
+                            for row in verification.readbacks
+                            if row.get("uri")
+                            == "ak.wwise.core.transport.getList"
+                            and isinstance(row.get("result"), Mapping)
+                        ]
+                        transport_list = (
+                            list_readbacks[-1]["result"].get("list")
+                            if list_readbacks
+                            else None
+                        )
+                        bound_rows = (
+                            [
+                                row
+                                for row in transport_list
+                                if isinstance(row, Mapping)
+                                and row.get("transport") == transport_id
+                            ]
+                            if isinstance(transport_list, list)
+                            else []
+                        )
+                        if len(bound_rows) != 1:
+                            raise RuntimeTransportHandleError(
+                                "TRANSPORT_HANDLE_NOT_LIVE",
+                                "Verified transport cannot be bound to one exact live row.",
+                                details={"match_count": len(bound_rows)},
+                            )
+                        issued = handle_store.issue(
+                            transport_id=transport_id,
+                            context=transport_context,
+                            source_transaction_id=transaction_id,
+                            source_artifact_hash=preview.artifact_hash,
+                            transport_row_sha256=canonical_sha256(bound_rows[0]),
+                        )
+                        agent_result["business_result"] = {
+                            "contract": "waapi-skill.runtime-control-result/v1",
+                            "transport_handle": issued.handle,
+                        }
+                    else:
+                        native_args = transaction_arguments.get("args")
+                        transport_id = (
+                            native_args.get("transport")
+                            if isinstance(native_args, Mapping)
+                            else None
+                        )
+                        retired = handle_store.retire_native_id(
+                            transport_id,
+                            context=transport_context,
+                        )
+                        agent_result["business_result"] = {
+                            "contract": "waapi-skill.runtime-control-result/v1",
+                            "retired_transport_handle_count": len(retired),
+                        }
+                except (RuntimeTransportHandleError, OSError, ValueError) as exc:
+                    payload.update(
+                        {
+                            "ok": False,
+                            "status": "transport_handle_persistence_failed",
+                            "error_code": getattr(
+                                exc,
+                                "error_code",
+                                "TRANSPORT_HANDLE_PERSISTENCE_FAILED",
+                            ),
+                            "message": str(exc),
+                            "agent_result": None,
+                            "automatic_retry": False,
+                        }
+                    )
+                    return payload
+            if transaction_api == POST_EVENT_URI:
+                if project is None:  # pragma: no cover - invariant project guard
+                    raise GatewayResultShapeError(
+                        "SoundEngine verification lacks its live project identity.",
+                        error_code="INVALID_STATUS_RESULT",
+                    )
+                execution_payload = execution_result.get("result")
+                playing_id = (
+                    execution_payload.get("return")
+                    if isinstance(execution_payload, Mapping)
+                    else None
+                )
+                native_args = transaction_arguments.get("args")
+                event_id = (
+                    native_args.get("event")
+                    if isinstance(native_args, Mapping)
+                    else None
+                )
+                game_object_id = (
+                    native_args.get("gameObject")
+                    if isinstance(native_args, Mapping)
+                    else None
+                )
+                try:
+                    issued = RuntimePlayingHandleStore(store.state_dir).issue(
+                        playing_id=playing_id,
+                        event_id=event_id,
+                        game_object_id=game_object_id,
+                        context=_runtime_game_object_context_from_live(
+                            endpoint=common["endpoint"],
+                            project=project,
+                            detected_version=detected_version,
+                            live_info=live_info,
+                        ),
+                        source_transaction_id=transaction_id,
+                        source_artifact_hash=preview.artifact_hash,
+                    )
+                    agent_result["business_result"] = {
+                        "contract": "waapi-skill.soundengine-control-result/v1",
+                        "playing_handle": issued.handle,
+                    }
+                except (RuntimePlayingHandleError, OSError, ValueError) as exc:
+                    payload.update(
+                        {
+                            "ok": False,
+                            "status": (
+                                "soundengine_playback_not_started"
+                                if getattr(exc, "error_code", None)
+                                == "PLAYING_HANDLE_NOT_STARTED"
+                                else "playing_handle_persistence_failed"
+                            ),
+                            "error_code": getattr(
+                                exc,
+                                "error_code",
+                                "PLAYING_HANDLE_PERSISTENCE_FAILED",
+                            ),
+                            "message": str(exc),
+                            "agent_result": None,
+                            "automatic_retry": False,
+                        }
+                    )
+                    return payload
+            if transaction_api == REGISTER_GAME_OBJECT_URI:
+                if project is None:  # pragma: no cover - invariant project guard
+                    raise GatewayResultShapeError(
+                        "SoundEngine verification lacks its live project identity.",
+                        error_code="INVALID_STATUS_RESULT",
+                    )
+                native_args = transaction_arguments.get("args")
+                game_object_id = (
+                    native_args.get("gameObject")
+                    if isinstance(native_args, Mapping)
+                    else None
+                )
+                game_object_name = (
+                    native_args.get("name")
+                    if isinstance(native_args, Mapping)
+                    else None
+                )
+                try:
+                    issued = RuntimeGameObjectHandleStore(store.state_dir).issue(
+                        game_object_id=game_object_id,
+                        game_object_name=game_object_name,
+                        context=_runtime_game_object_context_from_live(
+                            endpoint=common["endpoint"],
+                            project=project,
+                            detected_version=detected_version,
+                            live_info=live_info,
+                        ),
+                        source_transaction_id=transaction_id,
+                        source_artifact_hash=preview.artifact_hash,
+                    )
+                    agent_result["business_result"] = {
+                        "contract": "waapi-skill.soundengine-control-result/v1",
+                        "game_object_handle": issued.handle,
+                        "game_object_name": issued.game_object_name,
+                    }
+                except (RuntimeGameObjectHandleError, OSError, ValueError) as exc:
+                    payload.update(
+                        {
+                            "ok": False,
+                            "status": "game_object_handle_persistence_failed",
+                            "error_code": getattr(
+                                exc,
+                                "error_code",
+                                "GAME_OBJECT_HANDLE_PERSISTENCE_FAILED",
+                            ),
+                            "message": str(exc),
+                            "agent_result": None,
+                            "automatic_retry": False,
+                        }
+                    )
+                    return payload
+            if transaction_api == UNREGISTER_GAME_OBJECT_URI:
+                if project is None:  # pragma: no cover - invariant project guard
+                    raise GatewayResultShapeError(
+                        "SoundEngine verification lacks its live project identity.",
+                        error_code="INVALID_STATUS_RESULT",
+                    )
+                native_args = transaction_arguments.get("args")
+                game_object_id = (
+                    native_args.get("gameObject")
+                    if isinstance(native_args, Mapping)
+                    else None
+                )
+                try:
+                    retired = RuntimeGameObjectHandleStore(
+                        store.state_dir
+                    ).retire_native_id(
+                        game_object_id,
+                        context=_runtime_game_object_context_from_live(
+                            endpoint=common["endpoint"],
+                            project=project,
+                            detected_version=detected_version,
+                            live_info=live_info,
+                        ),
+                    )
+                    agent_result["business_result"] = {
+                        "contract": "waapi-skill.soundengine-control-result/v1",
+                        "retired_game_object_handle_count": len(retired),
+                    }
+                except (RuntimeGameObjectHandleError, OSError, ValueError) as exc:
+                    payload.update(
+                        {
+                            "ok": False,
+                            "status": "game_object_handle_retirement_failed",
+                            "error_code": getattr(
+                                exc,
+                                "error_code",
+                                "GAME_OBJECT_HANDLE_RETIREMENT_FAILED",
+                            ),
+                            "message": str(exc),
+                            "agent_result": None,
+                            "automatic_retry": False,
+                        }
+                    )
+                    return payload
+            if transaction_api == STOP_PLAYING_ID_URI:
+                if project is None:  # pragma: no cover - invariant project guard
+                    raise GatewayResultShapeError(
+                        "SoundEngine verification lacks its live project identity.",
+                        error_code="INVALID_STATUS_RESULT",
+                    )
+                native_args = transaction_arguments.get("args")
+                playing_id = (
+                    native_args.get("playingId")
+                    if isinstance(native_args, Mapping)
+                    else None
+                )
+                try:
+                    retired = RuntimePlayingHandleStore(
+                        store.state_dir
+                    ).retire_native_id(
+                        playing_id,
+                        context=_runtime_game_object_context_from_live(
+                            endpoint=common["endpoint"],
+                            project=project,
+                            detected_version=detected_version,
+                            live_info=live_info,
+                        ),
+                    )
+                    agent_result["business_result"] = {
+                        "contract": "waapi-skill.soundengine-control-result/v1",
+                        "retired_playing_handle_count": len(retired),
+                    }
+                except (RuntimePlayingHandleError, OSError, ValueError) as exc:
+                    payload.update(
+                        {
+                            "ok": False,
+                            "status": "playing_handle_retirement_failed",
+                            "error_code": getattr(
+                                exc,
+                                "error_code",
+                                "PLAYING_HANDLE_RETIREMENT_FAILED",
+                            ),
+                            "message": str(exc),
+                            "agent_result": None,
+                            "automatic_retry": False,
+                        }
+                    )
+                    return payload
             if agent_result["operation"] in {"waapi.call", "waapi.undoGroup"}:
-                agent_result["result"] = execution_result.get("result")
+                projected_result = execution_result.get("result")
+                if (
+                    transaction_api == POST_EVENT_URI
+                    and isinstance(agent_result.get("business_result"), Mapping)
+                ):
+                    projected_result = {
+                        "playing_handle": agent_result["business_result"][
+                            "playing_handle"
+                        ]
+                    }
+                verification_plan = prepared.get("verification_plan")
+                if (
+                    agent_result["operation"] == "waapi.call"
+                    and isinstance(projected_result, Mapping)
+                    and isinstance(verification_plan, Mapping)
+                    and verification_plan.get("uri")
+                    == SOURCE_CONTROL_GET_SOURCE_FILES_URI
+                    and isinstance(
+                        verification_plan.get("result_projection"), Mapping
+                    )
+                ):
+                    projected_result = project_source_control_result(
+                        SOURCE_CONTROL_GET_SOURCE_FILES_URI,
+                        projected_result,
+                        verification_plan["result_projection"],
+                    )
+                agent_result["result"] = projected_result
             payload["agent_result"] = agent_result
         return payload
     raise GatewayInputError(f"unsupported transaction command: {args.command}")
@@ -8023,15 +20651,29 @@ def dispatch_host_control_transaction(
         }
 
     dispatch_accepted = bool(result is not None and result.get("ok") is True)
+    normalized_exception = (
+        result is not None and result.get("failure_origin") == "exception"
+    )
+    explicit_dispatch_failure = (
+        result is not None
+        and not dispatch_accepted
+        and not (expected_disconnect and normalized_exception)
+    )
     if dispatch_accepted:
         delivery = "waapi_result_returned"
         disconnect_observation = "not_observed_before_result"
+        terminal_classification = "dispatch_accepted_effect_unverified"
     elif result is not None:
         delivery = "indeterminate_after_dispatch_attempt"
         disconnect_observation = (
             "call_failed_or_connection_loss_observed"
             if expected_disconnect
             else "unexpected_call_failure_observed"
+        )
+        terminal_classification = (
+            "dispatch_failed"
+            if explicit_dispatch_failure
+            else "expected_disconnect_delivery_indeterminate"
         )
     else:
         delivery = "exception_after_dispatch_started"
@@ -8040,12 +20682,22 @@ def dispatch_host_control_transaction(
             if expected_disconnect
             else "unexpected_exception_observed"
         )
+        terminal_classification = (
+            "expected_disconnect_delivery_indeterminate"
+            if expected_disconnect
+            else "dispatch_failed"
+        )
     lifecycle = {
         "expected": process_expectation,
         "observed": "not_observed_by_gateway",
         "gateway_process_action": "none",
         "reconnect_attempted": False,
     }
+    durable_state = (
+        TransactionState.EXECUTION_FAILED
+        if explicit_dispatch_failure
+        else TransactionState.INDETERMINATE
+    )
     durable_details = {
         "host_control": call_uri,
         "expected_disconnect": expected_disconnect,
@@ -8056,27 +20708,40 @@ def dispatch_host_control_transaction(
         "dispatch_result": dict(result) if result is not None else None,
         "exception": dict(exception_evidence) if exception_evidence else None,
         "automatic_retry": False,
+        "terminal_journal": {
+            "classification": terminal_classification,
+            "effect_verified": False,
+            "durable_state": durable_state.value,
+            "retry_allowed": False,
+        },
     }
-    indeterminate = store.mark_execution_indeterminate(
-        transaction_id,
-        details=durable_details,
+    terminal_record = (
+        store.mark_execution_failed(transaction_id, details=durable_details)
+        if explicit_dispatch_failure
+        else store.mark_execution_indeterminate(
+            transaction_id,
+            details=durable_details,
+        )
     )
     return {
         "ok": False,
         "status": (
-            "expected_disconnect_indeterminate"
+            "host_control_dispatch_failed"
+            if explicit_dispatch_failure
+            else "expected_disconnect_indeterminate"
             if expected_disconnect
             else "host_control_effect_indeterminate"
         ),
         **common,
         "transaction_id": transaction_id,
-        "state": indeterminate.state.value,
+        "state": terminal_record.state.value,
         "artifact_hash": artifact_hash,
         "host_control": call_uri,
         "expected_disconnect": expected_disconnect,
         "disconnect_observation": disconnect_observation,
         "dispatch_delivery": delivery,
         "dispatch_accepted": dispatch_accepted,
+        "terminal_journal": durable_details["terminal_journal"],
         "process_lifecycle": lifecycle,
         "call": (
             dispatch_call_summary(result)
@@ -8167,6 +20832,25 @@ def dispatch_undo_group_execution_plan(
             version=version,
         )
         capability = CapabilityCatalog().describe(version, uri_value)
+        sealed_timeout = phase.get("timeout_seconds")
+        sealed_result_limit = phase.get("result_limit_bytes")
+        current_timeout = float(capability.execution_contract["timeout_seconds"])
+        current_result_limit = int(
+            capability.execution_contract["result_limit_bytes"]
+        )
+        if (
+            not isinstance(sealed_timeout, (int, float))
+            or isinstance(sealed_timeout, bool)
+            or float(sealed_timeout) != current_timeout
+            or not isinstance(sealed_result_limit, int)
+            or isinstance(sealed_result_limit, bool)
+            or sealed_result_limit != current_result_limit
+        ):
+            raise OperationContractError(
+                "PREVIEW_DISPATCH_MISMATCH",
+                "Undo Group child execution limits no longer match the sealed contract.",
+                details={"index": index, "uri": uri_value},
+            )
         remaining = connection.deadline.require_remaining(
             f"Undo Group {phase_name} {uri_value}"
         )
@@ -8180,7 +20864,7 @@ def dispatch_undo_group_execution_plan(
                 ),
             )
         operation_timeout = min(
-            float(capability.execution_contract["timeout_seconds"]),
+            float(sealed_timeout),
             max(0.001, remaining - cancel_reserve),
         )
         result = dispatch(
@@ -8192,7 +20876,9 @@ def dispatch_undo_group_execution_plan(
             options=options_value,
             allow_destructive=True,
             operation_timeout=operation_timeout,
-            result_limit_bytes=int(capability.execution_contract["result_limit_bytes"]),
+            result_limit_bytes=(
+                int(sealed_result_limit)
+            ),
         )
         row: dict[str, Any] = {
             "phase": phase_name,
@@ -8585,45 +21271,6 @@ def _single_exact_lookup(args: Mapping[str, Any] | None) -> bool:
     return _canonical_wwise_path(value)
 
 
-def structured_query_requested(args: argparse.Namespace) -> bool:
-    """Return whether query-object uses the closed structured request lane."""
-
-    return getattr(args, "request_json", None) is not None
-
-
-def advanced_query_requested(args: argparse.Namespace) -> bool:
-    """Return whether query-object uses the bounded native WAQL lane."""
-
-    return getattr(args, "advanced_request_json", None) is not None
-
-
-def _require_advanced_query_option_exclusivity(
-    args: argparse.Namespace,
-) -> None:
-    """Keep the advanced request document authoritative for the complete read."""
-
-    conflicting: list[str] = []
-    if args.where_json is not None:
-        conflicting.append("--where-json")
-    if args.match_original_file_paths:
-        conflicting.append("--match-original-file-path")
-    if args.select:
-        conflicting.append("--select")
-    if args.take is not None:
-        conflicting.append("--take")
-    if args.all_results:
-        conflicting.append("--all-results")
-    if args.return_fields:
-        conflicting.append("--return-field")
-    if conflicting:
-        raise GatewayInputError(
-            "query-object --advanced-request-json owns the native WAQL, return "
-            "expressions, and result bound; it cannot be combined with "
-            + ", ".join(conflicting)
-            + "."
-        )
-
-
 def _advanced_query_bound(preview: SemanticPreview) -> dict[str, Any]:
     """Read the builder-owned final native WAQL row cap."""
 
@@ -8631,7 +21278,7 @@ def _advanced_query_bound(preview: SemanticPreview) -> dict[str, Any]:
     if not isinstance(bound, Mapping) or set(bound) != {"mode", "value"}:
         raise GatewayResultShapeError(
             "Advanced query builder returned an invalid result-bound contract.",
-            details={"command": "query-object --advanced-request-json"},
+            details={"command": "query-object --typed-advanced"},
             error_code="INVALID_ADVANCED_QUERY_PLAN",
         )
     mode = bound.get("mode")
@@ -8645,40 +21292,13 @@ def _advanced_query_bound(preview: SemanticPreview) -> dict[str, Any]:
         raise GatewayResultShapeError(
             "Advanced query builder returned an invalid final row cap.",
             details={
-                "command": "query-object --advanced-request-json",
+                "command": "query-object --typed-advanced",
                 "mode": mode,
                 "value": value,
             },
             error_code="INVALID_ADVANCED_QUERY_PLAN",
         )
     return {"mode": mode, "value": value}
-
-
-def _require_structured_query_option_exclusivity(
-    args: argparse.Namespace,
-) -> None:
-    """Keep one structured document authoritative for the complete query."""
-
-    conflicting: list[str] = []
-    if args.where_json is not None:
-        conflicting.append("--where-json")
-    if args.match_original_file_paths:
-        conflicting.append("--match-original-file-path")
-    if args.select:
-        conflicting.append("--select")
-    if args.take is not None:
-        conflicting.append("--take")
-    if args.all_results:
-        conflicting.append("--all-results")
-    if args.return_fields:
-        conflicting.append("--return-field")
-    if conflicting:
-        raise GatewayInputError(
-            "query-object --request-json owns the source, transforms, return "
-            "fields, and result bound; it cannot be combined with "
-            + ", ".join(conflicting)
-            + "."
-        )
 
 
 def _structured_query_exact_identity(
@@ -8821,7 +21441,7 @@ def validate_structured_exact_query_identity(
 def _canonical_exact_query_request(args: argparse.Namespace) -> bool:
     """Trust exactness from parsed CLI fields, never by reparsing generated WAQL."""
 
-    if args.where_json is not None or args.select or args.take is not None:
+    if args.where or args.select or args.take is not None:
         return False
     if args.path is not None:
         return _canonical_wwise_path(args.path)
@@ -8831,12 +21451,17 @@ def _canonical_exact_query_request(args: argparse.Namespace) -> bool:
 
 
 def _require_explicit_query_bound(args: argparse.Namespace) -> None:
-    broad_source = args.object_type is not None or args.search is not None or args.query is not None
+    broad_source = (
+        args.object_type is not None
+        or getattr(args, "custom_kind_meaning", None) is not None
+        or args.search is not None
+        or args.query is not None
+    )
     transformed = bool(args.select)
-    if (broad_source or transformed) and args.take is None and not args.all_results:
+    if (broad_source or transformed) and args.take is None:
         raise GatewayInputError(
-            "Broad query-object sources and --select transforms require an explicit --take limit "
-            "or the explicit --all-results opt-in."
+            "Broad query-object sources and --relationship traversal require an "
+            "explicit --max-results bound."
         )
 
 
@@ -9199,6 +21824,28 @@ def validate_exact_query_identity(
         )
 
 
+def validate_query_business_view_result(
+    args: argparse.Namespace,
+    rows: Sequence[Mapping[str, Any]],
+) -> None:
+    """Bind a high-level diagnostic view to its exact live object kind."""
+
+    view = getattr(args, "business_view", None)
+    if view != "sound-routing-diagnostics" or not rows:
+        return
+    if len(rows) != 1 or rows[0].get("type") != "Sound":
+        raise GatewayResultShapeError(
+            "sound-routing-diagnostics requires one exact live Sound object.",
+            details={
+                "command": "query-object --view sound-routing-diagnostics",
+                "returned_count": len(rows),
+                "returned_type": rows[0].get("type") if len(rows) == 1 else None,
+                "repair": "select the exact Sound target before requesting this view",
+            },
+            error_code="QUERY_VIEW_OBJECT_KIND_MISMATCH",
+        )
+
+
 def _normalize_wwise_identity_path(value: Any) -> str | None:
     """Normalize hierarchy separators and case for exact-path identity checks."""
 
@@ -9216,9 +21863,349 @@ def _normalize_wwise_identity_path(value: Any) -> str | None:
 def _query_bound_summary(args: argparse.Namespace) -> dict[str, Any]:
     if args.take is not None:
         return {"mode": "take", "value": args.take}
-    if args.all_results:
-        return {"mode": "all-results-explicit"}
     return {"mode": "exact-object"}
+
+
+def _project_query_business_rows(
+    args: argparse.Namespace,
+    rows: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Rename Gateway-compiled native accessors into stable business fields."""
+
+    bindings = tuple(getattr(args, "query_output_bindings", ()) or ())
+    projected: list[dict[str, Any]] = []
+    for row in rows:
+        item = {field: row[field] for field in SELECTED_REQUIRED_RETURN_FIELDS}
+        properties: dict[str, Any] = {}
+        references: dict[str, Any] = {}
+        for kind, native, output in bindings:
+            value = row.get(native)
+            if kind == "property":
+                properties[output] = value
+            elif kind == "reference":
+                references[output] = value
+            else:
+                item[output] = value
+        if properties:
+            item["properties"] = properties
+        if references:
+            item["references"] = references
+        projected.append(item)
+    return projected
+
+
+def _query_mutation_selection(
+    args: argparse.Namespace,
+    rows: Sequence[Mapping[str, Any]],
+) -> dict[str, Any] | None:
+    """Expose conditional exact-ID readbacks for a later selected mutation subset."""
+
+    if not 2 <= len(rows) <= MAX_QUERY_MUTATION_SELECTION_CANDIDATES:
+        return None
+    relationships = tuple(getattr(args, "relationships", ()) or ())
+    if (
+        relationships == ("event-actions",)
+        or getattr(args, "business_view", None) is not None
+    ):
+        return None
+
+    candidates: list[dict[str, Any]] = []
+    for row in rows:
+        object_id = row.get("id")
+        name = row.get("name")
+        object_type = row.get("type")
+        path = row.get("path")
+        if (
+            not _canonical_guid(object_id)
+            or not isinstance(name, str)
+            or not name
+            or not isinstance(object_type, str)
+            or not object_type
+            or not _canonical_wwise_path(path)
+        ):
+            return None
+        candidates.append(
+            {
+                "id": object_id,
+                "expected_identity": {
+                    "name": name,
+                    "type": object_type,
+                    "path": path,
+                },
+                "copy_command": operation_draft_copy_command(
+                    [
+                        "python",
+                        str(GATEWAY_RUNNER_PATH),
+                        "gateway.py",
+                        "query-object",
+                        "--exact-id",
+                        object_id,
+                    ]
+                ),
+            }
+        )
+    return {
+        "contract": "waapi-skill.query-mutation-selection/v1",
+        "activation": "later_user_selects_returned_candidates",
+        "current_turn_action": "none",
+        "required_before": [
+            "read_operate_reference",
+            "choose_operation",
+        ],
+        "later_selection_gate": {
+            "execute": "each_selected_candidate.copy_command_exactly_once",
+            "validate": "returned_name_type_and_path_equal_expected_identity",
+            "unselected_candidates": "do_not_execute",
+            "must_complete_before": [
+                "read_operate_reference",
+                "operations",
+                "operation_schema",
+                "draft_start",
+            ],
+            "skipping_is_invalid": True,
+        },
+        "instruction": (
+            "On the later turn where the user selects returned candidates for "
+            "mutation, the first Gateway actions must execute only each selected "
+            "candidate's copy_command once and match its exact name, type, and "
+            "path. Do not read the operate reference, list operations, request an "
+            "operation schema, or start a Draft until this gate is complete."
+        ),
+        "candidates": candidates,
+    }
+
+
+def _query_business_continuations(
+    args: argparse.Namespace,
+    rows: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Return bounded copy-ready business reads implied by an exact hop."""
+
+    relationships = tuple(getattr(args, "relationships", ()) or ())
+    exact_source = args.path is not None or args.object_id is not None
+    if (
+        getattr(args, "business_view", None) == "sound-routing-diagnostics"
+        and len(rows) == 1
+    ):
+        source = rows[0].get("active_source")
+        bus = rows[0].get("output_bus")
+        source_id = source.get("id") if isinstance(source, Mapping) else None
+        bus_id = bus.get("id") if isinstance(bus, Mapping) else None
+        continuations: list[dict[str, Any]] = []
+        if _canonical_guid(source_id):
+            continuations.append(
+                {
+                    "purpose": "read the exact active source file and language",
+                    "source_id": source_id,
+                    "next_command": transaction_next_command(
+                        "query-object",
+                        [
+                            "query-object",
+                            "--exact-id",
+                            source_id,
+                            "--include",
+                            "original-file-path",
+                            "--include",
+                            "source-language",
+                        ],
+                    ),
+                }
+            )
+        if _canonical_guid(bus_id):
+            continuations.append(
+                {
+                    "purpose": "read the exact output Bus volume",
+                    "output_bus_id": bus_id,
+                    "next_command": transaction_next_command(
+                        "query-object",
+                        [
+                            "query-object",
+                            "--exact-id",
+                            bus_id,
+                            "--include",
+                            "volume-db",
+                        ],
+                    ),
+                }
+            )
+        return continuations
+    if not relationships and exact_source and len(rows) == 1:
+        event_id = rows[0].get("id")
+        if rows[0].get("type") == "Event" and _canonical_guid(event_id):
+            return [
+                {
+                    "purpose": "read the exact Event Action hop",
+                    "source_event_id": event_id,
+                    "next_command": transaction_next_command(
+                        "query-object",
+                        [
+                            "query-object",
+                            "--exact-id",
+                            event_id,
+                            "--relationship",
+                            "event-actions",
+                        ],
+                    ),
+                }
+            ]
+    if relationships != ("event-actions",):
+        return []
+    continuations: list[dict[str, Any]] = []
+    for row in rows[:8]:
+        target = row.get("target")
+        target_id = target.get("id") if isinstance(target, Mapping) else None
+        if not _canonical_guid(target_id):
+            continue
+        continuations.append(
+            {
+                "purpose": "inspect the exact Action target as a Sound routing hop",
+                "source_action_id": row.get("id"),
+                "target_id": target_id,
+                "next_command": transaction_next_command(
+                    "query-object",
+                    [
+                        "query-object",
+                        "--exact-id",
+                        target_id,
+                        "--view",
+                        "sound-routing-diagnostics",
+                    ],
+                ),
+            }
+        )
+    return continuations
+
+
+def _bind_custom_kind_from_live_types(
+    args: argparse.Namespace,
+    *,
+    connection: GatewayConnection,
+    detected_version: str,
+    dispatcher: WwiseDispatcher,
+) -> dict[str, Any] | None:
+    """Resolve one user-facing custom kind against the live type inventory."""
+
+    meaning = getattr(args, "custom_kind_meaning", None) or getattr(
+        args,
+        "metadata_custom_kind_meaning",
+        None,
+    )
+    if meaning is None:
+        return None
+    read = transaction_read_call(
+        dispatcher,
+        connection=connection,
+        version=detected_version,
+    )
+    records = parse_get_types_result(read(CACHE_GET_TYPES_URI, {}, {}))
+
+    def lexical(value: str) -> str:
+        return "".join(character.casefold() for character in value if character.isalnum())
+
+    needle = lexical(meaning)
+    exact = [record for record in records if lexical(record.name) == needle]
+    matches = exact or [
+        record
+        for record in records
+        if needle and (needle in lexical(record.name) or lexical(record.name) in needle)
+    ]
+    if len(matches) != 1:
+        return {
+            "metadata_authority": "live-waapi",
+            "meaning": meaning,
+            "candidate_count": len(matches),
+            "candidates": [record.as_dict() for record in matches[:8]],
+            "repair": "refine --custom-kind until one live Wwise type matches",
+        }
+    args.object_type = matches[0].name
+    return None
+
+
+def _bind_query_custom_fields_from_live_metadata(
+    args: argparse.Namespace,
+    *,
+    connection: GatewayConnection,
+    detected_version: str,
+    dispatcher: WwiseDispatcher,
+) -> dict[str, Any] | None:
+    """Bind business field meanings to exact live query projection accessors.
+
+    Returns a structured clarification payload when any meaning is ambiguous;
+    otherwise mutates only the current invocation's compiled projection facts.
+    """
+
+    meanings = tuple(getattr(args, "query_custom_field_meanings", ()) or ())
+    if not meanings:
+        return None
+    discovery = discover_metadata(
+        read_call=transaction_read_call(
+            dispatcher,
+            connection=connection,
+            version=detected_version,
+        ),
+        queries=meanings,
+        object_type=args.object_type,
+        object=args.path if args.path is not None else args.object_id,
+        limit=DEFAULT_METADATA_DISCOVERY_LIMIT,
+    )
+    candidates = {
+        candidate.get("name"): candidate
+        for candidate in discovery.candidates
+        if isinstance(candidate.get("name"), str)
+    }
+    bindings = list(getattr(args, "query_output_bindings", ()) or ())
+    unresolved: list[dict[str, Any]] = []
+    for query_result in discovery.query_results:
+        meaning = query_result.get("query")
+        names = query_result.get("candidate_names")
+        if not isinstance(meaning, str) or not isinstance(names, list):
+            unresolved.append(
+                {
+                    "meaning": meaning,
+                    "candidate_names": names if isinstance(names, list) else [],
+                }
+            )
+            continue
+        exact_names: list[str] = []
+        for name in names:
+            candidate = candidates.get(name)
+            metadata = candidate.get("metadata") if isinstance(candidate, Mapping) else None
+            display = metadata.get("display") if isinstance(metadata, Mapping) else None
+            display_name = display.get("name") if isinstance(display, Mapping) else None
+            if (
+                isinstance(name, str)
+                and name.casefold() == meaning.casefold()
+            ) or (
+                isinstance(display_name, str)
+                and display_name.casefold() == meaning.casefold()
+            ):
+                exact_names.append(name)
+        selected_names = exact_names if len(exact_names) == 1 else names
+        if len(selected_names) != 1:
+            unresolved.append({"meaning": meaning, "candidate_names": names})
+            continue
+        candidate = candidates.get(selected_names[0])
+        kind = candidate.get("kind") if isinstance(candidate, Mapping) else None
+        token = candidate.get("name") if isinstance(candidate, Mapping) else None
+        if kind not in {"property", "reference"} or not isinstance(token, str):
+            unresolved.append({"meaning": meaning, "candidate_names": names})
+            continue
+        native = f"@{token}" if kind == "property" else token
+        bindings.append((kind, native, token))
+    if unresolved:
+        return {
+            "metadata_authority": "live-waapi",
+            "unresolved": unresolved,
+            "repair": "refine each --include-field meaning until one live field matches",
+        }
+    native_fields = [binding[1] for binding in bindings]
+    if len(set(native_fields)) != len(native_fields):
+        raise GatewayInputError(
+            "query-object live field discovery resolved duplicate result fields"
+        )
+    args.query_output_bindings = tuple(bindings)
+    args.query_return_fields = (*SELECTED_REQUIRED_RETURN_FIELDS, *native_fields)
+    return None
 
 
 def project_successful_query_object_payload(
@@ -9249,6 +22236,8 @@ def project_successful_query_object_payload(
         "count",
         "limit_reached",
         "objects",
+        "continuations",
+        "mutation_selection",
     )
     projected = {key: payload[key] for key in compact_keys if key in payload}
     if "agent_result" in payload:
@@ -9336,6 +22325,18 @@ def selected_ui_boundary(result: Mapping[str, Any], *, live_info: Mapping[str, A
         or unavailable_uri in message
     )
     return unavailable and bool(live_info.get("isCommandLine"))
+
+
+def metadata_call_evidence_projection(
+    calls: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Keep metadata stdout bounded while pointing to complete dispatcher evidence."""
+
+    return {
+        "metadata_call_count": len(calls),
+        "calls": [dict(calls[-1])] if calls else [],
+        "metadata_evidence_scope": "all calls retained in dispatcher evidence directory",
+    }
 
 
 def dispatch_call_summary(result: Mapping[str, Any]) -> dict[str, Any]:
@@ -9851,9 +22852,12 @@ def project_successful_transaction_verify_payload(
             projection["projected_payload_bytes"] = observed
         return gateway_json_document_size(projected)
 
-    if stabilize_size() > fixed_limit:
+    if stabilize_size() > TRANSACTION_VERIFY_AGENT_VIEW_TARGET_BYTES:
         projected.pop("agent_result", None)
         projected["verification"] = verification_summary
+        project_call = projected.get("project_call")
+        if isinstance(project_call, Mapping):
+            projected["project_call"] = dispatch_call_summary(project_call)
         projection["detail_level"] = "digest-verification-evidence"
         projection["full_verification_evidence_in_stdout"] = False
 
@@ -10094,34 +23098,6 @@ def strict_object_get_rows(
             error_code=error_code,
         )
     return [dict(row) for row in rows]
-
-
-def normalize_selected_return_fields(
-    requested: Sequence[str] | None,
-) -> tuple[str, ...]:
-    """Return a bounded projection while retaining stable selection identity."""
-
-    fields = list(SELECTED_REQUIRED_RETURN_FIELDS)
-    for value in requested or ():
-        if (
-            not isinstance(value, str)
-            or not value
-            or value != value.strip()
-            or len(value) > MAX_SELECTED_RETURN_FIELD_CHARS
-            or any(ord(character) < 0x20 for character in value)
-        ):
-            raise GatewayInputError(
-                "selected --return-field values must be non-empty, trimmed "
-                f"accessors of at most {MAX_SELECTED_RETURN_FIELD_CHARS} characters"
-            )
-        if value not in fields:
-            fields.append(value)
-        if len(fields) > MAX_SELECTED_RETURN_FIELDS:
-            raise GatewayInputError(
-                f"selected accepts at most {MAX_SELECTED_RETURN_FIELDS} unique "
-                "return fields including id, name, type, and path"
-            )
-    return tuple(fields)
 
 
 def strict_selected_rows(result: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -10411,6 +23387,7 @@ def transaction_next_command(
     command: str,
     gateway_argv: Sequence[str],
     *,
+    state_dir: str | Path | None = None,
     requires_explicit_user_confirmation: bool = False,
     requires_later_user_message: bool = False,
 ) -> dict[str, Any]:
@@ -10421,14 +23398,21 @@ def transaction_next_command(
         "python",
         str(GATEWAY_RUNNER_PATH),
         "gateway.py",
-        *normalized,
     ]
+    if state_dir is not None:
+        configured_state_dir = Path(state_dir)
+        if not configured_state_dir.is_absolute():
+            raise GatewayInputError("continuation state directory must be absolute")
+        normalized_state_dir = configured_state_dir.resolve(strict=False)
+        full_argv.extend(["--state-dir", str(normalized_state_dir)])
+    full_argv.extend(normalized)
     payload: dict[str, Any] = {
         "contract": TRANSACTION_NEXT_COMMAND_CONTRACT,
         "command": command,
         "gateway_argv": normalized,
         "full_argv": full_argv,
         "copy_exactly": True,
+        "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
     }
     if requires_explicit_user_confirmation:
         payload["requires_explicit_user_confirmation"] = True
@@ -10444,7 +23428,24 @@ def transaction_next_command(
             model_command = None
     else:
         payload["shell_family"] = "posix-sh"
-        shell_command = shlex.join(full_argv)
+        copy_argv = full_argv
+        try:
+            relative_runner = Path(str(GATEWAY_RUNNER_PATH)).resolve(
+                strict=False
+            ).relative_to(Path.cwd().resolve(strict=False))
+        except (OSError, ValueError):
+            relative_runner = None
+        if (
+            relative_runner is not None
+            and relative_runner.as_posix()
+            == ".agents/skills/waapi-skill/scripts/run.py"
+        ):
+            copy_argv = [
+                full_argv[0],
+                relative_runner.as_posix(),
+                *full_argv[2:],
+            ]
+        shell_command = shlex.join(copy_argv)
     if model_command is not None:
         payload["shell_command"] = shell_command
         payload["model_shell_family"] = WINDOWS_MODEL_COMMAND_FAMILY
@@ -10469,7 +23470,276 @@ def transaction_next_command(
     return payload
 
 
-def transaction_state_payload(command: str, record: Any, *, offline: bool) -> dict[str, Any]:
+def operation_draft_copy_command(
+    full_argv: Sequence[str],
+    *,
+    platform_name: str | None = None,
+) -> str:
+    """Render one exact compact Draft continuation for the active shell host."""
+
+    active_platform = os.name if platform_name is None else platform_name
+    normalized = [str(value) for value in full_argv]
+    if active_platform == "nt":
+        try:
+            return encode_windows_model_argv(normalized)
+        except PlatformCommandError:
+            return encode_windows_powershell_argv(normalized)
+    return shlex.join(normalized)
+
+
+def operation_draft_prefix_copy_binding(
+    full_argv: Sequence[str],
+    *,
+    append_action: str = "copy_verbatim_then_append_complete_typed_action_groups",
+) -> dict[str, Any]:
+    """Return one copy-ready Draft prefix plus its closed append policy."""
+
+    normalized = [str(value) for value in full_argv]
+    return {
+        "fixed_argv_prefix": normalized,
+        "fixed_argv_prefix_copy": operation_draft_copy_command(normalized),
+        "fixed_argv_prefix_copy_instruction": {
+            "contract": OPERATION_DRAFT_COMMAND_COPY_INSTRUCTION_CONTRACT,
+            "source_field": "fixed_argv_prefix_copy",
+            "action": append_action,
+            "forbidden_transformations": [
+                "reconstruct",
+                "shorten",
+                "normalize",
+                "substitute_path_segments",
+                "select_another_field",
+            ],
+            "opaque_token_guard": {
+                "task_authority": {
+                    "prefix": "da1-",
+                    "hex_characters_after_prefix": 40,
+                    "truncate_to_32_hex_characters": "invalid",
+                }
+            },
+        },
+    }
+
+
+def operation_draft_exact_copy_binding(
+    full_argv: Sequence[str],
+) -> dict[str, Any]:
+    """Return one complete Draft command with a closed exact-copy policy."""
+
+    normalized = [str(value) for value in full_argv]
+    return {
+        "fixed_full_argv": normalized,
+        "copy_command": operation_draft_copy_command(normalized),
+        "copy_exactly": True,
+        "copy_instruction": {
+            "contract": OPERATION_DRAFT_COMMAND_COPY_INSTRUCTION_CONTRACT,
+            "source_field": "copy_command",
+            "action": "copy_and_execute_verbatim_once",
+            "forbidden_transformations": [
+                "reconstruct",
+                "shorten",
+                "normalize",
+                "substitute_path_segments",
+                "select_another_field",
+            ],
+            "opaque_token_guard": {
+                "task_authority": {
+                    "prefix": "da1-",
+                    "hex_characters_after_prefix": 40,
+                    "truncate_to_32_hex_characters": "invalid",
+                }
+            },
+        },
+    }
+
+
+def _compact_business_binding_continuation(value: Any) -> Any:
+    """Remove repeated argv arrays while preserving every copy-ready route."""
+
+    if isinstance(value, Mapping):
+        return {
+            str(key): _compact_business_binding_continuation(nested)
+            for key, nested in value.items()
+            if key not in {"fixed_argv_prefix", "fixed_full_argv"}
+        }
+    if isinstance(value, list):
+        return [
+            _compact_business_binding_continuation(nested)
+            for nested in value
+        ]
+    return value
+
+
+def _compact_object_set_update_continuation(
+    value: Mapping[str, Any],
+    *,
+    command: str,
+    draft_id: str,
+    task_authority: str,
+) -> dict[str, Any]:
+    """Keep only phase-relevant object.set follow-ups Agent-visible.
+
+    The complete capability catalog remains available through one exact
+    ``draft-inspect`` continuation. Repeating every long-tail action and copy
+    policy after each binding or field discovery can exceed an Agent shell view
+    even though the JSON result itself is complete.
+    """
+
+    object_binding = value.get("object_binding")
+    compact_object_binding = (
+        {
+            key: object_binding[key]
+            for key in (
+                "by_id",
+                "by_path_segments",
+                "event_action_by_event_path_segments",
+                "selection_rule",
+                "result_validation_rule",
+                "result",
+            )
+            if key in object_binding
+        }
+        if isinstance(object_binding, Mapping)
+        else None
+    )
+    if command == "draft-declare-existing" and compact_object_binding:
+        complete_object_binding = compact_object_binding
+        by_id = compact_object_binding.get("by_id")
+        by_path = compact_object_binding.get("by_path_segments")
+        by_event = compact_object_binding.get(
+            "event_action_by_event_path_segments"
+        )
+        if all(
+            isinstance(route, Mapping)
+            for route in (by_id, by_path, by_event)
+        ):
+            compact_object_binding = {
+                key: by_id[key]
+                for key in (
+                    "fixed_argv_prefix_copy",
+                    "fixed_argv_prefix_copy_instruction",
+                )
+                if key in by_id
+            }
+            compact_object_binding.update(
+                {
+                    "choose_exactly_one_selector_form": True,
+                    "selector_forms": {
+                        "by_id": by_id.get("append"),
+                        "by_path_segments": {
+                            "append_repeated": by_path.get(
+                                "append_repeated"
+                            ),
+                            "segment_order": by_path.get("segment_order"),
+                        },
+                        "event_action_by_event_path_segments": {
+                            "append_repeated": by_event.get(
+                                "append_repeated"
+                            ),
+                            "segment_order": by_event.get("segment_order"),
+                            "gateway_owned_resolution": by_event.get(
+                                "gateway_owned_resolution"
+                            ),
+                        },
+                    },
+                    "selection_rule": complete_object_binding.get(
+                        "selection_rule"
+                    ),
+                    "result": complete_object_binding.get("result"),
+                }
+            )
+    inspect_argv = [
+        "python",
+        str(GATEWAY_RUNNER_PATH),
+        "gateway.py",
+        "draft-inspect",
+        draft_id,
+        "--task-authority",
+        task_authority,
+    ]
+    compact: dict[str, Any] = {
+        key: value[key]
+        for key in (
+            "contract",
+            "required_next_phase",
+        )
+        if key in value
+    }
+    if command == "draft-bind-object" and "existing_target_count_decision" in value:
+        compact["existing_target_count_decision"] = value[
+            "existing_target_count_decision"
+        ]
+    if (
+        command in {"draft-bind-object", "draft-declare-existing"}
+        and compact_object_binding
+    ):
+        compact["object_binding"] = compact_object_binding
+    common_actions = {
+        "draft-bind-object": [
+            "field_discovery",
+            "declare_existing",
+            "declare_existing_batch",
+            "declare_new",
+        ],
+        "draft-discover-fields": [
+            "field_discovery",
+            "declare_existing",
+        ],
+        "draft-declare-existing": [
+            "completion_candidate",
+        ],
+        "draft-declare-existing-batch": [
+            "completion_candidate",
+        ],
+    }.get(command, [])
+    for key in common_actions:
+        if key in value:
+            action = value[key]
+            if key == "declare_existing" and isinstance(action, Mapping):
+                action = {
+                    **action,
+                    "cardinality": "exactly_one_declaration_per_command",
+                    "repeat_rule": (
+                        "after_each_success_copy_the_next_response_revision_and_"
+                        "submit_the_next_declaration_separately"
+                    ),
+                }
+            elif key == "declare_existing_batch" and isinstance(action, Mapping):
+                action = {
+                    name: action[name]
+                    for name in (
+                        "fixed_argv_prefix_copy",
+                        "fixed_argv_prefix_copy_instruction",
+                        "append_repeated",
+                        "row_value_orders",
+                        "gateway_disambiguation",
+                        "precondition",
+                    )
+                    if name in action
+                }
+            compact[key] = action
+    compact["more_actions"] = {
+        "use_only_when_common_followups_cannot_express_the_user_intent": True,
+        **_compact_business_binding_continuation(
+            operation_draft_exact_copy_binding(inspect_argv)
+        ),
+    }
+    for key in (
+        "shell_tool_timeout_ms",
+        "then_read_next_response",
+        "precompute_or_increment_revision",
+    ):
+        if key in value:
+            compact[key] = value[key]
+    return compact
+
+
+def transaction_state_payload(
+    command: str,
+    record: Any,
+    *,
+    offline: bool,
+    state_dir: str | Path | None = None,
+) -> dict[str, Any]:
     payload = {
         "contract": GATEWAY_RESULT_CONTRACT,
         "ok": True,
@@ -10484,6 +23754,7 @@ def transaction_state_payload(command: str, record: Any, *, offline: bool) -> di
         payload["next_command"] = transaction_next_command(
             "execute",
             ["execute", record.transaction_id],
+            state_dir=state_dir,
         )
     return payload
 
@@ -10502,6 +23773,26 @@ def _operation_draft_projection_handles(value: Any) -> set[str]:
     return handles
 
 
+def _operation_draft_projection_handles_in_order(value: Any) -> tuple[str, ...]:
+    handles: list[str] = []
+    seen: set[str] = set()
+
+    def visit(item: Any) -> None:
+        if isinstance(item, Mapping):
+            handle = item.get("handle")
+            if isinstance(handle, str) and handle not in seen:
+                seen.add(handle)
+                handles.append(handle)
+            for nested in item.values():
+                visit(nested)
+        elif isinstance(item, list):
+            for nested in item:
+                visit(nested)
+
+    visit(value)
+    return tuple(handles)
+
+
 def _operation_draft_facts_summary(current_facts: list[Any]) -> dict[str, Any]:
     return {
         "contract": "waapi-skill.operation-draft-facts-summary/v1",
@@ -10511,9 +23802,3238 @@ def _operation_draft_facts_summary(current_facts: list[Any]) -> dict[str, Any]:
     }
 
 
+def _object_lifecycle_handles_by_role(
+    session: BusinessDeclarationSession,
+    roles: Sequence[str],
+) -> dict[str, str]:
+    """Return Draft-owned lifecycle handles without exposing them as inputs."""
+
+    object_rows = session.handles.as_dict()["objects"]
+    handles_by_role = {
+        row["role"]: row["handle"]
+        for row in object_rows
+        if isinstance(row, Mapping)
+        and isinstance(row.get("role"), str)
+        and isinstance(row.get("handle"), str)
+    }
+    if (
+        len(roles) == 1
+        and len(object_rows) == 1
+        and roles[0] not in handles_by_role
+        and isinstance(object_rows[0], Mapping)
+        and isinstance(object_rows[0].get("handle"), str)
+    ):
+        handles_by_role[roles[0]] = object_rows[0]["handle"]
+    return handles_by_role
+
+
+def _business_next_action_binding(
+    record: OperationDraftRecord,
+    *,
+    task_authority: str | None,
+) -> dict[str, Any]:
+    authority = task_authority or "<task-authority-from-draft-start>"
+    base = [
+        "python",
+        str(GATEWAY_RUNNER_PATH),
+        "gateway.py",
+    ]
+    binding = [
+        record.draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        str(record.revision),
+    ]
+    raw_session = (
+        record.composition.get("business_session")
+        if record.composition is not None
+        else None
+    )
+    session = (
+        None
+        if raw_session is None
+        else BusinessDeclarationSession.from_dict(raw_session)
+    )
+    adapter = business_adapter(record.operation)
+    if record.check is not None:
+        raw_compound_parent = (
+            record.composition.get("compound_parent")
+            if record.composition is not None
+            else None
+        )
+        if raw_compound_parent is not None:
+            parent = CompoundParentDraftBinding.from_dict(
+                raw_compound_parent
+            )
+            start_next_child = [
+                *base,
+                "draft-start-undo-child",
+                parent.draft_id,
+                "--task-authority",
+                parent.task_authority,
+                "--expected-revision",
+                str(parent.expected_revision),
+            ]
+            finish_parent = [
+                *base,
+                "draft-declare-undo-plan",
+                parent.draft_id,
+                "--task-authority",
+                parent.task_authority,
+                "--expected-revision",
+                str(parent.expected_revision),
+            ]
+            return {
+                "contract": "waapi-skill.business-draft-next-action/v1",
+                "required_next_phase": (
+                    "return_checked_child_to_compound_parent"
+                ),
+                "checked_child_argument": [
+                    "--child-draft",
+                    record.draft_id,
+                    authority,
+                ],
+                "start_next_child": {
+                    **operation_draft_prefix_copy_binding(
+                        start_next_child
+                    ),
+                    "append": ["--operation <eligible-child-operation>"],
+                    "eligible_operations": sorted(
+                        compound_business_child_operations(record.version)
+                    ),
+                },
+                "finish_parent": {
+                    **operation_draft_prefix_copy_binding(finish_parent),
+                    "append": [
+                        "--display-name <user-facing-Wwise-Undo-step-name>",
+                        "each checked_child_argument in exact user-requested order",
+                    ],
+                },
+                "child_preview": "forbidden",
+                "decision_rule": (
+                    "start_next_child_when_a_requested_child_outcome_remains; "
+                    "otherwise_finish_parent_with_every_checked_child_argument"
+                ),
+                "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+            }
+        preview = [*base, "preview-from-draft", *binding]
+        if not adapter.auto_apply_preview:
+            preview.append("--apply")
+        return {
+            "contract": "waapi-skill.business-draft-next-action/v1",
+            "required_next_phase": "preview_from_checked_business_draft",
+            **operation_draft_exact_copy_binding(preview),
+            "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+        }
+    object_bind_prefix = [*base, "draft-bind-object", *binding]
+    field_bind_prefix = [*base, "draft-bind-field", *binding]
+    field_discover_prefix = [*base, "draft-discover-fields", *binding]
+    configure_prefix = [*base, "draft-business-configure", *binding]
+    declare_new_prefix = [*base, "draft-declare-new", *binding]
+    declare_existing_prefix = [*base, "draft-declare-existing", *binding]
+    declare_existing_batch_prefix = [
+        *base,
+        "draft-declare-existing-batch",
+        *binding,
+    ]
+    declare_import_batch_prefix = [
+        *base,
+        "draft-declare-import-batch",
+        *binding,
+    ]
+    add_media_prefix = [*base, "draft-add-media", *binding]
+    clear_object_list_prefix = [
+        *base,
+        "draft-clear-object-list",
+        *binding,
+    ]
+    declare_object_change_prefix = [
+        *base,
+        "draft-declare-object-change",
+        *binding,
+    ]
+    declare_field_change_prefix = [
+        *base,
+        "draft-declare-field-change",
+        *binding,
+    ]
+    declare_rtpc_prefix = [*base, "draft-declare-rtpc", *binding]
+    declare_soundbank_plan_prefix = [
+        *base,
+        "draft-declare-soundbank-plan",
+        *binding,
+    ]
+    declare_artifact_plan_prefix = [
+        *base,
+        "draft-declare-artifact-plan",
+        *binding,
+    ]
+    declare_cli_console_plan_prefix = [
+        *base,
+        "draft-declare-cli-console-plan",
+        *binding,
+    ]
+    declare_host_plan_prefix = [
+        *base,
+        "draft-declare-host-plan",
+        *binding,
+    ]
+    declare_ui_plan_prefix = [*base, "draft-declare-ui-plan", *binding]
+    add_ui_command_prefix = [*base, "draft-add-ui-command", *binding]
+    declare_debug_intent_prefix = [
+        *base,
+        "draft-declare-debug-intent",
+        *binding,
+    ]
+    declare_undo_plan_prefix = [
+        *base,
+        "draft-declare-undo-plan",
+        *binding,
+    ]
+    declare_core_plan_prefix = [
+        *base,
+        "draft-declare-core-plan",
+        *binding,
+    ]
+    declare_project_setting_plan_prefix = [
+        *base,
+        "draft-declare-project-setting-plan",
+        *binding,
+    ]
+    declare_runtime_control_plan_prefix = [
+        *base,
+        "draft-declare-runtime-control-plan",
+        *binding,
+    ]
+    declare_soundengine_plan_prefix = [
+        *base,
+        "draft-declare-soundengine-plan",
+        *binding,
+    ]
+    declare_source_control_plan_prefix = [
+        *base,
+        "draft-declare-source-control-plan",
+        *binding,
+    ]
+    revise_prefix = [*base, "draft-revise-declaration", *binding]
+    remove_prefix = [*base, "draft-remove-declaration", *binding]
+    check = [*base, "draft-check", *binding]
+    by_id = operation_draft_prefix_copy_binding(object_bind_prefix)
+    by_id["append"] = ["--object-id", "<exact-guid>"]
+    by_path_segments = operation_draft_prefix_copy_binding(object_bind_prefix)
+    by_path_segments["append_repeated"] = [
+        "--object-path-segment",
+        "<one-exact-user-path-segment-without-separators>",
+    ]
+    by_path_segments["segment_order"] = "root_to_leaf"
+    object_binding = {
+        "by_id": by_id,
+        "by_path_segments": by_path_segments,
+        "selection_rule": (
+            "user_supplied_complete_path_requires_by_path_segments; "
+            "user_supplied_name_without_a_path_requires_query_then_by_id; "
+            "user_selected_guid_uses_by_id"
+        ),
+        "path_rule": (
+            "copy_each_nonempty_literal_business_name_root_to_leaf; gateway_"
+            "inserts_every_wwise_separator; type_prefixes_are_forbidden"
+        ),
+        "new_target_parent_rule": (
+            "when_the_user_supplies_a_complete_new_object_path_bind_every_segment_"
+            "except_the_final_new_object_name; pass_that_final_segment_once_as_the_"
+            "later_declaration_name; never_skip_the_immediate_parent_or_substitute_"
+            "an_ancestor; a_missing_immediate_parent_is_a_structured_stop"
+        ),
+        "name_rule": "unscoped_name_is_not_a_mutation_identity",
+        "result": "copy_the_returned_bound_object.handle",
+        "result_validation_rule": (
+            "before_declaration_compare_returned_name_and_path_to_the_user_"
+            "target; when_business_kind_resolution_status_is_resolved_and_the_"
+            "user_supplied_a_business_type_compare_business_kind_not_the_"
+            "version_specific_reflected_type; when_status_is_ambiguous_stop_only_"
+            "when_the_user_supplied_a_business_type; continue_when_the_user_did_"
+            "not_state_a_business_type_and_the_returned_name_and_path_match; "
+            "hierarchy_label_is_not_an_object_type; bind_again_or_stop_if_they_"
+            "differ"
+        ),
+        "use_only_for": [
+            "existing_target",
+            "new_target_parent",
+            "output_bus",
+            "event_parent",
+            "custom_reference_value",
+        ],
+    }
+    if record.operation == "object.set":
+        event_action_by_event_path_segments = (
+            operation_draft_prefix_copy_binding(object_bind_prefix)
+        )
+        event_action_by_event_path_segments["append_repeated"] = [
+            "--event-action-of-path-segment",
+            "<one-exact-event-path-segment-without-separators>",
+        ]
+        event_action_by_event_path_segments["segment_order"] = "root_to_leaf"
+        event_action_by_event_path_segments["gateway_owned_resolution"] = (
+            "the_single_direct_Action_child_of_the_exact_Event"
+        )
+        object_binding["event_action_by_event_path_segments"] = (
+            event_action_by_event_path_segments
+        )
+        object_binding["selection_rule"] = (
+            "user_supplied_complete_path_requires_by_path_segments; "
+            "the_Action_owned_by_a_named_Event_requires_"
+            "event_action_by_event_path_segments; "
+            "user_supplied_name_without_a_path_requires_query_then_by_id; "
+            "user_selected_guid_uses_by_id"
+        )
+    if record.operation == "object.create":
+        object_binding["existing_same_name_root_merge_rule"] = (
+            "after_exact_preflight_proves_the_existing_same_name_root_and_the_"
+            "user_requests_merge; bind_that_root_direct_parent_not_the_existing_"
+            "root; declare_the_existing_root_name_once; configure_name_conflict_"
+            "merge; never_use_the_existing_root_as_its_own_new_parent"
+        )
+    if adapter.family == "audio-import":
+        object_binding["import_row_path_rule"] = (
+            "existing_import_row_bind_the_complete_existing_sound_path_including_"
+            "its_final_sound_name; new_import_row_bind_only_its_exact_existing_"
+            "immediate_parent_and_pass_the_final_new_sound_name_once_in_the_"
+            "declaration; never_reuse_a_parent_binding_for_an_existing_row; "
+            "semantic_kind_belongs_to_the_business_declaration; wwise_type_prefixes_"
+            "are_forbidden"
+        )
+    role_declaration = adapter.role_declaration
+    if role_declaration is not None:
+        object_binding.pop("new_target_parent_rule", None)
+
+    def role_object_binding(next_role: str) -> dict[str, Any]:
+        role_bind_prefix = [*object_bind_prefix, "--role", next_role]
+        role_by_id = operation_draft_prefix_copy_binding(role_bind_prefix)
+        role_by_id["append"] = ["--object-id", "<exact-guid>"]
+        role_by_path_segments = operation_draft_prefix_copy_binding(
+            role_bind_prefix
+        )
+        role_by_path_segments["append_repeated"] = [
+            "--object-path-segment",
+            "<one-exact-user-path-segment-without-separators>",
+        ]
+        role_by_path_segments["segment_order"] = "root_to_leaf"
+        role_by_path_segments["scoped_child_of_complete_parent"] = {
+            "append_child": [
+                "--scoped-child-name",
+                "<exact-direct-child-name>",
+            ],
+            "append_parent_repeated": [
+                "--parent-path-segment",
+                "<one-exact-parent-path-segment-without-separators>",
+            ],
+            "parent_segment_order": "root_to_leaf",
+            "gateway_owned_resolution": (
+                "join_parent_segments_and_child_then_require_one_exact_row"
+            ),
+            "direct_query_before_binding": "forbidden",
+        }
+        return {
+            **object_binding,
+            "by_id": role_by_id,
+            "by_path_segments": role_by_path_segments,
+            "selection_rule": (
+                "user_supplied_complete_path_requires_by_path_segments; "
+                "complete_parent_path_plus_exact_direct_child_name_requires_"
+                "by_path_segments.scoped_child_of_complete_parent_without_a_"
+                "query; "
+                "truly_unscoped_name_requires_query_then_by_id; "
+                "user_selected_guid_uses_by_id"
+            ),
+            "name_rule": (
+                "a_name_scoped_to_one_user_supplied_complete_parent_path_is_a_"
+                "closed_child_identity; only_a_truly_unscoped_name_requires_a_"
+                "query"
+            ),
+            "next_role": next_role,
+            "use_only_for": [next_role],
+            "role_assignment": (
+                "copy this Gateway-owned role prefix exactly, then copy "
+                "the returned handle into the same named declaration field"
+            ),
+        }
+
+    forbidden_inputs = [
+        "native_request",
+        "model_invented_object_path",
+        "object_type",
+        "metadata_scope",
+        "waapi_args",
+        "waapi_options",
+    ]
+    business_contract = operation_business_contract(
+        record.operation,
+        record.version,
+    )
+    if not (adapter.supports_field_binding or adapter.supports_field_discovery):
+        object_binding = {
+            **object_binding,
+            "use_only_for": business_contract["binding"]["roles"],
+            "role_assignment": (
+                "bind_each_required_role_then_copy_its_returned_handle_into_"
+                "the_same_named_declaration_field"
+            ),
+        }
+    if adapter.family == "object-lifecycle":
+        roles = list(business_contract["binding"]["roles"])
+
+        def lifecycle_object_binding(next_role: str) -> dict[str, Any]:
+            result = (
+                role_object_binding(next_role)
+                if len(roles) > 1
+                else dict(object_binding)
+            )
+            result["result"] = (
+                "gateway_stores_the_bound_role;_do_not_copy_the_handle_into_"
+                "the_declaration"
+            )
+            result["role_assignment"] = (
+                "the_Gateway-owned_route_fixes_the_role_and_the_Draft_keeps_"
+                "the_returned_handle"
+                if len(roles) > 1
+                else "the_Draft_keeps_the_single_returned_handle"
+            )
+            return result
+
+        shared = {
+            "contract": "waapi-skill.business-draft-next-action/v1",
+            "responsibility_split": {
+                "agent": "natural_language_to_closed_object_lifecycle_outcome",
+                "gateway": (
+                    "bound_objects_and_business_values_to_exact_waapi_preview"
+                ),
+            },
+            "business_contract": business_contract,
+            "forbidden_inputs": [
+                *forbidden_inputs,
+                "native_request",
+                "native_object_identity",
+                "object_handle",
+                "parent_handle",
+                "request_fragment",
+            ],
+            "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+            "then_read_next_response": True,
+            "precompute_or_increment_revision": False,
+        }
+        if session is None:
+            return {
+                **shared,
+                "required_next_phase": "bind_next_object_lifecycle_role",
+                "object_binding": lifecycle_object_binding(roles[0]),
+            }
+        handles_by_role = _object_lifecycle_handles_by_role(session, roles)
+        if session.declarations:
+            return {
+                **shared,
+                "required_next_phase": "check_complete_business_declaration",
+                "check": {
+                    **operation_draft_prefix_copy_binding(check),
+                    "append": [],
+                },
+            }
+        next_role = next(
+            (role for role in roles if role not in handles_by_role),
+            None,
+        )
+        if next_role is not None:
+            return {
+                **shared,
+                "required_next_phase": "bind_next_object_lifecycle_role",
+                "object_binding": lifecycle_object_binding(next_role),
+            }
+        declaration_append: list[str] = []
+        if record.operation == "object.setName":
+            declaration_append.extend(["--new-name", "<exact-new-name>"])
+        elif record.operation == "object.setNotes":
+            declaration_append.extend(["--notes", "<exact-notes>"])
+        optional_fields = business_contract["declaration"]["optional_fields"]
+        if "name_conflict" in optional_fields:
+            declaration_append.append("[--name-conflict fail|rename]")
+        if "add_to_source_control" in optional_fields:
+            declaration_append.append(
+                "[--add-to-source-control|--no-add-to-source-control]"
+            )
+        if "check_out_from_source_control" in optional_fields:
+            declaration_append.append(
+                "[--check-out-from-source-control|--no-check-out-from-source-control]"
+            )
+        return {
+            **shared,
+            "required_next_phase": "declare_complete_object_change",
+            "declaration": {
+                **operation_draft_prefix_copy_binding(
+                    declare_object_change_prefix,
+                    append_action=(
+                        "copy_verbatim_then_append_only_the_disclosed_business_values"
+                    ),
+                ),
+                "append": declaration_append,
+                "opaque_handles_inferred_from_bound_roles": True,
+                "submit_once": True,
+            },
+        }
+    if adapter.family == "soundengine-control-business":
+        roles = business_contract["binding"].get(
+            "required_roles",
+            business_contract["binding"]["roles"],
+        )
+        shared = {
+            "contract": "waapi-skill.business-draft-next-action/v1",
+            "responsibility_split": {
+                "agent": "natural_language_to_closed_soundengine_outcome",
+                "gateway": (
+                    "business_outcome_to_exact_native_request_preview_and_lifecycle"
+                ),
+            },
+            "business_contract": business_contract,
+            "forbidden_inputs": [
+                *forbidden_inputs,
+                "native_soundengine_id",
+                "native_overload_branch",
+                "native_array",
+                "wire_type",
+                "complete_request",
+            ],
+            "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+            "then_read_next_response": True,
+            "precompute_or_increment_revision": False,
+        }
+        if session is not None and adapter.is_complete(session):
+            return {
+                **shared,
+                "required_next_phase": "check_complete_soundengine_plan",
+                "check": {
+                    **operation_draft_prefix_copy_binding(check),
+                    "append": [],
+                },
+            }
+        bound_roles = (
+            set()
+            if session is None
+            else {
+                row.get("role")
+                for row in session.handles.as_dict()["objects"]
+                if isinstance(row, Mapping) and isinstance(row.get("role"), str)
+            }
+        )
+        next_role = next((role for role in roles if role not in bound_roles), None)
+        if next_role is not None:
+            role_binding = role_object_binding(next_role)
+            exact_type = {
+                "event": "Event",
+                "state_group": "StateGroup",
+                "state": "State",
+                "switch_group": "SwitchGroup",
+                "switch": "Switch",
+                "trigger": "Trigger",
+                "game_parameter": "GameParameter",
+                "sound_bank": "SoundBank",
+                "aux_bus": "AuxBus",
+            }.get(next_role)
+            if exact_type is not None:
+                exact_name = operation_draft_prefix_copy_binding(
+                    [
+                        *object_bind_prefix,
+                        "--role",
+                        next_role,
+                        "--exact-type-name",
+                        exact_type,
+                    ]
+                )
+                exact_name["append"] = [
+                    f"<exact-{next_role.replace('_', '-')}-name>"
+                ]
+                role_binding = {
+                    **role_binding,
+                    "by_exact_name": exact_name,
+                    "direct_query_before_binding": "forbidden",
+                    "selection_rule": (
+                        "user_supplied_exact_name_uses_by_exact_name; "
+                        "user_supplied_complete_path_uses_by_path_segments; "
+                        "user_selected_guid_uses_by_id"
+                    ),
+                    "name_rule": (
+                        f"the_gateway_fixes_type_{exact_type}_and_requires_one_"
+                        "unique_exact_name_match"
+                    ),
+                }
+            return {
+                **shared,
+                "required_next_phase": "bind_next_soundengine_role",
+                "object_binding": role_binding,
+            }
+        declaration = {
+            **operation_draft_prefix_copy_binding(
+                declare_soundengine_plan_prefix,
+                append_action=(
+                    "copy_verbatim_then_append_one_complete_soundengine_plan"
+                ),
+            ),
+            "append_fields": business_contract["declaration"],
+            "append": {
+                "ak.soundengine.postMsgMonitor": [
+                    "--monitor-message <exact-bounded-message>"
+                ],
+                "ak.soundengine.registerGameObj": [
+                    "--game-object-name <exact-runtime-game-object-name>"
+                ],
+                "ak.soundengine.unregisterGameObj": [
+                    "--game-object-handle <gateway-runtime-game-object-handle>"
+                ],
+                "ak.soundengine.postEvent": [
+                    "--event-handle <bound-event-handle>",
+                    *(
+                        ["--game-object-handle <gateway-runtime-game-object-handle>"]
+                        if record.version in {"2021.1", "2022.1", "2023.1"}
+                        else [
+                            "[--game-object-handle <gateway-runtime-game-object-handle>]"
+                        ]
+                    ),
+                ],
+                "ak.soundengine.stopPlayingID": [
+                    "--playing-handle <gateway-runtime-playing-handle>",
+                    "[--fade-duration-ms <nonnegative-whole-milliseconds>]",
+                    "[--fade-curve <Log3|Sine|Log1|InvSCurve|Linear|SCurve|Exp1|SineRecip|Exp3>]",
+                ],
+                "ak.soundengine.executeActionOnEvent": [
+                    "--event-handle <bound-event-handle>",
+                    "--action <Stop|Pause|Resume|Break|ReleaseEnvelope>",
+                    "[--game-object-handle <gateway-runtime-game-object-handle>]",
+                    "[--fade-duration-ms <nonnegative-whole-milliseconds>]",
+                    "[--fade-curve <Log3|Sine|Log1|InvSCurve|Linear|SCurve|Exp1|SineRecip|Exp3>]",
+                ],
+                "ak.soundengine.stopAll": [
+                    "[--game-object-handle <gateway-runtime-game-object-handle>]",
+                ],
+                "ak.soundengine.seekOnEvent": [
+                    "--event-handle <bound-event-handle>",
+                    "<exactly-one-of --position-ms <whole-ms> | --position-percent <0..100>>",
+                    "[--playing-handle <gateway-runtime-playing-handle> | --game-object-handle <gateway-runtime-game-object-handle>]",
+                    "[--nearest-marker]",
+                ],
+                "ak.soundengine.setState": [
+                    "--state-group-handle <bound-state-group-handle>",
+                    "--state-handle <bound-direct-child-state-handle>",
+                ],
+                "ak.soundengine.setSwitch": [
+                    "--switch-group-handle <bound-switch-group-handle>",
+                    "--switch-handle <bound-direct-child-switch-handle>",
+                    *(
+                        ["--game-object-handle <gateway-runtime-game-object-handle>"]
+                        if record.version in {"2021.1", "2022.1"}
+                        else ["[--game-object-handle <gateway-runtime-game-object-handle>]"]
+                    ),
+                ],
+                "ak.soundengine.postTrigger": [
+                    "--trigger-handle <bound-trigger-handle>",
+                    *(
+                        ["--game-object-handle <gateway-runtime-game-object-handle>"]
+                        if record.version in {"2021.1", "2022.1"}
+                        else ["[--game-object-handle <gateway-runtime-game-object-handle>]"]
+                    ),
+                ],
+                "ak.soundengine.setRTPCValue": [
+                    "--game-parameter-handle <bound-game-parameter-handle>",
+                    "--value <finite-business-value>",
+                    *(
+                        ["--game-object-handle <gateway-runtime-game-object-handle>"]
+                        if record.version in {"2021.1", "2022.1"}
+                        else ["[--game-object-handle <gateway-runtime-game-object-handle>]"]
+                    ),
+                ],
+                "ak.soundengine.resetRTPCValue": [
+                    "--game-parameter-handle <bound-game-parameter-handle>",
+                    *(
+                        ["--game-object-handle <gateway-runtime-game-object-handle>"]
+                        if record.version in {"2021.1", "2022.1"}
+                        else ["[--game-object-handle <gateway-runtime-game-object-handle>]"]
+                    ),
+                ],
+                "ak.soundengine.loadBank": [
+                    "--sound-bank-handle <bound-sound-bank-handle>",
+                ],
+                "ak.soundengine.unloadBank": [
+                    "--sound-bank-handle <bound-sound-bank-handle>",
+                ],
+                "ak.soundengine.setDefaultListeners": [
+                    "<exactly-one-of --listener-handle <gateway-runtime-game-object-handle> [repeat] | --clear-listeners>",
+                ],
+                "ak.soundengine.setListeners": [
+                    "--emitter-handle <gateway-runtime-game-object-handle>",
+                    "<exactly-one-of --listener-handle <gateway-runtime-game-object-handle> [repeat] | --clear-listeners>",
+                ],
+                "ak.soundengine.setPosition": [
+                    "--game-object-handle <gateway-runtime-game-object-handle>",
+                    "--position-frame <x> <y> <z> <front-x> <front-y> <front-z> <top-x> <top-y> <top-z>",
+                ],
+                "ak.soundengine.setMultiplePositions": [
+                    "--game-object-handle <gateway-runtime-game-object-handle>",
+                    "--multi-position-mode <SingleSource|MultiSources|MultiDirections>",
+                    "--position-frame <x> <y> <z> <front-x> <front-y> <front-z> <top-x> <top-y> <top-z> [repeat for each frame]",
+                ],
+                "ak.soundengine.setObjectObstructionAndOcclusion": [
+                    "--emitter-handle <gateway-runtime-game-object-handle>",
+                    "--listener-handle <gateway-runtime-game-object-handle>",
+                    "--obstruction-percent <0..100>",
+                    "--occlusion-percent <0..100>",
+                ],
+                "ak.soundengine.setScalingFactor": [
+                    "--game-object-handle <gateway-runtime-game-object-handle>",
+                    "--attenuation-scale-percent <positive-percentage>",
+                ],
+                "ak.soundengine.setGameObjectOutputBusVolume": [
+                    "--emitter-handle <gateway-runtime-game-object-handle>",
+                    "--listener-handle <gateway-runtime-game-object-handle>",
+                    "--volume-db <finite-decibels>",
+                ],
+                "ak.soundengine.setListenerSpatialization": [
+                    "--listener-handle <gateway-runtime-game-object-handle>",
+                    "--spatialization <enabled|disabled>",
+                    "<exactly-one-of --channel-layout <1.0|1.1|2.0|2.1|3.0|3.1|4.0|4.1|5.0|5.1|6.0|6.1|7.0|7.1> | --channel-layout-kind Standard --channel-speaker <Wwise-speaker-name> [repeat] | --channel-layout-kind <Anonymous|Ambisonic> --channel-count <channels> | --channel-layout-kind Objects>",
+                    "[--speaker-offset-db <standard-speaker-name> <decibels>] [repeat per changed standard speaker]",
+                    "[--channel-offset-db <one-based-channel-index> <decibels>] [repeat per changed Anonymous or Ambisonic channel]",
+                ],
+                "ak.soundengine.setGameObjectAuxSendValues": [
+                    "--emitter-handle <gateway-runtime-game-object-handle>",
+                    "<exactly-one-of --aux-send <listener-game-object-handle> <bound-aux-bus-handle> <0..100-percent> [repeat 1..4] | --clear-aux-sends>",
+                ],
+            }[record.operation],
+            "submit_once": True,
+            "native_request_input": "forbidden",
+        }
+        if record.operation == "ak.soundengine.setGameObjectAuxSendValues":
+            declaration["optional_aux_bus_binding"] = {
+                **role_object_binding("aux_bus"),
+                "repeat": "bind once for each distinct Aux Bus, maximum four",
+                "skip_only_when": "--clear-aux-sends is the complete user intent",
+            }
+        return {
+            **shared,
+            "required_next_phase": "declare_complete_soundengine_plan",
+            "declaration": declaration,
+        }
+    if adapter.family == "runtime-control-business":
+        roles = business_contract["binding"]["roles"]
+        shared = {
+            "contract": "waapi-skill.business-draft-next-action/v1",
+            "responsibility_split": {
+                "agent": "natural_language_to_closed_runtime_control_outcome",
+                "gateway": (
+                    "business_outcome_to_exact_native_request_preview_and_lifecycle"
+                ),
+            },
+            "business_contract": business_contract,
+            "forbidden_inputs": [
+                *forbidden_inputs,
+                "native_cursor_enum",
+                "native_runtime_handle",
+                "complete_request",
+            ],
+            "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+            "then_read_next_response": True,
+            "precompute_or_increment_revision": False,
+        }
+        if session is not None and adapter.is_complete(session):
+            return {
+                **shared,
+                "required_next_phase": "check_complete_runtime_control_plan",
+                "check": {
+                    **operation_draft_prefix_copy_binding(check),
+                    "append": [],
+                },
+            }
+        bound_roles = (
+            set()
+            if session is None
+            else {
+                row.get("role")
+                for row in session.handles.as_dict()["objects"]
+                if isinstance(row, Mapping) and isinstance(row.get("role"), str)
+            }
+        )
+        next_role = next((role for role in roles if role not in bound_roles), None)
+        if next_role is not None:
+            return {
+                **shared,
+                "required_next_phase": "bind_next_runtime_control_role",
+                "object_binding": role_object_binding(next_role),
+            }
+        append_by_operation = {
+            "ak.wwise.core.profiler.moveCursor": [
+                "--cursor-move first-frame|last-frame|next-frame|previous-frame"
+            ],
+            "ak.wwise.core.profiler.setCursorTime": [
+                "--cursor-target-ms <non-negative-integer-milliseconds>"
+            ],
+            "ak.wwise.core.profiler.enableProfilerData": [
+                "--capture-data <disclosed-version-data-set> enable|disable (repeat)"
+            ],
+            "ak.wwise.core.log.addItem": [
+                "--message <exact-bounded-message>",
+                "[--log-channel <disclosed-log-view>]",
+                "[--severity message|warning|error|fatal]",
+            ],
+            "ak.wwise.core.log.clear": [
+                "--log-channel <disclosed-log-view>"
+            ],
+            "ak.wwise.core.remote.connect": [
+                "--remote-host <exact-host-or-prof-capture>",
+                "[--application-name <exact-application-name>]",
+                "[--command-port <1..65535>]",
+                *(
+                    ["[--notification-port <1..65535>] (Wwise 2021.1 only)"]
+                    if record.version == "2021.1"
+                    else []
+                ),
+            ],
+            "ak.wwise.core.transport.create": [
+                "--target-handle <bound-target-handle>",
+                "[--game-object-id <unsigned-64-bit-id>]",
+            ],
+            "ak.wwise.core.transport.destroy": [
+                "--transport-handle <gateway-transport-session-handle>"
+            ],
+            "ak.wwise.core.transport.executeAction": [
+                "--audition-action play|stop|pause|toggle-play-stop|play-directly",
+                "--transport-scope one-transport|all-active",
+                "[--transport-handle <gateway-transport-session-handle>]",
+            ],
+            "ak.wwise.core.transport.prepare": [
+                "--target-handle <bound-target-handle>"
+            ],
+            "ak.wwise.core.transport.useOriginals": [
+                "--audition-media originals|converted"
+            ],
+            "ak.wwise.core.profiler.registerMeter": [
+                "--meter-object-handle <bound-meter-object-handle>"
+            ],
+            "ak.wwise.core.profiler.unregisterMeter": [
+                "--meter-object-handle <bound-meter-object-handle>"
+            ],
+            "ak.wwise.core.profiler.saveCapture": [
+                "--capture-output-directory <exact-authorized-absolute-directory>",
+                "--capture-name <host-valid-capture-name>",
+            ],
+        }
+        declaration = {
+            **operation_draft_prefix_copy_binding(
+                declare_runtime_control_plan_prefix,
+                append_action=(
+                    "copy_verbatim_then_append_one_complete_runtime_control_plan"
+                ),
+            ),
+            "append_fields": business_contract["declaration"],
+            "append": append_by_operation[record.operation],
+            "submit_once": True,
+            "native_request_input": "forbidden",
+        }
+        return {
+            **shared,
+            "required_next_phase": "declare_complete_runtime_control_plan",
+            "declaration": declaration,
+        }
+    if adapter.family == "project-setting-business":
+        roles = business_contract["binding"]["roles"]
+        shared = {
+            "contract": "waapi-skill.business-draft-next-action/v1",
+            "responsibility_split": {
+                "agent": "natural_language_to_closed_project_setting_outcome",
+                "gateway": "bound_objects_and_business_values_to_exact_waapi_preview",
+            },
+            "business_contract": business_contract,
+            "forbidden_inputs": [
+                *forbidden_inputs,
+                "native_curve_update_enum",
+                "complete_request",
+            ],
+            "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+            "then_read_next_response": True,
+            "precompute_or_increment_revision": False,
+        }
+        if session is not None and adapter.is_complete(session):
+            return {
+                **shared,
+                "required_next_phase": "check_complete_project_setting_plan",
+                "check": {
+                    **operation_draft_prefix_copy_binding(check),
+                    "append": [],
+                },
+            }
+        declaration = {
+            **operation_draft_prefix_copy_binding(
+                declare_project_setting_plan_prefix,
+                append_action=(
+                    "copy_verbatim_then_append_one_complete_project_setting_plan"
+                ),
+            ),
+            "append_fields": business_contract["declaration"],
+            "append": (
+                [
+                    "--game-parameter-handle <bound-game-parameter-handle>",
+                    "--minimum <finite-number>",
+                    "--maximum <finite-number>",
+                    "--curve-update-outcome stretch|preserve-x",
+                ]
+                if record.operation == "ak.wwise.core.gameParameter.setRange"
+                else [
+                    "--sound-handle <bound-sound-handle>",
+                    "--source-handle <bound-audio-file-source-handle>",
+                    "[--platform-name <exact-installed-platform-name>]",
+                ]
+            ),
+            "submit_once": True,
+            "native_request_input": "forbidden",
+        }
+        bound_roles = (
+            set()
+            if session is None
+            else {
+                row.get("role")
+                for row in session.handles.as_dict()["objects"]
+                if isinstance(row, Mapping) and isinstance(row.get("role"), str)
+            }
+        )
+        next_role = next((role for role in roles if role not in bound_roles), None)
+        if next_role is not None:
+            role_binding = role_object_binding(next_role)
+            if next_role == "game_parameter":
+                exact_name = operation_draft_prefix_copy_binding(
+                    [
+                        *object_bind_prefix,
+                        "--role",
+                        next_role,
+                        "--exact-type-name",
+                        "GameParameter",
+                    ]
+                )
+                exact_name["append"] = ["<exact-game-parameter-name>"]
+                role_binding = {
+                    **role_binding,
+                    "by_exact_name": exact_name,
+                    "direct_query_before_binding": "forbidden",
+                    "selection_rule": (
+                        "user_supplied_exact_game_parameter_name_uses_by_exact_name; "
+                        "user_supplied_complete_path_uses_by_path_segments; "
+                        "user_selected_guid_uses_by_id"
+                    ),
+                    "name_rule": (
+                        "the_gateway_fixes_type_GameParameter_and_requires_one_"
+                        "unique_exact_name_match"
+                    ),
+                }
+            return {
+                **shared,
+                "required_next_phase": "bind_next_project_setting_role",
+                "object_binding": role_binding,
+            }
+        return {
+            **shared,
+            "required_next_phase": "declare_complete_project_setting_plan",
+            "declaration": declaration,
+        }
+    if adapter.family == "source-control-business":
+        shared = {
+            "contract": "waapi-skill.business-draft-next-action/v1",
+            "responsibility_split": {
+                "agent": "natural_language_to_closed_source_control_file_action",
+                "gateway": (
+                    "live_roots_and_file_locators_to_exact_absolute_paths_and_preview"
+                ),
+            },
+            "business_contract": business_contract,
+            "forbidden_inputs": [
+                *forbidden_inputs,
+                "native_absolute_path_for_project_or_originals_locator",
+                "source_control_provider_credentials",
+                "complete_request",
+            ],
+            "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+            "then_read_next_response": True,
+            "precompute_or_increment_revision": False,
+        }
+        if session is not None and adapter.is_complete(session):
+            return {
+                **shared,
+                "required_next_phase": "check_complete_source_control_plan",
+                "check": {
+                    **operation_draft_prefix_copy_binding(check),
+                    "append": [],
+                },
+            }
+        return {
+            **shared,
+            "required_next_phase": "declare_complete_source_control_plan",
+            "declaration": {
+                **operation_draft_prefix_copy_binding(
+                    declare_source_control_plan_prefix,
+                    append_action=(
+                        "copy_verbatim_then_append_one_complete_source_control_plan"
+                    ),
+                ),
+                "append_fields": business_contract["declaration"],
+                "file_locator_flags": {
+                    "project-relative": "--project-file <exact-relative-path>",
+                    "originals-relative": "--originals-file <exact-relative-path>",
+                    "exact-user-path-under-io-root": [
+                        "--exact-file <exact-absolute-path>",
+                        "--io-root <exact-approved-absolute-root>",
+                    ],
+                },
+                "move_pair_flag": (
+                    "--move <project|originals|exact> <source-path> "
+                    "<project|originals|exact> <destination-path>"
+                ),
+                "stable_scalar_flags": {
+                    "commit_message": "--commit-message <exact-user-message>",
+                    "usage_scope": "--usage-scope <all|used|unused>",
+                    "originals_folder": "--originals-folder <exact-relative-folder>",
+                    "recursive": "--recursive | --no-recursive",
+                    "include_usage_objects": (
+                        "--include-usage-objects | --no-usage-objects"
+                    ),
+                    "max_results": "--max-results <1..1000>",
+                },
+                "submit_once": True,
+                "native_request_input": "forbidden",
+            },
+        }
+    if adapter.family == "core-project-object":
+        roles = business_contract["binding"]["roles"]
+
+        def core_role_binding() -> dict[str, Any]:
+            if len(roles) == 1:
+                return {
+                    **role_object_binding(roles[0]),
+                    "repeat_until": (
+                        "every_object_for_this_business_role_is_bound"
+                    ),
+                }
+            return {
+                "role_routes": {
+                    role: role_object_binding(role) for role in roles
+                },
+                "selection_rule": (
+                    "choose_the_business_role_then_copy_only_its_"
+                    "Gateway_owned_binding_route"
+                ),
+                "result": (
+                    "copy_each_returned_handle_into_the_same_named_"
+                    "declaration_field"
+                ),
+            }
+
+        core_field_types = business_contract["declaration"]["field_types"]
+        needs_field_discovery = any(
+            value_type in {"bound_field_handle", "bound_field_handle_list"}
+            for value_type in core_field_types.values()
+        )
+        shared = {
+            "contract": "waapi-skill.business-draft-next-action/v1",
+            "responsibility_split": {
+                "agent": "natural_language_to_closed_high_level_business_facts",
+                "gateway": "business_facts_to_exact_waapi_request_and_execution_plan",
+            },
+            "business_contract": business_contract,
+            "forbidden_inputs": [
+                *forbidden_inputs,
+                "native_field_name",
+                "native_enum_token",
+                "complete_request",
+            ],
+            "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+            "then_read_next_response": True,
+            "precompute_or_increment_revision": False,
+        }
+        if session is not None and adapter.is_complete(session):
+            return {
+                **shared,
+                "required_next_phase": "check_complete_core_plan",
+                "check": {
+                    **operation_draft_prefix_copy_binding(check),
+                    "append": [],
+                },
+            }
+        declaration = {
+            **operation_draft_prefix_copy_binding(
+                declare_core_plan_prefix,
+                append_action=(
+                    "copy_verbatim_then_append_one_complete_core_business_plan"
+                ),
+            ),
+            "append_fields": business_contract["declaration"],
+            "submit_once": True,
+            "native_request_input": "forbidden",
+        }
+        field_discovery = {
+            **operation_draft_prefix_copy_binding(field_discover_prefix),
+            "append": [
+                "--object-handle",
+                "<bound-field-owner-handle>",
+                "[--platform <exact-user-requested-platform>]",
+            ],
+            "append_repeated": [
+                "--meaning",
+                "<user-facing-field-meaning>",
+            ],
+            "meaning_count": (
+                f"1..{MAX_METADATA_DISCOVERY_QUERIES}_distinct_meanings"
+            ),
+            "result": (
+                "copy_exactly_one_meaning_results[].candidates[].handle_"
+                "per_requested_meaning"
+            ),
+            "token_input": "forbidden",
+        }
+        if session is None and roles:
+            return {
+                **shared,
+                "required_next_phase": "bind_remaining_core_roles",
+                "object_binding": core_role_binding(),
+                "declaration": declaration,
+                **(
+                    {"field_discovery": field_discovery}
+                    if needs_field_discovery
+                    else {}
+                ),
+            }
+        return {
+            **shared,
+            "required_next_phase": "declare_complete_core_plan",
+            **(
+                {
+                    "object_binding": core_role_binding()
+                }
+                if roles
+                else {}
+            ),
+            "declaration": declaration,
+            **(
+                {"field_discovery": field_discovery}
+                if needs_field_discovery
+                else {}
+            ),
+        }
+    if adapter.family == "compound-undo-business":
+        shared = {
+            "contract": "waapi-skill.business-draft-next-action/v1",
+            "responsibility_split": business_contract["responsibility_split"],
+            "business_contract": business_contract,
+            "forbidden_inputs": [
+                *forbidden_inputs,
+                "child_call_handle",
+                "child_schema_digest",
+                "child_native_request",
+                "action_ordering_grammar",
+                "begin_group_call",
+                "end_group_call",
+                "cancel_group_call",
+                "revision_arithmetic",
+            ],
+            "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+            "then_read_next_response": True,
+            "precompute_or_increment_revision": False,
+        }
+        if session is not None and adapter.is_complete(session):
+            return {
+                **shared,
+                "required_next_phase": "check_complete_compound_undo_plan",
+                "check": {
+                    **operation_draft_prefix_copy_binding(check),
+                    "append": [],
+                },
+            }
+        start_child_prefix = [
+            *base,
+            "draft-start-undo-child",
+            record.draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            str(record.revision),
+        ]
+        return {
+            **shared,
+            "required_next_phase": "declare_ordered_checked_child_business_drafts",
+            "start_child": {
+                **operation_draft_prefix_copy_binding(start_child_prefix),
+                "append": ["--operation <eligible-child-operation>"],
+                "eligible_operations": sorted(
+                    compound_business_child_operations(record.version)
+                ),
+                "result": (
+                    "complete_the_returned_child_business_draft_until_its_"
+                    "compound_handoff;_never_preview_the_child"
+                ),
+            },
+            "declaration": {
+                **operation_draft_prefix_copy_binding(
+                    declare_undo_plan_prefix,
+                    append_action=(
+                        "copy_verbatim_then_append_display_name_and_each_checked_"
+                        "child_draft_in_user_requested_order"
+                    ),
+                ),
+                "append": [
+                    "--display-name <user-facing-Wwise-Undo-step-name>",
+                    "--child-draft <checked-child-draft-id> <its-task-authority> [--child-draft ...]",
+                ],
+                "order_rule": "repeat_child_draft_in_exact_user_requested_execution_order",
+                "order_ownership": {
+                    "business_sequence": "caller_owned_stable_business_value",
+                    "native_phase_dependencies": (
+                        "gateway_owned_begin_then_business_sequence_then_end_"
+                        "with_cancel_on_failure"
+                    ),
+                    "dependency_edges_input": "forbidden",
+                },
+                "child_prerequisite": (
+                    "each_child_is_a_current_revision_draft-check-passed_closed_"
+                    "business_draft_for_this_project_and_version_with_a_supported_"
+                    "business_outcome_verifier; generic_typed_children_are_"
+                    "prohibited_until_their_separate_interface_depth_migration"
+                ),
+                "submit_once": True,
+                "native_request_input": "forbidden",
+            },
+        }
+    if adapter.family == "debug-host-control":
+        shared = {
+            "contract": "waapi-skill.business-draft-next-action/v1",
+            "responsibility_split": business_contract["responsibility_split"],
+            "business_contract": business_contract,
+            "forbidden_inputs": [
+                *forbidden_inputs,
+                "acknowledgement_literal",
+                "native_uri",
+                "native_request",
+                "waapi_args",
+                "waapi_options",
+                "disconnect_classification",
+                "retry_or_reconnect_plan",
+            ],
+            "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+            "then_read_next_response": True,
+            "precompute_or_increment_revision": False,
+        }
+        if session is not None and adapter.is_complete(session):
+            return {
+                **shared,
+                "required_next_phase": "check_complete_debug_business_intent",
+                "check": {
+                    **operation_draft_prefix_copy_binding(check),
+                    "append": [],
+                },
+            }
+        append = (
+            ["exactly one of --enable or --disable"]
+            if record.operation
+            in {"debug.setAsserts", "debug.setAutomationMode"}
+            else []
+        )
+        return {
+            **shared,
+            "required_next_phase": "declare_debug_business_intent",
+            "declaration": {
+                **operation_draft_prefix_copy_binding(
+                    declare_debug_intent_prefix,
+                    append_action=(
+                        "copy_verbatim_then_append_the_stable_boolean_outcome"
+                        if append
+                        else "copy_and_execute_verbatim_once"
+                    ),
+                ),
+                "append": append,
+                "submit_once": True,
+                "native_request_input": "forbidden",
+            },
+        }
+    if adapter.family == "authoring-ui-business":
+        shared = {
+            "contract": "waapi-skill.business-draft-next-action/v1",
+            "responsibility_split": operation_business_contract(
+                record.operation,
+                record.version,
+            )["responsibility_split"],
+            "business_contract": operation_business_contract(
+                record.operation,
+                record.version,
+            ),
+            "forbidden_inputs": [
+                *forbidden_inputs,
+                "native_command_id_for_registration",
+                "source_authority",
+                "host_platform",
+                "acknowledgement_literal",
+                "native_request",
+                "revision_arithmetic",
+                "request_fragment",
+            ],
+            "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+            "then_read_next_response": True,
+            "precompute_or_increment_revision": False,
+        }
+        if record.operation in {
+            "ui.commands.execute",
+            "ui.commands.register",
+            "ui.commands.unregister",
+        }:
+            shared["fresh_command_inventory"] = {
+                "owner": "gateway",
+                "agent_action": (
+                    "declare_the_user_requested_business_choice_without_an_"
+                    "extra_getCommands_or_request_schema_call"
+                ),
+                "validation_timing": "immediately_before_dispatch",
+            }
+        if session is not None and adapter.is_complete(session):
+            return {
+                **shared,
+                "required_next_phase": "check_complete_authoring_ui_plan",
+                "check": {
+                    **operation_draft_prefix_copy_binding(check),
+                    "append": [],
+                },
+            }
+        if record.operation == "ui.commands.register" and session is not None:
+            raw_plan = session.settings.get("ui_plan")
+            commands = raw_plan.get("commands") if isinstance(raw_plan, Mapping) else None
+            expected = raw_plan.get("command_count") if isinstance(raw_plan, Mapping) else None
+            next_index = len(commands) if isinstance(commands, list) else 0
+            handler_kinds = ["notification", "program"]
+            if record.version in {"2023.1", "2024.1", "2025.1"}:
+                handler_kinds.append("lua_script")
+            return {
+                **shared,
+                "required_next_phase": "add_next_complete_ui_command",
+                "command_index": next_index,
+                "expected_command_count": expected,
+                "declaration": {
+                    **operation_draft_prefix_copy_binding(
+                        add_ui_command_prefix,
+                        append_action="copy_verbatim_then_append_one_complete_ui_command",
+                    ),
+                    "append": [
+                        "--key <stable-business-command-key>",
+                        "--display-name <user-facing-name>",
+                        f"--handler-kind {'|'.join(handler_kinds)}",
+                        "[--handler-path <exact-user-supplied-existing-path>]",
+                        "[--argument-token <one-exact-token>]... (lua_script only)",
+                        "[--working-directory <exact-existing-directory>]",
+                        "[--start-mode SingleSelectionSingleProcess|MultipleSelectionSingleProcessSpaceSeparated|MultipleSelectionMultipleProcesses]",
+                        "[--redirect-outputs] (program/Windows only)",
+                        "[--lua-module-directory <exact-existing-directory>]...",
+                        "[--lua-selected-return <field>]...",
+                        "[--default-shortcut <shortcut>]",
+                        "[--context-menu-segment <Wwise-menu-segment>]...",
+                        "[--context-visible-for <Wwise-object-type>]...",
+                        "[--context-enabled-for <Wwise-object-type>]...",
+                        "[--main-menu-segment <Wwise-menu-segment>]...",
+                    ],
+                    "submit_once": True,
+                },
+            }
+        shapes = {
+            "ui.captureScreen": [
+                "[--view-name <exact-Wwise-view-name>]",
+                "[--view-channel 1|2|3|4]",
+                "[--rect <x> <y> <width> <height>]",
+            ],
+            "ui.commands.execute": [
+                "--command-id <exact-user-requested-command-choice>",
+                "[--command-object <exact-object-guid-or-command-operand>]...",
+                "[--command-platform <exact-project-platform>]...",
+                "[--value string|boolean|integer|number|null <exact-value>]",
+                "[--command-file <exact-user-supplied-file>]... (2025.1 only)",
+            ],
+            "ui.commands.register": [
+                "--command-count <number-of-user-requested-commands-1-to-32>",
+            ],
+            "ui.commands.unregister": [
+                "either --registered-command-key <Gateway-derived-registration-key> [...]",
+                "or --existing-command-id <exact-id-from-fresh-getCommands-choice> [...] --confirm-unknown-ownership",
+            ],
+        }
+        return {
+            **shared,
+            "required_next_phase": "declare_authoring_ui_business_plan",
+            "declaration": {
+                **operation_draft_prefix_copy_binding(
+                    declare_ui_plan_prefix,
+                    append_action="copy_verbatim_then_append_one_complete_ui_business_plan",
+                ),
+                "append": shapes[record.operation],
+                "submit_once": True,
+            },
+        }
+    if adapter.family == "exact-artifact-code":
+        shared = {
+            "contract": "waapi-skill.business-draft-next-action/v1",
+            "responsibility_split": {
+                "agent": (
+                    "select_the_operation_and_copy_exact_user_artifacts_plus_"
+                    "closed_business_values"
+                ),
+                "gateway": (
+                    "derive_source_authority_io_root_native_loader_fields_"
+                    "request_order_and_serialization"
+                ),
+            },
+            "business_contract": business_contract,
+            "forbidden_inputs": [
+                *forbidden_inputs,
+                "source_authority",
+                "native_loader_field",
+                "luaScript",
+                "luaString",
+                "doFiles",
+                "luaPaths",
+                "requires",
+                "request_fragment",
+                "serialized_native_payload",
+            ],
+            "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+            "then_read_next_response": True,
+            "precompute_or_increment_revision": False,
+        }
+        if session is not None and session.settings:
+            return {
+                **shared,
+                "required_next_phase": "check_complete_business_declaration",
+                "check": {
+                    **operation_draft_prefix_copy_binding(check),
+                    "append": [],
+                },
+            }
+        binding_roles = business_contract["binding"]["roles"]
+        bound_roles = (
+            set()
+            if session is None
+            else {
+                row.get("role")
+                for row in session.handles.as_dict()["objects"]
+                if isinstance(row, Mapping)
+            }
+        )
+        missing_roles = [role for role in binding_roles if role not in bound_roles]
+        if missing_roles:
+            next_role = missing_roles[0]
+            return {
+                **shared,
+                "required_next_phase": "bind_exact_artifact_business_role",
+                "object_binding": role_object_binding(next_role),
+            }
+        declaration_shapes = {
+            "audio.importTabDelimited": [
+                "--table-file <exact-user-supplied-tsv-file>",
+                "--location-handle <bound-import-location-handle>",
+                "--language <exact-project-language>",
+                "[--mode create|reimport|replace]",
+                "[--add-to-source-control|--no-add-to-source-control]",
+                "[--check-out-from-source-control|--no-check-out-from-source-control] (2023.1+)",
+            ],
+            "lua.executeCliFile": [
+                "--script-file <exact-user-supplied-lua-file>",
+                "[--argument <key> string|boolean|integer|number|json|null <value>]...",
+                "[--watchdog-seconds <non-negative-integer>] (2024.1+)",
+            ],
+            "lua.executeCoreFile": [
+                "--script-file <exact-user-supplied-lua-file>",
+                "[--argument <key> string|boolean|integer|number|json|null <value>]...",
+            ],
+            "lua.executeCoreInline": [
+                "--lua-source <exact-user-supplied-utf8-source>",
+                "--io-root <exact-isolated-transaction-root>",
+                "[--argument <key> string|boolean|integer|number|json|null <value>]...",
+            ],
+        }
+        declaration_binding = {
+            **operation_draft_prefix_copy_binding(
+                declare_artifact_plan_prefix,
+                append_action=(
+                    "copy_verbatim_then_append_one_complete_exact_artifact_plan"
+                ),
+            ),
+            "append": declaration_shapes[record.operation],
+            "submit_once": True,
+            "native_request_input": "forbidden",
+        }
+        if record.operation.startswith("lua."):
+            declaration_binding["argument_types"] = {
+                "string": "exact_text_value",
+                "boolean": "true_or_false",
+                "integer": "strict_json_integer_not_a_native_width",
+                "number": "finite_json_number",
+                "json": "strict_json_object_or_array",
+                "null": "literal_null",
+            }
+        if record.operation == "audio.importTabDelimited":
+            declaration_binding["business_value_choices"] = {
+                "mode": {
+                    "create": "Wwise createNew",
+                    "reimport": "Wwise useExisting",
+                    "replace": "Wwise replaceExisting",
+                }
+            }
+        return {
+            **shared,
+            "required_next_phase": "declare_complete_exact_artifact_plan",
+            "declaration": declaration_binding,
+        }
+    if adapter.family == "cli-console-business":
+        declaration = business_contract["declaration"]
+        shared = {
+            "contract": "waapi-skill.business-draft-next-action/v1",
+            "responsibility_split": {
+                "agent": (
+                    "select_the_project_build_operation_and_supply_only_closed_"
+                    "business_values_and_exact_user_artifacts"
+                ),
+                "gateway": (
+                    "derive_native_cli_options_version_deltas_platform_mappings_"
+                    "io_root_ordering_and_shell_serialization"
+                ),
+            },
+            "business_contract": business_contract,
+            "forbidden_inputs": [
+                *forbidden_inputs,
+                "native_request",
+                "waapi_args",
+                "waapi_options",
+                "native_cli_option",
+                "custom_command",
+                "shell_fragment",
+                "request_fragment",
+            ],
+            "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+            "then_read_next_response": True,
+            "precompute_or_increment_revision": False,
+        }
+        if session is not None and adapter.is_complete(session):
+            return {
+                **shared,
+                "required_next_phase": "check_complete_cli_console_plan",
+                "check": {
+                    **operation_draft_prefix_copy_binding(check),
+                    "append": [],
+                },
+            }
+        return {
+            **shared,
+            "required_next_phase": "declare_complete_cli_console_plan",
+            "declaration": {
+                **operation_draft_prefix_copy_binding(
+                    declare_cli_console_plan_prefix,
+                    append_action=(
+                        "copy_verbatim_then_append_one_complete_cli_console_plan"
+                    ),
+                ),
+                "required_fields": list(declaration["required_fields"]),
+                "optional_fields": list(declaration["optional_fields"]),
+                "input_forms": dict(declaration["input_forms"]),
+                "submit_once": True,
+                "native_request_input": "forbidden",
+            },
+        }
+    if adapter.family == "host-ui-debug-business":
+        declaration = business_contract["declaration"]
+        shared = {
+            "contract": "waapi-skill.business-draft-next-action/v1",
+            "responsibility_split": business_contract["responsibility_split"],
+            "business_contract": business_contract,
+            "forbidden_inputs": [
+                *forbidden_inputs,
+                "native_request",
+                "waapi_args",
+                "waapi_options",
+                "waveform_channel_mask",
+                "native_project_policy_field",
+                "request_fragment",
+            ],
+            "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+            "then_read_next_response": True,
+            "precompute_or_increment_revision": False,
+        }
+        if session is not None and adapter.is_complete(session):
+            return {
+                **shared,
+                "required_next_phase": "check_complete_host_plan",
+                "check": {
+                    **operation_draft_prefix_copy_binding(check),
+                    "append": [],
+                },
+            }
+        return {
+            **shared,
+            "required_next_phase": "declare_complete_host_plan",
+            "declaration": {
+                **operation_draft_prefix_copy_binding(
+                    declare_host_plan_prefix,
+                    append_action=(
+                        "copy_verbatim_then_append_one_complete_host_plan"
+                    ),
+                ),
+                "required_fields": list(declaration["required_fields"]),
+                "optional_fields": list(declaration["optional_fields"]),
+                "input_forms": dict(declaration["input_forms"]),
+                "submit_once": True,
+                "native_request_input": "forbidden",
+            },
+        }
+    if adapter.family == "soundbank-planning":
+        def soundbank_role_route(role: str) -> dict[str, Any]:
+            role_prefix = [*object_bind_prefix, "--role", role]
+            role_by_id = operation_draft_prefix_copy_binding(role_prefix)
+            role_by_id["append"] = ["--object-id", "<exact-guid>"]
+            role_by_path_segments = operation_draft_prefix_copy_binding(
+                role_prefix
+            )
+            role_by_path_segments["append_repeated"] = [
+                "--object-path-segment",
+                "<one-exact-user-path-segment-without-separators>",
+            ]
+            role_by_path_segments["segment_order"] = "root_to_leaf"
+            route: dict[str, Any] = {
+                "fixed_role": role,
+                "by_id": role_by_id,
+                "by_path_segments": role_by_path_segments,
+                "result": "copy_the_returned_bound_object.handle",
+            }
+            if role == "soundbank":
+                role_exact_name = operation_draft_prefix_copy_binding(
+                    [*role_prefix, "--exact-type-name", "SoundBank"]
+                )
+                role_exact_name["append"] = ["<exact-object-name>"]
+                route["by_exact_name"] = role_exact_name
+            return route
+
+        soundbank_object_binding = {
+            "direct_query_before_binding": "forbidden",
+            "route_by_user_fact": {
+                "complete_object_path": "role_routes.<role>.by_path_segments",
+                "exact_soundbank_name": (
+                    "role_routes.soundbank.by_exact_name"
+                ),
+                "selected_guid": "role_routes.<role>.by_id",
+            },
+            "role_routes": {
+                role: soundbank_role_route(role)
+                for role in business_contract["binding"]["roles"]
+            },
+            "selection_rule": (
+                "choose_the_business_role_first_then_copy_its_disclosed_identity_route"
+            ),
+            "name_rule": (
+                "an_unscoped_soundbank_name_uses_the_soundbank_exact_name_route"
+            ),
+            "result_validation_rule": (
+                "compare_returned_name_type_path_to_the_user_target_before_using_"
+                "the_handle"
+            ),
+        }
+        shared = {
+            "contract": "waapi-skill.business-draft-next-action/v1",
+            "responsibility_split": {
+                "agent": "natural_language_to_closed_high_level_business_facts",
+                "gateway": "business_facts_to_exact_waapi_request_and_execution_plan",
+            },
+            "business_contract": business_contract,
+            "forbidden_inputs": [
+                *(
+                    item
+                    for item in forbidden_inputs
+                    if item != "object_type"
+                ),
+                "native_object_type_field",
+                "native_soundbank_row",
+                "identity_selector",
+                "skip_languages",
+                "write_to_disk",
+                "request_fragment",
+                "batch_layout",
+            ],
+            "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+            "then_read_next_response": True,
+            "precompute_or_increment_revision": False,
+        }
+        if session is not None and session.settings:
+            return {
+                **shared,
+                "required_next_phase": "check_complete_business_declaration",
+                "check": {
+                    **operation_draft_prefix_copy_binding(check),
+                    "append": [],
+                },
+            }
+        declaration_shapes = {
+            "soundbank.setInclusions": [
+                "--mode add|remove|replace",
+                "--soundbank-handle <bound-soundbank-handle>",
+                "[--inclusion <bound-object-handle> <one-or-more-unique-events|structures|media-filters>]...",
+            ],
+            "soundbank.generate": [
+                "--soundbank <bound-soundbank-handle> nonlocalized|localized|mixed",
+                "[--event <bound-soundbank-handle> <bound-event-handle>]...",
+                "[--aux-bus <bound-soundbank-handle> <bound-aux-bus-handle>]...",
+                "[--generation-inclusion <bound-soundbank-handle> <one-or-more-unique-events|structures|media-filters>]...",
+                "[--soundbank-rebuild <bound-soundbank-handle> true|false]...",
+                "--platform <project-platform-name> [--platform ...]",
+                "[--language <localized-project-language>]...",
+                "[--rebuild-soundbanks true|false]",
+                "[--clear-audio-file-cache true|false]",
+                "[--rebuild-init-bank true|false]",
+                "--io-root <exact-caller-owned-authority-root-containing-project-cache-"
+                "and-all-generated-output-not-the-final-output-directory>",
+            ],
+            "soundbank.convertExternalSources": [
+                "--source <exact-wsources-file> <project-platform-name> <exact-output-root>",
+                "[--source ...]...",
+                "--io-root <exact-isolated-root>",
+            ],
+            "soundbank.processDefinitionFiles": [
+                "--definition-file <exact-definition-file> [--definition-file ...]",
+                "--io-root <exact-isolated-root>",
+            ],
+        }
+        binding_roles = business_contract["binding"]["roles"]
+        result = {
+            **shared,
+            "required_next_phase": (
+                "bind_remaining_plan_objects_or_declare_complete_soundbank_plan"
+                if binding_roles
+                else "declare_complete_soundbank_plan"
+            ),
+        }
+        if binding_roles:
+            result["object_binding"] = {
+                **soundbank_object_binding,
+                "use_only_for": binding_roles,
+                "repeat_until": "every_object_named_by_the_business_plan_is_bound",
+            }
+        result["declaration"] = {
+            **operation_draft_prefix_copy_binding(
+                declare_soundbank_plan_prefix,
+                append_action=(
+                    "copy_verbatim_then_append_one_complete_soundbank_business_plan"
+                ),
+            ),
+            "append": declaration_shapes[record.operation],
+            "optional_field_policy": {
+                "append_only_when": "explicitly_present_in_user_request",
+                "unspecified": "omit",
+                "infer_defaults": False,
+            },
+            "submit_once": True,
+            "native_request_input": "forbidden",
+        }
+        return result
+    if session is None:
+        if role_declaration is not None:
+            next_role = role_declaration.roles[0]
+            return {
+                "contract": "waapi-skill.business-draft-next-action/v1",
+                "required_next_phase": "bind_remaining_switch_assignment_roles",
+                "responsibility_split": {
+                    "agent": "natural_language_to_closed_high_level_business_facts",
+                    "gateway": (
+                        "business_facts_to_exact_waapi_request_and_execution_plan"
+                    ),
+                },
+                "business_contract": business_contract,
+                "object_binding": role_object_binding(next_role),
+                "forbidden_inputs": [
+                    *forbidden_inputs,
+                    *role_declaration.forbidden_inputs,
+                ],
+                "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+                "then_read_next_response": True,
+            }
+        return {
+            "contract": "waapi-skill.business-draft-next-action/v1",
+            "required_next_phase": "bind_existing_business_object",
+            "responsibility_split": {
+                "agent": "natural_language_to_closed_high_level_business_facts",
+                "gateway": "business_facts_to_exact_waapi_request_and_execution_plan",
+            },
+            "business_contract": business_contract,
+            "object_binding": object_binding,
+            "forbidden_inputs": forbidden_inputs,
+            "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+            "then_read_next_response": True,
+            "precompute_or_increment_revision": False,
+        }
+    if role_declaration is not None:
+        bound_count = len(session.handles.as_dict()["objects"])
+        shared = {
+            "contract": "waapi-skill.business-draft-next-action/v1",
+            "responsibility_split": {
+                "agent": "natural_language_to_closed_high_level_business_facts",
+                "gateway": "business_facts_to_exact_waapi_request_and_execution_plan",
+            },
+            "business_contract": business_contract,
+            "forbidden_inputs": [
+                *forbidden_inputs,
+                *role_declaration.forbidden_inputs,
+            ],
+            "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+            "then_read_next_response": True,
+            "precompute_or_increment_revision": False,
+        }
+        if session.declarations:
+            return {
+                **shared,
+                "required_next_phase": "check_complete_business_declaration",
+                "check": {
+                    **operation_draft_prefix_copy_binding(check),
+                    "append": [],
+                },
+        }
+        if bound_count < len(role_declaration.roles):
+            next_role = role_declaration.roles[bound_count]
+            return {
+                **shared,
+                "required_next_phase": "bind_remaining_switch_assignment_roles",
+                "object_binding": role_object_binding(next_role),
+            }
+        return {
+            **shared,
+            "required_next_phase": "declare_complete_switch_assignment",
+            "declaration": {
+                **operation_draft_prefix_copy_binding(
+                    [*base, role_declaration.command, *binding]
+                ),
+                "append": list(role_declaration.continuation_argv),
+                "submit_once": True,
+            },
+        }
+    if adapter.supports_type_discovery:
+        type_discover_prefix = [*base, "draft-discover-types", *binding]
+        declaration_prefix = [*base, "draft-declare-new", *binding]
+        if record.operation == "object.createPlugin":
+            shared = {
+                "contract": "waapi-skill.business-draft-next-action/v1",
+                "responsibility_split": {
+                    "agent": "natural_language_to_closed_high_level_business_facts",
+                    "gateway": "business_facts_to_exact_waapi_request_and_execution_plan",
+                },
+                "business_contract": business_contract,
+                "object_binding": object_binding,
+                "forbidden_inputs": [
+                    *forbidden_inputs,
+                    "plugin_class_id",
+                    "plugin_property_token",
+                    "native_plugin_topology",
+                ],
+                "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+                "then_read_next_response": True,
+                "precompute_or_increment_revision": False,
+            }
+            if session.declarations:
+                return {
+                    **shared,
+                    "required_next_phase": "check_complete_business_declaration",
+                    "check": {
+                        **operation_draft_prefix_copy_binding(check),
+                        "append": [],
+                    },
+                }
+            type_discovery = {
+                **operation_draft_prefix_copy_binding(type_discover_prefix),
+                "role_decision": {
+                    "source": [
+                        "--meaning",
+                        "<user-facing-plugin-name>",
+                        "--role",
+                        "source",
+                    ],
+                    "effect": [
+                        "--meaning",
+                        "<user-facing-plugin-name>",
+                        "--role",
+                        "effect",
+                    ],
+                },
+                "result": "copy_one_returned_type_candidate.handle",
+            }
+            field_discovery = {
+                **operation_draft_prefix_copy_binding(field_discover_prefix),
+                "append": [
+                    "--type-handle",
+                    "<selected-plugin-type-handle>",
+                ],
+                "append_repeated": [
+                    "--meaning",
+                    "<user-facing-plugin-property-meaning>",
+                ],
+                "meaning_count": (
+                    f"1..{MAX_METADATA_DISCOVERY_QUERIES}_distinct_meanings"
+                ),
+                "use_only_when": "the_user_requested_plugin_properties",
+                "token_input": "forbidden",
+            }
+            declaration = {
+                **operation_draft_prefix_copy_binding(declare_existing_prefix),
+                "append": [
+                    "--declaration-id",
+                    "plugin",
+                    "--object-handle",
+                    "<bound-plugin-owner-handle>",
+                    "--field",
+                    "plugin_role",
+                    "<source-or-effect>",
+                    "--field",
+                    "plugin_name",
+                    "<requested-plugin-object-name>",
+                    "--field",
+                    "plugin_type_handle",
+                    "<selected-plugin-type-handle>",
+                    "[--field notes <exact-user-notes>]",
+                    "[--field platform <exact-user-platform>]",
+                    "[--field language <exact-source-language>]",
+                    "[--field-value <bound-property-handle> <business-value>]...",
+                ],
+            }
+            return {
+                **shared,
+                "required_next_phase": (
+                    "declare_plugin_or_discover_requested_properties"
+                    if session.handles.as_dict()["types"]
+                    else "discover_plugin_type"
+                ),
+                "type_discovery": type_discovery,
+                "field_discovery": field_discovery,
+                "declaration": declaration,
+            }
+        if record.operation == "object.set":
+            shared = {
+                "contract": "waapi-skill.business-draft-next-action/v1",
+                "responsibility_split": {
+                    "agent": "natural_language_to_closed_high_level_business_facts",
+                    "gateway": "business_facts_to_exact_waapi_request_and_execution_plan",
+                },
+                "business_contract": business_contract,
+                "object_binding": object_binding,
+                "forbidden_inputs": [
+                    *forbidden_inputs,
+                    "property_token",
+                    "reference_token",
+                    "target_row",
+                    "batch_layout",
+                    "recursive_request_fragment",
+                ],
+                "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+                "then_read_next_response": True,
+                "precompute_or_increment_revision": False,
+            }
+            result = {
+                **shared,
+                "required_next_phase": (
+                    "declare_remaining_object_outcomes_or_check_complete_batch"
+                    if session.declarations
+                    else "declare_existing_or_new_object_outcome"
+                ),
+                "field_discovery": {
+                    **operation_draft_prefix_copy_binding(field_discover_prefix),
+                    "scope_decision": {
+                        "existing_object": [
+                            "--object-handle",
+                            "<bound-existing-target-handle>",
+                        ],
+                        "stable_new_kind": [
+                            "--semantic-kind",
+                            "<disclosed-stable-semantic-kind>",
+                        ],
+                        "discovered_new_type": [
+                            "--type-handle",
+                            "<selected-type-handle>",
+                        ],
+                    },
+                    "append_repeated": [
+                        "--meaning",
+                        "<user-facing-field-meaning>",
+                    ],
+                    "meaning_count": (
+                        f"1..{MAX_METADATA_DISCOVERY_QUERIES}_distinct_meanings"
+                    ),
+                    "result": (
+                        "copy_exactly_one_meaning_results[].candidates[].handle_"
+                        "per_requested_meaning"
+                    ),
+                    "token_input": "forbidden",
+                },
+                "type_discovery": {
+                    **operation_draft_prefix_copy_binding(type_discover_prefix),
+                    "append": [
+                        "--meaning",
+                        "<user-facing-long-tail-child-kind>",
+                        "--role",
+                        "object",
+                    ],
+                    "use_when": "new_kind_is_not_one_disclosed_stable_semantic_kind",
+                },
+                "stable_semantic_kinds": list(SUPPORTED_BUSINESS_KINDS),
+                "stable_kind_display_aliases": {
+                    "Sound SFX": "sound-sfx",
+                    "Sound Voice": "sound-voice",
+                    "Random Container": "random-container",
+                    "Sequence Container": "sequence-container",
+                },
+                "declare_existing": {
+                    **operation_draft_prefix_copy_binding(declare_existing_prefix),
+                    "append": [
+                        "--declaration-id",
+                        "<task-local-id>",
+                        "--object-handle",
+                        "<bound-existing-target-handle>",
+                        "[--field <stable-business-field> <business-value>]...",
+                        "[--field-value <bound-field-handle> <business-value>]...",
+                    ],
+                },
+                "declare_existing_batch": {
+                    **operation_draft_prefix_copy_binding(
+                        declare_existing_batch_prefix
+                    ),
+                    "append_repeated": {
+                        "row_order": ["--row-order", "<task-local-id>"],
+                        "row": [
+                            "--row",
+                            "<same-task-local-id>",
+                            "<bound-existing-target-handle>",
+                        ],
+                        "stable_field": [
+                            "--field",
+                            "<same-task-local-id>",
+                            "<stable-business-field>",
+                            "<business-value>",
+                        ],
+                        "dynamic_field": [
+                            "--field-meaning-value",
+                            "<same-task-local-id>",
+                            "<user-facing-field-meaning>",
+                            "<business-value>",
+                        ],
+                    },
+                    "row_value_orders": [
+                        "task_local_id_then_bound_object_handle",
+                        "bound_object_handle_then_task_local_id",
+                    ],
+                    "gateway_disambiguation": (
+                        "the_exact_boh1_object_handle_contract_identifies_the_handle"
+                    ),
+                    "field_resolution": (
+                        "--field_uses_a_disclosed_stable_field_when_exactly_matched_"
+                        "otherwise_it_is_a_live_user_facing_field_meaning"
+                    ),
+                    "maximum_rows": OBJECT_SET_BUSINESS_BATCH_MAX_ROWS,
+                    "gateway_owned_behavior": (
+                        "resolve_and_revalidate_each_field_for_each_exact_object_"
+                        "then_apply_one_atomic_draft_revision"
+                    ),
+                    "precondition": (
+                        "bind_every_requested_existing_target_before_starting_"
+                        "this_single_batch"
+                    ),
+                    "use_when": (
+                        "all_requested_existing_targets_are_bound_and_two_or_"
+                        "more_outcomes_remain"
+                    ),
+                },
+                "declare_new": {
+                    **operation_draft_prefix_copy_binding(declare_new_prefix),
+                    "append": [
+                        "--declaration-id",
+                        "<task-local-id>",
+                        "--parent-handle",
+                        "<bound-or-planned-parent-handle>",
+                        "--name",
+                        "<requested-child-name>",
+                        "--kind",
+                        "<stable-semantic-kind-or-selected-type-handle>",
+                        "[--field <stable-business-field> <business-value>]...",
+                        "[--field-value <bound-field-handle> <business-value>]...",
+                    ],
+                },
+                "configure": {
+                    **operation_draft_prefix_copy_binding(configure_prefix),
+                    "append": [
+                        "[--name-conflict fail|rename|merge]",
+                        "[--list-behavior append|replace-all]",
+                        "[--add-to-source-control|--no-add-to-source-control]",
+                    ],
+                },
+                "clear_object_list": {
+                    **operation_draft_prefix_copy_binding(
+                        clear_object_list_prefix
+                    ),
+                    "append": [
+                        "--declaration-id",
+                        "<task-local-existing-target-id>",
+                        "--object-handle",
+                        "<bound-existing-target-handle>",
+                        "--list-name",
+                        "<exact-user-owned-wwise-object-list-name>",
+                    ],
+                    "list_name_input": (
+                        "exact_user_owned_wwise_object_list_name_without_at_prefix"
+                    ),
+                    "effect": "replace_all_with_empty_list",
+                },
+                **(
+                    {
+                        "add_media": {
+                            **operation_draft_prefix_copy_binding(add_media_prefix),
+                            "append": [
+                                "--declaration-id",
+                                "<existing-task-local-declaration-id>",
+                                "--media-file",
+                                "<exact-user-media-path>",
+                                "or",
+                                "--inline-wav",
+                                "<exact-user-inline-wav>",
+                                "[--kind <stable-semantic-kind-or-selected-type-handle>]",
+                                "[--language <exact-project-language>]",
+                                "[--originals-subfolder <exact-relative-subfolder>]",
+                            ],
+                            "supported_versions": ["2023.1", "2024.1", "2025.1"],
+                            "native_import_fragment_input": "forbidden",
+                            "repeat_for_each_media_artifact": True,
+                        }
+                    }
+                    if record.version in {"2023.1", "2024.1", "2025.1"}
+                    else {}
+                ),
+                "completion_candidate": {
+                    "condition": "all_user_requested_object_outcomes_are_declared",
+                    **operation_draft_exact_copy_binding(check),
+                    "is_next_command_when_condition_true": bool(
+                        session.declarations
+                    ),
+                },
+            }
+            batch_ready = (
+                not session.declarations
+                and len(session.handles.as_dict()["objects"])
+                >= 3
+            )
+            if not session.declarations:
+                result["existing_target_count_decision"] = {
+                    "three_or_more_requested": (
+                        "bind_every_requested_existing_target_before_any_field_"
+                        "discovery_or_declaration_then_use_declare_existing_batch"
+                    ),
+                    "one_or_two_requested": (
+                        "use_the_individual_discover_and_declare_routes"
+                    ),
+                }
+            if batch_ready:
+                result["required_next_phase"] = (
+                    "bind_remaining_targets_or_declare_all_ready_existing_"
+                    "targets_as_one_batch"
+                )
+                result.pop("field_discovery", None)
+                result.pop("declare_existing", None)
+            elif session.declarations:
+                result.pop("declare_existing_batch", None)
+            return result
+        shared = {
+            "contract": "waapi-skill.business-draft-next-action/v1",
+            "responsibility_split": {
+                "agent": "natural_language_to_closed_high_level_business_facts",
+                "gateway": "business_facts_to_exact_waapi_request_and_execution_plan",
+            },
+            "business_contract": business_contract,
+            "object_binding": object_binding,
+            "forbidden_inputs": [
+                *forbidden_inputs,
+                "native_object_type",
+                "plugin_class_id",
+                "recursive_request_fragment",
+            ],
+            "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+            "then_read_next_response": True,
+            "precompute_or_increment_revision": False,
+        }
+        type_discovery = {
+            **operation_draft_prefix_copy_binding(type_discover_prefix),
+            "append": [
+                "--meaning",
+                "<user-facing-object-kind>",
+                "--role",
+                "object",
+            ],
+            "use_when": "requested_kind_is_not_one_disclosed_stable_semantic_kind",
+            "result": "copy_one_returned_type_candidate.handle",
+            "native_type_input": "forbidden",
+            "class_id_input": "forbidden",
+        }
+        declare = {
+            **operation_draft_prefix_copy_binding(declaration_prefix),
+            "append": [
+                "--declaration-id",
+                "<task-local-id>",
+                "--parent-handle",
+                "<bound-or-planned-parent-handle>",
+                "--name",
+                "<requested-object-name>",
+                "--kind",
+                "<stable-semantic-kind-or-selected-type-handle>",
+                "[--field <stable-business-field> <business-value>]...",
+            ],
+            "task_local_id": "bounded_unique_not_business_data",
+            "planned_child_result": "copy_returned_declaration.result_handle",
+        }
+        field_discovery = {
+            **operation_draft_prefix_copy_binding(field_discover_prefix),
+            "scope_decision": {
+                "stable_semantic_kind": [
+                    "--semantic-kind",
+                    "<disclosed-stable-semantic-kind>",
+                ],
+                "discovered_type": [
+                    "--type-handle",
+                    "<selected-type-handle>",
+                ],
+            },
+            "append_repeated": [
+                "--meaning",
+                "<user-facing-field-meaning>",
+            ],
+            "meaning_count": (
+                f"1..{MAX_METADATA_DISCOVERY_QUERIES}_distinct_meanings"
+            ),
+            "use_only_when": "the_user_requested_custom_properties_or_references",
+            "token_input": "forbidden",
+        }
+        configure = {
+            **operation_draft_prefix_copy_binding(configure_prefix),
+            "append": [
+                "[--name-conflict fail|rename|merge|replace]",
+                "[--replace-owner-handle <bound-existing-owner-handle>]",
+                "[--platform <exact-user-platform>]",
+                "[--add-to-source-control|--no-add-to-source-control]",
+            ],
+        }
+        merge_configured = (
+            record.operation == "object.create"
+            and session.settings.get("name_conflict") == "merge"
+        )
+        existing_same_name_root_merge = {
+            **operation_draft_prefix_copy_binding(
+                configure_prefix,
+                append_action="execute_verbatim_to_configure_the_proven_merge",
+            ),
+            "append": ["--name-conflict", "merge"],
+            "use_only_when": (
+                "the_exact_preflight_found_the_existing_same_name_root_and_the_"
+                "user_requested_merge"
+            ),
+            "required_before_root_declaration": True,
+            "then": (
+                "declare_that_existing_root_name_once_under_its_bound_direct_"
+                "parent_then_declare_only_the_requested_descendants"
+            ),
+        }
+        return {
+            **shared,
+            "required_next_phase": (
+                "declare_remaining_named_objects_or_check_complete_graph"
+                if session.declarations
+                else (
+                    "merge_configured_declare_existing_same_name_root_once_then_"
+                    "requested_descendants"
+                    if merge_configured
+                    else (
+                        "if_exact_preflight_found_an_existing_same_name_root_"
+                        "configure_merge_before_its_declaration; otherwise_"
+                        "declare_named_object_or_discover_long_tail_kind"
+                        if record.operation == "object.create"
+                        else "declare_named_object_or_discover_long_tail_kind"
+                    )
+                )
+            ),
+            "type_discovery": type_discovery,
+            "field_discovery": field_discovery,
+            "configure": configure,
+            **(
+                {
+                    "existing_same_name_root_merge_status": "satisfied",
+                }
+                if merge_configured
+                else (
+                    {
+                        "existing_same_name_root_merge": (
+                            existing_same_name_root_merge
+                        ),
+                        "existing_same_name_root_merge_status": "required_when_"
+                        "exact_preflight_found_the_existing_root",
+                    }
+                    if record.operation == "object.create"
+                    else {}
+                )
+            ),
+            "declaration": declare,
+            "completion_candidate": {
+                "condition": "all_user_requested_named_objects_are_declared",
+                **operation_draft_exact_copy_binding(check),
+                "is_next_command_when_condition_true": bool(session.declarations),
+            },
+        }
+    if not (adapter.supports_field_binding or adapter.supports_field_discovery):
+        if session.declarations:
+            return {
+                "contract": "waapi-skill.business-draft-next-action/v1",
+                "required_next_phase": "check_complete_business_declaration",
+                "business_contract": business_contract,
+                "check": {
+                    **operation_draft_prefix_copy_binding(check),
+                    "append": [],
+                },
+                "forbidden_inputs": forbidden_inputs,
+                "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+                "then_read_next_response": True,
+                "precompute_or_increment_revision": False,
+            }
+        return {
+            "contract": "waapi-skill.business-draft-next-action/v1",
+            "required_next_phase": (
+                "bind_remaining_business_objects_then_declare_complete_object_change"
+                if len(session.handles.as_dict()["objects"])
+                < len(business_contract["binding"]["roles"])
+                else "declare_complete_object_change"
+            ),
+            "responsibility_split": {
+                "agent": "natural_language_to_closed_high_level_business_facts",
+                "gateway": "business_facts_to_exact_waapi_request_and_execution_plan",
+            },
+            "business_contract": business_contract,
+            "object_binding": object_binding,
+            "declaration": {
+                **operation_draft_prefix_copy_binding(
+                    declare_object_change_prefix
+                ),
+                "append_fields": business_contract["declaration"],
+                "submit_once": True,
+            },
+            "forbidden_inputs": forbidden_inputs,
+            "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+            "then_read_next_response": True,
+            "precompute_or_increment_revision": False,
+        }
+    if adapter.supports_field_discovery:
+        if record.operation == "object.setRTPC":
+            handle_state = session.handles.as_dict()
+            bound_objects = handle_state["objects"]
+            bound_fields = handle_state["fields"]
+            shared = {
+                "contract": "waapi-skill.business-draft-next-action/v1",
+                "responsibility_split": {
+                    "agent": "natural_language_to_closed_high_level_business_facts",
+                    "gateway": "business_facts_to_exact_waapi_request_and_execution_plan",
+                },
+                "business_contract": business_contract,
+                "forbidden_inputs": [
+                    *forbidden_inputs,
+                    "property_token",
+                    "rtpc_list_row",
+                    "native_curve_fragment",
+                ],
+                "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+                "then_read_next_response": True,
+                "precompute_or_increment_revision": False,
+            }
+            if session.declarations:
+                return {
+                    **shared,
+                    "required_next_phase": "check_complete_business_declaration",
+                    "check": {
+                        **operation_draft_prefix_copy_binding(check),
+                        "append": [],
+                    },
+                }
+            if not bound_fields:
+                discovery = {
+                    **operation_draft_prefix_copy_binding(field_discover_prefix),
+                    "append": [
+                        "--object-handle",
+                        "<bound-rtpc-owner-handle>",
+                        "--meaning",
+                        "<user-facing-rtpc-property-meaning>",
+                    ],
+                    "result": "copy_one_returned_property_candidate.handle",
+                    "token_input": "forbidden",
+                }
+                return {
+                    **shared,
+                    "required_next_phase": "discover_rtpc_property_for_bound_object",
+                    "field_discovery": discovery,
+                }
+            if len(bound_objects) < 2:
+                return {
+                    **shared,
+                    "required_next_phase": "bind_rtpc_control_input",
+                    "object_binding": {
+                        **object_binding,
+                        "use_only_for": ["control_input"],
+                    },
+                }
+            return {
+                **shared,
+                "required_next_phase": "declare_complete_rtpc_curve",
+                "declaration": {
+                    **operation_draft_prefix_copy_binding(declare_rtpc_prefix),
+                    "append": [
+                        "--object-handle",
+                        "<bound-rtpc-owner-handle>",
+                        "--field-handle",
+                        "<selected-property-handle>",
+                        "--control-input-handle",
+                        "<bound-control-input-handle>",
+                        "--point",
+                        "<x>",
+                        "<y>",
+                        "<Wwise-shape>",
+                        "[--point <x> <y> <Wwise-shape>]...",
+                        "[--mode add-only|add-or-update]",
+                        "[--notes <exact-user-notes>]",
+                    ],
+                    "submit_once": True,
+                },
+            }
+        if session.declarations:
+            return {
+                "contract": "waapi-skill.business-draft-next-action/v1",
+                "required_next_phase": "check_complete_business_declaration",
+                "business_contract": business_contract,
+                "check": {
+                    **operation_draft_prefix_copy_binding(check),
+                    "append": [],
+                },
+                "forbidden_inputs": forbidden_inputs,
+                "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+                "then_read_next_response": True,
+                "precompute_or_increment_revision": False,
+            }
+        handle_state = session.handles.as_dict()
+        bound_objects = handle_state["objects"]
+        bound_fields = handle_state["fields"]
+        field_discovery = {
+            **operation_draft_prefix_copy_binding(field_discover_prefix),
+            "append": [
+                "--object-handle",
+                "<bound-target-object-handle>",
+                "--meaning",
+                "<user-facing-field-meaning>",
+                "[--platform <exact-user-requested-platform>]",
+            ],
+            "result": "copy_one_returned_field_candidate.handle",
+            "token_input": "forbidden",
+            "refine_only_when": "returned_candidates_do_not_identify_user_intent",
+        }
+        declaration_prefix = {
+            **operation_draft_prefix_copy_binding(
+                declare_field_change_prefix
+            ),
+            "submit_once": True,
+        }
+        shared = {
+            "contract": "waapi-skill.business-draft-next-action/v1",
+            "responsibility_split": {
+                "agent": "natural_language_to_closed_high_level_business_facts",
+                "gateway": "business_facts_to_exact_waapi_request_and_execution_plan",
+            },
+            "business_contract": business_contract,
+            "forbidden_inputs": [
+                *forbidden_inputs,
+                "property_token",
+                "reference_token",
+                "field_scope",
+                "field_wire_type",
+            ],
+            "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+            "then_read_next_response": True,
+            "precompute_or_increment_revision": False,
+        }
+        if not bound_fields:
+            return {
+                **shared,
+                "required_next_phase": "discover_field_for_bound_object",
+                "field_discovery": field_discovery,
+            }
+        if record.operation == "object.setReference" and len(bound_objects) < 2:
+            clear_declaration = {
+                **declaration_prefix,
+                "append": [
+                    "--object-handle",
+                    "<bound-source-object-handle>",
+                    "--field-handle",
+                    "<selected-field-handle>",
+                    "--clear-reference",
+                ],
+            }
+            return {
+                **shared,
+                "required_next_phase": "choose_clear_or_bind_reference_target",
+                "decision": {
+                    "clear": clear_declaration,
+                    "set_target": "bind_the_exact_reference_target_then_read_next_response",
+                },
+                "object_binding": {
+                    **object_binding,
+                    "use_only_for": ["reference_target"],
+                },
+            }
+        if record.operation == "object.setProperty":
+            declaration_append = [
+                "--object-handle",
+                "<bound-source-object-handle>",
+                "--field-handle",
+                "<selected-field-handle>",
+                "--business-value",
+                "<user-requested-business-value>",
+            ]
+        elif record.operation == "object.setReference":
+            declaration_append = [
+                "--object-handle",
+                "<bound-source-object-handle>",
+                "--field-handle",
+                "<selected-field-handle>",
+                "--target-handle",
+                "<bound-reference-target-handle>",
+            ]
+        else:
+            declaration_append = [
+                "--object-handle",
+                "<bound-source-object-handle>",
+                "--field-handle",
+                "<selected-field-handle>",
+                "--link-state",
+                "<linked-or-unlinked>",
+            ]
+        return {
+            **shared,
+            "required_next_phase": "declare_complete_field_change",
+            "declaration": {
+                **declaration_prefix,
+                "append": declaration_append,
+            },
+        }
+    if adapter.family == "audio-import":
+        dependency_closure = {
+            "scope": "all_remaining_user_requested_rows_not_only_the_next_chunk",
+            "bind_before_append": [
+                "existing_row_target_or_new_row_parent",
+                "output_bus_or_custom_reference",
+                "event_parent_for_every_row_requesting_an_event",
+            ],
+            "never_bind": [
+                "switch_group",
+                "switch_value",
+                "preservation_only_object",
+            ],
+            "literal_transport": {
+                "switch_value": (
+                    "copy_the_exact_user_value_into_--switch-value; "
+                    "never_call_draft-bind-object_for_it"
+                ),
+            },
+            "event_row": (
+                "include_--event_in_that_rows_same_chunk; omission_is_not_deferred"
+            ),
+            "append_gate": (
+                "every_handle_needed_by_the_next_chunk_is_already_bound"
+            ),
+        }
+        audio_object_binding = {
+            **object_binding,
+            "use_only_for": [
+                "existing_import_row_target",
+                "new_import_row_parent",
+                "output_bus_reference",
+                "new_event_parent",
+                "custom_reference_value",
+            ],
+            "forbidden_for": [
+                "switch_group",
+                "switch_value",
+                "preservation_only_object",
+            ],
+        }
+        return {
+            "contract": "waapi-skill.business-draft-next-action/v1",
+            "required_next_phase": (
+                "bind_all_prompt_visible_handle_dependencies_before_any_import_"
+                "chunk_then_append_bounded_complete_rows"
+            ),
+            "object_binding": audio_object_binding,
+            "field_binding": {
+                "object_scope": {
+                    **operation_draft_prefix_copy_binding(field_bind_prefix),
+                    "append": [
+                        "--object-handle",
+                        "<bound-object-handle>",
+                        "--token",
+                        "<exact-live-field-token>",
+                    ],
+                },
+                "class_scope": {
+                    **operation_draft_prefix_copy_binding(field_bind_prefix),
+                    "append": [
+                        "--class-name",
+                        "<exact-live-class-name>",
+                        "--token",
+                        "<exact-live-field-token>",
+                    ],
+                },
+                "use_only_for": "custom_property_or_reference_field_values",
+            },
+            "target_form_mode": {
+                "all_new_rows": "Gateway derives create",
+                "one_or_more_existing_rows": "Gateway derives reimport",
+                "explicit_replace_request": (
+                    "use explicit_batch_overrides --mode replace"
+                ),
+                "use_existing_is_not_a_batch_override": True,
+            },
+            "explicit_batch_overrides": {
+                **operation_draft_prefix_copy_binding(configure_prefix),
+                "append": [
+                    "[--mode replace] only_for_explicit_replace_existing",
+                    "[--add-to-source-control|--no-add-to-source-control]",
+                    "[--check-out-from-source-control|--no-check-out-from-source-control]",
+                    "[--default <stable-field> <business-value>]...",
+                    "[--default-field-value <bound-field-handle> <business-value>]...",
+                ],
+                "use_only_when": (
+                    "the_user_explicitly_requests_replace_existing_media_source_"
+                    "control_behavior_or_one_global_default"
+                ),
+            },
+            "declare_import_batch": {
+                **operation_draft_prefix_copy_binding(
+                    declare_import_batch_prefix
+                ),
+                "derived_batch_facts": {
+                    "declaration_count": "Gateway_counts_the_closed_row_set",
+                    "switch_assignment_count": (
+                        "Gateway_counts_rows_with_switch_assignment"
+                    ),
+                    "caller_supplied_counts": "forbidden",
+                },
+                "row_order": {
+                    "grouped": [
+                        "--row-order",
+                        "<declaration-id-1>",
+                        "[<declaration-id-2>...]",
+                    ],
+                    "repeated": [
+                        "--row-order",
+                        "<one-declaration-id>",
+                        "repeat_the_option_for_each_remaining_row",
+                    ],
+                    "rule": (
+                        "both_forms_are_equivalent; preserve_exact_import_order; "
+                        "supply_one_to_six_ids"
+                    ),
+                },
+                "row_forms": {
+                    "new": [
+                        "--new-row",
+                        "<id>",
+                        "<bound-parent-handle-or-earlier-parent-id>",
+                        "<name>",
+                        "<semantic-kind>",
+                    ],
+                    "existing": [
+                        "--existing-row",
+                        "<id>",
+                        "<bound-existing-object-handle>",
+                    ],
+                },
+                "row_fields": {
+                    "stable": [
+                        "--field",
+                        "<id>",
+                        "<stable-field-except-switch_value>",
+                        "<business-value>",
+                    ],
+                    "custom": [
+                        "--field-value",
+                        "<id>",
+                        "<bound-field-handle>",
+                        "<business-value>",
+                    ],
+                    "switch_assignment": [
+                        "--switch-value",
+                        "<id>",
+                        "<exact-user-requested-switch-value>",
+                    ],
+                    "event": [
+                        "--event",
+                        "<id>",
+                        "<bound-event-parent-handle>",
+                        "<event-name>",
+                        "<Play|Stop|Pause|Resume|Break|Seek>",
+                    ],
+                },
+                "switch_assignment_ownership": {
+                    "attach_to": (
+                        "the_exact_declaration_assigned_as_the_Switch_Container_child"
+                    ),
+                    "container_with_media_children": (
+                        "put_switch_value_on_the_container_row_only_not_its_"
+                        "descendant_Sound_rows"
+                    ),
+                    "sound_row_exception": (
+                        "only_when_the_user_explicitly_assigns_that_Sound_directly"
+                    ),
+                },
+                "media_source": {
+                    "directory": [
+                        "--media-directory",
+                        "<one-absolute-source-directory>",
+                    ],
+                    "file": [
+                        "--media-file",
+                        "<id>",
+                        "<one-file-name-without-separators>",
+                    ],
+                    "rule": (
+                        "when two or more requested media files share a directory, "
+                        "copy that directory once and submit one leaf file name per row; "
+                        "later chunks may omit the directory only while every prior "
+                        "media row in this Draft has that same sole directory"
+                    ),
+                },
+                "rows_per_command": {
+                    "minimum": 1,
+                    "maximum": AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS,
+                },
+                "row_completeness": (
+                    "each_row_must_include_its_media_every_known_requested_field_"
+                    "switch_assignment_and_event_in_the_same_command; partial_"
+                    "rows_are_forbidden"
+                ),
+                "dependency_closure": dependency_closure,
+                "repeat_with_next_response_revision": True,
+                "check_only_after": (
+                    "every_user_requested_row_has_been_appended"
+                ),
+            },
+            "forbidden_inputs": forbidden_inputs,
+            "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+            "then_read_next_response": True,
+            "precompute_or_increment_revision": False,
+        }
+    return {
+        "contract": "waapi-skill.business-draft-next-action/v1",
+        "required_next_phase": (
+            "bind_only_handle_typed_business_objects_then_configure_and_declare"
+            if session is None
+            else "complete_business_declarations_then_check"
+        ),
+        "responsibility_split": {
+            "agent": "natural_language_to_closed_high_level_business_facts",
+            "gateway": "business_facts_to_exact_waapi_request_and_execution_plan",
+        },
+        "business_contract": business_contract,
+        "object_binding": object_binding,
+        "field_binding": {
+            "object_scope": {
+                **operation_draft_prefix_copy_binding(field_bind_prefix),
+                "append": [
+                    "--object-handle",
+                    "<bound-object-handle>",
+                    "--token",
+                    "<exact-live-field-token>",
+                ],
+            },
+            "class_scope": {
+                **operation_draft_prefix_copy_binding(field_bind_prefix),
+                "append": [
+                    "--class-name",
+                    "<exact-live-class-name>",
+                    "--token",
+                    "<exact-live-field-token>",
+                ],
+            },
+            "result": "copy_the_returned_bound_field.handle_and_restrictions",
+            "use_only_for": "custom_property_or_reference_field_values",
+        },
+        "binding_decision": {
+            "bound_object_handle_fields": [
+                "output_bus",
+                "event_parent",
+                "custom_reference_value",
+            ],
+            "literal_never_bind": [
+                "audio_source_notes",
+                "dialogue_event_directive",
+                "inline_wav",
+                "language",
+                "loop",
+                "max_instances",
+                "media_file",
+                "notes",
+                "originals_subfolder",
+                "ignore_parent_instance_limit",
+                "switch_value",
+                "volume_db",
+            ],
+            "rule": "bind_only_when_the_disclosed_value_type_requires_a_handle",
+        },
+        "configure": {
+            **operation_draft_prefix_copy_binding(configure_prefix),
+            "append": [
+                "[--mode replace] only_for_explicit_replacement; "
+                "create_and_reimport_derive_from_target_form",
+                "[--add-to-source-control|--no-add-to-source-control]",
+                "[--check-out-from-source-control|--no-check-out-from-source-control]",
+            ],
+        },
+        "explicit_global_defaults": {
+            **operation_draft_prefix_copy_binding(configure_prefix),
+            "append": [
+                "[--default <stable-field> <business-value>]...",
+                "[--default-field-value <bound-field-handle> <business-value>]...",
+            ],
+            "use_only_when": (
+                "user_explicitly_requests_a_Wwise_global_batch_default"
+            ),
+            "scope": "every_declaration_in_the_batch_after_expansion",
+            "reference_default_rule": (
+                "copy_one_bound_object_handle_never_a_path_or_name"
+            ),
+            "default_use_rule": (
+                "use_only_when_the_user_explicitly_requests_one_value_for_every_"
+                "declaration_and_the_field_is_valid_for_every_target_kind; otherwise_"
+                "put_the_field_on_each_applicable_declaration"
+            ),
+        },
+        "declare_new": {
+            **operation_draft_prefix_copy_binding(declare_new_prefix),
+            "append": [
+                "--declaration-id",
+                "<task-local-id>",
+                "--parent-handle",
+                "<bound-or-planned-object-handle>",
+                "--name",
+                "<child-name>",
+                "--kind",
+                "<semantic-kind>",
+                "--switch-value <exact-user-requested-switch-value> "
+                "required_when_user_requests_this_declaration_be_assigned_to_a_"
+                "switch_value; omission_is_incomplete",
+                "[--field <stable-field-except-switch_value> <business-value>]...",
+                "[--field-value <bound-field-handle> <business-value>]...",
+            ],
+            "task_local_id": "bounded_unique_not_business_data",
+            "known_user_fields": "complete_on_first_submission",
+            "conditional_required_user_fields": {
+                "switch_assignment": {
+                    "argument": "--switch-value",
+                    "value": "exact_user_requested_switch_value",
+                    "required_when": (
+                        "user_requests_this_declaration_be_assigned_to_a_switch_value"
+                    ),
+                    "omission": "incomplete_declaration",
+                }
+            },
+        },
+        "declare_existing": {
+            **operation_draft_prefix_copy_binding(declare_existing_prefix),
+            "append": [
+                "--declaration-id",
+                "<task-local-id>",
+                "--object-handle",
+                "<bound-object-handle>",
+                "--switch-value <exact-user-requested-switch-value> "
+                "required_when_user_requests_this_declaration_be_assigned_to_a_"
+                "switch_value; omission_is_incomplete",
+                "[--field <stable-field-except-switch_value> <business-value>]...",
+                "[--field-value <bound-field-handle> <business-value>]...",
+            ],
+            "task_local_id": "bounded_unique_not_business_data",
+            "known_user_fields": "complete_on_first_submission",
+            "conditional_required_user_fields": {
+                "switch_assignment": {
+                    "argument": "--switch-value",
+                    "value": "exact_user_requested_switch_value",
+                    "required_when": (
+                        "user_requests_this_declaration_be_assigned_to_a_switch_value"
+                    ),
+                    "omission": "incomplete_declaration",
+                }
+            },
+        },
+        "revise": {
+            **operation_draft_prefix_copy_binding(revise_prefix),
+            "append": [
+                "--declaration-id",
+                "<existing-task-local-id>",
+                "[--switch-value <corrected-exact-user-requested-switch-value>]",
+                "[--field <stable-field-except-switch_value> <corrected-business-value>]...",
+                "[--field-value <bound-field-handle> <corrected-business-value>]...",
+            ],
+            "use_only_for": "correction_or_late_discovered_fact",
+        },
+        "remove": {
+            **operation_draft_prefix_copy_binding(remove_prefix),
+        },
+        "completion_candidate": {
+            "condition": "all_user_requested_business_declarations_are_complete",
+            **operation_draft_exact_copy_binding(check),
+            "is_next_command_when_condition_true": bool(
+                session is not None and session.declarations
+            ),
+        },
+        "forbidden_inputs": forbidden_inputs,
+        "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+        "then_read_next_response": True,
+        "precompute_or_increment_revision": False,
+    }
+
+
+def _operation_draft_node_batch_continuation(
+    actions: Sequence[Mapping[str, Any]],
+    *,
+    operation: str,
+    version: str,
+) -> dict[str, Any] | None:
+    """Resume the disclosed child after one atomic parent-plus-node batch."""
+
+    if len(actions) < 2:
+        return None
+    parent_fact = actions[0]
+    response_handle = parent_fact.get("value")
+    if (
+        parent_fact.get("action") != "add_typed_fact"
+        or parent_fact.get("fact_action") not in {"append", "map-put", "set"}
+        or not isinstance(response_handle, str)
+        or not response_handle.startswith("trm1-")
+    ):
+        return None
+    reachable_handles = {response_handle}
+    for row in actions[1:]:
+        if (
+            row.get("action") != "add_typed_fact"
+            or row.get("field_handle") not in reachable_handles
+        ):
+            return None
+        nested_handle = row.get("value")
+        if (
+            row.get("fact_action") in {"append", "map-put", "set"}
+            and isinstance(nested_handle, str)
+            and nested_handle.startswith("trm1-")
+        ):
+            reachable_handles.add(nested_handle)
+    return {
+        "source": "most_recent_typed_container_handle_response",
+        "response_was_complete_not_truncated": True,
+        "current_handle": response_handle,
+        "completed_fact_action": "batch",
+        "next_rule": (
+            "resume_previous_container_response_after_current_node_fact_batch"
+        ),
+        "stop_cancel_or_claim_truncation_before_current_root_is_complete": (
+            "invalid"
+        ),
+        "resume_previous_container_response": (
+            _operation_draft_resume_previous_container_payload(
+                response_handle=response_handle,
+                completed_candidate="current_node_fact_batch",
+                operation=operation,
+                version=version,
+                actions=actions,
+            )
+        ),
+    }
+
+
+def _operation_draft_root_array_next_item_disclosure(
+    *,
+    operation: str,
+    version: str,
+    actions: Sequence[Mapping[str, Any]],
+) -> dict[str, Any] | None:
+    """Carry the exact next direct-root array command across child receipts."""
+
+    if not actions:
+        return None
+    parent_fact = actions[0]
+    candidate_handles = {
+        value
+        for value in (parent_fact.get("field_handle"), parent_fact.get("value"))
+        if isinstance(value, str) and value.startswith("trm1-")
+    }
+    if not candidate_handles:
+        return None
+    contract = draft_operation_request_contract(operation, version)
+    for field in contract.fields:
+        if field.parent_handle is not None or field.shape != "array":
+            continue
+        for index in range(MAX_TYPED_ARRAY_ITEMS):
+            matched = False
+            for shape in ("object", "array"):
+                choices = dynamic_array_item_choices(
+                    contract,
+                    array_handle=field.handle,
+                    index=index,
+                    shape=shape,
+                )
+                if len(choices) != 1:
+                    continue
+                current_handle = dynamic_array_item_handle(
+                    contract,
+                    array_handle=field.handle,
+                    index=index,
+                    shape=shape,
+                )
+                if current_handle in candidate_handles:
+                    matched = True
+                    break
+            if not matched:
+                continue
+            next_index = index + 1
+            if next_index >= MAX_TYPED_ARRAY_ITEMS:
+                return None
+            copy_command_by_shape: dict[str, str] = {}
+            for shape in ("object", "array"):
+                choices = dynamic_array_item_choices(
+                    contract,
+                    array_handle=field.handle,
+                    index=next_index,
+                    shape=shape,
+                )
+                if len(choices) != 1:
+                    continue
+                copy_command_by_shape[shape] = operation_draft_copy_command(
+                    [
+                        "python",
+                        str(GATEWAY_RUNNER_PATH),
+                        "gateway.py",
+                        "request-array-item",
+                        operation,
+                        "--schema-digest",
+                        contract.schema_digest,
+                        "--array-handle",
+                        field.handle,
+                        "--index",
+                        str(next_index),
+                        "--shape",
+                        shape,
+                    ]
+                )
+            if not copy_command_by_shape:
+                return None
+            return {
+                "condition": "current_business_request_contains_next_complex_item",
+                "business_cardinality_authority": "current_business_request",
+                "index": next_index,
+                "copy_command_by_shape": copy_command_by_shape,
+            }
+    return None
+
+
+def _operation_draft_current_item_business_sibling(
+    *,
+    operation: str,
+    version: str,
+    actions: Sequence[Mapping[str, Any]],
+) -> dict[str, Any] | None:
+    """Reissue the exact schema sibling after one connected branch subtree."""
+
+    if not actions:
+        return None
+    parent_fact = actions[0]
+    candidate_handles = {
+        value
+        for value in (parent_fact.get("field_handle"), parent_fact.get("value"))
+        if isinstance(value, str) and value.startswith("trm1-")
+    }
+    if not candidate_handles:
+        return None
+    contract = draft_operation_request_contract(operation, version)
+    for field in contract.fields:
+        if field.parent_handle is not None or field.shape != "array":
+            continue
+        for index in range(MAX_TYPED_ARRAY_ITEMS):
+            for item_shape in ("object", "array"):
+                choices = dynamic_array_item_choices(
+                    contract,
+                    array_handle=field.handle,
+                    index=index,
+                    shape=item_shape,
+                )
+                if len(choices) != 1:
+                    continue
+                item_handle = dynamic_array_item_handle(
+                    contract,
+                    array_handle=field.handle,
+                    index=index,
+                    shape=item_shape,
+                )
+                if item_handle not in candidate_handles:
+                    continue
+                item_disclosure = dynamic_container_disclosure(
+                    contract,
+                    parent_handle=field.handle,
+                    key=str(index),
+                    shape=item_shape,
+                    child_handle=item_handle,
+                )
+                item_schema = item_disclosure.get("schema_lineage")
+                if not isinstance(item_schema, Mapping):
+                    return None
+                item_lineage_token = typed_schema_lineage_token(
+                    contract,
+                    child_handle=item_handle,
+                    parent_token=None,
+                    parent_handle=field.handle,
+                    key=str(index),
+                    shape=item_shape,
+                    choice_handle=None,
+                )
+                for branch in actions[1:]:
+                    branch_key = branch.get("key")
+                    branch_choice = branch.get("value")
+                    if (
+                        branch.get("action") != "add_typed_fact"
+                        or branch.get("fact_action") != "choose-dynamic"
+                        or branch.get("field_handle") != item_handle
+                        or not isinstance(branch_key, str)
+                        or not isinstance(branch_choice, str)
+                    ):
+                        continue
+                    children = tuple(
+                        row
+                        for row in actions[1:]
+                        if row.get("action") == "add_typed_fact"
+                        and row.get("fact_action") == "map-put"
+                        and row.get("field_handle") == item_handle
+                        and row.get("key") == branch_key
+                        and row.get("value_type") in {"object", "array"}
+                        and isinstance(row.get("value"), str)
+                    )
+                    if len(children) != 1:
+                        return None
+                    child = children[0]
+                    child_shape = str(child["value_type"])
+                    child_handle = str(child["value"])
+                    choice_rows = dynamic_map_container_choices(
+                        contract,
+                        map_handle=item_handle,
+                        key=branch_key,
+                        shape=child_shape,
+                        parent_schema=item_schema,
+                        parent_section=field.section,
+                    )
+                    if not any(
+                        choice_handle == branch_choice
+                        for choice_handle, _choice_index, _variant in choice_rows
+                    ):
+                        return None
+                    expected_child_handle = dynamic_map_entry_handle(
+                        contract,
+                        map_handle=item_handle,
+                        key=branch_key,
+                        shape=child_shape,
+                        choice_handle=branch_choice,
+                        parent_schema=item_schema,
+                        parent_section=field.section,
+                    )
+                    if child_handle != expected_child_handle:
+                        return None
+                    child_lineage_token = typed_schema_lineage_token(
+                        contract,
+                        child_handle=child_handle,
+                        parent_token=item_lineage_token,
+                        parent_handle=item_handle,
+                        key=branch_key,
+                        shape=child_shape,
+                        choice_handle=branch_choice,
+                    )
+                    try:
+                        business_pointer = typed_schema_lineage_business_pointer(
+                            contract,
+                            child_handle=child_handle,
+                            token=child_lineage_token,
+                        )
+                    except TypedRequestError:
+                        return None
+                    sibling = _next_map_sibling_disclosure(
+                        argparse.Namespace(
+                            command="request-map-container",
+                            parent_schema_token=item_lineage_token,
+                            key=branch_key,
+                            shape=child_shape,
+                            map_handle=item_handle,
+                            api=operation,
+                        ),
+                        contract=contract,
+                        parent_schema=item_schema,
+                        parent_section=field.section,
+                        current_business_value_pointer=business_pointer,
+                    )
+                    projected = _dynamic_disclosure_copy_commands(sibling)
+                    transition = projected.get("business_sibling_transition")
+                    return dict(transition) if isinstance(transition, Mapping) else None
+                return None
+    return None
+
+
+def _operation_draft_resume_previous_container_payload(
+    *,
+    response_handle: str,
+    completed_candidate: str,
+    operation: str,
+    version: str,
+    actions: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "contract": "waapi-skill.typed-container-handle/v1",
+        "response_handle": response_handle,
+        "completed_candidate": completed_candidate,
+        "decision_pointer": "/continuation/next_command_decision/evaluate_in_order",
+        "selection": "first_remaining_business_present_candidate_in_order",
+        "continue_in_same_turn": True,
+        "after_exhausted": "resume_ancestor_response_stack",
+        "ancestor_resume_gate": (
+            "current_response_and_all_descendant_business_candidates_exhausted"
+        ),
+        "ancestor_next_item_source": "next_item_disclosure.copy_command_by_shape",
+        "retype_schema_digest": "invalid",
+    }
+    business_sibling = _operation_draft_current_item_business_sibling(
+        operation=operation,
+        version=version,
+        actions=actions,
+    )
+    if business_sibling is not None:
+        payload["decision_pointer"] = "/business_sibling_transition"
+        payload["selection"] = "business_present_sibling_before_ancestor_item"
+        payload["business_sibling_transition"] = business_sibling
+    disclosure = _operation_draft_root_array_next_item_disclosure(
+        operation=operation,
+        version=version,
+        actions=actions,
+    )
+    if disclosure is not None:
+        payload["ancestor_next_item_source"] = (
+            "ancestor_next_item_disclosure.copy_command_by_shape"
+        )
+        payload["ancestor_next_item_disclosure"] = disclosure
+    return payload
+
+
 def _operation_draft_compact_action_projection(
     *,
-    action: Mapping[str, Any],
+    actions: Sequence[Mapping[str, Any]],
     prior_record: OperationDraftRecord,
     record: OperationDraftRecord,
     current_facts: list[Any],
@@ -10534,24 +27054,152 @@ def _operation_draft_compact_action_projection(
     )["current_facts"]
     prior_handles = _operation_draft_projection_handles(prior_facts)
     current_handles = _operation_draft_projection_handles(current_facts)
+    if not actions:
+        raise GatewayInputError("Compact Draft action result lacks its action batch.")
+    action = actions[-1]
     action_name = action.get("action")
     if not isinstance(action_name, str) or not action_name:
         raise GatewayInputError("Compact Draft action result lacks its action name.")
     affected_handles = sorted(
         {
             value
-            for key, value in action.items()
+            for row in actions
+            for key, value in row.items()
             if key.endswith("_handle") and isinstance(value, str)
         }
     )
+    action_result: dict[str, Any] = {
+        "contract": "waapi-skill.operation-draft-action-result/v1",
+        "action": action_name,
+        "created_handles": [
+            handle
+            for handle in _operation_draft_projection_handles_in_order(current_facts)
+            if handle not in prior_handles
+        ],
+        "affected_handles": affected_handles,
+    }
+    fact_action = action.get("fact_action")
+    field_handle = action.get("field_handle")
+    value = action.get("value")
+    key = action.get("key")
+    dynamic_field = (
+        field_handle
+        if isinstance(field_handle, str) and field_handle.startswith("trm1-")
+        else None
+    )
+    dynamic_value = (
+        value
+        if isinstance(value, str) and value.startswith("trm1-")
+        else None
+    )
+    if fact_action in {"append", "set", "map-put", "choose-dynamic"} and (
+        dynamic_field is not None or dynamic_value is not None
+    ):
+        continuation: dict[str, Any] = {
+            "source": "most_recent_typed_container_handle_response",
+            "response_was_complete_not_truncated": True,
+            "current_handle": dynamic_field or dynamic_value,
+            "completed_fact_action": fact_action,
+            "next_rule": (
+                "map_put_the_same_key_from_its_disclosed_choice"
+                if fact_action == "choose-dynamic"
+                else (
+                    "continue_with_child_contract_facts_for_the_appended_value"
+                    if fact_action == "append" and dynamic_value is not None
+                    else (
+                        "continue_with_the_next_business_present_child_contract_"
+                        "fact_in_queue_index_order"
+                    )
+                )
+            ),
+            "stop_cancel_or_claim_truncation_before_current_root_is_complete": (
+                "invalid"
+            ),
+        }
+        if isinstance(key, str):
+            continuation["current_key"] = key
+        if fact_action == "map-put" and dynamic_value is not None:
+            continuation["next_rule"] = (
+                "resume_previous_container_response_after_deferred_fact_queue"
+            )
+            continuation["resume_previous_container_response"] = (
+                _operation_draft_resume_previous_container_payload(
+                    response_handle=dynamic_value,
+                    completed_candidate="deferred_fact_queue",
+                    operation=record.operation,
+                    version=record.version,
+                    actions=actions,
+                )
+            )
+        action_result["construction_continuation"] = continuation
+    if action.get("fact_action") == "choose" and isinstance(
+        action.get("value"), str
+    ):
+        field_payloads = draft_operation_request_contract(
+            record.operation, record.version
+        ).gateway_field_payloads()
+        selected_handle = action["value"]
+        selected = next(
+            (
+                field
+                for field in field_payloads
+                if field.get("handle") == selected_handle
+            ),
+            None,
+        )
+        constants = (
+            selected.get("branch_choice_constants")
+            if isinstance(selected, Mapping)
+            else None
+        )
+        if isinstance(constants, Mapping) and constants:
+            required_followups: list[dict[str, Any]] = []
+            for field in field_payloads:
+                name = field.get("name")
+                if (
+                    field.get("parent_handle") != selected_handle
+                    or not isinstance(name, str)
+                    or name not in constants
+                ):
+                    continue
+                value = constants[name]
+                if isinstance(value, bool):
+                    value_type, value_text = "boolean", "true" if value else "false"
+                elif isinstance(value, int):
+                    value_type, value_text = "integer", str(value)
+                elif isinstance(value, float) and math.isfinite(value):
+                    value_type, value_text = (
+                        "number",
+                        json.dumps(value, ensure_ascii=False, allow_nan=False),
+                    )
+                elif isinstance(value, str):
+                    value_type, value_text = "string", value
+                else:
+                    raise GatewayInputError(
+                        "Selected branch constant has an unsupported typed value."
+                    )
+                required_followups.append(
+                    {
+                        "reason": "selected_branch_constant",
+                        "typed_fact_arguments": [
+                            "--action",
+                            "add_typed_fact",
+                            "--fact-action",
+                            "set",
+                            "--field-handle",
+                            field["handle"],
+                            "--value-type",
+                            value_type,
+                            "--fact-value",
+                            value_text,
+                        ],
+                    }
+                )
+            if required_followups:
+                action_result["required_followup_facts"] = required_followups
     return {
         "current_facts_summary": _operation_draft_facts_summary(current_facts),
-        "action_result": {
-            "contract": "waapi-skill.operation-draft-action-result/v1",
-            "action": action_name,
-            "created_handles": sorted(current_handles - prior_handles),
-            "affected_handles": affected_handles,
-        },
+        "action_result": action_result,
     }
 
 
@@ -10560,10 +27208,17 @@ def operation_draft_payload(
     record: OperationDraftRecord,
     *,
     offline: bool = True,
-    compact_action: Mapping[str, Any] | None = None,
+    state_dir: str | Path | None = None,
+    compact_actions: Sequence[Mapping[str, Any]] | None = None,
     prior_record: OperationDraftRecord | None = None,
+    task_authority: str | None = None,
 ) -> dict[str, Any]:
     """Project bounded lifecycle facts without inventing adapter-owned fields."""
+
+    read_only_draft = (
+        record.operation.startswith("ak.")
+        and public_typed_contract(record.version, record.operation).effect == "read"
+    )
 
     if record.composer_digest is not None and record.composition is not None:
         projection = composition_projection(
@@ -10597,7 +27252,10 @@ def operation_draft_payload(
                 projection["allowed_actions"].extend(
                     ["check", "preview-from-draft"]
                 )
-            if command == "draft-check":
+            if command == "draft-check" and not operation_uses_business_declaration(
+                record.operation,
+                record.version,
+            ):
                 current_facts = projection.pop("current_facts")
                 if not isinstance(current_facts, list):
                     raise GatewayInputError(
@@ -10613,6 +27271,17 @@ def operation_draft_payload(
                     "compact_projection_is_not_truncation": True,
                     "draft_inspect_required_before_preview": False,
                 }
+                projection["construction_state"] = {
+                    "draft_complete": True,
+                    "preview_created": False,
+                    "required_next_phase": "preview-from-draft",
+                    "execute_returned_next_command_exactly": True,
+                    "construction_boundary": (
+                        operation_draft_construction_boundary(
+                            read_only=read_only_draft
+                        )
+                    ),
+                }
         if record.seal is None:
             projection["seal"] = None
         else:
@@ -10626,7 +27295,7 @@ def operation_draft_payload(
                 "transaction_id": record.seal["transaction_id"],
                 "artifact_hash": record.seal["artifact_hash"],
             }
-        if compact_action is not None:
+        if compact_actions is not None:
             if command != "draft-apply" or prior_record is None:
                 raise GatewayInputError(
                     "Compact Draft action projection is valid only for draft-apply."
@@ -10638,12 +27307,31 @@ def operation_draft_payload(
                 )
             projection.update(
                 _operation_draft_compact_action_projection(
-                    action=compact_action,
+                    actions=compact_actions,
                     prior_record=prior_record,
                     record=record,
                     current_facts=current_facts,
                 )
             )
+            if len(compact_actions) > 1:
+                action_result = projection.get("action_result")
+                if not isinstance(action_result, dict):
+                    raise GatewayInputError(
+                        "Compact Draft batch projection lacks its action result."
+                    )
+                action_result["last_action"] = action_result.pop("action")
+                action_result["action"] = "batch"
+                action_result["action_count"] = len(compact_actions)
+                action_result["applied_atomically"] = True
+                batch_continuation = _operation_draft_node_batch_continuation(
+                    compact_actions,
+                    operation=record.operation,
+                    version=record.version,
+                )
+                if batch_continuation is None:
+                    action_result.pop("construction_continuation", None)
+                else:
+                    action_result["construction_continuation"] = batch_continuation
             projection["schema_required_fields_status"] = projection.pop(
                 "missing_fields_status"
             )
@@ -10652,10 +27340,11 @@ def operation_draft_payload(
                 "truncated": False,
                 "projection": "action_delta_and_draft_receipt",
                 "compact_projection_is_not_truncation": True,
-                "user_intent_coverage": (
-                    "compare_planned_actions_before_draft-check"
+                "construction_boundary": (
+                    operation_draft_construction_boundary(
+                        read_only=read_only_draft
+                    )
                 ),
-                "draft_inspect_required_before_next_planned_action": False,
             }
             projection = {
                 key: projection[key]
@@ -10677,6 +27366,7 @@ def operation_draft_payload(
                 else []
             ),
         }
+    projection = operation_draft_public_projection(projection)
     draft = {
         "contract": OPERATION_DRAFT_CONTRACT,
         "draft_id": record.draft_id,
@@ -10689,7 +27379,7 @@ def operation_draft_payload(
         },
         **(
             {}
-            if compact_action is not None
+            if compact_actions is not None
             else {
                 "created_at": record.created_at,
                 "updated_at": record.updated_at,
@@ -10698,20 +27388,510 @@ def operation_draft_payload(
         ),
         **projection,
     }
+    if (
+        record.state is OperationDraftState.EDITABLE
+        and operation_uses_business_declaration(
+            record.operation,
+            record.version,
+        )
+    ):
+        next_action_binding = _business_next_action_binding(
+            record,
+            task_authority=task_authority,
+        )
+        adapter = business_adapter(record.operation)
+        audio_import_declaration_receipt = (
+            record.operation == "audio.import"
+            and command
+            in {
+                "draft-declare-import-batch",
+                "draft-declare-new",
+                "draft-declare-existing",
+            }
+        )
+        compact_business_update = (
+            record.check is None
+            and not audio_import_declaration_receipt
+            and (
+                command
+                in {
+                    "draft-bind-object",
+                    "draft-bind-field",
+                    "draft-discover-fields",
+                    "draft-discover-types",
+                }
+                or adapter.accepts_update_command(command)
+                or command == "draft-declare-existing-batch"
+            )
+        )
+        if compact_business_update:
+            declared_object: dict[str, str] | None = None
+            if command in {"draft-declare-new", "draft-declare-existing"}:
+                declarations = draft.get("declarations")
+                if isinstance(declarations, list) and declarations:
+                    latest = declarations[-1]
+                    if (
+                        isinstance(latest, Mapping)
+                        and isinstance(latest.get("declaration_id"), str)
+                        and isinstance(latest.get("result_handle"), str)
+                    ):
+                        declared_object = {
+                            "declaration_id": latest["declaration_id"],
+                            "result_handle": latest["result_handle"],
+                        }
+            next_action_binding = {
+                key: value
+                for key, value in next_action_binding.items()
+                if key
+                not in {
+                    "business_contract",
+                    "responsibility_split",
+                    "forbidden_inputs",
+                }
+            }
+            next_action_binding = _compact_business_binding_continuation(
+                next_action_binding
+            )
+            if (
+                command in {
+                    "draft-bind-object",
+                    "draft-discover-fields",
+                    "draft-declare-existing",
+                    "draft-declare-existing-batch",
+                }
+                and record.operation == "object.set"
+            ):
+                next_action_binding = _compact_object_set_update_continuation(
+                    next_action_binding,
+                    command=command,
+                    draft_id=record.draft_id,
+                    task_authority=(
+                        task_authority or "<task-authority-from-draft-start>"
+                    ),
+                )
+            draft = {
+                key: draft[key]
+                for key in (
+                    "contract",
+                    "draft_id",
+                    "lifecycle_state",
+                    "revision",
+                    "binding",
+                    "business_revision",
+                )
+                if key in draft
+            }
+            if declared_object is not None:
+                draft["declared_object"] = declared_object
+            draft["response_integrity"] = {
+                "complete": True,
+                "truncated": False,
+                "projection": (
+                    "bound_object_and_copy_ready_continuation"
+                    if command == "draft-bind-object"
+                    else "business_update_and_copy_ready_continuation"
+                ),
+                "compact_projection_is_not_truncation": True,
+            }
+        if (
+            record.operation == "audio.import"
+            and record.check is None
+            and command == "draft-declare-import-batch"
+        ):
+            declarations = draft.get("declarations")
+            if not isinstance(declarations, list) or not declarations:
+                raise GatewayInputError(
+                    "Audio import batch receipt is unavailable."
+                )
+            check_argv = [
+                "python",
+                str(GATEWAY_RUNNER_PATH),
+                "gateway.py",
+                "draft-check",
+                record.draft_id,
+                "--task-authority",
+                task_authority or "<task-authority-from-draft-start>",
+                "--expected-revision",
+                str(record.revision),
+            ]
+            append_import_chunk = next_action_binding.get(
+                "declare_import_batch"
+            )
+            if not isinstance(append_import_chunk, Mapping):
+                raise GatewayInputError(
+                    "Audio import chunk continuation is unavailable."
+                )
+            compact_append = _compact_business_binding_continuation(
+                append_import_chunk
+            )
+            if not isinstance(compact_append, Mapping):  # pragma: no cover
+                raise GatewayInputError(
+                    "Audio import chunk continuation is malformed."
+                )
+            append_import_chunk = {
+                key: compact_append[key]
+                for key in (
+                    "fixed_argv_prefix_copy",
+                    "fixed_argv_prefix_copy_instruction",
+                    "row_order",
+                    "rows_per_command",
+                    "row_completeness",
+                    "dependency_closure",
+                )
+            }
+            raw_object_binding = next_action_binding.get("object_binding")
+            by_path_binding = (
+                raw_object_binding.get("by_path_segments")
+                if isinstance(raw_object_binding, Mapping)
+                else None
+            )
+            if not isinstance(by_path_binding, Mapping):
+                raise GatewayInputError(
+                    "Audio import path binding continuation is unavailable."
+                )
+            compact_path_binding = _compact_business_binding_continuation(
+                by_path_binding
+            )
+            if not isinstance(compact_path_binding, Mapping):  # pragma: no cover
+                raise GatewayInputError(
+                    "Audio import path binding continuation is malformed."
+                )
+            bind_additional_object = {
+                key: compact_path_binding[key]
+                for key in (
+                    "fixed_argv_prefix_copy",
+                    "fixed_argv_prefix_copy_instruction",
+                    "append_repeated",
+                )
+            }
+            next_action_binding = {
+                "contract": "waapi-skill.business-draft-next-action/v1",
+                "required_next_phase": (
+                    "bind_all_remaining_user_requested_dependencies_before_append_"
+                    "next_import_chunk_or_use_draft_next_command_when_complete"
+                ),
+                "bind_additional_object_by_path_segments": bind_additional_object,
+                "append_import_chunk": append_import_chunk,
+                "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+            }
+            draft = {
+                key: draft[key]
+                for key in (
+                    "contract",
+                    "draft_id",
+                    "lifecycle_state",
+                    "revision",
+                    "binding",
+                )
+                if key in draft
+            }
+            declaration_ids = [
+                row.get("declaration_id")
+                for row in declarations
+                if isinstance(row, Mapping)
+            ]
+            if (
+                len(declaration_ids) != len(declarations)
+                or not all(isinstance(value, str) for value in declaration_ids)
+            ):
+                raise GatewayInputError(
+                    "Audio import batch receipt has invalid declaration identities."
+                )
+            switch_assignment_count = sum(
+                1
+                for row in declarations
+                if isinstance(row, Mapping)
+                and isinstance(row.get("fields"), Mapping)
+                and "switch_value" in row["fields"]
+            )
+            prior_declaration_count = 0
+            if prior_record is not None and prior_record.composition is not None:
+                prior_session = prior_record.composition.get(
+                    "business_session"
+                )
+                if isinstance(prior_session, Mapping):
+                    prior_declarations = prior_session.get("declarations")
+                    if isinstance(prior_declarations, list):
+                        prior_declaration_count = len(prior_declarations)
+            chunk_declaration_count = len(declarations) - prior_declaration_count
+            if not 1 <= chunk_declaration_count <= AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS:
+                raise GatewayInputError(
+                    "Audio import chunk receipt has an invalid declaration count."
+                )
+            draft["batch_receipt"] = {
+                "contract": (
+                    "waapi-skill.business-declaration-batch-receipt/v1"
+                ),
+                "chunk_declaration_count": chunk_declaration_count,
+                "cumulative_declaration_count": len(declarations),
+                "switch_assignment_count": switch_assignment_count,
+            }
+            draft["response_integrity"] = {
+                "complete": True,
+                "truncated": False,
+                "projection": "business_declaration_batch_receipt_and_check",
+                "compact_projection_is_not_truncation": True,
+            }
+            draft["next_command"] = transaction_next_command(
+                "draft-check",
+                check_argv[3:],
+                state_dir=state_dir,
+            )
+        elif (
+            record.operation == "audio.import"
+            and record.check is None
+            and command in {"draft-declare-new", "draft-declare-existing"}
+        ):
+            declarations = draft.get("declarations")
+            if not isinstance(declarations, list) or not declarations:
+                raise GatewayInputError(
+                    "Audio import declaration receipt is unavailable."
+                )
+            check_argv = [
+                "python",
+                str(GATEWAY_RUNNER_PATH),
+                "gateway.py",
+                "draft-check",
+                record.draft_id,
+                "--task-authority",
+                task_authority or "<task-authority-from-draft-start>",
+                "--expected-revision",
+                str(record.revision),
+            ]
+            next_action_binding = {
+                "contract": "waapi-skill.business-draft-next-action/v1",
+                "required_next_phase": "check_complete_business_declaration",
+                "check": {
+                    **operation_draft_prefix_copy_binding(check_argv),
+                    "append": [],
+                },
+                "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+                "then_read_next_response": True,
+                "precompute_or_increment_revision": False,
+            }
+            draft = {
+                key: draft[key]
+                for key in (
+                    "contract",
+                    "draft_id",
+                    "lifecycle_state",
+                    "revision",
+                    "binding",
+                    "business_revision",
+                )
+                if key in draft
+            }
+            draft["declaration_receipt"] = declarations[-1]
+            draft["declarations_summary"] = {
+                "count": len(declarations),
+                "canonical_sha256": canonical_sha256(declarations),
+            }
+            draft["response_integrity"] = {
+                "complete": True,
+                "truncated": False,
+                "projection": "business_declaration_receipt_and_continuation",
+                "compact_projection_is_not_truncation": True,
+            }
+        checked_compound_child = (
+            command == "draft-check"
+            and record.check is not None
+            and record.composition.get("compound_parent") is not None
+        )
+        checked_business_preview = (
+            command == "draft-check"
+            and record.check is not None
+            and not checked_compound_child
+        )
+        if checked_business_preview:
+            draft["construction_state"] = {
+                "draft_complete": True,
+                "preview_created": False,
+                "required_next_phase": "preview-from-draft",
+                "sole_continuation_source": "/next_command",
+            }
+        else:
+            draft["next_action_binding"] = next_action_binding
+            draft["agent_control"] = {
+                "terminal": False,
+                "required_outcome_before_reply": "preview_or_structured_refusal",
+                "next": "follow_next_action_binding",
+                "reply_or_claim_preview_now": "invalid",
+            }
+        return {
+            "contract": GATEWAY_RESULT_CONTRACT,
+            "ok": True,
+            "status": record.state.value,
+            "command": command,
+            "offline": offline,
+            "draft": draft,
+        }
     if record.state is OperationDraftState.EDITABLE:
+        generic_typed_draft = record.operation.startswith("ak.") or (
+            record.operation in DRAFT_TYPED_OPERATIONS
+            and record.operation != "waapi.undoGroup"
+        )
         next_action_binding: dict[str, Any] = {
             "contract": "waapi-skill.operation-draft-next-action/v1",
+            "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
         }
-        if compact_action is None:
+        if (
+            command == "draft-start"
+            and compact_actions is None
+            and record.check is None
+            and not generic_typed_draft
+        ):
+            composer_input = operation_composer_input_contract(
+                record.operation,
+                record.version,
+            )
+            apply_contract = require_mapping(
+                composer_input.get("apply"),
+                "operation Composer apply contract",
+            )
+            action_argv = require_mapping(
+                apply_contract.get("action_argv"),
+                "operation Composer action argv",
+            )
+            allowed_actions = draft.get("allowed_actions")
+            if not isinstance(allowed_actions, list):
+                raise GatewayInputError(
+                    "Editable operation Draft lacks its allowed actions."
+                )
+            allowed_action_argv = {
+                action: list(action_argv[action])
+                for action in allowed_actions
+                if isinstance(action, str) and action in action_argv
+            }
+            if allowed_action_argv:
+                next_action_binding["allowed_action_argv"] = allowed_action_argv
+                next_action_binding["action_argv_discipline"] = {
+                    "source": "allowed_action_argv[action-name]",
+                    "copy_placeholder_positions_exactly": True,
+                    "insert_type_only_where_template_contains_TYPE": True,
+                }
+            if (
+                operation_uses_business_declaration(
+                    record.operation,
+                    record.version,
+                )
+                and business_adapter(
+                    record.operation
+                ).requires_wwise_path_discipline
+            ):
+                next_action_binding["wwise_path_discipline"] = {
+                    "parent_source": "exact_user_supplied_business_path",
+                    "append_descendant": (
+                        "one_literal_backslash_before_each_child_name"
+                    ),
+                    "remove_or_normalize_existing_separators": "invalid",
+                }
+        if generic_typed_draft:
+            typed_draft_contract = (
+                request_contract(record.version, record.operation)
+                if record.operation.startswith("ak.")
+                else draft_operation_request_contract(
+                    record.operation,
+                    record.version,
+                )
+            )
+            next_action_binding["typed_fact_batch_discipline"] = {
+                "batch_size": "6 until fewer than 6 facts remain",
+                "final_batch": (
+                    "include every remaining complete action; never split"
+                ),
+                "top_level_facts_before_dynamic_disclosure": True,
+                "branch_choice_requires_selected_branch_facts": True,
+                "schema_candidates_without_business_values": "skip",
+            }
+            next_action_binding["selected_branch_fact_completion"] = {
+                "choose_only": "invalid",
+                "same_batch_before_next_top_level_fact": True,
+                "path_selector_exact_sequence": [
+                    "choose branch handle with the path choice handle",
+                    "set selected path choice kind handle to string path",
+                    "set selected path choice value handle to the exact business path",
+                ],
+                "exact_type_name_selector_exact_sequence": [
+                    "choose branch handle with the exact-type-name choice handle",
+                    "set selected choice kind handle to string exact-type-name",
+                    "set selected choice type handle to the exact business object type",
+                    "set selected choice name handle to the exact business object name",
+                ],
+                "copy_handles_from_operation_schema_exactly": True,
+            }
+            root_disclosures = _root_dynamic_disclosure_commands(
+                typed_draft_contract
+            )
+            if root_disclosures["rows"]:
+                next_action_binding["root_dynamic_disclosure_commands"] = (
+                    root_disclosures
+                )
+            next_action_binding["next_phase_decision"] = {
+                "business_presence_source": "current_user_business_request",
+                "evaluate_in_order": [
+                    {
+                        "candidate": "remaining_top_level_fact_batch",
+                        "condition": (
+                            "unsubmitted_top_level_or_selected_branch_fact_is_present"
+                        ),
+                        "action": (
+                            "use_fixed_argv_prefix_for_next_full_or_final_batch"
+                        ),
+                    },
+                    {
+                        "candidate": "dynamic_disclosure",
+                        "condition": (
+                            "no_remaining_top_level_or_selected_branch_fact"
+                        ),
+                    },
+                ],
+                "first_true_candidate_is_the_only_next_phase": True,
+            }
+        if generic_typed_draft:
+            next_action_binding["prompt_fact_completion_guard"] = {
+                "schema_optional_is_not_evidence_of_prompt_absence": True,
+                "account_for_every_prompt_present_scalar_array_item_and_map_entry": True,
+                "copy_boolean_values_exactly": True,
+                "infer_or_replace_prompt_values": "invalid",
+            }
+        if compact_actions is None:
             next_action_binding.update(
                 {
                     "draft_id": record.draft_id,
                     "expected_revision": record.revision,
-                    "one_action_only": True,
+                    "one_atomic_action_batch_only": True,
+                    "minimum_actions": 1,
+                    "maximum_actions": MAX_TYPED_ACTIONS_PER_APPLY,
                     "then_read_next_response": True,
                     "precompute_or_increment_revision": False,
                 }
             )
+            if (
+                record.revision == 1
+                and record.check is None
+                and generic_typed_draft
+            ):
+                next_action_binding.update(
+                    {
+                        "required_next_phase": "typed_fact_batch",
+                        "fact_order_source": (
+                            "/operation-schema/composer/construction_order"
+                            if not record.operation.startswith("ak.")
+                            else "/request-schema/construction_order"
+                        ),
+                        "first_batch_rule": (
+                            "submit the next 6 schema-ordered facts when "
+                            "available; otherwise submit every remaining fact "
+                            "before disclosure"
+                        ),
+                        "branch_choice_rule": (
+                            "after choose, add required selected-branch "
+                            "constant and prompt-value facts before the next "
+                            "top-level fact"
+                        ),
+                        "dynamic_disclosure_before_first_fact": "invalid",
+                    }
+                )
         if record.check is not None:
             next_action_binding.update(
                 {
@@ -10722,46 +27902,263 @@ def operation_draft_payload(
                         "preview-from-draft",
                         record.draft_id,
                         "--task-authority",
-                        "<task-authority-from-draft-start>",
+                        task_authority or "<task-authority-from-draft-start>",
                         "--expected-revision",
                         str(record.revision),
                         "--apply",
                     ],
-                    "replace_only": ["<task-authority-from-draft-start>"],
+                    "replace_only": (
+                        []
+                        if task_authority is not None
+                        else ["<task-authority-from-draft-start>"]
+                    ),
                 }
             )
         else:
+            draft_apply_prefix = [
+                "python",
+                str(GATEWAY_RUNNER_PATH),
+                "gateway.py",
+                "draft-apply",
+                record.draft_id,
+                "--task-authority",
+                task_authority or "<task-authority-from-draft-start>",
+                "--expected-revision",
+                str(record.revision),
+                "--compact",
+                "--facts",
+            ]
+            if compact_actions is None:
+                next_action_binding.update(
+                    operation_draft_prefix_copy_binding(draft_apply_prefix)
+                )
+            else:
+                next_action_binding["fixed_argv_prefix"] = draft_apply_prefix
             next_action_binding.update(
                 {
-                    "fixed_argv_prefix": [
-                        "python",
-                        str(GATEWAY_RUNNER_PATH),
-                        "gateway.py",
-                        "draft-apply",
-                        record.draft_id,
-                        "--task-authority",
-                        "<task-authority-from-draft-start>",
-                        "--expected-revision",
-                        str(record.revision),
-                        "--compact",
-                        "--facts",
-                    ],
-                    "append_exactly_one_typed_action": [
+                    "append_every_next_complete_handle_ready_typed_action_until_limit_or_new_handle_dependency": [
                         "--action",
                         "<action-name>",
                         "<typed-fact-arguments>",
                     ],
                     "replace_only": [
-                        "<task-authority-from-draft-start>",
                         "<action-name>",
                         "<typed-fact-arguments>",
                     ],
                 }
             )
-        if compact_action is None:
+            if task_authority is None:
+                next_action_binding["replace_only"].insert(
+                    0, "<task-authority-from-draft-start>"
+                )
+        if compact_actions is None:
             next_action_binding["copy_all_other_values_exactly"] = True
-        if not (command == "draft-check" and record.check is not None):
+        elif record.check is None:
+            action_result = draft.get("action_result")
+            construction_continuation = (
+                action_result.get("construction_continuation")
+                if isinstance(action_result, Mapping)
+                else None
+            )
+            resume_previous = (
+                construction_continuation.get(
+                    "resume_previous_container_response"
+                )
+                if isinstance(construction_continuation, Mapping)
+                else None
+            )
+            if isinstance(resume_previous, Mapping):
+                for stale_key in (
+                    "typed_fact_batch_discipline",
+                    "selected_branch_fact_completion",
+                    "root_dynamic_disclosure_commands",
+                    "next_phase_decision",
+                ):
+                    next_action_binding.pop(stale_key, None)
+                next_action_binding["resume_previous_container_response"] = dict(
+                    resume_previous
+                )
+            if (
+                compact_actions is not None
+                and draft.get("schema_required_fields_status") == "complete"
+            ):
+                completion_argv = [
+                    "python",
+                    str(GATEWAY_RUNNER_PATH),
+                    "gateway.py",
+                    "draft-check",
+                    record.draft_id,
+                    "--task-authority",
+                    task_authority or "<task-authority-from-draft-start>",
+                    "--expected-revision",
+                    str(record.revision),
+                ]
+                completion_candidate = {
+                    "condition": (
+                        "all_current_business_request_facts_and_disclosures_submitted"
+                    ),
+                    "business_completion_check": {
+                        "source": "current_user_business_request",
+                        "schema_required_fields_complete_is_insufficient": True,
+                        "all_user_present_optional_map_and_constant_facts_required": True,
+                        "exact_values_and_object_types_required": True,
+                    },
+                    "is_next_command_when_condition_true": True,
+                    "fixed_argv_prefix": completion_argv,
+                    "copy_exactly": True,
+                    "copy_instruction": {
+                        "contract": (
+                            OPERATION_DRAFT_COMMAND_COPY_INSTRUCTION_CONTRACT
+                        ),
+                        "source_field": "copy_command",
+                        "action": "execute_verbatim_as_one_shell_tool_call",
+                        "forbidden_transformations": [
+                            "reconstruct",
+                            "shorten",
+                            "normalize",
+                            "substitute_path_segments",
+                            "select_another_field",
+                        ],
+                    },
+                    "copy_command": operation_draft_copy_command(
+                        completion_argv
+                    ),
+                    "allowed_suffix_source": (
+                        "request_schema_terminal_arguments_only"
+                    ),
+                    "draft_apply_action_check": "invalid",
+                    "when_condition_false": (
+                        "continue_with_one_atomic_typed_action_batch_or_dynamic_disclosure"
+                    ),
+                }
+                if generic_typed_draft:
+                    terminal_arguments = typed_draft_contract.as_gateway_payload().get(
+                        "result_filter"
+                    )
+                    if isinstance(terminal_arguments, Mapping):
+                        completion_candidate[
+                            "request_schema_terminal_arguments"
+                        ] = {
+                            "source_pointer": "/request-schema/result_filter",
+                            "append_before_execute": True,
+                            "contract": dict(terminal_arguments),
+                        }
+                next_action_binding["completion_candidate"] = completion_candidate
+            followups = (
+                action_result.get("required_followup_facts")
+                if isinstance(action_result, Mapping)
+                else None
+            )
+            prefix = next_action_binding.get("fixed_argv_prefix")
+            if isinstance(followups, list) and isinstance(prefix, list):
+                for followup in followups:
+                    arguments = (
+                        followup.get("typed_fact_arguments")
+                        if isinstance(followup, dict)
+                        else None
+                    )
+                    if not isinstance(arguments, list):
+                        continue
+                    followup.update(
+                        {
+                            "is_next_command": True,
+                            "literal_copy_policy": {
+                                "copy_fixed_full_argv_exactly": True,
+                                "business_value_substitution": "invalid",
+                            },
+                            "fixed_full_argv": [*prefix, *arguments],
+                        }
+                    )
+        if compact_actions is not None and "completion_candidate" in next_action_binding:
+            # A long generic composition can repeat several exact root
+            # disclosure commands after every atomic fact batch.  Put the
+            # terminal decision first so a caller that has finished every
+            # business-present fact sees the complete draft-check command in
+            # the bounded stdout prefix instead of mistaking the receipt for a
+            # truncated continuation.
+            contract_name = next_action_binding.pop("contract")
+            completion_candidate = next_action_binding.pop(
+                "completion_candidate"
+            )
+            next_action_binding = {
+                "contract": contract_name,
+                "completion_candidate": completion_candidate,
+                **next_action_binding,
+            }
+        checked_compound_child = (
+            command == "draft-check"
+            and record.check is not None
+            and record.composition is not None
+            and record.composition.get("compound_parent") is not None
+        )
+        if (
+            not (command == "draft-check" and record.check is not None)
+            or checked_compound_child
+        ):
+            priority_keys = (
+                "contract",
+                "required_next_phase",
+                "fixed_argv_prefix_copy",
+                "fixed_argv_prefix_copy_instruction",
+                "next_phase_decision",
+            )
+            next_action_binding = {
+                **{
+                    key: next_action_binding[key]
+                    for key in priority_keys
+                    if key in next_action_binding
+                },
+                **{
+                    key: value
+                    for key, value in next_action_binding.items()
+                    if key not in priority_keys
+                },
+            }
             draft["next_action_binding"] = next_action_binding
+        if command in {
+            "draft-start",
+            "draft-start-undo-child",
+            "draft-apply",
+        }:
+            agent_control = {
+                "terminal": False,
+                "required_outcome_before_reply": (
+                    "preview_or_structured_refusal"
+                ),
+                "next": "follow_next_action_binding",
+                "reply_or_claim_preview_now": "invalid",
+            }
+            draft = {
+                **{
+                    key: draft[key]
+                    for key in (
+                        "contract",
+                        "draft_id",
+                        "lifecycle_state",
+                        "revision",
+                        "binding",
+                    )
+                },
+                "agent_control": agent_control,
+                **(
+                    {"next_action_binding": draft["next_action_binding"]}
+                    if "next_action_binding" in draft
+                    else {}
+                ),
+                **{
+                    key: value
+                    for key, value in draft.items()
+                    if key
+                    not in {
+                        "contract",
+                        "draft_id",
+                        "lifecycle_state",
+                        "revision",
+                        "binding",
+                        "next_action_binding",
+                    }
+                },
+            }
     return {
         "contract": GATEWAY_RESULT_CONTRACT,
         "ok": True,
@@ -10871,6 +28268,7 @@ def transaction_show_summary(
     cleanup_phase = {
         TransactionState.EXECUTING.value: "indeterminate",
         TransactionState.INDETERMINATE.value: "indeterminate",
+        TransactionState.EXECUTION_FAILED.value: "indeterminate",
         TransactionState.EXECUTED_UNVERIFIED.value: "executed",
         TransactionState.VERIFIED.value: "verified",
         TransactionState.RESULT_SCHEMA_CHECKED.value: "verified",
@@ -11564,6 +28962,7 @@ def transaction_read_call(
     *,
     connection: GatewayConnection,
     version: str,
+    call_sink: list[dict[str, Any]] | None = None,
 ) -> Callable[[str, Mapping[str, Any], Mapping[str, Any]], Mapping[str, Any]]:
     def read(uri: str, args: Mapping[str, Any], options: Mapping[str, Any]) -> Mapping[str, Any]:
         if uri not in PACKAGED_TRANSACTION_READBACK_URIS:
@@ -11591,6 +28990,8 @@ def transaction_read_call(
                 f"Read-only transaction preflight failed for {uri}.",
                 details={"call": result},
             )
+        if call_sink is not None:
+            call_sink.append(dispatch_call_summary(result))
         payload = result.get("result")
         if not isinstance(payload, Mapping):
             raise OperationContractError(
@@ -11806,90 +29207,53 @@ def parse_json_object(
     return payload
 
 
-def parse_preview_request_object(text: str) -> dict[str, Any]:
-    """Parse the larger, still argv-safe preview envelope used by inline audio."""
+def parse_operation_draft_cli_actions(
+    args: argparse.Namespace,
+) -> tuple[dict[str, Any], ...]:
+    """Build one bounded ordered production Draft action batch."""
 
-    return parse_json_object(
-        text,
-        "--request-json",
-        max_document_bytes=MAX_PREVIEW_JSON_INPUT_BYTES,
-        max_string_bytes=MAX_PREVIEW_JSON_STRING_BYTES,
-    )
-
-
-def parse_operation_draft_action_object(text: str) -> dict[str, Any]:
-    """Parse a bounded Draft action that may carry reviewed inline media.
-
-    The Adapter applies its narrower operation-specific action ceiling after
-    this syntax-only parse, so object.set retains its existing 32 KiB limit.
-    """
-
-    return parse_json_object(
-        text,
-        "--action-json",
-        max_document_bytes=MAX_PREVIEW_JSON_INPUT_BYTES,
-        max_string_bytes=MAX_PREVIEW_JSON_STRING_BYTES,
-    )
-
-
-def parse_operation_draft_cli_action(args: argparse.Namespace) -> dict[str, Any]:
-    """Build the normal typed action or parse the hidden compatibility form."""
-
-    typed_rows_present = bool(args.facts)
-    if args.action_json is not None:
-        if typed_rows_present:
-            raise GatewayInputError(
-                "draft-apply cannot combine typed fact flags with --action-json"
-            )
-        return parse_operation_draft_action_object(args.action_json)
     if not args.facts:
         raise GatewayInputError("draft-apply requires --facts --action and typed facts")
     try:
-        return parse_typed_action_cli_arguments(args.facts)
+        return parse_typed_action_cli_argument_sequence(args.facts)
     except OperationComposerError as exc:
         raise GatewayInputError(str(exc)) from exc
-
-
-def require_normal_legacy_preview_input_mode(
-    request_payload: Mapping[str, Any],
-) -> None:
-    """Keep raw full JSON on ``preview`` only while it is the normal mode.
-
-    Unknown, malformed, or version-unavailable requests continue to the
-    canonical parser so ``preview`` and ``legacy-preview`` retain identical
-    request-contract errors.  A valid exact lane whose normal mode migrated to
-    the Composer is rejected before connecting; only the explicit
-    compatibility command may then submit full JSON.
-    """
-
-    operation = request_payload.get("operation")
-    version = request_payload.get("version")
-    if not isinstance(operation, str) or not isinstance(version, str):
-        return
-    try:
-        input_mode = operation_input_mode(operation, version)
-    except OperationContractError as exc:
-        if exc.error_code in {"UNKNOWN_OPERATION", "UNAVAILABLE_IN_VERSION"}:
-            return
-        raise
-    if input_mode != LEGACY_JSON_INPUT_MODE:
-        raise OperationContractError(
-            "INPUT_MODE_MISMATCH",
-            "The normal preview route does not accept legacy full-JSON input "
-            "for this exact operation and Wwise version.",
-            details={
-                "operation": operation,
-                "version": version,
-                "required_input_mode": input_mode,
-                "submitted_input_mode": LEGACY_JSON_INPUT_MODE,
-            },
-        )
 
 
 def parse_optional_json(text: str | None, option_name: str) -> Any:
     if text is None:
         return None
     return parse_strict_json(text, option_name)
+
+
+def typed_query_predicates(args: argparse.Namespace) -> Any:
+    """Return repeated typed simple predicates."""
+
+    predicates: list[dict[str, Any]] = []
+    for field, operator, value_type, raw_value in args.where:
+        if value_type == "string":
+            value: Any = raw_value
+        elif value_type == "integer":
+            if re.fullmatch(r"-?(0|[1-9][0-9]*)", raw_value) is None:
+                raise GatewayInputError("--where integer values must be canonical")
+            value = int(raw_value)
+        elif value_type == "number":
+            try:
+                value = float(raw_value)
+            except ValueError as exc:
+                raise GatewayInputError("--where number values must be numeric") from exc
+            if not math.isfinite(value):
+                raise GatewayInputError("--where number values must be finite")
+        elif value_type == "boolean":
+            if raw_value not in {"true", "false"}:
+                raise GatewayInputError("--where boolean values must be true or false")
+            value = raw_value == "true"
+        else:
+            raise GatewayInputError(
+                "--where TYPE must be string, integer, number, or boolean"
+            )
+        predicates.append({"field": field, "operator": operator, "value": value})
+    return predicates or None
 
 
 def parse_strict_json(
@@ -11945,209 +29309,14 @@ def _parse_strict_json_float(token: str) -> float:
     return value
 
 
-def parse_media_pool_post_filter_spec(text: str | None) -> dict[str, Any] | None:
-    """Parse the one closed client-side Media Pool post-filter contract."""
-
-    if text is None:
-        return None
-    spec = parse_json_object(text, "--post-filter-json")
-    expected_keys = {"field", "operator", "value", "limit"}
-    actual_keys = set(spec)
-    if actual_keys != expected_keys:
-        missing = sorted(expected_keys - actual_keys)
-        extra = sorted(actual_keys - expected_keys)
-        details: list[str] = []
-        if missing:
-            details.append(f"missing keys: {', '.join(missing)}")
-        if extra:
-            details.append(f"extra keys: {', '.join(extra)}")
-        raise GatewayInputError(
-            "--post-filter-json must contain exactly field, operator, value, and limit"
-            + (f" ({'; '.join(details)})" if details else "")
-        )
-    if spec["field"] != "Filename":
-        raise GatewayInputError("--post-filter-json field must be exactly 'Filename'")
-    if spec["operator"] != "containsCaseSensitive":
-        raise GatewayInputError(
-            "--post-filter-json operator must be exactly 'containsCaseSensitive'"
-        )
-    value = spec["value"]
-    if not isinstance(value, str) or not value:
-        raise GatewayInputError("--post-filter-json value must be a nonempty string")
-    if len(value) > MAX_MEDIA_POOL_SEARCH_TEXT_CHARS:
-        raise GatewayInputError(
-            "--post-filter-json value exceeds the reviewed "
-            f"{MAX_MEDIA_POOL_SEARCH_TEXT_CHARS}-code-point literal limit"
-        )
-    limit = spec["limit"]
-    if type(limit) is not int or not 1 <= limit <= MAX_MEDIA_POOL_RESULTS:
-        raise GatewayInputError(
-            "--post-filter-json limit must be an integer between 1 and "
-            f"{MAX_MEDIA_POOL_RESULTS}"
-        )
-    return spec
 
 
-def validate_media_pool_post_filter_request(
-    *,
-    api: str,
-    spec: Mapping[str, Any],
-    request_args: Mapping[str, Any],
-    request_options: Mapping[str, Any],
-    dry_run: bool,
-) -> None:
-    """Bind a post-filter to one bounded superset request before connecting."""
-
-    if api != MEDIA_POOL_GET_URI:
-        raise GatewayInputError(
-            "--post-filter-json is supported only for ak.wwise.core.mediaPool.get"
-        )
-    if dry_run:
-        raise GatewayInputError(
-            "--post-filter-json requires a live result and cannot be combined with --dry-run"
-        )
-    max_results = request_args.get("maxResults")
-    if (
-        type(max_results) is not int
-        or not 1 <= max_results <= MAX_MEDIA_POOL_RESULTS
-    ):
-        raise GatewayInputError(
-            "A Media Pool post-filter requires request maxResults between 1 and "
-            f"{MAX_MEDIA_POOL_RESULTS}"
-        )
-    if max_results < spec["limit"]:
-        raise GatewayInputError(
-            "A Media Pool post-filter requires request maxResults to be greater "
-            "than or equal to its limit"
-        )
-    filters = request_args.get("filters")
-    if not isinstance(filters, list) or not any(
-        isinstance(item, Mapping)
-        and item.get("type") == "field"
-        and item.get("field") == spec["field"]
-        and item.get("operator") == "contains"
-        and item.get("value") == spec["value"]
-        for item in filters
-    ):
-        raise GatewayInputError(
-            "A Media Pool post-filter requires a matching Filename contains field "
-            "filter with the same value in --args-json"
-        )
-    return_fields = request_options.get("return")
-    if not isinstance(return_fields, list) or "Filename" not in return_fields:
-        raise GatewayInputError(
-            "A Media Pool post-filter requires options.return to include 'Filename'"
-        )
 
 
-def media_pool_post_filter_audit(
-    spec: Mapping[str, Any],
-    *,
-    request_max_results: int,
-    status: str,
-    raw_count: int | None = None,
-    matched_count: int | None = None,
-    returned_count: int | None = None,
-) -> dict[str, Any]:
-    """Build a bounded audit projection without echoing the arbitrary match text."""
-
-    value = spec["value"]
-    return {
-        "contract": MEDIA_POOL_POST_FILTER_CONTRACT,
-        "status": status,
-        "field": "Filename",
-        "operator": "containsCaseSensitive",
-        "value_sha256": canonical_sha256({"value": value}),
-        "value_code_points": len(value),
-        "value_utf8_bytes": len(value.encode("utf-8")),
-        "limit": spec["limit"],
-        "request_max_results": request_max_results,
-        "raw_count": raw_count,
-        "matched_count": matched_count,
-        "returned_count": returned_count,
-        "truncated_to_limit": (
-            None
-            if matched_count is None or returned_count is None
-            else matched_count > returned_count
-        ),
-    }
 
 
-def apply_media_pool_post_filter(
-    raw_result: Any,
-    *,
-    spec: Mapping[str, Any],
-    request_max_results: int,
-    evidence_path: Any,
-) -> tuple[dict[str, Any] | None, dict[str, Any]]:
-    """Apply code-point case-sensitive containment only to a proven-complete candidate set."""
 
-    if not isinstance(raw_result, Mapping) or set(raw_result) != {"return"}:
-        raise GatewayResultShapeError(
-            "mediaPool.get post-filter expected exactly one top-level return array.",
-            details={
-                "expected": {"return": "array<object>"},
-                "actual_result_type": type(raw_result).__name__,
-                "evidence_path": evidence_path,
-            },
-            error_code="INVALID_MEDIA_POOL_POST_FILTER_RESULT",
-        )
-    raw_rows = raw_result.get("return")
-    if not isinstance(raw_rows, list):
-        raise GatewayResultShapeError(
-            "mediaPool.get post-filter expected result.return to be an array.",
-            details={
-                "expected": "array<object>",
-                "actual_return_type": type(raw_rows).__name__,
-                "evidence_path": evidence_path,
-            },
-            error_code="INVALID_MEDIA_POOL_POST_FILTER_RESULT",
-        )
-    rows: list[dict[str, Any]] = []
-    for index, raw_row in enumerate(raw_rows):
-        if not isinstance(raw_row, Mapping):
-            raise GatewayResultShapeError(
-                "mediaPool.get post-filter expected every return row to be an object.",
-                details={
-                    "invalid_index": index,
-                    "actual_row_type": type(raw_row).__name__,
-                    "evidence_path": evidence_path,
-                },
-                error_code="INVALID_MEDIA_POOL_POST_FILTER_RESULT",
-            )
-        filename = raw_row.get("Filename")
-        if not isinstance(filename, str):
-            raise GatewayResultShapeError(
-                "mediaPool.get post-filter expected every return row Filename to be a string.",
-                details={
-                    "invalid_index": index,
-                    "actual_filename_type": type(filename).__name__,
-                    "evidence_path": evidence_path,
-                },
-                error_code="INVALID_MEDIA_POOL_POST_FILTER_RESULT",
-            )
-        rows.append(dict(raw_row))
 
-    raw_count = len(rows)
-    if raw_count >= request_max_results:
-        return None, media_pool_post_filter_audit(
-            spec,
-            request_max_results=request_max_results,
-            status="incomplete",
-            raw_count=raw_count,
-        )
-
-    value = spec["value"]
-    matches = [row for row in rows if value in row["Filename"]]
-    filtered_rows = matches[: spec["limit"]]
-    return {"return": filtered_rows}, media_pool_post_filter_audit(
-        spec,
-        request_max_results=request_max_results,
-        status="applied",
-        raw_count=raw_count,
-        matched_count=len(matches),
-        returned_count=len(filtered_rows),
-    )
 
 
 def canonicalize_bounded_direct_call_request(
@@ -12451,7 +29620,7 @@ def build_metadata_command_preview(args: argparse.Namespace, *, version: str) ->
         return builder.get_property_info(property=args.property, object=args.object, class_id=args.class_id)
     if args.operation == "property-enabled":
         return builder.is_property_enabled(object=args.object, property=args.property, platform=args.platform)
-    if args.operation == "attenuation-curve":
+    if args.operation in {"attenuation", "attenuation-curve"}:
         return builder.get_attenuation_curve(
             object=args.object,
             curve_type=args.curve_type,
@@ -12472,7 +29641,7 @@ def normalize_metadata_result(operation: str, result: Mapping[str, Any]) -> Any:
         return parse_get_property_info_result(payload).as_dict()
     if operation == "property-enabled":
         return parse_is_property_enabled_result(payload).as_dict()
-    if operation == "attenuation-curve":
+    if operation in {"attenuation", "attenuation-curve"}:
         record = parse_get_attenuation_curve_result(payload, allow_documented_empty=True)
         return record.as_dict() if record is not None else None
     raise GatewayInputError(f"unsupported metadata operation: {operation}")
@@ -12691,7 +29860,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     if payload.get("contract") == TOPIC_STREAM_RECORD_CONTRACT:
         print(topic_stream_stdout_json_encoder().encode(payload), flush=True)
     else:
-        print(gateway_stdout_json_encoder(payload).encode(payload))
+        stdout_payload = gateway_stdout_payload(payload)
+        print(gateway_stdout_json_encoder(stdout_payload).encode(stdout_payload))
     return exit_code
 
 

@@ -18,6 +18,7 @@ from tests.semantic.support.codex_eval_bundle_v3 import OnlineScenario
 from tests.semantic.support.codex_eval_protocol_v3 import (
     V3GatewayProtocol,
     build_direct_protocol,
+    build_optional_query_schema_protocol,
     build_transaction_protocol,
     query_object_step,
 )
@@ -46,6 +47,9 @@ _READ_FIELDS = (
     "audioSource:language",
     "isIncluded",
 )
+_READ_FIELDS_2021 = tuple(
+    field for field in _READ_FIELDS if field not in {"activeSource", "isIncluded"}
+)
 _OUTPUT_BUS_OVERRIDE_TYPES = frozenset(
     {"ActorMixer", "PropertyContainer", "RandomSequenceContainer", "Sound"}
 )
@@ -60,6 +64,10 @@ _ACTIVE_SOURCE_FIELDS = (
     "audioSource:language",
 )
 _NUMBER_TOKEN_RE = re.compile(r"(?<![\w.])[-+]?\d+(?:\.\d+)?(?![\w.])")
+_DB_VALUE_RE = re.compile(
+    r"(?<![\w.])([-+]?\d+(?:\.\d+)?)\s*dB\b",
+    re.IGNORECASE,
+)
 _ANSWER_CLAUSE_SPLIT_RE = re.compile(
     r"[，,、；;。.!！？?：:（）()\[\]\n]+|但(?:是)?|不过|然而|\bbut\b|\bhowever\b",
     re.IGNORECASE,
@@ -331,6 +339,24 @@ class PreparedObjectRuntime:
         self._before_output_bus_overrides: dict[str, bool | None] | None = None
         self._last_snapshot_output_bus_overrides: dict[str, bool | None] = {}
 
+    @property
+    def _read_fields(self) -> tuple[str, ...]:
+        return _READ_FIELDS_2021 if self.recipe.version == "2021.1" else _READ_FIELDS
+
+    def _read_path(
+        self,
+        path: str,
+        *,
+        language: str | None = None,
+    ) -> tuple[Mapping[str, Any], ...]:
+        if language is None:
+            return self.backend.read_path(path, fields=self._read_fields)
+        return self.backend.read_path(
+            path,
+            fields=self._read_fields,
+            language=language,
+        )
+
     def render_prompt(self) -> str:
         return self.scenario.render_prompt({})
 
@@ -341,8 +367,11 @@ class PreparedObjectRuntime:
                 [request.as_dict(version=self.recipe.version)]
             )
         if isinstance(request, QueryObjectRequestSpec):
-            return build_direct_protocol(
-                [query_object_step("query-object", request.argv[3:])]
+            query = query_object_step("query-object", request.argv[3:])
+            return (
+                build_optional_query_schema_protocol(query)
+                if "--max-results" in request.argv
+                else build_direct_protocol((query,))
             )
         raise ObjectRuntimeError("unknown object recipe request type")
 
@@ -353,7 +382,7 @@ class PreparedObjectRuntime:
         ordered = sorted(self.recipe.fixture.objects, key=lambda item: (item.path.count("\\"), item.path))
         for item in ordered:
             language = self._fixture_language(item)
-            existing = self.backend.read_path(item.path, language=language) if language else self.backend.read_path(item.path)
+            existing = self._read_path(item.path, language=language)
             if item.role == "borrowed":
                 if len(existing) != 1:
                     raise ObjectRuntimeError(f"borrowed fixture path must exist exactly once: {item.path}")
@@ -383,7 +412,7 @@ class PreparedObjectRuntime:
                     object_type=requested_type,
                     name=item.name,
                 )
-            rows = self.backend.read_path(item.path, language=language) if language else self.backend.read_path(item.path)
+            rows = self._read_path(item.path, language=language)
             if len(rows) != 1 or str(rows[0].get("id")) != object_id:
                 raise ObjectRuntimeError(f"created fixture object did not resolve exactly: {item.path}")
             materialized[item.key] = self._materialize_fixture(item, rows[0])
@@ -458,15 +487,29 @@ class PreparedObjectRuntime:
         if language_context is None:
             return materialized
         active_source_id = _reference_id(row.get("activeSource"))
+        source_rows: tuple[Mapping[str, Any], ...] = ()
+        if self.recipe.version == "2021.1":
+            source_rows = tuple(
+                source
+                for source in self.backend.read_children(
+                    materialized.id,
+                    fields=_ACTIVE_SOURCE_FIELDS,
+                )
+                if str(source.get("type") or "").casefold() == "audiofilesource"
+                and _reference_id(source.get("parent")) == materialized.id
+            )
+            if len(source_rows) == 1:
+                active_source_id = _reference_id(source_rows[0].get("id"))
         if active_source_id is None:
             raise ObjectRuntimeError(
                 f"{item.key}: language-bound Sound is missing activeSource identity"
             )
-        source_rows = self.backend.read_id(
-            active_source_id,
-            fields=_ACTIVE_SOURCE_FIELDS,
-            language=language_context,
-        )
+        if self.recipe.version != "2021.1":
+            source_rows = self.backend.read_id(
+                active_source_id,
+                fields=_ACTIVE_SOURCE_FIELDS,
+                language=language_context,
+            )
         if len(source_rows) != 1:
             raise ObjectRuntimeError(
                 f"{item.key}: activeSource must resolve exactly once"
@@ -537,7 +580,7 @@ class PreparedObjectRuntime:
         absent: list[str] = []
         for item in self.recipe.fixture.objects:
             language = self._fixture_language(item)
-            rows = self.backend.read_path(item.path, language=language) if language else self.backend.read_path(item.path)
+            rows = self._read_path(item.path, language=language)
             if len(rows) > 1:
                 raise ObjectRuntimeError(f"fixture path resolved more than once: {item.path}")
             if rows:
@@ -635,7 +678,7 @@ class PreparedObjectRuntime:
 
         for expected in self.recipe.oracle.expected_objects:
             if expected.path is not None:
-                rows = self.backend.read_path(expected.path)
+                rows = self._read_path(expected.path)
             else:
                 parent = resolved.get(expected.parent_key or "") or before_by_key.get(expected.parent_key or "")
                 if parent is None and expected.parent_path:
@@ -644,7 +687,10 @@ class PreparedObjectRuntime:
                 if parent is None:
                     failures.append(f"{expected.key}: dynamic parent is unresolved")
                     continue
-                candidates = self.backend.read_children(parent.id)
+                candidates = self.backend.read_children(
+                    parent.id,
+                    fields=self._read_fields,
+                )
                 rows = tuple(
                     row
                     for row in candidates
@@ -688,7 +734,7 @@ class PreparedObjectRuntime:
                 failures.append(f"{key}: protected before-state missing")
                 continue
             protected_before[key] = asdict(old)
-            rows = self.backend.read_path(old.path)
+            rows = self._read_path(old.path)
             current = _materialize(key, rows[0]) if len(rows) == 1 else None
             protected_after[key] = asdict(current) if current is not None else None
             before_override = self._before_output_bus_override(key)
@@ -1057,10 +1103,22 @@ def _verify_query_primary_rows(
 
 
 def _query_row_field(row: Mapping[str, Any], name: str) -> Any:
+    properties = row.get("properties")
+    references = row.get("references")
+    if name == "@Volume" and isinstance(properties, Mapping):
+        return properties.get("volume_db")
+    if name == "OutputBus" and isinstance(references, Mapping):
+        return _reference_id(references.get("output_bus"))
+    if name == "isIncluded" and "included" in row:
+        return row.get("included")
     if name == "parent":
         return _reference_id(row.get(name))
     if name == "audioSource:language":
-        return _language_name(row.get(name))
+        return _language_name(
+            row.get("source_language")
+            if "source_language" in row
+            else row.get(name)
+        )
     if name == "childrenCount":
         value = row.get(name)
         return int(value) if isinstance(value, int) and not isinstance(value, bool) else value
@@ -1115,7 +1173,11 @@ def _verify_query_derived_rows(
             failures.append(f"derived row {index} has an unknown activeSource identity")
             continue
         try:
-            language = _language_name(row.get("audioSource:language"))
+            language = _language_name(
+                row.get("source_language")
+                if "source_language" in row
+                else row.get("audioSource:language")
+            )
         except ObjectRuntimeError as exc:
             failures.append(f"derived row {source_id} has invalid language: {exc}")
             language = None
@@ -1270,11 +1332,33 @@ def _paired_path_answer_proof(
     lines = final_response.splitlines()
     required: list[dict[str, Any]] = []
     excluded: list[dict[str, Any]] = []
+    id_to_key = {item.id: key for key, item in before.items()}
+    exact = set(request.exact_expected_keys)
+    expected_children = [
+        key
+        for key in expected_order_keys
+        if before[key].type == "Sound"
+        and before[key].parent_id is not None
+        and id_to_key.get(before[key].parent_id) in exact
+    ]
+    paired_line_indexes = [
+        index
+        for child_key in expected_children
+        for index, line in enumerate(lines)
+        if (
+            (parent_key := id_to_key.get(before[child_key].parent_id or ""))
+            is not None
+            and _path_token_offsets(line, before[child_key].path)
+            and _path_token_offsets(line, before[parent_key].path)
+        )
+    ]
+    result_start = min(paired_line_indexes) if paired_line_indexes else 0
+    result_lines = lines[result_start:]
     for key in request.exact_expected_keys:
         item = before[key]
         matches = [
-            (index, offset)
-            for index, line in enumerate(lines)
+            (result_start + index, offset)
+            for index, line in enumerate(result_lines)
             for offset in _path_token_offsets(line, item.path)
         ]
         required.append(
@@ -1290,8 +1374,8 @@ def _paired_path_answer_proof(
     for key in excluded_keys:
         item = before[key]
         matches = [
-            (index, offset)
-            for index, line in enumerate(lines)
+            (result_start + index, offset)
+            for index, line in enumerate(result_lines)
             for offset in _path_token_offsets(line, item.path)
         ]
         excluded.append(
@@ -1304,15 +1388,6 @@ def _paired_path_answer_proof(
         if matches:
             failures.append(f"final answer includes excluded standalone path {key}")
 
-    id_to_key = {item.id: key for key, item in before.items()}
-    exact = set(request.exact_expected_keys)
-    expected_children = [
-        key
-        for key in expected_order_keys
-        if before[key].type == "Sound"
-        and before[key].parent_id is not None
-        and id_to_key.get(before[key].parent_id) in exact
-    ]
     all_languages = {
         item.source_language
         for item in before.values()
@@ -1337,11 +1412,12 @@ def _paired_path_answer_proof(
             (index, offset)
             for index, line in enumerate(lines)
             for offset in _path_token_offsets(line, child.path)
+            if _path_token_offsets(line, parent.path)
         ]
         line_index = child_matches[0][0] if child_matches else None
         line = lines[line_index] if line_index is not None else ""
         expected_volume = _one_volume(child)
-        numeric_values = [float(value) for value in _NUMBER_TOKEN_RE.findall(line)]
+        numeric_values = [float(value) for value in _DB_VALUE_RE.findall(line)]
         language_present = (
             isinstance(child.source_language, str)
             and child.source_language.casefold() in line.casefold()

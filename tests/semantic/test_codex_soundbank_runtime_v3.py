@@ -7,6 +7,7 @@ import uuid
 import wave
 import xml.etree.ElementTree as ET
 from collections import Counter
+from dataclasses import replace
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from types import SimpleNamespace
 from typing import Any, Mapping, Sequence
@@ -18,6 +19,7 @@ from tests.semantic.support.codex_eval_bundle_v3 import load_eval_bundle_v3
 from tests.semantic.support.codex_compound_heavy_v1 import (
     load_compound_heavy_profile,
 )
+from tests.semantic.support.codex_typed_input_profile import load_typed_input_profile
 from tests.semantic.support.codex_soundbank_business_plan_v3 import (
     compile_soundbank_business_plan,
     validate_soundbank_business_plan,
@@ -64,6 +66,9 @@ COMPOUND_PROFILE = (
     / "compound-heavy-v1"
     / "profile.json"
 )
+TYPED_PROFILE = (
+    REPO_ROOT / "tests" / "semantic" / "data" / "typed-input-v1" / "profile.json"
+)
 QUERY_REFERENCE = (
     REPO_ROOT / "skills" / "waapi-skill" / "references" / "waapi-query.md"
 )
@@ -71,6 +76,24 @@ QUERY_REFERENCE = (
 
 def _guid(label: str) -> str:
     return "{" + str(uuid.uuid5(uuid.NAMESPACE_URL, f"waapi-v3:{label}")).upper() + "}"
+
+
+def test_2021_media_source_fields_remain_inside_the_closed_return_projection() -> None:
+    assert soundbank_runtime._fields(
+        soundbank_runtime.MEDIA_SOURCE_FIELDS_2021,
+        version="2021.1",
+    ) == soundbank_runtime.MEDIA_SOURCE_FIELDS_2021
+
+    with pytest.raises(SoundBankRuntimeError, match="escaped the closed set"):
+        soundbank_runtime._fields(
+            (*soundbank_runtime.MEDIA_SOURCE_FIELDS_2021, "invented"),
+            version="2021.1",
+        )
+    with pytest.raises(SoundBankRuntimeError, match="escaped the closed set"):
+        soundbank_runtime._fields(
+            soundbank_runtime.MEDIA_SOURCE_FIELDS_2021,
+            version="2022.1",
+        )
 
 
 class FakeSoundBankBackend:
@@ -86,7 +109,9 @@ class FakeSoundBankBackend:
         self.omit_conversion_short_id = False
         self.omit_source_media_id = False
         self.omit_source_from_import_result = False
+        self.omit_all_import_result_ids = False
         self.add_second_source_to_import_result = False
+        self.add_second_legacy_source = False
         self.use_wrong_source_parent = False
         self.replace_sound_on_localized_reuse = False
         self.replace_action_on_localized_reuse = False
@@ -182,6 +207,27 @@ class FakeSoundBankBackend:
                     pass
             projected.append({key: row.get(key) for key in fields})
         return tuple(projected)
+
+    def read_direct_children(
+        self,
+        object_id: str,
+        *,
+        fields: Sequence[str],
+    ) -> tuple[Mapping[str, Any], ...]:
+        rows = [
+            row
+            for row in self.rows.values()
+            if soundbank_runtime._payload_identity(row.get("parent")) == object_id
+        ]
+        return tuple(
+            {field: row.get(field) for field in fields}
+            for row in sorted(rows, key=lambda item: str(item["path"]))
+        )
+
+    def read_legacy_media_id(self, source_id: str, *, sandbox_root: Path) -> int:
+        del sandbox_root
+        row = self.rows[source_id.casefold()]
+        return int(row["mediaId"])
 
     def create_object(self, fixture: ObjectFixture) -> str:
         if fixture.path.casefold() in self.by_path:
@@ -327,6 +373,25 @@ class FakeSoundBankBackend:
             duplicate_row["mediaId"] = self.next_media
             duplicate_row["parent"] = {"id": sound_id}
             imported_ids.append(duplicate_id)
+        if self.add_second_legacy_source:
+            duplicate_path = source_path + "_legacy_duplicate"
+            duplicate_id = self._insert(
+                duplicate_path,
+                "AudioFileSource_" + fixture.key + "_legacy_duplicate",
+                "AudioFileSource",
+            )
+            duplicate_row = self.rows[duplicate_id.casefold()]
+            duplicate_row.pop("shortId")
+            duplicate_row.update(
+                {
+                    "parent": {"id": sound_id},
+                    "mediaId": self.next_media + 20_000,
+                    "audioSource:language": {"name": fixture.language},
+                    "originalWavFilePath": str(copied),
+                }
+            )
+        if self.omit_all_import_result_ids:
+            return ()
         return tuple(imported_ids)
 
     def read_event_graph(self, path: str) -> EventGraphState | None:
@@ -433,6 +498,58 @@ class FakeSoundBankBackend:
                     (artifact.path.parent / "Wwise.dat").write_bytes(
                         ("INDEX:" + case.scenario_id).encode("utf-8")
                     )
+            if case.blueprint.version == "2021.1" and case.blueprint.api == SOUNDBANK_TOPIC:
+                cache_root = case.allowed_dynamic_artifact_roots[0] / "Windows" / "SFX"
+                cache_root.mkdir(parents=True, exist_ok=True)
+                info = ET.Element("SoundBanksInfo")
+                roots = ET.SubElement(info, "RootPaths")
+                ET.SubElement(roots, "SourceFilesRoot").text = str(
+                    cache_root.parent
+                )
+                streamed = ET.SubElement(info, "StreamedFiles")
+                for media in case.blueprint.media_fixtures:
+                    relative = f"SFX\\{media.wav_path.stem}_A07A4AEB.wem"
+                    (cache_root / f"{media.wav_path.stem}_A07A4AEB.wem").write_bytes(
+                        b"bounded converted cache media"
+                    )
+                    row = ET.SubElement(
+                        streamed,
+                        "File",
+                        {"Id": str(case.media_ids[media.key])},
+                    )
+                    ET.SubElement(row, "ShortName").text = media.wav_path.name
+                    ET.SubElement(row, "Path").text = relative
+                soundbanks = ET.SubElement(info, "SoundBanks")
+                for bank_name in sorted(
+                    {
+                        name
+                        for media in case.blueprint.media_fixtures
+                        for name in media.soundbank_names
+                    }
+                ):
+                    bank = ET.SubElement(soundbanks, "SoundBank")
+                    ET.SubElement(bank, "ShortName").text = bank_name
+                    events = ET.SubElement(bank, "IncludedEvents")
+                    event = ET.SubElement(events, "Event")
+                    references = ET.SubElement(event, "ReferencedStreamedFiles")
+                    for media in case.blueprint.media_fixtures:
+                        if bank_name in media.soundbank_names:
+                            ET.SubElement(
+                                references,
+                                "File",
+                                {"Id": str(case.media_ids[media.key])},
+                            )
+                bank_root = next(
+                    artifact.path.parent
+                    for artifact in case.expected_artifacts
+                    if artifact.kind == "bank"
+                )
+                ET.SubElement(roots, "SoundBanksRoot").text = str(bank_root)
+                ET.ElementTree(info).write(
+                    bank_root / "SoundbanksInfo.xml",
+                    encoding="utf-8",
+                    xml_declaration=True,
+                )
             return
         if case.blueprint.api == "ak.wwise.core.soundbank.setInclusions":
             spec = case.blueprint.asset_spec
@@ -523,7 +640,27 @@ def _unprepared_runtime(
     project_root = owned / "sandbox" / "SampleProject"
     project_root.mkdir(parents=True)
     project = project_root / "SampleProject.wproj"
-    project.write_text("<Project/>\n", encoding="utf-8")
+    if version == "2021.1":
+        (owned / "io" / "cache").mkdir(parents=True)
+        for platform in ("Windows", "Mac"):
+            (owned / "io" / "soundbanks" / platform).mkdir(parents=True)
+        project.write_text(
+            "<WwiseDocument><ProjectInfo><Project><PropertyList>"
+            "<Property Name='SoundBankPaths'><ValueList>"
+            "<Value Platform='Windows'>..\\..\\io\\soundbanks\\Windows</Value>"
+            "<Value Platform='Mac'>..\\..\\io\\soundbanks\\Mac</Value>"
+            "</ValueList></Property></PropertyList><MiscSettings>"
+            "<MiscSettingEntry Name='Cache'>..\\..\\io\\cache</MiscSettingEntry>"
+            "</MiscSettings></Project></ProjectInfo>"
+            "<SharedPropertyList><PropertyList>"
+            "<Property Name='SoundBankPaths'><ValueList>"
+            "<Value Platform='Windows'>ignored\\shared\\default</Value>"
+            "</ValueList></Property></PropertyList></SharedPropertyList>"
+            "</WwiseDocument>\n",
+            encoding="utf-8",
+        )
+    else:
+        project.write_text("<Project/>\n", encoding="utf-8")
     (project_root / "Default Work Unit.wwu").write_text("<WorkUnit/>\n", encoding="utf-8")
     blueprint = build_soundbank_blueprint(
         scenario,
@@ -533,6 +670,15 @@ def _unprepared_runtime(
         asset_root=owned / "assets" / scenario.id,
     )
     backend = FakeSoundBankBackend(blueprint)
+    if version == "2021.1":
+        backend.project_info["directories"]["cache"] = str(owned / "io" / "cache")
+        backend.project_info["directories"]["soundBankOutputRoot"] = str(
+            owned / "io" / "soundbanks"
+        )
+        for row in backend.project_info["platforms"]:
+            platform_root = owned / "io" / "soundbanks" / str(row["name"])
+            row["soundBankPath"] = str(platform_root)
+            row["copiedMediaPath"] = str(platform_root / "Media")
     runtime = PreparedSoundBankRuntime(blueprint, backend)
     return runtime, backend
 
@@ -555,6 +701,68 @@ def _compound_scenario(base_scenario_id: str, version: str) -> Any:
         for row in profile.units
         if row.base_scenario_id == base_scenario_id and row.version == version
     )
+
+
+def _typed_scenario(unit_id: str) -> Any:
+    profile = load_typed_input_profile(TYPED_PROFILE)
+    return next(row.scenario for row in profile.units if row.unit_id == unit_id)
+
+
+@pytest.mark.parametrize(
+    "unit_id",
+    (
+        "TYP21-TOPIC-SOUNDBANK-GENERATED",
+        "TYP23-TOPIC-SOUNDBANK-GENERATED",
+        "TYP24-TOPIC-SOUNDBANK-GENERATED",
+        "TYP24-DRAFT-SOUNDBANK-GENERATE",
+    ),
+)
+def test_typed_profile_soundbank_runtime_accepts_exact_cross_version_lane(
+    tmp_path: Path,
+    unit_id: str,
+) -> None:
+    scenario = _typed_scenario(unit_id)
+    runtime, _backend = _unprepared_runtime(
+        tmp_path / unit_id,
+        scenario,
+        version=scenario.versions[0],
+    )
+
+    assert runtime.blueprint.version == scenario.versions[0]
+
+
+def test_typed_profile_2024_generate_compiles_the_closed_business_plan(
+    tmp_path: Path,
+) -> None:
+    scenario = _typed_scenario("TYP24-DRAFT-SOUNDBANK-GENERATE")
+    runtime, backend = _unprepared_runtime(
+        tmp_path / "typed-2024-generate",
+        scenario,
+        version="2024.1",
+    )
+    cache_root = runtime.blueprint.io_root / "io" / "cache"
+    cache_root.mkdir(parents=True, exist_ok=True)
+    backend.project_info["directories"]["cache"] = str(cache_root)
+    case = runtime.prepare()
+    before = runtime.hidden_before
+    assert before is not None
+    protocol = build_transaction_protocol(case.operation_requests)
+
+    sections = compile_soundbank_business_plan(case, before, protocol)
+
+    assert sections.static_expectation["version"] == "2024.1"
+
+
+def test_soundbank_runtime_rejects_unreviewed_cross_version_scenario(
+    tmp_path: Path,
+) -> None:
+    scenario = replace(
+        next(row for row in _scenarios() if row.id == "O22-SB-SET-INCLUSIONS-05"),
+        versions=("2023.1",),
+    )
+
+    with pytest.raises(SoundBankRuntimeError, match="supports only"):
+        _unprepared_runtime(tmp_path, scenario, version="2023.1")
 
 
 def test_dirty_fixture_normalization_never_saves_a_different_live_project(
@@ -610,6 +818,253 @@ def test_project_info_observer_receives_detached_strict_json_before_validation(
     assert backend.project_info == raw_before
     assert normalized["path"] == str(runtime.blueprint.sandbox_project)
     assert normalized["directories"]["root"] == raw_before["directories"]["root"]
+
+
+def test_2021_topic_runtime_derives_reviewed_project_info_without_unavailable_api(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scenario = next(
+        row for row in _scenarios() if row.id == "O22-SB-GENERATED-01"
+    )
+    scenario = replace(scenario, versions=("2021.1",))
+    runtime, backend = _unprepared_runtime(tmp_path, scenario, version="2021.1")
+    backend.omit_all_import_result_ids = True
+    backend._insert(r"\Platforms\Windows", "Windows", "Platform")
+    backend._insert(r"\Languages\SFX", "SFX", "Language")
+
+    def unavailable() -> Mapping[str, Any]:
+        raise AssertionError("2021.1 must not call getProjectInfo")
+
+    monkeypatch.setattr(backend, "get_project_info", unavailable)
+
+    materialized = runtime.prepare()
+
+    assert materialized.topic_plan is not None
+    assert materialized.topic_plan.event_count == 3
+    assert all(
+        row.platform_id is not None
+        for row in materialized.topic_plan.expected_events
+    )
+    output = runtime.blueprint.io_root / "io" / "soundbanks" / "Windows"
+    assert (output / "Init.bnk").is_file()
+    assert (output / "Test_Debug.bnk").is_file()
+    assert (output / "Frontend.bnk").is_file()
+    assert not tuple(
+        (runtime.blueprint.sandbox_root / "GeneratedSoundBanks").rglob("*.bnk")
+    )
+
+
+def test_2021_topic_runtime_rejects_ambiguous_direct_audio_sources(
+    tmp_path: Path,
+) -> None:
+    scenario = next(
+        row for row in _scenarios() if row.id == "O22-SB-GENERATED-01"
+    )
+    scenario = replace(scenario, versions=("2021.1",))
+    runtime, backend = _unprepared_runtime(tmp_path, scenario, version="2021.1")
+    backend.omit_all_import_result_ids = True
+    backend.add_second_legacy_source = True
+    backend._insert(r"\Platforms\Windows", "Windows", "Platform")
+    backend._insert(r"\Languages\SFX", "SFX", "Language")
+
+    with pytest.raises(
+        SoundBankRuntimeError,
+        match="must bind exactly one imported AudioFileSource; got 2",
+    ):
+        runtime.prepare()
+
+
+def test_2021_persisted_media_id_is_exact_and_bounded(tmp_path: Path) -> None:
+    source_id = _guid("persisted-source")
+    work_unit = tmp_path / "Actor-Mixer Hierarchy" / "Owned.wwu"
+    work_unit.parent.mkdir(parents=True)
+    work_unit.write_text(
+        "<?xml version='1.0' encoding='utf-8'?>"
+        "<WwiseDocument><AudioFileSource ID='"
+        + source_id
+        + "'><MediaIDList><MediaID ID='76597505'/></MediaIDList>"
+        "</AudioFileSource></WwiseDocument>",
+        encoding="utf-8",
+    )
+
+    assert soundbank_runtime._legacy_media_id_from_project(
+        source_id,
+        sandbox_root=tmp_path,
+    ) == 76597505
+
+    duplicate = tmp_path / "Actor-Mixer Hierarchy" / "Duplicate.wwu"
+    duplicate.write_text(work_unit.read_text(encoding="utf-8"), encoding="utf-8")
+    with pytest.raises(
+        SoundBankRuntimeError,
+        match="must resolve to exactly one MediaID",
+    ):
+        soundbank_runtime._legacy_media_id_from_project(
+            source_id,
+            sandbox_root=tmp_path,
+        )
+
+
+def test_2021_persisted_media_id_rejects_reparse_before_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_id = _guid("persisted-reparse-source")
+    work_unit = tmp_path / "Actor-Mixer Hierarchy" / "Owned.wwu"
+    work_unit.parent.mkdir(parents=True)
+    work_unit.write_text(
+        "<WwiseDocument><AudioFileSource ID='"
+        + source_id
+        + "'><MediaIDList><MediaID ID='7'/></MediaIDList>"
+        "</AudioFileSource></WwiseDocument>",
+        encoding="utf-8",
+    )
+    original = soundbank_runtime.path_is_link_or_reparse
+
+    def simulated_reparse(path: Path, *, metadata: os.stat_result | None = None) -> bool:
+        if path == work_unit.parent:
+            return True
+        return original(path, metadata=metadata)
+
+    monkeypatch.setattr(
+        soundbank_runtime,
+        "path_is_link_or_reparse",
+        simulated_reparse,
+    )
+
+    with pytest.raises(
+        SoundBankRuntimeError,
+        match="symlink or reparse directory",
+    ):
+        soundbank_runtime._legacy_media_id_from_project(
+            source_id,
+            sandbox_root=tmp_path,
+        )
+
+
+def test_2021_topic_runtime_rejects_output_link_before_creating_external_rows(
+    tmp_path: Path,
+) -> None:
+    scenario = next(
+        row for row in _scenarios() if row.id == "O22-SB-GENERATED-01"
+    )
+    scenario = replace(scenario, versions=("2021.1",))
+    runtime, backend = _unprepared_runtime(tmp_path, scenario, version="2021.1")
+    backend._insert(r"\Platforms\Windows", "Windows", "Platform")
+    backend._insert(r"\Languages\SFX", "SFX", "Language")
+    generated = runtime.blueprint.io_root / "io" / "soundbanks"
+    shutil.rmtree(generated)
+    outside = tmp_path / "outside-generated"
+    outside.mkdir()
+    create_symlink_or_skip(generated, outside, target_is_directory=True)
+
+    with pytest.raises(
+        SoundBankRuntimeError,
+        match="symbolic link or Windows reparse point",
+    ):
+        runtime.prepare()
+
+    assert list(outside.iterdir()) == []
+
+
+def test_2021_topic_runtime_rejects_output_reparse_before_creating_rows(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scenario = next(
+        row for row in _scenarios() if row.id == "O22-SB-GENERATED-01"
+    )
+    scenario = replace(scenario, versions=("2021.1",))
+    runtime, backend = _unprepared_runtime(tmp_path, scenario, version="2021.1")
+    backend._insert(r"\Platforms\Windows", "Windows", "Platform")
+    backend._insert(r"\Languages\SFX", "SFX", "Language")
+    generated = runtime.blueprint.io_root / "io" / "soundbanks"
+    shutil.rmtree(generated)
+    generated.mkdir()
+    monkeypatch.setattr(
+        soundbank_runtime,
+        "path_is_link_or_reparse",
+        lambda path, *, metadata: path == generated,
+    )
+
+    with pytest.raises(
+        SoundBankRuntimeError,
+        match="symbolic link or Windows reparse point",
+    ):
+        runtime.prepare()
+
+    assert list(generated.iterdir()) == []
+
+
+def test_2021_topic_runtime_rejects_noncanonical_project_output_traversal(
+    tmp_path: Path,
+) -> None:
+    scenario = replace(
+        next(row for row in _scenarios() if row.id == "O22-SB-GENERATED-01"),
+        versions=("2021.1",),
+    )
+    runtime, backend = _unprepared_runtime(tmp_path, scenario, version="2021.1")
+    backend._insert(r"\Platforms\Windows", "Windows", "Platform")
+    backend._insert(r"\Languages\SFX", "SFX", "Language")
+    document = ET.parse(runtime.blueprint.sandbox_project)
+    value = document.find(".//Property[@Name='SoundBankPaths']//Value[@Platform='Windows']")
+    assert value is not None
+    value.text = r"..\..\io\soundbanks\redirect\..\Windows"
+    document.write(
+        runtime.blueprint.sandbox_project,
+        encoding="utf-8",
+        xml_declaration=True,
+    )
+
+    with pytest.raises(SoundBankRuntimeError, match="traversal after a named component"):
+        runtime.prepare()
+
+
+@pytest.mark.parametrize(
+    "value",
+    (
+        r"..\.\..\io\soundbanks\Windows",
+        r"..\..\io\\soundbanks\Windows",
+        r"..\../io\soundbanks\Windows",
+        r"C:\owned\soundbanks\Windows",
+        r"\\server\share\soundbanks\Windows",
+        "..\\..\\io\\soundbanks\\Windows ",
+    ),
+)
+def test_2021_project_output_path_rejects_noncanonical_spelling(
+    tmp_path: Path,
+    value: str,
+) -> None:
+    scenario = replace(
+        next(row for row in _scenarios() if row.id == "O22-SB-GENERATED-01"),
+        versions=("2021.1",),
+    )
+    runtime, _backend = _unprepared_runtime(tmp_path, scenario, version="2021.1")
+
+    with pytest.raises(SoundBankRuntimeError):
+        soundbank_runtime._legacy_owned_project_directory(
+            value,
+            project=runtime.blueprint.sandbox_project,
+            io_root=runtime.blueprint.io_root,
+            field="SoundBankPaths[Windows]",
+        )
+
+
+def test_2021_project_output_path_accepts_one_wwise_trailing_separator(
+    tmp_path: Path,
+) -> None:
+    scenario = replace(
+        next(row for row in _scenarios() if row.id == "O22-SB-GENERATED-01"),
+        versions=("2021.1",),
+    )
+    runtime, _backend = _unprepared_runtime(tmp_path, scenario, version="2021.1")
+
+    assert soundbank_runtime._legacy_owned_project_directory(
+        "..\\..\\io\\soundbanks\\Windows\\",
+        project=runtime.blueprint.sandbox_project,
+        io_root=runtime.blueprint.io_root,
+        field="SoundBankPaths[Windows]",
+    ) == runtime.blueprint.io_root / "io" / "soundbanks" / "Windows"
 
 
 def _bounded_project_info_inventories(
@@ -1622,11 +2077,14 @@ def test_each_generated_topic_binds_live_media_id_for_exact_wem_oracle(
     expected_keys = {fixture.key for fixture in case.blueprint.media_fixtures}
     assert set(case.media_ids) == expected_keys
     assert not any(key.startswith("media_source:") for key in case.short_ids)
-    assert {
+    expected_artifact_ids = {
         int(artifact.path.stem)
         for artifact in case.expected_artifacts
         if artifact.kind == "media"
-    } == set(case.media_ids.values())
+    }
+    assert expected_artifact_ids == (
+        set() if case.blueprint.version == "2021.1" else set(case.media_ids.values())
+    )
 
     for fixture in case.blueprint.media_fixtures:
         source_id = case.object_ids[f"media_source:{fixture.key}"]
@@ -1650,6 +2108,91 @@ def test_each_generated_topic_binds_live_media_id_for_exact_wem_oracle(
         match=r"media source .* has no bounded uint32 mediaId",
     ):
         invalid_runtime.prepare()
+
+
+def test_2021_topic_verifies_exact_new_cache_media_without_claiming_copy_step(
+    tmp_path: Path,
+) -> None:
+    scenario = _typed_scenario("TYP21-TOPIC-SOUNDBANK-GENERATED")
+    runtime, backend = _unprepared_runtime(
+        tmp_path / "valid", scenario, version="2021.1"
+    )
+    backend.omit_all_import_result_ids = True
+    backend._insert(r"\Platforms\Windows", "Windows", "Platform")
+    backend._insert(r"\Languages\SFX", "SFX", "Language")
+    runtime.prepare()
+    case = runtime.materialized
+    assert case is not None and case.blueprint.version == "2021.1"
+    assert case.topic_plan is not None
+    events = [_topic_payload(row) for row in case.topic_plan.expected_events]
+
+    backend.apply_business_effect(case)
+    topic_result, artifact_result = runtime.verify_topic(events)
+    assert topic_result.passed
+    assert artifact_result.passed
+
+    info_path = next(
+        artifact.path.parent / "SoundbanksInfo.xml"
+        for artifact in case.expected_artifacts
+        if artifact.kind == "bank"
+    )
+    document = ET.parse(info_path)
+    for path_row in document.getroot().findall(".//StreamedFiles/File/Path"):
+        assert isinstance(path_row.text, str)
+        path_row.text = path_row.text.replace("\\", "/")
+    document.write(info_path, encoding="utf-8", xml_declaration=True)
+    _topic_result, forward_slash_artifacts = runtime.verify_topic(events)
+    assert forward_slash_artifacts.passed
+
+    cache_files = sorted(case.allowed_dynamic_artifact_roots[0].rglob("*.wem"))
+    assert len(cache_files) == len(case.blueprint.media_fixtures)
+    cache_files[0].unlink()
+    _topic_result, missing = runtime.verify_topic(events)
+    assert not missing.passed
+    assert any("streamed cache media is absent" in row for row in missing.failures)
+
+    backend.apply_business_effect(case)
+    extra = cache_files[0].parent / "unreviewed_A07A4AEB.wem"
+    extra.write_bytes(b"unreviewed cache media")
+    _topic_result, surplus = runtime.verify_topic(events)
+    assert not surplus.passed
+    assert any("unreviewed cache media" in row for row in surplus.failures)
+
+    extra.unlink()
+    backend.apply_business_effect(case)
+    document = ET.parse(info_path)
+    streamed = document.getroot().find("./StreamedFiles/File")
+    assert streamed is not None
+    streamed.set("Id", "4294967295")
+    document.write(info_path, encoding="utf-8", xml_declaration=True)
+    _topic_result, wrong_media_id = runtime.verify_topic(events)
+    assert not wrong_media_id.passed
+    assert any("MediaID set differs" in row for row in wrong_media_id.failures)
+
+    backend.apply_business_effect(case)
+    document = ET.parse(info_path)
+    reference = document.getroot().find(
+        "./SoundBanks/SoundBank/IncludedEvents/Event/ReferencedStreamedFiles/File"
+    )
+    assert reference is not None
+    reference.set("Id", "4294967295")
+    document.write(info_path, encoding="utf-8", xml_declaration=True)
+    _topic_result, wrong_bank_reference = runtime.verify_topic(events)
+    assert not wrong_bank_reference.passed
+    assert any(
+        "per-Bank streamed references differ" in row
+        for row in wrong_bank_reference.failures
+    )
+
+    backend.apply_business_effect(case)
+    document = ET.parse(info_path)
+    source_root = document.getroot().find("./RootPaths/SourceFilesRoot")
+    assert source_root is not None
+    source_root.text = str(case.blueprint.io_root / "foreign-cache" / "Windows")
+    document.write(info_path, encoding="utf-8", xml_declaration=True)
+    _topic_result, wrong_source_root = runtime.verify_topic(events)
+    assert not wrong_source_root.passed
+    assert any("SourceFilesRoot differs" in row for row in wrong_source_root.failures)
 
 
 @pytest.mark.parametrize(
@@ -1796,11 +2339,14 @@ def test_each_generated_topic_prompt_reaches_a_name_only_request_and_hidden_guid
 
 def test_generated_topic_reference_closes_model_owned_request_fields() -> None:
     reference = " ".join(QUERY_REFERENCE.read_text(encoding="utf-8").split())
-    assert '`{"return":["id","name","type","path"]}`' in reference
-    assert "`soundbank.name`" in reference
-    assert "`platform.name`" in reference
-    assert "omit `--match-json` instead of passing an empty object" in reference
-    assert "Never discover or inject a GUID" in reference
+    assert "Run `topic-schema`" in reference
+    assert "--include-object-identity" in reference
+    assert "--match-platform-name <exact-name>" in reference
+    assert "without a handle" in reference
+    assert "`id,name,type,path`" in reference
+    assert "--match-soundbank-name <exact-name>" in reference
+    assert "Omit a match the user did not request" in reference
+    assert "never inject a GUID" in reference
 
 
 def test_all_25_cases_emit_registry_valid_closed_operation_requests(
@@ -1901,6 +2447,12 @@ def test_definition_files_are_lf_utf8_and_live_identity_bound(tmp_path: Path) ->
         runtime, _ = _runtime(tmp_path / scenario.id, scenario)
         case = runtime.materialized
         assert case is not None
+        if scenario.id == "O22-SB-PROCESS-DEF-01":
+            assert {
+                row.identity_format
+                for document in case.blueprint.definitions
+                for row in document.rows
+            } <= {"guid", "decimal_short_id", "hexadecimal_short_id"}
         for document in case.blueprint.definitions:
             data = document.path.read_bytes()
             assert not data.startswith(b"\xef\xbb\xbf")
@@ -2455,3 +3007,44 @@ def test_closed_direct_effect_fixture_copies_reviewed_factory_template() -> None
         "onNameConflict": "fail",
     }
     assert calls[2][1] == {"object": copied_id, "value": "Radio_Filter"}
+
+
+@pytest.mark.parametrize("object_type", ("Platform", "Language"))
+def test_closed_direct_backend_reads_2021_project_identities_by_exact_name(
+    object_type: str,
+) -> None:
+    object_id = _guid(f"2021:{object_type}")
+    calls: list[tuple[str, Mapping[str, Any], Mapping[str, Any]]] = []
+
+    def call(uri: str, args: Mapping[str, Any], options: Mapping[str, Any]) -> Any:
+        calls.append((uri, dict(args), dict(options)))
+        return {
+            "return": [
+                {
+                    "id": object_id,
+                    "name": "Windows" if object_type == "Platform" else "SFX",
+                    "type": object_type,
+                    "path": f"\\{object_type}s",
+                }
+            ]
+        }
+
+    backend = ClosedDirectWaapiSoundBankBackend(call)
+    name = "Windows" if object_type == "Platform" else "SFX"
+
+    rows = backend.read_objects(
+        object_type=object_type,
+        name=name,
+        fields=("id", "name", "type", "path"),
+    )
+
+    assert rows == (
+        {"id": object_id, "name": name, "type": object_type, "path": f"\\{object_type}s"},
+    )
+    assert calls == [
+        (
+            "ak.wwise.core.object.get",
+            {"waql": f'from type {object_type} where name = "{name}" take 2'},
+            {"return": ["id", "name", "type", "path"]},
+        )
+    ]

@@ -79,6 +79,7 @@ EXPECTED_TURN_KINDS = {
 EXPECTED_VISIBLE_INPUTS = {
     "rifle_safe_reimport": (
         "rifle_source_directory",
+        "rifle_source_files",
         "rifle_container_path",
         "rifle_event_path",
         "rifle_bus_path",
@@ -294,7 +295,11 @@ _ASSERTION_KINDS = {
     "exact_id_readback_before_preview",
     "requested_fields_exact",
 }
-_VISIBLE_INPUT_KINDS = {"absolute_directory_path", "object_path"}
+_VISIBLE_INPUT_KINDS = {
+    "absolute_directory_path",
+    "object_path",
+    "structured_array",
+}
 _PROMPT_FORBIDDEN = (
     re.compile(r"\b(?:skill|gateway|harness|runner|fixture|sandbox|oracle)\b", re.I),
     re.compile(r"\b(?:eval|benchmark|test case)\b", re.I),
@@ -1187,6 +1192,12 @@ def _validate_binding(value: Any, path: str, kind: str) -> None:
         _closed(value, {"source", "relative_path"}, path)
         if kind != "absolute_directory_path":
             raise IntegrationWorkflowV2Error(f"{path} owned path kind drifted")
+        _safe_relative(value["relative_path"], f"{path}.relative_path")
+        return
+    if value.get("source") == "owned_file_list":
+        _closed(value, {"source", "relative_path"}, path)
+        if kind != "structured_array":
+            raise IntegrationWorkflowV2Error(f"{path} owned file list kind drifted")
         _safe_relative(value["relative_path"], f"{path}.relative_path")
         return
     raise IntegrationWorkflowV2Error(f"{path} binding source is invalid")

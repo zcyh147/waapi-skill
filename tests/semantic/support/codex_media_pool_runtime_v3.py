@@ -321,38 +321,6 @@ class BoundMediaPoolRequest:
     binding: MediaPoolFieldBinding
     post_filter: Mapping[str, Any] | None = None
 
-    def gateway_argv(self) -> tuple[str, ...]:
-        result = (
-            "call",
-            MEDIA_POOL_GET_URI,
-            "--args-json",
-            json.dumps(
-                _plain(self.args),
-                ensure_ascii=False,
-                sort_keys=True,
-                separators=(",", ":"),
-            ),
-            "--options-json",
-            json.dumps(
-                _plain(self.options),
-                ensure_ascii=False,
-                sort_keys=True,
-                separators=(",", ":"),
-            ),
-        )
-        if self.post_filter is not None:
-            result = (
-                *result,
-                "--post-filter-json",
-                json.dumps(
-                    _plain(self.post_filter),
-                    ensure_ascii=False,
-                    sort_keys=True,
-                    separators=(",", ":"),
-                ),
-            )
-        return result
-
 
 @dataclass(frozen=True, slots=True)
 class SealedMediaRow:
@@ -1258,17 +1226,6 @@ def bind_media_pool_request(
         post_filter=(
             None if post_filter is None else _freeze_json(post_filter)
         ),
-    )
-
-
-def get_fields_gateway_argv() -> tuple[str, ...]:
-    return (
-        "call",
-        MEDIA_POOL_GET_FIELDS_URI,
-        "--args-json",
-        "{}",
-        "--options-json",
-        "{}",
     )
 
 
@@ -3733,7 +3690,6 @@ __all__ = [
     "host_directory_to_native_windows_path",
     "host_directory_to_wine_z_path",
     "expected_macos_wine_prefix",
-    "get_fields_gateway_argv",
     "materialize_media_pool_case",
     "media_answer_requires_order",
     "media_near_classification",

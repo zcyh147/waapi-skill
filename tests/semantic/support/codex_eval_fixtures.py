@@ -37,6 +37,9 @@ from tests.semantic.support.codex_gateway_broker import (
     GatewayInvocationError,
     validate_transaction_show_confirmation_payload,
 )
+from tests.semantic.support.typed_gateway_input import (
+    create_typed_transaction_preview,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SKILL_ROOT = REPO_ROOT / "skills" / "waapi-skill"
@@ -162,6 +165,10 @@ class TrustedGateway(Protocol):
     ) -> Mapping[str, Any]: ...
 
 
+TrustedPreview: TypeAlias = Callable[
+    [Mapping[str, Any], Path, Path],
+    Mapping[str, Any],
+]
 ReadCall: TypeAlias = Callable[[str, Mapping[str, Any], Mapping[str, Any]], Any]
 
 
@@ -518,10 +525,18 @@ class _OwnedDirectReadCall:
 
 
 class _TransactionRunner:
-    def __init__(self, config: _RuntimeConfig, gateway: TrustedGateway, *, namespace: str) -> None:
+    def __init__(
+        self,
+        config: _RuntimeConfig,
+        gateway: TrustedGateway,
+        *,
+        namespace: str,
+        trusted_preview: TrustedPreview | None = None,
+    ) -> None:
         self.config = config
         self.gateway = gateway
         self.namespace = namespace
+        self._trusted_preview = trusted_preview
         self.records: list[TrustedTransactionEvidence] = []
         self._executed_setup_creates: set[str] = set()
         self._sequence = 0
@@ -560,17 +575,18 @@ class _TransactionRunner:
             "operation": operation,
             "arguments": copy.deepcopy(dict(arguments)),
         }
-        preview = self._call(
-            command="preview",
-            state_dir=state_dir,
-            evidence_dir=evidence_dir,
-            command_args=(
-                "preview",
-                "--request-json",
-                json.dumps(request, ensure_ascii=False, separators=(",", ":"), sort_keys=True),
-                "--ttl",
-                "900",
-            ),
+        preview = (
+            self._trusted_preview(request, state_dir, evidence_dir)
+            if self._trusted_preview is not None
+            else create_typed_transaction_preview(
+                lambda argv: self._call(
+                    command=argv[0],
+                    state_dir=state_dir,
+                    evidence_dir=evidence_dir,
+                    command_args=tuple(argv),
+                ),
+                request,
+            )
         )
         if preview.get("state") != "awaiting_confirmation" or preview.get("executed") is not False:
             raise FixtureContractError(f"fixture preview did not await confirmation: {_safe_json(preview)}")
@@ -1757,6 +1773,7 @@ def create_shared_fixture_bundle(
     runner_env: Mapping[str, str],
     packaged_gateway_binding: PackagedGatewayBinding | None = None,
     trusted_gateway: TrustedGateway | None = None,
+    trusted_preview: TrustedPreview | None = None,
     read_call: ReadCall | None = None,
     fixture_token: str | None = None,
     timeout_seconds: float = 30.0,
@@ -1765,8 +1782,10 @@ def create_shared_fixture_bundle(
 
     ``packaged_gateway_binding`` binds production setup and cleanup to the
     evaluated Skill source's validated ``scripts/run.py`` and matching cwd.
-    ``trusted_gateway`` and ``read_call`` are injection points for focused
-    tests and may not be combined with that production binding.  Setup failure
+    ``trusted_gateway``, ``trusted_preview``, and ``read_call`` are injection
+    points for focused tests and may not be combined with that production
+    binding. The production path always builds Preview through the public
+    typed/business protocol. Setup failure
     performs bounded cleanup of identities returned by setup or recovered from
     a trusted successful execute payload in the preflighted unique namespace.
     """
@@ -1774,6 +1793,10 @@ def create_shared_fixture_bundle(
     if trusted_gateway is not None and packaged_gateway_binding is not None:
         raise FixtureContractError(
             "packaged_gateway_binding and trusted_gateway are mutually exclusive"
+        )
+    if trusted_preview is not None and trusted_gateway is None:
+        raise FixtureContractError(
+            "trusted_preview is available only with an injected trusted_gateway"
         )
     config = _validate_runtime(
         version=version,
@@ -1797,6 +1820,7 @@ def create_shared_fixture_bundle(
         config,
         gateway,
         namespace=f"{version.replace('.', '-')}-{token}",
+        trusted_preview=trusted_preview,
     )
     fixture_root = config.sandbox_path / ".waapi-skill-semantic-evals" / token
     if fixture_root.exists() or fixture_root.is_symlink():
@@ -2813,6 +2837,7 @@ __all__ = [
     "SoundBankOracleSnapshot",
     "SwitchOracleSnapshot",
     "TrustedGateway",
+    "TrustedPreview",
     "TrustedTransactionEvidence",
     "create_shared_fixture_bundle",
     "normalize_typed_import_object_path",

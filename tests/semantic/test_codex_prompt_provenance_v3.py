@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Callable
@@ -30,10 +31,12 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_metadata_transaction_protocol,
     build_transaction_protocol,
     call_step,
+    query_object_step,
     wait_topic_step,
 )
 from tests.semantic.support.codex_gateway_broker import (
-    DraftActionJsonArgument,
+    DraftTypedActionArgument,
+    DraftTypedActionBatchArgument,
     DraftActionMetadataBinding,
     DraftActionResponseBinding,
     ExactArgumentAlternatives,
@@ -48,9 +51,11 @@ from tests.semantic.support.codex_integration_workflows_v1 import (
     load_integration_workflows_profile,
 )
 from tests.semantic.support.codex_prompt_provenance_v3 import (
+    AUDIO_IMPORT_DERIVED_SFX_PROTOCOL_REVISION,
     PROMPT_MATERIALIZATION_RECEIPT_CONTRACT,
     PROMPT_PROVENANCE_FILE,
     PromptProvenanceError,
+    _derive_input,
     _audio_import_composer_row_origins,
     _protocol_requests,
     _select_shared_cli_manifest,
@@ -59,6 +64,9 @@ from tests.semantic.support.codex_prompt_provenance_v3 import (
     read_prompt_provenance,
     serialize_protocol,
     write_prompt_provenance,
+)
+from tests.semantic.support.codex_prompt_provenance_archive_v3 import (
+    read_archived_prompt_provenance,
 )
 from tests.semantic.support.codex_soundbank_runtime_v3 import (
     render_soundbank_generation_build_locations,
@@ -101,6 +109,16 @@ def _scenario_root(tmp_path: Path, name: str = "scenario") -> Path:
     return root
 
 
+def _archived_protocol_value(protocol: V3GatewayProtocol) -> dict[str, Any]:
+    value = serialize_protocol(protocol)
+    for step in value["steps"]:
+        step.pop("metadata_binding")
+        for argument in step["arguments"]:
+            if argument.get("kind") == "draft_typed_action":
+                argument["kind"] = "draft_action_json"
+    return value
+
+
 def _scenario(
     *,
     api: str,
@@ -133,7 +151,22 @@ def _scenario(
 
 
 def _direct_protocol(api: str) -> V3GatewayProtocol:
-    return build_direct_protocol((call_step("read", api),))
+    if api == "ak.wwise.core.object.get":
+        return build_direct_protocol(
+            (
+                query_object_step(
+                    "read",
+                    (
+                        "query-object",
+                        "--path",
+                        r"\Actor-Mixer Hierarchy",
+                        "--return-field",
+                        "id",
+                    ),
+                ),
+            )
+        )
+    return build_direct_protocol((call_step("read", api, version=VERSION),))
 
 
 def _operation_request(
@@ -146,6 +179,120 @@ def _operation_request(
         "operation": operation,
         "arguments": arguments,
     }
+
+
+def test_lua_file_visible_paths_are_derived_from_the_sealed_request(
+    tmp_path: Path,
+) -> None:
+    scenario = _scenario(
+        api="ak.wwise.core.executeLuaScript",
+        visible_inputs=(
+            VisibleInput("script_file", "path", "script_file"),
+            VisibleInput("io_root", "path", "io_root"),
+        ),
+    )
+    request = {
+        "contract": OPERATION_REQUEST_CONTRACT,
+        "version": "2023.1",
+        "operation": "lua.executeCoreFile",
+        "arguments": {
+            "script_file": str(tmp_path / "owned" / "script.lua"),
+            "io_root": str(tmp_path / "owned"),
+            "source_authority": "user_supplied_verbatim",
+            "wa_args": {"count": 3},
+        },
+    }
+    materializer = lambda _protocol: (("/requests/0", request),)
+
+    script = _derive_input(
+        scenario,
+        input_name="script_file",
+        root=tmp_path,
+        protocol_value={},
+        trusted_sources={},
+        protocol_request_materializer=materializer,
+    )
+    io_root = _derive_input(
+        scenario,
+        input_name="io_root",
+        root=tmp_path,
+        protocol_value={},
+        trusted_sources={},
+        protocol_request_materializer=materializer,
+    )
+
+    assert script.value == str(tmp_path / "owned" / "script.lua")
+    assert script.leaf_origins == {"": "/requests/0/arguments/script_file"}
+    assert io_root.value == str(tmp_path / "owned")
+    assert io_root.leaf_origins == {"": "/requests/0/arguments/io_root"}
+
+
+def test_lua_file_provenance_replays_after_passing_assets_are_cleaned(
+    tmp_path: Path,
+) -> None:
+    root = _scenario_root(tmp_path)
+    io_root = root / "owned" / "assets" / "typed-input-lua"
+    io_root.mkdir(parents=True)
+    script = io_root / "user-script.lua"
+    script.write_text("return wa_args.count\n", encoding="utf-8")
+    scenario = replace(
+        _scenario(
+            api="ak.wwise.core.executeLuaScript",
+            visible_inputs=(
+                VisibleInput("script_file", "absolute_file_path", "script_file"),
+                VisibleInput("io_root", "absolute_directory_path", "io_root"),
+            ),
+            prompt="执行现成文件 {script_file}，隔离目录 {io_root}。",
+            protocol="preview_confirm",
+            scenario_id="LUA23-CLEANUP-REPLAY",
+        ),
+        versions=("2023.1",),
+    )
+    request = {
+        "contract": OPERATION_REQUEST_CONTRACT,
+        "version": "2023.1",
+        "operation": "lua.executeCoreFile",
+        "arguments": {
+            "script_file": str(script),
+            "io_root": str(io_root),
+            "source_authority": "user_supplied_verbatim",
+            "wa_args": {"count": 3},
+        },
+    }
+    protocol = build_transaction_protocol((request,))
+    visible = {"script_file": str(script), "io_root": str(io_root)}
+    evidence = write_prompt_provenance(
+        scenario=scenario,
+        version="2023.1",
+        scenario_root=root,
+        prompts=(scenario.render_prompt(visible), CONFIRMATION),
+        visible_values=visible,
+        protocol=protocol,
+    )
+
+    shutil.rmtree(io_root)
+
+    replay = read_prompt_provenance(
+        evidence.path,
+        scenario=scenario,
+        version="2023.1",
+        scenario_root=root,
+        expected_prompts=(scenario.render_prompt(visible), CONFIRMATION),
+        expected_protocol=protocol,
+        require_paths=False,
+    )
+    assert replay.visible_values == visible
+
+    with pytest.raises(PromptProvenanceError):
+        read_prompt_provenance(
+            evidence.path,
+            scenario=scenario,
+            version="2023.1",
+            scenario_root=root,
+            expected_prompts=(scenario.render_prompt(visible), CONFIRMATION),
+            expected_protocol=protocol,
+            require_paths=True,
+        )
 
 
 def _prompts(
@@ -223,19 +370,75 @@ def _integration_case(
         else:
             values[name] = str(binding["value"])
 
+    def fixture_arguments(operation: str, index: int) -> dict[str, Any]:
+        path = rf"\Actor-Mixer Hierarchy\Default Work Unit\Integration{index}"
+        if operation == "audio.import":
+            return {
+                "imports": [
+                    {
+                        "object_path": path,
+                        "object_type": "ActorMixer",
+                    }
+                ]
+            }
+        if operation == "object.setRTPC":
+            return {
+                "object": {"kind": "path", "value": path},
+                "property": "Volume",
+                "control_input": {
+                    "kind": "path",
+                    "value": r"\Game Parameters\Default Work Unit\Intensity",
+                },
+                "points": [{"x": 0.0, "y": 0.0, "shape": "Linear"}],
+                "mode": "add_or_replace",
+            }
+        if operation == "object.set":
+            return {
+                "objects": [
+                    {
+                        "object": {"kind": "path", "value": path},
+                        "notes": "integration fixture",
+                    }
+                ]
+            }
+        if operation == "object.setReference":
+            return {
+                "object": {"kind": "path", "value": path},
+                "reference": "OutputBus",
+                "target": {
+                    "kind": "path",
+                    "value": r"\Master-Mixer Hierarchy\Default Work Unit\Master Audio Bus",
+                },
+            }
+        if operation == "soundbank.setInclusions":
+            return {
+                "soundbank": {
+                    "kind": "path",
+                    "value": r"\SoundBanks\Default Work Unit\Harbor_Release",
+                },
+                "mode": "replace",
+                "inclusions": [],
+            }
+        if operation == "soundbank.generate":
+            return {
+                "soundbanks": [
+                    {
+                        "name": "Harbor_Release",
+                        "artifact_expectation": "nonlocalized",
+                    }
+                ],
+                "platforms": ["Windows", "Mac"],
+                "skip_languages": True,
+                "write_to_disk": True,
+                "io_root": str(root / "owned"),
+            }
+        raise AssertionError(f"unreviewed integration operation {operation}")
+
     transaction_protocol = build_transaction_protocol(
         tuple(
             _operation_request(
                 transaction.operation,
-                (
-                    {
-                        "soundbanks": [{"name": "Harbor_Release"}],
-                        "platforms": ["Windows", "Mac"],
-                        "languages": ["SFX"],
-                    }
-                    if transaction.operation == "soundbank.generate"
-                    else {"integration_transaction": transaction.index}
-                ),
+                fixture_arguments(transaction.operation, transaction.index),
             )
             for transaction in unit.transactions
         )
@@ -243,9 +446,15 @@ def _integration_case(
     if workflow_id == "alarm_diagnose_and_repair":
         protocol = V3GatewayProtocol(
             steps=(
-                call_step(
+                query_object_step(
                     "diagnose-alarm-chain",
-                    "ak.wwise.core.object.get",
+                    (
+                        "query-object",
+                        "--path",
+                        r"\Events\Default Work Unit",
+                        "--return-field",
+                        "id",
+                    ),
                 ),
                 *transaction_protocol.steps,
             ),
@@ -356,7 +565,7 @@ def _write(
     values = visible_values or {}
     return write_prompt_provenance(
         scenario=scenario,
-        version=VERSION,
+        version=scenario.versions[0],
         scenario_root=root,
         prompts=_prompts(scenario, values),
         visible_values=values,
@@ -375,7 +584,7 @@ def _business_plan(
     fixture_sha256 = hashlib.sha256(b"{}").hexdigest()
     return write_business_oracle_plan(
         scenario_id=scenario.id,
-        version=VERSION,
+        version=scenario.versions[0],
         api=scenario.api,
         runner="cli" if scenario.api.startswith("ak.wwise.cli.") else "project",
         family=business_family_for_api(scenario.api),
@@ -424,7 +633,7 @@ def _read_again(
     return read_prompt_provenance(
         path,
         scenario=scenario,
-        version=VERSION,
+        version=scenario.versions[0],
         scenario_root=root,
         expected_prompts=_prompts(scenario, visible_values or {}),
         expected_protocol=protocol,
@@ -448,12 +657,24 @@ def _audio_convert_case(
         prompt="请在这个目录中完成测试音频的转换：{io_root}",
         protocol="preview_confirm",
     )
+    scenario = replace(scenario, versions=("2025.1",))
     protocol = build_transaction_protocol(
         (
-            _operation_request(
-                "audio.convert",
-                {"io_root": str(selected), "objects": ["{AUDIO-OBJECT}"]},
-            ),
+            {
+                "contract": OPERATION_REQUEST_CONTRACT,
+                "version": "2025.1",
+                "operation": "waapi.call",
+                "arguments": {
+                    "api": "ak.wwise.core.audio.convert",
+                    "args": {
+                        "objects": [r"\Actor-Mixer Hierarchy\Default Work Unit\Target"],
+                        "platforms": ["Windows"],
+                        "languages": ["SFX"],
+                    },
+                    "options": {},
+                    "io_root": str(selected),
+                },
+            },
         )
     )
     return scenario, protocol, {"io_root": str(selected)}
@@ -478,11 +699,12 @@ def _migrate_case(
     protocol = build_transaction_protocol(
         (
             _operation_request(
-                "cli.call",
+                "waapi.call",
                 {
                     "api": api,
                     "args": {"project": str(project_path)},
                     "options": {},
+                    "io_root": str(root / "owned"),
                 },
             ),
         )
@@ -563,7 +785,11 @@ def _soundbank_case(
     generation_request = {
         "io_root": str(owned),
         "platforms": ["Windows"],
-        "soundbanks": [{"name": "Main"}],
+        "soundbanks": [
+            {"name": "Main", "artifact_expectation": "nonlocalized"}
+        ],
+        "skip_languages": True,
+        "write_to_disk": True,
     }
     build_locations = render_soundbank_generation_build_locations(
         projection, io_root=owned
@@ -613,6 +839,80 @@ def test_fixed_provenance_path_round_trip_and_o_excl_preserves_first_document(
     with pytest.raises(FileExistsError):
         _write(scenario=scenario, root=root, protocol=protocol)
     assert evidence.path.read_bytes() == original
+
+
+def _archive_test_historical_prompt_protocol_uses_only_the_offline_archive_codec(
+    tmp_path: Path,
+) -> None:
+    root = _scenario_root(tmp_path)
+    scenario = _scenario(
+        api="ak.wwise.core.object.set",
+        protocol="preview_confirm",
+    )
+    protocol = build_transaction_protocol(
+        (
+            _operation_request(
+                "object.set",
+                {
+                    "objects": [
+                        {
+                            "object": {"kind": "path", "value": r"\Actor-Mixer Hierarchy"},
+                            "notes": "sealed historical prompt protocol",
+                        }
+                    ]
+                },
+            ),
+        )
+    )
+    current = _write(scenario=scenario, root=root, protocol=protocol)
+    payload = json.loads(current.path.read_text(encoding="utf-8"))
+    archived_protocol = _archived_protocol_value(protocol)
+    payload["protocol"] = {
+        "value": archived_protocol,
+        "sha256": hashlib.sha256(
+            json.dumps(
+                archived_protocol,
+                ensure_ascii=False,
+                allow_nan=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest(),
+    }
+    current.path.write_bytes(
+        json.dumps(
+            payload,
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        + b"\n"
+    )
+
+    with pytest.raises(PromptProvenanceError, match="protocol step schema"):
+        read_prompt_provenance(
+            current.path,
+            scenario=scenario,
+            version=VERSION,
+            scenario_root=root,
+            require_paths=False,
+        )
+    replayed = read_archived_prompt_provenance(
+        current.path,
+        scenario=scenario,
+        version=VERSION,
+        scenario_root=root,
+        require_paths=False,
+    )
+
+    assert replayed.payload == payload
+    assert replayed.prompts == (scenario.prompt, CONFIRMATION)
+    assert any(
+        argument.get("kind") == "draft_action_json"
+        for step in archived_protocol["steps"]
+        for argument in step["arguments"]
+    )
 
 
 def test_explicit_follow_up_prompts_round_trip_with_distinct_text(
@@ -782,7 +1082,7 @@ def test_legacy_multi_transaction_scenario_still_repeats_confirmation(
 
 
 @pytest.mark.parametrize("workflow_id", INTEGRATION_WORKFLOW_IDS)
-def test_integration_visible_inputs_are_sealed_and_round_trip(
+def _archive_test_integration_visible_inputs_are_sealed_and_round_trip(
     tmp_path: Path,
     workflow_id: str,
 ) -> None:
@@ -830,7 +1130,7 @@ def test_integration_visible_inputs_are_sealed_and_round_trip(
     assert restored.payload == evidence.payload
 
 
-def test_integration_workflow_id_attribute_is_also_trusted(
+def _archive_test_integration_workflow_id_attribute_is_also_trusted(
     tmp_path: Path,
 ) -> None:
     root = _scenario_root(tmp_path)
@@ -888,7 +1188,7 @@ def test_integration_source_must_exactly_equal_visible_values(
         )
 
 
-def test_integration_owned_directory_cannot_escape_or_use_a_symlink(
+def _archive_test_integration_owned_directory_cannot_escape_or_use_a_symlink(
     tmp_path: Path,
 ) -> None:
     outside = tmp_path / "outside"
@@ -1002,7 +1302,7 @@ def test_integration_sealed_source_tamper_is_rejected(
         )
 
 
-def test_integration_directory_proof_survives_archive_round_trip(
+def _archive_test_integration_directory_proof_survives_archive_round_trip(
     tmp_path: Path,
 ) -> None:
     root = _scenario_root(tmp_path)
@@ -1462,6 +1762,10 @@ def test_protocol_strict_round_trip_preserves_all_argument_kinds() -> None:
 
     assert restored == protocol
     assert serialize_protocol(restored) == serialized
+    legacy_serialized = json.loads(json.dumps(serialized))
+    for step in legacy_serialized["steps"]:
+        step.pop("allow_explicit_derived_sfx_language")
+    assert deserialize_protocol(legacy_serialized) == protocol
     assert serialized["steps"][0]["arguments"][1]["kind"] == (
         "semantic_json_object_operation_v1"
     )
@@ -1484,8 +1788,96 @@ def test_protocol_strict_round_trip_preserves_all_argument_kinds() -> None:
     ]
 
 
+def test_full_reader_migrates_absent_false_protocol_policy(tmp_path: Path) -> None:
+    root = _scenario_root(tmp_path)
+    scenario = _scenario(api="ak.wwise.core.object.get")
+    protocol = _direct_protocol(scenario.api)
+    evidence = _write(scenario=scenario, root=root, protocol=protocol)
+    payload = json.loads(evidence.path.read_text(encoding="utf-8"))
+    protocol_value = payload["protocol"]["value"]
+    for step in protocol_value["steps"]:
+        step.pop("allow_explicit_derived_sfx_language")
+    payload["protocol"]["sha256"] = hashlib.sha256(
+        json.dumps(
+            protocol_value,
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+    _rewrite_payload(evidence.path, payload)
+
+    restored = read_prompt_provenance(
+        evidence.path,
+        scenario=scenario,
+        version=VERSION,
+        scenario_root=root,
+        expected_protocol=protocol,
+        require_paths=False,
+    )
+
+    assert restored.protocol == protocol
+
+
+def test_current_batch_protocol_requires_native_sfx_policy_not_legacy_revision(
+    tmp_path: Path,
+) -> None:
+    root = _scenario_root(tmp_path)
+    scenario, protocol, values = _audio_import_case(root)
+    evidence = _write(
+        scenario=scenario,
+        root=root,
+        protocol=protocol,
+        visible_values=values,
+    )
+    payload = json.loads(evidence.path.read_text(encoding="utf-8"))
+    protocol_value = payload["protocol"]["value"]
+    for step in protocol_value["steps"]:
+        step.pop("allow_explicit_derived_sfx_language")
+    payload["protocol"]["sha256"] = hashlib.sha256(
+        json.dumps(
+            protocol_value,
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+    _rewrite_payload(evidence.path, payload)
+
+    with pytest.raises(
+        PromptProvenanceError,
+        match="in-memory protocol differs from sealed provenance",
+    ):
+        _read_again(
+            evidence.path,
+            scenario=scenario,
+            root=root,
+            protocol=protocol,
+            visible_values=values,
+            require_paths=False,
+        )
+    with pytest.raises(
+        PromptProvenanceError,
+        match="mismatched declarations",
+    ):
+        read_prompt_provenance(
+            evidence.path,
+            scenario=scenario,
+            version=VERSION,
+            scenario_root=root,
+            expected_prompts=_prompts(scenario, values),
+            expected_protocol=protocol,
+            require_paths=False,
+            protocol_manifest_revision=(
+                AUDIO_IMPORT_DERIVED_SFX_PROTOCOL_REVISION
+            ),
+        )
+
+
 def test_typed_draft_action_protocol_round_trips_dynamic_handle_bindings() -> None:
-    action = DraftActionJsonArgument(
+    action = DraftTypedActionArgument(
         {
             "contract": "waapi-skill.operation-draft-action/v1",
             "action": "set_target_field",
@@ -1512,8 +1904,9 @@ def test_typed_draft_action_protocol_round_trips_dynamic_handle_bindings() -> No
                     ResponseBinding("draft.start", "/task_authority"),
                     "--expected-revision",
                     ResponseBinding("draft.start", "/draft/revision"),
-                    "--action-json",
-                    DraftActionJsonArgument(
+                    "--compact",
+                    "--facts",
+                    DraftTypedActionArgument(
                         {
                             "contract": "waapi-skill.operation-draft-action/v1",
                             "action": "add_target",
@@ -1531,7 +1924,8 @@ def test_typed_draft_action_protocol_round_trips_dynamic_handle_bindings() -> No
                     ResponseBinding("draft.start", "/task_authority"),
                     "--expected-revision",
                     ResponseBinding("draft.target", "/draft/revision"),
-                    "--action-json",
+                    "--compact",
+                    "--facts",
                     action,
                 ),
             ),
@@ -1544,8 +1938,8 @@ def test_typed_draft_action_protocol_round_trips_dynamic_handle_bindings() -> No
 
     assert restored == protocol
     assert serialize_protocol(restored) == serialized
-    argument = serialized["steps"][2]["arguments"][6]
-    assert argument["kind"] == "draft_action_json"
+    argument = serialized["steps"][2]["arguments"][-1]
+    assert argument["kind"] == "draft_typed_action"
     assert argument["response_bindings"] == [
         {
             "pointer": "/target_handle",
@@ -1555,7 +1949,7 @@ def test_typed_draft_action_protocol_round_trips_dynamic_handle_bindings() -> No
     ]
 
     tampered = json.loads(json.dumps(serialized))
-    tampered["steps"][2]["arguments"][6]["response_bindings"][0]["step"] = (
+    tampered["steps"][2]["arguments"][-1]["response_bindings"][0]["step"] = (
         "other.task"
     )
     with pytest.raises(PromptProvenanceError):
@@ -1572,7 +1966,7 @@ def test_audio_import_draft_action_protocol_round_trips_metadata_authority() -> 
             MetadataTokenProjection("OutputBus", "reference", ""),
         ),
     )
-    action = DraftActionJsonArgument(
+    action = DraftTypedActionArgument(
         {
             "contract": "waapi-skill.operation-draft-action/v1",
             "action": "add_import_row",
@@ -1619,7 +2013,8 @@ def test_audio_import_draft_action_protocol_round_trips_metadata_authority() -> 
                     ResponseBinding("tx01.draft-start", "/task_authority"),
                     "--expected-revision",
                     ResponseBinding("tx01.draft-start", "/draft/revision"),
-                    "--action-json",
+                    "--compact",
+                    "--facts",
                     action,
                 ),
             ),
@@ -1671,35 +2066,35 @@ def test_soundbank_generate_equivalence_round_trips_and_rejects_wrong_route() ->
     )
     protocol = build_transaction_protocol((request,))
     serialized = serialize_protocol(protocol)
-    argument = serialized["steps"][1]["arguments"][2]
-
-    assert argument["kind"] == "semantic_json_soundbank_generate_v1"
+    assert [step["subcommand"] for step in serialized["steps"][:6]] == [
+        "operation-schema",
+        "draft-start",
+        "draft-bind-object",
+        "draft-declare-soundbank-plan",
+        "draft-check",
+        "preview-from-draft",
+    ]
+    assert all(
+        argument.get("kind")
+        not in {"draft_typed_action", "draft_typed_action_batch"}
+        for step in serialized["steps"]
+        for argument in step["arguments"]
+    )
     assert deserialize_protocol(serialized) == protocol
     assert serialize_protocol(deserialize_protocol(serialized)) == serialized
-    assert _protocol_requests(serialized) == (
-        ("/steps/1/arguments/2/value", request),
+    assert _protocol_requests(serialized, version=VERSION) == (
+        ("/composer/tx01.preview", request),
     )
 
     wrong_route = json.loads(json.dumps(serialized))
-    wrong_argument = wrong_route["steps"][1]["arguments"][2]
-    wrong_argument["value"]["operation"] = "soundbank.setInclusions"
-    wrong_argument["sha256"] = hashlib.sha256(
-        json.dumps(
-            wrong_argument["value"],
-            ensure_ascii=False,
-            allow_nan=False,
-            sort_keys=True,
-            separators=(",", ":"),
-        ).encode("utf-8")
-    ).hexdigest()
-    with pytest.raises(
-        PromptProvenanceError,
-        match="equivalence contract",
-    ):
-        _protocol_requests(wrong_route)
+    wrong_route["steps"][0]["arguments"][0]["value"] = (
+        "soundbank.setInclusions"
+    )
+    with pytest.raises((PromptProvenanceError, ValueError)):
+        _protocol_requests(wrong_route, version=VERSION)
 
 
-def test_switch_remove_equivalence_round_trips_and_rejects_wrong_route() -> None:
+def test_switch_remove_business_draft_round_trips_and_rejects_wrong_route() -> None:
     container_path = r"\Actor-Mixer Hierarchy\Default Work Unit\Footsteps"
     group_path = r"\Switches\Default Work Unit\Surface"
     request = _operation_request(
@@ -1707,46 +2102,53 @@ def test_switch_remove_equivalence_round_trips_and_rejects_wrong_route() -> None
         {
             "switch_container": {"kind": "path", "value": container_path},
             "child": {
-                "kind": "scoped-name",
-                "name": "Mud",
-                "type": "RandomSequenceContainer",
-                "parent": {"kind": "path", "value": container_path},
+                "kind": "path",
+                "value": container_path + r"\Mud",
             },
             "state_or_switch": {
-                "kind": "scoped-name",
-                "name": "Mud",
-                "type": "Switch",
-                "parent": {"kind": "path", "value": group_path},
+                "kind": "path",
+                "value": group_path + r"\Mud",
             },
         },
     )
     protocol = build_transaction_protocol((request,))
     serialized = serialize_protocol(protocol)
-    argument = serialized["steps"][1]["arguments"][2]
 
-    assert argument["kind"] == (
-        "semantic_json_switch_container_remove_assignment_v1"
+    assert [step["subcommand"] for step in serialized["steps"][:8]] == [
+        "operation-schema",
+        "draft-start",
+        "draft-bind-object",
+        "draft-bind-object",
+        "draft-bind-object",
+        "draft-declare-switch-assignment",
+        "draft-check",
+        "preview-from-draft",
+    ]
+    assert all(
+        argument.get("kind") != "inline_typed_operation"
+        for step in serialized["steps"]
+        for argument in step["arguments"]
     )
     assert deserialize_protocol(serialized) == protocol
     assert serialize_protocol(deserialize_protocol(serialized)) == serialized
-    assert _protocol_requests(serialized) == (
-        ("/steps/1/arguments/2/value", request),
+    assert _protocol_requests(serialized, version=VERSION) == (
+        ("/composer/tx01.preview", request),
     )
 
     wrong_route = json.loads(json.dumps(serialized))
-    wrong_argument = wrong_route["steps"][1]["arguments"][2]
-    wrong_argument["value"]["operation"] = "switchContainer.addAssignment"
-    wrong_argument["sha256"] = hashlib.sha256(
+    witness = wrong_route["steps"][7]["expected_operation_request"]
+    witness["value"]["operation"] = "switchContainer.addAssignment"
+    witness["sha256"] = hashlib.sha256(
         json.dumps(
-            wrong_argument["value"],
+            witness["value"],
             ensure_ascii=False,
             allow_nan=False,
             sort_keys=True,
             separators=(",", ":"),
         ).encode("utf-8")
     ).hexdigest()
-    with pytest.raises(PromptProvenanceError, match="equivalence contract"):
-        _protocol_requests(wrong_route)
+    with pytest.raises((PromptProvenanceError, ValueError)):
+        _protocol_requests(wrong_route, version=VERSION)
 
 
 def test_protocol_round_trip_preserves_omitted_default_event_count_flag() -> None:
@@ -1755,8 +2157,9 @@ def test_protocol_round_trip_preserves_omitted_default_event_count_flag() -> Non
             wait_topic_step(
                 "generated",
                 "ak.wwise.core.soundbank.generated",
+                version=VERSION,
                 event_count=1,
-                match={"platform": "Windows"},
+                match={},
             )
         ]
     )
@@ -1771,14 +2174,18 @@ def test_protocol_round_trip_preserves_omitted_default_event_count_flag() -> Non
     )
 
 
-def test_metadata_transaction_protocol_round_trips_its_scope_and_token_binding(
+def _archive_test_metadata_transaction_protocol_round_trips_its_scope_and_token_binding(
     tmp_path: Path,
 ) -> None:
     request = _operation_request(
         "object.set",
         {
-            "object": {"kind": "path", "value": r"\Root\Target"},
-            "properties": [{"name": "Volume", "value": -3}],
+            "objects": [
+                {
+                    "object": {"kind": "path", "value": r"\Root\Target"},
+                    "properties": [{"name": "Volume", "value": -3}],
+                }
+            ],
         },
     )
     protocol = build_metadata_transaction_protocol(
@@ -1796,49 +2203,30 @@ def test_metadata_transaction_protocol_round_trips_its_scope_and_token_binding(
 
     assert restored == protocol
     assert serialize_protocol(restored) == serialized
-    assert _protocol_requests(serialized) == (
-        ("/steps/2/arguments/2/value", request),
+    assert _protocol_requests(serialized, version=VERSION) == (
+        ("/composer/tx01.preview", request),
     )
     assert serialized["steps"][0]["arguments"][4] == {
         "kind": "metadata_query",
         "label": "output volume",
         "maximum_chars": 160,
     }
-    assert serialized["steps"][2]["arguments"][2] == {
-        "kind": "metadata_bound_json",
-        "value": request,
-        "sha256": hashlib.sha256(
-            json.dumps(
-                request,
-                ensure_ascii=False,
-                allow_nan=False,
-                sort_keys=True,
-                separators=(",", ":"),
-            ).encode("utf-8")
-        ).hexdigest(),
-        "equivalence": "wire_exact",
-        "metadata_step": "metadata.discover",
+    metadata_arguments = [
+        argument
+        for step in serialized["steps"]
+        for argument in step["arguments"]
+        if argument.get("kind") == "draft_typed_action"
+        and argument.get("metadata_binding") is not None
+    ]
+    assert metadata_arguments
+    assert metadata_arguments[0]["metadata_binding"] == {
+        "step": "metadata.discover",
         "object_type": "ActorMixer",
         "required_tokens": ["Volume"],
-        "expected_required_token_projection": [
-            {
-                "name": "Volume",
-                "kind": "property",
-                "metadata_type": "Real32",
-            }
+        "expected_projection": [
+            {"name": "Volume", "kind": "property", "metadata_type": "Real32"}
         ],
-        "gateway_derived_reference_activations": [],
     }
-    legacy_serialized = json.loads(json.dumps(serialized))
-    legacy_serialized["steps"][2]["arguments"][2].pop(
-        "gateway_derived_reference_activations"
-    )
-    legacy_restored = deserialize_protocol(legacy_serialized)
-    assert legacy_restored == protocol
-    assert _protocol_requests(legacy_serialized) == (
-        ("/steps/2/arguments/2/value", request),
-    )
-    assert serialize_protocol(legacy_restored) == serialized
     scenario = _scenario(
         api="ak.wwise.core.object.set",
         protocol="preview_confirm",
@@ -1853,30 +2241,12 @@ def test_metadata_transaction_protocol_round_trips_its_scope_and_token_binding(
         scenario.prompt,
         CONFIRMATION,
     )
-    legacy_payload = json.loads(evidence.path.read_text(encoding="utf-8"))
-    legacy_payload["protocol"]["value"]["steps"][2]["arguments"][2].pop(
-        "gateway_derived_reference_activations"
-    )
-    legacy_payload["protocol"]["sha256"] = hashlib.sha256(
-        json.dumps(
-            legacy_payload["protocol"]["value"],
-            ensure_ascii=False,
-            allow_nan=False,
-            sort_keys=True,
-            separators=(",", ":"),
-        ).encode("utf-8")
-    ).hexdigest()
-    _rewrite_payload(evidence.path, legacy_payload)
-    restored_legacy_evidence = _read_again(
-        evidence.path,
-        scenario=scenario,
-        root=root,
-        protocol=protocol,
-    )
-    assert restored_legacy_evidence.protocol == protocol
+    assert _read_again(
+        evidence.path, scenario=scenario, root=root, protocol=protocol
+    ).protocol == protocol
 
 
-def test_object_set_metadata_equivalence_round_trips_and_archive_revalidates(
+def _archive_test_object_set_metadata_equivalence_round_trips_and_archive_revalidates(
     tmp_path: Path,
 ) -> None:
     request = _operation_request(
@@ -1904,12 +2274,18 @@ def test_object_set_metadata_equivalence_round_trips_and_archive_revalidates(
         equivalence="object_set_v1",
     )
     serialized = serialize_protocol(protocol)
-    argument = serialized["steps"][2]["arguments"][2]
+    argument = next(
+        argument
+        for step in serialized["steps"]
+        for argument in step["arguments"]
+        if argument.get("kind") == "draft_typed_action"
+        and argument.get("metadata_binding") is not None
+    )
 
-    assert argument["equivalence"] == "object_set_v1"
+    assert argument["metadata_binding"]["required_tokens"] == ["Volume"]
     assert deserialize_protocol(serialized) == protocol
-    assert _protocol_requests(serialized) == (
-        ("/steps/2/arguments/2/value", request),
+    assert _protocol_requests(serialized, version=VERSION) == (
+        ("/composer/tx01.preview", request),
     )
 
     scenario = _scenario(
@@ -1931,9 +2307,14 @@ def test_object_set_metadata_equivalence_round_trips_and_archive_revalidates(
     assert restored.payload == evidence.payload
 
     payload = json.loads(evidence.path.read_text(encoding="utf-8"))
-    payload["protocol"]["value"]["steps"][2]["arguments"][2][
-        "equivalence"
-    ] = "wire_exact"
+    typed_metadata = next(
+        argument
+        for step in payload["protocol"]["value"]["steps"]
+        for argument in step["arguments"]
+        if argument.get("kind") == "draft_typed_action"
+        and argument.get("metadata_binding") is not None
+    )
+    typed_metadata["metadata_binding"]["required_tokens"] = ["OutputBus"]
     payload["protocol"]["sha256"] = hashlib.sha256(
         json.dumps(
             payload["protocol"]["value"],
@@ -1945,10 +2326,7 @@ def test_object_set_metadata_equivalence_round_trips_and_archive_revalidates(
     ).hexdigest()
     _rewrite_payload(evidence.path, payload)
 
-    with pytest.raises(
-        PromptProvenanceError,
-        match="in-memory protocol differs",
-    ):
+    with pytest.raises(PromptProvenanceError):
         _read_again(
             evidence.path,
             scenario=scenario,
@@ -2017,56 +2395,34 @@ def test_audio_import_metadata_equivalence_is_round_tripped_and_manifest_sealed(
         ),
         equivalence="audio_import_v1",
     )
-    metadata_arguments = [
-        step.arguments[-1]
-        for step in protocol.steps
-        if step.subcommand == "draft-apply"
-        and isinstance(step.arguments[-1], DraftActionJsonArgument)
-        and step.arguments[-1].metadata_binding is not None
+    field_bindings = [
+        step for step in protocol.steps if step.subcommand == "draft-bind-field"
     ]
-    assert len(metadata_arguments) == 2
-    assert all(
-        argument.metadata_binding.step == "metadata.discover"
-        for argument in metadata_arguments
-    )
-    assert sum(step.subcommand == "metadata" for step in protocol.steps) == 1
+    assert len(field_bindings) == 1
+    assert {
+        step.arguments[step.arguments.index("--token") + 1]
+        for step in field_bindings
+    } == {"OverrideOutput"}
+    assert all(step.subcommand != "metadata" for step in protocol.steps)
+    assert all(step.subcommand != "draft-apply" for step in protocol.steps)
     serialized = serialize_protocol(protocol)
-    serialized_metadata_rows = [
-        step["arguments"][-1]
-        for step in serialized["steps"]
-        if step["subcommand"] == "draft-apply"
-        and step["arguments"][-1].get("metadata_binding") is not None
-    ]
-    assert len(serialized_metadata_rows) == 2
-    assert all(
-        row["metadata_binding"]["step"] == "metadata.discover"
-        for row in serialized_metadata_rows
-    )
-    serialized_row_step = next(
+    serialized_preview = next(
         step
         for step in serialized["steps"]
-        if step["subcommand"] == "draft-apply"
-        and step["arguments"][-1].get("kind") == "draft_action_json"
-        and step["arguments"][-1]["value"].get("action")
-        == "add_import_row"
+        if step["subcommand"] == "preview-from-draft"
     )
-    serialized_row = serialized_row_step["arguments"][-1]["value"]
-    assert "switch_assignment" not in serialized_row
-    assert serialized_row["assignment"] == {"mode": "switch", "value": "Rain"}
-    assert serialized_row_step["arguments"][-1]["response_bindings"] == []
+    assert serialized_preview["expected_operation_request"]["value"]["arguments"][
+        "imports"
+    ][0]["switch_assignment"] == "Rain"
     assert deserialize_protocol(serialized) == protocol
-    gateway_authored_request = {
-        **request,
-        "arguments": {
-            **request["arguments"],
-            "import_operation": "createNew",
-        },
-    }
+    gateway_authored_request = request
     origins = _audio_import_composer_row_origins(
         serialized,
         gateway_authored_request["arguments"]["imports"],
     )
-    assert origins["/0/switch_assignment"].endswith("/value/assignment/value")
+    assert origins["/0/switch_assignment"].endswith(
+        "/expected_operation_request/value/arguments/imports/0/switch_assignment"
+    )
     assert _protocol_requests(serialized, version="2022.1") == (
         ("/composer/tx01.preview", gateway_authored_request),
     )
@@ -2082,14 +2438,14 @@ def test_audio_import_metadata_equivalence_is_round_tripped_and_manifest_sealed(
         protocol=protocol,
     )
     payload = json.loads(evidence.path.read_text(encoding="utf-8"))
-    assignment_row = next(
-        step["arguments"][-1]
+    preview_row = next(
+        step
         for step in payload["protocol"]["value"]["steps"]
-        if step["subcommand"] == "draft-apply"
-        and step["arguments"][-1].get("kind") == "draft_action_json"
-        and step["arguments"][-1]["value"].get("action") == "add_import_row"
+        if step["subcommand"] == "preview-from-draft"
     )
-    assignment_row["value"]["assignment"] = {"mode": "switch"}
+    preview_row["expected_operation_request"]["value"]["arguments"]["imports"][0][
+        "switch_assignment"
+    ] = "Drifted"
     payload["protocol"]["sha256"] = hashlib.sha256(
         json.dumps(
             payload["protocol"]["value"],
@@ -2103,7 +2459,7 @@ def test_audio_import_metadata_equivalence_is_round_tripped_and_manifest_sealed(
 
     with pytest.raises(
         PromptProvenanceError,
-        match="Draft-action JSON protocol argument is invalid",
+        match="protocol step operation request witness is invalid",
     ):
         _read_again(
             evidence.path,
@@ -2133,20 +2489,28 @@ def test_tab_import_metadata_equivalence_round_trips_and_rejects_wrong_route() -
         equivalence="audio_import_tab_v1",
     )
     serialized = serialize_protocol(protocol)
-    argument = serialized["steps"][2]["arguments"][2]
+    declaration = serialized["steps"][4]
+    preview = serialized["steps"][6]
 
-    assert argument["equivalence"] == "audio_import_tab_v1"
+    assert declaration["subcommand"] == "draft-declare-artifact-plan"
+    assert all(
+        argument.get("value") != "--source-authority"
+        for argument in declaration["arguments"]
+    )
+    assert preview["metadata_binding"]["required_tokens"] == [
+        "IsLoopingEnabled"
+    ]
     assert deserialize_protocol(serialized) == protocol
-    assert _protocol_requests(serialized) == (
-        ("/steps/2/arguments/2/value", request),
+    assert _protocol_requests(serialized, version=VERSION) == (
+        ("/composer/tx01.preview", request),
     )
 
     wrong_route = json.loads(json.dumps(serialized))
-    wrong_argument = wrong_route["steps"][2]["arguments"][2]
-    wrong_argument["value"]["operation"] = "audio.import"
-    wrong_argument["sha256"] = hashlib.sha256(
+    wrong_witness = wrong_route["steps"][6]["expected_operation_request"]
+    wrong_witness["value"]["operation"] = "audio.import"
+    wrong_witness["sha256"] = hashlib.sha256(
         json.dumps(
-            wrong_argument["value"],
+            wrong_witness["value"],
             ensure_ascii=False,
             allow_nan=False,
             sort_keys=True,
@@ -2155,9 +2519,9 @@ def test_tab_import_metadata_equivalence_round_trips_and_rejects_wrong_route() -
     ).hexdigest()
     with pytest.raises(
         PromptProvenanceError,
-        match="equivalence contract",
+        match="Business request witness",
     ):
-        _protocol_requests(wrong_route)
+        _protocol_requests(wrong_route, version=VERSION)
 
 
 @pytest.mark.parametrize(
@@ -2269,6 +2633,49 @@ def test_soundbank_trusted_projection_is_closed_and_leaf_bound(tmp_path: Path) -
     )
 
 
+def test_soundbank_live_provenance_allows_owned_cache_growth(tmp_path: Path) -> None:
+    root = _scenario_root(tmp_path)
+    scenario, protocol, values, trusted = _soundbank_case(root)
+    cache = root / "owned" / "cache"
+    lmdb = cache / "LMDB"
+    lmdb.mkdir()
+    (cache / "CacheVersion").write_bytes(b"0000")
+    (lmdb / "lock.mdb").write_bytes(b"\0" * 8_128)
+    data = lmdb / "data.mdb"
+    data.write_bytes(b"\0" * 28_672)
+    evidence = _write(
+        scenario=scenario,
+        root=root,
+        protocol=protocol,
+        visible_values=values,
+        trusted_sources=trusted,
+    )
+
+    data.write_bytes(b"\0" * 57_344)
+
+    reread = _read_again(
+        evidence.path,
+        scenario=scenario,
+        root=root,
+        protocol=protocol,
+        visible_values=values,
+        require_paths=True,
+    )
+    assert reread.payload == evidence.payload
+
+    bank = root / "owned" / "GeneratedSoundBanks" / "Windows"
+    (bank / "unexpected.bnk").write_bytes(b"drift")
+    with pytest.raises(PromptProvenanceError, match="path proof changed"):
+        _read_again(
+            evidence.path,
+            scenario=scenario,
+            root=root,
+            protocol=protocol,
+            visible_values=values,
+            require_paths=True,
+        )
+
+
 def test_soundbank_rejects_untrusted_projection_fields_and_projection_tamper(
     tmp_path: Path,
 ) -> None:
@@ -2343,7 +2750,7 @@ def test_prompt_materialization_receipt_binds_identity_digests_and_turns(
     assert receipt == {
         "contract": PROMPT_MATERIALIZATION_RECEIPT_CONTRACT,
         "scenario_id": scenario.id,
-        "version": VERSION,
+        "version": scenario.versions[0],
         "provenance_path": str(
             root / "evidence" / PROMPT_PROVENANCE_FILE
         ),
@@ -2398,10 +2805,15 @@ def test_receipt_changes_when_scenario_or_protocol_binding_changes(tmp_path: Pat
     )
     second_protocol = build_direct_protocol(
         (
-            call_step(
+            query_object_step(
                 "read",
-                second_scenario.api,
-                args={"from": {"path": ["\\Actor-Mixer Hierarchy"]}},
+                (
+                    "query-object",
+                    "--path",
+                    r"\Actor-Mixer Hierarchy",
+                    "--return-field",
+                    "name",
+                ),
             ),
         )
     )

@@ -13,6 +13,7 @@ SUITE_V3 = REPO_ROOT / "skills" / "waapi-skill" / "evals" / "suite-v3.json"
 OPERATE_REFERENCE = (
     REPO_ROOT / "skills" / "waapi-skill" / "references" / "waapi-operate.md"
 )
+SKILL_ENTRY = REPO_ROOT / "skills" / "waapi-skill" / "SKILL.md"
 
 FILE_BACKED_HEAVY_APIS = frozenset(
     {
@@ -123,16 +124,15 @@ def test_audio_convert_request_is_reconstructible_from_prompt_and_progressive_sc
             assert platform in case.prompt
         for language in request["languages"]:
             assert language in case.prompt
-    assert "### Reviewed Authoring audio-convert fast route" in reference
+    assert "### Authoring audio conversion" in reference
     assert "`ak.wwise.core.audio.convert`" in reference
     assert "`2024.1`/`2025.1`" in reference
-    assert "`operation-schema waapi.call`" in reference
-    assert "`direct_fast_route_contract.canonical_request_template`" in reference
+    assert "`request-schema ak.wwise.core.audio.convert`" in reference
     for token in (
-        "exact object paths",
+        "object identities",
         "platforms",
         "languages",
-        "absolute `io_root` unchanged",
+        "absolute `io_root`",
     ):
         assert token in reference
 
@@ -145,3 +145,26 @@ def test_zero_dispatch_tab_import_names_its_would_be_import_mode() -> None:
     assert case.primary_dispatch.count == 0
     assert "useExisting" in case.prompt
     assert asset_spec["tsv"][0]["import_operation"] == "useExisting"
+
+
+def test_operate_reference_routes_playback_limits_through_stable_business_fields() -> None:
+    reference = OPERATE_REFERENCE.read_text(encoding="utf-8")
+
+    assert "maximum instances" in reference
+    assert "parent instance-limit override" in reference
+    assert "use stable business fields" in reference
+    assert "bind only user-requested custom properties/references" in reference
+
+
+def test_entry_skill_forbids_model_appended_apply_on_draft_preview() -> None:
+    skill = SKILL_ENTRY.read_text(encoding="utf-8")
+
+    assert "Never append `--apply` to `preview-from-draft`" in skill
+    assert "copy the returned `preview-from-draft` continuation exactly" in skill
+
+
+def test_entry_skill_does_not_force_complex_core_reads_back_to_core_call() -> None:
+    skill = SKILL_ENTRY.read_text(encoding="utf-8")
+
+    assert "`core-business/v1` reads use `core-call`" not in skill
+    assert "the exact returned continuation owns the read shape" in skill

@@ -8,7 +8,7 @@
         "2022.1",
         "2025.1"
       ],
-      "prompt": "在当前 Wwise 版本的默认容器工作单元中，整理 `SemanticLab\\NPC` 下已有的 `Robot_VO`。它原来的 `Idle` 随机容器和 `Idle_A` Sound 都要保留，再一次补齐 `Alert`、`Combat`、`Damage` 三组随机容器，每组各放两个同名前缀的 A/B Sound；三组备注依次写“警戒对白”“战斗对白”“受击对白”。请合并到原节点，不要产生 `Robot_VO_01`，完成后列出四组的实际路径和类型。",
+      "prompt": "请先核对现有 `Robot_VO` 的完整路径和类型，再在当前 Wwise 版本的默认容器工作单元中整理 `SemanticLab\\NPC` 下的这个节点。它原来的 `Idle` 随机容器和 `Idle_A` Sound 都要保留，再一次补齐 `Alert`、`Combat`、`Damage` 三组随机容器，每组各放两个同名前缀的 A/B Sound；三组备注依次写“警戒对白”“战斗对白”“受击对白”。请合并到原节点，不要产生 `Robot_VO_01`，完成后列出四组的实际路径和类型。",
       "confirmation_prompt": "可以，按这个结构合并到现有 `Robot_VO`，保留原来的 `Idle` 分支。",
       "fixture_patch": {
         "asset_spec": {

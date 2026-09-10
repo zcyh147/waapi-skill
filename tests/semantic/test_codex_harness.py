@@ -7,7 +7,7 @@ import signal
 import subprocess
 import sys
 import time
-from pathlib import Path, PureWindowsPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from types import SimpleNamespace
 from typing import Mapping, Sequence
 
@@ -27,6 +27,7 @@ from .support.codex_harness import (  # pyright: ignore[reportMissingImports]
     CodexGatewayErrorExpectation,
     CodexHarnessError,
     CodexHarnessConfig,
+    WORKSPACE_SKILL_EXCLUDED_NAMES,
     WindowsPowerShellCoreHost,
     audit_prompt_input_payload,
     audit_session_events,
@@ -40,6 +41,7 @@ from .support.codex_harness import (  # pyright: ignore[reportMissingImports]
     completed_command_records,
     count_invalid_jsonl_lines,
     discover_windows_powershell_core,
+    discover_windows_user_skill_paths,
     final_agent_message,
     gateway_continuation_binding_errors,
     gateway_runtime_apis,
@@ -54,6 +56,7 @@ from .support.codex_harness import (  # pyright: ignore[reportMissingImports]
     run_process,
     subprocess_process_group_options,
     prepare_workspace_skill_install,
+    recoverable_preprocess_attempt_indexes,
     snapshot_tree_hash,
     snapshot_workspace,
     turn_usage,
@@ -73,6 +76,12 @@ from .support.codex_gateway_broker import (  # pyright: ignore[reportMissingImpo
     GATEWAY_REQUIRED_ENV,
     SemanticJsonArgument,
     SHIM_TRUSTED_PYTHON_ENV,
+)
+from .support.codex_gateway_contracts import (
+    BUSINESS_QUERY_SCHEMA_CONTRACT,
+    TASK_LOCAL_RUNNER_POSIX,
+    TASK_LOCAL_RUNNER_WINDOWS,
+    TYPED_REQUEST_SCHEMA_CONTRACT,
 )
 
 
@@ -99,6 +108,7 @@ def _closed_next_command(
         "gateway_argv": gateway_argv,
         "full_argv": list(full_argv),
         "copy_exactly": True,
+        "shell_tool_timeout_ms": 30_000,
         "shell_family": (
             "windows-powershell-encoded" if platform_name == "nt" else "posix-sh"
         ),
@@ -309,6 +319,39 @@ def test_response_derived_windows_model_command_binds_exact_inner_script() -> No
     assert errors == ()
 
 
+def test_response_derived_windows_model_command_accepts_sealed_task_local_runner() -> None:
+    full_argv = (
+        "python",
+        r"C:\Agent Workspace\.agents\skills\waapi-skill\scripts\run.py",
+        "gateway.py",
+        "confirm",
+        "tx-1",
+    )
+    next_command = _closed_next_command(full_argv, platform_name="nt")
+    next_command["model_command"] = encode_windows_model_argv(
+        ("python", TASK_LOCAL_RUNNER_WINDOWS, *full_argv[2:])
+    )
+    payload = {"next_command": next_command}
+    selected = str(next_command["model_command"])
+    prior = completed_windows_record(
+        windows_powershell_recording("python initial.py"),
+        payload,
+    )
+    current = completed_windows_record(
+        windows_powershell_recording(selected),
+        {},
+    )
+
+    errors = gateway_continuation_binding_errors(
+        (prior, current),
+        (SimpleNamespace(payload=payload), SimpleNamespace(payload={})),
+        platform_name="nt",
+        windows_powershell_core_host=_WINDOWS_POWERSHELL_CORE_HOST,
+    )
+
+    assert errors == ()
+
+
 def test_response_derived_windows_fallback_binds_exact_encoded_script() -> None:
     full_argv = (
         "python",
@@ -438,6 +481,488 @@ def test_model_authored_command_without_prior_continuation_is_unchanged() -> Non
         (SimpleNamespace(payload={}),),
         platform_name="posix",
     ) == ()
+
+
+def _business_prefix_payload(
+    copy_command: str,
+    *,
+    action: str = "copy_verbatim_then_append_complete_typed_action_groups",
+) -> dict[str, object]:
+    return {
+        "draft": {
+            "next_action_binding": {
+                "contract": "waapi-skill.business-draft-next-action/v1",
+                "shell_tool_timeout_ms": 30_000,
+                "object_binding": {
+                    "by_path_segments": {
+                        "fixed_argv_prefix_copy": copy_command,
+                        "fixed_argv_prefix_copy_instruction": {
+                            "contract": (
+                                "waapi-skill.operation-draft-command-"
+                                "copy-instruction/v1"
+                            ),
+                            "source_field": "fixed_argv_prefix_copy",
+                            "action": action,
+                            "forbidden_transformations": [
+                                "reconstruct",
+                                "shorten",
+                                "normalize",
+                                "substitute_path_segments",
+                                "select_another_field",
+                            ],
+                            "opaque_token_guard": {
+                                "task_authority": {
+                                    "prefix": "da1-",
+                                    "hex_characters_after_prefix": 40,
+                                    "truncate_to_32_hex_characters": "invalid",
+                                }
+                            },
+                        },
+                        "append_repeated": [
+                            "--object-path-segment",
+                            "<literal-name>",
+                        ],
+                    }
+                },
+            }
+        }
+    }
+
+
+def test_business_draft_prefix_continuation_binds_exact_copied_bytes() -> None:
+    prefix = (
+        "python '/tmp/Skill Path/scripts/run.py' gateway.py draft-bind-object "
+        "od1-opaque --task-authority da1-opaque --expected-revision 1"
+    )
+    payload = _business_prefix_payload(prefix)
+    current = completed_record(
+        prefix + " --object-path-segment 'Actor-Mixer Hierarchy'",
+        {},
+    )
+
+    assert gateway_continuation_binding_errors(
+        (completed_record("python initial.py", payload), current),
+        (SimpleNamespace(payload=payload), SimpleNamespace(payload={})),
+        platform_name="posix",
+    ) == ()
+
+
+def test_business_draft_accepts_its_nested_closed_standard_continuation() -> None:
+    business_prefix = (
+        "python '/tmp/Task Skill/scripts/run.py' gateway.py draft-check "
+        "od1-opaque --task-authority da1-opaque --expected-revision 5"
+    )
+    standard_argv = (
+        "python",
+        "/tmp/Candidate Skill/scripts/run.py",
+        "gateway.py",
+        "draft-check",
+        "od1-opaque",
+        "--task-authority",
+        "da1-opaque",
+        "--expected-revision",
+        "5",
+    )
+    payload = _business_prefix_payload(business_prefix)
+    payload["draft"]["next_command"] = _closed_next_command(
+        standard_argv,
+        platform_name="posix",
+    )
+    standard_command = shlex.join(standard_argv)
+
+    assert gateway_continuation_binding_errors(
+        (
+            completed_record("python initial.py", payload),
+            completed_record(standard_command, {}),
+        ),
+        (SimpleNamespace(payload=payload), SimpleNamespace(payload={})),
+        platform_name="posix",
+    ) == ()
+
+
+def test_business_draft_boolean_continuation_binds_exact_copied_prefix() -> None:
+    prefix = (
+        "python '/tmp/Skill Path/scripts/run.py' gateway.py "
+        "draft-declare-debug-intent od1-opaque --task-authority da1-opaque "
+        "--expected-revision 1"
+    )
+    payload = _business_prefix_payload(
+        prefix,
+        action="copy_verbatim_then_append_the_stable_boolean_outcome",
+    )
+    current = completed_record(prefix + " --enable", {})
+
+    assert gateway_continuation_binding_errors(
+        (completed_record("python initial.py", payload), current),
+        (SimpleNamespace(payload=payload), SimpleNamespace(payload={})),
+        platform_name="posix",
+    ) == ()
+
+
+def test_business_draft_plan_continuation_binds_exact_copied_prefix() -> None:
+    prefix = (
+        "python '/tmp/Skill Path/scripts/run.py' gateway.py "
+        "draft-declare-soundengine-plan od1-opaque --task-authority da1-opaque "
+        "--expected-revision 1"
+    )
+    payload = _business_prefix_payload(
+        prefix,
+        action="copy_verbatim_then_append_one_complete_soundengine_plan",
+    )
+    current = completed_record(prefix + " --game-object-name Player", {})
+
+    assert gateway_continuation_binding_errors(
+        (completed_record("python initial.py", payload), current),
+        (SimpleNamespace(payload=payload), SimpleNamespace(payload={})),
+        platform_name="posix",
+    ) == ()
+
+
+def test_business_draft_uses_the_unique_longest_matching_nested_prefix() -> None:
+    broad = (
+        "python '/tmp/Skill Path/scripts/run.py' gateway.py "
+        "draft-bind-object od1-opaque --task-authority da1-opaque "
+        "--expected-revision 1 --role event"
+    )
+    specific = broad + " --exact-type-name Event"
+    payload = _business_prefix_payload(broad)
+    payload["draft"]["next_action_binding"]["object_binding"]["by_exact_type"] = (
+        _business_prefix_payload(specific)["draft"]["next_action_binding"]
+        ["object_binding"]
+    )
+    current = completed_record(specific + " 'Fresh Alarm Event'", {})
+
+    assert gateway_continuation_binding_errors(
+        (completed_record("python initial.py", payload), current),
+        (SimpleNamespace(payload=payload), SimpleNamespace(payload={})),
+        platform_name="posix",
+    ) == ()
+
+
+def test_business_draft_execute_once_requires_the_exact_complete_command() -> None:
+    command = (
+        "python '/tmp/Skill Path/scripts/run.py' gateway.py "
+        "draft-declare-debug-intent od1-opaque --task-authority da1-opaque "
+        "--expected-revision 1"
+    )
+    payload = _business_prefix_payload(
+        command,
+        action="copy_and_execute_verbatim_once",
+    )
+    prior = completed_record("python initial.py", payload)
+    broker_records = (
+        SimpleNamespace(payload=payload),
+        SimpleNamespace(payload={}),
+    )
+
+    assert gateway_continuation_binding_errors(
+        (prior, completed_record(command, {})),
+        broker_records,
+        platform_name="posix",
+    ) == ()
+    assert gateway_continuation_binding_errors(
+        (prior, completed_record(command + " --unexpected", {})),
+        broker_records,
+        platform_name="posix",
+    ) == (
+        "command 2: Gateway business Draft continuation was not copied "
+        "from its selected source field",
+    )
+
+
+def test_compound_checked_children_defer_preview_and_copy_parent_prefix() -> None:
+    parent_authority = "da1-" + "a" * 40
+    child_one = "od1-child-one"
+    child_one_authority = "da1-" + "b" * 40
+    child_two = "od1-child-two"
+    child_two_authority = "da1-" + "c" * 40
+    parent_prefix = (
+        "python /tmp/run.py gateway.py draft-declare-undo-plan od1-parent "
+        f"--task-authority {parent_authority} --expected-revision 1"
+    )
+    parent_payload = _business_prefix_payload(
+        parent_prefix,
+        action=(
+            "copy_verbatim_then_append_display_name_and_each_checked_child_"
+            "draft_in_user_requested_order"
+        ),
+    )
+    parent_payload["draft"]["next_action_binding"]["required_next_phase"] = (
+        "declare_ordered_checked_child_business_drafts"
+    )
+
+    def child_payload(child_id: str, authority: str) -> dict[str, object]:
+        return {
+            "next_command": _closed_next_command(
+                (
+                    "python",
+                    "/tmp/run.py",
+                    "gateway.py",
+                    "preview-from-draft",
+                    child_id,
+                    "--task-authority",
+                    authority,
+                    "--expected-revision",
+                    "4",
+                ),
+                platform_name="posix",
+            )
+        }
+
+    child_one_payload = child_payload(child_one, child_one_authority)
+    child_two_payload = child_payload(child_two, child_two_authority)
+    parent_command = (
+        parent_prefix
+        + " --display-name 'Weather cleanup' --child-draft "
+        + child_one
+        + " "
+        + child_one_authority
+        + " --child-draft "
+        + child_two
+        + " "
+        + child_two_authority
+    )
+    command_records = (
+        completed_record(
+            "python /tmp/run.py gateway.py draft-start waapi.undoGroup",
+            parent_payload,
+        ),
+        completed_record(
+            "python /tmp/run.py gateway.py draft-check "
+            + child_one
+            + " --task-authority "
+            + child_one_authority,
+            child_one_payload,
+        ),
+        completed_record(
+            "python /tmp/run.py gateway.py operation-schema object.setName",
+            {},
+        ),
+        completed_record(
+            "python /tmp/run.py gateway.py draft-check "
+            + child_two
+            + " --task-authority "
+            + child_two_authority,
+            child_two_payload,
+        ),
+        completed_record(parent_command, {}),
+    )
+    broker_records = (
+        SimpleNamespace(
+            payload=parent_payload,
+            gateway_arguments=("draft-start", "waapi.undoGroup"),
+        ),
+        SimpleNamespace(
+            payload=child_one_payload,
+            gateway_arguments=(
+                "draft-check",
+                child_one,
+                "--task-authority",
+                child_one_authority,
+            ),
+        ),
+        SimpleNamespace(
+            payload={},
+            gateway_arguments=("operation-schema", "object.setName"),
+        ),
+        SimpleNamespace(
+            payload=child_two_payload,
+            gateway_arguments=(
+                "draft-check",
+                child_two,
+                "--task-authority",
+                child_two_authority,
+            ),
+        ),
+        SimpleNamespace(
+            payload={},
+            gateway_arguments=(
+                "draft-declare-undo-plan",
+                "od1-parent",
+                "--child-draft",
+                child_one,
+                child_one_authority,
+                "--child-draft",
+                child_two,
+                child_two_authority,
+            ),
+        ),
+    )
+
+    assert gateway_continuation_binding_errors(
+        command_records,
+        broker_records,
+        platform_name="posix",
+        allow_compound_checked_child_handoff=True,
+    ) == ()
+
+    reconstructed = list(command_records)
+    reconstructed[-1] = completed_record(
+        parent_command.replace(parent_authority, "da1-" + "d" * 40),
+        {},
+    )
+    assert gateway_continuation_binding_errors(
+        tuple(reconstructed),
+        broker_records,
+        platform_name="posix",
+        allow_compound_checked_child_handoff=True,
+    ) == (
+        "command 5: deferred compound Draft continuation was not copied from its "
+        "selected source field",
+    )
+
+
+def test_business_draft_continuation_rejects_unreviewed_copy_action() -> None:
+    prefix = (
+        "python '/tmp/Skill Path/scripts/run.py' gateway.py draft-check "
+        "od1-opaque --task-authority da1-opaque --expected-revision 1"
+    )
+    payload = _business_prefix_payload(
+        prefix,
+        action="normalize_then_execute",
+    )
+
+    assert gateway_continuation_binding_errors(
+        (
+            completed_record("python initial.py", payload),
+            completed_record(prefix, {}),
+        ),
+        (SimpleNamespace(payload=payload), SimpleNamespace(payload={})),
+        platform_name="posix",
+    ) == (
+        "command 2: Gateway business Draft continuation was not copied "
+        "from its selected source field",
+    )
+
+
+def test_business_draft_prefix_continuation_rejects_equivalent_requote() -> None:
+    prefix = (
+        "python '/tmp/Skill Path/scripts/run.py' gateway.py draft-bind-object "
+        "od1-opaque --task-authority da1-opaque --expected-revision 1"
+    )
+    payload = _business_prefix_payload(prefix)
+    reconstructed = (
+        'python "/tmp/Skill Path/scripts/run.py" gateway.py draft-bind-object '
+        "od1-opaque --task-authority da1-opaque --expected-revision 1 "
+        "--object-path-segment 'Actor-Mixer Hierarchy'"
+    )
+
+    errors = gateway_continuation_binding_errors(
+        (
+            completed_record("python initial.py", payload),
+            completed_record(reconstructed, {}),
+        ),
+        (SimpleNamespace(payload=payload), SimpleNamespace(payload={})),
+        platform_name="posix",
+    )
+
+    assert errors == (
+        "command 2: Gateway business Draft continuation was not copied "
+        "from its selected source field",
+    )
+
+
+def _windows_business_prefix_fixture() -> tuple[str, dict[str, object]]:
+    prefix_argv = (
+        "python",
+        TASK_LOCAL_RUNNER_WINDOWS,
+        "gateway.py",
+        "draft-bind-object",
+        "od1-opaque",
+        "--task-authority",
+        "da1-opaque",
+        "--expected-revision",
+        "1",
+    )
+    prefix = encode_windows_model_argv(prefix_argv)
+    return prefix, _business_prefix_payload(prefix)
+
+
+def test_windows_business_draft_prefix_accepts_exact_copy() -> None:
+    prefix, payload = _windows_business_prefix_fixture()
+    command = prefix + " '--object-path-segment' 'Actor-Mixer Hierarchy'"
+
+    assert gateway_continuation_binding_errors(
+        (
+            completed_windows_record(
+                windows_powershell_recording("python initial.py"),
+                payload,
+            ),
+            completed_windows_record(
+                windows_powershell_recording(command),
+                {},
+            ),
+        ),
+        (SimpleNamespace(payload=payload), SimpleNamespace(payload={})),
+        platform_name="nt",
+        windows_powershell_core_host=_WINDOWS_POWERSHELL_CORE_HOST,
+    ) == ()
+
+
+def test_windows_business_draft_prefix_accepts_only_task_local_runner_expansion() -> None:
+    prefix, payload = _windows_business_prefix_fixture()
+    absolute_runner = (
+        r"C:\campaign\agent-workspace\.agents\skills\waapi-skill\scripts\run.py"
+    )
+    expanded = encode_windows_model_argv(
+        (
+            "python",
+            absolute_runner,
+            "gateway.py",
+            "draft-bind-object",
+            "od1-opaque",
+            "--task-authority",
+            "da1-opaque",
+            "--expected-revision",
+            "1",
+        )
+    )
+    command = expanded + " '--object-path-segment' 'Actor-Mixer Hierarchy'"
+
+    assert gateway_continuation_binding_errors(
+        (
+            completed_windows_record(
+                windows_powershell_recording("python initial.py"),
+                payload,
+            ),
+            completed_windows_record(
+                windows_powershell_recording(command),
+                {},
+            ),
+        ),
+        (SimpleNamespace(payload=payload), SimpleNamespace(payload={})),
+        platform_name="nt",
+        windows_powershell_core_host=_WINDOWS_POWERSHELL_CORE_HOST,
+    ) == ()
+
+
+def test_windows_business_draft_prefix_rejects_equivalent_requote() -> None:
+    prefix, payload = _windows_business_prefix_fixture()
+    reconstructed = (
+        prefix.removesuffix("'1'")
+        + "1 '--object-path-segment' 'Actor-Mixer Hierarchy'"
+    )
+
+    errors = gateway_continuation_binding_errors(
+        (
+            completed_windows_record(
+                windows_powershell_recording("python initial.py"),
+                payload,
+            ),
+            completed_windows_record(
+                windows_powershell_recording(reconstructed),
+                {},
+            ),
+        ),
+        (SimpleNamespace(payload=payload), SimpleNamespace(payload={})),
+        platform_name="nt",
+        windows_powershell_core_host=_WINDOWS_POWERSHELL_CORE_HOST,
+    )
+
+    assert errors == (
+        "command 2: Gateway business Draft continuation was not copied "
+        "from its selected source field",
+    )
 
 
 def passing_prompt_audit() -> codex_harness_module.CodexPromptAudit:
@@ -771,6 +1296,35 @@ def test_powershell_core_probe_rejects_original_reparse_before_launch(
     assert launched == []
 
 
+def test_powershell_core_probe_allows_a_cold_interactive_windows_start(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    executable = tmp_path / "pwsh.exe"
+    executable.write_bytes(b"reviewed-powershell-core")
+    calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
+
+    def runner(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls.append((args, kwargs))
+        return subprocess.CompletedProcess(
+            args=args[0],
+            returncode=0,
+            stdout="Core|7.6.4|Windows",
+            stderr="",
+        )
+
+    monkeypatch.setattr(
+        codex_harness_module,
+        "validate_powershell_core_probe_output",
+        lambda *_args, **_kwargs: _WINDOWS_POWERSHELL_CORE_HOST,
+    )
+    host = probe_windows_powershell_core(executable, runner=runner)
+
+    assert host is _WINDOWS_POWERSHELL_CORE_HOST
+    assert len(calls) == 1
+    assert calls[0][1]["timeout"] == 30.0
+
+
 def test_windows_codex_runtime_path_keeps_broker_shim_first(
     tmp_path: Path,
 ) -> None:
@@ -1000,6 +1554,55 @@ def gateway_command(skill: Path, arguments: str) -> str:
     )
 
 
+@pytest.mark.parametrize(
+    "subcommand",
+    (
+        "draft-add-media",
+        "draft-bind-field",
+        "draft-bind-object",
+        "draft-business-configure",
+        "draft-declare-import-batch",
+        "draft-clear-object-list",
+        "draft-declare-existing",
+        "draft-declare-field-change",
+        "draft-declare-new",
+        "draft-declare-object-change",
+        "draft-declare-rtpc",
+        "draft-declare-switch-assignment",
+        "draft-discover-fields",
+        "draft-discover-types",
+        "draft-remove-declaration",
+        "draft-revise-declaration",
+        "core-call",
+    ),
+)
+def test_business_draft_gateway_subcommands_are_classified(
+    tmp_path: Path,
+    subcommand: str,
+) -> None:
+    skill = tmp_path / "waapi-skill"
+    (skill / "scripts").mkdir(parents=True)
+    (skill / "scripts" / "run.py").write_text("# runner\n", encoding="utf-8")
+    command = gateway_command(skill, f"{subcommand} placeholder")
+    record = completed_record(
+        command,
+        {
+            "contract": "waapi-skill.gateway-result/v1",
+            "command": subcommand,
+            "ok": True,
+        },
+    )
+
+    facts = classify_commands(
+        (record,),
+        skill_source=skill,
+        expected_gateway_subcommands=(subcommand,),
+    )
+
+    assert facts.gateway_subcommands == (subcommand,)
+    assert facts.unexpected_commands == ()
+
+
 def recorded_argv_command(*argv: str) -> str:
     """Render synthetic Codex argv with its platform-neutral JSONL grammar."""
 
@@ -1144,6 +1747,145 @@ def test_prompt_audit_accepts_exact_target_and_codex_system_skills(tmp_path: Pat
     assert audit.target_skill_locator_matches is True
     assert audit.unexpected_skills == ()
     assert audit.passed is True
+
+
+def test_prompt_audit_resolves_unique_short_skill_root_locators(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "workspace" / ".agents" / "skills" / "waapi-skill"
+    target.mkdir(parents=True)
+    (target / "SKILL.md").write_text("target\n", encoding="utf-8")
+    system_root = tmp_path / "codex-home" / "skills" / ".system"
+    builtin = system_root / "skill-creator" / "SKILL.md"
+    builtin.parent.mkdir(parents=True)
+    builtin.write_text("builtin\n", encoding="utf-8")
+    payload = [
+        {
+            "role": "developer",
+            "content": (
+                "### Skill roots\n"
+                f"- `r0` = `{system_root}`\n"
+                f"- `r1` = `{target.parent}`\n"
+                "### Available skills\n"
+                "- skill-creator: builtin (file: r0/skill-creator/SKILL.md)\n"
+                "- waapi-skill: target (file: r1/waapi-skill/SKILL.md)"
+            ),
+        }
+    ]
+
+    audit = audit_prompt_input_payload(
+        payload,
+        target_skill_source=target,
+        system_skill_root=system_root,
+    )
+
+    assert audit.skill_inventory == (
+        ("skill-creator", "r0/skill-creator/SKILL.md"),
+        ("waapi-skill", "r1/waapi-skill/SKILL.md"),
+    )
+    assert audit.system_skills == (
+        ("skill-creator", "r0/skill-creator/SKILL.md"),
+    )
+    assert audit.target_skill_count == 1
+    assert audit.target_skill_locator_matches is True
+    assert audit.unexpected_skills == ()
+    assert audit.passed is True
+
+
+@pytest.mark.parametrize(
+    ("root", "locator", "expected"),
+    (
+        (
+            "/opt/codex/skills/.system",
+            "r0/skill-creator/SKILL.md",
+            "/opt/codex/skills/.system/skill-creator/SKILL.md",
+        ),
+        (
+            r"C:\Users\cbos\.codex\skills\.system",
+            r"r0\skill-creator/SKILL.md",
+            r"C:\Users\cbos\.codex\skills\.system\skill-creator\SKILL.md",
+        ),
+        (
+            r"\\server\codex-share\skills\.system",
+            "r0/skill-creator/SKILL.md",
+            r"\\server\codex-share\skills\.system\skill-creator\SKILL.md",
+        ),
+    ),
+)
+def test_short_skill_locator_expansion_preserves_the_root_lexical_flavor(
+    root: str,
+    locator: str,
+    expected: str,
+) -> None:
+    assert codex_harness_module.expand_short_skill_locator(
+        locator,
+        roots={"r0": root},
+    ) == expected
+
+
+@pytest.mark.parametrize(
+    "locator",
+    (
+        "/Users/test/.agents/skills/demo/SKILL.md",
+        r"C:\Users\test\.agents\skills\demo\SKILL.md",
+        r"C:/Users/test/.agents\skills/demo/SKILL.md",
+        r"\\server\share\.agents\skills\demo\SKILL.md",
+    ),
+)
+def test_skill_locator_classification_is_independent_of_the_runner_host(
+    locator: str,
+) -> None:
+    assert codex_harness_module.local_locator_contains_parts(
+        locator,
+        (".agents", "skills"),
+    )
+
+
+def test_windows_skill_locator_classification_uses_windows_case_semantics() -> None:
+    assert codex_harness_module.local_locator_contains_parts(
+        r"C:\USERS\TEST\.CODEX\SKILLS\.SYSTEM\skill-creator\SKILL.md",
+        (".codex", "skills", ".system"),
+    )
+    assert not codex_harness_module.local_locator_contains_parts(
+        "/Users/test/.CODEX/SKILLS/.SYSTEM/skill-creator/SKILL.md",
+        (".codex", "skills", ".system"),
+    )
+
+
+def test_prompt_audit_rejects_ambiguous_and_personal_short_skill_roots(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "workspace" / ".agents" / "skills" / "waapi-skill"
+    target.mkdir(parents=True)
+    (target / "SKILL.md").write_text("target\n", encoding="utf-8")
+    personal_root = tmp_path / "home" / ".agents" / "skills"
+    personal = personal_root / "demo" / "SKILL.md"
+    personal.parent.mkdir(parents=True)
+    personal.write_text("personal\n", encoding="utf-8")
+    payload = [
+        {
+            "role": "developer",
+            "content": (
+                "### Skill roots\n"
+                f"- `r1` = `{target.parent}`\n"
+                f"- `r1` = `{tmp_path / 'wrong-root'}`\n"
+                f"- `r2` = `{personal_root}`\n"
+                "### Available skills\n"
+                "- waapi-skill: target (file: r1/waapi-skill/SKILL.md)\n"
+                "- demo: personal (file: r2/demo/SKILL.md)"
+            ),
+        }
+    ]
+
+    audit = audit_prompt_input_payload(payload, target_skill_source=target)
+
+    assert audit.has_target_skill is False
+    assert audit.has_user_agent_skills is True
+    assert audit.unexpected_skills == (
+        ("waapi-skill", "r1/waapi-skill/SKILL.md"),
+        ("demo", "r2/demo/SKILL.md"),
+    )
+    assert audit.passed is False
 
 
 def test_prompt_audit_binds_system_skills_to_exact_disposable_codex_home(tmp_path: Path) -> None:
@@ -1379,6 +2121,258 @@ def test_task_commands_start_non_ephemeral_then_resume_exact_thread_with_isolati
         )
 
 
+def test_task_and_prompt_audit_commands_seal_bootstrap_developer_instructions(
+    tmp_path: Path,
+) -> None:
+    bootstrap = (
+        "Before any other action, read the injected waapi-skill SKILL.md exactly once "
+        "using one standalone complete file-read command."
+    )
+    config = CodexHarnessConfig(
+        workspace=tmp_path,
+        skill_source=tmp_path / "skill",
+        codex_binary=tmp_path / "codex",
+        developer_instructions=bootstrap,
+    )
+
+    initial = build_task_exec_command(
+        config,
+        prompt="Read current Wwise info.",
+        writable_dir=tmp_path / "outputs",
+    )
+    followup = build_task_resume_command(
+        config,
+        thread_id="thread-exact-123",
+        prompt="Continue.",
+        writable_dir=tmp_path / "outputs",
+    )
+    audit = build_prompt_audit_command(config, prompt="Read current Wwise info.")
+
+    expected_override = f"developer_instructions={json.dumps(bootstrap)}"
+    for command in (initial, followup, audit):
+        assert command.count(expected_override) == 1
+        assert command[command.index(expected_override) - 1] == "-c"
+
+
+def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_rebuild() -> None:
+    instructions = (
+        codex_harness_module.SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS
+    )
+
+    assert "First read SKILL.md once, standalone" in instructions
+    assert "Get-Content -Raw -Encoding UTF8" not in instructions
+    assert "copy source_field/fixed_argv_prefix_copy verbatim" in instructions
+    assert "keep quotes/runner" in instructions
+    assert "fixed_argv_prefix" in instructions
+    assert "never reconstruct" in instructions
+    assert "Omit workdir/cwd" in instructions
+    assert "Read now; no pre-read reply/questions" in instructions
+    assert "draft-apply: 1 argv/fact" in instructions
+    assert "all facts" in instructions
+    assert "batch=6" in instructions
+    assert "final=remaining" in instructions
+    assert "Rows obey returned max" in instructions
+    assert "Composer: one action/call" in instructions
+    assert "allowed_action_argv owns TYPE" in instructions
+    assert "not Real64/int16" in instructions
+    assert "unapplied ancestor deferred_fact" in instructions
+    assert "execute_after=all_pending_ancestor_facts_in_response_tree_preorder" in instructions
+    assert "all_pending_ancestor_facts_in_response_tree_preorder" in instructions
+    assert "branch constant/value" in instructions
+    assert "Metadata: obey composer.start.preconditions" in instructions
+    assert "absent=none" in instructions
+    assert "prompt/schema!=live" in instructions
+    assert "all dynamic tokens pre-draft" in instructions
+    assert "single existing=>--object GUID" in instructions
+    assert "--object-type only new/imported/plural" in instructions
+    assert "subset reread only" in instructions
+    assert "no exact-type-name; reread pre-schema" not in instructions
+    assert "path=>by_path_segments one arg/segment" in instructions
+    assert "SoundBank=>role_route" in instructions
+    assert "exact bank=>soundbank.by_exact_name" in instructions
+    assert "name=>query>ID=>by_id" in instructions
+    assert "GUID=>by_id" in instructions
+    assert "Else path=>path" in instructions
+    assert "one query/hop; no merge" in instructions
+    assert "enum/const exact" in instructions
+    assert "typed_operation: copy gateway_argv_prefix" in instructions
+    assert "incl --apply" in instructions
+    assert "selector kind/value separate" in instructions
+    assert "opaque IDs/handles/tokens/digests" in instructions
+    assert "Import type=Sound SFX" in instructions
+    assert "Sound query=all-sounds" in instructions
+    assert "query type=Sound" not in instructions
+    assert "Events:" in instructions
+    assert "parents first" in instructions
+    assert "New path=>parent" in instructions
+    assert "name=>declaration only" in instructions
+    assert "POSIX path: single-quote" in instructions
+    assert "keep backslashes" in instructions
+    assert "one arg/child" in instructions
+    assert "Files absolute; no traversal" in instructions
+    assert "scalars first" in instructions
+    assert "Top facts first; exhaust tree" in instructions
+    assert "More=>ancestor_next_item_source" in instructions
+    assert "none=>completion_candidate.copy_command incl task_authority" in instructions
+    assert "shell_tool_timeout_ms" in instructions
+    assert "timeout_ms>=30000" in instructions
+    assert "draft-check!=Preview" in instructions
+    assert (
+        "Preview-now: finish schema/metadata/Preview now; "
+        "only execution waits for confirmation"
+    ) in instructions
+    assert "Draft same turn" in instructions
+    assert "no progress reply" in instructions
+    assert "requires_later_user_message" in instructions
+
+
+def test_formal_bootstrap_instructions_bind_one_exact_windows_runner_prefix() -> None:
+    runner = r"C:\Git_Repos\waapi-skills\skills\waapi-skill\scripts\run.py"
+
+    instructions = (
+        codex_harness_module.semantic_skill_bootstrap_developer_instructions(runner)
+    )
+
+    assert (
+        "python "
+        r"'C:\Git_Repos\waapi-skills\skills\waapi-skill\scripts\run.py' "
+        "'gateway.py'"
+    ) in instructions
+    assert "No next_command: only" in instructions
+    assert "append disclosed argv verbatim" in instructions
+    assert len(instructions.encode("utf-8")) <= 2048
+
+
+def test_formal_task_instructions_bind_exact_posix_skill_read_schedule() -> None:
+    task_skill = PurePosixPath(
+        "/tmp/campaign/scenarios/001-TYP22/evidence/codex-task/agent-workspace/"
+        ".agents/skills/waapi-skill"
+    )
+
+    instructions = codex_harness_module.semantic_task_developer_instructions(
+        "/repo/skills/waapi-skill/scripts/run.py",
+        task_skill_source=task_skill,
+        expected_skill_reads=(
+            ("SKILL.md", "references/waapi-query.md"),
+            (),
+        ),
+    )
+
+    assert "cat '.agents/skills/waapi-skill/SKILL.md'" in instructions
+    assert "python .agents/skills/waapi-skill/scripts/run.py gateway.py" in instructions
+    assert str(task_skill / "scripts" / "run.py") not in instructions
+    assert "/repo/skills/waapi-skill/scripts/run.py" not in instructions
+    assert (
+        "cat '.agents/skills/waapi-skill/references/waapi-query.md'"
+        in instructions
+    )
+    assert "Reads: 1" in instructions
+    assert "2 none" in instructions
+    assert "Exact turn; no early/late/extra reads" in instructions
+    assert len(instructions.encode("utf-8")) <= 2048
+
+
+def test_formal_task_instructions_bind_exact_windows_skill_read_schedule() -> None:
+    instructions = codex_harness_module.semantic_task_developer_instructions(
+        r"C:\Git_Repos\waapi-skills\skills\waapi-skill\scripts\run.py",
+        task_skill_source=(
+            r"C:\Git_Repos\waapi-skills\skills\waapi-skill-workspace\root"
+            r"\agent-workspace\.agents\skills\waapi-skill"
+        ),
+        expected_skill_reads=(
+            ("SKILL.md", "references/waapi-operate.md"),
+        ),
+    )
+
+    assert (
+        "Get-Content -Raw -Encoding UTF8 "
+        r"'.agents\skills\waapi-skill\SKILL.md'"
+    ) in instructions
+    assert (
+        "python '.agents\\skills\\waapi-skill\\scripts\\run.py' "
+        "'gateway.py'"
+    ) in instructions
+    assert "No next_command: only" in instructions
+    assert "append disclosed argv verbatim" in instructions
+    assert "waapi-skill-workspace\\root" not in instructions
+    assert (
+        "Get-Content -Raw -Encoding UTF8 "
+        r"'.agents\skills\waapi-skill\references\waapi-operate.md'"
+    ) in instructions
+    assert "Exact turn; no early/late/extra reads" in instructions
+    assert len(instructions.encode("utf-8")) <= 2048
+
+
+def test_public_integration_alarm_instructions_fit_the_sealed_byte_limit() -> None:
+    task_skill = (
+        r"C:\Git_Repos\waapi-skills\skills\waapi-skill-workspace"
+        r"\w1a68649-int-fail10-r1\attempts\attempt-000001\runs\heavy-v3"
+        r"\matrix\scenarios\002-INT22-ALARM\evidence\codex-task"
+        r"\agent-workspace\.agents\skills\waapi-skill"
+    )
+
+    instructions = codex_harness_module.semantic_task_developer_instructions(
+        r"C:\Git_Repos\waapi-skills\skills\waapi-skill\scripts\run.py",
+        task_skill_source=task_skill,
+        expected_skill_reads=(
+            ("SKILL.md", "references/waapi-query.md"),
+            ("references/waapi-operate.md",),
+            (),
+        ),
+        base_developer_instructions=(
+            codex_harness_module.semantic_skill_bootstrap_developer_instructions(
+                r"c:\git_repos\waapi-skills\skills\waapi-skill\scripts\run.py"
+            )
+        ),
+    )
+
+    assert "Reads: 1" in instructions
+    assert "2 [Get-Content" in instructions
+    assert "3 none" in instructions
+    assert "not Real64/int16" in instructions
+    assert len(instructions.encode("utf-8")) <= 2048
+
+
+def test_prompt_audit_requires_exact_bootstrap_developer_instruction_once(
+    tmp_path: Path,
+) -> None:
+    skill = tmp_path / "waapi-skill"
+    skill.mkdir()
+    (skill / "SKILL.md").write_text("skill\n", encoding="utf-8")
+    bootstrap = "Read the injected waapi-skill SKILL.md exactly once."
+    skill_line = f"- waapi-skill: target (file: {skill / 'SKILL.md'})"
+
+    accepted = audit_prompt_input_payload(
+        [
+            {"role": "developer", "content": bootstrap},
+            {"role": "developer", "content": skill_line},
+        ],
+        target_skill_source=skill,
+        expected_developer_instructions=bootstrap,
+    )
+    missing = audit_prompt_input_payload(
+        [{"role": "developer", "content": skill_line}],
+        target_skill_source=skill,
+        expected_developer_instructions=bootstrap,
+    )
+    duplicated = audit_prompt_input_payload(
+        [
+            {"role": "developer", "content": bootstrap},
+            {"role": "developer", "content": bootstrap},
+            {"role": "developer", "content": skill_line},
+        ],
+        target_skill_source=skill,
+        expected_developer_instructions=bootstrap,
+    )
+
+    assert accepted.developer_instructions_exact is True
+    assert accepted.passed is True
+    assert missing.developer_instructions_exact is False
+    assert missing.passed is False
+    assert duplicated.developer_instructions_exact is False
+    assert duplicated.passed is False
+
+
 def test_prompt_audit_command_uses_supported_global_flags_with_pristine_codex_home(tmp_path: Path) -> None:
     config = CodexHarnessConfig(
         workspace=tmp_path,
@@ -1391,6 +2385,77 @@ def test_prompt_audit_command_uses_supported_global_flags_with_pristine_codex_ho
     assert command[:3] == [str(config.codex_binary), "--disable", "memories"]
     assert "--ignore-user-config" not in command
     assert command[-3:] == ["debug", "prompt-input", "List buses."]
+
+
+def test_native_windows_commands_disable_each_ambient_user_skill_by_exact_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        codex_harness_module,
+        "_is_windows",
+        lambda platform_name=None: True,
+    )
+    first = (tmp_path / "profile" / ".agents" / "skills" / "first" / "SKILL.md")
+    second = (tmp_path / "profile" / ".agents" / "skills" / "second" / "SKILL.md")
+    for path in (first, second):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("---\nname: example\n---\n", encoding="utf-8")
+    config = CodexHarnessConfig(
+        workspace=tmp_path,
+        skill_source=tmp_path / "skill",
+        codex_binary=tmp_path / "codex.exe",
+        disabled_user_skill_paths=(first, second),
+    )
+    expected = (
+        "skills.config=["
+        f"{{path={json.dumps(str(first.resolve()))},enabled=false}},"
+        f"{{path={json.dumps(str(second.resolve()))},enabled=false}}]"
+    )
+
+    commands = (
+        build_prompt_audit_command(config, prompt="Inspect it."),
+        build_task_exec_command(
+            config,
+            prompt="Inspect it.",
+            writable_dir=tmp_path / "output",
+        ),
+        build_task_resume_command(
+            config,
+            thread_id="thread-exact-123",
+            prompt="Continue.",
+            writable_dir=tmp_path / "output",
+        ),
+    )
+
+    for command in commands:
+        assert command.count(expected) == 1
+        assert command[command.index(expected) - 1] == "-c"
+
+
+def test_native_windows_user_skill_discovery_tracks_new_exact_skill_files(
+    tmp_path: Path,
+) -> None:
+    profile = tmp_path / "profile"
+    skills = profile / ".agents" / "skills"
+    first = skills / "first" / "SKILL.md"
+    first.parent.mkdir(parents=True)
+    first.write_text("---\nname: first\n---\n", encoding="utf-8")
+    (skills / "not-a-skill").mkdir()
+    environment = {"USERPROFILE": str(profile)}
+
+    assert discover_windows_user_skill_paths(
+        environment=environment,
+        platform_name="nt",
+    ) == (first.resolve(),)
+
+    second = skills / "second" / "SKILL.md"
+    second.parent.mkdir()
+    second.write_text("---\nname: second\n---\n", encoding="utf-8")
+    assert discover_windows_user_skill_paths(
+        environment=environment,
+        platform_name="nt",
+    ) == (first.resolve(), second.resolve())
 
 
 def test_prompt_audit_retries_one_pre_action_timeout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1449,7 +2514,17 @@ def test_prompt_audit_stops_after_two_pre_action_timeouts(
     assert calls == [30.0, 30.0]
 
 
-@pytest.mark.parametrize("key", ["HOME", "CODEX_HOME", "XDG_CACHE_HOME", "XDG_CONFIG_HOME", "CODEX_FOO"])
+@pytest.mark.parametrize(
+    "key",
+    [
+        "HOME",
+        "USERPROFILE",
+        "CODEX_HOME",
+        "XDG_CACHE_HOME",
+        "XDG_CONFIG_HOME",
+        "CODEX_FOO",
+    ],
+)
 def test_isolated_environment_rejects_protected_extra_env(tmp_path: Path, key: str) -> None:
     auth = tmp_path / "auth.json"
     auth.write_text("{}\n", encoding="utf-8")
@@ -1533,9 +2608,17 @@ def test_prompt_audit_and_exec_environments_scrub_ambient_waapi_state(
     assert first.codex_home != second.codex_home
 
 
-def test_native_windows_isolated_environment_uses_detached_auth_copy(tmp_path: Path) -> None:
+def test_native_windows_isolated_environment_uses_detached_auth_copy(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     auth = tmp_path / "auth.json"
     auth.write_text('{"token":"runner-owned"}\n', encoding="utf-8")
+    ambient_profile = tmp_path / "ambient-profile"
+    ambient_skill = ambient_profile / ".agents" / "skills" / "user-global-skill"
+    ambient_skill.mkdir(parents=True)
+    (ambient_skill / "SKILL.md").write_text("user-global\n", encoding="utf-8")
+    monkeypatch.setenv("USERPROFILE", str(ambient_profile))
 
     with isolated_codex_environment(auth, platform_name="nt") as environment:
         audit = inspect_isolated_environment(
@@ -1546,6 +2629,9 @@ def test_native_windows_isolated_environment_uses_detached_auth_copy(tmp_path: P
         installed_auth = Path(environment["CODEX_HOME"]) / "auth.json"
 
         assert audit.passed is True
+        assert environment["USERPROFILE"] == environment["HOME"]
+        assert environment["USERPROFILE"] != str(ambient_profile)
+        assert not (Path(environment["USERPROFILE"]) / ".agents").exists()
         assert audit.auth_install_mode == "copy"
         assert audit.auth_is_symlink is False
         assert audit.auth_same_file_as_source is False
@@ -2159,6 +3245,26 @@ def test_native_windows_taskkill_command_is_tree_scoped_and_fail_closed(
     with pytest.raises(CodexHarnessError, match="could not terminate"):
         codex_harness_module.taskkill_process_tree(fake, force=False)
 
+    exited_during_taskkill = InterruptingFakeProcess()
+
+    def partial_exit_race(
+        command: Sequence[str],
+        **_kwargs: object,
+    ) -> subprocess.CompletedProcess[str]:
+        exited_during_taskkill.returncode = 1
+        return subprocess.CompletedProcess(
+            command,
+            255,
+            "SUCCESS: terminated the tracked parent",
+            "ERROR: one console helper operation is not supported",
+        )
+
+    monkeypatch.setattr(subprocess, "run", partial_exit_race)
+    codex_harness_module.taskkill_process_tree(
+        exited_during_taskkill,  # type: ignore[arg-type]
+        force=True,
+    )
+
 
 def test_windows_system_executable_uses_fixed_system32_path() -> None:
     assert codex_harness_module.windows_system_executable(
@@ -2252,6 +3358,144 @@ def test_harness_verify_requires_exactly_one_installed_workspace_skill(tmp_path:
         harness.verify()
 
 
+def test_windows_console_utf8_preflight_sets_and_attests_both_code_pages() -> None:
+    class FakeConsoleApi:
+        def __init__(self) -> None:
+            self.input_code_page = 936
+            self.output_code_page = 936
+            self.calls: list[tuple[str, int]] = []
+
+        def GetConsoleCP(self) -> int:
+            return self.input_code_page
+
+        def GetConsoleOutputCP(self) -> int:
+            return self.output_code_page
+
+        def SetConsoleCP(self, value: int) -> int:
+            self.calls.append(("input", value))
+            self.input_code_page = value
+            return 1
+
+        def SetConsoleOutputCP(self, value: int) -> int:
+            self.calls.append(("output", value))
+            self.output_code_page = value
+            return 1
+
+    console = FakeConsoleApi()
+
+    result = codex_harness_module.enforce_windows_console_utf8(
+        platform_name="nt",
+        console_api=console,
+    )
+
+    assert result == (65001, 65001)
+    assert console.calls == [("input", 65001), ("output", 65001)]
+
+
+def test_windows_console_utf8_preflight_rolls_back_input_when_output_fails() -> None:
+    class FailingConsoleApi:
+        def __init__(self) -> None:
+            self.input_code_page = 936
+            self.calls: list[tuple[str, int]] = []
+
+        def GetConsoleCP(self) -> int:
+            return self.input_code_page
+
+        def GetConsoleOutputCP(self) -> int:
+            return 936
+
+        def SetConsoleCP(self, value: int) -> int:
+            self.calls.append(("input", value))
+            self.input_code_page = value
+            return 1
+
+        def SetConsoleOutputCP(self, value: int) -> int:
+            self.calls.append(("output", value))
+            return 0
+
+    console = FailingConsoleApi()
+
+    with pytest.raises(CodexHarnessError, match="output code page"):
+        codex_harness_module.enforce_windows_console_utf8(
+            platform_name="nt",
+            console_api=console,
+        )
+
+    assert console.input_code_page == 936
+    assert console.calls == [
+        ("input", 65001),
+        ("output", 65001),
+        ("input", 936),
+    ]
+
+
+def test_windows_console_utf8_preflight_fails_closed_on_readback_drift() -> None:
+    class LyingConsoleApi:
+        def GetConsoleCP(self) -> int:
+            return 936
+
+        def GetConsoleOutputCP(self) -> int:
+            return 936
+
+        def SetConsoleCP(self, _value: int) -> int:
+            return 1
+
+        def SetConsoleOutputCP(self, _value: int) -> int:
+            return 1
+
+    with pytest.raises(CodexHarnessError, match="attestation failed"):
+        codex_harness_module.enforce_windows_console_utf8(
+            platform_name="nt",
+            console_api=LyingConsoleApi(),
+        )
+
+
+def test_native_windows_harness_forces_utf8_console_before_pwsh_attestation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    binary = tmp_path / "codex.exe"
+    binary.write_bytes(b"synthetic")
+    binary.chmod(0o755)
+    auth = tmp_path / "auth.json"
+    auth.write_text("{}\n", encoding="utf-8")
+    source = tmp_path / "waapi-skill"
+    source.mkdir()
+    (source / "SKILL.md").write_text("skill\n", encoding="utf-8")
+    workspace = tmp_path / "workspace"
+    prepare_workspace_skill_install(workspace, source, platform_name="nt")
+    harness = CodexCliHarness(
+        CodexHarnessConfig(
+            workspace=workspace,
+            skill_source=source,
+            codex_binary=binary,
+            windows_powershell_core_host=_WINDOWS_POWERSHELL_CORE_HOST,
+            auth_json=auth,
+        )
+    )
+    calls: list[str] = []
+    monkeypatch.setattr(
+        codex_harness_module,
+        "_is_windows",
+        lambda platform_name=None: True,
+    )
+    monkeypatch.setattr(
+        codex_harness_module,
+        "enforce_windows_console_utf8",
+        lambda: calls.append("console") or (65001, 65001),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        codex_harness_module,
+        "discover_windows_powershell_core",
+        lambda **_kwargs: calls.append("pwsh") or _WINDOWS_POWERSHELL_CORE_HOST,
+    )
+
+    harness.verify()
+
+    assert calls == ["console", "pwsh"]
+
+
 def test_native_windows_harness_verify_fails_before_exec_without_attested_pwsh(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -2275,6 +3519,11 @@ def test_native_windows_harness_verify_fails_before_exec_without_attested_pwsh(
         )
     )
     monkeypatch.setattr(codex_harness_module, "_is_windows", lambda platform_name=None: True)
+    monkeypatch.setattr(
+        codex_harness_module,
+        "enforce_windows_console_utf8",
+        lambda: (65001, 65001),
+    )
     monkeypatch.setattr(
         codex_harness_module,
         "discover_windows_powershell_core",
@@ -2311,6 +3560,11 @@ def test_native_windows_harness_binds_and_revalidates_campaign_sealed_pwsh(
         )
     )
     monkeypatch.setattr(codex_harness_module, "_is_windows", lambda platform_name=None: True)
+    monkeypatch.setattr(
+        codex_harness_module,
+        "enforce_windows_console_utf8",
+        lambda: (65001, 65001),
+    )
     monkeypatch.setattr(
         codex_harness_module,
         "discover_windows_powershell_core",
@@ -2796,6 +4050,216 @@ def test_command_classifier_recognizes_versioned_operation_input_routes(
     assert facts.gateway_commands == (record.command,)
     assert facts.gateway_attempt_commands == (record.command,)
     assert facts.gateway_subcommands == (subcommand,)
+    assert facts.unexpected_commands == ()
+
+
+@pytest.mark.parametrize(
+    ("subcommand", "accepted_contract"),
+    (
+        ("request-schema", TYPED_REQUEST_SCHEMA_CONTRACT),
+        ("query-schema", BUSINESS_QUERY_SCHEMA_CONTRACT),
+    ),
+)
+def test_command_classifier_requires_exact_typed_schema_envelope(
+    tmp_path: Path,
+    subcommand: str,
+    accepted_contract: str,
+) -> None:
+    skill = tmp_path / "skill"
+    runner = skill / "scripts" / "run.py"
+    runner.parent.mkdir(parents=True)
+    runner.write_text("# packaged runner\n", encoding="utf-8")
+    argv = ("python", str(runner), "gateway.py", subcommand)
+
+    def record(contract: str) -> CodexCommandRecord:
+        return CodexCommandRecord(
+            command=shlex.join(argv),
+            exit_code=0,
+            status="completed",
+            aggregated_output=json.dumps(
+                {
+                    "contract": contract,
+                    "ok": True,
+                    "command": subcommand,
+                }
+            ),
+            argv=argv,
+            has_shell_operators=False,
+            parse_error="",
+            parser_kind="posix-native",
+        )
+
+    accepted = classify_commands(
+        (record(accepted_contract),),
+        skill_source=skill,
+        expected_gateway_subcommands=(subcommand,),
+    )
+    rejected = classify_commands(
+        (record("waapi-skill.unrelated-contract/v1"),),
+        skill_source=skill,
+        expected_gateway_subcommands=(subcommand,),
+    )
+
+    assert accepted.gateway_subcommands == (subcommand,)
+    assert accepted.unexpected_commands == ()
+    assert rejected.gateway_commands == ()
+    assert rejected.gateway_attempt_commands == (shlex.join(argv),)
+    assert rejected.unexpected_commands == (shlex.join(argv),)
+
+
+def test_command_classifier_accepts_exact_topic_schema_envelope(
+    tmp_path: Path,
+) -> None:
+    skill = tmp_path / "skill"
+    runner = skill / "scripts" / "run.py"
+    runner.parent.mkdir(parents=True)
+    runner.write_text("# packaged runner\n", encoding="utf-8")
+    argv = (
+        "python",
+        str(runner),
+        "gateway.py",
+        "topic-schema",
+        "ak.wwise.core.soundbank.generated",
+    )
+    record = CodexCommandRecord(
+        command=shlex.join(argv),
+        exit_code=0,
+        status="completed",
+        aggregated_output=json.dumps(
+            {
+                "contract": "waapi-skill.topic-business-envelope/v1",
+                "ok": True,
+                "command": "topic-schema",
+            }
+        ),
+        argv=argv,
+        has_shell_operators=False,
+        parse_error="",
+        parser_kind="posix-native",
+    )
+
+    facts = classify_commands(
+        (record,),
+        skill_source=skill,
+        expected_gateway_subcommands=("topic-schema",),
+    )
+
+    assert facts.gateway_commands == (record.command,)
+    assert facts.gateway_attempt_commands == (record.command,)
+    assert facts.gateway_subcommands == ("topic-schema",)
+    assert facts.unexpected_commands == ()
+
+
+def test_command_classifier_accepts_successful_stream_topic_ndjson(
+    tmp_path: Path,
+) -> None:
+    skill = tmp_path / "skill"
+    runner = skill / "scripts" / "run.py"
+    runner.parent.mkdir(parents=True)
+    runner.write_text("# packaged runner\n", encoding="utf-8")
+    topic = "ak.wwise.core.soundbank.generated"
+    argv = (
+        "python",
+        str(runner),
+        "gateway.py",
+        "--timeout",
+        "30",
+        "stream-topic",
+        topic,
+    )
+    records = (
+        {
+            "contract": "waapi-skill.topic-stream/v1",
+            "command": "stream-topic",
+            "record_type": "started",
+            "ok": True,
+            "status": "streaming",
+            "topic": topic,
+        },
+        {
+            "contract": "waapi-skill.topic-stream/v1",
+            "record_type": "event",
+            "sequence": 1,
+            "topic": topic,
+            "event": {"soundbank": {"name": "Weapons_Core"}},
+        },
+        {
+            "contract": "waapi-skill.topic-stream/v1",
+            "command": "stream-topic",
+            "record_type": "terminal",
+            "ok": True,
+            "status": "completed",
+            "completion_reason": "duration_elapsed",
+            "topic": topic,
+            "event_count": 1,
+            "cleanup": "unsubscribed",
+        },
+    )
+    record = CodexCommandRecord(
+        command=shlex.join(argv),
+        exit_code=0,
+        status="completed",
+        aggregated_output="".join(
+            json.dumps(item, separators=(",", ":")) + "\n"
+            for item in records
+        ),
+        argv=argv,
+        has_shell_operators=False,
+        parse_error="",
+        parser_kind="posix-native",
+    )
+
+    facts = classify_commands(
+        (record,),
+        skill_source=skill,
+        expected_gateway_subcommands=("stream-topic",),
+    )
+
+    assert facts.gateway_commands == (record.command,)
+    assert facts.gateway_attempt_commands == (record.command,)
+    assert facts.gateway_subcommands == ("stream-topic",)
+    assert facts.unexpected_commands == ()
+
+
+def test_command_classifier_accepts_packaged_query_schema_result() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    skill = repo_root / "skills" / "waapi-skill"
+    runner = skill / "scripts" / "run.py"
+    argv = (
+        sys.executable,
+        str(runner),
+        "gateway.py",
+        "--version",
+        "2021.1",
+        "query-schema",
+    )
+    completed = subprocess.run(
+        argv,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert completed.returncode == 0, completed.stderr
+    record = CodexCommandRecord(
+        command=shlex.join(argv),
+        exit_code=completed.returncode,
+        status="completed",
+        aggregated_output=completed.stdout,
+        argv=argv,
+        has_shell_operators=False,
+        parse_error="",
+        parser_kind="posix-native",
+    )
+
+    facts = classify_commands(
+        (record,),
+        skill_source=skill,
+        expected_gateway_subcommands=("query-schema",),
+        expected_wwise_version="2021.1",
+    )
+
+    assert facts.gateway_subcommands == ("query-schema",)
     assert facts.unexpected_commands == ()
 
 
@@ -3396,6 +4860,71 @@ def test_windows_get_content_utf8_newline_contract(
     assert facts.unexpected_commands == (() if accepted else (command,))
 
 
+def test_windows_get_content_accepts_repeated_safe_path_separators(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """PowerShell and NTFS treat repeated relative separators identically."""
+
+    monkeypatch.setattr(
+        codex_harness_module,
+        "split_native_command_line",
+        portable_windows_outer_split,
+    )
+    skill = tmp_path / "agent-workspace" / ".agents" / "skills" / "waapi-skill"
+    skill.mkdir(parents=True)
+    content = "# skill\r\n声音\r\n"
+    (skill / "SKILL.md").write_bytes(content.encode("utf-8"))
+    command = windows_powershell_recording(
+        r"Get-Content -Raw -Encoding UTF8 '.agents\\skills\\waapi-skill\\SKILL.md'"
+    )
+    record = completed_windows_record(command, content)
+
+    facts = classify_commands((record,), skill_source=skill)
+
+    assert facts.skill_read is True
+    assert facts.skill_read_files == ("SKILL.md",)
+    assert facts.unexpected_commands == ()
+
+
+def test_windows_failed_exact_skill_read_can_recover_once_before_success(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        codex_harness_module,
+        "split_native_command_line",
+        portable_windows_outer_split,
+    )
+    skill = tmp_path / "agent-workspace" / ".agents" / "skills" / "waapi-skill"
+    skill.mkdir(parents=True)
+    content = "# skill\r\n声音\r\n"
+    (skill / "SKILL.md").write_bytes(content.encode("utf-8"))
+    command = windows_powershell_recording(
+        r"Get-Content -Raw -Encoding UTF8 '.agents\skills\waapi-skill\SKILL.md'"
+    )
+    successful = completed_windows_record(command, content)
+    failed = CodexCommandRecord(
+        command=successful.command,
+        exit_code=-1,
+        status="failed",
+        aggregated_output=(
+            "execution error: Io(Custom { kind: Other, error: \"windows sandbox: "
+            "CreateProcessAsUserW failed: 267 (invalid directory)\" })"
+        ),
+        argv=successful.argv,
+        has_shell_operators=False,
+        parser_kind=successful.parser_kind,
+    )
+
+    facts = classify_commands((failed, successful), skill_source=skill)
+
+    assert facts.skill_read is True
+    assert facts.allowed_read_commands == (command,)
+    assert facts.unexpected_commands == ()
+    assert recoverable_preprocess_attempt_indexes(facts.command_records) == (0,)
+
+
 @pytest.mark.parametrize(
     "parser_kind",
     ("", "posix-native", "windows-native", "windows-powershell-encoded"),
@@ -3888,6 +5417,30 @@ def test_explicit_pre_action_cli_errors_are_infrastructure_without_turn_failed(
     assert failure.agent_item_event_count == 0
 
 
+def test_transport_error_item_does_not_masquerade_as_agent_action() -> None:
+    message = (
+        "stream disconnected before completion: tls handshake eof; "
+        "error sending request for url"
+    )
+    events = [
+        {"type": "thread.started", "thread_id": "thread-1"},
+        {"type": "turn.started"},
+        {"type": "error", "message": message},
+        {
+            "type": "item.completed",
+            "item": {"id": "error-1", "type": "error", "message": message},
+        },
+        {"type": "turn.failed", "error": {"message": message}},
+    ]
+
+    failure = classify_codex_infrastructure_failure(events)
+
+    assert failure is not None
+    assert failure.category == "service_unavailable"
+    assert failure.turn_failed is True
+    assert failure.agent_item_event_count == 0
+
+
 def test_turn_failure_after_agent_action_remains_a_semantic_skill_failure() -> None:
     message = "You've hit your usage limit after the model already acted."
     events = [
@@ -3959,6 +5512,55 @@ def test_session_audit_rejects_duplicate_threads_missing_completion_and_collab()
     assert audit.passed is False
 
 
+def test_session_audit_accepts_completed_websocket_to_https_fallback() -> None:
+    events = [
+        {"type": "thread.started", "thread_id": "thread-1"},
+        {"type": "turn.started"},
+        {
+            "type": "item.completed",
+            "item": {
+                "id": "transport-1",
+                "type": "error",
+                "message": (
+                    "Falling back from WebSockets to HTTPS transport. "
+                    "stream disconnected before completion: tls handshake eof"
+                ),
+            },
+        },
+        {
+            "type": "item.completed",
+            "item": {"id": "message-1", "type": "agent_message", "text": "done"},
+        },
+        {"type": "turn.completed", "usage": {}},
+    ]
+
+    audit = audit_session_events(events)
+
+    assert audit.unexpected_item_types == ()
+    assert audit.passed is True
+
+
+def test_session_audit_rejects_other_error_items_after_a_completed_turn() -> None:
+    events = [
+        {"type": "thread.started", "thread_id": "thread-1"},
+        {"type": "turn.started"},
+        {
+            "type": "item.completed",
+            "item": {
+                "id": "error-1",
+                "type": "error",
+                "message": "model output could not be decoded",
+            },
+        },
+        {"type": "turn.completed", "usage": {}},
+    ]
+
+    audit = audit_session_events(events)
+
+    assert audit.unexpected_item_types == ("error",)
+    assert audit.passed is False
+
+
 def test_windows_operator_scan_preserves_backslash_paths_and_rejects_composition() -> None:
     command = r'python C:\ProgramData\waapi-skill\scripts\run.py gateway.py status'
 
@@ -4016,6 +5618,52 @@ def test_command_classifier_distinguishes_gateway_from_inline_code_and_discovery
     assert facts.inline_python_commands == (commands[-1].command,)
     assert facts.direct_waapi_client_commands == (commands[-1].command,)
     assert facts.unexpected_commands == (commands[2].command, commands[3].command)
+
+
+def test_command_classifier_counts_one_identical_gateway_after_preprocess_failure(
+    tmp_path: Path,
+) -> None:
+    skill = tmp_path / "waapi-skill"
+    skill.mkdir()
+    (skill / "SKILL.md").write_text("skill\n", encoding="utf-8")
+    payload = {
+        "contract": "waapi-skill.gateway-result/v1",
+        "command": "buses",
+        "ok": True,
+    }
+    base = completed_record(gateway_command(skill, "buses"), payload)
+    successful = CodexCommandRecord(
+        command=base.command,
+        exit_code=base.exit_code,
+        status=base.status,
+        aggregated_output=base.aggregated_output,
+        argv=base.argv,
+        has_shell_operators=False,
+        parser_kind="windows-pwsh-command",
+    )
+    failed = CodexCommandRecord(
+        command=successful.command,
+        exit_code=-1,
+        status="failed",
+        aggregated_output=(
+            "execution error: Io(Custom { kind: Other, error: \"windows sandbox: "
+            "CreateProcessAsUserW failed: 267 (invalid directory)\" })"
+        ),
+        argv=successful.argv,
+        has_shell_operators=False,
+        parser_kind=successful.parser_kind,
+    )
+
+    facts = classify_commands(
+        (failed, successful),
+        skill_source=skill,
+        expected_gateway_subcommands=("buses",),
+    )
+
+    assert recoverable_preprocess_attempt_indexes(facts.command_records) == (0,)
+    assert facts.gateway_attempt_commands == (successful.command,)
+    assert facts.gateway_commands == (successful.command,)
+    assert facts.unexpected_commands == ()
 
 
 def test_command_classifier_accepts_only_explicit_exact_gateway_exit_2_error(
@@ -4453,6 +6101,151 @@ def test_validated_skill_read_accepts_complete_coverage_reference(tmp_path: Path
     ) == ("references/waapi-coverage.md", content)
 
 
+def test_posix_task_classifier_accepts_only_exact_task_local_skill_reads(
+    tmp_path: Path,
+) -> None:
+    candidate = tmp_path / "candidate"
+    workspace = tmp_path / "agent-workspace"
+    installed = workspace / ".agents" / "skills" / "waapi-skill"
+    for root in (candidate, installed):
+        (root / "references").mkdir(parents=True)
+        (root / "SKILL.md").write_text("# skill\n", encoding="utf-8")
+        (root / "references" / "waapi-query.md").write_text(
+            "# query\n",
+            encoding="utf-8",
+        )
+
+    commands = (
+        completed_record(
+            "cat '.agents/skills/waapi-skill/SKILL.md'",
+            "# skill\n",
+        ),
+        completed_record(
+            "cat '.agents/skills/waapi-skill/references/waapi-query.md'",
+            "# query\n",
+        ),
+    )
+
+    facts = classify_task_commands(
+        commands,
+        workspace=workspace,
+        skill_source=candidate,
+    )
+
+    assert facts.skill_read_files == ("SKILL.md", "references/waapi-query.md")
+    assert facts.allowed_read_commands == tuple(row.command for row in commands)
+    assert facts.unexpected_commands == ()
+
+    near = completed_record(
+        "cat '.agents/skills/waapi-skill/./SKILL.md'",
+        "# skill\n",
+    )
+    near_facts = classify_task_commands(
+        (near,),
+        workspace=workspace,
+        skill_source=candidate,
+    )
+    assert near_facts.allowed_read_commands == ()
+    assert near_facts.unexpected_commands == (near.command,)
+
+
+def test_task_classifier_accepts_exact_task_local_gateway_runner(
+    tmp_path: Path,
+) -> None:
+    candidate = tmp_path / "candidate" / "waapi-skill"
+    installed = (
+        tmp_path
+        / "agent-workspace"
+        / ".agents"
+        / "skills"
+        / "waapi-skill"
+    )
+    for root in (candidate, installed):
+        (root / "scripts").mkdir(parents=True)
+        (root / "scripts" / "run.py").write_text("# runner\n", encoding="utf-8")
+    payload = {
+        "contract": "waapi-skill.gateway-result/v1",
+        "command": "status",
+        "ok": True,
+    }
+    relative_runner = (
+        TASK_LOCAL_RUNNER_WINDOWS if os.name == "nt" else TASK_LOCAL_RUNNER_POSIX
+    )
+    record = CodexCommandRecord(
+        command=f"python {relative_runner} gateway.py status",
+        exit_code=0,
+        status="completed",
+        aggregated_output=json.dumps(payload),
+        argv=("python", relative_runner, "gateway.py", "status"),
+        has_shell_operators=False,
+        parser_kind="windows-pwsh-command" if os.name == "nt" else "posix-native",
+    )
+
+    facts = classify_commands(
+        (record,),
+        skill_source=candidate,
+        alternate_gateway_skill_sources=(installed,),
+        expected_gateway_subcommands=("status",),
+    )
+
+    assert facts.gateway_commands == (record.command,)
+    assert facts.gateway_subcommands == ("status",)
+    assert facts.unexpected_commands == ()
+
+
+def test_archive_classifier_keeps_windows_lua_typed_argument_gateway_owned(
+    tmp_path: Path,
+) -> None:
+    candidate = tmp_path / "candidate" / "waapi-skill"
+    runner = candidate / "scripts" / "run.py"
+    runner.parent.mkdir(parents=True)
+    runner.write_text("# runner\n", encoding="utf-8")
+    argv = (
+        "python",
+        str(runner),
+        "gateway.py",
+        "draft-declare-artifact-plan",
+        "od1-" + "1" * 32,
+        "--task-authority",
+        "da1-" + "2" * 40,
+        "--expected-revision",
+        "1",
+        "--script-file",
+        str(tmp_path / "user-script.lua"),
+        "--argument",
+        "count",
+        "integer",
+        "3",
+    )
+    command = windows_powershell_recording(encode_windows_model_argv(argv))
+    record = CodexCommandRecord(
+        command=command,
+        exit_code=0,
+        status="completed",
+        aggregated_output=json.dumps(
+            {
+                "contract": "waapi-skill.gateway-result/v1",
+                "command": "draft-declare-artifact-plan",
+                "ok": True,
+                "status": "editable",
+            }
+        ),
+        argv=argv,
+        has_shell_operators=False,
+        parser_kind="windows-pwsh-command",
+    )
+
+    facts = classify_commands(
+        (record,),
+        skill_source=candidate,
+        expected_gateway_subcommands=("draft-declare-artifact-plan",),
+    )
+
+    assert facts.gateway_subcommands == ("draft-declare-artifact-plan",)
+    assert facts.unexpected_commands == ()
+    assert facts.non_gateway_unexpected_commands == ()
+
+
 def test_validated_skill_read_normalizes_only_line_endings(tmp_path: Path) -> None:
     skill = tmp_path / "waapi-skill"
     skill.mkdir()
@@ -4773,6 +6566,25 @@ def test_output_snapshot_and_skill_tree_hash_detect_created_and_modified_source(
 
     assert created == ("helper.py",)
     assert snapshot_tree_hash(after_skill) != before_hash
+
+
+def test_skill_snapshot_excludes_generated_runtime_state(tmp_path: Path) -> None:
+    skill = tmp_path / "skill"
+    skill.mkdir()
+    (skill / "SKILL.md").write_text("stable\n", encoding="utf-8")
+    before = snapshot_workspace(
+        skill,
+        exclude_names=WORKSPACE_SKILL_EXCLUDED_NAMES,
+    )
+
+    cache = skill / "__pycache__"
+    cache.mkdir()
+    (cache / "gateway.pyc").write_bytes(b"generated")
+
+    assert snapshot_workspace(
+        skill,
+        exclude_names=WORKSPACE_SKILL_EXCLUDED_NAMES,
+    ) == before
 
 
 def test_workspace_snapshot_uses_platform_write_then_restore_contract(tmp_path: Path) -> None:

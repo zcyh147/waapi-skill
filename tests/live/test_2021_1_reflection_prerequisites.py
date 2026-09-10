@@ -39,7 +39,6 @@ from tests.destructive.support.sandbox_fixture import (  # pyright: ignore[repor
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-RESOURCE_ROOT = REPO_ROOT / "skills" / "waapi-skill" / "resources" / "manifest"
 EXPECTED_WWISE_VERSION = "2021.1"
 EXPECTED_WWISE_BUILD = "2021.1.14.8108"
 EXPECTED_DISPLAY_PREFIX = "2021.1.14"
@@ -76,7 +75,9 @@ def test_2021_1_version_display_name_rejects_non_exact_2021_1_14_shapes(display_
 
 
 @pytest.mark.live
-def test_2021_1_live_reflection_prerequisites_and_resource_generation() -> None:
+def test_2021_1_live_reflection_prerequisites_and_resource_generation(
+    tmp_path: Path,
+) -> None:
     contract = require_2021_1_live_environment()
     assert contract.sample_project_source == EXPECTED_SAMPLE_PROJECT
 
@@ -117,7 +118,11 @@ def test_2021_1_live_reflection_prerequisites_and_resource_generation() -> None:
                 }
             )
 
-            store = ManifestStore(root=RESOURCE_ROOT)
+            # Real validation must not rewrite the packaged source inventory.
+            # Persist the freshly reflected candidate below the disposable
+            # test root, then audit its exact round trip there.
+            reflected_root = tmp_path / "reflected-manifest"
+            store = ManifestStore(root=reflected_root)
             written = store.write_manifest(manifest)
             loaded = store.load(EXPECTED_WWISE_VERSION)
             audit = audit_manifest(loaded)

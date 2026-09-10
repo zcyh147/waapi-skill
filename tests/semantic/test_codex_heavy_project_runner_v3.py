@@ -7,6 +7,7 @@ import shutil
 import sys
 import threading
 import time
+from dataclasses import replace
 from pathlib import Path
 from types import MappingProxyType, SimpleNamespace
 
@@ -28,6 +29,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_direct_protocol,
     build_transaction_protocol,
     call_step,
+    query_object_step,
     wait_topic_step,
 )
 from tests.semantic.support.codex_harness import (
@@ -40,10 +42,12 @@ from tests.semantic.support.codex_media_pool_runtime_v3 import (
     WINE_Z_DRIVE_TARGET,
 )
 from tests.semantic.support.codex_gateway_broker import (
-    MetadataBoundJsonArgument,
+    DraftTypedActionBatchArgument,
+    ExpectedGatewayStep,
     MetadataTokenProjection,
 )
 from tests.semantic.support.codex_object_heavy_v3 import (
+    business_query_path_arguments,
     build_object_heavy_v3_recipe,
 )
 
@@ -51,6 +55,40 @@ from tests.semantic.support.codex_object_heavy_v3 import (
 class _Verification:
     passed = True
     failures: tuple[str, ...] = ()
+
+
+def test_weak_verifier_oracle_accepts_clear_chinese_boundary() -> None:
+    response = (
+        "profile：`typed_input`\ncount：`3`\n\n"
+        "弱验证：仅已验证脚本返回结果符合结构；未验证、也不声称已验证"
+        "脚本的全部业务副作用。"
+    )
+
+    assert runner.final_response_reports_weak_verifier_boundary(response)
+    assert runner.final_response_reports_weak_verifier_boundary(
+        "profile: typed_input; count: 3; "
+        "已验证返回结果符合反射结果结构；未验证、也不能声称已验证"
+        "该 Lua 脚本的全部业务副作用。"
+    )
+    assert runner.final_response_reports_weak_verifier_boundary(
+        "profile：`typed_input`; count：`3`; "
+        "仅完成返回结果结构验证；不能声称已验证脚本的全部业务副作用。"
+    )
+    assert not runner.final_response_reports_weak_verifier_boundary(
+        "profile: typed_input; count: 3; 已验证全部业务副作用"
+    )
+
+
+def test_get_info_oracle_accepts_exact_wwiseconsole_release_and_labeled_build() -> None:
+    response = (
+        "实时 getInfo 显示：连接的是 WwiseConsole.exe，PID 1104，"
+        "完整版本 v2023.1.19（build 8928）。"
+    )
+
+    assert runner._final_response_has_complete_build_identity(  # noqa: SLF001
+        response,
+        expected_build="2023.1.19.8928",
+    )
 
 
 def _successful_spawn_topic_publisher(
@@ -134,12 +172,13 @@ def _scenario(
     item_type: str = "function",
     count: int = 1,
     fixture: dict | None = None,
+    version: str = "2022.1",
 ):
     prompt = "请读取这个 Wwise 工程并总结结果。"
     return SimpleNamespace(
         id=scenario_id,
         api=api,
-        versions=("2022.1",),
+        versions=(version,),
         protocol=protocol,
         item_type=item_type,
         fixture=fixture or {},
@@ -209,7 +248,7 @@ def _prepared(
         prompt="请读取这个 Wwise 工程并总结结果。",
         visible_values={},
         protocol=build_direct_protocol(
-            [call_step("object.get", "ak.wwise.core.object.get")]
+            [query_object_step("object.get", ("query-object", "--from", "project", "--take", "1"))]
         ),
         required_reference="references/waapi-query.md",
         snapshot=lambda: ("sealed",),
@@ -553,18 +592,28 @@ def test_project_runner_forwards_prepared_reference_schedule(
         captured["turn_reference_schedule"] = kwargs[
             "turn_reference_schedule"
         ]
+        captured["developer_instructions"] = kwargs[
+            "developer_instructions"
+        ]
         return _fake_task(kwargs["task_root"])
 
     monkeypatch.setattr(runner, "run_v3_codex_task", run_task)
 
+    options = replace(
+        _options(tmp_path),
+        developer_instructions="sealed bootstrap instructions",
+    )
     outcome = runner.run_heavy_project_unit(
         _unit(),
         scenario_root=tmp_path / "case",
-        options=_options(tmp_path),
+        options=options,
     )
 
     assert outcome.status == "PASS"
     assert captured["turn_reference_schedule"] == schedule
+    assert captured["developer_instructions"] == (
+        "sealed bootstrap instructions"
+    )
 
 
 def test_project_runner_api_union_is_exact_and_excludes_only_cli() -> None:
@@ -573,11 +622,13 @@ def test_project_runner_api_union_is_exact_and_excludes_only_cli() -> None:
             *runner.OBJECT_APIS,
             *runner.INTEGRATION_PRIMARY_APIS,
             *runner.IMPORT_APIS,
-            *runner.SOUNDBANK_RUNTIME_APIS,
-            runner.AUDIO_CONVERT_URI,
-            runner.MEDIA_POOL_GET_URI,
-        }
-    )
+                *runner.SOUNDBANK_RUNTIME_APIS,
+                runner.AUDIO_CONVERT_URI,
+                runner.MEDIA_POOL_GET_URI,
+                runner.GET_INFO_URI,
+                runner.CORE_LUA_URI,
+            }
+        )
     assert runner.AUDIO_CONVERT_URI in runner.PROJECT_RUNNER_APIS
     assert not any(".cli." in api for api in runner.PROJECT_RUNNER_APIS)
     assert runner.PROJECT_RUNNER_MODEL_RESOLVED_REQUEST_FIELDS == {
@@ -616,6 +667,61 @@ def test_dispatch_audit_accepts_only_the_sealed_topic_ack_as_auxiliary_evidence(
     )
 
     assert [row["api"] for row in rows] == [runner.SOUNDBANK_TOPIC]
+
+
+def test_primary_dispatch_audit_accepts_stream_lifecycle_without_wait_call(
+    tmp_path: Path,
+) -> None:
+    evidence = (tmp_path / "evidence").resolve()
+    evidence.mkdir()
+    ack_path = evidence / "subscription-ack-stream.json"
+    ack_payload = {
+        "contract": runner.SUBSCRIPTION_ACK_CONTRACT,
+        "step_name": "soundbank.generated.stream",
+        "topic": runner.SOUNDBANK_TOPIC,
+    }
+    ack_raw = runner._canonical_json_bytes(ack_payload) + b"\n"
+    ack_path.write_bytes(ack_raw)
+    proof = {
+        "ack_path": str(ack_path),
+        "ack_payload": ack_payload,
+        "ack_file_sha256": hashlib.sha256(ack_raw).hexdigest(),
+    }
+    task = SimpleNamespace(
+        broker_evidence=SimpleNamespace(evidence_directory=str(evidence))
+    )
+    events = [
+        {"soundbank": {"name": "Weapons_Core"}, "platform": {"name": "Mac"}},
+        {"soundbank": {"name": "Weapons_Core"}, "platform": {"name": "Windows"}},
+    ]
+
+    audit = runner._audit_primary_dispatch(
+        _scenario(
+            runner.SOUNDBANK_TOPIC,
+            scenario_id="O22-SB-GENERATED-03",
+            item_type="topic",
+            count=2,
+        ),
+        task=task,
+        topic_payload={
+            "contract": "waapi-skill.topic-stream/v1",
+            "command": "stream-topic",
+            "record_type": "terminal",
+            "status": "completed",
+            "completion_reason": "duration_elapsed",
+            "event_count": 2,
+            "events": events,
+            "cleanup": "unsubscribed",
+        },
+        topic_subscription_ack=proof,
+    )
+
+    assert audit == {
+        "api": runner.SOUNDBANK_TOPIC,
+        "gateway_dispatch_calls": 0,
+        "topic_lifecycle": "stream-topic",
+        "event_count": 2,
+    }
 
 
 @pytest.mark.parametrize("tamper", ("hash", "payload", "outside", "extra_ack"))
@@ -778,7 +884,7 @@ def test_common_plan_writer_requires_and_forwards_typed_sections_exactly(
 ) -> None:
     scenario = _scenario()
     protocol = build_direct_protocol(
-        [call_step("object.get", "ak.wwise.core.object.get")]
+        [query_object_step("object.get", ("query-object", "--from", "project", "--take", "1"))]
     )
     provenance = SimpleNamespace(
         sha256="b" * 64,
@@ -839,7 +945,9 @@ def test_common_plan_writer_fails_closed_for_every_project_api_without_typed_sec
             scenario=scenario,
             version="2022.1",
             scenario_root=tmp_path,
-            protocol=build_direct_protocol([call_step("query", "ak.wwise.core.object.get")]),
+            protocol=build_direct_protocol([
+                query_object_step("query", ("query-object", "--from", "project", "--take", "1"))
+            ]),
             provenance=SimpleNamespace(sha256="b" * 64, payload={"protocol": {"sha256": "a" * 64}}),
             runner="project",
             typed_sections=None,
@@ -863,7 +971,666 @@ def test_prepare_case_fails_closed_instead_of_falling_through_to_soundbank(
         )
 
 
-def test_prepare_case_binds_2025_object_recipe_to_active_lifecycle(
+def test_prepare_get_info_case_binds_exact_live_process_and_result(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    baseline = {
+        "displayName": "Wwise",
+        "isCommandLine": True,
+        "sessionId": "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}",
+        "processId": 4242,
+        "processPath": "/Applications/WwiseConsole",
+        "apiVersion": 1,
+        "platform": "macosx",
+        "configuration": "release",
+        "version": {
+            "year": 2021,
+            "major": 1,
+            "minor": 14,
+            "build": 8108,
+            "displayName": "v2021.1.14",
+        },
+    }
+    status_wwise = {
+        key: baseline[key]
+        for key in (
+            "apiVersion",
+            "displayName",
+            "isCommandLine",
+            "processId",
+            "processPath",
+            "sessionId",
+            "version",
+        )
+    }
+    calls: list[tuple[str, dict, dict]] = []
+
+    def direct(api, args, options):
+        calls.append((api, args, options))
+        return baseline
+
+    monkeypatch.setattr(runner, "_project_document_digest", lambda _path: "d" * 64)
+    scenario = _scenario(
+        runner.GET_INFO_URI,
+        scenario_id="O22-GET-INFO-01",
+    )
+    scenario.prompt = "确认当前连接的 Wwise 实例与进程身份。"
+    project = tmp_path / "SampleProject.wproj"
+    project.write_text(
+        '<?xml version="1.0"?><WwiseDocument><ProjectInfo>'
+        '<Project Name="SampleProject" '
+        'ID="{16164796-C6E6-491A-8799-C42A33110A84}"/>'
+        '</ProjectInfo></WwiseDocument>',
+        encoding="utf-8",
+    )
+    prepared = runner._prepare_case(
+        scenario,
+        runtime=SimpleNamespace(
+            version="2021.1",
+            lifecycle=SimpleNamespace(
+                process=SimpleNamespace(pid=4200),
+                ready_result=baseline,
+            ),
+            sandbox=SimpleNamespace(
+                sandbox_path=tmp_path,
+                sandbox_project=project,
+            ),
+        ),
+        direct=direct,
+        media_holder={},
+        unit=SimpleNamespace(unit_id="TYP21-ZERO-GET-INFO"),
+    )
+
+    assert calls == [(runner.GET_INFO_URI, {}, {})]
+    assert [step.subcommand for step in prepared.protocol.steps] == ["status"]
+    assert prepared.required_reference is None
+    assert prepared.turn_reference_schedule is None
+    assert prepared.typed_sections.static_expectation["verification_boundary"] == (
+        "exact_host_identity"
+    )
+    omitted_status = prepared.verify_final(
+        {"wwise": status_wwise},
+        SimpleNamespace(final_response="Wwise 2021.1.14.8108，进程 4242。"),
+    )
+    assert omitted_status.passed is False
+    assert "Gateway status identity was not observed" in omitted_status.failures
+    prepared.observe_payload(
+        prepared.protocol.steps[0],
+        {
+            "wwise": status_wwise,
+            "project": {
+                "id": "{16164796-C6E6-491A-8799-C42A33110A84}",
+                "name": "SampleProject",
+                "type": "Project",
+                "path": "\\",
+                "displayTitle": "SampleProject",
+                "isDirty": False,
+                "currentLanguageId": "{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}",
+                "currentPlatformId": "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}",
+            },
+        },
+    )
+    verification = prepared.verify_final(
+        {"wwise": status_wwise},
+        SimpleNamespace(final_response="Wwise 2021.1.14.8108，进程 4242。"),
+    )
+    assert verification.passed is True
+    split_build = prepared.verify_final(
+        {"wwise": status_wwise},
+        SimpleNamespace(
+            final_response="Wwise v2021.1.14，build 8108，进程 4242。"
+        ),
+    )
+    assert split_build.passed is True
+    incomplete = prepared.verify_final(
+        {"wwise": status_wwise},
+        SimpleNamespace(final_response="Wwise 2021.1，进程 4242。"),
+    )
+    assert incomplete.passed is False
+    wrong_split_build = prepared.verify_final(
+        {"wwise": status_wwise},
+        SimpleNamespace(
+            final_response="Wwise v2021.1.14，build 8109，进程 4242。"
+        ),
+    )
+    assert wrong_split_build.passed is False
+    negated_split_build = prepared.verify_final(
+        {"wwise": status_wwise},
+        SimpleNamespace(
+            final_response="Wwise 不是 v2021.1.14，build 8108，进程 4242。"
+        ),
+    )
+    assert negated_split_build.passed is False
+
+
+@pytest.mark.parametrize(
+    ("version", "status_project_api"),
+    (
+        ("2021.1", "ak.wwise.core.object.get"),
+        ("2025.1", "ak.wwise.core.getProjectInfo"),
+    ),
+)
+def test_get_info_dispatch_audit_binds_the_single_status_route(
+    tmp_path: Path,
+    version: str,
+    status_project_api: str,
+) -> None:
+    evidence_root = tmp_path / "evidence"
+    evidence_root.mkdir()
+
+    def write_evidence(name: str, api: str) -> Path:
+        path = evidence_root / name
+        path.write_text(
+            json.dumps({"api": api, "evidence_path": str(path)}),
+            encoding="utf-8",
+        )
+        return path
+
+    status_get_info = write_evidence("01-get-info.json", runner.GET_INFO_URI)
+    status_project = write_evidence("02-project.json", status_project_api)
+    task = SimpleNamespace(
+        broker_evidence=SimpleNamespace(
+            evidence_directory=str(evidence_root),
+            records=(
+                SimpleNamespace(
+                    step_name="host.status",
+                    payload={
+                        "calls": [
+                            {
+                                "api": runner.GET_INFO_URI,
+                                "evidence_path": str(status_get_info),
+                            },
+                            {
+                                "api": status_project_api,
+                                "evidence_path": str(status_project),
+                            },
+                        ]
+                    },
+                ),
+            ),
+        )
+    )
+
+    audit = runner._audit_primary_dispatch(
+        _scenario(
+            runner.GET_INFO_URI,
+            scenario_id="O22-GET-INFO-01",
+            version=version,
+        ),
+        task=task,
+        topic_payload=None,
+        expected_count=1,
+    )
+
+    assert audit == {
+        "api": runner.GET_INFO_URI,
+        "dispatch_count": 1,
+        "status_preflight_dispatch_count": 0,
+    }
+
+    task.broker_evidence.records[0].payload["calls"][1]["api"] = (
+        "ak.wwise.core.getProjectInfo"
+        if status_project_api == "ak.wwise.core.object.get"
+        else "ak.wwise.core.object.get"
+    )
+    with pytest.raises(
+        runner.HeavyProjectRunnerError,
+        match="status dispatch partition is invalid",
+    ):
+        runner._audit_primary_dispatch(
+            _scenario(
+                runner.GET_INFO_URI,
+                scenario_id="O22-GET-INFO-01",
+                version=version,
+            ),
+            task=task,
+            topic_payload=None,
+            expected_count=1,
+        )
+    task.broker_evidence.records[0].payload["calls"][1]["api"] = (
+        status_project_api
+    )
+
+    task.broker_evidence.records[0].payload["calls"][0]["evidence_path"] = []
+    with pytest.raises(
+        runner.HeavyProjectRunnerError,
+        match="evidence paths are invalid",
+    ):
+        runner._audit_primary_dispatch(
+            _scenario(
+                runner.GET_INFO_URI,
+                scenario_id="O22-GET-INFO-01",
+                version=version,
+            ),
+            task=task,
+            topic_payload=None,
+            expected_count=1,
+        )
+
+    task.broker_evidence.records[0].payload["calls"][0]["evidence_path"] = str(
+        status_get_info
+    )
+    task.broker_evidence.records[0].payload["calls"][1]["evidence_path"] = []
+    with pytest.raises(
+        runner.HeavyProjectRunnerError,
+        match="evidence paths are invalid",
+    ):
+        runner._audit_primary_dispatch(
+            _scenario(
+                runner.GET_INFO_URI,
+                scenario_id="O22-GET-INFO-01",
+                version=version,
+            ),
+            task=task,
+            topic_payload=None,
+            expected_count=1,
+        )
+
+    task.broker_evidence.records[0].payload["calls"][1]["evidence_path"] = str(
+        status_project
+    )
+    task.broker_evidence.records[0].payload["calls"][0]["evidence_path"] = str(
+        status_project
+    )
+    task.broker_evidence.records[0].payload["calls"][1]["evidence_path"] = str(
+        status_get_info
+    )
+    with pytest.raises(
+        runner.HeavyProjectRunnerError,
+        match="not bound to its ordered status result",
+    ):
+        runner._audit_primary_dispatch(
+            _scenario(
+                runner.GET_INFO_URI,
+                scenario_id="O22-GET-INFO-01",
+                version=version,
+            ),
+            task=task,
+            topic_payload=None,
+            expected_count=1,
+        )
+
+
+def test_prepare_get_info_rejects_status_for_a_different_project(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    baseline = {
+        "processId": 4242,
+        "sessionId": "session",
+        "version": {"year": 2025, "major": 1, "minor": 0, "build": 9000},
+    }
+    monkeypatch.setattr(runner, "_project_document_digest", lambda _path: "d" * 64)
+    scenario = _scenario(runner.GET_INFO_URI, scenario_id="O22-GET-INFO-01")
+    scenario.prompt = "确认当前连接的 Wwise 实例与进程身份。"
+    project = tmp_path / "SampleProject.wproj"
+    project.write_text(
+        '<?xml version="1.0"?><WwiseDocument><ProjectInfo>'
+        '<Project Name="SampleProject" '
+        'ID="{16164796-C6E6-491A-8799-C42A33110A84}"/>'
+        '</ProjectInfo></WwiseDocument>',
+        encoding="utf-8",
+    )
+    prepared = runner._prepare_case(
+        scenario,
+        runtime=SimpleNamespace(
+            version="2025.1",
+            lifecycle=SimpleNamespace(
+                process=SimpleNamespace(pid=4200),
+                ready_result=baseline,
+            ),
+            sandbox=SimpleNamespace(
+                sandbox_path=tmp_path,
+                sandbox_project=project,
+            ),
+        ),
+        direct=lambda *_args: baseline,
+        media_holder={},
+        unit=SimpleNamespace(unit_id="TYP25-ZERO-GET-INFO"),
+    )
+
+    prepared.observe_payload(
+        prepared.protocol.steps[0],
+        {
+            "wwise": baseline,
+            "project": {
+                "id": "{16164796-C6E6-491A-8799-C42A33110A84}",
+                "name": "SampleProject",
+                "path": str(project),
+                "displayTitle": "SampleProject",
+                "isDirty": False,
+                "currentLanguageId": "{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}",
+                "currentPlatformId": "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}",
+            },
+        },
+    )
+
+    with pytest.raises(runner.HeavyProjectRunnerError, match="sealed Wwise/project"):
+        prepared.observe_payload(
+            prepared.protocol.steps[0],
+            {
+                "wwise": baseline,
+                "project": {
+                    "id": "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}",
+                    "name": "OtherProject",
+                    "type": "Project",
+                    "path": str(tmp_path / "OtherProject.wproj"),
+                },
+            },
+        )
+
+
+def test_typed_profile_set03_requires_exact_live_property_metadata() -> None:
+    scenario = _scenario(
+        "ak.wwise.core.object.set",
+        scenario_id="OBJ22-F-SET-03",
+        version="2022.1",
+    )
+
+    assert runner._compound_object_metadata_binding(
+        scenario,
+        version="2022.1",
+        profile_unit_id="TYP22-METADATA-OBJECT-SET",
+    ) == (
+        "ActorMixer",
+        ("volume", "pitch", "notes", "output bus"),
+        ("Volume", "Pitch", "OutputBus"),
+    )
+    with pytest.raises(
+        runner.HeavyProjectRunnerError,
+        match="outside its reviewed lane",
+    ):
+        runner._compound_object_metadata_binding(
+            scenario,
+            version="2023.1",
+            profile_unit_id="TYP22-METADATA-OBJECT-SET",
+        )
+    assert runner._compound_object_metadata_binding(
+        scenario,
+        version="2022.1",
+    ) is None
+
+
+@pytest.mark.parametrize(
+    ("unit_id", "scenario_id", "api", "version"),
+    (
+        (
+            "TYP24-METADATA-OBJECT-SET",
+            "OBJ22-F-SET-01",
+            "ak.wwise.core.object.set",
+            "2024.1",
+        ),
+        (
+            "TYP25-METADATA-OBJECT-SET",
+            "OBJ22-F-SET-02",
+            "ak.wwise.core.object.set",
+            "2025.1",
+        ),
+    ),
+)
+def test_other_typed_profile_object_metadata_lanes_are_exact(
+    unit_id: str,
+    scenario_id: str,
+    api: str,
+    version: str,
+) -> None:
+    scenario = _scenario(api, scenario_id=scenario_id, version=version)
+    assert runner._compound_object_metadata_binding(
+        scenario,
+        version=version,
+        profile_unit_id=unit_id,
+    ) == (
+        runner.get_codex_version_layout_v3(version).reflected_type("ActorMixer"),
+        ("volume",),
+        ("Volume",),
+    )
+
+
+def test_typed_profile_set03_uses_gateway_owned_batch_field_meanings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scenario = _scenario(
+        "ak.wwise.core.object.set",
+        scenario_id="OBJ22-F-SET-03",
+        version="2022.1",
+    )
+    recipe = build_object_heavy_v3_recipe("OBJ22-F-SET-03", "2022.1")
+    monkeypatch.setattr(
+        runner,
+        "discover_metadata",
+        lambda **_kwargs: pytest.fail("retired outer metadata discovery ran"),
+    )
+
+    protocol = runner._build_compound_object_metadata_protocol(
+        scenario,
+        recipe=recipe,
+        direct=SimpleNamespace(),
+        version="2022.1",
+        profile_unit_id="TYP22-METADATA-OBJECT-SET",
+    )
+
+    assert protocol is not None
+    assert [step.subcommand for step in protocol.steps[:2]] == [
+        "operation-schema",
+        "draft-start",
+    ]
+    declarations = tuple(
+        step
+        for step in protocol.steps
+        if step.subcommand == "draft-declare-existing-batch"
+    )
+    assert len(declarations) == 1
+    assert declarations[0].arguments.count("--field-meaning-value") == 3
+    assert all(
+        step.subcommand not in {"draft-discover-fields", "draft-declare-existing"}
+        for step in protocol.steps
+    )
+    assert all(step.subcommand != "metadata" for step in protocol.steps)
+
+
+def test_prepare_get_info_rejects_process_drift_from_readiness_proof(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    ready = {
+        "processId": 4242,
+        "sessionId": "ready-session",
+        "version": {"year": 2021, "major": 1, "minor": 14, "build": 8108},
+    }
+    drifted = {**ready, "processId": 4243}
+    monkeypatch.setattr(runner, "_project_document_digest", lambda _path: "d" * 64)
+    scenario = _scenario(runner.GET_INFO_URI, scenario_id="O22-GET-INFO-01")
+    scenario.prompt = "确认当前连接的 Wwise 实例与进程身份。"
+    project = tmp_path / "SampleProject.wproj"
+    project.write_text(
+        '<?xml version="1.0"?><WwiseDocument><ProjectInfo>'
+        '<Project Name="SampleProject" '
+        'ID="{16164796-C6E6-491A-8799-C42A33110A84}"/>'
+        '</ProjectInfo></WwiseDocument>',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(runner.HeavyProjectRunnerError, match="readiness proof"):
+        runner._prepare_case(
+            scenario,
+            runtime=SimpleNamespace(
+                version="2021.1",
+                lifecycle=SimpleNamespace(
+                    process=SimpleNamespace(pid=4200),
+                    ready_result=ready,
+                ),
+                sandbox=SimpleNamespace(
+                    sandbox_path=tmp_path,
+                    sandbox_project=project,
+                ),
+            ),
+            direct=lambda *_args: drifted,
+            media_holder={},
+            unit=SimpleNamespace(unit_id="TYP21-ZERO-GET-INFO"),
+        )
+
+
+def test_prepare_lua_case_seals_source_and_preserves_result_schema_only_boundary(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(runner, "_project_document_digest", lambda _path: "e" * 64)
+
+    def no_read(*_args, **_kwargs):
+        raise AssertionError("Lua preparation must not perform a live read")
+
+    scenario = _scenario(
+        runner.CORE_LUA_URI,
+        scenario_id="LUA23-CORE-FILE-02",
+        protocol="preview_confirm",
+    )
+    scenario.prompt = (
+        "执行现成文件 {script_file}，隔离目录 {io_root}，并报告弱验证边界。"
+    )
+    prepared = runner._prepare_case(
+        scenario,
+        runtime=SimpleNamespace(
+            version="2025.1",
+            asset_root=tmp_path / "assets",
+            sandbox=SimpleNamespace(sandbox_path=tmp_path),
+        ),
+        direct=no_read,
+        media_holder={},
+        unit=SimpleNamespace(unit_id="TYP25-CODE-LUA-FILE"),
+    )
+
+    assert prepared.typed_sections.static_expectation["verification_boundary"] == (
+        "result_schema_only"
+    )
+    assert prepared.visible_values["script_file"].endswith("user-script.lua")
+    execute_step = next(
+        step for step in prepared.protocol.steps if step.name.endswith(".execute")
+    )
+    prepared.observe_payload(
+        execute_step,
+        {
+            "dispatch_result": {
+                "result": {"return": {"profile": "typed_input", "count": 3}}
+            }
+        },
+    )
+    terminal = prepared.verify_final(
+        {
+            "status": "result_schema_checked",
+            "result_schema_checked": True,
+            "verified": False,
+            "verification_strength": "complete_reflected_schema",
+            "verification": {"business_state_verified": False},
+        },
+        SimpleNamespace(final_response="unused"),
+    )
+    assert terminal.passed is True
+    response = prepared.verify_turn(
+        2,
+        SimpleNamespace(
+            final_response=(
+                "脚本返回 profile=typed_input、count=3；验证仅限返回结果结构。"
+            )
+        ),
+    )
+    assert response.passed is True
+
+    equivalent_boundary = prepared.verify_turn(
+        2,
+        SimpleNamespace(
+            final_response=(
+                "脚本已执行，返回 profile=typed_input、count=3。"
+                "验证仅确认返回结果符合预期结构；未验证、也不能据此声称"
+                "已验证脚本的全部业务副作用。"
+            )
+        ),
+    )
+    assert equivalent_boundary.passed is True
+
+    observed_natural_boundary = prepared.verify_turn(
+        2,
+        SimpleNamespace(
+            final_response=(
+                "profile=typed_input，count=3；验证仅限脚本返回结果的结构；"
+                "不能声称已验证脚本的全部业务副作用。"
+            )
+        ),
+    )
+    assert observed_natural_boundary.passed is True
+
+    macos_observed_boundary = prepared.verify_turn(
+        2,
+        SimpleNamespace(
+            final_response=(
+                "profile：typed_input；count：3。"
+                "仅验证了脚本返回结果的结构；"
+                "不能声称已验证脚本的全部业务副作用。"
+            )
+        ),
+    )
+    assert macos_observed_boundary.passed is True
+
+    windows_observed_boundary = prepared.verify_turn(
+        2,
+        SimpleNamespace(
+            final_response=(
+                "profile：typed_input；count：3。"
+                "弱验证：仅确认脚本返回结果符合预期结构；"
+                "不能据此声称已验证脚本的全部业务副作用。"
+            )
+        ),
+    )
+    assert windows_observed_boundary.passed is True
+
+    reflected_result_boundary = prepared.verify_turn(
+        2,
+        SimpleNamespace(
+            final_response=(
+                "profile：typed_input；count：3。"
+                "弱验证已完成：仅确认返回结果符合反射的结果结构。"
+                "不能据此声称已验证脚本的全部业务副作用。"
+            )
+        ),
+    )
+    assert reflected_result_boundary.passed is True
+
+    equivalent_not_representative_boundary = prepared.verify_turn(
+        2,
+        SimpleNamespace(
+            final_response=(
+                "profile：typed_input；count：3。"
+                "验证仅限脚本返回结果的结构；"
+                "不代表已验证脚本的全部业务副作用。"
+            )
+        ),
+    )
+    assert equivalent_not_representative_boundary.passed is True
+
+    broader_overclaim = prepared.verify_turn(
+        2,
+        SimpleNamespace(
+            final_response=(
+                "profile=typed_input，count=3；验证仅限返回结果结构；"
+                "另外已经确认所有业务状态正确。"
+            )
+        ),
+    )
+    assert broader_overclaim.passed is False
+
+    overclaim = prepared.verify_turn(
+        2,
+        SimpleNamespace(
+            final_response=(
+                "profile=typed_input，count=3；验证不仅限于结果结构，"
+                "已经验证全部业务副作用。"
+            )
+        ),
+    )
+    assert overclaim.passed is False
+
+
+def _archive_test_prepare_case_binds_2025_object_recipe_to_active_lifecycle(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -966,7 +1733,7 @@ def test_prepare_case_binds_2025_object_recipe_to_active_lifecycle(
         ("CMP25-OBJ22-F-SET-02", "PropertyContainer"),
     ),
 )
-def test_compound_object_protocol_binds_volume_to_trusted_live_metadata(
+def _archive_test_compound_object_protocol_binds_volume_to_trusted_live_metadata(
     monkeypatch: pytest.MonkeyPatch,
     unit_id: str,
     object_type: str,
@@ -1020,30 +1787,46 @@ def test_compound_object_protocol_binds_volume_to_trusted_live_metadata(
     )
 
     assert protocol is not None
-    assert protocol.turn_prefix_counts == (3, 7)
-    assert tuple(step.subcommand for step in protocol.steps[:3]) == (
+    preview_index = next(
+        index
+        for index, step in enumerate(protocol.steps)
+        if step.subcommand == "preview-from-draft"
+    )
+    assert protocol.turn_prefix_counts == (
+        preview_index + 1,
+        len(protocol.steps),
+    )
+    assert tuple(step.subcommand for step in protocol.steps[:2]) == (
         "operation-schema",
         "metadata",
-        "preview",
     )
     assert observed["object_type"] == object_type
     assert observed["queries"] == ("volume",)
     assert observed["limit"] == 8
-    preview = next(
-        step for step in protocol.steps if step.subcommand == "preview"
+    metadata_binding = next(
+        (
+            step.metadata_binding
+            for step in protocol.steps
+            if step.metadata_binding is not None
+        ),
+        None,
     )
-    argument = preview.arguments[2]
-    assert isinstance(argument, MetadataBoundJsonArgument)
-    assert argument.object_type == object_type
-    assert argument.required_tokens == ("Volume",)
-    assert argument.expected_required_token_projection == (
+    if metadata_binding is None:
+        metadata_binding = next(
+            candidate
+            for step in protocol.steps
+            for argument in step.arguments
+            for candidate in (
+                tuple(action.metadata_binding for action in argument.actions)
+                if isinstance(argument, DraftTypedActionBatchArgument)
+                else (getattr(argument, "metadata_binding", None),)
+            )
+            if candidate is not None
+        )
+    assert metadata_binding.object_type == object_type
+    assert metadata_binding.required_tokens == ("Volume",)
+    assert metadata_binding.expected_projection == (
         MetadataTokenProjection("Volume", "property", "Real32"),
-    )
-    assert argument.expected["version"] == unit.version
-    assert argument.equivalence == (
-        "object_set_v1"
-        if recipe.request.operation == "object.set"
-        else "wire_exact"
     )
 
 
@@ -1088,7 +1871,7 @@ def test_compound_object_without_dynamic_property_keeps_original_protocol() -> N
         ),
     ),
 )
-def test_compound_merge_requires_exact_existing_root_type_query(
+def _archive_test_compound_merge_requires_exact_existing_root_type_query(
     unit_id: str,
     expected_path: str,
 ) -> None:
@@ -1114,23 +1897,21 @@ def test_compound_merge_requires_exact_existing_root_type_query(
     )
 
     assert protocol is not None
-    assert protocol.turn_prefix_counts == (3, 7)
-    assert tuple(step.subcommand for step in protocol.steps[:3]) == (
-        "operation-schema",
-        "query-object",
-        "preview",
+    preview_index = next(
+        index
+        for index, step in enumerate(protocol.steps)
+        if step.subcommand == "preview-from-draft"
     )
-    assert protocol.steps[1].arguments == (
-        "--path",
-        expected_path,
-        "--return-field",
-        "id",
-        "--return-field",
-        "name",
-        "--return-field",
-        "type",
-        "--return-field",
-        "path",
+    assert protocol.turn_prefix_counts == (
+        preview_index + 1,
+        len(protocol.steps),
+    )
+    assert tuple(step.subcommand for step in protocol.steps[:2]) == (
+        "query-object",
+        "operation-schema",
+    )
+    assert protocol.steps[0].arguments == business_query_path_arguments(
+        expected_path
     )
 
 
@@ -1226,7 +2007,7 @@ def test_prepare_compound_import_uses_two_stage_reference_and_metadata_binding(
     monkeypatch.setattr(
         runner,
         "ClosedDirectWaapiBackend",
-        lambda _direct: backend_sentinel,
+        lambda _direct, **_kwargs: backend_sentinel,
     )
 
     def prepare_references(scenario, materialized, *, version, backend):
@@ -1321,10 +2102,10 @@ def test_prepare_compound_import_uses_two_stage_reference_and_metadata_binding(
     )
 
     assert calls == ["references", "metadata-bind", "runtime"]
-    assert prepared.protocol.turn_prefix_counts == (6, 10)
+    assert prepared.protocol.turn_prefix_counts == (7, 11)
     assert sum(
         step.subcommand == "metadata" for step in prepared.protocol.steps
-    ) == 1
+    ) == 0
     assert next(
         step for step in prepared.protocol.steps if step.name == "tx01.preview"
     ).subcommand == "preview-from-draft"
@@ -1368,7 +2149,7 @@ def test_prepare_compound_import_cleans_unadopted_bus_after_binding_failure(
     monkeypatch.setattr(
         runner,
         "ClosedDirectWaapiBackend",
-        lambda _direct: SimpleNamespace(),
+        lambda _direct, **_kwargs: SimpleNamespace(),
     )
     monkeypatch.setattr(
         runner,
@@ -1408,11 +2189,56 @@ def test_prepare_compound_import_cleans_unadopted_bus_after_binding_failure(
 
 
 def _soundbank_request(api: str) -> dict:
+    operation_arguments = {
+        "ak.wwise.core.soundbank.generate": {
+            "operation": "soundbank.generate",
+            "arguments": {
+                "soundbanks": [
+                    {
+                        "name": "Bank",
+                        "artifact_expectation": "nonlocalized",
+                    }
+                ],
+                "platforms": ["Windows"],
+                "skip_languages": True,
+                "write_to_disk": True,
+                "io_root": "/owned",
+            },
+        },
+        "ak.wwise.core.soundbank.processDefinitionFiles": {
+            "operation": "soundbank.processDefinitionFiles",
+            "arguments": {
+                "files": ["/owned/Bank.tsv"],
+                "io_root": "/owned",
+            },
+        },
+        "ak.wwise.core.soundbank.convertExternalSources": {
+            "operation": "soundbank.convertExternalSources",
+            "arguments": {
+                "sources": [
+                    {
+                        "input": "/owned/input.wsources",
+                        "platform": "Windows",
+                        "output": "/owned/output",
+                    }
+                ],
+                "io_root": "/owned",
+            },
+        },
+        "ak.wwise.core.soundbank.setInclusions": {
+            "operation": "soundbank.setInclusions",
+            "arguments": {
+                "soundbank": {"kind": "path", "value": r"\SoundBanks\Bank"},
+                "mode": "replace",
+                "inclusions": [],
+            },
+        },
+    }
+    entry = operation_arguments[api]
     return {
         "contract": "waapi-skill.operation-request/v1",
         "version": "2022.1",
-        "operation": "waapi.call",
-        "arguments": {"api": api, "args": {}, "options": {}},
+        **entry,
     }
 
 
@@ -1426,7 +2252,7 @@ def _prepare_soundbank_case(
     )
     before = SimpleNamespace(snapshot="sealed-before")
     topic = None
-    requests = (_soundbank_request(scenario.api),)
+    requests = ()
     if scenario.api == runner.SOUNDBANK_TOPIC:
         events = tuple(SimpleNamespace(index=index) for index in range(scenario.primary_dispatch.count))
         topic = SimpleNamespace(
@@ -1439,7 +2265,8 @@ def _prepare_soundbank_case(
                 for index in range(scenario.primary_dispatch.count)
             ),
         )
-        requests = ()
+    else:
+        requests = (_soundbank_request(scenario.api),)
     runtime = SimpleNamespace(
         materialized=materialized,
         hidden_before=before,
@@ -1469,7 +2296,11 @@ def _prepare_soundbank_case(
         )
 
     monkeypatch.setattr(runner, "prepare_soundbank_runtime", lambda *_args, **_kwargs: runtime)
-    monkeypatch.setattr(runner, "ClosedDirectWaapiSoundBankBackend", lambda _direct: SimpleNamespace())
+    monkeypatch.setattr(
+        runner,
+        "ClosedDirectWaapiSoundBankBackend",
+        lambda _direct, *, version: SimpleNamespace(version=version),
+    )
     monkeypatch.setattr(runner, "compile_soundbank_business_plan", compile_plan)
     monkeypatch.setattr(runner, "validate_soundbank_business_plan", validate_plan)
     prepared = runner._prepare_case(
@@ -1507,7 +2338,10 @@ def test_prepare_case_compiles_and_validates_typed_soundbank_sections_for_all_ap
     assert validated[-1] is True
     assert prepared.typed_sections is sections
     if topic:
-        assert [step.name for step in prepared.protocol.steps] == ["soundbank.generated.wait"]
+        assert [step.name for step in prepared.protocol.steps] == [
+            "soundbank.generated.schema",
+            "soundbank.generated.wait",
+        ]
         assert len(prepared.topic_publishers) == 3
         assert all("publisher" not in step.name for step in prepared.protocol.steps)
     else:
@@ -1799,7 +2633,18 @@ def test_prepare_audio_convert_binds_one_exact_io_root_and_full_verify_payload(
 
         def gateway_protocol(self):
             return build_direct_protocol(
-                [call_step("tx01.verify", runner.AUDIO_CONVERT_URI)]
+                [
+                    call_step(
+                        "tx01.verify",
+                        runner.AUDIO_CONVERT_URI,
+                        version="2024.1",
+                        args={
+                            "objects": [r"\Actor-Mixer Hierarchy\SemanticLab"],
+                            "platforms": ["Windows"],
+                            "languages": ["SFX"],
+                        },
+                    )
+                ]
             )
 
         def snapshot(self):
@@ -2453,7 +3298,7 @@ def test_preview_observer_proves_hidden_state_unchanged_and_checks_refusal() -> 
         prompt="请检查请求。",
         visible_values={},
         protocol=build_direct_protocol(
-            [call_step("tx01.preview", "ak.wwise.core.object.get")]
+            [query_object_step("tx01.preview", ("query-object", "--from", "project", "--take", "1"))]
         ),
         required_reference="references/waapi-operate.md",
         snapshot=lambda: next(snapshots),
@@ -2487,7 +3332,7 @@ def test_preview_observer_rejects_hidden_business_state_drift() -> None:
         prompt="请预览。",
         visible_values={},
         protocol=build_direct_protocol(
-            [call_step("tx01.preview", "ak.wwise.core.object.get")]
+            [query_object_step("tx01.preview", ("query-object", "--from", "project", "--take", "1"))]
         ),
         required_reference="references/waapi-operate.md",
         snapshot=lambda: next(snapshots),
@@ -2530,6 +3375,39 @@ def test_direct_turn_requires_natural_intro_and_runs_final_business_oracle() -> 
     assert observer.checks["first_use_intro"] is True
     assert observer.checks["final_response_nonempty"] is True
     assert "business_verification" in observer.checks
+
+
+def test_deep_business_turn_delegates_first_use_intro_to_dedicated_profile() -> None:
+    prepared = _prepared()
+    observer = runner._CaseObservers(
+        scenario=_scenario(),
+        prepared=prepared,
+        direct=_FakeDirect(),
+        endpoint="127.0.0.1:49152",
+        version="2022.1",
+        business_oracle_plan_sha256="a" * 64,
+        require_first_use_intro=False,
+    )
+    observer.payloads[prepared.protocol.steps[-1].name] = {"objects": []}
+    result = _first_turn_result(
+        after_gateway=("已生成不可变预览，尚未执行任何改动。",),
+    )
+
+    observer.after_turn(1, result, SimpleNamespace())
+
+    assert observer.checks["first_use_intro"] == "delegated_to_dedicated_profile"
+    assert "business_verification" in observer.checks
+
+
+def test_natural_intro_accepts_human_spacing_in_the_skill_name() -> None:
+    runner._require_natural_intro(
+        "已加载 WAAPI skill，当前 WAAPI 地址是 127.0.0.1:49152，"
+        "适配层版本 2022.1，修改策略 ask_before_changes，可用模式为 "
+        "read_only、ask_before_changes、allow_changes。",
+        endpoint="127.0.0.1:49152",
+        version="2022.1",
+        policy="ask_before_changes",
+    )
 
 
 def test_first_use_intro_rejects_later_agent_message_after_gateway() -> None:
@@ -2620,6 +3498,7 @@ def _topic_observer(
                 wait_topic_step(
                     step_name,
                     runner.SOUNDBANK_TOPIC,
+                    version="2022.1",
                     event_count=1,
                 )
             ]
@@ -3425,6 +4304,85 @@ def test_media_observer_accepts_only_closed_compact_reference_match_result(
         match="compact Audio Source association query",
     ):
         adapter.observe_payload(step, {"agent_result": tampered})
+
+
+def test_media_verifier_restores_only_exact_reconciled_gateway_reads() -> None:
+    adapter = object.__new__(runner._PreparedMediaPoolAdapter)
+    adapter.protocol = SimpleNamespace(
+        steps=(
+            ExpectedGatewayStep("media.get-fields", "typed-zero-call"),
+            ExpectedGatewayStep("media.get", "core-call"),
+        )
+    )
+    observed: list[tuple[str, object]] = []
+    adapter.observe_payload = lambda step, payload: observed.append(
+        (step.name, payload["agent_result"])
+    )
+    get_fields = {
+        "command": "typed-zero-call",
+        "api_attempted": runner.MEDIA_POOL_GET_FIELDS_URI,
+        "ok": True,
+        "status": "ok",
+        "agent_result": {"return": ["Filename"]},
+    }
+    media_get = {
+        "command": "core-call",
+        "api_attempted": runner.MEDIA_POOL_GET_URI,
+        "ok": True,
+        "status": "ok",
+        "agent_result": {"return": []},
+    }
+
+    adapter._restore_model_reads_from_gateway_results(
+        SimpleNamespace(
+            command_facts=SimpleNamespace(
+                gateway_results=(get_fields, {"command": "draft-start"}, media_get)
+            )
+        )
+    )
+
+    assert observed == [
+        ("media.get-fields", get_fields["agent_result"]),
+        ("media.get", media_get["agent_result"]),
+    ]
+    with pytest.raises(
+        runner.HeavyProjectRunnerError,
+        match="exactly one reconciled media.get gateway result",
+    ):
+        adapter._restore_model_reads_from_gateway_results(
+            SimpleNamespace(
+                command_facts=SimpleNamespace(
+                    gateway_results=(get_fields, media_get, dict(media_get))
+                )
+            )
+        )
+
+
+def test_media_observer_records_the_sealed_media_get_result(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter = object.__new__(runner._PreparedMediaPoolAdapter)
+    adapter.oracle = object()
+    adapter.staged = object()
+    adapter.model_media_result = None
+    monkeypatch.setattr(
+        runner,
+        "verify_media_pool_business_projection",
+        lambda _oracle, _step, _raw, _business_request: _Verification(),
+    )
+    monkeypatch.setattr(
+        runner,
+        "verify_media_pool_read_unchanged",
+        lambda _staged, _oracle: _Verification(),
+    )
+    result = {"return": [{"id": "media-row"}]}
+
+    adapter.observe_payload(
+        ExpectedGatewayStep("media.get", "core-call"),
+        {"agent_result": result, "business_request": {"operation": "media.get"}},
+    )
+
+    assert adapter.model_media_result == result
 
 
 def test_custom_database_roundtrip_uses_plain_json_and_runner_owned_host_path(

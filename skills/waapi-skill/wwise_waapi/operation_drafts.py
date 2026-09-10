@@ -21,16 +21,27 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Collection, Iterator, Mapping
+from typing import Any, Callable, Collection, Iterator, Mapping, Sequence
 
+from .business_declaration_state import (
+    BUSINESS_SESSION_UPDATE_EVENTS,
+    BusinessDeclarationSession,
+    BusinessPreview,
+)
+from .business_declarations import BusinessContext, BusinessDeclarationError
+from .business_adapters import business_adapter
 from .canonical import canonical_json_bytes, canonical_sha256
 from .filesystem_security import path_is_link_or_reparse
 from .operation_composer import (
+    MAX_TYPED_ACTIONS_PER_APPLY,
     OperationComposerError,
     apply_composer_action,
     composition_projection,
     materialize_operation_request,
     new_composition,
+)
+from .operation_registry import (
+    operation_uses_business_declaration,
 )
 from .transactions import validate_transaction_id
 
@@ -74,6 +85,11 @@ MAX_OPERATION_DRAFT_RESULT_BYTES = 256 * 1024
 # envelope, session context, binding, timestamps, and check/seal summaries
 # makes the pre-write proof independent of Gateway serialization order.
 MAX_OPERATION_DRAFT_FACTS_BYTES = MAX_OPERATION_DRAFT_RESULT_BYTES // 4
+# Generic schema-derived Drafts include a reviewed 256-point RTPC curve whose
+# canonical fact projection is about 170 KiB.  Keep the established object.set
+# and audio.import result budget unchanged; only the exact typed-Draft family
+# receives this larger, still fixed projection allowance.
+MAX_TYPED_OPERATION_DRAFT_FACTS_BYTES = MAX_OPERATION_DRAFT_RESULT_BYTES * 3 // 4
 _DRAFT_ID_PATTERN = re.compile(r"^od1-[0-9a-f]{32}$")
 _TASK_AUTHORITY_PATTERN = re.compile(r"^da1-[0-9a-f]{40}$")
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
@@ -459,6 +475,7 @@ class OperationDraftStore:
         version: str,
         schema_digest: str,
         composer_digest: str | None = None,
+        compound_parent: Mapping[str, Any] | None = None,
         now: datetime | None = None,
     ) -> OperationDraftStart:
         _require_binding(operation, version, schema_digest)
@@ -467,6 +484,10 @@ class OperationDraftStore:
             or not _SHA256_PATTERN.fullmatch(composer_digest)
         ):
             raise ValueError("composer_digest must be a lowercase SHA-256 digest")
+        if compound_parent is not None and composer_digest is None:
+            raise ValueError(
+                "compound_parent requires a current Composer-backed Draft"
+            )
         created_datetime = _utc_datetime(now)
         created_at = _timestamp(created_datetime)
         expires_at = _timestamp(
@@ -518,7 +539,11 @@ class OperationDraftStore:
                     ),
                     composer_digest=composer_digest,
                     composition=(
-                        new_composition(operation, version)
+                        new_composition(
+                            operation,
+                            version,
+                            compound_parent=compound_parent,
+                        )
                         if composer_digest is not None
                         else None
                     ),
@@ -550,6 +575,41 @@ class OperationDraftStore:
         now: datetime | None = None,
     ) -> OperationDraftRecord:
         """Atomically apply one typed Adapter action to an editable Draft."""
+
+        return self.apply_actions(
+            draft_id,
+            task_authority=task_authority,
+            expected_revision=expected_revision,
+            schema_digest=schema_digest,
+            composer_digest=composer_digest,
+            actions=(action,),
+            now=now,
+        )
+
+    def apply_actions(
+        self,
+        draft_id: str,
+        *,
+        task_authority: str,
+        expected_revision: int,
+        schema_digest: str,
+        composer_digest: str,
+        actions: Sequence[Mapping[str, Any]],
+        now: datetime | None = None,
+    ) -> OperationDraftRecord:
+        """Atomically apply one bounded ordered typed-action batch."""
+
+        if (
+            not isinstance(actions, Sequence)
+            or isinstance(actions, (str, bytes, bytearray))
+            or not actions
+            or len(actions) > MAX_TYPED_ACTIONS_PER_APPLY
+            or any(not isinstance(action, Mapping) for action in actions)
+        ):
+            raise OperationComposerError(
+                "Typed action batch must contain a bounded ordered action list."
+            )
+        ordered_actions = tuple(actions)
 
         if not isinstance(draft_id, str) or not _DRAFT_ID_PATTERN.fullmatch(draft_id):
             raise _not_available()
@@ -583,27 +643,49 @@ class OperationDraftStore:
                 raise OperationDraftStorageCorruption(
                     "Composer-backed Operation Draft is missing its composition."
                 )
+            if len(record.audit) + len(ordered_actions) > MAX_OPERATION_DRAFT_ACTIONS:
+                raise OperationDraftLimitExceeded(
+                    "Operation Draft action history exceeds its fixed ceiling.",
+                    details={"limit": MAX_OPERATION_DRAFT_ACTIONS},
+                )
             # Validation and normalization happen entirely before the first
-            # durable write, so every invalid action leaves identical bytes.
-            try:
+            # durable write, so every invalid action in the ordered batch leaves
+            # identical bytes.
+            composition = record.composition
+            action_names: list[str] = []
+            for action in ordered_actions:
                 composition, action_name = apply_composer_action(
                     record.operation,
                     record.version,
-                    record.composition,
+                    composition,
                     action,
                 )
-            except OperationComposerError:
-                raise
-            _require_composition_projection_budget(
-                record.operation,
-                record.version,
-                composition,
-            )
+                action_names.append(action_name)
+                _require_composition_projection_budget(
+                    record.operation,
+                    record.version,
+                    composition,
+                )
             updated_at = _timestamp(current)
+            audit = list(record.audit)
+            previous_event_hash = str(audit[-1]["event_hash"])
+            for offset, action_name in enumerate(action_names, start=1):
+                event = _build_audit_event(
+                    draft_id=record.draft_id,
+                    sequence=len(audit) + 1,
+                    revision=record.revision + offset,
+                    event_type=f"action.{action_name}",
+                    from_state=record.state,
+                    to_state=record.state,
+                    timestamp=updated_at,
+                    previous_event_hash=previous_event_hash,
+                )
+                audit.append(event)
+                previous_event_hash = str(event["event_hash"])
             updated = OperationDraftRecord(
                 draft_id=record.draft_id,
                 state=record.state,
-                revision=record.revision + 1,
+                revision=record.revision + len(ordered_actions),
                 operation=record.operation,
                 version=record.version,
                 schema_digest=record.schema_digest,
@@ -612,19 +694,7 @@ class OperationDraftStore:
                 updated_at=updated_at,
                 expires_at=record.expires_at,
                 terminal_at=None,
-                audit=(
-                    *record.audit,
-                    _build_audit_event(
-                        draft_id=record.draft_id,
-                        sequence=len(record.audit) + 1,
-                        revision=record.revision + 1,
-                        event_type=f"action.{action_name}",
-                        from_state=record.state,
-                        to_state=record.state,
-                        timestamp=updated_at,
-                        previous_event_hash=str(record.audit[-1]["event_hash"]),
-                    ),
-                ),
+                audit=tuple(audit),
                 limits_digest=record.limits_digest,
                 schema_version=record.schema_version,
                 composer_digest=record.composer_digest,
@@ -680,7 +750,7 @@ class OperationDraftStore:
                 raise OperationDraftStorageCorruption(
                     "Composer-backed Operation Draft is missing its composition."
                 )
-            request = materialize_operation_request(
+            request = _materialize_draft_composition(
                 record.operation,
                 record.version,
                 record.composition,
@@ -690,6 +760,162 @@ class OperationDraftStore:
                 request=request,
                 request_digest=canonical_sha256(request),
             )
+
+    def apply_business_update(
+        self,
+        draft_id: str,
+        *,
+        task_authority: str,
+        expected_revision: int,
+        schema_digest: str,
+        composer_digest: str,
+        context: BusinessContext,
+        update: Callable[
+            [BusinessDeclarationSession], BusinessDeclarationSession
+        ],
+        event_type: str,
+        now: datetime | None = None,
+    ) -> OperationDraftRecord:
+        """CAS-publish one internally validated Business Declaration revision.
+
+        ``update`` is an in-process Adapter seam, never caller-authored code.
+        It runs under the existing per-Draft lock and the resulting state is
+        fully normalized before the first durable write.
+        """
+
+        if not isinstance(context, BusinessContext):
+            raise TypeError("context must be BusinessContext")
+        if not callable(update):
+            raise TypeError("update must be callable")
+        if (
+            not isinstance(event_type, str)
+            or event_type not in BUSINESS_SESSION_UPDATE_EVENTS
+        ):
+            raise ValueError("event_type must be one closed business Draft update")
+        if not isinstance(draft_id, str) or not _DRAFT_ID_PATTERN.fullmatch(draft_id):
+            raise _not_available()
+        with self._existing_draft_lock(draft_id):
+            current = _utc_datetime(now)
+            loaded = self._inspect_unlocked(
+                draft_id,
+                task_authority=task_authority,
+                now=current,
+            )
+            record = loaded.record
+            _require_expected_revision(record, expected_revision)
+            if record.state is not OperationDraftState.EDITABLE:
+                raise OperationDraftInvalidTransition(
+                    "Only an editable Operation Draft accepts business declarations.",
+                    details={"state": record.state.value},
+                )
+            if record.schema_version != OPERATION_DRAFT_SCHEMA_VERSION:
+                raise OperationDraftRecreateRequired(
+                    "This legacy Operation Draft must be recreated before using business declarations."
+                )
+            _require_current_binding(
+                record,
+                schema_digest=schema_digest,
+                composer_digest=composer_digest,
+            )
+            if not operation_uses_business_declaration(
+                record.operation,
+                record.version,
+            ):
+                raise OperationDraftInvalidTransition(
+                    "This Operation Draft does not expose a Business Declaration Adapter."
+                )
+            if record.composition is None:
+                raise OperationDraftStorageCorruption(
+                    "Composer-backed Operation Draft is missing its composition."
+                )
+            if not hmac.compare_digest(
+                context.task_authority_digest,
+                record.authority_digest,
+            ):
+                raise OperationDraftNotAvailable(
+                    "Business context does not belong to this task authority."
+                )
+            if context.wwise_version != record.version:
+                raise OperationDraftBindingDrift(
+                    "Business context Wwise version differs from the Draft binding."
+                )
+            raw_session = record.composition.get("business_session")
+            session = (
+                BusinessDeclarationSession.create(context)
+                if raw_session is None
+                else BusinessDeclarationSession.from_dict(raw_session)
+            )
+            if session.context != context:
+                raise OperationDraftBindingDrift(
+                    "Business context differs from the durable declaration binding."
+                )
+            before_session_payload = session.as_dict()
+            # The Adapter callback, state round-trip, Composer normalization,
+            # and projection budget all complete before atomic replacement.
+            candidate_session = update(session)
+            if not isinstance(candidate_session, BusinessDeclarationSession):
+                raise TypeError("business update must return BusinessDeclarationSession")
+            if candidate_session.context != context:
+                raise OperationDraftBindingDrift(
+                    "Business update changed its task, project, or Wwise binding."
+                )
+            session_payload = candidate_session.as_dict()
+            try:
+                BusinessDeclarationSession.validate_transition(
+                    before_session_payload,
+                    candidate_session,
+                    event_type=event_type,
+                )
+            except (TypeError, ValueError) as exc:
+                raise OperationDraftInvalidTransition(
+                    "Business Declaration update violates its closed transition contract."
+                ) from exc
+            composition = dict(record.composition)
+            composition["business_session"] = session_payload
+            _require_composition_projection_budget(
+                record.operation,
+                record.version,
+                composition,
+            )
+            updated_at = _timestamp(current)
+            updated = OperationDraftRecord(
+                draft_id=record.draft_id,
+                state=record.state,
+                revision=record.revision + 1,
+                operation=record.operation,
+                version=record.version,
+                schema_digest=record.schema_digest,
+                authority_digest=record.authority_digest,
+                created_at=record.created_at,
+                updated_at=updated_at,
+                expires_at=record.expires_at,
+                terminal_at=None,
+                audit=(
+                    *record.audit,
+                    _build_audit_event(
+                        draft_id=record.draft_id,
+                        sequence=len(record.audit) + 1,
+                        revision=record.revision + 1,
+                        event_type=event_type,
+                        from_state=record.state,
+                        to_state=record.state,
+                        timestamp=updated_at,
+                        previous_event_hash=str(record.audit[-1]["event_hash"]),
+                    ),
+                ),
+                limits_digest=record.limits_digest,
+                schema_version=record.schema_version,
+                composer_digest=record.composer_digest,
+                composition=composition,
+                check=None,
+                seal=None,
+            )
+            self._replace_record(
+                self._record_path(draft_id),
+                updated.as_durable_dict(),
+                expected_previous=loaded,
+            )
+            return updated
 
     def record_check(
         self,
@@ -703,6 +929,7 @@ class OperationDraftStore:
         project_guard: Mapping[str, Any],
         runtime_guard_fingerprint: str,
         prepared_digest: str,
+        business_preview: BusinessPreview | None = None,
         now: datetime | None = None,
     ) -> OperationDraftRecord:
         """CAS-publish bounded successful live-check evidence."""
@@ -753,7 +980,7 @@ class OperationDraftStore:
                 raise OperationDraftStorageCorruption(
                     "Composer-backed Operation Draft is missing its composition."
                 )
-            current_request = materialize_operation_request(
+            current_request = _materialize_draft_composition(
                 record.operation,
                 record.version,
                 record.composition,
@@ -763,6 +990,35 @@ class OperationDraftStore:
                 raise OperationDraftRevisionConflict(
                     "Operation Draft facts changed before live check evidence could be recorded.",
                     details={"actual_revision": record.revision},
+                )
+            composition = record.composition
+            if business_preview is not None:
+                if not isinstance(business_preview, BusinessPreview):
+                    raise TypeError("business_preview must be BusinessPreview")
+                raw_session = composition.get("business_session")
+                adapter = business_adapter(record.operation)
+                if not adapter.records_business_preview or raw_session is None:
+                    raise OperationDraftInvalidTransition(
+                        "This Business Draft cannot record a business Preview."
+                    )
+                try:
+                    session = BusinessDeclarationSession.from_dict(raw_session)
+                    candidate = session.with_preview(business_preview)
+                    BusinessDeclarationSession.validate_transition(
+                        session.as_dict(),
+                        candidate,
+                        event_type="preview.recorded",
+                    )
+                except (BusinessDeclarationError, TypeError, ValueError) as exc:
+                    raise OperationDraftInvalidTransition(
+                        "Business Preview does not match the checked declaration revision."
+                    ) from exc
+                composition = dict(composition)
+                composition["business_session"] = candidate.as_dict()
+                _require_composition_projection_budget(
+                    record.operation,
+                    record.version,
+                    composition,
                 )
             checked_at = _timestamp(current)
             check = {
@@ -811,7 +1067,7 @@ class OperationDraftStore:
                 limits_digest=record.limits_digest,
                 schema_version=record.schema_version,
                 composer_digest=record.composer_digest,
-                composition=record.composition,
+                composition=composition,
                 check=check,
                 seal=None,
             )
@@ -895,7 +1151,7 @@ class OperationDraftStore:
                 raise OperationDraftCheckRequired(
                     "Operation Draft check evidence is stale for the current revision."
                 )
-            request = materialize_operation_request(
+            request = _materialize_draft_composition(
                 record.operation,
                 record.version,
                 record.composition,
@@ -1849,7 +2105,7 @@ def _replay_seal_reservation(
         raise OperationDraftStorageCorruption(
             "Reserved Operation Draft is missing its composition."
         )
-    current_request = materialize_operation_request(
+    current_request = _materialize_draft_composition(
         record.operation,
         record.version,
         record.composition,
@@ -1869,6 +2125,8 @@ def _validate_durable_composition(
     *,
     operation: str,
     version: str,
+    allow_cleaned_file_evidence: bool = False,
+    allow_retired_audio_import_composition: bool = False,
 ) -> Mapping[str, Any]:
     if not isinstance(value, Mapping):
         raise ValueError("draft composition fields are invalid")
@@ -1878,8 +2136,54 @@ def _validate_durable_composition(
         raise ValueError("draft composition is not strict JSON") from exc
     if not isinstance(normalized, Mapping):  # pragma: no cover - mapping invariant
         raise ValueError("draft composition is invalid")
-    composition_projection(operation, version, normalized)
+    retired_audio_import = (
+        allow_retired_audio_import_composition
+        and operation == "audio.import"
+        and set(normalized) == {"contract", "request_options", "defaults", "imports"}
+        and normalized.get("contract") == "waapi-skill.operation-composition/v1"
+    )
+    if not retired_audio_import:
+        composition_projection(
+            operation,
+            version,
+            normalized,
+            allow_cleaned_file_evidence=allow_cleaned_file_evidence,
+        )
     return normalized
+
+
+def _materialize_draft_composition(
+    operation: str,
+    version: str,
+    composition: Mapping[str, Any],
+    *,
+    allow_cleaned_file_evidence: bool = False,
+) -> Mapping[str, Any]:
+    raw_business_session = composition.get("business_session")
+    if raw_business_session is not None and operation_uses_business_declaration(
+        operation,
+        version,
+    ):
+        try:
+            session = BusinessDeclarationSession.from_dict(raw_business_session)
+            adapter = business_adapter(operation)
+            return adapter.materialize(
+                session,
+                allow_cleaned_file_evidence=(
+                    allow_cleaned_file_evidence
+                    and adapter.supports_cleaned_file_evidence
+                ),
+            )
+        except (TypeError, ValueError) as exc:
+            raise OperationComposerError(
+                f"{operation} business declarations cannot materialize their canonical request."
+            ) from exc
+    return materialize_operation_request(
+        operation,
+        version,
+        composition,
+        allow_cleaned_file_evidence=allow_cleaned_file_evidence,
+    )
 
 
 def _require_composition_projection_budget(
@@ -1889,12 +2193,22 @@ def _require_composition_projection_budget(
 ) -> None:
     projection = composition_projection(operation, version, composition)
     observed = len(canonical_json_bytes(projection))
-    if observed > MAX_OPERATION_DRAFT_FACTS_BYTES:
+    is_schema_derived_typed_draft = (
+        composition.get("contract") == "waapi-skill.operation-composition/v1"
+        and "typed_request_schema_digest" in composition
+        and "facts" in composition
+    )
+    limit = (
+        MAX_TYPED_OPERATION_DRAFT_FACTS_BYTES
+        if is_schema_derived_typed_draft
+        else MAX_OPERATION_DRAFT_FACTS_BYTES
+    )
+    if observed > limit:
         raise OperationDraftLimitExceeded(
             "Operation Draft facts exceed the pre-write public result budget.",
             details={
                 "facts_bytes": observed,
-                "facts_limit_bytes": MAX_OPERATION_DRAFT_FACTS_BYTES,
+                "facts_limit_bytes": limit,
                 "result_limit_bytes": MAX_OPERATION_DRAFT_RESULT_BYTES,
             },
         )
@@ -1992,7 +2306,6 @@ def _validate_durable_seal(
     *,
     revision: int,
     state: OperationDraftState,
-    operation: str,
     version: str,
     schema_digest: str,
     composer_digest: str,
@@ -2075,7 +2388,8 @@ def _validate_durable_seal(
     if (
         request.get("contract") != "waapi-skill.operation-request/v1"
         or request.get("version") != version
-        or request.get("operation") != operation
+        or not isinstance(request.get("operation"), str)
+        or not request.get("operation")
         or not isinstance(request.get("arguments"), Mapping)
         or canonical_sha256(request) != seal.get("request_digest")
         or seal.get("request_digest") != check.get("request_digest")
@@ -2119,11 +2433,15 @@ def _parse_canonical_record_bytes(
     data: bytes,
     *,
     expected_draft_id: str,
+    allow_cleaned_file_evidence: bool = False,
+    allow_retired_audio_import_composition: bool = False,
 ) -> OperationDraftRecord:
     payload = json.loads(data.decode("utf-8"))
     record = _record_from_mapping(
         payload,
         expected_draft_id=expected_draft_id,
+        allow_cleaned_file_evidence=allow_cleaned_file_evidence,
+        allow_retired_audio_import_composition=allow_retired_audio_import_composition,
     )
     if not hmac.compare_digest(data, canonical_json_bytes(record.as_durable_dict())):
         raise ValueError("draft record bytes are not in canonical durable form")
@@ -2134,6 +2452,8 @@ def parse_operation_draft_archive_bytes(
     data: bytes,
     *,
     expected_draft_id: str,
+    allow_cleaned_file_evidence: bool = False,
+    allow_retired_audio_import_composition: bool = False,
 ) -> OperationDraftRecord:
     """Strictly parse one bounded canonical record without opening a live Store."""
 
@@ -2149,6 +2469,8 @@ def parse_operation_draft_archive_bytes(
         return _parse_canonical_record_bytes(
             data,
             expected_draft_id=expected_draft_id,
+            allow_cleaned_file_evidence=allow_cleaned_file_evidence,
+            allow_retired_audio_import_composition=allow_retired_audio_import_composition,
         )
     except (json.JSONDecodeError, RecursionError, UnicodeError) as exc:
         raise ValueError("Operation Draft archive record is invalid") from exc
@@ -2157,20 +2479,33 @@ def parse_operation_draft_archive_bytes(
 def load_operation_draft_archive_record(
     state_dir: Path,
     draft_id: str,
+    *,
+    allow_cleaned_file_evidence: bool = False,
+    allow_retired_audio_import_composition: bool = False,
 ) -> OperationDraftRecord:
     """Read one frozen Draft record without creating, locking, or repairing state."""
 
     return load_operation_draft_archive_records(
         state_dir,
         (draft_id,),
+        allow_cleaned_file_evidence=allow_cleaned_file_evidence,
+        allow_retired_audio_import_composition=allow_retired_audio_import_composition,
     )[draft_id]
 
 
 def load_operation_draft_archive_records(
     state_dir: Path,
     draft_ids: Collection[str],
+    *,
+    allow_cleaned_file_evidence: bool = False,
+    allow_retired_audio_import_composition: bool = False,
 ) -> dict[str, OperationDraftRecord]:
-    """Read exactly the frozen Draft records bound by one semantic protocol."""
+    """Read exactly the frozen Draft records bound by one semantic protocol.
+
+    ``allow_retired_audio_import_composition`` is a read-only compatibility
+    aperture for the formal semantic archive verifier. It never changes the
+    current Store or Gateway grammar.
+    """
 
     if not isinstance(state_dir, Path) or not state_dir.is_absolute():
         raise ValueError("state_dir must be one absolute pathlib.Path")
@@ -2231,6 +2566,8 @@ def load_operation_draft_archive_records(
         records[draft_id] = parse_operation_draft_archive_bytes(
             snapshot.data,
             expected_draft_id=draft_id,
+            allow_cleaned_file_evidence=allow_cleaned_file_evidence,
+            allow_retired_audio_import_composition=allow_retired_audio_import_composition,
         )
     return records
 
@@ -2239,6 +2576,8 @@ def _record_from_mapping(
     payload: Any,
     *,
     expected_draft_id: str,
+    allow_cleaned_file_evidence: bool = False,
+    allow_retired_audio_import_composition: bool = False,
 ) -> OperationDraftRecord:
     if not isinstance(payload, Mapping):
         raise TypeError("draft record must be an object")
@@ -2349,10 +2688,15 @@ def _record_from_mapping(
             or not _SHA256_PATTERN.fullmatch(composer_digest)
         ):
             raise ValueError("composer digest is invalid")
+        cleaned_file_replay = (
+            allow_cleaned_file_evidence and state is OperationDraftState.SEALED
+        )
         composition = _validate_durable_composition(
             payload["composition"],
             operation=payload["operation"],
             version=payload["version"],
+            allow_cleaned_file_evidence=cleaned_file_replay,
+            allow_retired_audio_import_composition=allow_retired_audio_import_composition,
         )
         check = _validate_durable_check(
             payload["check"],
@@ -2367,19 +2711,24 @@ def _record_from_mapping(
             payload["seal"],
             revision=revision,
             state=state,
-            operation=payload["operation"],
             version=payload["version"],
             schema_digest=schema_digest,
             composer_digest=composer_digest,
             check=check,
             updated_at=payload["updated_at"],
         )
-        if seal is not None:
+        retired_audio_import = (
+            allow_retired_audio_import_composition
+            and payload["operation"] == "audio.import"
+            and set(composition) == {"contract", "request_options", "defaults", "imports"}
+        )
+        if seal is not None and not retired_audio_import:
             try:
-                composed_request = materialize_operation_request(
+                composed_request = _materialize_draft_composition(
                     payload["operation"],
                     payload["version"],
                     composition,
+                    allow_cleaned_file_evidence=cleaned_file_replay,
                 )
             except OperationComposerError as exc:
                 raise ValueError(

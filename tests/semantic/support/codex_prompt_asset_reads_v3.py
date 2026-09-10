@@ -11,11 +11,10 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Mapping, Sequence
 
 from tests.semantic.support.codex_harness import CodexCommandRecord
-from tests.semantic.support.codex_gateway_broker import (
-    ExpectedGatewayStep,
-    MetadataBoundJsonArgument,
-    SemanticJsonArgument,
+from tests.semantic.support.codex_eval_protocol_v3 import (
+    materialize_typed_transaction_protocol_requests,
 )
+from tests.semantic.support.codex_gateway_broker import ExpectedGatewayStep
 from tests.semantic.support.codex_prompt_provenance_v3 import (
     PromptProvenanceEvidence,
 )
@@ -157,37 +156,23 @@ def _applied_tab_import_file_paths(
         raise PromptAssetReadError(
             "prompt provenance transaction protocol is unavailable"
         )
+    if any(not isinstance(step, ExpectedGatewayStep) for step in steps):
+        raise PromptAssetReadError("prompt provenance transaction step is invalid")
+    version = provenance.payload.get("version")
+    if not isinstance(version, str):
+        raise PromptAssetReadError("prompt provenance version is unavailable")
+    try:
+        requests = materialize_typed_transaction_protocol_requests(
+            protocol,
+            version=version,
+            allow_cleaned_file_evidence=True,
+        )
+    except ValueError as exc:
+        raise PromptAssetReadError(
+            "prompt provenance typed transaction cannot be materialized"
+        ) from exc
     import_files: set[str] = set()
-    for step in steps:
-        if not isinstance(step, ExpectedGatewayStep):
-            raise PromptAssetReadError(
-                "prompt provenance transaction step is invalid"
-            )
-        if step.subcommand != "preview":
-            continue
-        arguments = step.arguments
-        if (
-            len(arguments) == 2
-            and arguments[0] == "--request-json"
-            and isinstance(
-                arguments[1],
-                (SemanticJsonArgument, MetadataBoundJsonArgument),
-            )
-        ):
-            # A design-only preview is not an ordinary mutation turn.
-            continue
-        if (
-            len(arguments) != 3
-            or arguments[:2] != ("--apply", "--request-json")
-            or not isinstance(
-                arguments[2],
-                (SemanticJsonArgument, MetadataBoundJsonArgument),
-            )
-        ):
-            raise PromptAssetReadError(
-                "prompt provenance transaction preview is malformed"
-            )
-        request = arguments[2].expected
+    for _pointer, request in requests:
         if (
             not isinstance(request, Mapping)
             or set(request)

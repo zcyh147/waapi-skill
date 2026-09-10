@@ -7,6 +7,7 @@ import pytest
 from tests.semantic.support.codex_host_paths import (
     ReflectedHostPathError,
     parse_posix_absolute_path,
+    parse_relative_host_path,
     parse_windows_drive_path,
 )
 
@@ -170,3 +171,37 @@ def test_posix_parser_rejects_ambiguous_or_normalizing_spellings(
 ) -> None:
     with pytest.raises(ReflectedHostPathError):
         parse_posix_absolute_path(value)
+
+
+def test_semantic_relative_parser_preserves_parent_segments_and_trailing_separator() -> None:
+    parsed = parse_relative_host_path(
+        "..\\..\\io\\soundbanks\\Windows\\",
+        allow_parent_segments=True,
+        allow_trailing_separator=True,
+    )
+
+    assert parsed.flavor == "windows"
+    assert parsed.relative_parts == ("..", "..", "io", "soundbanks", "Windows")
+    assert parsed.pure == PureWindowsPath(r"..\..\io\soundbanks\Windows")
+
+
+@pytest.mark.parametrize(
+    "value",
+    (
+        r"..\.\io\soundbanks",
+        r"..\\io\soundbanks",
+        r"C:\io\soundbanks",
+        r"\\server\share\soundbanks",
+        "..\\io\\soundbanks ",
+        r"..\NUL\soundbanks",
+    ),
+)
+def test_semantic_relative_parser_rejects_noncanonical_windows_spelling(
+    value: str,
+) -> None:
+    with pytest.raises(ReflectedHostPathError):
+        parse_relative_host_path(
+            value,
+            allow_parent_segments=True,
+            allow_trailing_separator=True,
+        )

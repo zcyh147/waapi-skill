@@ -26,13 +26,18 @@ from tests.semantic.support.codex_prompt_provenance_v3 import (
 
 
 def _transaction_protocol(operation: str) -> V3GatewayProtocol:
+    arguments = (
+        {"files": ["/owned/definition.tsv"], "io_root": "/owned"}
+        if operation == "soundbank.processDefinitionFiles"
+        else {"fixture": "sealed-input"}
+    )
     return build_transaction_protocol(
         (
             {
                 "contract": "waapi-skill.operation-request/v1",
                 "version": "2025.1",
                 "operation": operation,
-                "arguments": {"fixture": "sealed-input"},
+                "arguments": arguments,
             },
         )
     )
@@ -72,6 +77,7 @@ def _provenance(
     tmp_path: Path,
     *,
     content: str = "Object Path\t@Volume\n<Sound>A\t-3\n",
+    filename: str = "import.tsv",
     kind: str = "absolute_file_path",
     relative: str = "assets/import.tsv",
     size: int | None = None,
@@ -79,7 +85,7 @@ def _provenance(
 ) -> tuple[PromptProvenanceEvidence, str, str]:
     root = tmp_path / "scenario"
     owned = root / "owned"
-    path = owned / "assets" / "import.tsv"
+    path = owned / "assets" / filename
     encoded = content.encode("utf-8")
     row = {
         "name": "import_file",
@@ -109,6 +115,7 @@ def _provenance(
         path=root / "evidence" / "prompt-provenance.json",
         sha256="c" * 64,
         payload={
+            "version": "2025.1",
             "scenario_root": str(root),
             "owned_root": str(owned),
             "request": {
@@ -264,6 +271,47 @@ def test_other_file_transaction_keeps_single_sealed_prompt_asset_cat(
         provenance=provenance,
         turn_index=1,
     ) == (record.command,)
+
+
+def test_lua_file_prompt_asset_audit_replays_after_pass_cleanup(
+    tmp_path: Path,
+) -> None:
+    provenance, path, content = _provenance(
+        tmp_path,
+        filename="user-script.lua",
+        relative="assets/user-script.lua",
+        content="return wa_args.count\n",
+    )
+    script = Path(path)
+    script.parent.mkdir(parents=True, exist_ok=True)
+    script.write_text(content, encoding="utf-8")
+    provenance = replace(
+        provenance,
+        protocol=build_transaction_protocol(
+            (
+                {
+                    "contract": "waapi-skill.operation-request/v1",
+                    "version": "2025.1",
+                    "operation": "lua.executeCoreFile",
+                    "arguments": {
+                        "script_file": path,
+                        "io_root": str(script.parent),
+                        "source_authority": "user_supplied_verbatim",
+                        "wa_args": {"count": 3},
+                    },
+                },
+            )
+        ),
+    )
+
+    script.unlink()
+    script.parent.rmdir()
+
+    assert validated_prompt_asset_cat_commands(
+        (),
+        provenance=provenance,
+        turn_index=1,
+    ) == ()
 
 
 def test_each_sealed_asset_cat_is_accepted_at_most_once(

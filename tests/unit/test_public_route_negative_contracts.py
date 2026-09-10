@@ -78,64 +78,140 @@ def _env(tmp_path: Path, version: str = "2022.1") -> dict[str, str]:
 
 
 def test_bounded_call_returns_validated_business_result_to_agent(tmp_path: Path) -> None:
+    state_group_id = "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"
+    project = tmp_path / "SampleProject" / "SampleProject.wproj"
+    project.parent.mkdir()
+    project.write_text("fixture", encoding="utf-8")
     state_result = {"id": "{00000000-0000-0000-0000-000000000001}", "name": "Gameplay"}
     client = FakeClient(
         {
             "ak.wwise.core.getInfo": [_live_info()],
-            "ak.soundengine.getState": [state_result],
+            "ak.wwise.core.getProjectInfo": [
+                {
+                    "id": "{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}",
+                    "name": "SampleProject",
+                    "path": str(project),
+                }
+            ],
+            "ak.wwise.core.object.get": [
+                {
+                    "return": [
+                        {
+                            "id": state_group_id,
+                            "name": "Gameplay",
+                            "type": "StateGroup",
+                            "path": r"\States\Default Work Unit\Gameplay",
+                        }
+                    ]
+                }
+            ],
+            "ak.soundengine.getState": [{"return": state_result}],
         }
     )
 
+    schema_code, schema = waapi_gateway.execute_gateway(
+        ["request-schema", "ak.soundengine.getState"],
+        env=_env(tmp_path),
+        client_factory=lambda url: pytest.fail(f"schema connected to {url}"),
+    )
+    assert schema_code == 0, schema
+    assert schema["business_adapter"]["execution_shape"] == "bounded_read"
     exit_code, payload = waapi_gateway.execute_gateway(
         [
-            "call",
+            "core-call",
             "ak.soundengine.getState",
-            "--args-json",
-            '{"stateGroup":"Gameplay"}',
+            "--state-group-id",
+            state_group_id,
         ],
         env=_env(tmp_path),
         client_factory=lambda url: client,
     )
 
-    assert exit_code == 0, payload
+    assert exit_code == 0, json.dumps(payload, indent=2)
     assert payload["agent_result"] == state_result
-    assert payload["result_validation"]["section"] == "result"
-    assert payload["result_validation"]["unresolved_refs"]
-    assert [call[0] for call in client.calls] == ["ak.wwise.core.getInfo", "ak.soundengine.getState"]
+    assert [call[0] for call in client.calls] == [
+        "ak.wwise.core.getInfo",
+        "ak.wwise.core.getProjectInfo",
+        "ak.wwise.core.object.get",
+        "ak.soundengine.getState",
+    ]
 
 
 @pytest.mark.parametrize(
-    "api, expected_status",
+    ("api", "group_flag", "group_type"),
     (
-        ("ak.wwise.core.project.save", "transaction_required"),
-        ("ak.wwise.debug.testCrash", "transaction_required"),
-        ("ak.wwise.ui.commands.register", "transaction_required"),
-        ("ak.wwise.ui.commands.execute", "transaction_required"),
-        ("ak.wwise.ui.commands.unregister", "transaction_required"),
+        ("ak.soundengine.getState", "--state-group-id", "StateGroup"),
+        ("ak.soundengine.getSwitch", "--switch-group-id", "SwitchGroup"),
     ),
 )
-def test_call_cannot_bypass_transaction_or_exclusion_even_with_destructive_env(
+@pytest.mark.parametrize(
+    "malformed_result",
+    (
+        {},
+        {"return": []},
+        {"return": {"id": "not-a-guid", "name": "Gameplay"}},
+        {
+            "return": {
+                "id": "{00000000-0000-0000-0000-000000000001}",
+                "name": "",
+            }
+        },
+    ),
+)
+def test_soundengine_bounded_reads_reject_malformed_wire_results(
     tmp_path: Path,
     api: str,
-    expected_status: str,
+    group_flag: str,
+    group_type: str,
+    malformed_result: Mapping[str, Any],
 ) -> None:
-    connected = False
-
-    def factory(url: str) -> FakeClient:
-        nonlocal connected
-        connected = True
-        raise AssertionError(f"preflight boundary must not connect to {url}")
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["call", api, "--dry-run"],
-        env=_env(tmp_path),
-        client_factory=factory,
+    version = "2025.1"
+    group_id = "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"
+    project = tmp_path / "SampleProject" / "SampleProject.wproj"
+    project.parent.mkdir()
+    project.write_text("fixture", encoding="utf-8")
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": [_live_info(version)],
+            "ak.wwise.core.getProjectInfo": [
+                {
+                    "id": "{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}",
+                    "name": "SampleProject",
+                    "path": str(project),
+                }
+            ],
+            "ak.wwise.core.object.get": [
+                {
+                    "return": [
+                        {
+                            "id": group_id,
+                            "name": "Gameplay",
+                            "type": group_type,
+                            "path": rf"\{group_type}s\Default Work Unit\Gameplay",
+                        }
+                    ]
+                }
+            ],
+            api: [dict(malformed_result)],
+        }
     )
 
-    assert exit_code == 2
-    assert payload["status"] == expected_status
-    assert payload["executed"] is False
-    assert connected is False
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "--version",
+            version,
+            "core-call",
+            api,
+            group_flag,
+            group_id,
+        ],
+        env=_env(tmp_path, version),
+        client_factory=lambda _url: client,
+    )
+
+    assert exit_code == 2, payload
+    assert payload["error_code"] == "SOUNDENGINE_READ_RESULT_INVALID"
+    assert "agent_result" not in payload
 
 
 @pytest.mark.parametrize("api", ("ak.wwise.core.getInfo", "ak.wwise.debug.testCrash"))
@@ -344,42 +420,36 @@ def test_generic_non_isolated_transaction_rejects_fake_io_root(tmp_path: Path) -
 def test_unresolved_result_ref_is_reported_as_partial_schema_check_not_business_verified() -> None:
     capability = CapabilityCatalog().describe("2022.1", "ak.wwise.core.object.copy")
     args, options, _ = request_and_result_from_schema(capability.schema)
+    with pytest.raises(OperationContractError, match="dedicated operation"):
+        parse_operation_request(
+            {
+                "contract": OPERATION_REQUEST_CONTRACT,
+                "version": "2022.1",
+                "operation": "waapi.call",
+                "arguments": {
+                    "api": capability.uri,
+                    "args": args,
+                    "options": options,
+                },
+            }
+        )
+
     request = parse_operation_request(
         {
             "contract": OPERATION_REQUEST_CONTRACT,
             "version": "2022.1",
-            "operation": "waapi.call",
+            "operation": "object.copy",
             "arguments": {
-                "api": capability.uri,
-                "args": args,
-                "options": options,
+                "object": {"kind": "id", "value": args["object"]},
+                "parent": {"kind": "path", "value": r"\Actor-Mixer Hierarchy\Default Work Unit"},
             },
         }
     )
-    prepared = prepare_operation(
-        request,
-        read_call=lambda uri, call_args, call_options: {},
-    )
-
-    verification = verify_prepared_operation(
-        prepared.as_dict(),
-        execution_result={"ok": True, "result": None},
-        read_call=lambda uri, call_args, call_options: {},
-    )
-
-    assert verification.ok is True
-    assert verification.status == "result_schema_checked"
-    assert verification.business_state_verified is False
-    assert verification.verification_strength == "partial_reflected_schema"
-    evidence = verification.assertions[0]["evidence"]
-    assert evidence["unresolved_refs"] == ["#/definitions/objectReturn"]
+    assert request.operation == "object.copy"
 
 
 def test_transaction_default_deadline_preserves_isolated_contract_timeout(tmp_path: Path) -> None:
     env = _env(tmp_path)
-    preview_args = waapi_gateway.build_parser().parse_args(
-        ["preview", "--request-json", "{}"]
-    )
     draft_preview_args = waapi_gateway.build_parser().parse_args(
         [
             "preview-from-draft",
@@ -395,7 +465,6 @@ def test_transaction_default_deadline_preserves_isolated_contract_timeout(tmp_pa
         ["--timeout", "5", "execute", "tx-example"]
     )
 
-    preview_connection = waapi_gateway.resolve_connection(preview_args, env=env)
     draft_preview_connection = waapi_gateway.resolve_connection(
         draft_preview_args,
         env=env,
@@ -403,8 +472,7 @@ def test_transaction_default_deadline_preserves_isolated_contract_timeout(tmp_pa
     status_connection = waapi_gateway.resolve_connection(status_args, env=env)
     explicit_connection = waapi_gateway.resolve_connection(explicit_args, env=env)
 
-    assert preview_connection.timeout == waapi_gateway.DEFAULT_TRANSACTION_TIMEOUT == 150.0
-    assert draft_preview_connection.timeout == waapi_gateway.DEFAULT_TRANSACTION_TIMEOUT
-    assert preview_connection.timeout > 120.0
+    assert draft_preview_connection.timeout == waapi_gateway.DEFAULT_TRANSACTION_TIMEOUT == 150.0
+    assert draft_preview_connection.timeout > 120.0
     assert status_connection.timeout == waapi_gateway.DEFAULT_TIMEOUT == 10.0
     assert explicit_connection.timeout == 5.0

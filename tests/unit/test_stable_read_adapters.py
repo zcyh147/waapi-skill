@@ -23,6 +23,9 @@ from wwise_waapi.builders.stable_reads import (
 )
 from wwise_waapi.capabilities import CapabilityCatalog
 
+GET_VOICES_URI = "ak.wwise.core.profiler.getVoices"
+GET_BUSSES_URI = "ak.wwise.core.profiler.getBusses"
+
 
 SCRIPT_PATH = (
     Path(__file__).resolve().parents[2]
@@ -316,27 +319,33 @@ def test_project_defaults_rejects_2025_fields_in_an_older_lane() -> None:
     assert exc.value.error_code == "INVALID_STABLE_READ_RESULT"
 
 
-def test_gateway_game_objects_dispatches_one_closed_2022_request(
+@pytest.mark.parametrize("version", ("2022.1", "2023.1", "2024.1", "2025.1"))
+def test_gateway_game_objects_dispatches_one_closed_request_per_exact_lane(
     tmp_path: Path,
+    version: str,
 ) -> None:
+    register_field = "registrationTime" if version == "2022.1" else "registerTime"
+    unregister_field = (
+        "unregistrationTime" if version == "2022.1" else "unregisterTime"
+    )
     client = FakeClient(
         {
-            "ak.wwise.core.getInfo": _live_info("2022.1"),
+            "ak.wwise.core.getInfo": _live_info(version),
             GET_GAME_OBJECTS_URI: {
                 "return": [
                     {
                         "id": 1001,
                         "name": "Player",
-                        "registrationTime": 20,
-                        "unregistrationTime": -1,
+                        register_field: 20,
+                        unregister_field: -1,
                     }
                 ]
             },
         }
     )
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["profiler-game-objects", "--time", "capture"],
-        env=_gateway_env(tmp_path, "2022.1"),
+        ["profiler-game-objects", "--capture", "latest"],
+        env=_gateway_env(tmp_path, version),
         client_factory=lambda url: client,
     )
     assert exit_code == 0
@@ -369,7 +378,7 @@ def test_gateway_game_objects_returns_structured_result_mismatch(
         }
     )
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["profiler-game-objects", "--time", "capture"],
+        ["profiler-game-objects", "--capture", "latest"],
         env=_gateway_env(tmp_path, "2022.1"),
         client_factory=lambda url: client,
     )
@@ -379,12 +388,104 @@ def test_gateway_game_objects_returns_structured_result_mismatch(
     assert payload["details"]["missing_field"] == "registrationTime"
 
 
-def test_gateway_voice_contributions_dispatches_closed_pipeline_args(
+@pytest.mark.parametrize(
+    "version",
+    ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"),
+)
+def test_gateway_voice_contributions_resolves_identity_in_every_exact_lane(
+    tmp_path: Path,
+    version: str,
+) -> None:
+    voice_id = "{11111111-1111-1111-1111-111111111111}"
+    result = {
+        "volume": -3.0,
+        "LPF": 2.0,
+        "HPF": 1.0,
+        "objects": [],
+    }
+    if version == "2025.1":
+        result["DSF"] = -0.5
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": _live_info(version),
+            GET_VOICES_URI: {
+                "return": [
+                    {
+                        "pipelineID": 17,
+                        "gameObjectID": 1001,
+                        "objectGUID": voice_id,
+                        "objectName": "Rain",
+                        "gameObjectName": "Weather",
+                    }
+                ]
+            },
+            GET_VOICE_CONTRIBUTIONS_URI: {"return": result},
+        }
+    )
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "profiler-voice-contributions",
+            "--capture",
+            "latest",
+            "--voice-object-id",
+            voice_id,
+        ],
+        env=_gateway_env(tmp_path, version),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 0, payload
+    assert client.calls[-1] == (
+        GET_VOICE_CONTRIBUTIONS_URI,
+        {
+            "voicePipelineID": 17,
+            "bussesPipelineID": [],
+            "time": "capture",
+        },
+        {},
+    )
+    assert payload["agent_result"]["volume"] == -3.0
+
+
+def test_gateway_voice_contributions_resolves_business_object_identities(
     tmp_path: Path,
 ) -> None:
+    voice_id = "{11111111-1111-1111-1111-111111111111}"
+    first_bus = "{22222222-2222-2222-2222-222222222222}"
+    second_bus = "{33333333-3333-3333-3333-333333333333}"
     client = FakeClient(
         {
             "ak.wwise.core.getInfo": _live_info("2025.1"),
+            GET_VOICES_URI: {
+                "return": [
+                    {
+                        "pipelineID": 17,
+                        "gameObjectID": 1001,
+                        "objectGUID": voice_id,
+                        "objectName": "Rain",
+                        "gameObjectName": "Weather",
+                    }
+                ]
+            },
+            GET_BUSSES_URI: {
+                "return": [
+                    {
+                        "pipelineID": 21,
+                        "gameObjectID": 1001,
+                        "objectGUID": first_bus,
+                        "objectName": "Weather Bus",
+                        "gameObjectName": "Weather",
+                    },
+                    {
+                        "pipelineID": 22,
+                        "gameObjectID": 1001,
+                        "objectGUID": second_bus,
+                        "objectName": "Master Audio Bus",
+                        "gameObjectName": "Weather",
+                    },
+                ]
+            },
             GET_VOICE_CONTRIBUTIONS_URI: {
                 "return": {
                     "volume": -3.0,
@@ -399,20 +500,48 @@ def test_gateway_voice_contributions_dispatches_closed_pipeline_args(
     exit_code, payload = waapi_gateway.execute_gateway(
         [
             "profiler-voice-contributions",
-            "--time",
+            "--capture-ms",
             "1200",
-            "--voice-pipeline-id",
-            "17",
-            "--bus-pipeline-id",
-            "21",
-            "--bus-pipeline-id",
-            "22",
+            "--voice-object-id",
+            voice_id,
+            "--bus-object-id",
+            first_bus,
+            "--bus-object-id",
+            second_bus,
         ],
         env=_gateway_env(tmp_path, "2025.1"),
         client_factory=lambda url: client,
     )
-    assert exit_code == 0
+    assert exit_code == 0, payload
     assert payload["agent_result"]["dsf"]["value"] == -0.5
+    assert client.calls[-3:-1] == [
+        (
+            GET_VOICES_URI,
+            {"time": 1200},
+            {
+                "return": [
+                    "pipelineID",
+                    "gameObjectID",
+                    "objectGUID",
+                    "objectName",
+                    "gameObjectName",
+                ]
+            },
+        ),
+        (
+            GET_BUSSES_URI,
+            {"time": 1200},
+            {
+                "return": [
+                    "pipelineID",
+                    "gameObjectID",
+                    "objectGUID",
+                    "objectName",
+                    "gameObjectName",
+                ]
+            },
+        ),
+    ]
     assert client.calls[-1] == (
         GET_VOICE_CONTRIBUTIONS_URI,
         {
@@ -422,6 +551,184 @@ def test_gateway_voice_contributions_dispatches_closed_pipeline_args(
         },
         {},
     )
+
+
+def test_gateway_voice_contributions_accepts_copy_ready_voice_and_bus_handles(
+    tmp_path: Path,
+) -> None:
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": _live_info("2025.1"),
+            GET_VOICES_URI: {
+                "return": [
+                    {
+                        "pipelineID": 17,
+                        "gameObjectID": 1001,
+                        "objectGUID": "{11111111-1111-1111-1111-111111111111}",
+                        "objectName": "Rain",
+                        "gameObjectName": "Weather",
+                    }
+                ]
+            },
+            GET_BUSSES_URI: {
+                "return": [
+                    {
+                        "pipelineID": pipeline_id,
+                        "gameObjectID": 1001,
+                        "objectGUID": object_guid,
+                        "objectName": name,
+                        "gameObjectName": "Weather",
+                    }
+                    for pipeline_id, object_guid, name in (
+                        (21, "{22222222-2222-2222-2222-222222222222}", "Weather Bus"),
+                        (22, "{33333333-3333-3333-3333-333333333333}", "Master Bus"),
+                    )
+                ]
+            },
+            GET_VOICE_CONTRIBUTIONS_URI: {
+                "return": {
+                    "volume": -3.0,
+                    "LPF": 2.0,
+                    "HPF": 1.0,
+                    "DSF": -0.5,
+                    "objects": [],
+                }
+            },
+        }
+    )
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "profiler-voice-contributions",
+            "--capture",
+            "latest",
+            "--voice-instance-handle",
+            "voice-instance-00000011",
+            "--bus-instance-handle",
+            "bus-instance-00000015",
+            "--bus-instance-handle",
+            "bus-instance-00000016",
+        ],
+        env=_gateway_env(tmp_path, "2025.1"),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 0, payload
+    assert client.calls[-1] == (
+        GET_VOICE_CONTRIBUTIONS_URI,
+        {
+            "voicePipelineID": 17,
+            "bussesPipelineID": [21, 22],
+            "time": "capture",
+        },
+        {},
+    )
+
+
+def test_profiler_read_parser_has_no_native_time_or_pipeline_parameters() -> None:
+    parser = waapi_gateway.build_parser()
+    subparsers = next(
+        action
+        for action in parser._actions
+        if "profiler-voice-contributions" in (getattr(action, "choices", None) or {})
+    )
+    voice = subparsers.choices["profiler-voice-contributions"]
+    options = {
+        option
+        for action in voice._actions
+        for option in action.option_strings
+    }
+
+    assert {
+        "--capture",
+        "--capture-ms",
+        "--voice-object-id",
+        "--bus-object-id",
+        "--voice-instance-handle",
+        "--bus-instance-handle",
+    } <= options
+    assert not {"--time", "--voice-pipeline-id", "--bus-pipeline-id"} & options
+
+
+def test_gateway_voice_contributions_returns_bounded_semantic_ambiguity(
+    tmp_path: Path,
+) -> None:
+    voice_id = "{11111111-1111-1111-1111-111111111111}"
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": _live_info("2025.1"),
+            GET_VOICES_URI: {
+                "return": [
+                    {
+                        "pipelineID": pipeline_id,
+                        "gameObjectID": game_object_id,
+                        "objectGUID": voice_id,
+                        "objectName": "Rain",
+                        "gameObjectName": game_object_name,
+                    }
+                    for pipeline_id, game_object_id, game_object_name in (
+                        (17, 1001, "Weather A"),
+                        (18, 1002, "Weather B"),
+                    )
+                ]
+            },
+        }
+    )
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "profiler-voice-contributions",
+            "--capture",
+            "latest",
+            "--voice-object-id",
+            voice_id,
+        ],
+        env=_gateway_env(tmp_path, "2025.1"),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 0
+    assert payload["status"] == "needs_clarification"
+    assert payload["agent_result"]["matching_voice_count"] == 2
+    assert "pipelineID" not in json.dumps(payload["agent_result"])
+    assert GET_VOICE_CONTRIBUTIONS_URI not in [call[0] for call in client.calls]
+
+
+def test_gateway_voice_contributions_rejects_malformed_identity_rows(
+    tmp_path: Path,
+) -> None:
+    voice_id = "{11111111-1111-1111-1111-111111111111}"
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": _live_info("2025.1"),
+            GET_VOICES_URI: {
+                "return": [
+                    {
+                        "pipelineID": 17,
+                        "gameObjectID": 1001,
+                        "objectGUID": voice_id,
+                        "objectName": "Rain",
+                    }
+                ]
+            },
+        }
+    )
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "profiler-voice-contributions",
+            "--capture",
+            "latest",
+            "--voice-object-id",
+            voice_id,
+        ],
+        env=_gateway_env(tmp_path, "2025.1"),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 2
+    assert payload["error_code"] == "INVALID_STABLE_READ_RESULT"
+    assert GET_VOICE_CONTRIBUTIONS_URI not in [call[0] for call in client.calls]
 
 
 @pytest.mark.parametrize("version", ["2021.1", "2024.1"])
@@ -494,34 +801,6 @@ def test_gateway_project_defaults_reports_real_2025_values(
     assert payload["agent_result"]["default_work_units"]["value"]["Events"] == work_unit
 
 
-def test_fixed_profiler_uri_rejects_generic_call_before_connect(
-    tmp_path: Path,
-) -> None:
-    factory_called = False
-
-    def factory(url: str) -> FakeClient:
-        nonlocal factory_called
-        factory_called = True
-        raise AssertionError("generic fixed-route boundary must not connect")
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        [
-            "call",
-            GET_GAME_OBJECTS_URI,
-            "--args-json",
-            '{"time":"capture"}',
-            "--options-json",
-            "{}",
-        ],
-        env=_gateway_env(tmp_path, "2022.1"),
-        client_factory=factory,
-    )
-    assert exit_code == 2
-    assert payload["error_code"] == "FIXED_COMMAND_REQUIRED"
-    assert payload["required_command"] == "profiler-game-objects"
-    assert factory_called is False
-
-
 def test_invalid_profiler_input_fails_before_connect(tmp_path: Path) -> None:
     factory_called = False
 
@@ -531,7 +810,7 @@ def test_invalid_profiler_input_fails_before_connect(tmp_path: Path) -> None:
         raise AssertionError("invalid fixed-read input must not connect")
 
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["profiler-game-objects", "--time", "latest"],
+        ["profiler-game-objects", "--capture-ms", "-1"],
         env=_gateway_env(tmp_path, "2022.1"),
         client_factory=factory,
     )

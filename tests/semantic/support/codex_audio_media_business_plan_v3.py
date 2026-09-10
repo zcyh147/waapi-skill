@@ -27,9 +27,13 @@ from tests.semantic.support.codex_audio_conversion_runtime_v3 import (
 from tests.semantic.support.codex_eval_protocol_v3 import (
     V3GatewayProtocol,
     build_direct_protocol,
+    build_operations_discovery_protocol,
     build_transaction_protocol,
     call_step,
+    media_pool_business_call_step,
     query_object_step,
+    request_schema_step,
+    typed_read_draft_steps,
 )
 from tests.semantic.support.codex_media_pool_runtime_v3 import (
     MEDIA_POOL_GET_FIELDS_URI,
@@ -269,6 +273,10 @@ def validate_audio_media_business_plan_archive(
         if sections.fixture_spec.get("kind") != "audio_conversion_materialized_v1" or sections.assertion_ids != _AUDIO_ASSERTIONS:
             raise AudioMediaBusinessPlanError("archived audio fixture kind or assertions drifted")
         expected_protocol = build_transaction_protocol([static["operation_request"]])
+        expected_protocols = (
+            expected_protocol,
+            build_operations_discovery_protocol(expected_protocol),
+        )
         expected_primary = ["tx01.execute"]
         expected_verification = ["tx01.operation-schema", "tx01.preview", "tx01.transaction-show", "tx01.confirm", "tx01.verify"]
         if live["before_snapshot_sha256"] != _archived_audio_snapshot_digest(
@@ -290,15 +298,19 @@ def validate_audio_media_business_plan_archive(
                 "archived media request shape is not closed"
             )
         steps = [
-            call_step("media.get-fields", MEDIA_POOL_GET_FIELDS_URI),
-            call_step(
-                "media.get",
+            request_schema_step("media.get-fields.schema", MEDIA_POOL_GET_FIELDS_URI),
+            call_step("media.get-fields", MEDIA_POOL_GET_FIELDS_URI, version=MEDIA_VERSION),
+        ]
+        steps.extend(
+            typed_read_draft_steps(
+                "media",
                 MEDIA_POOL_GET_URI,
+                version=MEDIA_VERSION,
                 args=request["args"],
                 options=request["options"],
                 post_filter=request["post_filter"],
-            ),
-        ]
+            )
+        )
         expected_verification = ["media.get-fields"]
         if static["association_expectations"] is not None:
             steps.append(
@@ -310,7 +322,39 @@ def validate_audio_media_business_plan_archive(
                 )
             )
             expected_verification.append("media.audio-sources")
-        expected_protocol = build_direct_protocol(steps)
+        legacy_protocol = build_direct_protocol(steps)
+        direct_steps = [
+            request_schema_step(
+                "media.get-fields.schema",
+                MEDIA_POOL_GET_FIELDS_URI,
+            ),
+            call_step(
+                "media.get-fields",
+                MEDIA_POOL_GET_FIELDS_URI,
+                version=MEDIA_VERSION,
+            ),
+            request_schema_step("media.operation-schema", MEDIA_POOL_GET_URI),
+            media_pool_business_call_step(
+                "media.get",
+                scenario_id=scenario_id,
+                args=request["args"],
+                options=request["options"],
+                post_filter=request["post_filter"],
+            ),
+        ]
+        if static["association_expectations"] is not None:
+            direct_steps.append(
+                query_object_step(
+                    "media.audio-sources",
+                    build_reference_match_gateway_argv(
+                        _archived_reference_match_paths(live)
+                    ),
+                )
+            )
+        expected_protocols = (
+            legacy_protocol,
+            build_direct_protocol(direct_steps),
+        )
         expected_primary = ["media.get"]
         if live["request_sha256"] != _sha256(
             {
@@ -328,7 +372,9 @@ def validate_audio_media_business_plan_archive(
         expected_delta = _media_archive_delta(live)
     else:  # _validate_archive_shape already rejects this, retained for type narrowing.
         raise AudioMediaBusinessPlanError("archived family schema is unknown")
-    if _protocol_value(protocol) != _protocol_value(expected_protocol):
+    if _protocol_value(protocol) not in tuple(
+        _protocol_value(expected) for expected in expected_protocols
+    ):
         raise AudioMediaBusinessPlanError("archived typed plan protocol drifted")
     if sections.payload_bindings != {"primary_steps": expected_primary, "verification_steps": expected_verification}:
         raise AudioMediaBusinessPlanError("archived primary/verification partition drifted")
@@ -510,6 +556,75 @@ def _archived_reference_match_expectations(
     return tuple(result)
 
 
+def _audio_request_with_live_object_ids(
+    expected_request: Mapping[str, Any],
+    identity_rows: Any,
+) -> Mapping[str, Any]:
+    """Resolve only sealed audio object paths to their live GUID identities."""
+
+    if not isinstance(identity_rows, list) or not identity_rows:
+        raise AudioMediaBusinessPlanError(
+            "archived conversion live object identities are unavailable"
+        )
+    ids_by_path: dict[str, set[str]] = {}
+    for row in identity_rows:
+        if not isinstance(row, Mapping):
+            raise AudioMediaBusinessPlanError(
+                "archived conversion live object identity is malformed"
+            )
+        path = row.get("object_path")
+        object_id = row.get("object_id")
+        if not isinstance(path, str) or not path or not isinstance(object_id, str) or not object_id:
+            raise AudioMediaBusinessPlanError(
+                "archived conversion live object identity is malformed"
+            )
+        ids_by_path.setdefault(path, set()).add(object_id)
+    if any(len(values) != 1 for values in ids_by_path.values()):
+        raise AudioMediaBusinessPlanError(
+            "archived conversion live object identity is ambiguous"
+        )
+
+    resolved = _plain(expected_request)
+    try:
+        objects = resolved["arguments"]["args"]["objects"]
+    except (KeyError, TypeError) as exc:
+        raise AudioMediaBusinessPlanError(
+            "archived conversion sealed request is malformed"
+        ) from exc
+    if (
+        not isinstance(objects, list)
+        or not objects
+        or any(not isinstance(path, str) or not path for path in objects)
+    ):
+        raise AudioMediaBusinessPlanError(
+            "archived conversion sealed request object identities are malformed"
+        )
+    try:
+        resolved["arguments"]["args"]["objects"] = [
+            next(iter(ids_by_path[path])) for path in objects
+        ]
+    except KeyError as exc:
+        raise AudioMediaBusinessPlanError(
+            "archived conversion live object identity is incomplete"
+        ) from exc
+    return resolved
+
+
+def audio_request_matches_resolved_object_ids(
+    actual_request: Mapping[str, Any],
+    expected_request: Mapping[str, Any],
+    identity_rows: Any,
+) -> bool:
+    """Match a sealed path request or its unique sealed live-GUID equivalent."""
+
+    if actual_request == expected_request:
+        return True
+    return actual_request == _audio_request_with_live_object_ids(
+        expected_request,
+        identity_rows,
+    )
+
+
 def validate_audio_archived_verification(sections: AudioMediaBusinessPlanSections, verification: Mapping[str, Any]) -> None:
     """Bind archived conversion-oracle evidence to the sealed pre-Codex plan."""
 
@@ -521,10 +636,20 @@ def validate_audio_archived_verification(sections: AudioMediaBusinessPlanSection
     static = sections.static_expectation
     if evidence.get("before") != live["before_snapshot"]:
         raise AudioMediaBusinessPlanError("archived conversion verification before snapshot drifted")
-    if evidence.get("operation_request") != static["operation_request"]:
+    operation_request = evidence.get("operation_request")
+    if not isinstance(operation_request, Mapping):
         raise AudioMediaBusinessPlanError("archived conversion verification request drifted")
-    if evidence.get("operation_request_sha256") != static["operation_request_sha256"]:
+    if evidence.get("operation_request_sha256") != _sha256(operation_request):
         raise AudioMediaBusinessPlanError("archived conversion verification request digest drifted")
+    expected_request = static["operation_request"]
+    if not audio_request_matches_resolved_object_ids(
+        operation_request,
+        expected_request,
+        live.get("artifact_fingerprints"),
+    ):
+        raise AudioMediaBusinessPlanError(
+            "archived conversion verification request drifted"
+        )
     if evidence.get("target_slots") != static["expected_output_count"]:
         raise AudioMediaBusinessPlanError("archived conversion verification target count drifted")
     after = evidence.get("after")
@@ -1758,7 +1883,13 @@ def _validate_audio_inputs(
     if before.digest != _audio_snapshot_digest(before):
         raise AudioMediaBusinessPlanError("audio before snapshot digest cannot be independently recomputed")
     expected_protocol = build_transaction_protocol([plan.operation_request])
-    if _protocol_value(protocol) != _protocol_value(expected_protocol):
+    expected_protocols = (
+        expected_protocol,
+        build_operations_discovery_protocol(expected_protocol),
+    )
+    if _protocol_value(protocol) not in tuple(
+        _protocol_value(expected) for expected in expected_protocols
+    ):
         raise AudioMediaBusinessPlanError("audio protocol does not exactly bind the sealed operation request")
     slots = {(item.object_path, item.platform, item.language) for item in before.artifacts}
     expected_slots = set(_audio_target_slots(plan))
@@ -1937,22 +2068,51 @@ def _validate_media_inputs(
         oracle.request.post_filter,
     ):
         raise AudioMediaBusinessPlanError("media sealed request is not independently reproducible from its field binding")
-    expected_protocol = _expected_media_protocol(case, oracle)
-    if _protocol_value(protocol) != _protocol_value(expected_protocol):
+    expected_protocols = (
+        _expected_media_protocol(case, oracle),
+        _expected_media_protocol(case, oracle, direct_business=True),
+    )
+    if json.dumps(_protocol_value(protocol), sort_keys=True) not in {
+        json.dumps(_protocol_value(expected), sort_keys=True)
+        for expected in expected_protocols
+    }:
         raise AudioMediaBusinessPlanError("media protocol does not exactly bind fields, request, and association readback")
 
 
-def _expected_media_protocol(case: MaterializedMediaPoolCase, oracle: SealedMediaPoolOracle) -> V3GatewayProtocol:
+def _expected_media_protocol(
+    case: MaterializedMediaPoolCase,
+    oracle: SealedMediaPoolOracle,
+    *,
+    direct_business: bool = False,
+) -> V3GatewayProtocol:
     steps = [
-        call_step("media.get-fields", MEDIA_POOL_GET_FIELDS_URI),
-        call_step(
-            "media.get",
-            MEDIA_POOL_GET_URI,
-            args=oracle.request.args,
-            options=oracle.request.options,
-            post_filter=oracle.request.post_filter,
-        ),
+        request_schema_step("media.get-fields.schema", MEDIA_POOL_GET_FIELDS_URI),
+        call_step("media.get-fields", MEDIA_POOL_GET_FIELDS_URI, version=MEDIA_VERSION),
     ]
+    if direct_business:
+        steps.extend(
+            (
+                request_schema_step("media.operation-schema", MEDIA_POOL_GET_URI),
+                media_pool_business_call_step(
+                    "media.get",
+                    scenario_id=case.scenario_id,
+                    args=oracle.request.args,
+                    options=oracle.request.options,
+                    post_filter=oracle.request.post_filter,
+                ),
+            )
+        )
+    else:
+        steps.extend(
+            typed_read_draft_steps(
+                "media",
+                MEDIA_POOL_GET_URI,
+                version=MEDIA_VERSION,
+                args=oracle.request.args,
+                options=oracle.request.options,
+                post_filter=oracle.request.post_filter,
+            )
+        )
     if case.association_expectations is not None:
         steps.append(
             query_object_step(
@@ -2283,6 +2443,7 @@ def _plain(value: Any) -> Any:
 
 __all__ = [
     "AudioMediaBusinessPlanError", "AudioMediaBusinessPlanSections",
+    "audio_request_matches_resolved_object_ids",
     "compile_audio_conversion_business_plan", "validate_audio_conversion_business_plan",
     "compile_media_pool_business_plan", "validate_media_pool_business_plan",
     "parse_audio_media_business_plan_sections", "validate_audio_media_business_plan_archive",

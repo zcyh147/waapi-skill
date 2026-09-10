@@ -43,6 +43,30 @@ def test_script_config_exports_expected_paths_and_targets() -> None:
     assert script_config.CORE_COVERAGE_TARGETS["manifest"] == 95
 
 
+def test_environment_ready_marker_binds_requirements_and_rejects_symlink(
+    tmp_path: Path,
+) -> None:
+    skill_root = tmp_path / "skill"
+    venv_root = skill_root / ".venv"
+    skill_root.mkdir()
+    requirements = skill_root / "requirements.txt"
+    requirements.write_text("waapi-client==0.8.1\n", encoding="utf-8")
+
+    marker = script_config.write_environment_ready_marker(venv_root, skill_root)
+
+    assert script_config.environment_is_ready(venv_root, skill_root) is True
+    requirements.write_text("waapi-client==0.8.2\n", encoding="utf-8")
+    assert script_config.environment_is_ready(venv_root, skill_root) is False
+    marker.unlink()
+    outside = tmp_path / "outside-ready-marker"
+    outside.write_text(
+        script_config.environment_ready_marker_contents(skill_root),
+        encoding="utf-8",
+    )
+    create_symlink_or_skip(marker, outside)
+    assert script_config.environment_is_ready(venv_root, skill_root) is False
+
+
 def test_run_main_without_script_prints_help(capsys: pytest.CaptureFixture[str]) -> None:
     assert run_script.main([]) == 0
     captured = capsys.readouterr()
@@ -347,9 +371,15 @@ def test_run_main_does_not_confuse_config_set_field_with_global_selector(
 def test_run_bootstrap_if_needed_invokes_setup_when_venv_missing(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr(run_script, "VENV_DIR", tmp_path / ".venv")
     invoked: list[list[str]] = []
+    observed_options: dict[str, object] = {}
 
-    def fake_run(cmd, check=True):
+    def fake_run(cmd, **options):
         invoked.append([str(part) for part in cmd])
+        observed_options.update(options)
+        script_config.write_environment_ready_marker(
+            run_script.VENV_DIR,
+            run_script.SKILL_DIR,
+        )
 
         class Result:
             returncode = 0
@@ -358,6 +388,38 @@ def test_run_bootstrap_if_needed_invokes_setup_when_venv_missing(monkeypatch: py
 
     monkeypatch.setattr(run_script.subprocess, "run", fake_run)
     run_script.bootstrap_if_needed()
+    assert invoked and invoked[0][0] == str(run_script.sys.executable)
+    assert observed_options == {
+        "check": True,
+        "stdout": run_script.sys.stderr,
+    }
+
+
+def test_run_bootstrap_repairs_existing_venv_without_ready_marker(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(run_script, "VENV_DIR", tmp_path / ".venv")
+    run_script.VENV_DIR.mkdir()
+    invoked: list[list[str]] = []
+
+    def fake_run(command, **options):
+        del options
+        invoked.append([str(part) for part in command])
+        script_config.write_environment_ready_marker(
+            run_script.VENV_DIR,
+            run_script.SKILL_DIR,
+        )
+
+        class Result:
+            returncode = 0
+
+        return Result()
+
+    monkeypatch.setattr(run_script.subprocess, "run", fake_run)
+
+    run_script.bootstrap_if_needed()
+
     assert invoked and invoked[0][0] == str(run_script.sys.executable)
 
 
@@ -498,6 +560,7 @@ def test_setup_environment_ensure_creates_venv_and_installs(monkeypatch: pytest.
     assert env.ensure() is True
     assert created and created[0] == tmp_path / ".venv"
     assert installs and "install" in installs[0]
+    assert (tmp_path / ".venv" / ".waapi-skill-ready-v1").is_file()
 
 
 def test_setup_environment_ensure_without_requirements_skips_install(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -586,7 +649,21 @@ def test_setup_environment_run_rejects_symlinked_allowlisted_target(
 def test_setup_environment_main_check_branch(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr(setup_script, "VENV_DIR", tmp_path / ".venv")
     setup_script.VENV_DIR.mkdir(parents=True)
+    script_config.write_environment_ready_marker(
+        setup_script.VENV_DIR,
+        setup_script.SKILL_DIR,
+    )
     assert setup_script.main(["--check"]) == 0
+
+
+def test_setup_environment_check_rejects_partial_existing_venv(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(setup_script, "VENV_DIR", tmp_path / ".venv")
+    setup_script.VENV_DIR.mkdir(parents=True)
+
+    assert setup_script.main(["--check"]) == 1
 
 
 def test_setup_environment_parser_exists() -> None:
@@ -601,4 +678,4 @@ def test_setup_environment_main_run_branch(monkeypatch: pytest.MonkeyPatch, tmp_
     original_class = setup_script.SkillEnvironment
     monkeypatch.setattr(original_class, "run", lambda self, script_name, args: 0)
     monkeypatch.setattr(setup_script, "SkillEnvironment", lambda: env)
-    assert setup_script.main(["--run", "setup_environment.py", "--check"]) == 0
+    assert setup_script.main(["--run", "setup_environment.py", "argument"]) == 0

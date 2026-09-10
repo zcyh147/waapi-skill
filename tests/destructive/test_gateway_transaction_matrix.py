@@ -20,15 +20,26 @@ from tests.destructive.support.live_environment import (  # pyright: ignore[repo
     path_is_under,
     resolve_sample_project_source,
 )
+from tests.destructive.support.category_evidence import (  # pyright: ignore[reportMissingImports]
+    exact_git_candidate,
+)
+from tests.destructive.support.exact_real_evidence import (  # pyright: ignore[reportMissingImports]
+    finalize_exact_real_evidence,
+)
 from tests.destructive.support.sandbox_fixture import (  # pyright: ignore[reportMissingImports]
     DEFAULT_SANDBOX_ROOT,
     LiveSandboxLock,
     SandboxFixtureError,
     SandboxProject,
-    cleanup_sandbox,
     launch_sandboxed_wwise,
     prepare_sample_project_sandbox,
     shutdown_sandboxed_wwise,
+)
+from tests.semantic.support.typed_gateway_input import (  # pyright: ignore[reportMissingImports]
+    create_object_lifecycle_business_preview,
+    create_typed_transaction_preview,
+    prepare_packaged_skill_environment,
+    typed_wait_topic_command,
 )
 from tests.semantic.support.codex_harness import (  # pyright: ignore[reportMissingImports]
     force_kill_and_reap_process,
@@ -80,6 +91,8 @@ class _GatewaySandboxRuntime:
     lifecycle: HeadlessLifecycle
     state_dir: Path
     env: dict[str, str]
+    candidate: str
+    category_results: list[dict[str, Any]]
 
     @property
     def port(self) -> int:
@@ -239,7 +252,10 @@ class _PackagedTopicWait:
 
 
 @pytest.fixture(scope="module")
-def gateway_sandbox_runtime(tmp_path_factory: pytest.TempPathFactory) -> Iterator[_GatewaySandboxRuntime]:
+def gateway_sandbox_runtime(
+    request: pytest.FixtureRequest,
+    tmp_path_factory: pytest.TempPathFactory,
+) -> Iterator[_GatewaySandboxRuntime]:
     env = dict(os.environ)
     version = env.get("WWISE_VERSION", "")
     if version not in SUPPORTED_WWISE_VERSION_KEYS:
@@ -247,13 +263,31 @@ def gateway_sandbox_runtime(tmp_path_factory: pytest.TempPathFactory) -> Iterato
             f"WWISE_VERSION must select one of {SUPPORTED_WWISE_VERSION_KEYS!r}; got {version!r}"
         )
 
+    packaged_env = dict(env)
+    packaged_env.pop(CODEX_GATEWAY_REQUIRED_ENV, None)
+    packaged_env[PYTHON_IO_ENCODING_ENV] = "utf-8:strict"
+    prepare_packaged_skill_environment(
+        python_executable=sys.executable,
+        setup_script=SKILL_ROOT / "scripts" / "setup_environment.py",
+        skill_root=SKILL_ROOT,
+        environment=packaged_env,
+    )
+
     lock = LiveSandboxLock(_safe_lock_root(env))
     sandbox: SandboxProject | None = None
     lifecycle: HeadlessLifecycle | None = None
     source_hash_before: tuple[str, int, int] | None = None
+    source_tree_before: tuple[str, int] | None = None
+    source_hash_after: tuple[str, int, int] | None = None
+    source_tree_after: tuple[str, int] | None = None
+    source_mtime_before_ns: int | None = None
+    source_mtime_after_ns: int | None = None
     deferred_error: BaseException | None = None
     task_root = tmp_path_factory.mktemp(f"gateway-transaction-{version.replace('.', '-')}")
     state_dir = task_root / "state"
+    candidate = exact_git_candidate(REPO_ROOT)
+    category_results: list[dict[str, Any]] = []
+    started_at_unix_ns = time.time_ns()
 
     lock.__enter__()
     try:
@@ -263,6 +297,8 @@ def gateway_sandbox_runtime(tmp_path_factory: pytest.TempPathFactory) -> Iterato
             hash_strategy="bounded",
         )
         source_hash_before = _hash_mutation_bearing_project_files(sandbox.source_root)
+        source_tree_before = _source_tree_inventory(sandbox.source_root)
+        source_mtime_before_ns = sandbox.source_project.stat().st_mtime_ns
         assert source_hash_before[1] > 0, "immutable SampleProject source has no .wproj/.wwu files to hash"
         lifecycle = launch_sandboxed_wwise(sandbox, env)
         assert lifecycle.port is not None
@@ -300,8 +336,11 @@ def gateway_sandbox_runtime(tmp_path_factory: pytest.TempPathFactory) -> Iterato
             lifecycle=lifecycle,
             state_dir=state_dir,
             env=gateway_env,
+            candidate=candidate,
+            category_results=category_results,
         )
     finally:
+        active_error = sys.exc_info()[1]
         if lifecycle is not None and sandbox is not None:
             try:
                 shutdown_sandboxed_wwise(lifecycle, sandbox)
@@ -311,24 +350,62 @@ def gateway_sandbox_runtime(tmp_path_factory: pytest.TempPathFactory) -> Iterato
         if sandbox is not None and source_hash_before is not None:
             try:
                 source_hash_after = _hash_mutation_bearing_project_files(sandbox.source_root)
+                source_mtime_after_ns = sandbox.source_project.stat().st_mtime_ns
                 if source_hash_after != source_hash_before:
                     raise AssertionError(
                         "immutable SampleProject source hash changed during gateway transaction test: "
                         f"before={source_hash_before[0]} after={source_hash_after[0]}"
                     )
+                if source_mtime_after_ns != source_mtime_before_ns:
+                    raise AssertionError(
+                        "immutable SampleProject project mtime changed during gateway transaction test: "
+                        f"before={source_mtime_before_ns} after={source_mtime_after_ns}"
+                    )
+                if source_tree_before is not None:
+                    source_tree_after = _source_tree_inventory(sandbox.source_root)
+                    if source_tree_after != source_tree_before:
+                        raise AssertionError(
+                            "immutable SampleProject source tree metadata changed during "
+                            f"gateway transaction test: before={source_tree_before} "
+                            f"after={source_tree_after}"
+                        )
             except BaseException as exc:  # noqa: BLE001 - sandbox cleanup still has to run
                 deferred_error = deferred_error or exc
 
-        if sandbox is not None:
+        if sandbox is not None and lifecycle is not None:
+            deferred_error = finalize_exact_real_evidence(
+                repo_root=REPO_ROOT,
+                candidate=candidate,
+                version=version,
+                request=request,
+                module_file=Path(__file__),
+                started_at_unix_ns=started_at_unix_ns,
+                active_error=active_error,
+                deferred_error=deferred_error,
+                sandbox=sandbox,
+                lock=lock,
+                state_dir=state_dir,
+                host={
+                    "display_name": sandbox.metadata.get_info_display_name,
+                    "is_command_line": True,
+                    "version": sandbox.metadata.get_info_version,
+                },
+                categories=category_results,
+                source={
+                    "project": str(sandbox.source_project),
+                    "hash_before": source_hash_before[0] if source_hash_before else None,
+                    "hash_after": source_hash_after[0] if source_hash_after else None,
+                    "mtime_before_ns": source_mtime_before_ns,
+                    "mtime_after_ns": source_mtime_after_ns,
+                    "tree_metadata_before": source_tree_before[0] if source_tree_before else None,
+                    "tree_metadata_after": source_tree_after[0] if source_tree_after else None,
+                },
+            )
+        else:
             try:
-                cleanup_sandbox(sandbox, keep=False, failed=False)
-            except BaseException as exc:  # noqa: BLE001 - lock release must still run
+                lock.__exit__(None, None, None)
+            except BaseException as exc:  # noqa: BLE001
                 deferred_error = deferred_error or exc
-
-        try:
-            lock.__exit__(None, None, None)
-        except BaseException as exc:  # noqa: BLE001 - preserve the first teardown failure
-            deferred_error = deferred_error or exc
 
         if deferred_error is not None:
             raise deferred_error
@@ -350,18 +427,11 @@ def test_gateway_transaction_object_lifecycle_across_selected_version(
         CONTAINERS_PARENT if runtime.version == "2025.1" else ACTOR_MIXER_PARENT
     )
 
-    create = _complete_transaction(
+    create = _complete_business_object_create(
         runtime,
-        operation="object.create",
-        arguments={
-            "parent": {
-                "kind": "path",
-                "value": parent_path,
-            },
-            "type": "ActorMixer",
-            "name": object_name,
-            "notes": initial_notes,
-        },
+        parent_segments=_object_parent_segments(runtime.version),
+        name=object_name,
+        notes=initial_notes,
     )
     created_id = _created_object_id(create["execute"])
 
@@ -393,7 +463,10 @@ def test_gateway_transaction_object_lifecycle_across_selected_version(
         assert str(renamed_row["id"]).casefold() == created_id.casefold(), renamed_row
         assert renamed_row["name"] == renamed_object_name, renamed_row
         assert renamed_row["path"] == f"{parent_path}\\{renamed_object_name}", renamed_row
-        _assert_query_object_absent(runtime, selector=("--path", created_path))
+        _assert_query_object_absent(
+            runtime,
+            path_segments=(*_object_parent_segments(runtime.version), object_name),
+        )
 
         _complete_transaction(
             runtime,
@@ -429,14 +502,14 @@ def test_gateway_transaction_object_lifecycle_across_selected_version(
         assert property_row["name"] == renamed_object_name, property_row
         assert property_row["path"] == f"{parent_path}\\{renamed_object_name}", property_row
         assert property_row["notes"] == updated_notes, property_row
-        assert float(property_row["Volume"]) == pytest.approx(expected_volume), property_row
+        assert float(property_row["volume_db"]) == pytest.approx(expected_volume), property_row
     finally:
         _complete_transaction(
             runtime,
             operation="object.delete",
             arguments={"object": {"kind": "id", "value": created_id}},
         )
-        _assert_query_object_absent(runtime, selector=("--object-id", created_id))
+        _assert_query_object_absent(runtime, exact_id=created_id)
 
 
 @pytest.mark.live
@@ -453,38 +526,24 @@ def test_gateway_wait_topic_matches_runner_owned_object_create_and_unsubscribes(
     created_id: str | None = None
     topic_wait = _start_packaged_topic_wait(
         runtime,
-        [
-            "wait-topic",
-            topic_uri,
-            "--options-json",
-            '{"return":["id","name","type","path"]}',
-            "--match-json",
-            json.dumps(
-                {"object": {"type": event_object_type}},
-                separators=(",", ":"),
-            ),
-        ],
+        typed_wait_topic_command(
+            name="destructive.gateway.wait-topic",
+            topic=topic_uri,
+            version=runtime.version,
+            event_count=1,
+            options={"return": ["id", "name", "type", "path"]},
+            match={"object": {"type": event_object_type}},
+        ),
         topic=topic_uri,
     )
     try:
         ack = topic_wait.wait_until_subscribed()
         assert ack["topic"] == topic_uri
-        created = _complete_transaction(
+        created = _complete_business_object_create(
             runtime,
-            operation="object.create",
-            arguments={
-                "parent": {
-                    "kind": "path",
-                    "value": (
-                        CONTAINERS_PARENT
-                        if runtime.version == "2025.1"
-                        else ACTOR_MIXER_PARENT
-                    ),
-                },
-                "type": "ActorMixer",
-                "name": object_name,
-                "notes": "runner-owned packaged wait-topic probe",
-            },
+            parent_segments=_object_parent_segments(runtime.version),
+            name=object_name,
+            notes="runner-owned packaged wait-topic probe",
         )
         created_id = _created_object_id(created["execute"])
         topic = topic_wait.finish()
@@ -500,6 +559,9 @@ def test_gateway_wait_topic_matches_runner_owned_object_create_and_unsubscribes(
         assert isinstance(event_object, Mapping), event
         assert event_object.get("type") == event_object_type, event_object
         assert str(event_object.get("id", "")).casefold() == created_id.casefold(), event_object
+        runtime.category_results.append(
+            {"category": "topic", "status": "PASS", "verifier_strength": "exact_event_and_cleanup"}
+        )
     finally:
         topic_wait.close()
         if created_id is not None:
@@ -510,7 +572,7 @@ def test_gateway_wait_topic_matches_runner_owned_object_create_and_unsubscribes(
             )
             _assert_query_object_absent(
                 runtime,
-                selector=("--object-id", created_id),
+                exact_id=created_id,
             )
 
 
@@ -703,13 +765,145 @@ def _complete_transaction(
         "operation": operation,
         "arguments": dict(arguments),
     }
-    preview = runtime.gateway(
-        ["preview", "--request-json", json.dumps(request, ensure_ascii=False), "--ttl", "900"],
+    if operation in {"object.delete", "object.setName", "object.setNotes"}:
+        object_identity = arguments.get("object")
+        assert isinstance(object_identity, Mapping), arguments
+        assert object_identity.get("kind") == "id", arguments
+        object_id = object_identity.get("value")
+        assert isinstance(object_id, str) and object_id, arguments
+        scalar_value = arguments.get("value")
+        if operation != "object.delete":
+            assert isinstance(scalar_value, str), arguments
+        preview = create_object_lifecycle_business_preview(
+            lambda command: runtime.gateway(
+                command,
+                live=command[0]
+                in {"draft-bind-object", "draft-check", "preview-from-draft"},
+            ),
+            version=runtime.version,
+            operation=operation,
+            object_id=object_id,
+            new_name=scalar_value if operation == "object.setName" else None,
+            notes=scalar_value if operation == "object.setNotes" else None,
+        )
+    else:
+        preview = create_typed_transaction_preview(
+            lambda command: runtime.gateway(
+                command,
+                live=command[0]
+                in {"draft-check", "preview-from-draft", "typed-call", "typed-operation"},
+            ),
+            request,
+        )
+    return _finish_transaction_preview(
+        runtime,
+        operation=operation,
+        preview=preview,
+        expected_request=request,
+    )
+
+
+def _complete_business_object_create(
+    runtime: _GatewaySandboxRuntime,
+    *,
+    parent_segments: Sequence[str],
+    name: str,
+    notes: str,
+) -> dict[str, Mapping[str, Any]]:
+    started = runtime.gateway(["draft-start", "object.create"], live=False)
+    draft = started.get("draft")
+    assert isinstance(draft, Mapping), started
+    draft_id = draft.get("draft_id")
+    task_authority = started.get("task_authority")
+    revision = draft.get("revision")
+    assert isinstance(draft_id, str) and draft_id, started
+    assert isinstance(task_authority, str) and task_authority, started
+    assert isinstance(revision, int), started
+
+    def update(
+        command: str,
+        arguments: Sequence[str] = (),
+        *,
+        live: bool,
+    ) -> dict[str, Any]:
+        nonlocal revision
+        payload = runtime.gateway(
+            [
+                command,
+                draft_id,
+                "--task-authority",
+                task_authority,
+                "--expected-revision",
+                str(revision),
+                *arguments,
+            ],
+            live=live,
+        )
+        projection = payload.get("draft")
+        if isinstance(projection, Mapping):
+            next_revision = projection.get("revision")
+            assert isinstance(next_revision, int), payload
+            revision = next_revision
+        return payload
+
+    bound = update(
+        "draft-bind-object",
+        [
+            item
+            for segment in parent_segments
+            for item in ("--object-path-segment", segment)
+        ],
         live=True,
     )
+    bound_object = bound.get("bound_object")
+    assert isinstance(bound_object, Mapping), bound
+    parent_handle = bound_object.get("handle")
+    assert isinstance(parent_handle, str) and parent_handle, bound
+
+    update(
+        "draft-declare-new",
+        [
+            "--declaration-id",
+            "created-object",
+            "--parent-handle",
+            parent_handle,
+            "--name",
+            name,
+            "--kind",
+            "actor-mixer",
+            "--field",
+            "notes",
+            notes,
+        ],
+        live=False,
+    )
+    update("draft-check", live=True)
+    preview = update("preview-from-draft", live=True)
+    return _finish_transaction_preview(
+        runtime,
+        operation="object.create",
+        preview=preview,
+        expected_request=None,
+    )
+
+
+def _finish_transaction_preview(
+    runtime: _GatewaySandboxRuntime,
+    *,
+    operation: str,
+    preview: Mapping[str, Any],
+    expected_request: Mapping[str, Any] | None,
+) -> dict[str, Mapping[str, Any]]:
     assert preview["status"] == TransactionState.AWAITING_CONFIRMATION.value
     assert preview["state"] == TransactionState.AWAITING_CONFIRMATION.value
-    assert preview["preview_summary"]["request"] == request
+    preview_request = preview["preview_summary"]["request"]
+    assert isinstance(preview_request, Mapping), preview
+    if expected_request is not None:
+        assert preview_request == expected_request
+    else:
+        assert preview_request["contract"] == OPERATION_REQUEST_CONTRACT
+        assert preview_request["version"] == runtime.version
+        assert preview_request["operation"] == operation
     assert preview["preview_summary"]["dispatch"]["uri"].startswith("ak.wwise.")
     assert preview["executed"] is False
     assert preview["verified"] is False
@@ -719,8 +913,16 @@ def _complete_transaction(
     assert isinstance(transaction_id, str) and transaction_id
     assert isinstance(artifact_hash, str) and len(artifact_hash) == 64
 
+    shown = runtime.gateway(
+        ["transaction-show", transaction_id, "--summary-only"],
+        live=False,
+    )
+    confirmation = shown.get("confirmation")
+    assert isinstance(confirmation, Mapping), shown
+    confirmation_token = confirmation.get("token")
+    assert isinstance(confirmation_token, str) and confirmation_token, shown
     confirmed = runtime.gateway(
-        ["confirm", transaction_id, "--artifact-hash", artifact_hash],
+        ["confirm", transaction_id, "--confirmation-token", confirmation_token],
         live=False,
     )
     assert confirmed["offline"] is True
@@ -756,6 +958,14 @@ def _complete_transaction(
     return {"preview": preview, "execute": executed, "verify": verified}
 
 
+def _object_parent_segments(version: str) -> tuple[str, str]:
+    return (
+        ("Containers", "Default Work Unit")
+        if version == "2025.1"
+        else ("Actor-Mixer Hierarchy", "Default Work Unit")
+    )
+
+
 def _created_object_id(executed: Mapping[str, Any]) -> str:
     dispatch_result = executed.get("dispatch_result")
     assert isinstance(dispatch_result, Mapping), executed
@@ -772,9 +982,12 @@ def _query_one_object_by_id(
     *,
     fields: Sequence[str],
 ) -> Mapping[str, Any]:
-    command = ["query-object", "--object-id", object_id]
+    command = ["query-object", "--exact-id", object_id]
+    business_includes = {"notes": "notes", "Volume": "volume-db"}
     for field in fields:
-        command.extend(("--return-field", field))
+        include = business_includes.get(field)
+        if include is not None:
+            command.extend(("--include", include))
     payload = runtime.gateway(command, live=True)
     objects = payload.get("objects")
     assert payload.get("count") == 1, payload
@@ -787,21 +1000,19 @@ def _query_one_object_by_id(
 def _assert_query_object_absent(
     runtime: _GatewaySandboxRuntime,
     *,
-    selector: Sequence[str],
+    exact_id: str | None = None,
+    path_segments: Sequence[str] = (),
 ) -> None:
-    assert len(selector) == 2 and selector[0] in {"--object-id", "--path"}, selector
+    assert (exact_id is None) != (not path_segments), (exact_id, path_segments)
+    selector = ["--exact-id", exact_id] if exact_id is not None else [
+        item
+        for segment in path_segments
+        for item in ("--path-segment", segment)
+    ]
     payload = runtime.gateway(
         [
             "query-object",
             *selector,
-            "--return-field",
-            "id",
-            "--return-field",
-            "name",
-            "--return-field",
-            "type",
-            "--return-field",
-            "path",
         ],
         live=True,
     )
@@ -841,3 +1052,22 @@ def _hash_mutation_bearing_project_files(root: Path) -> tuple[str, int, int]:
         digest.update(b"\0")
         bytes_hashed += len(data)
     return digest.hexdigest(), len(files), bytes_hashed
+
+
+def _source_tree_inventory(root: Path) -> tuple[str, int]:
+    digest = hashlib.sha256()
+    paths = sorted(root.rglob("*"))
+    for path in paths:
+        metadata = path.lstat()
+        digest.update(path.relative_to(root).as_posix().encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(str(metadata.st_mode).encode("ascii"))
+        digest.update(b"\0")
+        digest.update(str(metadata.st_size).encode("ascii"))
+        digest.update(b"\0")
+        digest.update(str(metadata.st_mtime_ns).encode("ascii"))
+        digest.update(b"\0")
+        if path.is_symlink():
+            digest.update(os.readlink(path).encode("utf-8"))
+            digest.update(b"\0")
+    return digest.hexdigest(), len(paths)

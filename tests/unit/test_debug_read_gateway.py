@@ -6,6 +6,8 @@ import sys
 from pathlib import Path
 from typing import Any, Mapping
 
+import pytest
+
 
 SCRIPT_PATH = (
     Path(__file__).resolve().parents[2]
@@ -25,8 +27,14 @@ SPEC.loader.exec_module(waapi_gateway)
 
 
 class FakeClient:
-    def __init__(self, responses: Mapping[str, Any]) -> None:
+    def __init__(
+        self,
+        responses: Mapping[str, Any],
+        *,
+        errors: Mapping[str, BaseException] | None = None,
+    ) -> None:
         self.responses = dict(responses)
+        self.errors = dict(errors or {})
         self.calls: list[
             tuple[str, Mapping[str, Any] | None, Mapping[str, Any] | None]
         ] = []
@@ -39,10 +47,19 @@ class FakeClient:
         options: Mapping[str, Any] | None = None,
     ) -> Any:
         self.calls.append((uri, args, options))
+        if uri in self.errors:
+            raise self.errors[uri]
         return self.responses[uri]
 
     def disconnect(self) -> None:
         self.disconnected = True
+
+
+class WaapiRequestFailed(Exception):
+    def __init__(self, uri: str, kwargs: Mapping[str, Any] | None = None) -> None:
+        super().__init__("untrusted rendered application error")
+        self.uri = uri
+        self.kwargs = kwargs
 
 
 def _live_info(version: str) -> dict[str, Any]:
@@ -82,12 +99,14 @@ def _gateway_env(tmp_path: Path, version: str) -> dict[str, str]:
     }
 
 
+@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
 def test_debug_wal_tree_dispatches_one_closed_bounded_request(
     tmp_path: Path,
+    version: str,
 ) -> None:
     client = FakeClient(
         {
-            "ak.wwise.core.getInfo": _live_info("2025.1"),
+            "ak.wwise.core.getInfo": _live_info(version),
             "ak.wwise.debug.getWalTree": {
                 "return": {
                     "nodes": {
@@ -100,8 +119,8 @@ def test_debug_wal_tree_dispatches_one_closed_bounded_request(
     )
 
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["debug-wal-tree", "--take", "1"],
-        env=_gateway_env(tmp_path, "2025.1"),
+        ["debug-wal-tree", "--max-nodes", "1"],
+        env=_gateway_env(tmp_path, version),
         client_factory=lambda url: client,
     )
 
@@ -122,9 +141,131 @@ def test_debug_wal_tree_dispatches_one_closed_bounded_request(
     assert client.disconnected is True
 
 
-def test_debug_validate_call_sends_only_user_supplied_validation_sections(
+def test_debug_parser_exposes_only_business_boundaries() -> None:
+    parser = waapi_gateway.build_parser()
+    subparsers = next(
+        action
+        for action in parser._actions
+        if "debug-wal-tree" in (getattr(action, "choices", None) or {})
+    )
+    wal = subparsers.choices["debug-wal-tree"]
+    validate = subparsers.choices["debug-validate-call"]
+    wal_options = {
+        option for action in wal._actions for option in action.option_strings
+    }
+    validate_options = {
+        option for action in validate._actions for option in action.option_strings
+    }
+
+    assert "--max-nodes" in wal_options
+    assert "--take" not in wal_options
+    assert "--artifact-file" in validate_options
+    assert not {
+        "--schema-digest",
+        "--set",
+        "--map-put",
+        "--args-json",
+        "--options-json",
+        "--result-json",
+    } & validate_options
+
+
+@pytest.mark.parametrize("version", ("2024.1", "2025.1"))
+def test_debug_validate_call_validates_target_without_executing_it(
+    tmp_path: Path,
+    version: str,
+) -> None:
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": _live_info(version),
+            "ak.wwise.debug.validateCall": {},
+        }
+    )
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["debug-validate-call", "ak.wwise.core.getProjectInfo"],
+        env=_gateway_env(tmp_path, version),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 0, payload
+    assert payload["agent_result"] == {
+        "validated_api": "ak.wwise.core.getProjectInfo",
+        "supplied_sections": [],
+        "accepted_by_wwise": True,
+    }
+    assert client.calls == [
+        ("ak.wwise.core.getInfo", None, None),
+        (
+            "ak.wwise.debug.validateCall",
+            {"id": "ak.wwise.core.getProjectInfo"},
+            {},
+        ),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("version", "command", "uri"),
+    (
+        ("2023.1", ["debug-wal-tree", "--max-nodes", "1"], "ak.wwise.debug.getWalTree"),
+        (
+            "2025.1",
+            ["debug-validate-call", "ak.wwise.core.getProjectInfo"],
+            "ak.wwise.debug.validateCall",
+        ),
+    ),
+)
+def test_debug_reads_report_release_build_boundary(
+    tmp_path: Path,
+    version: str,
+    command: list[str],
+    uri: str,
+) -> None:
+    client = FakeClient(
+        {"ak.wwise.core.getInfo": _live_info(version)},
+        errors={
+            uri: WaapiRequestFailed(
+                "ak.wwise.invalid_procedure_uri",
+                {
+                    "details": {"procedureUri": uri},
+                    "message": "The procedure URI is unknown.",
+                },
+            )
+        },
+    )
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        command,
+        env=_gateway_env(tmp_path, version),
+        client_factory=lambda url: client,
+    )
+
+    assert exit_code == 0, payload
+    assert payload["ok"] is True
+    assert payload["status"] == "unsupported_boundary"
+    assert payload["error_code"] == "DEBUG_BUILD_REQUIRED"
+    assert payload["executed"] is False
+    assert payload["call"]["waapi_error_uri"] == "ak.wwise.invalid_procedure_uri"
+    assert payload["agent_result"] is None
+    assert list(payload)[-1] == "agent_result"
+    assert client.calls[-1][0] == uri
+    assert client.disconnected is True
+
+
+def test_debug_validate_call_preserves_user_owned_exact_artifact(
     tmp_path: Path,
 ) -> None:
+    artifact = tmp_path / "call.json"
+    artifact.write_text(
+        json.dumps(
+            {
+                "args": {"from": {"id": ["{11111111-1111-1111-1111-111111111111}"]}},
+                "options": {"return": ["id", "name"]},
+                "result": {"return": []},
+            }
+        ),
+        encoding="utf-8",
+    )
     client = FakeClient(
         {
             "ak.wwise.core.getInfo": _live_info("2025.1"),
@@ -135,46 +276,56 @@ def test_debug_validate_call_sends_only_user_supplied_validation_sections(
     exit_code, payload = waapi_gateway.execute_gateway(
         [
             "debug-validate-call",
-            "ak.wwise.core.getInfo",
-            "--args-json",
-            "{}",
+            "ak.wwise.core.object.get",
+            "--artifact-file",
+            str(artifact),
         ],
         env=_gateway_env(tmp_path, "2025.1"),
         client_factory=lambda url: client,
     )
 
-    assert exit_code == 0
-    assert payload["ok"] is True
-    assert payload["agent_result"] == {
-        "validated_api": "ak.wwise.core.getInfo",
-        "supplied_sections": ["args"],
-        "accepted_by_wwise": True,
-    }
-    assert list(payload)[-1] == "agent_result"
-    assert client.calls == [
-        ("ak.wwise.core.getInfo", None, None),
-        (
-            "ak.wwise.debug.validateCall",
-            {"id": "ak.wwise.core.getInfo", "args": {}},
-            {},
-        ),
+    assert exit_code == 0, payload
+    assert payload["artifact"]["authority"] == "user_owned_exact_artifact"
+    assert payload["agent_result"]["supplied_sections"] == [
+        "args",
+        "options",
+        "result",
     ]
+    assert client.calls[-1] == (
+        "ak.wwise.debug.validateCall",
+        {
+            "id": "ak.wwise.core.object.get",
+            "args": {"from": {"id": ["{11111111-1111-1111-1111-111111111111}"]}},
+            "options": {"return": ["id", "name"]},
+            "result": {"return": []},
+        },
+        {},
+    )
 
 
-def test_debug_validate_call_fails_closed_when_absent_in_the_version(
+def test_debug_validate_call_rejects_non_object_artifact_before_connect(
     tmp_path: Path,
 ) -> None:
-    client = FakeClient({"ak.wwise.core.getInfo": _live_info("2023.1")})
+    artifact = tmp_path / "call.json"
+    artifact.write_text('{"args": []}', encoding="utf-8")
+    connected = False
+
+    def factory(url: str) -> FakeClient:
+        nonlocal connected
+        connected = True
+        raise AssertionError("invalid exact artifact must fail before connect")
 
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["debug-validate-call", "ak.wwise.core.getInfo"],
-        env=_gateway_env(tmp_path, "2023.1"),
-        client_factory=lambda url: client,
+        [
+            "debug-validate-call",
+            "ak.wwise.core.object.get",
+            "--artifact-file",
+            str(artifact),
+        ],
+        env=_gateway_env(tmp_path, "2025.1"),
+        client_factory=factory,
     )
 
     assert exit_code == 2
-    assert payload["ok"] is False
-    assert payload["status"] == "unsupported_by_skill_interface"
-    assert payload["api"] == "ak.wwise.debug.validateCall"
-    assert client.calls == [("ak.wwise.core.getInfo", None, None)]
-    assert client.disconnected is True
+    assert payload["error_code"] == "GatewayInputError"
+    assert connected is False

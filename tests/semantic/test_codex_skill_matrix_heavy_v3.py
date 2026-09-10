@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass, replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -123,6 +124,49 @@ def test_parse_args_preserves_v2_defaults_and_selects_v3_defaults(
     assert heavy.model == "gpt-5.6-terra"
     assert heavy.reasoning_effort == "medium"
     assert heavy.service_tier == "default"
+
+
+def test_heavy_run_config_records_readiness_timeout(tmp_path: Path) -> None:
+    options = replace(
+        _options(tmp_path),
+        wwise_readiness_timeout_seconds=180.0,
+    )
+
+    config = matrix._heavy_v3_run_config(
+        options,
+        unit_rows=(),
+        records=(),
+        run_errors=(),
+        stop_reason="",
+        preflight_state="passed",
+        started_at="2026-08-26T00:00:00Z",
+        completed_at="2026-08-26T00:00:01Z",
+    )
+
+    assert config["wwise_readiness_timeout_seconds"] == 180.0
+
+
+def test_public_integration_delegates_first_use_prose_to_dedicated_profile(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        matrix,
+        "resolve_codex_binary",
+        lambda _value: Path("/synthetic-host/codex"),
+    )
+
+    options = matrix.parse_args(
+        [
+            "--profile",
+            matrix.INTEGRATION_PROFILE_ID,
+            "--model",
+            "gpt-5.6-terra",
+            "--service-tier",
+            "default",
+        ]
+    )
+
+    assert options.require_first_use_intro is False
 
 
 @pytest.mark.parametrize("forbidden", [("--offline-only",), ("--pair-id", "pair-1")])
@@ -356,6 +400,8 @@ def test_project_dispatch_passes_closed_runtime_options_without_starting_it(
         timeout_seconds: float
         live_environment: Mapping[str, str]
         windows_powershell_core_host: Any = None
+        developer_instructions: str = ""
+        require_first_use_intro: bool = True
 
     def fake_run(value: _Unit, *, scenario_root: Path, options: FakeOptions):
         observed.update(unit=value, root=scenario_root, options=options)
@@ -384,6 +430,71 @@ def test_project_dispatch_passes_closed_runtime_options_without_starting_it(
     assert runtime_options.live_environment["WWISE_TEST_CONFIG"] == str(
         options.live_config
     )
+    assert runtime_options.developer_instructions == ""
+    assert runtime_options.require_first_use_intro is True
+
+
+@pytest.mark.parametrize(
+    "profile",
+    [matrix.TYPED_INPUT_PROFILE_ID, matrix.INTEGRATION_PROFILE_ID],
+)
+def test_agent_facing_project_dispatch_seals_pre_action_developer_instructions(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    profile: str,
+) -> None:
+    options = replace(_options(tmp_path), profile=profile)
+    unit = _Unit(
+        "TYP21-ZERO-GET-INFO",
+        "2021.1",
+        _Scenario("ak.wwise.core.getInfo"),
+    )
+    observed: dict[str, Any] = {}
+
+    @dataclass(frozen=True, slots=True)
+    class FakeOptions:
+        skill_source: Path
+        codex_binary: Path
+        auth_json: Path
+        model: str
+        reasoning_effort: str
+        service_tier: str
+        timeout_seconds: float
+        live_environment: Mapping[str, str]
+        windows_powershell_core_host: Any = None
+        developer_instructions: str = ""
+        require_first_use_intro: bool = True
+
+    def fake_run(value: _Unit, *, scenario_root: Path, options: FakeOptions):
+        observed.update(options=options)
+        return _Outcome(value.unit_id, value.version, "PASS")
+
+    module = SimpleNamespace(
+        PROJECT_RUNNER_APIS={"ak.wwise.core.getInfo"},
+        PROJECT_RUNNER_MODEL_RESOLVED_REQUEST_FIELDS={},
+        HeavyProjectRunnerOptions=FakeOptions,
+        run_heavy_project_unit=fake_run,
+    )
+    monkeypatch.setattr(matrix.importlib, "import_module", lambda _name: module)
+
+    outcome = matrix.run_heavy_v3_unit(
+        unit,
+        scenario_root=tmp_path / "case",
+        options=options,
+    )
+
+    assert outcome.passed
+    developer_instructions = observed["options"].developer_instructions
+    assert developer_instructions.startswith(
+        matrix.SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS
+    )
+    runner = options.skill_source / "scripts" / "run.py"
+    expected_prefix = (
+        f"python '{runner}' 'gateway.py'"
+        if os.name == "nt"
+        else f"python {runner} gateway.py"
+    )
+    assert expected_prefix in developer_instructions
 
 
 def test_audio_convert_hidden_io_root_is_blocked_before_runner_execution(

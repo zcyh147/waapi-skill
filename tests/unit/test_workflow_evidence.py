@@ -105,6 +105,25 @@ def test_audio_import_business_evidence_accepts_versioned_structural_proof(
     )
 
 
+def test_2021_audio_import_uses_result_bound_source_when_accessor_is_absent() -> None:
+    execution, verification = _audio_case("2021.1")
+    execution["dispatch_result"]["result"]["objects"][0].pop("activeSource")
+    verification["readbacks"][0]["result"]["return"][0].pop("activeSource")
+    execution["dispatch_result"]["result"]["objects"][1]["parent"] = {
+        "id": TARGET_ID
+    }
+
+    validate_audio_import_business_evidence(
+        execution=execution,
+        verification=verification,
+        version="2021.1",
+        expected_target_path=TARGET_PATH,
+        expected_target_id=TARGET_ID,
+        expected_notes=NOTES,
+        source_file="/fixtures/source.wav",
+    )
+
+
 @pytest.mark.parametrize(
     ("tamper", "message"),
     [

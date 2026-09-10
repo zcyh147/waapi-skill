@@ -8,6 +8,7 @@ import pytest  # pyright: ignore[reportMissingImports]
 
 from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImports]
     OPERATION_REQUEST_CONTRACT,
+    OPERATION_SPECS,
     OperationContractError,
     _is_rtpc_control_input,
     _read_rtpc_rows_with_evidence,
@@ -260,7 +261,10 @@ def test_set_linked_uses_is_linked_for_prestate_and_postcondition() -> None:
     assert verified.ok
 
 
-def test_rtpc_add_materializes_only_the_closed_append_shape_and_verifies_full_list() -> None:
+@pytest.mark.parametrize("version", ("2022.1", "2023.1", "2024.1", "2025.1"))
+def test_rtpc_add_materializes_only_the_closed_append_shape_and_verifies_full_list(
+    version: str,
+) -> None:
     points = [
         {"x": 0, "y": -20.0, "shape": "Linear"},
         {"x": 100, "y": 0.0, "shape": "SCurve"},
@@ -275,7 +279,7 @@ def test_rtpc_add_materializes_only_the_closed_append_shape_and_verifies_full_li
                 "points": points,
                 "notes": "Distance curve",
             },
-            version="2022.1",
+            version=version,
         )
     )
     prepare_reader = ScriptedReader(
@@ -679,6 +683,18 @@ def test_rtpc_update_targets_existing_rtpc_without_replace_all() -> None:
     assert verified.ok
 
 
+def test_rtpc_mode_schema_maps_replace_or_add_business_wording() -> None:
+    spec = OPERATION_SPECS["object.setRTPC"]
+    mode = spec.argument_contract["properties"]["mode"]
+
+    assert mode["x-discloseDescription"] is True
+    assert mode["description"] == (
+        "Use add_or_replace when the user asks to replace the matching RTPC if "
+        "present and add it if absent; use add only when an existing exact "
+        "property and ControlInput match must fail."
+    )
+
+
 def test_rtpc_add_fails_before_dispatch_when_complete_list_is_at_capacity() -> None:
     parsed = parse_operation_request(
         _request(
@@ -928,7 +944,9 @@ def test_capture_screen_maps_the_stable_view_channel_and_verifies_image(
         read_call=lambda *_: {},
     )
     assert verified.ok
-    assert verified.business_state_verified is True
+    assert verified.status == "result_schema_checked"
+    assert verified.verification_strength == "result_schema_only"
+    assert verified.business_state_verified is False
 
 
 @pytest.mark.parametrize(

@@ -22,6 +22,9 @@ from tests.semantic.support.codex_eval_bundle_v3 import (
 from tests.semantic.support.codex_compound_heavy_v1 import (
     load_compound_heavy_profile,
 )
+from tests.semantic.support.codex_typed_input_profile import (
+    load_typed_input_profile,
+)
 from tests.semantic.support.codex_import_assets_v3 import (
     MaterializedImportCase,
     bind_import_live_metadata,
@@ -60,10 +63,230 @@ COMPOUND_PROFILE = (
     / "compound-heavy-v1"
     / "profile.json"
 )
+TYPED_PROFILE = (
+    REPO_ROOT / "tests" / "semantic" / "data" / "typed-input-v1" / "profile.json"
+)
 IMPORT_APIS = {
     "ak.wwise.core.audio.import",
     "ak.wwise.core.audio.importTabDelimited",
 }
+
+
+def test_ordinary_import_runtime_accepts_the_reviewed_2021_profile_lane(
+    tmp_path: Path,
+) -> None:
+    version = "2021.1"
+    profile = load_typed_input_profile(TYPED_PROFILE)
+    unit = next(
+        item
+        for item in profile.units
+        if item.unit_id == "TYP21-FILE-AUDIO-IMPORT"
+    )
+    scenario = unit.scenario
+    assert "清单列出的六行就是完整范围" in scenario.prompt
+    assert "逐字使用" in scenario.prompt
+    assert "audio_file" in scenario.prompt
+    assert "不要重定位" in scenario.prompt
+    materialized = materialize_import_case(
+        scenario,
+        version=version,
+        asset_root=tmp_path / version,
+    )
+    project = tmp_path / "SampleProject.wproj"
+    project.write_text("<WwiseDocument/>", encoding="utf-8")
+
+    plan = build_import_runtime_plan(
+        scenario,
+        materialized,
+        sandbox_project=project,
+    )
+
+    assert plan.version == version
+
+
+def test_ordinary_import_runtime_resolves_2021_audio_source_without_active_source(
+    tmp_path: Path,
+) -> None:
+    version = "2021.1"
+    profile = load_typed_input_profile(TYPED_PROFILE)
+    unit = next(
+        item
+        for item in profile.units
+        if item.unit_id == "TYP21-FILE-AUDIO-IMPORT"
+    )
+    sandbox_root = tmp_path / "sandbox"
+    sandbox_root.mkdir()
+    project = sandbox_root / "SampleProject.wproj"
+    project.write_text("<WwiseDocument/>", encoding="utf-8")
+    materialized = materialize_import_case(
+        unit.scenario,
+        version=version,
+        asset_root=tmp_path / "assets",
+    )
+    class _LegacyBackend(_FakeImportBackend):
+        def read_objects(self, **kwargs):
+            unsupported = {"activeSource", "originalFilePath"}.intersection(
+                kwargs.get("fields", ())
+            )
+            if unsupported:
+                raise ImportRuntimeError(
+                    "Unknown accessor " + sorted(unsupported)[0]
+                )
+            return super().read_objects(**kwargs)
+
+        def read_direct_children(self, object_id, *, fields):
+            # Real Wwise 2021.1 scopes this result to direct children but does
+            # not echo the requested parent accessor on AudioFileSource rows.
+            return tuple(
+                {key: value for key, value in row.items() if key != "parent"}
+                for row in super().read_direct_children(object_id, fields=fields)
+            )
+
+    backend = _LegacyBackend(sandbox_root, version=version)
+
+    runtime = prepare_import_runtime(
+        unit.scenario,
+        materialized,
+        sandbox_project=project,
+        backend=backend,
+    )
+
+    assert runtime.hidden_before is not None
+    assert all(
+        row.object is None or row.object.audio_source is not None
+        for row in runtime.hidden_before.rows
+    )
+
+    class _InactiveLegacySourceBackend(_LegacyBackend):
+        def read_direct_children(self, object_id, *, fields):
+            rows = super().read_direct_children(object_id, fields=fields)
+            source = next(
+                (row for row in rows if row.get("type") == "AudioFileSource"),
+                None,
+            )
+            if source is None:
+                return rows
+            duplicate = dict(source)
+            duplicate["id"] = _guid(999)
+            duplicate["name"] = str(source["name"]) + "_duplicate"
+            duplicate["path"] = str(source["path"]) + "_duplicate"
+            return (*rows, duplicate)
+
+    # Wwise 2021 useExisting legitimately retains older direct sources.  The
+    # saved ActiveSourceList, rather than child count, chooses the live source.
+    runtime_with_inactive = prepare_import_runtime(
+        unit.scenario,
+        materialized,
+        sandbox_project=project,
+        backend=_InactiveLegacySourceBackend(sandbox_root, version=version),
+    )
+    assert runtime_with_inactive.hidden_before is not None
+
+    class _UnknownActiveSourceBackend(_LegacyBackend):
+        def save_project(self) -> None:
+            super().save_project()
+            document = ET.parse(self.sandbox_root / "Generated.wwu")
+            active = document.find(".//ActiveSource")
+            assert active is not None
+            active.set("ID", _guid(999))
+            document.write(
+                self.sandbox_root / "Generated.wwu",
+                encoding="utf-8",
+                xml_declaration=True,
+            )
+
+    with pytest.raises(ImportRuntimeError, match="persisted active Audio Source"):
+        prepare_import_runtime(
+            unit.scenario,
+            materialized,
+            sandbox_project=project,
+            backend=_UnknownActiveSourceBackend(sandbox_root, version=version),
+        )
+
+
+def test_ordinary_import_runtime_rejects_unreviewed_cross_version_scenario(
+    tmp_path: Path,
+) -> None:
+    bundle = load_eval_bundle_v3(SUITE_V3)
+    scenario = replace(
+        bundle.scenario("O22-AUDIO-IMPORT-01"),
+        versions=("2024.1",),
+    )
+    materialized = materialize_import_case(
+        scenario,
+        version="2024.1",
+        asset_root=tmp_path / "unreviewed",
+    )
+    project = tmp_path / "SampleProject.wproj"
+    project.write_text("<WwiseDocument/>", encoding="utf-8")
+
+    with pytest.raises(ImportRuntimeError, match="does not support Wwise 2024.1"):
+        build_import_runtime_plan(
+            scenario,
+            materialized,
+            sandbox_project=project,
+        )
+
+
+def test_2021_persisted_active_source_is_exact_and_reparse_safe(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sound_id = _guid(1)
+    active_id = _guid(2)
+    old_id = _guid(3)
+    work_unit = tmp_path / "Actor-Mixer Hierarchy" / "Owned.wwu"
+    work_unit.parent.mkdir(parents=True)
+    work_unit.write_text(
+        "<WwiseDocument><Sound ID='"
+        + sound_id
+        + "'><ChildrenList><AudioFileSource ID='"
+        + old_id
+        + "'/><AudioFileSource ID='"
+        + active_id
+        + "'/></ChildrenList><ActiveSourceList><ActiveSource ID='"
+        + active_id
+        + "' Platform='Linked'/></ActiveSourceList></Sound></WwiseDocument>",
+        encoding="utf-8",
+    )
+
+    assert import_runtime_v3._legacy_active_source_id_from_project(
+        sound_id,
+        sandbox_root=tmp_path,
+    ) == active_id
+
+    document = ET.parse(work_unit)
+    active_list = document.find(".//ActiveSourceList")
+    assert active_list is not None
+    ET.SubElement(
+        active_list,
+        "ActiveSource",
+        {"ID": old_id, "Platform": "Linked"},
+    )
+    document.write(work_unit, encoding="utf-8", xml_declaration=True)
+    with pytest.raises(ImportRuntimeError, match="exactly one Linked ActiveSource"):
+        import_runtime_v3._legacy_active_source_id_from_project(
+            sound_id,
+            sandbox_root=tmp_path,
+        )
+
+    original = import_runtime_v3.path_is_link_or_reparse
+
+    def simulated_reparse(path: Path, *, metadata: os.stat_result | None = None) -> bool:
+        if path == work_unit:
+            return True
+        return original(path, metadata=metadata)
+
+    monkeypatch.setattr(
+        import_runtime_v3,
+        "path_is_link_or_reparse",
+        simulated_reparse,
+    )
+    with pytest.raises(ImportRuntimeError, match="symlink or reparse file"):
+        import_runtime_v3._legacy_active_source_id_from_project(
+            sound_id,
+            sandbox_root=tmp_path,
+        )
 
 
 def _guid(number: int) -> str:
@@ -412,6 +635,15 @@ class _FakeImportBackend:
                 ET.SubElement(element, "Language").text = value.language
             if value.original_relative is not None:
                 ET.SubElement(element, "OriginalFile").text = value.original_relative
+            if value.type == "Sound" and value.sources:
+                active_sources = ET.SubElement(element, "ActiveSourceList")
+                for source_id in value.sources.values():
+                    source = self.objects[source_id.casefold()]
+                    ET.SubElement(
+                        active_sources,
+                        "ActiveSource",
+                        {"ID": source.id, "Name": source.name, "Platform": "Linked"},
+                    )
         ET.ElementTree(document).write(
             self.sandbox_root / "Generated.wwu",
             encoding="utf-8",

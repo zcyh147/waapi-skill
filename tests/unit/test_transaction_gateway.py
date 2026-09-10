@@ -14,16 +14,22 @@ from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, Mapping, Sequence
 
 import pytest  # pyright: ignore[reportMissingImports]
+from tests.support.canonical_preview import bind_canonical_preview_fixture
+from tests.support.compound_undo import compound_undo_request
 
 from wwise_waapi.builders.schema import validate_semantic_payload  # pyright: ignore[reportMissingImports]
+from wwise_waapi.canonical import canonical_sha256
 from wwise_waapi.execution_contracts import (  # pyright: ignore[reportMissingImports]
     PROJECT_GUARD_TRANSITION_TO_NONE,
     PROJECT_GUARD_TRANSITION_TO_PATH,
     ExecutionContractRegistry,
 )
 from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImports]
+    INTERNAL_CANONICAL_INPUT_MODE,
     OPERATION_REQUEST_CONTRACT,
+    OPERATION_SPECS,
     UNDO_GROUP_INNER_URIS_BY_VERSION,
+    operation_input_mode,
     parse_operation_request,
 )
 from wwise_waapi.platform_commands import (  # pyright: ignore[reportMissingImports]
@@ -35,7 +41,16 @@ from wwise_waapi.platform_commands import (  # pyright: ignore[reportMissingImpo
     encode_windows_model_argv,
     encode_windows_powershell_argv,
 )
+from wwise_waapi.typed_requests import (  # pyright: ignore[reportMissingImports]
+    expand_gateway_field_table,
+    request_contract,
+)
 from wwise_waapi.transactions import TransactionState, TransactionStore
+from wwise_waapi.runtime_transport_handles import (
+    RuntimeTransportContext,
+    RuntimeTransportHandleError,
+    RuntimeTransportHandleStore,
+)
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[2] / "skills" / "waapi-skill" / "scripts" / "gateway.py"
@@ -44,10 +59,20 @@ assert SPEC is not None and SPEC.loader is not None
 waapi_gateway = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = waapi_gateway
 SPEC.loader.exec_module(waapi_gateway)
+waapi_gateway.execute_gateway = bind_canonical_preview_fixture(waapi_gateway)
 
 
 PARENT_GUID = "{22222222-2222-2222-2222-222222222222}"
 OBJECT_GUID = "{33333333-3333-3333-3333-333333333333}"
+SOUND_BANK_GUID = "{55555555-5555-5555-5555-555555555555}"
+
+
+def _composer_fields(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
+    composer = payload["composer"]
+    fields = composer.get("typed_request_fields")
+    if isinstance(fields, list):
+        return fields
+    return expand_gateway_field_table(composer["typed_request_field_table"])
 CREATED_GUID = "{44444444-4444-4444-4444-444444444444}"
 PROJECT_GUID = "{11111111-1111-1111-1111-111111111111}"
 PARENT_PATH = r"\Actor-Mixer Hierarchy\Default Work Unit\WAAPI Sandbox"
@@ -71,6 +96,7 @@ def expected_transaction_next_command(
     command: str,
     gateway_argv: Sequence[str],
     *,
+    state_dir: Path | None = None,
     requires_explicit_user_confirmation: bool = False,
     requires_later_user_message: bool = False,
 ) -> dict[str, Any]:
@@ -79,14 +105,17 @@ def expected_transaction_next_command(
         "python",
         str(SCRIPT_PATH.with_name("run.py")),
         "gateway.py",
-        *normalized,
     ]
+    if state_dir is not None:
+        full_argv.extend(["--state-dir", str(state_dir.resolve())])
+    full_argv.extend(normalized)
     expected: dict[str, Any] = {
         "contract": "waapi-skill.gateway-next-command/v2",
         "command": command,
         "gateway_argv": normalized,
         "full_argv": full_argv,
         "copy_exactly": True,
+        "shell_tool_timeout_ms": 30_000,
     }
     if requires_explicit_user_confirmation:
         expected["requires_explicit_user_confirmation"] = True
@@ -125,6 +154,44 @@ def expected_transaction_next_command(
     else:
         expected["shell_command"] = shell_command
     return expected
+
+
+def test_transaction_next_command_preserves_explicit_state_dir_in_copy_envelope(
+    tmp_path: Path,
+) -> None:
+    state_dir = (tmp_path / "isolated state").resolve()
+
+    continuation = waapi_gateway.transaction_next_command(
+        "confirm",
+        ["confirm", "tx1-example", "--confirmation-token", "ct1-example"],
+        state_dir=state_dir,
+        requires_explicit_user_confirmation=True,
+    )
+
+    assert continuation["gateway_argv"] == [
+        "confirm",
+        "tx1-example",
+        "--confirmation-token",
+        "ct1-example",
+    ]
+    assert continuation["full_argv"][:5] == [
+        "python",
+        str(SCRIPT_PATH.with_name("run.py")),
+        "gateway.py",
+        "--state-dir",
+        str(state_dir),
+    ]
+    source_field = continuation["copy_instruction"]["source_field"]
+    if source_field == "model_command":
+        assert decode_windows_model_argv(continuation[source_field]) == tuple(
+            continuation["full_argv"]
+        )
+    elif os.name == "nt":
+        assert decode_windows_powershell_argv(continuation[source_field]) == tuple(
+            continuation["full_argv"]
+        )
+    else:
+        assert shlex.split(continuation[source_field]) == continuation["full_argv"]
 
 
 def assert_confirmation_binding(
@@ -201,10 +268,15 @@ class WaapiRequestFailed(Exception):
         self.kwargs = kwargs
 
 
-def live_info(*, year: int = 2022, major: int = 1) -> dict[str, Any]:
+def live_info(
+    *,
+    year: int = 2022,
+    major: int = 1,
+    is_command_line: bool = True,
+) -> dict[str, Any]:
     return {
         "displayName": "Wwise",
-        "isCommandLine": True,
+        "isCommandLine": is_command_line,
         "sessionId": "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}",
         "processId": 4242,
         "processPath": "/Applications/Audiokinetic/Wwise.app/Contents/MacOS/Wwise",
@@ -340,6 +412,15 @@ def object_row(*, path: str = OBJECT_PATH, notes: str = "before") -> dict[str, A
         "path": path,
         "parent": {"id": PARENT_GUID},
         "notes": notes,
+    }
+
+
+def sound_bank_row() -> dict[str, Any]:
+    return {
+        "id": SOUND_BANK_GUID,
+        "name": "Main",
+        "type": "SoundBank",
+        "path": r"\SoundBanks\Default Work Unit\Main",
     }
 
 
@@ -590,21 +671,19 @@ def migrate_call_request(io_root: Path) -> dict[str, Any]:
 
 
 def undo_group_request(*, version: str = "2023.1") -> dict[str, Any]:
-    return {
+    child_request = {
         "contract": OPERATION_REQUEST_CONTRACT,
         "version": version,
-        "operation": "waapi.undoGroup",
+        "operation": "object.setNotes",
         "arguments": {
-            "display_name": "Program Undo Group",
-            "calls": [
-                {
-                    "api": "ak.wwise.core.object.setNotes",
-                    "args": {"object": OBJECT_GUID, "value": "after"},
-                    "options": {},
-                }
-            ],
+            "object": {"kind": "id", "value": OBJECT_GUID},
+            "value": "after",
         },
     }
+    return compound_undo_request(
+        version=version,
+        child_requests=[child_request],
+    )
 
 
 def preview_and_confirm_undo_group(*, tmp_path: Path, state_dir: Path) -> dict[str, Any]:
@@ -616,6 +695,7 @@ def preview_and_confirm_undo_group(*, tmp_path: Path, state_dir: Path) -> dict[s
             {
                 "ak.wwise.core.getInfo": [live_info(year=2023)],
                 "ak.wwise.core.getProjectInfo": [project()],
+                "ak.wwise.core.object.get": [{"return": [object_row()]}],
             }
         ),
     )
@@ -710,10 +790,17 @@ def preview(
     policy: str = "ask_before_changes",
 ) -> dict[str, Any]:
     # These registry-preparation fixtures author full canonical requests.  The
-    # object.set normal surface is Composer-only; its reviewed JSON fixtures
-    # therefore exercise the explicit compatibility adapter.
+    # Composer normal surfaces reject canonical JSON; these reviewed Registry
+    # fixtures therefore exercise the explicit compatibility adapter.
+    operation = str(request.get("operation"))
+    version = str(request.get("version", "2022.1"))
+    # These Registry-preparation fixtures intentionally submit a complete
+    # canonical request.  Once an operation has a typed normal entry, the only
+    # test-only compatibility seam for that representation is legacy-preview.
     command = (
-        "legacy-preview" if request.get("operation") == "object.set" else "preview"
+        "preview"
+        if operation_input_mode(operation, version) == INTERNAL_CANONICAL_INPUT_MODE
+        else "legacy-preview"
     )
     arguments = [command]
     if apply:
@@ -726,7 +813,7 @@ def preview(
         tmp_path=tmp_path,
         state_dir=state_dir,
         client=client,
-        version=str(request.get("version", "2022.1")),
+        version=version,
         policy=policy,
     )
     assert exit_code == 0, payload
@@ -747,11 +834,13 @@ def preview(
         assert payload["next_command"] == expected_transaction_next_command(
             "execute",
             ["execute", payload["transaction_id"]],
+            state_dir=state_dir,
         )
     else:
         assert payload["next_command"] == expected_transaction_next_command(
             "transaction-show",
             ["transaction-show", payload["transaction_id"], "--summary-only"],
+            state_dir=state_dir,
             requires_later_user_message=True,
         )
     assert list(payload).index("session_context") < list(payload).index("next_command")
@@ -778,6 +867,7 @@ def confirm(
     assert payload["next_command"] == expected_transaction_next_command(
         "execute",
         ["execute", transaction_id],
+        state_dir=state_dir,
     )
     assert list(payload)[-1] == "next_command"
     return payload
@@ -791,7 +881,7 @@ def test_debug_test_crash_is_confirmed_dispatched_once_and_terminal_indeterminat
         "contract": OPERATION_REQUEST_CONTRACT,
         "version": "2022.1",
         "operation": "debug.testCrash",
-        "arguments": {"acknowledge": "crash_wwise_process"},
+        "arguments": {},
     }
     transaction = preview(
         request,
@@ -832,6 +922,12 @@ def test_debug_test_crash_is_confirmed_dispatched_once_and_terminal_indeterminat
     assert payload["expected_disconnect"] is True
     assert payload["dispatch_delivery"] == "waapi_result_returned"
     assert payload["dispatch_accepted"] is True
+    assert payload["terminal_journal"] == {
+        "classification": "dispatch_accepted_effect_unverified",
+        "effect_verified": False,
+        "durable_state": TransactionState.INDETERMINATE.value,
+        "retry_allowed": False,
+    }
     assert payload["process_lifecycle"] == {
         "expected": "wwise_process_termination",
         "observed": "not_observed_by_gateway",
@@ -855,12 +951,12 @@ def test_allow_changes_keeps_dangerous_host_control_on_confirmation_path(
         "contract": OPERATION_REQUEST_CONTRACT,
         "version": "2022.1",
         "operation": "debug.testCrash",
-        "arguments": {"acknowledge": "crash_wwise_process"},
+        "arguments": {},
     }
 
     exit_code, payload = execute(
         [
-            "preview",
+            "legacy-preview",
             "--apply",
             "--request-json",
             json.dumps(request),
@@ -876,7 +972,7 @@ def test_allow_changes_keeps_dangerous_host_control_on_confirmation_path(
         policy="allow_changes",
     )
 
-    assert exit_code == 0, payload
+    assert exit_code == 0, json.dumps(payload, indent=2)
     assert payload["state"] == TransactionState.AWAITING_CONFIRMATION.value
     assert payload["authorization"] == {
         "mode": "explicit_confirmation",
@@ -893,6 +989,7 @@ def test_allow_changes_keeps_dangerous_host_control_on_confirmation_path(
             payload["transaction_id"],
             "--summary-only",
         ],
+        state_dir=state_dir,
         requires_later_user_message=True,
     )
     assert [
@@ -901,6 +998,224 @@ def test_allow_changes_keeps_dangerous_host_control_on_confirmation_path(
             payload["transaction_id"]
         )
     ] == ["preview_created", "confirmation_requested"]
+
+
+@pytest.mark.parametrize(
+    "version,api,operation",
+    (
+        ("2023.1", "ak.wwise.debug.restartWaapiServers", "debug.restartWaapiServers"),
+        ("2021.1", "ak.wwise.debug.testAssert", "debug.testAssert"),
+        ("2021.1", "ak.wwise.debug.testCrash", "debug.testCrash"),
+    ),
+)
+def test_zero_input_debug_native_route_is_rejected_in_favor_of_named_operation(
+    tmp_path: Path,
+    version: str,
+    api: str,
+    operation: str,
+) -> None:
+    state_dir = tmp_path / "state"
+    schema_exit, schema = execute(
+        ["request-schema", api],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        version=version,
+    )
+    assert schema_exit == 2
+    assert f"operation-schema {operation}" in schema["message"]
+
+    reflected = request_contract(version, api)
+
+    exit_code, payload = execute(
+        [
+            "typed-zero-call", api,
+            "--schema-digest", reflected.schema_digest,
+            "--apply",
+        ],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        version=version,
+        policy="allow_changes",
+    )
+    assert exit_code == 2
+    assert f"operation-schema {operation}" in payload["message"]
+
+
+def test_zero_input_generic_mutation_enters_existing_preview_lifecycle(
+    tmp_path: Path,
+) -> None:
+    version = "2025.1"
+    api = "ak.wwise.core.profiler.startCapture"
+    state_dir = tmp_path / "state"
+    schema_exit, schema = execute(
+        ["request-schema", api],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        version=version,
+    )
+    assert schema_exit == 0
+    assert schema["fields"] == []
+
+    exit_code, payload = execute(
+        [
+            "typed-zero-call", api,
+            "--schema-digest", schema["schema_digest"],
+            "--apply",
+        ],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        version=version,
+        policy="ask_before_changes",
+        client=FakeClient(
+            {
+                "ak.wwise.core.getInfo": [live_info(year=2025)],
+                "ak.wwise.core.getProjectInfo": [project()],
+            }
+        ),
+    )
+
+    assert exit_code == 0, json.dumps(payload, indent=2)
+    assert payload["state"] == TransactionState.AWAITING_CONFIRMATION.value
+    assert payload["typed_request"] == {
+        "contract": "waapi-skill.typed-request/v1",
+        "schema_digest": schema["schema_digest"],
+        "business_values_required": False,
+        "gateway_owned_acknowledgement": False,
+    }
+    artifact = TransactionStore(state_dir).load_preview(payload["transaction_id"]).artifact
+    assert artifact["request"] == {
+        "contract": OPERATION_REQUEST_CONTRACT,
+        "version": version,
+        "operation": "waapi.call",
+        "arguments": {"api": api, "args": {}, "options": {}},
+    }
+    assert artifact["prepared_operation"]["dispatch"] == {
+        "uri": api,
+        "args": {},
+        "options": {},
+    }
+
+
+def test_soundengine_scalar_mutation_exposes_only_its_business_declaration(
+    tmp_path: Path,
+) -> None:
+    version = "2021.1"
+    api = "ak.soundengine.postMsgMonitor"
+    schema_exit, schema = execute(
+        ["request-schema", api],
+        tmp_path=tmp_path,
+        version=version,
+    )
+    assert schema_exit == 0
+    assert schema["input_shape"] == "business_declaration"
+    assert schema["native_request_fields_disclosed"] is False
+    assert "fields" not in schema
+    assert schema["business_adapter"]["declaration"] == {
+        "subcommand": "draft-declare-soundengine-plan",
+        "required_fields": ["monitor_message"],
+        "optional_fields": [],
+        "field_types": {"monitor_message": "bounded_exact_monitor_message"},
+        "input_forms": {
+            "monitor_message": {
+                "flag": "--monitor-message",
+                "repeatable": False,
+            }
+        },
+    }
+    assert schema["continuation"] == {
+        "subcommand": "draft-start",
+        "gateway_argv": ["draft-start", api],
+        "copy_exactly": True,
+        "append_arguments": "forbidden",
+    }
+
+
+def test_soundengine_listener_array_is_an_opaque_handle_business_set(
+    tmp_path: Path,
+) -> None:
+    version = "2021.1"
+    api = "ak.soundengine.setDefaultListeners"
+    schema_exit, schema = execute(
+        ["request-schema", api],
+        tmp_path=tmp_path,
+        version=version,
+    )
+    assert schema_exit == 0
+    declaration = schema["business_adapter"]["declaration"]
+    assert declaration["required_fields"] == []
+    assert declaration["optional_fields"] == [
+        "listener_handles",
+        "clear_listeners",
+    ]
+    assert declaration["field_types"] == {
+        "listener_handles": "gateway_runtime_game_object_handle_list",
+        "clear_listeners": "explicit_boolean_intent",
+    }
+    assert declaration["input_forms"] == {
+        "listener_handles": {
+            "flag": "--listener-handle",
+            "repeatable": True,
+            "minimum_items": 1,
+            "maximum_items": 64,
+            "unique_items": True,
+        },
+        "clear_listeners": {
+            "flag": "--clear-listeners",
+            "repeatable": False,
+        },
+    }
+    assert declaration["constraints"] == {
+        "exactly_one_of": [["listener_handles", "clear_listeners"]]
+    }
+    assert "fields" not in schema
+
+
+def test_zero_input_managed_read_dispatches_directly_with_its_route_contract(
+    tmp_path: Path,
+) -> None:
+    version = "2022.1"
+    api = "ak.wwise.core.transport.getList"
+    schema_exit, schema = execute(
+        ["request-schema", api],
+        tmp_path=tmp_path,
+        version=version,
+    )
+    assert schema_exit == 0
+    assert "apply" not in schema["continuation"]
+
+    exit_code, payload = execute(
+        [
+            "typed-zero-call", api,
+            "--schema-digest", schema["schema_digest"],
+        ],
+        tmp_path=tmp_path,
+        version=version,
+        policy="read_only",
+        client=FakeClient(
+            {
+                "ak.wwise.core.getInfo": [live_info(year=2022)],
+                api: [{"list": []}],
+            }
+        ),
+    )
+    assert exit_code == 0, json.dumps(payload, indent=2)
+    assert payload["agent_result"] == {"list": []}
+    assert "transaction_id" not in payload
+
+
+def test_compound_member_is_not_prematurely_exposed_by_request_schema(
+    tmp_path: Path,
+) -> None:
+    version = "2025.1"
+    api = "ak.wwise.core.undo.beginGroup"
+    schema_exit, schema = execute(
+        ["request-schema", api],
+        tmp_path=tmp_path,
+        version=version,
+    )
+    assert schema_exit == 2
+    assert "compound Undo" in schema["message"]
+    assert "waapi.undoGroup" in schema["message"]
 
 
 def preview_and_confirm_public_call(
@@ -922,6 +1237,110 @@ def preview_and_confirm_public_call(
             }
         ),
     )
+    confirm(
+        transaction["transaction_id"],
+        transaction["artifact_hash"],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+    )
+    return transaction
+
+
+def preview_and_confirm_soundengine_bank(
+    operation: str,
+    *,
+    tmp_path: Path,
+    state_dir: Path,
+) -> dict[str, Any]:
+    version = "2025.1"
+
+    def live_client() -> FakeClient:
+        return FakeClient(
+            {
+                "ak.wwise.core.getInfo": [live_info(year=2025)],
+                "ak.wwise.core.getProjectInfo": [project()],
+                "ak.wwise.core.object.get": [
+                    {"return": [sound_bank_row()]},
+                    {"return": [sound_bank_row()]},
+                    {"return": [sound_bank_row()]},
+                ],
+            }
+        )
+
+    code, started = execute(
+        ["draft-start", operation],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        version=version,
+    )
+    assert code == 0, started
+    draft = started["draft"]
+    code, bound = execute(
+        [
+            "draft-bind-object",
+            draft["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            str(draft["revision"]),
+            "--role",
+            "sound_bank",
+            "--object-id",
+            SOUND_BANK_GUID,
+        ],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=live_client(),
+        version=version,
+    )
+    assert code == 0, bound
+    code, declared = execute(
+        [
+            "draft-declare-soundengine-plan",
+            draft["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            str(bound["draft"]["revision"]),
+            "--sound-bank-handle",
+            bound["bound_object"]["handle"],
+        ],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=live_client(),
+        version=version,
+    )
+    assert code == 0, declared
+    code, checked = execute(
+        [
+            "draft-check",
+            draft["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            str(declared["draft"]["revision"]),
+        ],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=live_client(),
+        version=version,
+    )
+    assert code == 0, checked
+    code, transaction = execute(
+        [
+            "preview-from-draft",
+            draft["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            str(checked["draft"]["revision"]),
+        ],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=live_client(),
+        version=version,
+    )
+    assert code == 0, transaction
     confirm(
         transaction["transaction_id"],
         transaction["artifact_hash"],
@@ -1147,7 +1566,13 @@ def execute_migrate_successfully(
     )
     assert exit_code == 0, payload
     assert payload["state"] == TransactionState.EXECUTED_UNVERIFIED.value
-    assert "next_command" not in payload
+    assert payload["agent_control"]["required_outcome_before_reply"] == (
+        "verified_or_structured_verification_failure"
+    )
+    assert payload["next_command"]["gateway_argv"][-2:] == [
+        "verify",
+        transaction["transaction_id"],
+    ]
     return transaction, request, preview_client, execute_client
 
 
@@ -1158,35 +1583,51 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
     assert catalog["ok"] is True
     assert catalog["offline"] is True
     operations = {item["name"]: item for item in catalog["operations"]}
-    assert set(operations["object.create"]) == {
-        "name",
-        "uri",
-        "family",
-        "summary",
-        "implemented",
-        "boundary",
-        "supported_versions",
-        "required_arguments",
-        "optional_arguments",
-    }
-    assert operations["object.create"]["implemented"] is True
-    assert operations["object.copy"]["implemented"] is False
-    assert "returned copy GUID" in operations["object.copy"]["boundary"]
-    assert "argument_contract" not in operations["object.create"]
-    assert operations["ui.commands.execute"]["implemented"] is True
-    assert operations["ui.commands.register"]["implemented"] is True
-    assert operations["ui.commands.unregister"]["implemented"] is True
-    compact_json = json.dumps(catalog, ensure_ascii=False, indent=2, sort_keys=True).encode("utf-8")
-    assert len(compact_json) < 24_000
+    assert set(operations["object.create"]) == {"name", "summary", "next_command"}
+    assert operations["object.create"]["next_command"] == [
+        "operation-schema",
+        "object.create",
+    ]
+    assert operations["object.copy"]["next_command"] == [
+        "operation-schema",
+        "object.copy",
+    ]
+    assert "request_schema_routes" not in catalog
+    assert catalog["detail_available"] is True
+    assert catalog["request_schema_command_template"] == [
+        "request-schema",
+        "<api>",
+    ]
+    assert catalog["request_schema_route_count"] == 105
+    encoded_size = waapi_gateway.gateway_json_document_size(catalog)
+    assert encoded_size < 10 * 1024
+    assert "\n" not in waapi_gateway.gateway_stdout_json_encoder(catalog).encode(catalog)
 
     exit_code, detail_catalog = execute(["operations", "--detail"], tmp_path=tmp_path)
 
     assert exit_code == 0
     detailed = {item["name"]: item for item in detail_catalog["operations"]}
-    assert detailed["object.create"]["additional_properties"] is False
-    assert "argument_contract" in detailed["object.create"]
-    assert "constraints" in detailed["object.create"]
-    assert "identity_contract" in detailed["object.create"]
+    request_schema_routes = {
+        item["api"]: item for item in detail_catalog["request_schema_routes"]
+    }
+    project_save = request_schema_routes["ak.wwise.core.project.save"]
+    assert "save the current Wwise project" in project_save["intent"]
+    assert all("next_command" not in row for row in request_schema_routes.values())
+    assert detail_catalog["request_schema_route_count"] == len(request_schema_routes)
+    assert "ak.wwise.cli.generateSoundbank" in request_schema_routes
+    assert "ak.wwise.console.project.open" in request_schema_routes
+    assert "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion" in request_schema_routes
+    assert "ak.wwise.core.mediaPool.get" in request_schema_routes
+    assert "ak.wwise.core.sound.setActiveSource" in request_schema_routes
+    assert "ak.wwise.core.sourceControl.commit" in request_schema_routes
+    assert set(detailed["object.create"]["input_modes_by_version"].values()) == {
+        "business_declaration"
+    }
+    assert "argument_contract" not in detailed["object.create"]
+    assert "constraints" not in detailed["object.create"]
+    assert "identity_contract" not in detailed["object.create"]
+    assert "business_contracts_by_version" in detailed["object.create"]
+    assert "composer_contracts_by_version" not in detailed["object.create"]
 
     exit_code, schema = execute(["operation-schema", "object.setNotes"], tmp_path=tmp_path)
 
@@ -1194,10 +1635,10 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
     assert schema["ok"] is True
     assert schema["offline"] is True
     assert schema["operation"]["name"] == "object.setNotes"
-    assert schema["operation"]["required_arguments"] == ["object", "value"]
-    assert schema["operation"]["additional_properties"] is False
-    assert "argument_contract" in schema["operation"]
-    assert "identity_contract" in schema["operation"]
+    assert schema["operation"]["input_mode"] == "business_declaration"
+    assert "required_arguments" not in schema["operation"]
+    assert "argument_contract" not in schema["operation"]
+    assert "identity_contract" not in schema["operation"]
     assert schema["operation"]["selection_guidance"]["use_when"] == [
         "Exactly one existing object receives only a notes change."
     ]
@@ -1207,60 +1648,13 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
             "when": "the request is only one isolated notes edit",
         }
     ]
-    assert schema["request_envelope"] == {
-        "contract": OPERATION_REQUEST_CONTRACT,
-        "version": "2022.1",
-        "operation": "object.setNotes",
-        "arguments": {},
-    }
-    assert schema["request_envelope_policy"] == {
-        "status": "ready",
-        "required_top_level_keys": [
-            "contract",
-            "version",
-            "operation",
-            "arguments",
-        ],
-        "copy_top_level_exactly": True,
-        "replace_only": "arguments",
-        "argument_container_path": "$.arguments",
-        "argument_paths": {
-            "object": "$.arguments.object",
-            "value": "$.arguments.value",
-        },
-        "shell_transport": {
-            "outer_quoting": "single_quote_entire_compact_json",
-            "json_string_serialization": "exactly_once",
-            "decoded_value_rules": {
-                "embedded_quotes": (
-                    "ordinary quotation marks with no preceding backslash"
-                ),
-                "wwise_path_separator": "one backslash",
-            },
-            "forbidden": [
-                "double_escape_json_string_contents",
-                "leave_json_escape_backslashes_in_decoded_values",
-                "repair_or_retry_invalid_json_in_the_same_turn",
-            ],
-        },
-        "preview_invocation": {
-            "intended_change": {
-                "subcommand": "preview",
-                "required_flag": "--apply",
-                "effect": (
-                    "required even when the user asks to see only a preview; "
-                    "creates a durable confirmation-bound preview and does not "
-                    "execute the change"
-                ),
-                "includes_later_ordered_transactions": True,
-            },
-            "omit_apply_only_when": [
-                "hypothetical",
-                "design_only",
-                "explicitly_non_executable",
-            ],
-        },
-    }
+    assert "request_envelope" not in schema
+    assert "request_envelope_policy" not in schema
+    assert "typed_operation" not in schema
+    assert schema["business_adapter"]["operation"] == "object.setNotes"
+    assert schema["business_adapter"]["declaration"]["required_fields"] == [
+        "notes",
+    ]
 
     for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
         exit_code, versioned = execute(
@@ -1269,23 +1663,16 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
             version=version,
         )
         assert exit_code == 0
-        assert versioned["request_envelope"]["version"] == version
+        assert "request_envelope" not in versioned
+        assert versioned["business_adapter"]["version"] == version
 
     exit_code, raw_call = execute(
         ["operation-schema", "waapi.call"],
         tmp_path=tmp_path,
         version="2022.1",
     )
-    assert exit_code == 0
-    assert raw_call["request_envelope_policy"]["argument_paths"] == {
-        "api": "$.arguments.api",
-        "args": "$.arguments.args",
-        "options": "$.arguments.options",
-        "io_root": "$.arguments.io_root",
-    }
-    raw_properties = raw_call["operation"]["argument_contract"]["properties"]
-    assert "never place io_root" in raw_properties["args"]["description"]
-    assert "must never be nested inside args" in raw_properties["io_root"]["description"]
+    assert exit_code == 2
+    assert raw_call["error_code"] == "INTERNAL_CANONICAL_OPERATION"
 
     exit_code, unsupported = execute(
         ["operation-schema", "object.set"],
@@ -1293,11 +1680,11 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
         version="2021.1",
     )
     assert exit_code == 0
-    assert unsupported["request_envelope"] is None
-    assert unsupported["request_envelope_policy"]["status"] == "unsupported_version"
+    assert "request_envelope" not in unsupported
+    assert "request_envelope_policy" not in unsupported
 
 
-def test_operation_schema_exposes_tab_import_path_only_progression(
+def test_operation_schema_exposes_tab_import_business_progression(
     tmp_path: Path,
 ) -> None:
     exit_code, payload = execute(
@@ -1308,22 +1695,22 @@ def test_operation_schema_exposes_tab_import_path_only_progression(
 
     assert exit_code == 0
     assert payload["offline"] is True
-    assert payload["request_envelope"] == {
-        "contract": OPERATION_REQUEST_CONTRACT,
-        "version": "2025.1",
-        "operation": "audio.importTabDelimited",
-        "arguments": {},
-    }
-    operation = payload["operation"]
-    assert operation["file_read_policy"] == "pass_path_without_reading"
-    assert operation["next_step"] == "preview"
-    assert operation["preview_owns"] == [
-        "tsv_parsing",
-        "tsv_hash_validation",
-        "inline_base64_validation",
-        "media_validation",
-        "exact_path_conflict_validation",
+    assert "request_envelope" not in payload
+    adapter = payload["business_adapter"]
+    assert adapter["start"]["next_command"]["gateway_argv"] == (
+        ["draft-start", "audio.importTabDelimited"]
+    )
+    assert adapter["binding"]["roles"] == ["import_location"]
+    assert adapter["declaration"]["subcommand"] == (
+        "draft-declare-artifact-plan"
+    )
+    assert adapter["declaration"]["required_fields"] == [
+        "table_file",
+        "location_handle",
+        "language",
     ]
+    assert adapter["legacy_inline_typed_public"] is False
+    assert "typed_operation" not in payload
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])
@@ -1339,23 +1726,21 @@ def test_soundbank_inclusion_schema_exposes_one_scoped_replace_for_complete_post
 
     assert exit_code == 0
     assert payload["ok"] is True
-    operation = payload["operation"]
-    assert operation["constraints"][0] == (
-        "replace is one transaction scoped only to the selected SoundBank: "
-        "submit its complete desired post-state; omitted existing rows are "
-        "removed without naming them, every other SoundBank is unaffected, "
-        "and the list may be empty"
-    )
-    assert operation["selection_guidance"]["use_when"][1] == (
-        "The user gives one SoundBank's complete desired final inclusion set "
-        "and asks to remove Debug or any other omitted rows; use one replace "
-        "transaction and never split that final-state request into add and "
-        "remove transactions."
-    )
+    adapter = payload["business_adapter"]
+    declaration = adapter["declaration"]
+    schema = declaration["schema"]
+    assert declaration["subcommand"] == "draft-declare-soundbank-plan"
+    assert declaration["submit_once"] is True
+    assert schema["properties"]["mode"]["enum"] == ["add", "remove", "replace"]
+    assert schema["properties"]["inclusions"]["emptyAllowedWhen"] == {
+        "mode": "replace"
+    }
+    assert schema["properties"]["inclusions"]["maxItems"] == 128
+    assert "composer" not in payload
 
 
 @pytest.mark.parametrize("version", tuple(UNDO_GROUP_INNER_URIS_BY_VERSION))
-def test_operation_schema_discloses_exact_undo_inner_contracts_offline(
+def test_operation_schema_discloses_checked_child_business_contract_offline(
     tmp_path: Path,
     version: str,
 ) -> None:
@@ -1366,16 +1751,21 @@ def test_operation_schema_discloses_exact_undo_inner_contracts_offline(
     )
 
     assert exit_code == 0
-    api_schema = payload["operation"]["argument_contract"]["properties"][
-        "calls"
-    ]["items"]["properties"]["api"]
-    expected = sorted(UNDO_GROUP_INNER_URIS_BY_VERSION[version])
-    assert api_schema["enum"] == expected
-    assert [row["const"] for row in api_schema["value_contracts"]] == expected
+    adapter = payload["business_adapter"]
+    assert adapter["operation"] == "waapi.undoGroup"
+    assert adapter["input_mode"] == "business_declaration"
+    assert adapter["declaration"]["subcommand"] == "draft-declare-undo-plan"
+    assert adapter["declaration"]["child_input"] == (
+        "ordered_parent_owned_checked_closed_draft_snapshot"
+    )
+    assert adapter["legacy_composer_public"] is False
+    assert adapter["legacy_child_schema_public"] is False
+    assert "composer" not in payload
     assert all(
-        row["schema_pointer"]["gateway_argv"]
-        == ["--version", version, "describe", row["const"], "--full-schema"]
-        for row in api_schema["value_contracts"]
+        not operation.startswith("ak.wwise.core.object.setNotes")
+        for operation in adapter["declaration"][
+            "prohibited_generic_child_operations"
+        ]
     )
 
 
@@ -1394,9 +1784,7 @@ def test_operation_schema_exposes_closed_ui_command_items(
     )
 
     assert exit_code == 0
-    item = payload["operation"]["argument_contract"]["properties"]["commands"][
-        "items"
-    ]
+    item = OPERATION_SPECS[operation].argument_contract["properties"]["commands"]["items"]
     assert item["additionalProperties"] is False
     assert item["required"] == ["id", "display_name", "handler"]
     handlers = {
@@ -1417,14 +1805,10 @@ def test_operation_schema_exposes_closed_ui_command_items(
     assert item["properties"]["main_menu"]["required"] == ["base_path"]
 
 
-@pytest.mark.parametrize(
-    ("version", "expected_roots"),
-    EXPECTED_IMPORT_HIERARCHY_ROOTS.items(),
-)
-def test_audio_import_operation_schema_discloses_versioned_hierarchy_roots(
+@pytest.mark.parametrize("version", EXPECTED_IMPORT_HIERARCHY_ROOTS)
+def test_audio_import_operation_schema_keeps_native_hierarchy_mechanics_gateway_owned(
     tmp_path: Path,
     version: str,
-    expected_roots: list[str],
 ) -> None:
     exit_code, payload = execute(
         ["operation-schema", "audio.import"],
@@ -1434,71 +1818,20 @@ def test_audio_import_operation_schema_discloses_versioned_hierarchy_roots(
 
     assert exit_code == 0
     assert payload["offline"] is True
-    assert payload["request_envelope"] is None
-    fragments = payload["composer"]["registry_fragments"]
-    assert fragments["version"] == version
-    properties = fragments["row_fields"]
-    row_path_contract = properties["object_path"]["path_contract"]
-    default_path_contract = properties["object_path"]["path_contract"]
-    row_object_type = properties["object_type"]
-    default_object_type = properties["object_type"]
-    row_switch_assignment = properties["switch_assignment"]
-    default_switch_assignment = properties["switch_assignment"]
-    assert row_path_contract["contract"] == (
-        "waapi-skill.audio-import-object-path/v1"
+    assert "request_envelope" not in payload
+    assert "composer" not in payload
+    adapter = payload["business_adapter"]
+    assert adapter["version"] == version
+    assert adapter["input_mode"] == "business_declaration"
+    assert {"random-container", "sound-sfx", "sound-voice"} <= set(
+        adapter["semantic_kinds"]
     )
-    assert row_path_contract["resolved_target"] == {
-        "minimum_segments": 3,
-        "hierarchy_root_case_sensitive": True,
-        "wwise_version": version,
-        "allowed_hierarchy_roots": expected_roots,
-    }
-    assert row_path_contract["import_location_selection"] == {
-        "wire_significant": True,
-        "absolute_object_path": {
-            "ordinary_action": "omit",
-            "infer_from_common_parent": False,
-            "include_only_when_user_explicitly_requests_native_field": True,
-        },
-        "relative_object_path": {
-            "requires_effective_import_location": True,
-            "effective_sources": [
-                "$.arguments.imports[].import_location",
-                "$.arguments.defaults.import_location",
-            ],
-        },
-    }
-    assert default_path_contract == row_path_contract
-    assert row_object_type == default_object_type
-    assert "Random Container / 随机容器 -> RandomSequenceContainer" in (
-        row_object_type["description"]
+    assert {"canonical_object_path", "native_object_type", "target_parent_handle"} <= set(
+        adapter["gateway_derivations"]
     )
-    assert "never RandomContainer" in row_object_type["description"]
-    assert "Sound SFX / SFX 声音 -> Sound SFX" in row_object_type["description"]
-    assert row_switch_assignment == default_switch_assignment
-    assert "native Wwise Switch Assignation import directive" in (
-        row_switch_assignment["description"]
-    )
-    assert "exact Switch/State value name" in row_switch_assignment["description"]
-    assert "for example, Snow" in row_switch_assignment["description"]
-    assert "do not pass the value object's path" in (
-        row_switch_assignment["description"]
-    )
-    inline_audio = properties["audio_file_base64"]
-    assert inline_audio["verbatim_contract"]["contract"] == (
-        "waapi-skill.audio-file-base64-verbatim/v1"
-    )
-    assert inline_audio["verbatim_contract"][
-        "caller_provided_complete_value"
-    ] == "copy_character_for_character"
-    assert inline_audio["verbatim_contract"][
-        "on_unreliable_preservation"
-    ] == "stop_before_preview"
-    import_operation = fragments["request_options"]["import_operation"]
-    assert import_operation["default"] == "createNew"
-    assert "$.arguments.import_operation" in import_operation["description"]
-    assert "Never place it inside an imports[] row" in import_operation["description"]
-
+    assert "object_path" not in adapter["declaration_fields"]
+    assert "object_type" not in adapter["declaration_fields"]
+    assert adapter["legacy_shallow_composer_public"] is False
 
 @pytest.mark.parametrize(
     ("version", "default_work_unit_path", "actor_mixer_type"),
@@ -1526,7 +1859,7 @@ def test_audio_import_operation_schema_discloses_versioned_hierarchy_roots(
         ("2025.1", r"\Containers\Default Work Unit", "PropertyContainer"),
     ),
 )
-def test_object_create_operation_schema_discloses_versioned_parent_and_merge_contracts(
+def test_object_create_operation_schema_discloses_versioned_business_graph_contract(
     tmp_path: Path,
     version: str,
     default_work_unit_path: str,
@@ -1539,52 +1872,23 @@ def test_object_create_operation_schema_discloses_versioned_parent_and_merge_con
     )
 
     assert exit_code == 0
-    contract = payload["operation"]["argument_contract"][
-        "same_name_merge_path_contract"
+    assert payload["operation"]["input_mode"] == "business_declaration"
+    adapter = payload["business_adapter"]
+    assert adapter["operation"] == "object.create"
+    assert adapter["version"] == version
+    assert adapter["settings"]["name_conflict"] == [
+        "fail",
+        "rename",
+        "merge",
+        "replace",
     ]
-    assert contract["resolved_target"] == {
-        "wwise_version": version,
-        "default_container_work_unit_path": default_work_unit_path,
-    }
-    assert contract["identity_query"] == {
-        "route": "query-object",
-        "must_follow_operation_schema_directly": True,
-        "path_mode": "exact",
-        "return_fields": ["id", "name", "type", "path"],
-        "path_argument_contract": {
-            "contract": "waapi-skill.shell-single-quoted-wwise-path/v1",
-            "source_value": "decoded_gateway_json_string",
-            "shell_quoting": "single_quotes",
-            "literal_backslashes_per_path_separator": 1,
-            "json_serialized_backslashes_per_path_separator": 2,
-            "copy_json_escape_backslashes_as_literal_characters": False,
-        },
-    }
-    assert contract["forbidden_intermediate_routes"] == [
-        "project-default-work-units"
-    ]
-    parent_contract = payload["operation"]["argument_contract"][
-        "default_container_parent_contract"
-    ]
-    assert parent_contract["resolved_target"] == {
-        "wwise_version": version,
-        "default_container_work_unit_path": default_work_unit_path,
-    }
-    assert parent_contract["dynamic_actor_mixer_metadata_scope"] == {
-        "kind": "object_type",
-        "one_discovery_for_same_type_targets": True,
-        "object_scope_is_for_one_existing_target_only": True,
-        "wwise_version": version,
-        "actor_mixer_object_type": actor_mixer_type,
-    }
-    assert parent_contract["required_sequence"] == [
-        "operation-schema object.create",
-        "one metadata discover when a dynamic field token is unknown",
-        "preview",
-    ]
-    assert parent_contract["forbidden_intermediate_routes"] == [
-        "project-default-work-units"
-    ]
+    assert "native_object_type" in adapter["gateway_derivations"]
+    assert "recursive_object_tree" in adapter["gateway_derivations"]
+    assert adapter["legacy_shallow_composer_public"] is False
+    assert "composer" not in payload
+    assert "constraints" not in payload["operation"]
+    assert default_work_unit_path
+    assert actor_mixer_type
 
 
 @pytest.mark.parametrize(
@@ -1608,7 +1912,7 @@ def test_object_create_operation_schema_discloses_versioned_parent_and_merge_con
         ("2025.1", r"\Containers\Default Work Unit", "PropertyContainer"),
     ),
 )
-def test_object_set_operation_schema_discloses_versioned_target_and_metadata_scope(
+def test_object_set_operation_schema_owns_target_and_metadata_scope(
     tmp_path: Path,
     version: str,
     default_work_unit_path: str,
@@ -1621,26 +1925,23 @@ def test_object_set_operation_schema_discloses_versioned_target_and_metadata_sco
     )
 
     assert exit_code == 0
-    fragments = payload["composer"]["registry_fragments"]
-    contract = fragments["default_container_target_contract"]
-    assert contract["resolved_target"] == {
-        "wwise_version": version,
-        "default_container_work_unit_path": default_work_unit_path,
+    assert payload["operation"]["input_mode"] == "business_declaration"
+    adapter = payload["business_adapter"]
+    assert adapter["version"] == version
+    assert adapter["binding"] == {
+        "existing_targets": "bound_object_handles",
+        "new_descendants": "bound_or_planned_parent_handles",
+        "fields": "live_discovered_field_handles",
+        "long_tail_types": "live_discovered_type_handles",
     }
-    assert contract["dynamic_actor_mixer_metadata_scope"][
-        "actor_mixer_object_type"
-    ] == actor_mixer_type
-    assert contract["dynamic_actor_mixer_metadata_scope"]["kind"] == "object_type"
-    assert contract["forbidden_intermediate_routes"] == [
-        "project-default-work-units"
-    ]
-    on_name_conflict = fragments["request_options"]["on_name_conflict"]
-    assert on_name_conflict["default"] == "fail"
-    assert "Omission defaults to fail" in on_name_conflict["description"]
-
+    assert adapter["settings"]["name_conflict"] == ["fail", "rename", "merge"]
+    assert adapter["legacy_shallow_composer_public"] is False
+    assert "composer" not in payload
+    assert default_work_unit_path
+    assert actor_mixer_type
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])
-def test_object_set_schema_maps_live_query_accessors_to_canonical_mutation_tokens(
+def test_object_set_schema_keeps_metadata_tokens_gateway_owned(
     tmp_path: Path,
     version: str,
 ) -> None:
@@ -1651,28 +1952,13 @@ def test_object_set_schema_maps_live_query_accessors_to_canonical_mutation_token
     )
 
     assert exit_code == 0
-    fragments = payload["composer"]["registry_fragments"]
-    property_name = fragments["scalar_property"]["properties"]["name"]
-    reference_name = fragments["reference"]["properties"]["name"]
-
-    assert property_name["pattern"] == r"^[:_a-zA-Z0-9]+$"
-    assert property_name["live_query_accessor_mapping"] == {
-        "source": "successful_live_query_in_this_conversation",
-        "query": "@Foo",
-        "mutation": "Foo",
-        "transform": "remove_exactly_one_leading_at",
-        "guessing": False,
-    }
-    assert "submit Foo by removing exactly one leading @" in property_name["description"]
-    assert reference_name["live_query_accessor_mapping"] == {
-        "source": "successful_live_query_in_this_conversation",
-        "query": "OutputBus",
-        "mutation": "OutputBus",
-        "transform": "copy_exactly",
-        "guessing": False,
-    }
-    assert "OutputBus remains OutputBus" in reference_name["description"]
-
+    adapter = payload["business_adapter"]
+    assert adapter["binding"]["fields"] == "live_discovered_field_handles"
+    assert "metadata_tokens" in adapter["gateway_derivations"]
+    encoded = json.dumps(payload)
+    assert "live_query_accessor_mapping" not in encoded
+    assert "scalar_property" not in encoded
+    assert "registry_fragments" not in encoded
 
 @pytest.mark.parametrize(
     "version",
@@ -1689,61 +1975,31 @@ def test_soundbank_generate_operation_schema_closes_batch_language_scope(
     )
 
     assert exit_code == 0
-    properties = payload["operation"]["argument_contract"]["properties"]
-    row_expectation = properties["soundbanks"]["items"]["properties"][
-        "artifact_expectation"
+    adapter = payload["business_adapter"]
+    declaration = adapter["declaration"]
+    fields = declaration["schema"]["properties"]
+    assert fields["soundbanks"]["maxItems"] == 64
+    assert fields["platforms"]["maxItems"] == 16
+    assert fields["languages"]["maxItems"] == 64
+    assert "skip_languages" not in fields
+    assert "write_to_disk" not in fields
+    bank_fields = fields["soundbanks"]["items"]["properties"]
+    assert bank_fields["artifact_expectation"]["enum"] == [
+        "nonlocalized",
+        "localized",
+        "mixed",
     ]
-    row_rebuild = properties["soundbanks"]["items"]["properties"]["rebuild"]
-    batch_rebuild = properties["rebuild_soundbanks"]
-
-    assert "batch-level rule" in row_expectation["description"]
-    assert "Omit when every SoundBank" in properties["languages"]["description"]
-    assert "SFX is not a localized language" in properties["languages"][
-        "description"
-    ]
-    assert "true exactly when every SoundBank is nonlocalized" in properties[
-        "skip_languages"
-    ]["description"]
-    assert row_rebuild["default"] is False
-    assert batch_rebuild["default"] is False
-    assert properties["clear_audio_file_cache"]["default"] is False
-    assert properties["rebuild_init_bank"]["default"] is False
-    assert "Per-SoundBank rebuild control" in row_rebuild["description"]
-    assert "separate batch-level control" in row_rebuild["description"]
-    assert "independent from soundbanks[].rebuild" in batch_rebuild[
-        "description"
-    ]
-    assert any(
-        "batch-level rebuild_soundbanks and per-Bank soundbanks[].rebuild are independent"
-        in constraint
-        for constraint in payload["operation"]["constraints"]
-    )
-    assert any(
-        "language selection is batch-wide" in constraint
-        and "never SFX" in constraint
-        for constraint in payload["operation"]["constraints"]
-    )
-    assert payload["request_envelope_policy"]["preview_invocation"] == {
-        "intended_change": {
-            "subcommand": "preview",
-            "required_flag": "--apply",
-            "effect": (
-                "required even when the user asks to see only a preview; "
-                "creates a durable confirmation-bound preview and does not "
-                "execute the change"
-            ),
-            "includes_later_ordered_transactions": True,
-        },
-        "omit_apply_only_when": [
-            "hypothetical",
-            "design_only",
-            "explicitly_non_executable",
-        ],
-    }
+    assert bank_fields["rebuild"] == {"type": "boolean"}
+    assert fields["rebuild_soundbanks"] == {"type": "boolean"}
+    assert "language_skip_and_artifact_plan" in adapter["gateway_derivations"]
+    assert "request_envelope" not in payload
+    assert "composer" not in payload
+    assert adapter["start"]["subcommand"] == "draft-start"
+    assert declaration["subcommand"] == "draft-declare-soundbank-plan"
 
 
 @pytest.mark.parametrize("version", ["2024.1", "2025.1"])
-def test_operation_schema_owns_exact_audio_convert_fast_route_contract(
+def test_request_schema_owns_exact_audio_convert_business_route_contract(
     tmp_path: Path,
     version: str,
 ) -> None:
@@ -1755,149 +2011,37 @@ def test_operation_schema_owns_exact_audio_convert_fast_route_contract(
 
     env = gateway_env(tmp_path, version=version)
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["operation-schema", "waapi.call"],
+        ["request-schema", "ak.wwise.core.audio.convert"],
         env=env,
         client_factory=fail_if_connected,
     )
 
     assert exit_code == 0
     assert factory_calls == []
-    assert payload["offline"] is True
-    assert payload["direct_fast_route_contract"] == {
-        "contract": "waapi-skill.operation-schema-direct-fast-route/v1",
-        "scope": {
-            "operation": "waapi.call",
-            "version": version,
-            "exact_api": "ak.wwise.core.audio.convert",
-            "activation": "exact_api_intent_only",
-            "applies_to_other_waapi_call_uris": False,
-        },
-        "canonical_request_template": {
-            "contract": OPERATION_REQUEST_CONTRACT,
-            "version": version,
-            "operation": "waapi.call",
-            "arguments": {
-                "api": "ak.wwise.core.audio.convert",
-                "args": {
-                    "objects": ["<exact-wwise-object-path>"],
-                    "platforms": ["<platform>"],
-                    "languages": ["SFX"],
-                },
-                "options": {},
-                "io_root": "<absolute-allowed-conversion-root>",
-            },
-        },
-        "template_policy": {
-            "copy_outer_shape_exactly": True,
-            "replace_only": [
-                "$.arguments.args.objects",
-                "$.arguments.args.platforms",
-                "$.arguments.args.languages",
-                "$.arguments.io_root",
-            ],
-            "array_replacement": {
-                "paths": [
-                    "$.arguments.args.objects",
-                    "$.arguments.args.platforms",
-                    "$.arguments.args.languages",
-                ],
-                "replace_entire_array": True,
-                "non_empty": True,
-                "preserve_user_order": True,
-            },
-            "placeholders_must_all_be_replaced": True,
-            "missing_or_ambiguous_input": "ask_before_preview",
-        },
-        "rules": {
-            "required_ordered_string_arrays": {
-                "paths": [
-                    "$.arguments.args.objects",
-                    "$.arguments.args.platforms",
-                    "$.arguments.args.languages",
-                ],
-                "min_items": 1,
-                "preserve_user_order": True,
-                "scalar_form_allowed": False,
-                "object_record_items_allowed": False,
-            },
-            "language_mapping": {
-                "natural_sfx_target_without_explicit_localized_languages": [
-                    "SFX"
-                ],
-                "explicit_localized_languages": (
-                    "replace SFX with the stated non-empty ordered string array"
-                ),
-                "languages_must_never_be_omitted": True,
-            },
-            "options": {
-                "path": "$.arguments.options",
-                "exact_value": {},
-            },
-            "io_root": {
-                "path": "$.arguments.io_root",
-                "type": "string",
-                "shape": "scalar",
-                "absolute": True,
-            },
-        },
-    }
-    keys = list(payload)
-    assert (
-        keys.index("request_envelope_policy")
-        < keys.index("direct_fast_route_contract")
-        < keys.index("session_context")
-    )
-    assert waapi_gateway.gateway_json_document_size(payload) < 8 * 1024
-
-    materialized = json.loads(
-        json.dumps(
-            payload["direct_fast_route_contract"]["canonical_request_template"]
-        )
-    )
-    materialized["arguments"]["args"] = {
-        "objects": [
-            r"\Actor-Mixer Hierarchy\Default Work Unit\WAAPI Sandbox\SFX_A",
-            r"\Actor-Mixer Hierarchy\Default Work Unit\WAAPI Sandbox\SFX_B",
-        ],
-        "platforms": ["Mac", "Windows"],
-        "languages": ["SFX"],
-    }
-    materialized["arguments"]["io_root"] = str(tmp_path.resolve())
-    parsed = parse_operation_request(materialized, expected_version=version)
-    assert parsed.arguments == materialized["arguments"]
-    validation = validate_semantic_payload(
-        materialized["arguments"]["api"],
-        materialized["arguments"]["args"],
-        materialized["arguments"]["options"],
-        version=version,
-    )
-    assert validation.required_fields == ("objects", "platforms", "languages")
-
+    assert payload["uri"] == "ak.wwise.core.audio.convert"
+    assert payload["input_shape"] == "business_declaration"
+    assert payload["continuation"]["subcommand"] == "draft-start"
+    assert payload["continuation"]["gateway_argv"] == [
+        "draft-start",
+        "ak.wwise.core.audio.convert",
+    ]
+    declaration = payload["business_adapter"]["declaration"]
+    assert declaration["required_fields"] == [
+        "audio_object_handles",
+        "platform_names",
+        "languages",
+        "io_root",
+    ]
+    assert declaration["field_types"]["io_root"] == "exact_user_io_root"
+    assert payload["business_adapter"]["legacy_typed_call_public"] is False
     second_exit_code, second_payload = waapi_gateway.execute_gateway(
-        ["operation-schema", "waapi.call"],
+        ["request-schema", "ak.wwise.core.audio.convert"],
         env=env,
         client_factory=fail_if_connected,
     )
     assert second_exit_code == 0
     assert second_payload == payload
     assert factory_calls == []
-
-    for other_version in ("2021.1", "2022.1", "2023.1"):
-        other_exit_code, other = execute(
-            ["operation-schema", "waapi.call"],
-            tmp_path=tmp_path,
-            version=other_version,
-        )
-        assert other_exit_code == 0
-        assert "direct_fast_route_contract" not in other
-
-    operation_exit_code, other_operation = execute(
-        ["operation-schema", "object.setNotes"],
-        tmp_path=tmp_path,
-        version=version,
-    )
-    assert operation_exit_code == 0
-    assert "direct_fast_route_contract" not in other_operation
 
 
 def test_transaction_show_reads_immutable_artifact_and_journal_without_wwise(tmp_path: Path) -> None:
@@ -1927,11 +2071,12 @@ def test_transaction_show_reads_immutable_artifact_and_journal_without_wwise(tmp
     assert payload["next_command"] == expected_transaction_next_command(
         "confirm",
         ["confirm", "tx-show", "--confirmation-token", token],
+        state_dir=state_dir,
         requires_explicit_user_confirmation=True,
     )
     assert list(payload).index("confirmation") > list(payload).index("events")
     assert list(payload).index("next_command") > list(payload).index("events")
-    assert list(payload).index("next_command") > list(payload).index("session_context")
+    assert "session_context" not in payload
     assert list(payload)[-1] == "next_command"
     assert payload["artifact"] == artifact
     assert [event["event_type"] for event in payload["events"]] == [
@@ -1985,6 +2130,7 @@ def test_transaction_show_advertises_exact_confirm_argv_only_while_awaiting(
             "--confirmation-token",
             awaiting_token,
         ],
+        state_dir=state_dir,
         requires_explicit_user_confirmation=True,
     )
     assert list(awaiting)[-1] == "next_command"
@@ -2039,11 +2185,13 @@ def test_transaction_show_summary_omits_raw_artifact_bulk_but_keeps_review_evide
     assert payload["next_command"] == expected_transaction_next_command(
         "confirm",
         ["confirm", "tx-summary", "--confirmation-token", token],
+        state_dir=state_dir,
         requires_explicit_user_confirmation=True,
     )
     assert list(payload).index("next_command") > list(payload).index("events")
-    assert list(payload).index("next_command") > list(payload).index("session_context")
+    assert "session_context" not in payload
     assert list(payload)[-1] == "next_command"
+    assert waapi_gateway.gateway_json_document_size(payload) < 5_500
     assert payload["summary_only"] is True
     assert "artifact" not in payload
     assert payload["preview_summary"]["contract"] == artifact["contract"]
@@ -2094,6 +2242,7 @@ def test_transaction_next_command_quotes_posix_shell_arguments_without_reconstru
         f"'tx with space' --confirmation-token ct1-{'0' * 24}"
     )
     assert shlex.split(payload["shell_command"]) == payload["full_argv"]
+    assert payload["shell_tool_timeout_ms"] == 30_000
     assert payload["copy_instruction"]["source_field"] == "shell_command"
     assert payload["copy_instruction"]["contract"] == (
         "waapi-skill.gateway-command-copy-instruction/v2"
@@ -2104,6 +2253,32 @@ def test_transaction_next_command_quotes_posix_shell_arguments_without_reconstru
     assert "model_command" not in payload
     assert "model_shell_family" not in payload
     assert tuple(payload)[-2:] == ("copy_instruction", "shell_command")
+
+
+def test_transaction_next_command_uses_short_task_local_posix_runner(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    runner = (
+        tmp_path / ".agents" / "skills" / "waapi-skill" / "scripts" / "run.py"
+    )
+    monkeypatch.setattr(waapi_gateway, "os", type("PosixOS", (), {"name": "posix"})())
+    monkeypatch.setattr(waapi_gateway, "GATEWAY_RUNNER_PATH", runner)
+
+    payload = waapi_gateway.transaction_next_command(
+        "execute",
+        ["execute", "tx1-task-local"],
+    )
+
+    assert payload["full_argv"][1] == str(runner)
+    assert payload["shell_command"] == (
+        "python .agents/skills/waapi-skill/scripts/run.py "
+        "gateway.py execute tx1-task-local"
+    )
+    selected = shlex.split(payload["shell_command"])
+    assert (tmp_path / selected[1]).resolve() == runner.resolve()
+    assert payload["copy_instruction"]["source_field"] == "shell_command"
 
 
 def test_transaction_next_command_adds_one_short_copy_source_on_windows(
@@ -2232,6 +2407,7 @@ def test_transaction_next_command_uses_the_v2_windows_shape_for_every_phase(
     assert payload["contract"] == "waapi-skill.gateway-next-command/v2"
     assert payload["command"] == command
     assert payload["gateway_argv"] == gateway_argv
+    assert payload["shell_tool_timeout_ms"] == 30_000
     assert decode_windows_powershell_argv(payload["shell_command"]) == tuple(
         payload["full_argv"]
     )
@@ -2722,7 +2898,7 @@ def test_transaction_show_long_migrate_review_is_materially_smaller_than_legacy_
                 "execution_contract": {
                     "contract": "waapi-skill.public-execution-contract/v2",
                     "effect": "external",
-                    "gateway_commands": ["preview", "confirm", "execute", "verify"],
+                    "gateway_commands": ["request-schema"],
                     "io_audit": {
                         "contract": "waapi-skill.isolated-io-audit/v1",
                         "io_root": str(Path(project_path).parent),
@@ -2863,9 +3039,11 @@ def test_confirm_uses_environment_state_dir_and_never_connects_to_wwise(tmp_path
     store = TransactionStore(state_dir)
     created = store.create_preview("tx-confirm", {"operation": "object.setNotes"})
     store.submit_for_confirmation("tx-confirm")
+    token = store.load_snapshot("tx-confirm").confirmation_token
+    assert token is not None
 
     exit_code, payload = execute(
-        ["confirm", "tx-confirm", "--artifact-hash", created.artifact_hash],
+        ["confirm", "tx-confirm", "--confirmation-token", token],
         tmp_path=tmp_path,
         state_dir=state_dir,
         env_state_dir=True,
@@ -2914,6 +3092,7 @@ def test_confirm_accepts_state_scoped_confirmation_token_without_connecting(
     assert payload["next_command"] == expected_transaction_next_command(
         "execute",
         ["execute", "tx-confirm-token"],
+        state_dir=state_dir,
     )
     assert store.load("tx-confirm-token").state is TransactionState.CONFIRMED
 
@@ -3021,7 +3200,7 @@ def test_preview_apply_read_only_blocks_before_connection_or_state_write(
 
     exit_code, payload = execute(
         [
-            "preview",
+            "legacy-preview",
             "--apply",
             "--request-json",
             json.dumps(create_request()),
@@ -3205,6 +3384,7 @@ def test_preview_apply_ask_before_changes_still_requires_show_token_and_confirm(
     assert shown["next_command"] == expected_transaction_next_command(
         "confirm",
         ["confirm", transaction_id, "--confirmation-token", token],
+        state_dir=state_dir,
         requires_explicit_user_confirmation=True,
     )
 
@@ -3219,6 +3399,7 @@ def test_preview_apply_ask_before_changes_still_requires_show_token_and_confirm(
     assert confirmed["next_command"] == expected_transaction_next_command(
         "execute",
         ["execute", transaction_id],
+        state_dir=state_dir,
     )
 
 
@@ -3240,7 +3421,7 @@ def test_ask_before_changes_uses_same_home_state_store_without_broker_injection(
 
     preview_exit, transaction = waapi_gateway.execute_gateway(
         [
-            "preview",
+            "legacy-preview",
             "--apply",
             "--request-json",
             json.dumps(create_request()),
@@ -3323,6 +3504,7 @@ def test_preview_apply_allow_changes_records_policy_authority_without_confirmati
     assert transaction["next_command"] == expected_transaction_next_command(
         "execute",
         ["execute", transaction_id],
+        state_dir=state_dir,
     )
 
     store = TransactionStore(state_dir)
@@ -3354,6 +3536,7 @@ def test_preview_apply_allow_changes_records_policy_authority_without_confirmati
     assert shown["next_command"] == expected_transaction_next_command(
         "execute",
         ["execute", transaction_id],
+        state_dir=state_dir,
     )
     assert "requires_later_user_message" not in shown["next_command"]
     assert not any(
@@ -3412,6 +3595,7 @@ def test_policy_authorized_allow_changes_executes_once_and_can_verify(
     assert executed["next_command"] == expected_transaction_next_command(
         "verify",
         ["verify", transaction["transaction_id"]],
+        state_dir=state_dir,
     )
 
     verify_client = FakeClient(
@@ -3569,6 +3753,7 @@ def test_preview_without_apply_stays_review_only_under_allow_changes(
             transaction["transaction_id"],
             "--summary-only",
         ],
+        state_dir=state_dir,
         requires_later_user_message=True,
     )
     snapshot = TransactionStore(state_dir).load_snapshot(
@@ -3582,21 +3767,21 @@ def test_preview_without_apply_stays_review_only_under_allow_changes(
     ]
 
 
-def test_confirm_rejects_tampered_hash_and_preserves_awaiting_state(tmp_path: Path) -> None:
+def test_confirm_rejects_tampered_token_and_preserves_awaiting_state(tmp_path: Path) -> None:
     state_dir = tmp_path / "state"
     store = TransactionStore(state_dir)
     store.create_preview("tx-hash", {"operation": "object.setNotes"})
     store.submit_for_confirmation("tx-hash")
 
     exit_code, payload = execute(
-        ["confirm", "tx-hash", "--artifact-hash", "0" * 64],
+        ["confirm", "tx-hash", "--confirmation-token", "0" * 64],
         tmp_path=tmp_path,
         state_dir=state_dir,
     )
 
     assert exit_code == 2
     assert payload["ok"] is False
-    assert payload["error_code"] == "ArtifactIntegrityError"
+    assert payload["error_code"] == "ConfirmationTokenMismatch"
     assert store.load("tx-hash").state is TransactionState.AWAITING_CONFIRMATION
 
 
@@ -3834,7 +4019,7 @@ def test_preview_rejects_transaction_state_inside_live_project_before_state_writ
     )
 
     exit_code, payload = execute(
-        ["preview", "--request-json", json.dumps(create_request())],
+        ["legacy-preview", "--request-json", json.dumps(create_request())],
         tmp_path=tmp_path,
         state_dir=state_dir,
         client=client,
@@ -3873,7 +4058,7 @@ def test_preview_rejects_project_without_stable_id_name_path_guard(
     )
 
     exit_code, payload = execute(
-        ["preview", "--request-json", json.dumps(create_request())],
+        ["legacy-preview", "--request-json", json.dumps(create_request())],
         tmp_path=tmp_path,
         state_dir=state_dir,
         client=client,
@@ -3915,7 +4100,7 @@ def test_2021_preview_rejects_malformed_or_multiple_project_rows(
     )
 
     exit_code, payload = execute(
-        ["preview", "--request-json", json.dumps(request)],
+        ["legacy-preview", "--request-json", json.dumps(request)],
         tmp_path=tmp_path,
         state_dir=state_dir,
         client=client,
@@ -4198,9 +4383,18 @@ def test_large_successful_execute_is_bounded_but_journal_and_verify_stay_exact(
     assert execute_payload["executed"] is True
     assert execute_payload["verified"] is False
     assert execute_payload["automatic_retry"] is False
+    assert execute_payload["agent_control"] == {
+        "terminal": False,
+        "required_outcome_before_reply": (
+            "verified_or_structured_verification_failure"
+        ),
+        "next": "execute next_command.copy_instruction.source_field in same turn",
+        "reply_before_next_command": "invalid",
+    }
     assert execute_payload["next_command"] == expected_transaction_next_command(
         "verify",
         ["verify", transaction["transaction_id"]],
+        state_dir=state_dir,
     )
     assert list(execute_payload)[-1] == "next_command"
     assert execute_payload["dispatch_result"]["result"] == {
@@ -4247,7 +4441,12 @@ def test_large_successful_execute_is_bounded_but_journal_and_verify_stay_exact(
         client=FakeClient(
             {
                 "ak.wwise.core.getInfo": [live_info()],
-                "ak.wwise.core.getProjectInfo": [project()],
+                "ak.wwise.core.getProjectInfo": [
+                    {
+                        **project(),
+                        "directories": {"cache": "x" * 13_000},
+                    }
+                ],
                 "ak.wwise.core.object.get": [{"return": [created_row()]}],
             }
         ),
@@ -4258,6 +4457,14 @@ def test_large_successful_execute_is_bounded_but_journal_and_verify_stay_exact(
     assert verify_payload["agent_result"]["transaction_id"] == transaction[
         "transaction_id"
     ]
+    assert verify_payload["stdout_projection"]["detail_level"] == (
+        "digest-verification-evidence"
+    )
+    assert verify_payload["stdout_projection"][
+        "full_verification_evidence_in_stdout"
+    ] is False
+    assert "result" not in verify_payload["project_call"]
+    assert waapi_gateway.gateway_json_document_size(verify_payload) < 12_000
     assert list(verify_payload)[-1] == "agent_result"
 
 
@@ -5322,13 +5529,8 @@ def test_object_create_plugin_runs_full_preview_confirm_execute_verify_chain(
 
 def test_lifecycle_opener_cleanup_spec_survives_the_full_gateway_chain(tmp_path: Path) -> None:
     state_dir = tmp_path / "load-bank-state"
-    sound_bank = {"name": "Main", "ids": [1, 2]}
-    request = generic_public_call_request(
+    transaction = preview_and_confirm_soundengine_bank(
         "ak.soundengine.loadBank",
-        {"soundBank": sound_bank},
-    )
-    transaction = preview_and_confirm_public_call(
-        request,
         tmp_path=tmp_path,
         state_dir=state_dir,
     )
@@ -5340,7 +5542,7 @@ def test_lifecycle_opener_cleanup_spec_survives_the_full_gateway_chain(tmp_path:
     assert preview_cleanup["projection"]["status"] == "not_started"
     assert preview_cleanup["spec"]["companion_request"] == {
         "api": "ak.soundengine.unloadBank",
-        "args": {"soundBank": sound_bank},
+        "args": {"soundBank": SOUND_BANK_GUID},
         "options": {},
     }
     show_exit, show_payload = execute(
@@ -5353,7 +5555,7 @@ def test_lifecycle_opener_cleanup_spec_survives_the_full_gateway_chain(tmp_path:
     assert show_payload["preview_summary"]["cleanup"]["spec"] == preview_cleanup["spec"]
     assert show_payload["preview_summary"]["cleanup"]["spec"]["companion_request"] == {
         "api": "ak.soundengine.unloadBank",
-        "args": {"soundBank": sound_bank},
+        "args": {"soundBank": SOUND_BANK_GUID},
         "options": {},
     }
 
@@ -5366,6 +5568,7 @@ def test_lifecycle_opener_cleanup_spec_survives_the_full_gateway_chain(tmp_path:
             {
                 "ak.wwise.core.getInfo": [live_info(year=2025)],
                 "ak.wwise.core.getProjectInfo": [project()],
+                "ak.wwise.core.object.get": [{"return": [sound_bank_row()]}],
                 "ak.soundengine.loadBank": [{}],
             }
         ),
@@ -5391,7 +5594,6 @@ def test_lifecycle_opener_cleanup_spec_survives_the_full_gateway_chain(tmp_path:
     assert verify_payload["cleanup"]["status"] == "pending"
     assert verify_payload["cleanup"]["projection"]["status"] == "pending"
     assert verify_payload["agent_result"]["cleanup"] == verify_payload["cleanup"]
-
     cleanup_payloads = (
         preview_cleanup,
         transaction["preview_summary"]["cleanup"],
@@ -5419,13 +5621,8 @@ def test_load_bank_cleanup_binding_cannot_be_overridden_by_execution_result(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     state_dir = tmp_path / "load-bank-result-override-state"
-    confirmed_sound_bank = {"name": "Confirmed", "ids": [7, 8]}
-    request = generic_public_call_request(
+    transaction = preview_and_confirm_soundengine_bank(
         "ak.soundengine.loadBank",
-        {"soundBank": confirmed_sound_bank},
-    )
-    transaction = preview_and_confirm_public_call(
-        request,
         tmp_path=tmp_path,
         state_dir=state_dir,
     )
@@ -5455,6 +5652,7 @@ def test_load_bank_cleanup_binding_cannot_be_overridden_by_execution_result(
         {
             "ak.wwise.core.getInfo": [live_info(year=2025)],
             "ak.wwise.core.getProjectInfo": [project()],
+            "ak.wwise.core.object.get": [{"return": [sound_bank_row()]}],
         }
     )
     execute_exit, execute_payload = execute(
@@ -5469,25 +5667,26 @@ def test_load_bank_cleanup_binding_cannot_be_overridden_by_execution_result(
     assert execute_payload["dispatch_result"]["result"]["soundBank"]["name"] == "Injected"
     assert execute_payload["cleanup"]["projection"]["companion_request"] == {
         "api": "ak.soundengine.unloadBank",
-        "args": {"soundBank": confirmed_sound_bank},
+        "args": {"soundBank": SOUND_BANK_GUID},
         "options": {},
     }
     assert execute_payload["cleanup"]["spec"]["companion_request"]["args"] == {
-        "soundBank": confirmed_sound_bank
+        "soundBank": SOUND_BANK_GUID
     }
     assert not any(call[0] == "ak.soundengine.loadBank" for call in execute_client.calls)
     stored_spec = TransactionStore(state_dir).load_preview(
         transaction["transaction_id"]
     ).artifact["prepared_operation"]["cleanup"]
     assert stored_spec == transaction["cleanup"]["spec"]
-    assert stored_spec["companion_request"]["args"] == {"soundBank": confirmed_sound_bank}
+    assert stored_spec["companion_request"]["args"] == {"soundBank": SOUND_BANK_GUID}
 
 
 def test_transport_create_materializes_destroy_request_in_execute_verify_and_agent_result(
     tmp_path: Path,
 ) -> None:
     state_dir = tmp_path / "transport-state"
-    transport_id = 73
+    # Wwise 2022.1 Authoring proves that zero is a live uint32 transport ID.
+    transport_id = 0
     request = generic_public_call_request(
         "ak.wwise.core.transport.create",
         {"object": OBJECT_GUID},
@@ -5532,7 +5731,7 @@ def test_transport_create_materializes_destroy_request_in_execute_verify_and_age
             "ak.wwise.core.getInfo": [live_info(year=2025)],
             "ak.wwise.core.getProjectInfo": [project()],
             "ak.wwise.core.transport.getList": [
-                {"list": [{"transport": transport_id, "object": OBJECT_GUID, "gameObject": 1}]}
+                {"list": [{"transport": transport_id, "object": OBJECT_GUID, "gameObject": 1}]},
             ],
             "ak.wwise.core.transport.getState": [{"state": "stopped"}],
         }
@@ -5552,6 +5751,21 @@ def test_transport_create_materializes_destroy_request_in_execute_verify_and_age
         "transport": transport_id
     }
     assert verify_payload["agent_result"]["cleanup"] == verify_payload["cleanup"]
+    business_result = verify_payload["agent_result"]["business_result"]
+    assert business_result["contract"] == "waapi-skill.runtime-control-result/v1"
+    transport_handle = business_result["transport_handle"]
+    assert re.fullmatch(r"trh1-[0-9a-f]{32}", transport_handle)
+    issued = RuntimeTransportHandleStore(state_dir).resolve(
+        transport_handle,
+        context=RuntimeTransportContext(
+            endpoint_url="ws://127.0.0.1:31337/waapi",
+            project_id=PROJECT_GUID,
+            project_path=project()["path"],
+            wwise_version="2025.1",
+            wwise_build="v2025.1.19",
+        ),
+    )
+    assert issued.transport_id == transport_id
     assert verify_payload["agent_result"]["cleanup"]["projection"]["binding"]["materialized"] is True
     assert (
         verify_payload["cleanup"]["projection"]["cleanup_spec_sha256"]
@@ -5568,6 +5782,142 @@ def test_transport_create_materializes_destroy_request_in_execute_verify_and_age
         {"transport": transport_id},
         {},
     ) in verify_client.calls
+
+
+def test_verified_transport_destroy_retires_every_gateway_handle_for_reused_id(
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "transport-retire-state"
+    transport_id = 73
+    context = RuntimeTransportContext(
+        endpoint_url="ws://127.0.0.1:31337/waapi",
+        project_id=PROJECT_GUID,
+        project_path=project()["path"],
+        wwise_version="2025.1",
+        wwise_build="v2025.1.19",
+    )
+    handle_store = RuntimeTransportHandleStore(state_dir)
+    live_transport_row = {
+        "transport": transport_id,
+        "object": OBJECT_GUID,
+        "gameObject": 1,
+    }
+    issued = handle_store.issue(
+        transport_id=transport_id,
+        context=context,
+        source_transaction_id="tx1-testtransportretire00",
+        source_artifact_hash="f" * 64,
+        transport_row_sha256=canonical_sha256(live_transport_row),
+    )
+    request = generic_public_call_request(
+        "ak.wwise.core.transport.destroy",
+        {"transport": transport_id},
+    )
+    transaction = preview_and_confirm_public_call(
+        request,
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+    )
+
+    execute_exit, execute_payload = execute(
+        ["execute", transaction["transaction_id"]],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        version="2025.1",
+        client=FakeClient(
+            {
+                "ak.wwise.core.getInfo": [live_info(year=2025)],
+                "ak.wwise.core.getProjectInfo": [project()],
+                "ak.wwise.core.transport.getList": [
+                    {"list": [live_transport_row]}
+                ],
+                "ak.wwise.core.transport.destroy": [{}],
+            }
+        ),
+    )
+    assert execute_exit == 0, execute_payload
+    verify_exit, verify_payload = execute(
+        ["verify", transaction["transaction_id"]],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        version="2025.1",
+        client=FakeClient(
+            {
+                "ak.wwise.core.getInfo": [live_info(year=2025)],
+                "ak.wwise.core.getProjectInfo": [project()],
+                "ak.wwise.core.transport.getList": [{"list": []}],
+            }
+        ),
+    )
+
+    assert verify_exit == 0, verify_payload
+    assert verify_payload["agent_result"]["business_result"] == {
+        "contract": "waapi-skill.runtime-control-result/v1",
+        "retired_transport_handle_count": 1,
+    }
+    with pytest.raises(RuntimeTransportHandleError) as caught:
+        handle_store.resolve(issued.handle, context=context)
+    assert caught.value.error_code == "TRANSPORT_HANDLE_RETIRED"
+
+
+def test_transport_execution_rejects_same_numeric_id_reused_for_another_row(
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "transport-reuse-state"
+    transport_id = 73
+    context = RuntimeTransportContext(
+        endpoint_url="ws://127.0.0.1:31337/waapi",
+        project_id=PROJECT_GUID,
+        project_path=project()["path"],
+        wwise_version="2025.1",
+        wwise_build="v2025.1.19",
+    )
+    original_row = {
+        "transport": transport_id,
+        "object": OBJECT_GUID,
+        "gameObject": 1,
+    }
+    RuntimeTransportHandleStore(state_dir).issue(
+        transport_id=transport_id,
+        context=context,
+        source_transaction_id="tx1-testtransportreuse000",
+        source_artifact_hash="f" * 64,
+        transport_row_sha256=canonical_sha256(original_row),
+    )
+    transaction = preview_and_confirm_public_call(
+        generic_public_call_request(
+            "ak.wwise.core.transport.destroy",
+            {"transport": transport_id},
+        ),
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+    )
+    reused_row = {
+        "transport": transport_id,
+        "object": "{99999999-9999-9999-9999-999999999999}",
+        "gameObject": 2,
+    }
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": [live_info(year=2025)],
+            "ak.wwise.core.getProjectInfo": [project()],
+            "ak.wwise.core.transport.getList": [{"list": [reused_row]}],
+        }
+    )
+
+    execute_exit, execute_payload = execute(
+        ["execute", transaction["transaction_id"]],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        version="2025.1",
+        client=client,
+    )
+
+    assert execute_exit == 2
+    assert execute_payload["status"] == "repreview_required"
+    assert execute_payload["error_code"] == "TRANSPORT_HANDLE_STALE"
+    assert execute_payload["executed"] is False
+    assert all(call[0] != "ak.wwise.core.transport.destroy" for call in client.calls)
 
 
 def test_transport_verify_guard_failure_keeps_result_bound_destroy_request(
@@ -5785,12 +6135,8 @@ def test_transaction_readback_normalizes_only_single_exact_unknown_object(
 
 def test_lifecycle_opener_execution_exception_reports_unknown_cleanup(tmp_path: Path) -> None:
     state_dir = tmp_path / "indeterminate-cleanup-state"
-    request = generic_public_call_request(
+    transaction = preview_and_confirm_soundengine_bank(
         "ak.soundengine.loadBank",
-        {"soundBank": "Main"},
-    )
-    transaction = preview_and_confirm_public_call(
-        request,
         tmp_path=tmp_path,
         state_dir=state_dir,
     )
@@ -5803,6 +6149,7 @@ def test_lifecycle_opener_execution_exception_reports_unknown_cleanup(tmp_path: 
             {
                 "ak.wwise.core.getInfo": [live_info(year=2025)],
                 "ak.wwise.core.getProjectInfo": [project()],
+                "ak.wwise.core.object.get": [{"return": [sound_bank_row()]}],
                 "ak.soundengine.loadBank": [],
             },
             errors={
@@ -5876,12 +6223,8 @@ def test_work_unit_load_is_available_reversal_through_the_full_gateway_chain(
 
 def test_lifecycle_closer_is_not_reported_as_needing_more_cleanup(tmp_path: Path) -> None:
     state_dir = tmp_path / "unload-bank-state"
-    request = generic_public_call_request(
+    transaction = preview_and_confirm_soundengine_bank(
         "ak.soundengine.unloadBank",
-        {"soundBank": "Main"},
-    )
-    transaction = preview_and_confirm_public_call(
-        request,
         tmp_path=tmp_path,
         state_dir=state_dir,
     )
@@ -5899,6 +6242,7 @@ def test_lifecycle_closer_is_not_reported_as_needing_more_cleanup(tmp_path: Path
             {
                 "ak.wwise.core.getInfo": [live_info(year=2025)],
                 "ak.wwise.core.getProjectInfo": [project()],
+                "ak.wwise.core.object.get": [{"return": [sound_bank_row()]}],
                 "ak.soundengine.unloadBank": [{}],
             }
         ),
@@ -6156,7 +6500,16 @@ def test_remote_local_filesystem_previews_fail_before_project_or_path_proof(
     }
     preview_command = (
         "legacy-preview"
-        if operation in {"audio.import", "object.set"}
+        if operation
+        in {
+            "audio.import",
+            "audio.importTabDelimited",
+            "object.set",
+            "soundbank.convertExternalSources",
+            "soundbank.generate",
+            "soundbank.processDefinitionFiles",
+            "soundbank.setInclusions",
+        }
         else "preview"
     )
 
@@ -6343,7 +6696,7 @@ def test_confirmed_named_soundbank_transaction_stays_confirmed_on_remote_execute
     ]
 
 
-def test_remote_named_capture_screen_is_not_a_locality_transaction(
+def test_remote_named_capture_screen_still_requires_authoring(
     tmp_path: Path,
 ) -> None:
     request = {
@@ -6363,7 +6716,7 @@ def test_remote_named_capture_screen_is_not_a_locality_transaction(
         [
             "--host",
             "192.0.2.10",
-            "preview",
+            "legacy-preview",
             "--request-json",
             json.dumps(request),
         ],
@@ -6372,12 +6725,9 @@ def test_remote_named_capture_screen_is_not_a_locality_transaction(
         client=client,
     )
 
-    assert exit_code == 0, payload
-    assert payload["status"] == "awaiting_confirmation"
-    assert [call[0] for call in client.calls] == [
-        "ak.wwise.core.getInfo",
-        "ak.wwise.core.getProjectInfo",
-    ]
+    assert exit_code == 2, payload
+    assert payload["error_code"] == "AUTHORING_HOST_REQUIRED"
+    assert [call[0] for call in client.calls] == ["ak.wwise.core.getInfo"]
 
 
 @pytest.mark.skipif(
@@ -6470,6 +6820,111 @@ def test_local_wine_cli_execute_translates_only_the_transient_dispatch_paths(
     events = TransactionStore(state_dir).read_events(transaction["transaction_id"])
     completion = next(event for event in events if event["event_type"] == "execution_completed")
     assert completion["details"]["wire_path_adaptation"] == proof
+
+
+def test_console_project_open_selects_the_sealed_isolated_io_audit() -> None:
+    target = Path("/tmp/case/TargetProject.wproj")
+    audit = {
+        "contract": "waapi-skill.io-audit/v1",
+        "uri": "ak.wwise.console.project.open",
+        "paths": [
+            {
+                "section": "args",
+                "json_path": "$.args.path",
+                "raw_path": str(target),
+                "resolved_path": str(target),
+            }
+        ],
+    }
+    prepared = {
+        "pre_state": {
+            "execution_contract": {
+                "io_audit": audit,
+            }
+        }
+    }
+
+    selected = waapi_gateway.prepared_wire_path_io_audit(
+        operation="waapi.call",
+        call_uri="ak.wwise.console.project.open",
+        prepared=prepared,
+    )
+
+    assert selected == audit
+
+
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="Wine host path translation is POSIX-only",
+)
+def test_local_wine_authoring_project_open_translates_target_after_close(
+    tmp_path: Path,
+) -> None:
+    version = "2022.1"
+    api = "ak.wwise.ui.project.open"
+    state_dir = tmp_path / "wine-authoring-project-state"
+    target = (tmp_path / "target" / "TargetProject.wproj").resolve()
+    target.parent.mkdir()
+    target.write_text("<Project/>", encoding="utf-8")
+    request = {
+        "contract": OPERATION_REQUEST_CONTRACT,
+        "version": version,
+        "operation": "waapi.call",
+        "arguments": {
+            "api": api,
+            "args": {"path": str(target)},
+            "options": {},
+            "io_root": str(target.parent),
+        },
+    }
+    authoring_info = wine_live_info()
+    authoring_info["isCommandLine"] = False
+    authoring_info["processPath"] = (
+        r"c:\Program Files\Audiokinetic\Wwise\Wwise.exe"
+    )
+    no_project = {"ak.wwise.core.object.get": [{"return": []}]}
+    transaction = preview(
+        request,
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=FakeClient(
+            {
+                "ak.wwise.core.getInfo": [authoring_info],
+                **no_project,
+            }
+        ),
+    )
+    confirm(
+        transaction["transaction_id"],
+        transaction["artifact_hash"],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+    )
+    execute_client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": [authoring_info],
+            "ak.wwise.core.object.get": [{"return": []}],
+            api: [{}],
+        }
+    )
+
+    exit_code, payload = execute(
+        ["execute", transaction["transaction_id"]],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=execute_client,
+        version=version,
+    )
+
+    assert exit_code == 0, json.dumps(payload, indent=2)
+    assert next(call for call in execute_client.calls if call[0] == api) == (
+        api,
+        {"path": z_wire_path(target)},
+        {},
+    )
+    assert payload["wire_path_adaptation"]["mapping"]["anchor_source"] == (
+        "transition_target"
+    )
 
 
 @pytest.mark.skipif(
@@ -6934,10 +7389,9 @@ def test_additional_reviewed_explicit_project_cli_calls_verify_without_project_p
         api,
     ]
 
-    # Conversion uses this verification path directly. Migration remains
-    # terminal after execute in the agent-facing protocol, but its lower-level
-    # durable contract must likewise never probe an Authoring project that the
-    # CLI process may already have unloaded.
+    # Both conversion and migration must follow the returned verify continuation.
+    # That context/runtime-only verification never probes an Authoring project
+    # that the CLI process may already have unloaded.
     verify_client = FakeClient({"ak.wwise.core.getInfo": [live_info()]})
     verify_exit, verify_payload = execute(
         ["verify", transaction["transaction_id"]],
@@ -7098,6 +7552,7 @@ def test_every_project_transition_row_runs_one_complete_program_chain(
     guard_mode: str,
 ) -> None:
     year = int(version.split(".", 1)[0])
+    is_command_line = not api.startswith("ak.wwise.ui.")
     state_dir = tmp_path / "state"
     io_root = (tmp_path / "io-root").resolve()
     target_path = io_root / "TargetProject.wproj"
@@ -7127,7 +7582,9 @@ def test_every_project_transition_row_runs_one_complete_program_chain(
     )
     preview_client = FakeClient(
         {
-            "ak.wwise.core.getInfo": [live_info(year=year)],
+            "ak.wwise.core.getInfo": [
+                live_info(year=year, is_command_line=is_command_line)
+            ],
             "ak.wwise.core.object.get": [{"return": before_rows}],
         }
     )
@@ -7147,7 +7604,9 @@ def test_every_project_transition_row_runs_one_complete_program_chain(
     result = {"hadProjectOpen": True} if api.endswith(".close") else {}
     execute_client = FakeClient(
         {
-            "ak.wwise.core.getInfo": [live_info(year=year)],
+            "ak.wwise.core.getInfo": [
+                live_info(year=year, is_command_line=is_command_line)
+            ],
             "ak.wwise.core.object.get": [{"return": before_rows}],
             api: [result],
         }
@@ -7175,7 +7634,9 @@ def test_every_project_transition_row_runs_one_complete_program_chain(
     )
     verify_client = FakeClient(
         {
-            "ak.wwise.core.getInfo": [live_info(year=year)],
+            "ak.wwise.core.getInfo": [
+                live_info(year=year, is_command_line=is_command_line)
+            ],
             "ak.wwise.core.object.get": [{"return": after_rows}],
         }
     )
@@ -7194,6 +7655,182 @@ def test_every_project_transition_row_runs_one_complete_program_chain(
     assert verify_payload["verification"]["readbacks"][-1]["kind"] == "project-transition-observation"
     assert verify_payload["guard_validation"]["project_transition"]["matched"] is True
     assert verify_payload["agent_result"]["verified"] is True
+
+
+def test_project_transition_verify_waits_through_transient_authoring_lock(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    version = "2022.1"
+    api = "ak.wwise.ui.project.close"
+    state_dir = tmp_path / "state"
+    current_path = (tmp_path / "current" / "CurrentProject.wproj").resolve()
+    request = {
+        "contract": OPERATION_REQUEST_CONTRACT,
+        "version": version,
+        "operation": "waapi.call",
+        "arguments": {"api": api, "args": {}, "options": {}},
+    }
+    before = [{**project(path=str(current_path)), "type": "Project"}]
+    transaction = preview(
+        request,
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=FakeClient(
+            {
+                "ak.wwise.core.getInfo": [live_info(is_command_line=False)],
+                "ak.wwise.core.object.get": [{"return": before}],
+            }
+        ),
+    )
+    confirm(
+        transaction["transaction_id"],
+        transaction["artifact_hash"],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+    )
+    execute_exit, execute_payload = execute(
+        ["execute", transaction["transaction_id"]],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=FakeClient(
+            {
+                "ak.wwise.core.getInfo": [live_info(is_command_line=False)],
+                "ak.wwise.core.object.get": [{"return": before}],
+                api: [{"hadProjectOpen": True}],
+            }
+        ),
+        version=version,
+    )
+    assert execute_exit == 0, execute_payload
+    monkeypatch.setattr(waapi_gateway.time, "sleep", lambda _seconds: None)
+    locked = WaapiRequestFailed(
+        "ak.wwise.locked",
+        {
+            "message": "Cannot execute call because Wwise has an exclusive lock.",
+            "details": {"reasons": ["Closing project in progress"]},
+        },
+    )
+    verify_client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": [live_info(is_command_line=False)],
+            "ak.wwise.core.object.get": [{"return": []}],
+        },
+        errors={"ak.wwise.core.getInfo": [locked]},
+    )
+
+    verify_exit, verified = execute(
+        ["verify", transaction["transaction_id"]],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=verify_client,
+        version=version,
+    )
+
+    assert verify_exit == 0, verified
+    assert verified["state"] == TransactionState.VERIFIED.value
+    assert verified["guard_validation"]["project_transition"]["matched"] is True
+    assert [call[0] for call in verify_client.calls].count(
+        "ak.wwise.core.getInfo"
+    ) == 2
+
+
+def test_authoring_project_open_draft_allows_no_current_project(
+    tmp_path: Path,
+) -> None:
+    version = "2022.1"
+    operation = "ak.wwise.ui.project.open"
+    state_dir = tmp_path / "state"
+    target = (tmp_path / "target" / "TargetProject.wproj").resolve()
+    target.parent.mkdir()
+    target.write_text("fixture", encoding="utf-8")
+    code, started = execute(
+        ["draft-start", operation],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        version=version,
+    )
+    assert code == 0, started
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+
+    def no_project_client() -> FakeClient:
+        return FakeClient(
+            {
+                "ak.wwise.core.getInfo": [live_info(is_command_line=False)],
+                "ak.wwise.core.object.get": [{"return": []}],
+            },
+            errors={
+                "ak.wwise.core.getProjectInfo": [
+                    WaapiRequestFailed(
+                        "ak.wwise.unavailable",
+                        {"message": "No project is loaded"},
+                    )
+                ]
+            },
+        )
+
+    code, declared = execute(
+        [
+            "draft-declare-host-plan",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            "1",
+            "--value",
+            "project_file",
+            str(target),
+            "--toggle",
+            "discard_unsaved_current_project",
+            "disable",
+            "--value",
+            "upgrade_policy",
+            "fail",
+        ],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=no_project_client(),
+        version=version,
+    )
+    assert code == 0, declared
+    code, checked = execute(
+        [
+            "draft-check",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            str(declared["draft"]["revision"]),
+        ],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=no_project_client(),
+        version=version,
+    )
+    assert code == 0, checked
+    code, previewed = execute(
+        [
+            "preview-from-draft",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            str(checked["draft"]["revision"]),
+        ],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=no_project_client(),
+        version=version,
+    )
+
+    assert code == 0, previewed
+    assert previewed["state"] == TransactionState.AWAITING_CONFIRMATION.value
+    guard = TransactionStore(state_dir).load_preview(
+        previewed["transaction_id"]
+    ).artifact["project_guard"]
+    assert guard["project_guard_mode"] == PROJECT_GUARD_TRANSITION_TO_PATH
+    assert guard["project"]["state"] == "none"
 
 
 def test_project_transition_mismatch_stays_executed_unverified_for_manual_verify(
@@ -7221,7 +7858,7 @@ def test_project_transition_mismatch_stays_executed_unverified_for_manual_verify
         state_dir=state_dir,
         client=FakeClient(
             {
-                "ak.wwise.core.getInfo": [live_info()],
+                "ak.wwise.core.getInfo": [live_info(is_command_line=False)],
                 "ak.wwise.core.object.get": [{"return": []}],
             }
         ),
@@ -7238,7 +7875,7 @@ def test_project_transition_mismatch_stays_executed_unverified_for_manual_verify
         state_dir=state_dir,
         client=FakeClient(
             {
-                "ak.wwise.core.getInfo": [live_info()],
+                "ak.wwise.core.getInfo": [live_info(is_command_line=False)],
                 "ak.wwise.core.object.get": [{"return": []}],
                 api: [{}],
             }
@@ -7254,7 +7891,7 @@ def test_project_transition_mismatch_stays_executed_unverified_for_manual_verify
         state_dir=state_dir,
         client=FakeClient(
             {
-                "ak.wwise.core.getInfo": [live_info()],
+                "ak.wwise.core.getInfo": [live_info(is_command_line=False)],
                 "ak.wwise.core.object.get": [
                     {
                         "return": [
@@ -7276,7 +7913,7 @@ def test_project_transition_mismatch_stays_executed_unverified_for_manual_verify
     assert "agent_result" not in payload
 
 
-def test_undo_group_success_uses_one_client_and_verifies_only_result_schemas(
+def test_undo_group_success_uses_one_client_and_aggregates_child_verification(
     tmp_path: Path,
 ) -> None:
     state_dir = tmp_path / "state"
@@ -7285,6 +7922,7 @@ def test_undo_group_success_uses_one_client_and_verifies_only_result_schemas(
         {
             "ak.wwise.core.getInfo": [live_info(year=2023)],
             "ak.wwise.core.getProjectInfo": [project()],
+            "ak.wwise.core.object.get": [{"return": [object_row()]}],
             "ak.wwise.core.undo.beginGroup": [{}],
             "ak.wwise.core.object.setNotes": [{}],
             "ak.wwise.core.undo.endGroup": [{}],
@@ -7335,17 +7973,25 @@ def test_undo_group_success_uses_one_client_and_verifies_only_result_schemas(
             {
                 "ak.wwise.core.getInfo": [live_info(year=2023)],
                 "ak.wwise.core.getProjectInfo": [project()],
+                "ak.wwise.core.object.get": [
+                    {"return": [object_row(notes="after")]}
+                ],
             }
         ),
         version="2023.1",
     )
 
     assert verify_exit == 0, verify_payload
-    assert verify_payload["state"] == TransactionState.RESULT_SCHEMA_CHECKED.value
-    assert verify_payload["verified"] is False
-    assert verify_payload["result_schema_checked"] is True
-    assert verify_payload["verification"]["business_state_verified"] is False
-    assert verify_payload["agent_result"]["verified"] is False
+    assert verify_payload["state"] == TransactionState.VERIFIED.value
+    assert verify_payload["verified"] is True
+    assert verify_payload["verification"]["business_state_verified"] is True
+    assert verify_payload["verification"]["verification_strength"] == (
+        "compound_child_readback"
+    )
+    assert any(
+        assertion["name"].startswith("Undo Group child[0]")
+        for assertion in verify_payload["verification"]["assertions"]
+    )
 
 
 def test_undo_group_success_keeps_one_phase_copy_below_the_final_gateway_ceiling(
@@ -7374,6 +8020,7 @@ def test_undo_group_success_keeps_one_phase_copy_below_the_final_gateway_ceiling
         {
             "ak.wwise.core.getInfo": [live_info(year=2023)],
             "ak.wwise.core.getProjectInfo": [project()],
+            "ak.wwise.core.object.get": [{"return": [object_row()]}],
             "ak.wwise.core.undo.beginGroup": [{}],
             "ak.wwise.core.object.setNotes": [large_inner_result],
             "ak.wwise.core.undo.endGroup": [{}],
@@ -7427,6 +8074,7 @@ def test_undo_group_success_with_journal_failure_is_not_replayed(
         {
             "ak.wwise.core.getInfo": [live_info(year=2023)],
             "ak.wwise.core.getProjectInfo": [project()],
+            "ak.wwise.core.object.get": [{"return": [object_row()]}],
             "ak.wwise.core.undo.beginGroup": [{}],
             "ak.wwise.core.object.setNotes": [{}],
             "ak.wwise.core.undo.endGroup": [{}],
@@ -7468,6 +8116,7 @@ def test_undo_group_inner_timeout_reserves_budget_cancels_and_never_retries(
         {
             "ak.wwise.core.getInfo": [live_info(year=2023)],
             "ak.wwise.core.getProjectInfo": [project()],
+            "ak.wwise.core.object.get": [{"return": [object_row()]}],
             "ak.wwise.core.undo.beginGroup": [{}],
             "ak.wwise.core.undo.cancelGroup": [{}],
         },
@@ -7516,6 +8165,7 @@ def test_undo_group_cancel_failure_is_terminal_indeterminate(tmp_path: Path) -> 
         {
             "ak.wwise.core.getInfo": [live_info(year=2023)],
             "ak.wwise.core.getProjectInfo": [project()],
+            "ak.wwise.core.object.get": [{"return": [object_row()]}],
             "ak.wwise.core.undo.beginGroup": [{}],
         },
         errors={
@@ -7552,6 +8202,7 @@ def test_undo_group_malformed_begin_result_best_effort_cancels_but_stays_indeter
         {
             "ak.wwise.core.getInfo": [live_info(year=2023)],
             "ak.wwise.core.getProjectInfo": [project()],
+            "ak.wwise.core.object.get": [{"return": [object_row()]}],
             "ak.wwise.core.undo.beginGroup": [{"unexpected": True}],
             "ak.wwise.core.undo.cancelGroup": [{}],
         }
@@ -7584,6 +8235,7 @@ def test_undo_group_malformed_end_result_best_effort_cancels_but_stays_indetermi
         {
             "ak.wwise.core.getInfo": [live_info(year=2023)],
             "ak.wwise.core.getProjectInfo": [project()],
+            "ak.wwise.core.object.get": [{"return": [object_row()]}],
             "ak.wwise.core.undo.beginGroup": [{}],
             "ak.wwise.core.object.setNotes": [{}],
             "ak.wwise.core.undo.endGroup": [{"unexpected": True}],
@@ -7629,6 +8281,7 @@ def test_undo_group_phase_exception_best_effort_cancels_and_remains_indeterminat
         {
             "ak.wwise.core.getInfo": [live_info(year=2023)],
             "ak.wwise.core.getProjectInfo": [project()],
+            "ak.wwise.core.object.get": [{"return": [object_row()]}],
             "ak.wwise.core.undo.beginGroup": [{}],
             "ak.wwise.core.object.setNotes": [{}],
             "ak.wwise.core.undo.endGroup": [{}],
@@ -7686,6 +8339,7 @@ def test_undo_group_accumulated_result_limit_stops_inner_and_attempts_cancel(
         {
             "ak.wwise.core.getInfo": [live_info(year=2023)],
             "ak.wwise.core.getProjectInfo": [project()],
+            "ak.wwise.core.object.get": [{"return": [object_row()]}],
             "ak.wwise.core.undo.beginGroup": [{}],
             "ak.wwise.core.object.setNotes": [{"program_payload": "x" * 32_000}],
             "ak.wwise.core.undo.cancelGroup": [{}],

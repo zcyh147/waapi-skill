@@ -9,9 +9,12 @@ from typing import Any
 
 import pytest  # pyright: ignore[reportMissingImports]
 
+from tests.semantic.support import codex_object_heavy_v3 as object_heavy
+
 from tests.semantic.support.codex_object_heavy_v3 import (
     OBJECT_CREATE_CASE_IDS,
     OBJECT_COMPOUND_CROSS_VERSION_CASE_IDS,
+    OBJECT_COMPOUND_CROSS_VERSION_CASE_VERSIONS,
     OBJECT_GET_CASE_IDS,
     OBJECT_HEAVY_CASE_IDS,
     OBJECT_SET_CASE_IDS,
@@ -21,6 +24,8 @@ from tests.semantic.support.codex_object_heavy_v3 import (
     QueryObjectRequestSpec,
     all_object_heavy_v3_recipes,
     build_object_heavy_v3_recipe,
+    typed_input_business_query_recipe,
+    typed_input_merge_recipe,
 )
 from wwise_waapi.operation_registry import parse_operation_request
 
@@ -90,6 +95,78 @@ def test_all_fifteen_object_heavy_ids_build_deterministically() -> None:
 
     with pytest.raises(ObjectHeavyRecipeError, match="unknown object-heavy V3 scenario"):
         build_object_heavy_v3_recipe("OBJ22-F-GET-99")
+
+
+def test_typed_input_merge_recipe_keeps_one_representative_recursive_group() -> None:
+    base = build_object_heavy_v3_recipe("OBJ22-F-CREATE-02", "2021.1")
+
+    recipe = typed_input_merge_recipe(
+        base,
+        unit_id="TYP21-DEDICATED-OBJECT-CREATE",
+    )
+
+    assert isinstance(recipe.request, OperationRequestSpec)
+    assert [row["name"] for row in recipe.request.arguments["children"]] == [
+        "Alert"
+    ]
+    assert "notes" not in recipe.request.arguments["children"][0]
+    assert recipe.oracle.new_keys == ("alert", "alert_a", "alert_b")
+    robot = next(row for row in recipe.oracle.expected_objects if row.key == "robot")
+    assert robot.children == ("idle", "alert")
+    assert {row.key for row in recipe.oracle.expected_objects} == {
+        "robot",
+        "idle",
+        "idle_a",
+        "alert",
+        "alert_a",
+        "alert_b",
+    }
+    assert "Combat" not in recipe.prompt_literals
+    assert "Damage" not in recipe.prompt_literals
+    assert "警戒对白" not in recipe.prompt_literals
+    alert = next(row for row in recipe.oracle.expected_objects if row.key == "alert")
+    assert all(field.name != "notes" for field in alert.fields)
+    assert base.oracle.new_keys == (
+        "alert",
+        "alert_a",
+        "alert_b",
+        "combat",
+        "combat_a",
+        "combat_b",
+        "damage",
+        "damage_a",
+        "damage_b",
+    )
+
+
+def test_typed_input_rename_recipe_focuses_on_the_collision_root() -> None:
+    base = build_object_heavy_v3_recipe("OBJ22-F-CREATE-03", "2023.1")
+
+    recipe = object_heavy.typed_input_rename_recipe(
+        base,
+        unit_id="TYP23-DEDICATED-OBJECT-CREATE",
+    )
+
+    assert isinstance(recipe.request, OperationRequestSpec)
+    assert "properties" not in recipe.request.arguments
+    assert "children" not in recipe.request.arguments
+    assert recipe.request.arguments["notes"] == "新版材质碰撞库"
+    assert recipe.oracle.new_keys == ("new_impact",)
+    assert tuple(row.key for row in recipe.oracle.expected_objects) == (
+        "new_impact",
+    )
+    created = recipe.oracle.expected_objects[0]
+    assert created.children == ()
+    assert [field.name for field in created.fields] == ["notes"]
+    assert base.oracle.new_keys == (
+        "new_impact",
+        "new_metal",
+        "new_metal_light",
+        "new_metal_heavy",
+        "new_wood",
+        "new_wood_light",
+        "new_wood_heavy",
+    )
 
 
 def test_every_agent_visible_literal_is_grounded_in_the_approved_prompt() -> None:
@@ -185,7 +262,124 @@ def test_mutation_requests_parse_through_the_production_closed_contract() -> Non
     }
 
 
-@pytest.mark.parametrize("case_id", OBJECT_COMPOUND_CROSS_VERSION_CASE_IDS)
+def test_query_recipes_keep_historical_and_business_declarations_explicit() -> None:
+    simple = build_object_heavy_v3_recipe("OBJ22-F-GET-01", "2021.1")
+    conjunctive = build_object_heavy_v3_recipe("OBJ22-F-GET-03", "2022.1")
+
+    assert isinstance(simple.request, QueryObjectRequestSpec)
+    assert "--where-json" not in simple.request.argv
+    assert simple.request.argv[simple.request.argv.index("--where") :] == (
+        "--where",
+        "type",
+        "=",
+        "string",
+        "Sound",
+        "--take",
+        "24",
+        "--return-field",
+        "id",
+        "--return-field",
+        "name",
+        "--return-field",
+        "type",
+        "--return-field",
+        "path",
+        "--return-field",
+        "@Volume",
+        "--return-field",
+        "notes",
+        "--return-field",
+        "OutputBus",
+    )
+    assert isinstance(conjunctive.request, QueryObjectRequestSpec)
+    assert not {
+        "--path",
+        "--type",
+        "--select",
+        "--where",
+        "--where-json",
+        "--take",
+        "--return-field",
+    } & set(conjunctive.request.argv)
+    assert conjunctive.request.argv[4:] == (
+        "--path-segment",
+        "Actor-Mixer Hierarchy",
+        "--path-segment",
+        "Default Work Unit",
+        "--path-segment",
+        "SemanticLab_Query03",
+        "--path-segment",
+        "CombatMix",
+        "--relationship",
+        "descendants",
+        "--predicate",
+        "kind-is",
+        "all-sounds",
+        "--predicate",
+        "volume-db-at-most",
+        "-6.0",
+        "--predicate",
+        "notes-contain",
+        "mix-review",
+        "--predicate",
+        "included-is",
+        "true",
+        "--max-results",
+        "12",
+        "--include",
+        "volume-db",
+        "--include",
+        "notes",
+        "--include",
+        "output-bus",
+    )
+
+
+@pytest.mark.parametrize(
+    ("scenario_id", "version", "unit_id", "required_tokens"),
+    (
+        (
+            "OBJ22-F-GET-01",
+            "2021.1",
+            "TYP21-QUERY-OBJECT-GET",
+            {"--path-segment", "--relationship", "--predicate", "--max-results", "--include"},
+        ),
+        (
+            "OBJ22-F-GET-02",
+            "2023.1",
+            "TYP23-QUERY-OBJECT-GET",
+            {"--path-segment", "--relationship", "--max-results", "--include"},
+        ),
+    ),
+)
+def test_typed_input_query_recipes_use_only_the_business_declaration(
+    scenario_id: str,
+    version: str,
+    unit_id: str,
+    required_tokens: set[str],
+) -> None:
+    historical = build_object_heavy_v3_recipe(scenario_id, version)
+    migrated = typed_input_business_query_recipe(historical, unit_id=unit_id)
+
+    assert isinstance(migrated.request, QueryObjectRequestSpec)
+    assert required_tokens.issubset(set(migrated.request.argv))
+    assert not {
+        "--path",
+        "--select",
+        "--where",
+        "--take",
+        "--return-field",
+    } & set(migrated.request.argv)
+    assert migrated.oracle == historical.oracle
+    assert migrated.fixture == historical.fixture
+@pytest.mark.parametrize(
+    "case_id",
+    (
+        case_id
+        for case_id, versions in OBJECT_COMPOUND_CROSS_VERSION_CASE_VERSIONS.items()
+        if "2025.1" in versions
+    ),
+)
 def test_compound_object_recipe_translates_paths_and_reflected_types_for_2025(
     case_id: str,
 ) -> None:
@@ -239,8 +433,43 @@ def test_compound_object_recipe_translates_paths_and_reflected_types_for_2025(
 def test_unreviewed_object_cases_and_layout_versions_fail_closed() -> None:
     with pytest.raises(ObjectHeavyRecipeError, match="not approved"):
         build_object_heavy_v3_recipe("OBJ22-F-GET-01", "2025.1")
-    with pytest.raises(ObjectHeavyRecipeError, match="unsupported"):
+    with pytest.raises(ObjectHeavyRecipeError, match="not approved"):
         build_object_heavy_v3_recipe("OBJ22-F-CREATE-02", "2024.1")
+
+
+@pytest.mark.parametrize(
+    ("case_id", "version"),
+    tuple(
+        (case_id, version)
+        for case_id, versions in OBJECT_COMPOUND_CROSS_VERSION_CASE_VERSIONS.items()
+        for version in versions
+        if version != "2025.1"
+    ),
+)
+def test_profile_object_recipe_translates_to_each_reviewed_legacy_lane(
+    case_id: str,
+    version: str,
+) -> None:
+    recipe = build_object_heavy_v3_recipe(case_id, version)
+
+    assert recipe.version == version
+    assert all(
+        not isinstance(value, str) or "2022.1" not in value
+        for value in _walk(recipe.request)
+    )
+    if isinstance(recipe.request, QueryObjectRequestSpec):
+        assert recipe.request.argv[:4] == (
+            "gateway.py",
+            "--version",
+            version,
+            "query-object",
+        )
+    else:
+        parsed = parse_operation_request(
+            recipe.request.as_dict(version=version),
+            expected_version=version,
+        )
+        assert parsed.operation == recipe.request.operation
 
 
 def test_set_03_uses_raw_pitch_cents_and_exact_bus_references() -> None:
@@ -338,7 +567,7 @@ def test_every_get_is_one_bounded_query_object_with_closed_return_fields() -> No
     required_fields = {
         "OBJ22-F-GET-01": {"id", "name", "type", "path", "@Volume", "notes", "OutputBus"},
         "OBJ22-F-GET-02": {"id", "name", "type", "path", "parent", "audioSource:language", "@Volume", "notes"},
-        "OBJ22-F-GET-03": {"id", "name", "type", "path", "@Volume", "notes", "audioSource:language", "isIncluded", "OutputBus"},
+        "OBJ22-F-GET-03": {"id", "name", "type", "path", "@Volume", "notes", "isIncluded", "OutputBus"},
         "OBJ22-F-GET-04": {"id", "name", "type", "path", "childrenCount", "notes", "OutputBus"},
         "OBJ22-F-GET-05": {"id", "name", "type", "path", "childrenCount", "notes"},
     }
@@ -349,9 +578,12 @@ def test_every_get_is_one_bounded_query_object_with_closed_return_fields() -> No
         request = recipe.request
         assert request.argv[:4] == ("gateway.py", "--version", "2022.1", "query-object")
         assert request.argv.count("query-object") == 1
-        assert request.argv.count("--take") == 1
+        bound_option = (
+            "--max-results" if case_id == "OBJ22-F-GET-03" else "--take"
+        )
+        assert request.argv.count(bound_option) == 1
         assert request.take == expected_takes[case_id]
-        assert request.argv[request.argv.index("--take") + 1] == str(request.take)
+        assert request.argv[request.argv.index(bound_option) + 1] == str(request.take)
         assert set(request.return_fields) == required_fields[case_id]
         assert "--all-results" not in request.argv
         assert "--args-json" not in request.argv
@@ -425,7 +657,6 @@ def test_get_03_through_get_05_have_exact_rows_limits_and_decoy_oracles() -> Non
         "path",
         "@Volume",
         "notes",
-        "audioSource:language",
         "OutputBus",
         "isIncluded",
     )

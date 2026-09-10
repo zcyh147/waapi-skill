@@ -29,9 +29,13 @@ from tests.semantic.support.codex_integration_workflows_v1 import (
 )
 from tests.semantic.support.codex_gateway_broker import (
     ExactArgumentAlternatives,
+    MetadataQueryArgument,
     ResponseBinding,
     ResponseBindingOrExactArgument,
-    SemanticJsonArgument,
+)
+from tests.semantic.support.codex_eval_protocol_v3 import (
+    build_workflow_operations_discovery_protocol,
+    build_workflow_query_schema_discovery_protocol,
 )
 
 
@@ -333,6 +337,13 @@ def _unit(version: str = "2022.1"):
     )
 
 
+def test_repair_prompt_names_the_exact_diagnosed_target_bus() -> None:
+    repair = _unit().turns[1]
+
+    assert "SFX_Machinery" in repair.prompt
+    assert "应急总线" not in repair.prompt
+
+
 def _paths(tmp_path: Path) -> SimpleNamespace:
     scenario_root = tmp_path / "scenario"
     asset_root = scenario_root / "assets"
@@ -438,13 +449,14 @@ def test_prepare_builds_exact_alarm_chain_and_frozen_runner_seam(
     assert "backend" not in {field.name for field in dataclasses.fields(prepared)}
 
 
-def test_protocol_exposes_six_exact_chain_reads_then_one_standard_transaction(
+def test_protocol_exposes_six_chain_reads_optional_revalidation_and_transaction(
     tmp_path: Path,
 ) -> None:
     prepared, _fake = _prepared(tmp_path)
     protocol = prepared.protocol
 
-    assert protocol.turn_prefix_counts == (6, 8, 12)
+    assert protocol.turn_prefix_counts == (6, 15, 19)
+    assert protocol.allowed_turn_prefix_counts == ((6,), (14, 15), (18, 19))
     assert tuple(step.name for step in protocol.steps[:6]) == (
         "diag.event",
         "diag.action",
@@ -463,6 +475,15 @@ def test_protocol_exposes_six_exact_chain_reads_then_one_standard_transaction(
         "--take" not in step.arguments
         for step in protocol.steps[2:6]
     )
+    assert protocol.steps[6].name == "revalidation.sound"
+    assert protocol.steps[6].subcommand == "query-object"
+    assert protocol.steps[6].arguments == (
+        "--exact-id",
+        ResponseBinding("diag.sound", "/objects/0/id"),
+    )
+    assert protocol.optional_workflow_revalidation_step_names == (
+        "revalidation.sound",
+    )
     assert protocol.steps[1].arguments[1] == ResponseBindingOrExactArgument(
         binding=ResponseBinding("diag.event", "/objects/0/id"),
         exact_values=(alarm_fixture_paths("2022.1").event,),
@@ -472,15 +493,15 @@ def test_protocol_exposes_six_exact_chain_reads_then_one_standard_transaction(
     )
     assert protocol.steps[2].arguments[1] == ResponseBinding(
         "diag.action",
-        "/objects/0/Target/id",
+        "/objects/0/target/id",
     )
     assert protocol.steps[3].arguments[1] == ResponseBinding(
         "diag.sound",
-        "/objects/0/activeSource/id",
+        "/objects/0/active_source/id",
     )
     assert protocol.steps[4].arguments[1] == ResponseBinding(
         "diag.sound",
-        "/objects/0/OutputBus/id",
+        "/objects/0/output_bus/id",
     )
     sound_fields = protocol.steps[2].arguments[3::2]
     dead_bus_fields = protocol.steps[4].arguments[3::2]
@@ -502,19 +523,61 @@ def test_protocol_exposes_six_exact_chain_reads_then_one_standard_transaction(
         "path",
         "@Volume",
     )
-    assert tuple(step.subcommand for step in protocol.steps[6:]) == (
+    assert tuple(step.subcommand for step in protocol.steps[7:]) == (
         "operation-schema",
-        "preview",
+        "draft-start",
+        "draft-bind-object",
+        "draft-discover-fields",
+        "draft-bind-object",
+        "draft-declare-field-change",
+        "draft-check",
+        "preview-from-draft",
         "transaction-show",
         "confirm",
         "execute",
         "verify",
     )
+    discovery = protocol.steps[10]
+    sound_id = prepared.before_snapshot.by_key()["sound"].object_id
+    source_binding = protocol.steps[9]
+    assert source_binding.arguments[-2:] == ("--object-id", sound_id)
+    assert "--meaning" in discovery.arguments
+    meaning = discovery.arguments[discovery.arguments.index("--meaning") + 1]
+    assert meaning == MetadataQueryArgument("output bus")
+    assert "--token" not in discovery.arguments
+    target_id = prepared.before_snapshot.by_key()["target_bus"].object_id
+    target_binding = protocol.steps[11]
+    assert target_binding.arguments[-2:] == ("--object-id", target_id)
+    preview = protocol.steps[14]
+    assert preview.expected_operation_request == prepared.operation_request
     assert [row.api for row in prepared.expected_dispatches] == [
         "ak.wwise.core.object.setReference",
     ]
     assert [row.count for row in prepared.expected_dispatches] == [1]
     assert len(prepared.oracle_requirements) == 9
+
+
+def test_alarm_discovery_wrappers_keep_commutative_reads_inside_turn_one(
+    tmp_path: Path,
+) -> None:
+    prepared, _fake = _prepared(tmp_path)
+
+    wrapped = build_workflow_operations_discovery_protocol(
+        build_workflow_query_schema_discovery_protocol(prepared.protocol)
+    )
+
+    first_turn_minimum = min(wrapped.allowed_turn_prefix_counts[0])
+    optional_routing = {
+        *wrapped.optional_workflow_operations_discovery_step_names,
+        *wrapped.optional_workflow_query_schema_step_names,
+    }
+    selected_without_routing = tuple(
+        step for step in wrapped.steps if step.name not in optional_routing
+    )
+    first_turn_names = {
+        step.name for step in selected_without_routing[:first_turn_minimum]
+    }
+    assert set(wrapped.commutative_read_only_step_groups[0]) <= first_turn_names
 
 
 def test_operation_request_is_bound_to_live_sound_and_target_bus_ids(
@@ -538,10 +601,7 @@ def test_operation_request_is_bound_to_live_sound_and_target_bus_ids(
     preview_step = next(
         step for step in prepared.protocol.steps if step.name == "tx01.preview"
     )
-    preview_request = preview_step.arguments[2]
-    assert isinstance(preview_request, SemanticJsonArgument)
-    assert preview_request.equivalence == "wire_exact"
-    assert preview_request.expected == request
+    assert preview_step.expected_operation_request == request
     with pytest.raises(TypeError):
         request["arguments"]["reference"] = "Attenuation"  # type: ignore[index]
 
@@ -572,6 +632,92 @@ def test_diagnostic_payload_observer_seals_exact_chain_evidence(
         )
 
 
+def test_diagnostic_action_observer_accepts_gateway_business_projection(
+    tmp_path: Path,
+) -> None:
+    prepared, _fake = _prepared(tmp_path)
+    action = dict(_payload_row(prepared.before_snapshot.by_key()["action"]))
+    action["action_type"] = action.pop("ActionType")
+    action["target"] = action.pop("Target")
+
+    prepared.observe_payload(
+        prepared.protocol.steps[1],
+        {
+            "ok": True,
+            "command": "query-object",
+            "count": 1,
+            "objects": [action],
+        },
+    )
+
+
+def test_diagnostic_sound_observer_accepts_gateway_business_projection(
+    tmp_path: Path,
+) -> None:
+    prepared, _fake = _prepared(tmp_path)
+    sound = dict(_payload_row(prepared.before_snapshot.by_key()["sound"]))
+    sound["override_output"] = sound.pop("OverrideOutput")
+    sound["active_source"] = sound.pop("activeSource")
+    sound["output_bus"] = sound.pop("OutputBus")
+
+    prepared.observe_payload(
+        prepared.protocol.steps[2],
+        {
+            "ok": True,
+            "command": "query-object",
+            "count": 1,
+            "objects": [sound],
+        },
+    )
+
+
+def test_diagnostic_sound_observer_rejects_conflicting_business_alias(
+    tmp_path: Path,
+) -> None:
+    prepared, _fake = _prepared(tmp_path)
+    sound = dict(_payload_row(prepared.before_snapshot.by_key()["sound"]))
+    sound["override_output"] = not sound["OverrideOutput"]
+
+    with pytest.raises(AlarmIntegrationRuntimeError, match="aliases disagree"):
+        prepared.observe_payload(
+            prepared.protocol.steps[2],
+            {
+                "ok": True,
+                "command": "query-object",
+                "count": 1,
+                "objects": [sound],
+            },
+        )
+
+
+@pytest.mark.parametrize(
+    ("step_index", "state_key"),
+    ((3, "source"), (4, "dead_bus"), (5, "target_bus")),
+)
+def test_diagnostic_source_and_bus_observers_accept_business_projection(
+    tmp_path: Path,
+    step_index: int,
+    state_key: str,
+) -> None:
+    prepared, _fake = _prepared(tmp_path)
+    row = dict(_payload_row(prepared.before_snapshot.by_key()[state_key]))
+    if state_key == "source":
+        row["original_file_path"] = row.pop("originalFilePath")
+        row["source_language"] = row.pop("audioSource:language")
+    else:
+        row["volume_db"] = row.pop("@Volume")
+
+    prepared.observe_payload(
+        prepared.protocol.steps[step_index],
+        {
+            "ok": True,
+            "command": "query-object",
+            "count": 1,
+            "objects": [row],
+        },
+    )
+
+
 def test_diagnostic_payload_observer_rejects_wrong_chain_identity(
     tmp_path: Path,
 ) -> None:
@@ -592,6 +738,25 @@ def test_diagnostic_payload_observer_rejects_wrong_chain_identity(
                 "objects": [wrong_sound],
             },
         )
+
+
+def test_optional_sound_revalidation_accepts_only_the_diagnosed_identity(
+    tmp_path: Path,
+) -> None:
+    prepared, _fake = _prepared(tmp_path)
+    sound = _payload_row(prepared.before_snapshot.by_key()["sound"])
+    payload = {
+        "ok": True,
+        "command": "query-object",
+        "count": 1,
+        "objects": [sound],
+    }
+
+    prepared.observe_payload(prepared.protocol.steps[6], payload)
+
+    changed = {**payload, "objects": [{**sound, "path": sound["path"] + "_Wrong"}]}
+    with pytest.raises(AlarmIntegrationRuntimeError, match="revalidation differs"):
+        prepared.observe_payload(prepared.protocol.steps[6], changed)
 
 
 def test_diagnosis_and_preview_turns_prove_zero_project_delta(

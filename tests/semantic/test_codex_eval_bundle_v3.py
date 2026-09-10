@@ -138,13 +138,13 @@ def test_v3_bundle_covers_every_unique_five_version_api_with_reviewed_heavy_exte
     assert len(cases_2022) == 326
     assert len({case.api for case in cases_2022}) == 142
     assert Counter(case.protocol for case in cases_2022) == {
-        "preview_confirm": 210,
-        "single": 116,
+        "preview_confirm": 196,
+        "single": 130,
     }
-    assert sum(case.confirmation_turn_count for case in cases_2022) == 230
+    assert sum(case.confirmation_turn_count for case in cases_2022) == 213
     assert len(cases_2022) + sum(
         case.confirmation_turn_count for case in cases_2022
-    ) == 556
+    ) == 539
 
 
 def test_v3_debug_and_lua_cases_close_protocol_acknowledgement_and_oracle_boundaries() -> None:
@@ -1234,9 +1234,9 @@ def test_v3_multi_call_mutations_confirm_each_current_preview_separately() -> No
         if case.protocol == "preview_confirm" and case.primary_dispatch.count > 1
     ]
 
-    assert len(multi_call) == 32
-    assert sum(case.primary_dispatch.count - 1 for case in multi_call) == 39
-    assert len([case for case in multi_call if "2022.1" in case.versions]) == 17
+    assert len(multi_call) == 23
+    assert sum(case.primary_dispatch.count - 1 for case in multi_call) == 30
+    assert len([case for case in multi_call if "2022.1" in case.versions]) == 14
     assert all(
         case.confirmation_prompt == SEQUENTIAL_CONFIRMATION_PROMPT
         for case in multi_call

@@ -23,6 +23,7 @@ from typing import Any, Callable, Mapping, NoReturn, Sequence
 from xml.etree import ElementTree as ET
 
 from .canonical import canonical_json_bytes, canonical_sha256
+from .business_adapters import business_adapter
 from .builders.identity import ObjectIdentity, ResolvedObject, plan_object_resolution
 from .builders.metadata import (
     GET_PROPERTY_AND_REFERENCE_NAMES_URI,
@@ -61,6 +62,12 @@ from .host_paths import (
     parse_relative_host_path,
 )
 from .io_policy import IOPolicyError, validate_isolated_io
+from .identity_limits import MULTI_IDENTITY_READ_MAX_IDS
+from .metadata_restrictions import (
+    MetadataRestrictionError,
+    reference_allowed_types,
+    reference_type_token,
+)
 from .operation_import import (
     AUTO_CHECK_OUT_TO_SOURCE_CONTROL_VERSIONS,
     ImportContractError,
@@ -167,6 +174,11 @@ from .operation_soundbank import (
     parse_wwise_2021_language_inventory,
     verify_file_proof as verify_soundbank_file_proof,
 )
+from .object_capabilities import (
+    OBJECT_CREATE_SPECIALIZED_CHILD_TYPES_BY_PARENT,
+    object_child_capability,
+    object_identity_semantics,
+)
 from .platform_paths import WWISE_WIRE_PATH_INPUT_AUDIT_CONTRACT
 from .transaction_cleanup import build_transaction_cleanup_spec
 from .versions import SUPPORTED_WWISE_VERSION_KEYS
@@ -177,10 +189,17 @@ OPERATION_REQUEST_CONTRACT = "waapi-skill.operation-request/v1"
 PREPARED_OPERATION_CONTRACT = "waapi-skill.prepared-operation/v1"
 VERIFICATION_RESULT_CONTRACT = "waapi-skill.operation-verification/v1"
 ROLE_VALIDATION_CONTRACT = "waapi-skill.role-validation/v1"
-LEGACY_JSON_INPUT_MODE = "legacy_json"
+INTERNAL_CANONICAL_INPUT_MODE = "internal_canonical"
 COMPOSER_INPUT_MODE = "composer"
+BUSINESS_DECLARATION_INPUT_MODE = "business_declaration"
+INLINE_TYPED_INPUT_MODE = "inline_typed"
 SUPPORTED_OPERATION_INPUT_MODES = frozenset(
-    {LEGACY_JSON_INPUT_MODE, COMPOSER_INPUT_MODE}
+    {
+        INTERNAL_CANONICAL_INPUT_MODE,
+        COMPOSER_INPUT_MODE,
+        BUSINESS_DECLARATION_INPUT_MODE,
+        INLINE_TYPED_INPUT_MODE,
+    }
 )
 OBJECT_GET_URI = "ak.wwise.core.object.get"
 OBJECT_GET_TYPES_URI = "ak.wwise.core.object.getTypes"
@@ -239,6 +258,7 @@ REPLAY_GUARD_OPERATIONS = frozenset(
         "debug.restartWaapiServers",
         "debug.testAssert",
         "debug.testCrash",
+        "ui.captureScreen",
     }
 )
 PACKAGED_TRANSACTION_READBACK_URIS = frozenset(
@@ -305,7 +325,6 @@ UNDO_GROUP_INNER_URIS_BY_VERSION: Mapping[str, frozenset[str]] = {
 }
 SWITCH_GROUP_REFERENCE = "SwitchGroupOrStateGroup"
 IDENTITY_RETURN_FIELDS = ("id", "name", "type", "path", "parent", "notes")
-MULTI_IDENTITY_READ_MAX_IDS = 4096
 # ``ak.wwise.core.object.get`` does not accept a bare numeric Short ID.  Its
 # ``from.id`` Short ID selector is a closed object whose numeric ``type`` is
 # the WAAPI object-type code.  Only Definition directives with an official
@@ -376,29 +395,6 @@ IMPORT_REFLECTED_WRITABLE_PARENT_TYPES_BY_VERSION: Mapping[
     str,
     frozenset[str],
 ] = {
-    "2025.1": frozenset({"PropertyContainer"}),
-}
-OBJECT_CREATE_WRITABLE_PARENT_TYPES = frozenset(
-    {
-        "WorkUnit",
-        "Folder",
-        "ActorMixer",
-        "RandomSequenceContainer",
-        "SwitchContainer",
-        "BlendContainer",
-        "MusicSwitchContainer",
-        "MusicRanSeqCntr",
-        "MusicSegment",
-    }
-)
-OBJECT_CREATE_SPECIALIZED_CHILD_TYPES_BY_PARENT: Mapping[
-    str,
-    frozenset[str],
-] = {
-    "StateGroup": frozenset({"State"}),
-    "SwitchGroup": frozenset({"Switch"}),
-}
-OBJECT_CREATE_REFLECTED_PARENT_TYPES_BY_VERSION: Mapping[str, frozenset[str]] = {
     "2025.1": frozenset({"PropertyContainer"}),
 }
 IMPORT_ITEM_REQUIRED_FIELDS: tuple[str, ...] = ()
@@ -683,6 +679,12 @@ _PLUGIN_PROPERTY_ARGUMENT_SCHEMA: Mapping[str, Any] = {
             ),
         },
         "value": {
+            "oneOf": [
+                {"type": "string"},
+                {"type": "integer"},
+                {"type": "number"},
+                {"type": "boolean"},
+            ],
             "description": (
                 "Finite JSON scalar accepted only after live getPropertyInfo "
                 "name/type validation."
@@ -708,7 +710,11 @@ _PLUGIN_CREATION_ARGUMENT_SCHEMA: Mapping[str, Any] = {
                 "a display name."
             ),
         },
-        "notes": {"type": "string", "maxLength": 64 * 1024},
+        "notes": {
+            "type": "string",
+            "maxLength": 64 * 1024,
+            "x-maxUtf8Bytes": 64 * 1024,
+        },
         "platform": PLATFORM_ARGUMENT_SCHEMA,
         "language": {
             "type": "string",
@@ -836,7 +842,7 @@ _OBJECT_NODE_ARGUMENT_SCHEMA: Mapping[str, Any] = {
         "references": {"type": "array", "items": _OBJECT_REFERENCE_ARGUMENT_SCHEMA},
         "children": {
             "type": "array",
-            "description": "Recursive closed object-node DSL with the same six fields; depth 8 and 128 total nodes.",
+            "description": "Recursive closed object-node DSL; depth 8 and 128 total nodes.",
         },
     },
 }
@@ -1289,8 +1295,8 @@ _SOUNDBANK_GENERATE_ITEM_SCHEMA: Mapping[str, Any] = {
                 "all soundbanks[] rows."
             ),
         },
-        "events": {"type": "array", "minItems": 1, "items": IDENTITY_ARGUMENT_SCHEMA},
-        "aux_busses": {"type": "array", "minItems": 1, "items": IDENTITY_ARGUMENT_SCHEMA},
+        "events": {"type": "array", "minItems": 1, "maxItems": 256, "items": IDENTITY_ARGUMENT_SCHEMA},
+        "aux_busses": {"type": "array", "minItems": 1, "maxItems": 256, "items": IDENTITY_ARGUMENT_SCHEMA},
         "inclusions": {
             "type": "array",
             "minItems": 1,
@@ -1331,6 +1337,28 @@ _DELETE_AUTO_CHECK_OUT_SCHEMA: Mapping[str, Any] = {
     ),
 }
 
+_OBJECT_MUTATION_AUTO_CHECK_OUT_SCHEMA: Mapping[str, Any] = {
+    "type": "boolean",
+    "default": False,
+    "supported_versions": list(AUTO_CHECK_OUT_TO_SOURCE_CONTROL_VERSIONS),
+    "description": (
+        "Ask Wwise to check out affected source-control files before the object "
+        "mutation. Omission defaults to false; explicit use is accepted only "
+        "in Wwise 2023.1-2025.1."
+    ),
+}
+
+_COPY_AUTO_ADD_SCHEMA: Mapping[str, Any] = {
+    "type": "boolean",
+    "default": False,
+    "supported_versions": list(AUTO_CHECK_OUT_TO_SOURCE_CONTROL_VERSIONS),
+    "description": (
+        "Ask Wwise to add affected work units to source control after copy. "
+        "Omission defaults to false; explicit use is accepted only in Wwise "
+        "2023.1-2025.1."
+    ),
+}
+
 _LUA_SOURCE_AUTHORITY_SCHEMA: Mapping[str, Any] = {
     "const": LUA_SOURCE_AUTHORITY,
     "description": (
@@ -1343,6 +1371,8 @@ _LUA_SOURCE_AUTHORITY_SCHEMA: Mapping[str, Any] = {
 _LUA_WA_ARGS_SCHEMA: Mapping[str, Any] = {
     "type": "object",
     "maxProperties": MAX_LUA_WA_ARGS_KEYS,
+    "maximumBytes": MAX_LUA_WA_ARGS_BYTES,
+    "x-keyMaximumBytes": 128,
     "description": (
         f"Strict JSON data passed to wa_args, capped at {MAX_LUA_WA_ARGS_BYTES} "
         "bytes. Packaged Lua source/loader fields are reserved."
@@ -1772,8 +1802,8 @@ class VerificationResult:
 
 ReadCall = Callable[[str, Mapping[str, Any], Mapping[str, Any]], Mapping[str, Any]]
 
-MAX_OBJECT_SET_COMPOSER_CHECK_READS = 512
-MAX_OBJECT_SET_COMPOSER_CHECK_MESSAGE_CHARS = 1024
+MAX_OBJECT_SET_BATCH_CHECK_READS = 512
+MAX_OBJECT_SET_BATCH_CHECK_MESSAGE_CHARS = 1024
 
 # Positive contract for dedicated operations whose adapters bind paths on the
 # gateway machine. Generic ``waapi.call`` locality is derived separately from
@@ -1898,13 +1928,11 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                     "minItems": 1,
                     "maxItems": UNDO_GROUP_MAX_CALLS,
                     "items": _object_contract(
-                        ("api", "args"),
+                        ("schema_digest", "request"),
                         {
-                            "api": {"type": "string", "pattern": r"^ak\.wwise\.core\."},
-                            "args": {"type": "object"},
-                            "options": {"type": "object"},
+                            "schema_digest": {"type": "string", "pattern": r"^[0-9a-f]{64}$"},
+                            "request": {"type": "object"},
                         },
-                        optional=("options",),
                     ),
                 },
             },
@@ -1941,7 +1969,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         "public-execution-contract",
         "Execute one manifest-registered guarded function without model-authored code.",
         ("api",),
-        ("args", "options", "io_root"),
+        ("args", "options", "io_root", "result_projection"),
         argument_contract=_object_contract(
             ("api",),
             {
@@ -1976,8 +2004,15 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                         "inside args."
                     ),
                 },
+                "result_projection": {
+                    "type": "object",
+                    "description": (
+                        "Gateway-owned bounded result projection for the exact "
+                        "closed business route; never forwarded to WAAPI."
+                    ),
+                },
             },
-            optional=("args", "options", "io_root"),
+            optional=("args", "options", "io_root", "result_projection"),
         ),
         constraints=(
             "api must be reflected by the requested Wwise version",
@@ -2190,6 +2225,10 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                 "parent": IDENTITY_ARGUMENT_SCHEMA,
                 "type": _OBJECT_CREATE_TYPE_TOKEN_SCHEMA,
                 "name": {"type": "string", "minLength": 1},
+                "on_name_conflict": {
+                    "type": "string",
+                    "enum": ["fail", "rename", "merge", "replace"],
+                },
                 "notes": {"type": "string"},
                 "properties": {"type": "array", "items": _OBJECT_PROPERTY_ARGUMENT_SCHEMA},
                 "references": {"type": "array", "items": _OBJECT_REFERENCE_ARGUMENT_SCHEMA},
@@ -2204,10 +2243,6 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                         "For an existing named request root, keep its existing parent as parent, repeat "
                         "the root type/name, and use on_name_conflict=merge."
                     ),
-                },
-                "on_name_conflict": {
-                    "type": "string",
-                    "enum": ["fail", "rename", "merge", "replace"],
                 },
                 "replace_owned_root": {
                     **IDENTITY_ARGUMENT_SCHEMA,
@@ -2236,7 +2271,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         constraints=(
             "maximum depth 8, 128 nodes, and 32 children per parent",
             "one existing named root that only receives a recursive descendant merge remains an object.create request: identify its existing parent, repeat the root type/name, and use on_name_conflict=merge",
-            "when that existing merge root's exact type was not stated or already proven, operation-schema must be followed by one exact-path query-object returning id, name, type, and path before preview; Wwise 2025.1 PropertyContainer readback maps to the ActorMixer request token",
+            "when that existing merge root's exact type was not stated or already proven, perform one exact-path query-object returning id, name, type, and path before operation-schema so its sole continuation remains uninterrupted; Wwise 2025.1 PropertyContainer readback maps to the ActorMixer request token",
             "ordinary child creation requires one reviewed writable hierarchy parent; list creation requires a non-protected live owner and a canonical list token",
             "Game Sync hierarchy creation is closed to StateGroup -> State and SwitchGroup -> Switch, whether the live parent is a group or the group appears inside the recursive tree",
             "replace_owned_root is an explicit reviewed authorization boundary, not independently proven ownership; replace requires the collision strictly below that non-protected live root and a complete pre-state snapshot of at most 128 old subtree GUID/path rows",
@@ -2330,6 +2365,9 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             {"object": IDENTITY_ARGUMENT_SCHEMA, "value": {"type": "string", "minLength": 1}},
         ),
         identity_arguments=("object",),
+        constraints=(
+            "object types without a mutable intrinsic name, including derived, embedded-value, and owned-collection objects, fail before preview instead of dispatching setName",
+        ),
         selection_guidance=_selection_guidance(
             use_when=("Exactly one existing object receives only a rename.",),
             avoid_when=("The rename is one part of a multi-field or multi-object atomic change.",),
@@ -2419,6 +2457,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         constraints=(
             "target=null is an explicit closed clear operation and is rejected when live metadata contains a notNull restriction",
             "a non-null target is live-resolved and checked against live reference type restrictions",
+            "when a prior successful Gateway read returned an exact id for object or target, copy that id exactly; do not retype its path or name",
         ),
         selection_guidance=_selection_guidance(
             use_when=("Exactly one existing object receives one reference set or clear.",),
@@ -2533,6 +2572,13 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                     "type": "string",
                     "enum": ["add", "add_or_replace"],
                     "default": "add_or_replace",
+                    "x-discloseDescription": True,
+                    "description": (
+                        "Use add_or_replace when the user asks to replace the "
+                        "matching RTPC if present and add it if absent; use add "
+                        "only when an existing exact property and ControlInput "
+                        "match must fail."
+                    ),
                 },
             },
             optional=("notes", "mode"),
@@ -2677,6 +2723,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "canonical request limit: 262144 bytes including inline Base64 audio",
             "auto_add_to_source_control is explicit and defaults to false",
             "partial results or per-target readback mismatches fail verification",
+            "targets without a mutable intrinsic name, including derived, embedded-value, and owned-collection objects, may receive supported fields, references, or notes but cannot supply name",
         ),
         supported_versions=("2022.1", "2023.1", "2024.1", "2025.1"),
         parent_child_contract=OBJECT_CREATE_SPECIALIZED_CHILD_TYPES_BY_PARENT,
@@ -2884,13 +2931,10 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         DEBUG_RESTART_WAAPI_SERVERS_URI,
         "dangerous-host-control",
         "Request a WAAPI server restart and terminate the transaction without reconnecting.",
-        ("acknowledge",),
-        argument_contract=_object_contract(
-            ("acknowledge",),
-            {"acknowledge": {"const": "restart_waapi_servers"}},
-        ),
+        (),
+        argument_contract=_object_contract((), {}),
         constraints=(
-            "the immutable acknowledgement distinguishes this from an ordinary WAAPI call",
+            "the Gateway-owned business route distinguishes this from an ordinary WAAPI call",
             "disconnect is expected; delivery and server restart completion may remain indeterminate",
             "the Wwise process is expected to remain running, but this gateway does not claim lifecycle observation",
             "there is no automatic retry, reconnect, or generic verify phase",
@@ -2902,13 +2946,10 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         DEBUG_TEST_ASSERT_URI,
         "dangerous-host-control",
         "Deliberately trigger Wwise's private test assertion after explicit confirmation.",
-        ("acknowledge",),
-        argument_contract=_object_contract(
-            ("acknowledge",),
-            {"acknowledge": {"const": "trigger_debug_assert"}},
-        ),
+        (),
+        argument_contract=_object_contract((), {}),
         constraints=(
-            "the immutable acknowledgement distinguishes this deliberate failure from an ordinary call",
+            "the Gateway-owned business route distinguishes this deliberate failure from an ordinary call",
             "an assertion dialog, assertFailed event, disconnect, or continued process are host-build dependent",
             "there is no automatic retry, cleanup promise, or business-state verification",
         ),
@@ -2918,13 +2959,10 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         DEBUG_TEST_CRASH_URI,
         "dangerous-host-control",
         "Deliberately request Wwise process termination after explicit confirmation.",
-        ("acknowledge",),
-        argument_contract=_object_contract(
-            ("acknowledge",),
-            {"acknowledge": {"const": "crash_wwise_process"}},
-        ),
+        (),
+        argument_contract=_object_contract((), {}),
         constraints=(
-            "the immutable acknowledgement distinguishes this deliberate crash from an ordinary call",
+            "the Gateway-owned business route distinguishes this deliberate crash from an ordinary call",
             "disconnect and process termination are expected, but delivery and lifecycle completion may remain indeterminate",
             "there is no automatic retry, reconnect, cleanup promise, or generic verify phase",
         ),
@@ -2933,7 +2971,11 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         "ui.commands.execute",
         UI_COMMAND_EXECUTE_URI,
         "authoring-ui-command",
-        "Execute one installed Wwise Authoring UI command after a fresh live command-inventory check.",
+        (
+            "Execute one explicitly named installed Wwise Authoring UI command ID "
+            "such as SaveProject without translating it into a similarly named "
+            "native API; Gateway checks fresh inventory."
+        ),
         ("command",),
         ("objects", "platforms", "value", "files"),
         argument_contract=_object_contract(
@@ -2971,6 +3013,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         selection_guidance=_selection_guidance(
             use_when=(
                 "The user explicitly asks to execute an installed Wwise UI command or perform GUI command automation.",
+                "The user names an installed command ID such as SaveProject, even when a similarly named native WAAPI function exists.",
                 "No dedicated semantic operation owns the requested business outcome.",
             ),
             avoid_when=(
@@ -2981,6 +3024,12 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                 (
                     "the matching dedicated operation",
                     "the request names a supported import, object, SoundBank, Switch Container, debug, Lua, or capture outcome",
+                ),
+            ),
+            preferred_over=(
+                (
+                    "request-schema for a similarly named native URI",
+                    "the user supplied an installed Wwise UI command ID",
                 ),
             ),
         ),
@@ -3122,13 +3171,23 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         "object-mutation",
         "Copy one object under one parent.",
         ("object", "parent"),
+        ("on_name_conflict", "auto_add_to_source_control", "auto_check_out_to_source_control"),
         argument_contract=_object_contract(
             ("object", "parent"),
-            {"object": IDENTITY_ARGUMENT_SCHEMA, "parent": IDENTITY_ARGUMENT_SCHEMA},
+            {
+                "object": IDENTITY_ARGUMENT_SCHEMA,
+                "parent": IDENTITY_ARGUMENT_SCHEMA,
+                "on_name_conflict": {"type": "string", "enum": ["fail", "rename"]},
+                "auto_add_to_source_control": _COPY_AUTO_ADD_SCHEMA,
+                "auto_check_out_to_source_control": _OBJECT_MUTATION_AUTO_CHECK_OUT_SCHEMA,
+            },
+            optional=("on_name_conflict", "auto_add_to_source_control", "auto_check_out_to_source_control"),
         ),
         identity_arguments=("object", "parent"),
-        implemented=False,
-        boundary="The current builder reads back the source instead of the returned copy GUID.",
+        constraints=(
+            "the returned copy GUID is captured and verified under the requested parent",
+            "objects without an intrinsic name fail before preview because they cannot support the closed name-collision proof",
+        ),
     ),
     "object.move": OperationSpec(
         "object.move",
@@ -3136,13 +3195,22 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         "object-mutation",
         "Move one object under one parent.",
         ("object", "parent"),
+        ("on_name_conflict", "auto_check_out_to_source_control"),
         argument_contract=_object_contract(
             ("object", "parent"),
-            {"object": IDENTITY_ARGUMENT_SCHEMA, "parent": IDENTITY_ARGUMENT_SCHEMA},
+            {
+                "object": IDENTITY_ARGUMENT_SCHEMA,
+                "parent": IDENTITY_ARGUMENT_SCHEMA,
+                "on_name_conflict": {"type": "string", "enum": ["fail", "rename"]},
+                "auto_check_out_to_source_control": _OBJECT_MUTATION_AUTO_CHECK_OUT_SCHEMA,
+            },
+            optional=("on_name_conflict", "auto_check_out_to_source_control"),
         ),
         identity_arguments=("object", "parent"),
-        implemented=False,
-        boundary="The current builder does not assert the new parent/path or preserve a rollback snapshot.",
+        constraints=(
+            "the source GUID is preserved and its new parent/path are verified",
+            "objects without an intrinsic name fail before preview because they cannot support the closed name-collision proof",
+        ),
     ),
     "soundbank.setInclusions": OperationSpec(
         "soundbank.setInclusions",
@@ -3157,6 +3225,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                 "mode": {"type": "string", "enum": ["add", "remove", "replace"]},
                 "inclusions": {
                     "type": "array",
+                    "maxItems": 128,
                     "empty_allowed_when": {"mode": "replace"},
                     "items": _object_contract(
                         ("object", "filters"),
@@ -3224,10 +3293,11 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             ("soundbanks", "platforms", "skip_languages", "write_to_disk", "io_root"),
             {
                 "soundbanks": {"type": "array", "minItems": 1, "maxItems": 64, "items": _SOUNDBANK_GENERATE_ITEM_SCHEMA},
-                "platforms": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+                "platforms": {"type": "array", "minItems": 1, "maxItems": 16, "items": {"type": "string", "minLength": 1}},
                 "languages": {
                     "type": "array",
                     "minItems": 1,
+                    "maxItems": 64,
                     "items": {"type": "string", "minLength": 1},
                     "description": (
                         "Batch language selection. Omit when every SoundBank has "
@@ -3239,6 +3309,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                 },
                 "skip_languages": {
                     "type": "boolean",
+                    "x-discloseDescription": True,
                     "description": (
                         "Batch switch derived from the complete soundbanks[] list: "
                         "true exactly when every SoundBank is nonlocalized, and "
@@ -3292,7 +3363,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                 "The user asks to persistently change the SoundBank's saved inclusion rows.",
             ),
             choose_instead=(
-                ("waapi.call", "explicit CLI generation intent selects the versioned ak.wwise.cli.generateSoundbank route"),
+                ("request-schema ak.wwise.cli.generateSoundbank", "explicit CLI generation intent selects the exact reflected CLI route"),
                 ("wait-topic or stream-topic", "the request is observation-only"),
                 ("soundbank.setInclusions", "the requested outcome is a persistent inclusion edit"),
             ),
@@ -3354,6 +3425,9 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         ),
         constraints=(
             "SoundBank names and inclusion rows are derived only from hashed UTF-8 tab-delimited files",
+            "Wwise 2022.1 Definition object identities are limited to GUIDs and "
+            "supported uint32 Short IDs because quoted names can complete without "
+            "applying inclusions; 2023.1 and later retain the official quoted-name form",
             "unsupported directives, duplicate rows, unknown objects, and ambiguous names fail before dispatch",
             "execution replays file/project and SoundBank inclusion snapshots; verification checks exact target inclusions and one unrelated control Bank",
         ),
@@ -3421,6 +3495,8 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "child must be a direct child of switch_container",
             "state_or_switch must be a direct child of the group referenced by SwitchGroupOrStateGroup",
             "the exact child and state_or_switch pair must already exist",
+            "an exact child name plus a closed parent requires scoped-name; direct-child is only for one unnamed exactly-one child by type",
+            "an exact Switch or State value name plus its closed group parent requires scoped-name",
         ),
         selection_guidance=_selection_guidance(
             use_when=("The user asks to remove one existing Switch Container child assignment.",),
@@ -3437,40 +3513,40 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
 _OPERATION_INPUT_MODE_DECLARATIONS: tuple[
     tuple[str, tuple[str, ...], str], ...
 ] = (
-    ("audio.import", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), COMPOSER_INPUT_MODE),
-    ("audio.importTabDelimited", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("debug.restartWaapiServers", ("2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("debug.setAsserts", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("debug.setAutomationMode", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("debug.testAssert", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("debug.testCrash", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("lua.executeCliFile", ("2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("lua.executeCoreFile", ("2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("lua.executeCoreInline", ("2025.1",), LEGACY_JSON_INPUT_MODE),
-    ("object.copy", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("object.create", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("object.createPlugin", ("2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("object.delete", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("object.move", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("object.set", ("2022.1", "2023.1", "2024.1", "2025.1"), COMPOSER_INPUT_MODE),
-    ("object.setLinked", ("2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("object.setName", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("object.setNotes", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("object.setProperty", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("object.setRTPC", ("2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("object.setReference", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("soundbank.convertExternalSources", ("2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("soundbank.generate", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("soundbank.processDefinitionFiles", ("2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("soundbank.setInclusions", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("switchContainer.addAssignment", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("switchContainer.removeAssignment", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("ui.captureScreen", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("ui.commands.execute", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("ui.commands.register", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("ui.commands.unregister", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("waapi.call", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("waapi.undoGroup", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("audio.import", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
+    ("audio.importTabDelimited", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
+    ("debug.restartWaapiServers", ("2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
+    ("debug.setAsserts", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
+    ("debug.setAutomationMode", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
+    ("debug.testAssert", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
+    ("debug.testCrash", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
+    ("lua.executeCliFile", ("2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
+    ("lua.executeCoreFile", ("2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
+    ("lua.executeCoreInline", ("2025.1",), BUSINESS_DECLARATION_INPUT_MODE),
+    ("object.copy", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
+    ("object.create", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
+    ("object.createPlugin", ("2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
+    ("object.delete", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
+    ("object.move", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
+    ("object.set", ("2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
+    ("object.setLinked", ("2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
+    ("object.setName", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
+    ("object.setNotes", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
+    ("object.setProperty", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
+    ("object.setRTPC", ("2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
+    ("object.setReference", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
+    ("soundbank.convertExternalSources", ("2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
+    ("soundbank.generate", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
+    ("soundbank.processDefinitionFiles", ("2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
+    ("soundbank.setInclusions", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
+    ("switchContainer.addAssignment", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
+    ("switchContainer.removeAssignment", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
+    ("ui.captureScreen", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
+    ("ui.commands.execute", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
+    ("ui.commands.register", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
+    ("ui.commands.unregister", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
+    ("waapi.call", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), INTERNAL_CANONICAL_INPUT_MODE),
+    ("waapi.undoGroup", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
 )
 
 OPERATION_INPUT_MODE_LANES: tuple[OperationInputModeLane, ...] = tuple(
@@ -3548,7 +3624,17 @@ def _operation_input_mode_index(
 def operation_input_mode(name: str, version: str) -> str:
     """Return the sole normal input mode for one exact operation/version key."""
 
-    spec = describe_operation(name)
+    spec = OPERATION_SPECS.get(name)
+    if spec is None:
+        try:
+            business_adapter(name).contract(version)
+        except (KeyError, ValueError) as exc:
+            raise OperationContractError(
+                "UNKNOWN_OPERATION",
+                f"Unknown closed operation {name!r}.",
+                details={"operation": name, "supported": sorted(OPERATION_SPECS)},
+            ) from exc
+        return BUSINESS_DECLARATION_INPUT_MODE
     if version not in spec.supported_versions:
         raise OperationContractError(
             "UNAVAILABLE_IN_VERSION",
@@ -3560,6 +3646,68 @@ def operation_input_mode(name: str, version: str) -> str:
             },
         )
     return _operation_input_mode_index(OPERATION_INPUT_MODE_LANES)[(name, version)]
+
+
+def operation_uses_business_declaration(name: str, version: str) -> bool:
+    """Return whether one named or reviewed native lane has a deep Adapter."""
+
+    spec = OPERATION_SPECS.get(name)
+    if spec is None:
+        try:
+            business_adapter(name).contract(version)
+        except (KeyError, ValueError):
+            return False
+        return True
+    if version not in spec.supported_versions:
+        return False
+    uses_business_declaration = (
+        operation_input_mode(name, version) == BUSINESS_DECLARATION_INPUT_MODE
+    )
+    if uses_business_declaration:
+        try:
+            business_adapter(name)
+        except KeyError as exc:  # pragma: no cover - Registry validation invariant
+            raise OperationContractError(
+                "BUSINESS_ADAPTER_UNAVAILABLE",
+                f"{name} has no reviewed Business Declaration Adapter.",
+            ) from exc
+    return uses_business_declaration
+
+
+def audio_import_business_contract(version: str) -> dict[str, Any]:
+    """Publish Registry-owned audio.import business shape and safety metadata."""
+
+    if operation_input_mode("audio.import", version) != BUSINESS_DECLARATION_INPUT_MODE:
+        raise OperationContractError(
+            "OPERATION_INPUT_MODE_INVALID",
+            "audio.import does not expose the business declaration input mode.",
+        )
+    return business_adapter("audio.import").contract(version)
+
+
+def operation_business_contract(name: str, version: str) -> dict[str, Any]:
+    """Publish the Adapter-owned business contract for one exact lane."""
+
+    if name not in OPERATION_SPECS:
+        try:
+            return business_adapter(name).contract(version)
+        except (KeyError, ValueError) as exc:
+            raise OperationContractError(
+                "BUSINESS_ADAPTER_UNAVAILABLE",
+                f"{name} has no reviewed Business Declaration Adapter.",
+            ) from exc
+    if operation_input_mode(name, version) != BUSINESS_DECLARATION_INPUT_MODE:
+        raise OperationContractError(
+            "OPERATION_INPUT_MODE_INVALID",
+            f"{name} does not expose the business declaration input mode.",
+        )
+    try:
+        return business_adapter(name).contract(version)
+    except KeyError as exc:  # pragma: no cover - input-mode Registry invariant
+        raise OperationContractError(
+            "BUSINESS_ADAPTER_UNAVAILABLE",
+            f"{name} has no reviewed Business Declaration Adapter.",
+        ) from exc
 
 
 def operation_input_modes_by_version(name: str) -> dict[str, str]:
@@ -3653,580 +3801,34 @@ def operation_request_schema_digest(name: str, version: str) -> str:
     return canonical_sha256(operation_request_machine_contract(name, version))
 
 
-def object_set_composer_fragment_contract(version: str) -> dict[str, Any]:
-    """Project only the Registry-owned fragments reviewed for the Composer.
 
-    This intentionally does not expose a generic schema-pointer API.  A later
-    Adapter must add another reviewed projection rather than selecting an
-    arbitrary subtree or smuggling a complete request through this seam.
-    """
-
-    machine = operation_request_machine_contract("object.set", version)
-    try:
-        argument_properties = machine["argument_contract"]["properties"]
-        row = argument_properties["objects"]["items"]
-        properties = row["properties"]
-        selector = properties["object"]
-        scalar_property = properties["properties"]["items"]
-        node_properties = properties["children"]["items"]["properties"]
-        list_properties = properties["lists"]["items"]["properties"]
-        import_properties = properties["import"]["properties"]
-        import_file_properties = import_properties["files"]["items"]["properties"]
-    except (KeyError, TypeError) as exc:  # pragma: no cover - registry invariant
-        raise RuntimeError(
-            "object.set Registry schema no longer exposes the reviewed Composer fragments"
-        ) from exc
-    coverage = {
-        "request_fields": sorted(argument_properties),
-        "target_fields": sorted(properties),
-        "node_fields": sorted(node_properties),
-        "list_fields": sorted(list_properties),
-        "import_fields": sorted(import_properties),
-        "import_file_fields": sorted(import_file_properties),
-    }
-    expected_coverage = {
-        "request_fields": [
-            "auto_add_to_source_control",
-            "list_mode",
-            "objects",
-            "on_name_conflict",
-            "platform",
-        ],
-        "target_fields": [
-            "children",
-            "import",
-            "list_mode",
-            "lists",
-            "name",
-            "notes",
-            "object",
-            "on_name_conflict",
-            "platform",
-            "properties",
-            "references",
-        ],
-        "node_fields": [
-            "children",
-            "import",
-            "language",
-            "name",
-            "notes",
-            "platform",
-            "properties",
-            "references",
-            "type",
-        ],
-        "list_fields": ["name", "objects"],
-        "import_fields": ["auto_add_to_source_control", "files"],
-        "import_file_fields": [
-            "audio_file",
-            "audio_file_base64",
-            "language",
-            "object_type",
-            "originals_subfolder",
-        ],
-    }
-    if coverage != expected_coverage:
-        raise RuntimeError(
-            "object.set Registry fields changed without a complete Composer Adapter mapping"
-        )
-    return {
-        "contract": "waapi-skill.object-set-composer-fragments/v1",
-        "operation": "object.set",
-        "version": version,
-        "target_selector": _json_mapping(selector),
-        "scalar_property": _json_mapping(scalar_property),
-        "reference": _json_mapping(properties["references"]["items"]),
-        "default_container_target_contract": _json_mapping(
-            machine["argument_contract"]["default_container_target_contract"]
-        ),
-        "coverage": coverage,
-        "request_options": {
-            name: _json_mapping(argument_properties[name])
-            for name in (
-                "platform",
-                "list_mode",
-                "on_name_conflict",
-                "auto_add_to_source_control",
-            )
-        },
-        "target_fields": {
-            name: _json_mapping(properties[name])
-            for name in (
-                "name",
-                "notes",
-                "platform",
-                "list_mode",
-                "on_name_conflict",
-            )
-        },
-        "node_fields": {
-            name: _json_mapping(node_properties[name])
-            for name in ("type", "name", "notes", "platform", "language")
-        },
-        "list_name": _json_mapping(properties["lists"]["items"]["properties"]["name"]),
-        "import_supported": version in OBJECT_SET_IMPORT_VERSIONS,
-        "import_file": _json_mapping(
-            properties["import"]["properties"]["files"]["items"]
-        ),
-        "import_options": {
-            "auto_add_to_source_control": _json_mapping(
-                properties["import"]["properties"]["auto_add_to_source_control"]
-            )
-        },
-        "limits": {
-            "targets": 32,
-            "properties_per_target": DEFAULT_MAX_FIELDS_PER_NODE,
-            "children_per_parent": DEFAULT_MAX_CHILDREN_PER_NODE,
-            "lists_per_target": properties["lists"].get(
-                "maxItems", DEFAULT_MAX_CHILDREN_PER_NODE
-            ),
-            "total_nodes": DEFAULT_MAX_NODES,
-            "depth": DEFAULT_MAX_DEPTH,
-            "files_per_import": DEFAULT_MAX_IMPORT_FILES,
-            "canonical_request_bytes": machine["argument_contract"].get(
-                "maximumCanonicalRequestBytes"
-            ),
-        },
-        "source_schema_digest": canonical_sha256(machine),
-    }
-
-
-def audio_import_composer_fragment_contract(version: str) -> dict[str, Any]:
-    """Project the complete additive audio.import Adapter from Registry truth."""
-
-    machine = operation_request_machine_contract("audio.import", version)
-    try:
-        argument_properties = machine["argument_contract"]["properties"]
-        row_properties = argument_properties["imports"]["items"]["properties"]
-        metadata_dependency_closure = machine["argument_contract"][
-            "request_composition_contract"
-        ]["metadata_dependency_closure"]
-    except (KeyError, TypeError) as exc:  # pragma: no cover - registry invariant
-        raise RuntimeError(
-            "audio.import Registry schema no longer exposes the reviewed Composer fragments"
-        ) from exc
-    supported_row_fields = tuple(sorted(IMPORT_ITEM_OPTIONAL_FIELDS))
-    if set(row_properties) != set(supported_row_fields):
-        raise RuntimeError(
-            "audio.import Registry fields changed without a complete Composer Adapter mapping"
-        )
-    return {
-        "contract": "waapi-skill.audio-import-composer-fragments/v1",
-        "operation": "audio.import",
-        "version": version,
-        "supported_row_fields": list(supported_row_fields),
-        "row_fields": {
-            name: _json_mapping(row_properties[name])
-            for name in supported_row_fields
-        },
-        "request_options": {
-            name: _json_mapping(argument_properties[name])
-            for name in (
-                "import_operation",
-                "auto_add_to_source_control",
-                "auto_check_out_to_source_control",
-            )
-        },
-        "metadata_dependency_closure": _json_mapping(
-            metadata_dependency_closure
-        ),
-        "limits": {
-            "imports": MAX_IMPORT_ITEMS,
-            "canonical_request_bytes": machine["argument_contract"].get(
-                "maximumCanonicalRequestBytes"
-            ),
-        },
-        "source_schema_digest": canonical_sha256(machine),
-    }
-
-
-def validate_audio_import_composer_fragment(
+def validate_operation_identity_fragment(
+    operation: str,
     version: str,
     *,
-    fragment: str,
+    role: str,
     payload: Any,
 ) -> dict[str, Any]:
-    """Validate one audio.import Composer fact through Registry-owned contracts."""
+    """Validate one typed identity through an exact Registry operation lane."""
 
-    contract = audio_import_composer_fragment_contract(version)
-    if fragment == "request_option":
-        if not isinstance(payload, Mapping) or set(payload) != {"name", "value"}:
-            raise OperationContractError(
-                "INVALID_ARGUMENT",
-                "audio.import Composer request option must contain name and value.",
-            )
-        name = payload.get("name")
-        option_contracts = contract["request_options"]
-        if not isinstance(name, str) or name not in option_contracts:
-            raise OperationContractError(
-                "INVALID_ARGUMENT",
-                "audio.import Composer request option is not reviewed by the Adapter.",
-                details={"name": name, "allowed": sorted(option_contracts)},
-            )
-        option_contract = option_contracts[name]
-        supported_versions = option_contract.get("supported_versions")
-        if isinstance(supported_versions, list) and version not in supported_versions:
-            raise OperationContractError(
-                "UNSUPPORTED_VERSION",
-                f"audio.import {name} is not supported in Wwise {version}.",
-                details={
-                    "name": name,
-                    "version": version,
-                    "supported_versions": list(supported_versions),
-                },
-            )
-        return {
-            "name": name,
-            "value": _normalize_composer_scalar(
-                payload.get("value"),
-                schema=option_contract,
-                field=f"audio.import.{name}",
-            ),
-        }
-    if fragment == "row_field":
-        if not isinstance(payload, Mapping) or set(payload) != {"name", "value"}:
-            raise OperationContractError(
-                "INVALID_ARGUMENT",
-                "audio.import Composer row field must contain name and value.",
-            )
-        name = payload.get("name")
-        row_contracts = contract["row_fields"]
-        if not isinstance(name, str) or name not in row_contracts:
-            raise OperationContractError(
-                "INVALID_ARGUMENT",
-                "audio.import Composer row field is not reviewed by the Adapter.",
-                details={"name": name, "allowed": sorted(row_contracts)},
-            )
-        raw_value = payload.get("value")
-        if name == "import_location":
-            try:
-                descriptors = normalize_reference_descriptors(
-                    [{"name": "ImportLocation", "target": raw_value}],
-                    request_path="$.arguments.imports[0].import_location_probe",
-                )
-            except ObjectOperationContractError as exc:
-                raise OperationContractError(
-                    exc.error_code, str(exc), details=exc.details
-                ) from exc
-            value = descriptors[0].target.as_dict()
-        elif name == "properties":
-            try:
-                value = [
-                    descriptor.as_dict()
-                    for descriptor in normalize_property_descriptors(
-                        raw_value,
-                        request_path="$.arguments.imports[0].properties",
-                    )
-                ]
-            except ObjectOperationContractError as exc:
-                raise OperationContractError(
-                    exc.error_code, str(exc), details=exc.details
-                ) from exc
-        elif name == "references":
-            try:
-                value = [
-                    descriptor.as_dict()
-                    for descriptor in normalize_reference_descriptors(
-                        raw_value,
-                        request_path="$.arguments.imports[0].references",
-                    )
-                ]
-            except ObjectOperationContractError as exc:
-                raise OperationContractError(
-                    exc.error_code, str(exc), details=exc.details
-                ) from exc
-        elif name == "event":
-            if not isinstance(raw_value, Mapping):
-                raise OperationContractError(
-                    "INVALID_ARGUMENT", "audio.import event must be an object."
-                )
-            _require_exact_keys(
-                raw_value,
-                required=("path",),
-                optional=("action",),
-                context="audio.import Composer event",
-            )
-            event_contract = row_contracts[name]["properties"]
-            value = {
-                key: _normalize_composer_scalar(
-                    item,
-                    schema=event_contract[key],
-                    field=f"audio.import.event.{key}",
-                )
-                for key, item in raw_value.items()
-            }
-        else:
-            value = _normalize_composer_scalar(
-                raw_value,
-                schema=row_contracts[name],
-                field=f"audio.import.imports[].{name}",
-            )
-        if name == "object_path":
-            assert isinstance(value, str)
-            _canonical_import_target_paths(value, version=version)
-        elif name == "audio_file":
-            assert isinstance(value, str)
-            if not Path(value).is_absolute():
-                raise OperationContractError(
-                    "INVALID_FILE",
-                    "audio.import Composer audio_file must be an absolute host path.",
-                    details={"path": value},
-                )
-        elif name == "originals_subfolder":
-            try:
-                value = normalize_originals_subfolder(
-                    value,
-                    field="audio.import.imports[].originals_subfolder",
-                )
-            except ImportContractError as exc:
-                raise OperationContractError(
-                    exc.error_code, str(exc), details=exc.details
-                ) from exc
-        return {"name": name, "value": value}
-    raise OperationContractError(
-        "INVALID_ARGUMENT",
-        "audio.import Composer fragment is not reviewed by the Adapter.",
-        details={"fragment": fragment},
-    )
-
-
-def validate_object_set_composer_fragment(
-    version: str,
-    *,
-    fragment: str,
-    payload: Any,
-) -> dict[str, Any]:
-    """Validate one exact object.set Composer fragment through Registry rules."""
-
-    # Resolve the exact supported operation/version lane before accepting any
-    # fragment.  This keeps shared-URI operations outside the Adapter.
-    object_set_composer_fragment_contract(version)
-    if fragment == "target_selector":
-        try:
-            descriptors = normalize_reference_descriptors(
-                [{"name": "ComposerTarget", "target": payload}],
-                request_path="$.arguments.objects[0].composer_identity_probe",
-            )
-        except ObjectOperationContractError as exc:
-            raise OperationContractError(
-                exc.error_code,
-                str(exc),
-                details=exc.details,
-            ) from exc
-        if len(descriptors) != 1:  # pragma: no cover - normalizer invariant
-            raise RuntimeError("one target selector fragment did not normalize once")
-        return descriptors[0].target.as_dict()
-    if fragment == "scalar_property":
-        try:
-            descriptors = normalize_property_descriptors(
-                [payload],
-                request_path="$.arguments.objects[0].properties",
-            )
-        except ObjectOperationContractError as exc:
-            raise OperationContractError(
-                exc.error_code,
-                str(exc),
-                details=exc.details,
-            ) from exc
-        if len(descriptors) != 1:  # pragma: no cover - normalizer invariant
-            raise RuntimeError("one scalar property fragment did not normalize once")
-        return descriptors[0].as_dict()
-    if fragment == "reference":
-        try:
-            descriptors = normalize_reference_descriptors(
-                [payload],
-                request_path="$.arguments.objects[0].references",
-            )
-        except ObjectOperationContractError as exc:
-            raise OperationContractError(
-                exc.error_code,
-                str(exc),
-                details=exc.details,
-            ) from exc
-        if len(descriptors) != 1:  # pragma: no cover - normalizer invariant
-            raise RuntimeError("one reference fragment did not normalize once")
-        return descriptors[0].as_dict()
-    if fragment == "request_option":
-        if not isinstance(payload, Mapping) or set(payload) != {"name", "value"}:
-            raise OperationContractError(
-                "INVALID_ARGUMENT",
-                "object.set Composer request option must contain name and value.",
-            )
-        name = payload.get("name")
-        contract = object_set_composer_fragment_contract(version)
-        option_contracts = contract["request_options"]
-        if not isinstance(name, str) or name not in option_contracts:
-            raise OperationContractError(
-                "INVALID_ARGUMENT",
-                "object.set Composer request option is not reviewed.",
-                details={"name": name, "allowed": sorted(option_contracts)},
-            )
-        return {
-            "name": name,
-            "value": _normalize_composer_scalar(
-                payload.get("value"),
-                schema=option_contracts[name],
-                field=f"object.set.{name}",
-            ),
-        }
-    if fragment in {"target_field", "node_field"}:
-        if not isinstance(payload, Mapping) or set(payload) != {"name", "value"}:
-            raise OperationContractError(
-                "INVALID_ARGUMENT",
-                f"object.set Composer {fragment} must contain name and value.",
-            )
-        name = payload.get("name")
-        contract = object_set_composer_fragment_contract(version)
-        field_contracts = contract[
-            "target_fields" if fragment == "target_field" else "node_fields"
-        ]
-        if not isinstance(name, str) or name not in field_contracts:
-            raise OperationContractError(
-                "INVALID_ARGUMENT",
-                f"object.set Composer {fragment} is not reviewed.",
-                details={"name": name, "allowed": sorted(field_contracts)},
-            )
-        return {
-            "name": name,
-            "value": _normalize_composer_scalar(
-                payload.get("value"),
-                schema=field_contracts[name],
-                field=f"object.set.{fragment}.{name}",
-            ),
-        }
-    if fragment == "node":
-        try:
-            return normalize_object_node(
-                payload,
-                base_path="$.arguments.objects[0].children[0]",
-                allow_platform=True,
-                allow_language=True,
-                allow_import=version in OBJECT_SET_IMPORT_VERSIONS,
-            ).as_dict()
-        except ObjectOperationContractError as exc:
-            raise OperationContractError(
-                exc.error_code,
-                str(exc),
-                details=exc.details,
-            ) from exc
-    if fragment == "list_name":
-        try:
-            return {
-                "name": normalize_object_list_name(
-                    payload,
-                    request_path="$.arguments.objects[0].lists[0].name",
-                )
-            }
-        except ObjectOperationContractError as exc:
-            raise OperationContractError(
-                exc.error_code,
-                str(exc),
-                details=exc.details,
-            ) from exc
-    if fragment == "import_file":
-        if version not in OBJECT_SET_IMPORT_VERSIONS:
-            raise OperationContractError(
-                "VERSION_BEHAVIOR_BOUNDARY",
-                "object.set import is available only in Wwise 2023.1-2025.1.",
-                details={"version": version},
-            )
-        try:
-            descriptor = normalize_object_import(
-                {"files": [payload]},
-                request_path="$.arguments.objects[0].import",
-            )
-        except ObjectOperationContractError as exc:
-            raise OperationContractError(
-                exc.error_code,
-                str(exc),
-                details=exc.details,
-            ) from exc
-        return descriptor.files[0].as_dict()
-    if fragment == "import_option":
-        if version not in OBJECT_SET_IMPORT_VERSIONS:
-            raise OperationContractError(
-                "VERSION_BEHAVIOR_BOUNDARY",
-                "object.set import is available only in Wwise 2023.1-2025.1.",
-                details={"version": version},
-            )
-        if not isinstance(payload, Mapping) or set(payload) != {"name", "value"}:
-            raise OperationContractError(
-                "INVALID_ARGUMENT",
-                "object.set Composer import option must contain name and value.",
-            )
-        name = payload.get("name")
-        contracts = object_set_composer_fragment_contract(version)["import_options"]
-        if not isinstance(name, str) or name not in contracts:
-            raise OperationContractError(
-                "INVALID_ARGUMENT",
-                "object.set Composer import option is not reviewed.",
-                details={"name": name, "allowed": sorted(contracts)},
-            )
-        return {
-            "name": name,
-            "value": _normalize_composer_scalar(
-                payload.get("value"),
-                schema=contracts[name],
-                field=f"object.set.import.{name}",
-            ),
-        }
-    raise OperationContractError(
-        "OPERATION_DRAFT_ADAPTER_UNAVAILABLE",
-        "The requested object.set fragment is outside the reviewed Composer Adapter.",
-        details={"operation": "object.set", "version": version, "fragment": fragment},
-    )
-
-
-def _normalize_composer_scalar(
-    value: Any,
-    *,
-    schema: Mapping[str, Any],
-    field: str,
-) -> Any:
-    """Apply the small scalar subset projected from one Registry field."""
-
-    expected_type = schema.get("type")
-    if expected_type == "boolean":
-        if type(value) is not bool:
-            raise OperationContractError(
-                "INVALID_ARGUMENT",
-                f"{field} must be a JSON boolean.",
-            )
-    elif expected_type == "string":
-        if not isinstance(value, str):
-            raise OperationContractError(
-                "INVALID_ARGUMENT",
-                f"{field} must be a string.",
-            )
-        minimum = schema.get("minLength")
-        maximum = schema.get("maxLength")
-        if isinstance(minimum, int) and len(value) < minimum:
-            raise OperationContractError(
-                "INVALID_ARGUMENT",
-                f"{field} is shorter than the Registry minimum.",
-            )
-        if isinstance(maximum, int) and len(value) > maximum:
-            raise OperationContractError(
-                "INVALID_ARGUMENT",
-                f"{field} exceeds the Registry maximum.",
-            )
-        pattern = schema.get("pattern")
-        if isinstance(pattern, str) and re.search(pattern, value) is None:
-            raise OperationContractError(
-                "INVALID_ARGUMENT",
-                f"{field} does not match the Registry pattern.",
-            )
-    else:  # pragma: no cover - guarded by the reviewed Registry projection
-        raise RuntimeError(f"Unsupported Composer scalar schema for {field}")
-    allowed = schema.get("enum")
-    if isinstance(allowed, list) and value not in allowed:
+    machine = operation_request_machine_contract(operation, version)
+    if role not in machine["identity_arguments"]:
         raise OperationContractError(
-            "INVALID_ARGUMENT",
-            f"{field} is outside the Registry enum.",
-            details={"actual": value, "allowed": list(allowed)},
+            "INVALID_IDENTITY",
+            f"{role!r} is not an identity argument for {operation!r}.",
         )
-    return value
+    try:
+        descriptors = normalize_reference_descriptors(
+            [{"name": role, "target": payload}],
+            request_path=f"$.arguments.{role}",
+        )
+    except ObjectOperationContractError as exc:
+        raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
+    if len(descriptors) != 1:  # pragma: no cover - normalizer invariant
+        raise RuntimeError("one operation identity fragment did not normalize once")
+    return descriptors[0].target.as_dict()
+
+
 
 
 def parse_operation_request(payload: Mapping[str, Any], *, expected_version: str | None = None) -> OperationRequest:
@@ -4326,21 +3928,65 @@ def build_undo_group_execution_plan(
         )
     registry = ExecutionContractRegistry()
     calls: list[dict[str, Any]] = []
-    for index, raw_call in enumerate(raw_calls):
-        if not isinstance(raw_call, Mapping):
+    for index, raw_child_binding in enumerate(raw_calls):
+        if not isinstance(raw_child_binding, Mapping):
             raise OperationContractError(
                 "INVALID_ARGUMENT",
                 f"waapi.undoGroup calls[{index}] must be a JSON object.",
             )
         _require_exact_keys(
-            raw_call,
-            required=("api", "args"),
-            optional=("options",),
+            raw_child_binding,
+            required=("schema_digest", "request"),
             context=f"waapi.undoGroup calls[{index}]",
         )
-        api = raw_call.get("api")
-        args = raw_call.get("args")
-        options = raw_call.get("options", {})
+        child_payload = raw_child_binding.get("request")
+        if not isinstance(child_payload, Mapping):
+            raise OperationContractError(
+                "INVALID_ARGUMENT",
+                f"waapi.undoGroup calls[{index}].request must be an object.",
+            )
+        child = parse_operation_request(child_payload, expected_version=version)
+        if child.operation == "waapi.undoGroup":
+            raise OperationContractError(
+                "UNDO_GROUP_INNER_NOT_ALLOWED",
+                "Nested Undo Group child calls are not allowed.",
+                details={"index": index},
+            )
+        if child.operation == "waapi.call":
+            api_value = child.arguments.get("api")
+            if not isinstance(api_value, str):
+                raise OperationContractError(
+                    "INVALID_ARGUMENT", "Undo Group waapi.call child lacks its API."
+                )
+            from .typed_requests import request_contract
+
+            expected_child_schema_digest = request_contract(
+                version, api_value
+            ).schema_digest
+            api, args, options, _execution_contract = _public_call_arguments(
+                version, child.arguments
+            )
+            validation = validate_semantic_payload(
+                api, args, options, version=version
+            )
+        else:
+            child_spec = describe_operation(child.operation)
+            api = child_spec.uri
+            from .typed_operations import compound_child_request_contract
+
+            expected_child_schema_digest = compound_child_request_contract(
+                child.operation, version
+            ).schema_digest
+            # Dedicated children retain their closed semantic arguments here;
+            # live preparation below resolves them to the exact native call.
+            args = {}
+            options = {}
+        if raw_child_binding.get("schema_digest") != expected_child_schema_digest:
+            raise OperationContractError(
+                "UNDO_GROUP_CHILD_SCHEMA_MISMATCH",
+                "Undo Group child schema digest is stale or belongs to another contract.",
+                details={"index": index, "operation": child.operation},
+            )
         if not isinstance(api, str) or api not in allowed:
             raise OperationContractError(
                 "UNDO_GROUP_INNER_NOT_ALLOWED",
@@ -4351,11 +3997,6 @@ def build_undo_group_execution_plan(
                     "version": version,
                     "allowed": sorted(allowed),
                 },
-            )
-        if not isinstance(args, Mapping) or not isinstance(options, Mapping):
-            raise OperationContractError(
-                "INVALID_ARGUMENT",
-                f"waapi.undoGroup calls[{index}] args/options must be JSON objects.",
             )
         contract = registry.describe(version, api)
         if contract.route != "transaction" or contract.effect != "project_mutation":
@@ -4369,36 +4010,48 @@ def build_undo_group_execution_plan(
                     "effect": contract.effect,
                 },
             )
-        validation = validate_semantic_payload(api, args, options, version=version)
         calls.append(
             {
+                "child_operation": child.operation,
+                "child_request": child.as_dict(),
+                "child_schema_digest": expected_child_schema_digest,
                 "api": api,
                 "args": dict(args),
                 "options": dict(options),
-                "request_validation": validation.as_dict(),
-                "request_validation_strength": (
-                    "partial_reflected_schema"
-                    if validation.unresolved_refs
-                    else "complete_reflected_schema"
+                "timeout_seconds": contract.timeout_seconds,
+                "result_limit_bytes": contract.result_limit_bytes,
+                **(
+                    {
+                        "request_validation": validation.as_dict(),
+                        "request_validation_strength": (
+                            "partial_reflected_schema"
+                            if validation.unresolved_refs
+                            else "complete_reflected_schema"
+                        ),
+                    }
+                    if child.operation == "waapi.call"
+                    else {"request_validation_strength": "dedicated_operation_preparation"}
                 ),
             }
         )
     cancel_args = {} if version in {"2021.1", "2022.1"} else {"undo": True}
+    def phase(uri: str, args: Mapping[str, Any]) -> dict[str, Any]:
+        phase_contract = registry.describe(version, uri)
+        return {
+            "uri": uri,
+            "args": dict(args),
+            "options": {},
+            "timeout_seconds": phase_contract.timeout_seconds,
+            "result_limit_bytes": phase_contract.result_limit_bytes,
+        }
+
     plan = {
         "kind": "same_connection_undo_group",
         "version": version,
-        "begin": {"uri": UNDO_BEGIN_GROUP_URI, "args": {}, "options": {}},
+        "begin": phase(UNDO_BEGIN_GROUP_URI, {}),
         "calls": calls,
-        "end": {
-            "uri": UNDO_END_GROUP_URI,
-            "args": {"displayName": display_name},
-            "options": {},
-        },
-        "cancel": {
-            "uri": UNDO_CANCEL_GROUP_URI,
-            "args": cancel_args,
-            "options": {},
-        },
+        "end": phase(UNDO_END_GROUP_URI, {"displayName": display_name}),
+        "cancel": phase(UNDO_CANCEL_GROUP_URI, cancel_args),
         "same_connection_required": True,
         "automatic_retry": False,
     }
@@ -4481,6 +4134,27 @@ def _public_call_arguments(
             details={"api": api, "fields": list(supplied_forbidden)},
         )
     validation = validate_semantic_payload(api, raw_args, raw_options, version=version)
+    result_projection = arguments.get("result_projection")
+    if result_projection is not None:
+        if api != "ak.wwise.core.sourceControl.getSourceFiles":
+            raise OperationContractError(
+                "RESULT_PROJECTION_NOT_APPLICABLE",
+                "waapi.call result_projection is owned only by the closed source-file listing route.",
+                details={"api": api},
+            )
+        if (
+            not isinstance(result_projection, Mapping)
+            or set(result_projection) != {"kind", "max_results"}
+            or result_projection.get("kind") != "source-control-files"
+            or isinstance(result_projection.get("max_results"), bool)
+            or not isinstance(result_projection.get("max_results"), int)
+            or not 1 <= int(result_projection["max_results"]) <= 1_000
+        ):
+            raise OperationContractError(
+                "INVALID_RESULT_PROJECTION",
+                "source-control file projection requires kind and max_results from 1 to 1000.",
+                details={"api": api},
+            )
     _enforce_versioned_public_call_boundaries(
         version=version,
         api=api,
@@ -4489,7 +4163,7 @@ def _public_call_arguments(
     if api == TRANSPORT_DESTROY_URI and not _valid_transport_id(raw_args.get("transport")):
         raise OperationContractError(
             "INVALID_ARGUMENT",
-            "ak.wwise.core.transport.destroy requires a non-zero uint32 transport ID.",
+            "ak.wwise.core.transport.destroy requires a uint32 transport ID.",
             details={"api": api, "transport": raw_args.get("transport")},
         )
     io_root = arguments.get("io_root")
@@ -4648,8 +4322,58 @@ def _public_call_verification_plan(
     version: str,
     args: Mapping[str, Any],
     strategy: str,
+    result_projection: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     common = {"uri": api, "version": version}
+    if api == "ak.wwise.core.sound.setActiveSource":
+        sound_id = args.get("sound")
+        source_id = args.get("source")
+        if not _valid_object_id(sound_id) or not _valid_object_id(source_id):
+            raise OperationContractError(
+                "INVALID_ARGUMENT",
+                "The closed active-source route requires exact Sound and source GUIDs.",
+            )
+        platform = args.get("platform")
+        if platform is not None and (
+            not isinstance(platform, str) or not platform.strip()
+        ):
+            raise OperationContractError(
+                "INVALID_ARGUMENT",
+                "The closed active-source route requires one exact platform name.",
+            )
+        return {
+            "kind": "project-setting-state",
+            **common,
+            "strategy": "operation_specific_readback",
+            "base_result_strategy": strategy,
+            "object_id": sound_id,
+            "expected_active_source_id": source_id,
+            **({"platform": platform} if platform is not None else {}),
+        }
+    if api == "ak.wwise.core.gameParameter.setRange":
+        object_id = args.get("object")
+        minimum = args.get("min")
+        maximum = args.get("max")
+        if (
+            not _valid_object_id(object_id)
+            or isinstance(minimum, bool)
+            or not isinstance(minimum, (int, float))
+            or isinstance(maximum, bool)
+            or not isinstance(maximum, (int, float))
+        ):
+            raise OperationContractError(
+                "INVALID_ARGUMENT",
+                "The closed Game Parameter range route requires one exact GUID and numeric bounds.",
+            )
+        return {
+            "kind": "project-setting-state",
+            **common,
+            "strategy": "operation_specific_readback",
+            "base_result_strategy": strategy,
+            "object_id": object_id,
+            "expected_minimum": float(minimum),
+            "expected_maximum": float(maximum),
+        }
     if api in {REMOTE_CONNECT_URI, REMOTE_DISCONNECT_URI}:
         return {
             "kind": "remote-connection-state",
@@ -4670,7 +4394,7 @@ def _public_call_verification_plan(
         if not _valid_transport_id(transport_id):
             raise OperationContractError(
                 "INVALID_ARGUMENT",
-                "ak.wwise.core.transport.destroy requires a non-zero uint32 transport ID.",
+                "ak.wwise.core.transport.destroy requires a uint32 transport ID.",
                 details={"api": api, "transport": transport_id},
             )
         return {
@@ -4680,7 +4404,16 @@ def _public_call_verification_plan(
             "base_result_strategy": strategy,
             "transport_id": transport_id,
         }
-    return {"kind": "result-schema", **common, "strategy": strategy}
+    return {
+        "kind": "result-schema",
+        **common,
+        "strategy": strategy,
+        **(
+            {"result_projection": dict(result_projection)}
+            if result_projection is not None
+            else {}
+        ),
+    }
 
 
 def _closed_operation_preview(
@@ -4807,7 +4540,10 @@ def _prepare_object_create(
         )
     except ObjectOperationContractError as exc:
         raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
-    _require_specialized_object_tree_relationships(normalized.nodes)
+    _require_specialized_object_tree_relationships(
+        normalized.nodes,
+        version=request.version,
+    )
     type_catalog = _read_object_type_catalog(read)
     canonical_types: dict[str, str] = {}
     resolved_references: dict[str, Any] = {}
@@ -5733,7 +5469,10 @@ def _prepare_object_set(
                 version=request.version,
                 child_types=tuple(root.type for root in children.roots),
             )
-            _require_specialized_object_tree_relationships(children.nodes)
+            _require_specialized_object_tree_relationships(
+                children.nodes,
+                version=request.version,
+            )
         if lists:
             _require_object_list_owner(target)
         target_spec: dict[str, Any] = {
@@ -5796,6 +5535,10 @@ def _prepare_object_set(
                 raise OperationContractError("INVALID_ARGUMENT", f"object.set objects[{index}].notes must be a string.")
             trusted["notes"] = notes
         if "name" in item:
+            _reject_non_intrinsic_object_name_operation(
+                target,
+                operation="object.set objects[].name",
+            )
             requested_name = item.get("name")
             if not isinstance(requested_name, str) or not requested_name.strip():
                 raise OperationContractError(
@@ -8340,6 +8083,55 @@ def _dedupe_fields(fields: Sequence[Any]) -> list[str]:
     return result
 
 
+def _compound_business_outcome_key(plan: Mapping[str, Any]) -> str:
+    """Name one final business outcome that a child verifier owns."""
+
+    kind = plan.get("kind")
+    if kind == "same-guid-renamed":
+        identity = {"object_id": plan.get("object_id"), "field": "name"}
+    elif kind == "same-guid-notes":
+        identity = {"object_id": plan.get("object_id"), "field": "notes"}
+    elif kind in {"same-guid-property", "same-guid-reference"}:
+        identity = {
+            "object_id": plan.get("object_id"),
+            "field_kind": kind,
+            "field": plan.get("field"),
+            "platform": plan.get("platform"),
+        }
+    elif kind == "object-linked-state":
+        identity = {
+            "object_id": plan.get("object_id"),
+            "field_kind": kind,
+            "field": plan.get("property"),
+            "platform": plan.get("platform"),
+        }
+    elif kind == "soundbank-inclusions-exact":
+        identity = {
+            "soundbank_id": plan.get("soundbank_id"),
+            "field": "inclusions",
+        }
+    elif kind == "switch-assignment-pair":
+        identity = {
+            "switch_container_id": plan.get("switch_container_id"),
+            "child_id": plan.get("child_id"),
+            "field": "assignment",
+        }
+    else:
+        raise OperationContractError(
+            "UNDO_GROUP_CHILD_VERIFIER_REQUIRED",
+            "Compound Undo accepts only child operations with a supported "
+            "final business-outcome verifier.",
+            details={"verification_kind": kind},
+        )
+    if any(value is None for value in identity.values()):
+        raise OperationContractError(
+            "UNDO_GROUP_CHILD_VERIFIER_REQUIRED",
+            "Compound Undo child verification lacks its complete outcome identity.",
+            details={"verification_kind": kind},
+        )
+    return canonical_sha256(identity)
+
+
 def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> PreparedOperation:
     """Resolve live identities/metadata and build one immutable semantic preview."""
 
@@ -8365,6 +8157,63 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
 
     if request.operation == "waapi.undoGroup":
         execution_plan = build_undo_group_execution_plan(request.version, arguments)
+        prepared_children: list[Mapping[str, Any]] = []
+        outcome_owners: dict[str, int] = {}
+        for index, child_plan in enumerate(execution_plan["calls"]):
+            child_request = parse_operation_request(
+                child_plan["child_request"],
+                expected_version=request.version,
+            )
+            if child_request.operation == "waapi.call":
+                prepared_children.append(dict(child_plan))
+                continue
+            child_prepared = prepare_operation(child_request, read_call=read)
+            outcome_key = _compound_business_outcome_key(
+                child_prepared.verification_plan
+            )
+            previous = outcome_owners.get(outcome_key)
+            if previous is not None:
+                raise OperationContractError(
+                    "UNDO_GROUP_OVERLAPPING_OUTCOME",
+                    "Compound Undo children cannot independently verify two "
+                    "writes to the same final business outcome.",
+                    details={
+                        "first_index": previous,
+                        "second_index": index,
+                        "operation": child_request.operation,
+                    },
+                )
+            outcome_owners[outcome_key] = index
+            child_dispatch = child_prepared.semantic_preview.dispatch_payload()
+            if child_dispatch.get("uri") != child_plan["api"]:
+                raise OperationContractError(
+                    "UNDO_GROUP_INNER_ROUTE_MISMATCH",
+                    "Dedicated Undo child preparation changed its exact native URI.",
+                    details={"index": index, "operation": child_request.operation},
+                )
+            prepared_children.append(
+                {
+                    **dict(child_plan),
+                    "args": dict(child_dispatch.get("args", {})),
+                    "options": dict(child_dispatch.get("options", {})),
+                    "prepared_operation": child_prepared.as_dict(),
+                    "request_validation_strength": "dedicated_operation_preparation",
+                }
+            )
+        execution_plan = {
+            **execution_plan,
+            "calls": prepared_children,
+        }
+        prepared_plan_size = len(canonical_json_bytes(execution_plan))
+        if prepared_plan_size > UNDO_GROUP_MAX_PLAN_BYTES:
+            raise OperationContractError(
+                "UNDO_GROUP_PLAN_TOO_LARGE",
+                "waapi.undoGroup prepared execution plan exceeds the packaged byte limit.",
+                details={
+                    "size_bytes": prepared_plan_size,
+                    "limit_bytes": UNDO_GROUP_MAX_PLAN_BYTES,
+                },
+            )
         begin = execution_plan["begin"]
         preview = SemanticPreview(
             envelope=SemanticEnvelope(
@@ -8421,12 +8270,111 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
             version=request.version,
             args=call_args,
             strategy=str(execution_contract["verification_strategy"]),
+            result_projection=(
+                arguments.get("result_projection")
+                if isinstance(arguments.get("result_projection"), Mapping)
+                else None
+            ),
         )
         cleanup = build_transaction_cleanup_spec(
             api,
             call_args,
             execution_contract,
         )
+        soundengine_role_specs = {
+            "ak.soundengine.postEvent": (("event", "event", "Event"),),
+            "ak.soundengine.executeActionOnEvent": (
+                ("event", "event", "Event"),
+            ),
+            "ak.soundengine.seekOnEvent": (("event", "event", "Event"),),
+            "ak.soundengine.setState": (
+                ("stateGroup", "state_group", "StateGroup"),
+                ("state", "state", "State"),
+            ),
+            "ak.soundengine.setSwitch": (
+                ("switchGroup", "switch_group", "SwitchGroup"),
+                ("switchState", "switch", "Switch"),
+            ),
+            "ak.soundengine.postTrigger": (
+                ("trigger", "trigger", "Trigger"),
+            ),
+            "ak.soundengine.setRTPCValue": (
+                ("rtpc", "game_parameter", "GameParameter"),
+            ),
+            "ak.soundengine.resetRTPCValue": (
+                ("rtpc", "game_parameter", "GameParameter"),
+            ),
+            "ak.soundengine.loadBank": (
+                ("soundBank", "sound_bank", "SoundBank"),
+            ),
+            "ak.soundengine.unloadBank": (
+                ("soundBank", "sound_bank", "SoundBank"),
+            ),
+        }
+        for argument_name, role_name, expected_type in soundengine_role_specs.get(
+            api, ()
+        ):
+            resolved = _resolve_identity(
+                {"kind": "id", "value": call_args.get(argument_name)},
+                role=role_name,
+                read=read,
+            )
+            if resolved.row.get("type") != expected_type:
+                raise OperationContractError(
+                    "INVALID_IDENTITY",
+                    f"SoundEngine {role_name} target must remain {expected_type}.",
+                    details={
+                        "id": resolved.object,
+                        "actual_type": resolved.row.get("type"),
+                    },
+                )
+            roles[role_name] = resolved
+        if api == "ak.soundengine.setGameObjectAuxSendValues":
+            aux_rows = call_args.get("auxSendValues")
+            if not isinstance(aux_rows, list):
+                raise OperationContractError(
+                    "INVALID_IDENTITY",
+                    "SoundEngine auxiliary sends must remain one bounded row list.",
+                )
+            for index, row in enumerate(aux_rows, start=1):
+                aux_bus_id = row.get("auxBus") if isinstance(row, Mapping) else None
+                role_name = f"aux_bus_{index}"
+                resolved = _resolve_identity(
+                    {"kind": "id", "value": aux_bus_id},
+                    role=role_name,
+                    read=read,
+                )
+                if resolved.row.get("type") != "AuxBus":
+                    raise OperationContractError(
+                        "INVALID_IDENTITY",
+                        "SoundEngine auxiliary send target must remain an AuxBus.",
+                        details={
+                            "id": resolved.object,
+                            "actual_type": resolved.row.get("type"),
+                        },
+                    )
+                roles[role_name] = resolved
+        for group_role, value_role in (
+            ("state_group", "state"),
+            ("switch_group", "switch"),
+        ):
+            if group_role not in roles or value_role not in roles:
+                continue
+            group_path = roles[group_role].row.get("path")
+            value_path = roles[value_role].row.get("path")
+            if (
+                not isinstance(group_path, str)
+                or not isinstance(value_path, str)
+                or value_path.rsplit("\\", 1)[0] != group_path
+            ):
+                raise OperationContractError(
+                    "INVALID_IDENTITY",
+                    f"SoundEngine {value_role} must remain a direct child of {group_role}.",
+                    details={
+                        "group_id": roles[group_role].object,
+                        "value_id": roles[value_role].object,
+                    },
+                )
         metadata["execution_contract"] = execution_contract
     elif request.operation in {
         "lua.executeCliFile",
@@ -8546,6 +8494,92 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
         }
         verification = {"kind": "guid-absent", "object_id": target.object}
         cleanup = {"kind": "none-after-delete", "irreversible": True}
+    elif request.operation in {"object.copy", "object.move"}:
+        source = _resolve_identity(arguments["object"], role="object", read=read)
+        parent = _resolve_identity(arguments["parent"], role="parent", read=read)
+        if _same_identity(source.object, parent.object):
+            raise OperationContractError(
+                "INVALID_ARGUMENT",
+                "object and parent must identify different live objects.",
+            )
+        _reject_protected_delete(source)
+        roles.update({"object": source, "parent": parent})
+        conflict = str(arguments.get("on_name_conflict", "fail"))
+        if conflict == "replace":
+            raise OperationContractError(
+                "UNSUPPORTED_DESTRUCTIVE_COLLISION_POLICY",
+                "object.copy and object.move do not expose native replace because it can delete an unreviewed destination subtree.",
+            )
+        source_name = source.row.get("name")
+        parent_path = parent.row.get("path")
+        _reject_non_intrinsic_object_name_operation(
+            source,
+            operation=request.operation,
+        )
+        if not isinstance(source_name, str) or not source_name or not isinstance(parent_path, str):
+            raise OperationContractError(
+                "INVALID_READBACK",
+                "copy/move collision review requires live source name and parent path evidence.",
+            )
+        collision_path = parent_path.rstrip("\\") + "\\" + source_name
+        collision_rows = _read_object_path_rows(
+            collision_path,
+            fields=IDENTITY_RETURN_FIELDS,
+            read=read,
+        )
+        if len(collision_rows) > 1:
+            raise OperationContractError(
+                "AMBIGUOUS_COLLISION",
+                "copy/move destination path must resolve to at most one object.",
+                details={"path": collision_path, "rows": collision_rows},
+            )
+        if conflict == "fail" and collision_rows:
+            raise OperationContractError(
+                "NAME_COLLISION",
+                "copy/move destination already contains the source name; choose rename or another parent.",
+                details={"path": collision_path, "rows": collision_rows},
+            )
+        metadata["copy_move_collision_guard"] = {
+            "path": collision_path,
+            "rows": collision_rows,
+        }
+        try:
+            auto_check_out = normalize_auto_check_out_to_source_control(
+                arguments.get("auto_check_out_to_source_control"),
+                version=request.version,
+                supplied="auto_check_out_to_source_control" in arguments,
+            )
+            auto_add = (
+                normalize_auto_check_out_to_source_control(
+                    arguments.get("auto_add_to_source_control"),
+                    version=request.version,
+                    supplied="auto_add_to_source_control" in arguments,
+                )
+                if request.operation == "object.copy"
+                else None
+            )
+        except ImportContractError as exc:
+            raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
+        builder = ObjectMutationBuilder(version=request.version)
+        preview = (
+            builder.copy(object=source, parent=parent, on_name_conflict=conflict, auto_add_to_source_control=auto_add, auto_check_out_to_source_control=auto_check_out)
+            if request.operation == "object.copy"
+            else builder.move(object=source, parent=parent, on_name_conflict=conflict, auto_check_out_to_source_control=auto_check_out)
+        )
+        verification = {
+            "kind": "copied-guid-under-parent" if request.operation == "object.copy" else "moved-guid-under-parent",
+            "source_id": source.object,
+            "source_name": source.row.get("name"),
+            "old_path": source.row.get("path"),
+            "old_parent": _parent_value(source.row.get("parent")),
+            "expected_parent_id": parent.object,
+            "expected_parent_path": parent.row.get("path"),
+            "on_name_conflict": conflict,
+        }
+        cleanup = {
+            "kind": "delete-created-copy" if request.operation == "object.copy" else "move-back-to-original-parent",
+            "source_snapshot": dict(source.row),
+        }
     elif request.operation in {"object.setName", "object.setNotes"}:
         target = _resolve_identity(arguments["object"], role="object", read=read)
         roles["object"] = target
@@ -8553,6 +8587,10 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
         if not isinstance(value, str) or (request.operation == "object.setName" and not value.strip()):
             raise OperationContractError("INVALID_ARGUMENT", "value must be a non-empty string for setName and a string for setNotes.")
         if request.operation == "object.setName":
+            _reject_non_intrinsic_object_name_operation(
+                target,
+                operation=request.operation,
+            )
             if target.row.get("name") == value:
                 raise OperationContractError("NO_OP", "setName value already matches the live object name.")
             preview = PropertyReferenceBuilder(version=request.version).set_name(object=target, value=value)
@@ -8584,7 +8622,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
         )
         info = parse_get_property_info_result(info_payload)
         metadata["field_info"] = info.as_dict()
-        if platform is not None:
+        if platform is not None and request.operation == "object.setProperty":
             _require_platform_field_enabled(
                 read,
                 object_id=source.object,
@@ -8718,24 +8756,17 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
     )
 
 
-def prepare_object_set_composer_check(
+def prepare_object_set_batch_check(
     request: OperationRequest,
     *,
     read_call: ReadCall,
 ) -> ReadCall:
-    """Check every object.set row and return the same bounded read snapshot.
-
-    The Composer uses this only before its authoritative Preview build.  Each
-    row is prepared through the Registry's normal operation path so the check
-    does not maintain a second identity or metadata validator.  Successful
-    reads are cached and then replayed into the full Preview build, which still
-    reparses and prepares the complete canonical request.
-    """
+    """Check every object.set row and return the same bounded read snapshot."""
 
     if request.operation != "object.set":
         raise OperationContractError(
             "INVALID_REQUEST",
-            "The multi-row Composer check is available only for object.set.",
+            "The multi-row batch check is available only for object.set.",
         )
     raw_objects = _mapping_sequence(request.arguments.get("objects"), field="objects")
     cache: dict[bytes, Mapping[str, Any]] = {}
@@ -8751,11 +8782,11 @@ def prepare_object_set_composer_check(
         existing = cache.get(key)
         if existing is not None:
             return dict(existing)
-        if len(cache) >= MAX_OBJECT_SET_COMPOSER_CHECK_READS:
+        if len(cache) >= MAX_OBJECT_SET_BATCH_CHECK_READS:
             raise OperationContractError(
                 "OPERATION_DRAFT_CHECK_LIMIT_EXCEEDED",
                 "Operation Draft live check exceeded its fixed read ceiling.",
-                details={"limit": MAX_OBJECT_SET_COMPOSER_CHECK_READS},
+                details={"limit": MAX_OBJECT_SET_BATCH_CHECK_READS},
             )
         result = read_call(uri, args, options)
         if not isinstance(result, Mapping):
@@ -8788,7 +8819,7 @@ def prepare_object_set_composer_check(
                 {
                     "row_index": row_index,
                     "error_code": exc.error_code,
-                    "message": str(exc)[:MAX_OBJECT_SET_COMPOSER_CHECK_MESSAGE_CHARS],
+                    "message": str(exc)[:MAX_OBJECT_SET_BATCH_CHECK_MESSAGE_CHARS],
                 }
             )
     if issues:
@@ -9159,14 +9190,10 @@ def _prepare_debug_host_control(
             "process_expectation": "wwise_process_termination",
         },
     }[request.operation]
-    if arguments.get("acknowledge") != contract["acknowledge"]:
+    if arguments:
         raise OperationContractError(
-            "DANGEROUS_HOST_CONTROL_ACKNOWLEDGEMENT_REQUIRED",
-            f"{request.operation} requires its exact immutable acknowledgement.",
-            details={
-                "expected": contract["acknowledge"],
-                "actual": arguments.get("acknowledge"),
-            },
+            "INVALID_ARGUMENT",
+            f"{request.operation} accepts no caller-authored native fields.",
         )
     preview = _closed_operation_preview(
         uri=str(contract["uri"]),
@@ -11457,13 +11484,23 @@ def _import_target_return_fields(
     *,
     version: str,
 ) -> list[str]:
-    fields = [
-        *IDENTITY_RETURN_FIELDS,
-        "activeSource",
-        "originalFilePath",
-        "sound:originalWavFilePath",
-        "audioSource:language",
-    ]
+    fields = [*IDENTITY_RETURN_FIELDS]
+    # Wwise 2021.1 rejects the otherwise useful ``activeSource`` and
+    # ``originalFilePath`` accessors on the imported Sound object.  Its import
+    # result still returns the created AudioFileSource, so the verifier binds
+    # that child directly and uses the older Sound accessors for language/path.
+    fields.extend(
+        (
+            ("sound:originalWavFilePath", "audioSource:language")
+            if version == "2021.1"
+            else (
+                "activeSource",
+                "originalFilePath",
+                "sound:originalWavFilePath",
+                "audioSource:language",
+            )
+        )
+    )
     for key in ("validated_properties", "validated_references"):
         descriptors = target.get(key)
         if not isinstance(descriptors, list):
@@ -11486,9 +11523,10 @@ def _import_audio_source_return_fields(*, version: str) -> list[str]:
         "type",
         "path",
         "notes",
-        "originalFilePath",
         "audioSource:language",
     ]
+    if version != "2021.1":
+        fields.insert(-1, "originalFilePath")
     return fields
 
 
@@ -12546,6 +12584,10 @@ def _prepare_switch_assignment(
         "switch_assignment": {
             "switch_container_id": container.object,
             "reference_id": group.object,
+            "selectors": {
+                role: _json_mapping(arguments[role])
+                for role in ("switch_container", "child", "state_or_switch")
+            },
             "assignments": _public_assignment_pairs(assignments),
             "target_pair": {"child": child.object, "stateOrSwitch": state.object},
         }
@@ -12584,16 +12626,76 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                 "INVALID_PREVIEW",
                 "waapi.undoGroup preview lacks versioned arguments.",
             )
-        expected_plan = build_undo_group_execution_plan(version, arguments)
-        expected_dispatch = expected_plan["begin"]
         actual_plan = pre_state.get("execution_plan")
-        passed = actual_plan == expected_plan and dict(dispatch_payload) == expected_dispatch
+        base_plan = build_undo_group_execution_plan(version, arguments)
+        expected_dispatch = {
+            key: base_plan["begin"][key] for key in ("uri", "args", "options")
+        }
+        passed = isinstance(actual_plan, Mapping)
+        child_assertions: list[Mapping[str, Any]] = []
+        child_readbacks: list[Mapping[str, Any]] = []
+        if passed:
+            actual_calls = actual_plan.get("calls")
+            base_calls = base_plan.get("calls")
+            passed = (
+                isinstance(actual_calls, list)
+                and isinstance(base_calls, list)
+                and len(actual_calls) == len(base_calls)
+                and actual_plan.get("begin") == base_plan.get("begin")
+                and actual_plan.get("end") == base_plan.get("end")
+                and actual_plan.get("cancel") == base_plan.get("cancel")
+                and dict(dispatch_payload) == expected_dispatch
+            )
+            if passed:
+                for index, (actual_child, base_child) in enumerate(
+                    zip(actual_calls, base_calls, strict=True)
+                ):
+                    if not isinstance(actual_child, Mapping):
+                        passed = False
+                        break
+                    binding_keys = (
+                        "child_operation",
+                        "child_request",
+                        "child_schema_digest",
+                        "api",
+                        "timeout_seconds",
+                        "result_limit_bytes",
+                    )
+                    binding_ok = all(
+                        actual_child.get(key) == base_child.get(key)
+                        for key in binding_keys
+                    )
+                    prepared_child = actual_child.get("prepared_operation")
+                    if isinstance(prepared_child, Mapping):
+                        child_validation = validate_prepared_roles(
+                            prepared_child, read_call=read_call
+                        )
+                        binding_ok = binding_ok and child_validation.get("ok") is True
+                        child_assertions.extend(
+                            {
+                                **dict(item),
+                                "name": f"child[{index}] {item.get('name', 'role validation')}",
+                            }
+                            for item in child_validation.get("assertions", [])
+                            if isinstance(item, Mapping)
+                        )
+                        child_readbacks.extend(
+                            item
+                            for item in child_validation.get("readbacks", [])
+                            if isinstance(item, Mapping)
+                        )
+                    else:
+                        binding_ok = binding_ok and all(
+                            actual_child.get(key) == base_child.get(key)
+                            for key in ("args", "options", "request_validation")
+                        )
+                    passed = passed and binding_ok
         assertions.append(
             {
                 "name": "waapi.undoGroup execution plan still matches the immutable reviewed composite",
                 "passed": passed,
                 "evidence": {
-                    "expected_plan": expected_plan,
+                    "expected_plan": base_plan,
                     "actual_plan": actual_plan,
                     "expected_dispatch": expected_dispatch,
                     "actual_dispatch": dict(dispatch_payload),
@@ -12605,8 +12707,10 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
             "operation": operation,
             "ok": passed,
             "status": "valid" if passed else "repreview_required",
-            "assertions": [_json_mapping(item) for item in assertions],
-            "readbacks": [],
+            "assertions": [
+                _json_mapping(item) for item in (*assertions, *child_assertions)
+            ],
+            "readbacks": [_json_mapping(item) for item in child_readbacks],
         }
     if operation == "waapi.call":
         request_payload = prepared.get("request")
@@ -12636,6 +12740,78 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                 },
             }
         )
+        role_snapshots: list[tuple[str, Any, Mapping[str, Any]]] = []
+        for role, snapshot_value in roles.items():
+            if not isinstance(snapshot_value, Mapping):
+                raise OperationContractError(
+                    "INVALID_PREVIEW",
+                    f"Resolved role {role!r} is malformed.",
+                )
+            object_id = snapshot_value.get("object")
+            expected_row = snapshot_value.get("row")
+            if object_id is None or not isinstance(expected_row, Mapping):
+                raise OperationContractError(
+                    "INVALID_PREVIEW",
+                    f"Resolved role {role!r} lacks object/row evidence.",
+                )
+            _identity_key(object_id)
+            role_snapshots.append((str(role), object_id, expected_row))
+        if role_snapshots:
+            role_batch = _bounded_multi_identity_read(
+                [object_id for _, object_id, _ in role_snapshots],
+                fields=IDENTITY_RETURN_FIELDS,
+                read=read_call,
+                context="Prepared waapi.call business role validation",
+            )
+            readbacks.append(
+                {
+                    "role": "resolved-roles",
+                    "roles": [role for role, _, _ in role_snapshots],
+                    "uri": OBJECT_GET_URI,
+                    "args": role_batch["args"],
+                    "options": role_batch["options"],
+                    "result": role_batch["result"],
+                }
+            )
+            passed = passed and role_batch["exact"]
+            assertions.append(
+                {
+                    "name": "waapi.call resolved role GUID batch is exact",
+                    "passed": role_batch["exact"],
+                    "evidence": {
+                        "requested_unique_ids": role_batch["args"]["from"]["id"],
+                        "missing_ids": role_batch["missing_ids"],
+                        "duplicate_ids": role_batch["duplicate_ids"],
+                        "extra_rows": role_batch["extra_rows"],
+                        "malformed_rows": role_batch["malformed_rows"],
+                    },
+                }
+            )
+            for role, object_id, expected_row in role_snapshots:
+                rows = role_batch["rows_by_key"].get(_identity_key(object_id), [])
+                role_passed = len(rows) == 1
+                if role_passed:
+                    actual = rows[0]
+                    role_passed = all(
+                        (
+                            _same_identity(actual.get(field_name), expected_row.get(field_name))
+                            if field_name == "id"
+                            else actual.get(field_name) == expected_row.get(field_name)
+                        )
+                        for field_name in ("id", "name", "type", "path")
+                        if field_name in expected_row
+                    )
+                passed = passed and role_passed
+                assertions.append(
+                    {
+                        "name": f"waapi.call {role} identity is unchanged",
+                        "passed": role_passed,
+                        "evidence": {
+                            "expected": dict(expected_row),
+                            "actual": rows,
+                        },
+                    }
+                )
         return {
             "contract": ROLE_VALIDATION_CONTRACT,
             "operation": operation,
@@ -12937,6 +13113,47 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                     "evidence": {"expected": field_before.get("value"), "actual": actual, "rows": rows},
                 }
             )
+
+    copy_move_collision_guard = (
+        pre_state.get("copy_move_collision_guard")
+        if isinstance(pre_state, Mapping)
+        else None
+    )
+    if isinstance(copy_move_collision_guard, Mapping):
+        path = copy_move_collision_guard.get("path")
+        expected_rows = copy_move_collision_guard.get("rows")
+        if not isinstance(path, str) or not isinstance(expected_rows, list):
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                "copy/move collision guard is malformed.",
+            )
+        result = read_call(
+            OBJECT_GET_URI,
+            {"from": {"path": [path]}},
+            {"return": list(IDENTITY_RETURN_FIELDS)},
+        )
+        if not isinstance(result, Mapping):
+            raise OperationContractError(
+                "INVALID_READBACK",
+                "copy/move collision guard readback must be an object.",
+            )
+        actual_rows = _rows(result)
+        readbacks.append(
+            {
+                "role": "copy-move-collision",
+                "uri": OBJECT_GET_URI,
+                "args": {"from": {"path": [path]}},
+                "options": {"return": list(IDENTITY_RETURN_FIELDS)},
+                "result": dict(result),
+            }
+        )
+        assertions.append(
+            {
+                "name": "copy/move destination collision state is unchanged",
+                "passed": actual_rows == expected_rows,
+                "evidence": {"path": path, "expected": expected_rows, "actual": actual_rows},
+            }
+        )
 
     linked_before = pre_state.get("linked_before") if isinstance(pre_state, Mapping) else None
     if isinstance(linked_before, Mapping):
@@ -13879,6 +14096,53 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
         assignment_state = pre_state.get("switch_assignment")
         if isinstance(assignment_state, Mapping):
             container_id = assignment_state.get("switch_container_id")
+            selectors = assignment_state.get("selectors")
+            if not isinstance(selectors, Mapping):
+                raise OperationContractError(
+                    "INVALID_PREVIEW",
+                    "Switch Container assignment selector evidence is missing.",
+                )
+            for role in ("switch_container", "child", "state_or_switch"):
+                selector = selectors.get(role)
+                expected_role = roles.get(role)
+                if not isinstance(selector, Mapping) or not isinstance(expected_role, Mapping):
+                    raise OperationContractError(
+                        "INVALID_PREVIEW",
+                        f"Switch Container assignment {role} selector evidence is malformed.",
+                    )
+                # Exact IDs are already covered by the bounded role GUID batch.
+                # Every other selector must still resolve uniquely to that same
+                # GUID, including its recursively resolved parent selector.
+                if selector.get("kind") == "id":
+                    continue
+                try:
+                    resolved = _resolve_identity(
+                        selector,
+                        role=f"{role}.execution_selector",
+                        read=read_call,
+                    )
+                    passed = _same_identity(
+                        resolved.object, expected_role.get("object")
+                    )
+                    evidence: Any = {
+                        "selector": dict(selector),
+                        "expected_object": expected_role.get("object"),
+                        "actual_object": resolved.object,
+                    }
+                except OperationContractError as exc:
+                    passed = False
+                    evidence = {
+                        "selector": dict(selector),
+                        "expected_object": expected_role.get("object"),
+                        "error": exc.as_dict(),
+                    }
+                assertions.append(
+                    {
+                        "name": f"{role} original selector remains unique and unchanged",
+                        "passed": passed,
+                        "evidence": evidence,
+                    }
+                )
             reference_args = {"from": {"id": [container_id]}}
             reference_options = {"return": ["id", "path", SWITCH_GROUP_REFERENCE]}
             reference_result = read_call(OBJECT_GET_URI, reference_args, reference_options)
@@ -14428,8 +14692,6 @@ def verify_prepared_operation(
                 details={"operation": ui_operation},
             )
     elif kind == "undo-group-result-schemas":
-        success_status = "result_schema_checked"
-        business_state_verified = False
         version = plan.get("version")
         execution_plan = plan.get("execution_plan")
         compound_payload = execution_result.get("result")
@@ -14465,6 +14727,8 @@ def verify_prepared_operation(
             {"expected": expected_uris, "actual": actual_uris},
         )
         partial_schema = False
+        child_business_state_verified = True
+        verified_child_count = 0
         if actual_uris == expected_uris:
             for index, phase in enumerate(phases):
                 if not isinstance(phase, Mapping):
@@ -14503,8 +14767,66 @@ def verify_prepared_operation(
                         True,
                         validation.as_dict(),
                     )
+            for index, child_plan in enumerate(inner_plan):
+                if not isinstance(child_plan, Mapping):
+                    child_business_state_verified = False
+                    continue
+                prepared_child = child_plan.get("prepared_operation")
+                child_phase = phases[index + 1]
+                dispatch_result = (
+                    child_phase.get("dispatch_result")
+                    if isinstance(child_phase, Mapping)
+                    else None
+                )
+                if not isinstance(prepared_child, Mapping) or not isinstance(
+                    dispatch_result, Mapping
+                ):
+                    child_business_state_verified = False
+                    continue
+                child_verification = verify_prepared_operation(
+                    prepared_child,
+                    execution_result=dispatch_result,
+                    read_call=read_call,
+                )
+                verified_child_count += 1
+                child_business_state_verified = (
+                    child_business_state_verified
+                    and child_verification.business_state_verified
+                )
+                assertions.extend(
+                    {
+                        **dict(assertion),
+                        "name": (
+                            f"Undo Group child[{index}] "
+                            f"{assertion.get('name', 'postcondition')}"
+                        ),
+                    }
+                    for assertion in child_verification.assertions
+                )
+                readbacks.extend(
+                    {
+                        **dict(readback),
+                        "compound_child_index": index,
+                    }
+                    for readback in child_verification.readbacks
+                )
+        business_state_verified = (
+            child_business_state_verified
+            and verified_child_count == len(inner_plan)
+        )
+        success_status = (
+            "verified" if business_state_verified else "result_schema_checked"
+        )
         verification_strength = (
-            "partial_reflected_schema" if partial_schema else "complete_reflected_schema"
+            "compound_child_readback"
+            if business_state_verified
+            else "compound_mixed_child_verification"
+            if verified_child_count
+            else (
+                "partial_reflected_schema"
+                if partial_schema
+                else "complete_reflected_schema"
+            )
         )
     elif kind == "result-schema":
         success_status = "result_schema_checked"
@@ -14536,6 +14858,93 @@ def verify_prepared_operation(
                 True,
                 validation.as_dict(),
             )
+    elif kind == "project-setting-state":
+        uri = plan.get("uri")
+        version = plan.get("version")
+        object_id = plan.get("object_id")
+        if (
+            uri
+            not in {
+                "ak.wwise.core.sound.setActiveSource",
+                "ak.wwise.core.gameParameter.setRange",
+            }
+            or not isinstance(version, str)
+            or not _valid_object_id(object_id)
+        ):
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                "Project-setting verification lacks its exact URI, version, or object GUID.",
+            )
+        check_result_schema(str(uri), version)
+        if uri == "ak.wwise.core.sound.setActiveSource":
+            expected_source = plan.get("expected_active_source_id")
+            platform = plan.get("platform")
+            if not _valid_object_id(expected_source) or (
+                platform is not None and not isinstance(platform, str)
+            ):
+                raise OperationContractError(
+                    "INVALID_PREVIEW",
+                    "Active-source verification lacks its exact source or platform.",
+                )
+            rows = read_object(
+                object_id=object_id,
+                fields=("id", "name", "type", "path", "activeSource"),
+                platform=platform,
+            )
+            check(
+                "active-source target resolves exactly once",
+                len(rows) == 1,
+                rows,
+            )
+            if len(rows) == 1:
+                actual_source = _reference_identity(
+                    _field_value(rows[0], "activeSource")
+                )
+                check(
+                    "Sound active source matches the requested AudioFileSource",
+                    _same_identity(actual_source, expected_source),
+                    {
+                        "expected": expected_source,
+                        "actual": actual_source,
+                        "platform": platform,
+                    },
+                )
+        else:
+            expected_minimum = plan.get("expected_minimum")
+            expected_maximum = plan.get("expected_maximum")
+            if not isinstance(expected_minimum, (int, float)) or not isinstance(
+                expected_maximum, (int, float)
+            ):
+                raise OperationContractError(
+                    "INVALID_PREVIEW",
+                    "Game Parameter range verification lacks its exact numeric bounds.",
+                )
+            rows = read_object(
+                object_id=object_id,
+                fields=("id", "name", "type", "path", "@Min", "@Max"),
+            )
+            check(
+                "Game Parameter target resolves exactly once",
+                len(rows) == 1,
+                rows,
+            )
+            if len(rows) == 1:
+                actual_minimum = _field_value(rows[0], "@Min")
+                actual_maximum = _field_value(rows[0], "@Max")
+                check(
+                    "Game Parameter minimum matches exactly",
+                    isinstance(actual_minimum, (int, float))
+                    and not isinstance(actual_minimum, bool)
+                    and float(actual_minimum) == float(expected_minimum),
+                    {"expected": expected_minimum, "actual": actual_minimum},
+                )
+                check(
+                    "Game Parameter maximum matches exactly",
+                    isinstance(actual_maximum, (int, float))
+                    and not isinstance(actual_maximum, bool)
+                    and float(actual_maximum) == float(expected_maximum),
+                    {"expected": expected_maximum, "actual": actual_maximum},
+                )
     elif kind == "remote-connection-state":
         uri = plan.get("uri")
         version = plan.get("version")
@@ -14569,7 +14978,7 @@ def verify_prepared_operation(
         transport_id = _execution_payload(execution_result).get("transport")
         valid_transport_id = _valid_transport_id(transport_id)
         check(
-            "transport.create returned a non-zero uint32 transport ID",
+            "transport.create returned a uint32 transport ID",
             valid_transport_id,
             {"transport": transport_id},
         )
@@ -16316,6 +16725,56 @@ def verify_prepared_operation(
     elif kind == "guid-absent":
         rows = read_object(object_id=plan.get("object_id"), fields=("id", "name", "type", "path"))
         check("deleted GUID is absent", len(rows) == 0, rows)
+    elif kind in {"copied-guid-under-parent", "moved-guid-under-parent"}:
+        is_copy = kind == "copied-guid-under-parent"
+        object_id = _execution_result_id(execution_result)
+        check(
+            "execution returned copied GUID" if is_copy else "moved source GUID is known",
+            object_id is not None,
+            dict(execution_result),
+        )
+        if object_id is None:
+            return _verification(operation, assertions, readbacks)
+        rows = read_object(object_id=object_id, fields=("id", "name", "type", "path", "parent"))
+        check("result GUID resolves exactly once", len(rows) == 1, rows)
+        if len(rows) == 1:
+            row = rows[0]
+            check("result GUID is stable", _same_identity(row.get("id"), object_id), row.get("id"))
+            if is_copy:
+                check("copy GUID differs from source", not _same_identity(object_id, plan.get("source_id")), object_id)
+            else:
+                check("move preserves source GUID", _same_identity(object_id, plan.get("source_id")), object_id)
+            result_name = row.get("name")
+            conflict_policy = plan.get("on_name_conflict", "fail")
+            name_matches = (
+                isinstance(result_name, str) and bool(result_name)
+                if conflict_policy == "rename"
+                else result_name == plan.get("source_name")
+            )
+            check("result name satisfies conflict policy", name_matches, result_name)
+            parent_matches = _same_identity(
+                _parent_value(row.get("parent")), plan.get("expected_parent_id")
+            )
+            check("result parent matches requested parent", parent_matches, row.get("parent"))
+            path = row.get("path")
+            expected_parent_path = plan.get("expected_parent_path")
+            path_matches = (
+                isinstance(path, str)
+                and isinstance(expected_parent_path, str)
+                and path.startswith(expected_parent_path.rstrip("\\") + "\\")
+                and isinstance(result_name, str)
+                and path.rstrip("\\").endswith("\\" + result_name)
+            )
+            check("result path is below requested parent", path_matches, path)
+        if not is_copy:
+            old_path = plan.get("old_path")
+            if isinstance(old_path, str) and old_path:
+                old_rows = read_object(path=old_path, fields=("id", "path"))
+                check(
+                    "old path no longer resolves to moved GUID",
+                    not any(_same_identity(row.get("id"), plan.get("source_id")) for row in old_rows),
+                    old_rows,
+                )
     elif kind == "same-guid-renamed":
         object_id = plan.get("object_id")
         rows = read_object(object_id=object_id, fields=("id", "name", "type", "path", "parent"))
@@ -16393,6 +16852,9 @@ def verify_prepared_operation(
                     {"actual": actual, "expected": expected},
                 )
     elif kind == "ui-capture-screen-result":
+        success_status = "result_schema_checked"
+        verification_strength = "result_schema_only"
+        business_state_verified = False
         version = plan.get("version")
         max_chars = plan.get("max_base64_chars")
         if (
@@ -17342,7 +17804,11 @@ def verify_prepared_operation(
                         {"expected": before_notes, "actual": live_row.get("notes")},
                     )
 
-                active_source_id = _reference_identity(_field_value(live_row, "activeSource"))
+                active_source_id = _reference_identity(
+                    _field_value(live_row, "activeSource")
+                )
+                if version == "2021.1" and active_source_id is None:
+                    active_source_id = returned_source_id
                 if len(returned_source_matches) == 1:
                     returned_source = returned_source_matches[0]
                     returned_parent_id = _reference_identity(
@@ -18409,6 +18875,15 @@ def _validate_nested_request_shape(
                     f"{context_operation} commands[{index}].handler.kind is unsupported.",
                     details={"kind": kind},
                 )
+            if kind == "lua_script" and version not in UI_COMMAND_LUA_VERSIONS:
+                raise OperationContractError(
+                    "UNAVAILABLE_IN_VERSION",
+                    f"{context_operation} lua_script handlers are not available in Wwise {version}.",
+                    details={
+                        "version": version,
+                        "supported_versions": sorted(UI_COMMAND_LUA_VERSIONS),
+                    },
+                )
             required = (
                 ("kind", "program_path")
                 if kind == "program"
@@ -18452,7 +18927,18 @@ def _validate_nested_request_shape(
                         f"{context_operation} commands[{index}].{field_name}"
                     ),
                 )
+        requires_source_authority = any(
+            isinstance(command.get("handler"), Mapping)
+            and command["handler"].get("kind") in {"program", "lua_script"}
+            for command in raw_commands
+        )
         authority = arguments.get("source_authority")
+        if requires_source_authority and authority is None:
+            raise OperationContractError(
+                "SOURCE_AUTHORITY_REQUIRED",
+                f"{context_operation} requires source_authority for Program or Lua handlers.",
+                details={"expected": UI_COMMAND_SOURCE_AUTHORITY},
+            )
         if authority is not None and authority != UI_COMMAND_SOURCE_AUTHORITY:
             raise OperationContractError(
                 "INVALID_SOURCE_AUTHORITY",
@@ -18528,16 +19014,10 @@ def _validate_nested_request_shape(
         "debug.testAssert",
         "debug.testCrash",
     }:
-        expected = {
-            "debug.restartWaapiServers": "restart_waapi_servers",
-            "debug.testAssert": "trigger_debug_assert",
-            "debug.testCrash": "crash_wwise_process",
-        }[operation]
-        if arguments.get("acknowledge") != expected:
+        if arguments:
             raise OperationContractError(
-                "DANGEROUS_HOST_CONTROL_ACKNOWLEDGEMENT_REQUIRED",
-                f"{operation} requires its exact immutable acknowledgement.",
-                details={"expected": expected, "actual": arguments.get("acknowledge")},
+                "INVALID_ARGUMENT",
+                f"{operation} accepts no caller-authored native fields.",
             )
         return
     if operation == "audio.import":
@@ -19711,56 +20191,14 @@ def _require_reference_target_allowed(
     metadata: PropertyInfoMetadataRecord,
     target: ResolvedObject,
 ) -> None:
-    restrictions = metadata.restriction.get("restrictions")
-    if restrictions is None:
-        return
-    if not isinstance(restrictions, list):
+    try:
+        allowed_types = set(reference_allowed_types(metadata.restriction))
+    except MetadataRestrictionError as exc:
         raise OperationContractError(
-            "INVALID_METADATA",
-            "Reference restriction metadata must be an array when present.",
+            exc.error_code,
+            str(exc),
             details={"reference": metadata.name, "restriction": dict(metadata.restriction)},
-        )
-    allowed_types: set[str] = set()
-    for item in restrictions:
-        if isinstance(item, str):
-            if item == "notNull":
-                # The closed identity resolver has already proved one concrete,
-                # non-null target before this metadata check.
-                continue
-            if item == "playable":
-                raise OperationContractError(
-                    "CONSTRAINED_REFERENCE_BOUNDARY",
-                    "Playable reference restrictions require a dedicated live target classifier.",
-                    details={
-                        "reference": metadata.name,
-                        "restriction": dict(metadata.restriction),
-                    },
-                )
-            raise OperationContractError(
-                "INVALID_METADATA",
-                "Reference restriction metadata contains an unknown string flag.",
-                details={
-                    "reference": metadata.name,
-                    "restriction": dict(metadata.restriction),
-                    "flag": item,
-                },
-            )
-        if not isinstance(item, Mapping):
-            raise OperationContractError(
-                "INVALID_METADATA",
-                "Reference restriction entries must be objects or supported string flags.",
-                details={"reference": metadata.name, "restriction": dict(metadata.restriction)},
-            )
-        values = item.get("type")
-        if values is None:
-            continue
-        if not isinstance(values, list) or not all(isinstance(value, str) and value for value in values):
-            raise OperationContractError(
-                "INVALID_METADATA",
-                "Reference restriction type entries must be non-empty string arrays.",
-                details={"reference": metadata.name, "restriction": dict(metadata.restriction)},
-            )
-        allowed_types.update(values)
+        ) from exc
     if not allowed_types:
         return
     target_type = target.row.get("type")
@@ -19770,8 +20208,8 @@ def _require_reference_target_allowed(
             "Reference target readback must expose a type when live restrictions are present.",
             details={"reference": metadata.name, "target": target.as_dict()},
         )
-    target_token = _reference_type_token(target_type)
-    allowed_tokens = {_reference_type_token(value) for value in allowed_types}
+    target_token = reference_type_token(target_type)
+    allowed_tokens = {reference_type_token(value) for value in allowed_types}
     if target_token not in allowed_tokens:
         raise OperationContractError(
             "INVALID_REFERENCE_TARGET",
@@ -19835,22 +20273,12 @@ def _require_reference_clear_allowed(
             )
 
 
-def _reference_type_token(value: str) -> str:
-    token = "".join(character for character in value.casefold() if character.isalnum())
-    aliases = {
-        "audiobus": "bus",
-        "auxiliarybus": "auxbus",
-        "auxbus": "auxbus",
-    }
-    return aliases.get(token, token)
-
-
 def _valid_object_id(value: Any) -> bool:
     return not isinstance(value, bool) and isinstance(value, (str, int)) and value != ""
 
 
 def _valid_transport_id(value: Any) -> bool:
-    return not isinstance(value, bool) and isinstance(value, int) and 1 <= value <= 0xFFFFFFFF
+    return not isinstance(value, bool) and isinstance(value, int) and 0 <= value <= 0xFFFFFFFF
 
 
 def _transport_list_rows(result: Mapping[str, Any]) -> tuple[list[dict[str, Any]], bool]:
@@ -19859,6 +20287,34 @@ def _transport_list_rows(result: Mapping[str, Any]) -> tuple[list[dict[str, Any]
         return [], False
     rows = [dict(item) for item in value]
     return rows, all(_valid_transport_id(row.get("transport")) for row in rows)
+
+
+def _reject_non_intrinsic_object_name_operation(
+    target: ResolvedObject,
+    *,
+    operation: str,
+) -> None:
+    """Fail when rename or collision proof needs a mutable intrinsic name."""
+
+    object_type = target.row.get("type")
+    semantics = (
+        object_identity_semantics(object_type)
+        if isinstance(object_type, str)
+        else None
+    )
+    if semantics is not None and not semantics.mutable_intrinsic_name:
+        raise OperationContractError(
+            "DERIVED_OBJECT_NAME_BOUNDARY",
+            f"{operation} cannot target {object_type} because that Wwise object type has no mutable intrinsic name.",
+            details={
+                "operation": operation,
+                "object_id": target.object,
+                "object_type": object_type,
+                "name_mode": semantics.name_mode,
+                "display_identity_source": semantics.display_identity_source,
+                "path": target.row.get("path"),
+            },
+        )
 
 
 def _reject_protected_delete(target: ResolvedObject) -> None:
@@ -19902,26 +20358,8 @@ def _require_object_create_writable_parent(
             "object.create parent must expose an absolute live Wwise path.",
             details={"parent": parent.as_dict()},
         )
-    allowed_types = (
-        OBJECT_CREATE_WRITABLE_PARENT_TYPES
-        | frozenset(OBJECT_CREATE_SPECIALIZED_CHILD_TYPES_BY_PARENT)
-        | OBJECT_CREATE_REFLECTED_PARENT_TYPES_BY_VERSION.get(
-            version,
-            frozenset(),
-        )
-    )
-    if object_type not in allowed_types:
-        raise OperationContractError(
-            "INVALID_CREATE_PARENT_TYPE",
-            "object.create parent is not one of the reviewed writable object types.",
-            details={
-                "actual_type": object_type,
-                "allowed_types": sorted(allowed_types),
-                "version": version,
-                "parent": parent.as_dict(),
-            },
-        )
     _require_specialized_object_child_types(
+        version=version,
         parent_type=object_type,
         child_types=child_types,
         details={"parent": parent.as_dict(), "version": version},
@@ -19930,11 +20368,14 @@ def _require_object_create_writable_parent(
 
 def _require_specialized_object_tree_relationships(
     nodes: Sequence[ObjectNodeDescriptor],
+    *,
+    version: str,
 ) -> None:
     for node in nodes:
         if not node.children:
             continue
         _require_specialized_object_child_types(
+            version=version,
             parent_type=node.type,
             child_types=tuple(child.type for child in node.children),
             details={"request_path": node.request_path},
@@ -19943,66 +20384,53 @@ def _require_specialized_object_tree_relationships(
 
 def _require_specialized_object_child_types(
     *,
+    version: str,
     parent_type: Any,
     child_types: Sequence[str],
     details: Mapping[str, Any],
 ) -> None:
-    parent_token = _object_type_token(parent_type)
-    specialized = next(
-        (
-            (name, allowed)
-            for name, allowed in OBJECT_CREATE_SPECIALIZED_CHILD_TYPES_BY_PARENT.items()
-            if _object_type_token(name) == parent_token
-        ),
-        None,
+    capability = object_child_capability(
+        version=version,
+        parent_type=parent_type,
+        child_types=child_types,
     )
-    if specialized is not None:
-        canonical_parent, allowed_child_types = specialized
-        allowed_tokens = {
-            _object_type_token(child_type) for child_type in allowed_child_types
-        }
-        invalid_child_types = sorted(
-            {
-                str(child_type)
-                for child_type in child_types
-                if _object_type_token(child_type) not in allowed_tokens
+    if not capability.writable_parent:
+        raise OperationContractError(
+            "INVALID_CREATE_PARENT_TYPE",
+            "object.create parent is not one of the reviewed writable object types.",
+            details={
+                **dict(details),
+                "actual_type": parent_type,
+                "allowed_types": list(capability.allowed_parent_types),
+                "version": version,
             },
-            key=str.casefold,
         )
-        if invalid_child_types:
-            raise OperationContractError(
-                "INVALID_CREATE_CHILD_TYPE_FOR_PARENT",
-                f"{canonical_parent} accepts only its reviewed Game Sync child type.",
-                details={
-                    **dict(details),
-                    "parent_type": canonical_parent,
-                    "invalid_child_types": invalid_child_types,
-                    "allowed_child_types": sorted(allowed_child_types),
-                },
-            )
-
-    for child_type in child_types:
-        allowed_parent_types = sorted(
-            parent_name
-            for parent_name, allowed_children in (
-                OBJECT_CREATE_SPECIALIZED_CHILD_TYPES_BY_PARENT.items()
-            )
-            if _object_type_token(child_type)
-            in {_object_type_token(item) for item in allowed_children}
+    if not capability.invalid_child_types:
+        return
+    if capability.allowed_child_types:
+        raise OperationContractError(
+            "INVALID_CREATE_CHILD_TYPE_FOR_PARENT",
+            f"{parent_type} accepts only its reviewed Game Sync child type.",
+            details={
+                **dict(details),
+                "parent_type": parent_type,
+                "invalid_child_types": list(capability.invalid_child_types),
+                "allowed_child_types": list(capability.allowed_child_types),
+            },
         )
-        if allowed_parent_types and parent_token not in {
-            _object_type_token(item) for item in allowed_parent_types
-        }:
-            raise OperationContractError(
-                "INVALID_CREATE_PARENT_TYPE_FOR_CHILD",
-                f"{child_type} can be created only under its reviewed Game Sync group type.",
-                details={
-                    **dict(details),
-                    "actual_parent_type": parent_type,
-                    "child_type": child_type,
-                    "allowed_parent_types": allowed_parent_types,
-                },
-            )
+    child_type = capability.invalid_child_types[0]
+    raise OperationContractError(
+        "INVALID_CREATE_PARENT_TYPE_FOR_CHILD",
+        f"{child_type} can be created only under its reviewed Game Sync group type.",
+        details={
+            **dict(details),
+            "actual_parent_type": parent_type,
+            "child_type": child_type,
+            "allowed_parent_types": list(
+                capability.required_parent_types_for(child_type)
+            ),
+        },
+    )
 
 
 def _require_object_list_owner(owner: ResolvedObject) -> None:
@@ -20046,6 +20474,11 @@ def _execution_result_id(result: Mapping[str, Any]) -> Any:
     for _ in range(3):
         if isinstance(current, Mapping) and current.get("id") is not None:
             return current.get("id")
+        if isinstance(current, Mapping) and isinstance(current.get("return"), list):
+            rows = current["return"]
+            if len(rows) == 1 and isinstance(rows[0], Mapping):
+                return rows[0].get("id")
+            return None
         if isinstance(current, Mapping) and isinstance(current.get("result"), Mapping):
             current = current["result"]
             continue
@@ -20195,6 +20628,44 @@ def _json_mapping(value: Any) -> Any:
     return value
 
 
+_UNAVAILABLE_VERSION_SCHEMA = object()
+
+
+def _project_supported_version_contract(value: Any, *, version: str) -> Any:
+    """Remove Registry schema nodes that do not belong to one exact lane."""
+
+    if isinstance(value, Mapping):
+        supported = value.get("supported_versions")
+        if supported is not None:
+            if not isinstance(supported, list) or not all(
+                isinstance(item, str) for item in supported
+            ):
+                raise RuntimeError("Registry supported_versions must be a string array")
+            if version not in supported:
+                return _UNAVAILABLE_VERSION_SCHEMA
+        projected: dict[str, Any] = {}
+        for key, item in value.items():
+            child = _project_supported_version_contract(item, version=version)
+            if child is not _UNAVAILABLE_VERSION_SCHEMA:
+                projected[str(key)] = child
+        properties = projected.get("properties")
+        if isinstance(properties, Mapping):
+            allowed = set(properties)
+            for keyword in ("required", "optional"):
+                names = projected.get(keyword)
+                if isinstance(names, list):
+                    projected[keyword] = [name for name in names if name in allowed]
+        return projected
+    if isinstance(value, list):
+        projected_items = []
+        for item in value:
+            child = _project_supported_version_contract(item, version=version)
+            if child is not _UNAVAILABLE_VERSION_SCHEMA:
+                projected_items.append(child)
+        return projected_items
+    return value
+
+
 def _operation_argument_contract(
     operation: str,
     value: Mapping[str, Any],
@@ -20202,43 +20673,22 @@ def _operation_argument_contract(
     version: str | None,
 ) -> dict[str, Any]:
     contract = _json_mapping(value)
+    if version is not None and operation in {
+        "audio.importTabDelimited",
+        "lua.executeCliFile",
+        "lua.executeCoreFile",
+        "lua.executeCoreInline",
+        "ui.commands.register",
+        "ui.commands.unregister",
+    }:
+        projected = _project_supported_version_contract(contract, version=version)
+        if not isinstance(projected, dict):  # pragma: no cover - root invariant
+            raise RuntimeError("Operation argument contract is unavailable in its own version lane")
+        contract = projected
     if operation == "waapi.undoGroup":
-        try:
-            api_contract = contract["properties"]["calls"]["items"][
-                "properties"
-            ]["api"]
-        except (KeyError, TypeError) as exc:
-            raise RuntimeError(
-                "waapi.undoGroup schema no longer exposes calls[].api"
-            ) from exc
-        if version is None:
-            api_contract["allowed_values_by_version"] = {
-                lane: sorted(uris)
-                for lane, uris in UNDO_GROUP_INNER_URIS_BY_VERSION.items()
-            }
-        else:
-            allowed = sorted(UNDO_GROUP_INNER_URIS_BY_VERSION[version])
-            api_contract.pop("pattern", None)
-            api_contract["enum"] = allowed
-            api_contract["value_contracts"] = [
-                {
-                    "const": uri,
-                    "schema_pointer": {
-                        "gateway_argv": [
-                            "--version",
-                            version,
-                            "describe",
-                            uri,
-                            "--full-schema",
-                        ],
-                        "result_path": (
-                            f"$.availability.{version}."
-                            "capability.schema.full"
-                        ),
-                    },
-                }
-                for uri in allowed
-            ]
+        # The normal Composer owns child-operation discovery and typed facts.
+        # The canonical Registry records only Gateway-generated bound requests;
+        # it never exposes native URI/args/options as a public child grammar.
         return contract
     if operation == "object.create":
         contract["default_container_parent_contract"] = (
@@ -20446,11 +20896,14 @@ def _audio_import_object_path_contract(
 
 __all__ = [
     "COMPOSER_INPUT_MODE",
+    "BUSINESS_DECLARATION_INPUT_MODE",
+    "audio_import_business_contract",
+    "INLINE_TYPED_INPUT_MODE",
     "CONDITIONAL_LOCAL_FILESYSTEM_OPERATIONS",
     "DYNAMIC_LOCAL_FILESYSTEM_OPERATIONS",
     "LOCAL_FILESYSTEM_OPERATION_ROLES",
     "NO_LOCAL_FILESYSTEM_OPERATIONS",
-    "LEGACY_JSON_INPUT_MODE",
+    "INTERNAL_CANONICAL_INPUT_MODE",
     "OPERATION_INPUT_MODE_LANES",
     "OPERATION_REQUEST_CONTRACT",
     "PREPARED_OPERATION_CONTRACT",
@@ -20463,20 +20916,19 @@ __all__ = [
     "OperationSpec",
     "PreparedOperation",
     "VerificationResult",
-    "audio_import_composer_fragment_contract",
     "describe_operation",
     "list_operation_specs",
     "operation_input_mode",
     "operation_input_modes_by_version",
+    "operation_uses_business_declaration",
+    "operation_business_contract",
     "operation_request_machine_contract",
     "operation_request_schema_digest",
-    "object_set_composer_fragment_contract",
     "parse_operation_request",
-    "prepare_object_set_composer_check",
+    "prepare_object_set_batch_check",
     "prepare_operation",
     "validate_operation_input_mode_lanes",
-    "validate_audio_import_composer_fragment",
-    "validate_object_set_composer_fragment",
+    "validate_operation_identity_fragment",
     "validate_prepared_roles",
     "verify_prepared_operation",
 ]

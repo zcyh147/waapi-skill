@@ -1,0 +1,63 @@
+{
+  "contract": "waapi-skill.object-lifecycle-business-profile/v1",
+  "profile_id": "object_lifecycle_business_3",
+  "model": {
+    "name": "gpt-5.6-terra",
+    "reasoning_effort": "medium",
+    "service_tier": "default",
+    "memory": "disabled"
+  },
+  "units": [
+    {
+      "unit_id": "OLB22-NOTES",
+      "operation": "object.setNotes",
+      "api": "ak.wwise.core.object.setNotes",
+      "version": "2022.1",
+      "prompt": "请把 Wwise 对象 {object_path} 的备注改成“{value}”。先只给我变更预览，不要执行。",
+      "object": {
+        "id": "{11111111-1111-1111-1111-111111111111}",
+        "name": "Rain",
+        "type": "Sound",
+        "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Weather\\Rain",
+        "parent": "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}",
+        "notes": "Old weather note"
+      },
+      "value": "Exterior rain loop",
+      "final_markers": ["Exterior rain loop"]
+    },
+    {
+      "unit_id": "OLB22-DELETE",
+      "operation": "object.delete",
+      "api": "ak.wwise.core.object.delete",
+      "version": "2022.1",
+      "prompt": "请删除 Wwise 里的对象 {object_path}。这是设计请求，但现在先只给我删除预览，不要执行。",
+      "object": {
+        "id": "{22222222-2222-2222-2222-222222222222}",
+        "name": "Obsolete_Alarm",
+        "type": "Sound",
+        "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Alarms\\Obsolete_Alarm",
+        "parent": "{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}",
+        "notes": "Retired alarm"
+      },
+      "value": null,
+      "final_markers": ["Obsolete_Alarm", "删除"]
+    },
+    {
+      "unit_id": "OLB22-RENAME",
+      "operation": "object.setName",
+      "api": "ak.wwise.core.object.setName",
+      "version": "2022.1",
+      "prompt": "请把 Wwise 对象 {object_path} 重命名为“{value}”。先只给我变更预览，不要执行。",
+      "object": {
+        "id": "{33333333-3333-3333-3333-333333333333}",
+        "name": "Alarm_Old",
+        "type": "Sound",
+        "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Alarms\\Alarm_Old",
+        "parent": "{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}",
+        "notes": ""
+      },
+      "value": "Alarm_Main",
+      "final_markers": ["Alarm_Main"]
+    }
+  ]
+}

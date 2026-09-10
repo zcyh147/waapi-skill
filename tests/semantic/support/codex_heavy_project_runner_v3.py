@@ -22,6 +22,7 @@ import secrets
 import stat
 import threading
 import time
+import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass, field, fields, is_dataclass
 from pathlib import Path
 from types import MappingProxyType
@@ -32,12 +33,20 @@ from tests.semantic.support.codex_business_oracle_plan_v3 import (
     business_family_for_api,
     write_business_oracle_plan,
 )
+from tests.semantic.support.codex_direct_business_plan_v3 import (
+    DirectBusinessPlanSections,
+    compile_direct_business_plan,
+    validate_direct_business_plan,
+)
 from tests.semantic.support.codex_audio_media_business_plan_v3 import (
     AudioMediaBusinessPlanSections,
     compile_audio_conversion_business_plan,
     compile_media_pool_business_plan,
     validate_audio_conversion_business_plan,
     validate_media_pool_business_plan,
+)
+from tests.semantic.support.codex_media_pool_business_oracle_v3 import (
+    verify_media_pool_business_projection,
 )
 from tests.semantic.support.codex_eval_bundle_v3 import OnlineScenario
 from tests.semantic.support.codex_eval_execution_v3 import HeavyScenarioUnit
@@ -47,6 +56,7 @@ from tests.semantic.support.codex_filesystem_security import (
     read_bounded_exclusive_regular_file,
     write_utf8_text_bytes,
 )
+from wwise_waapi.host_paths import HostPathError, localize_waapi_host_path
 from tests.semantic.support.codex_eval_protocol_v3 import (
     StructuredRefusal,
     V3GatewayProtocol,
@@ -54,10 +64,19 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_direct_protocol,
     build_metadata_transaction_protocol,
     build_modification_policy_protocol,
+    build_optional_query_repair_protocol,
+    build_optional_query_schema_protocol,
+    build_optional_topic_schema_protocol,
+    build_operations_discovery_protocol,
+    build_workflow_operations_discovery_protocol,
+    build_workflow_query_schema_discovery_protocol,
     build_transaction_protocol,
     call_step,
+    media_pool_business_call_step,
     query_object_step,
+    request_schema_step,
     wait_topic_step,
+    topic_schema_step,
 )
 from tests.semantic.support.codex_gateway_broker import (
     SUBSCRIPTION_ACK_CONTRACT,
@@ -65,6 +84,9 @@ from tests.semantic.support.codex_gateway_broker import (
     TrustedSubscriptionAckExpectation,
     TrustedSubscriptionAckSpec,
     project_required_metadata_tokens,
+)
+from tests.semantic.support.codex_gateway_contracts import (
+    TOPIC_STREAM_RECORD_CONTRACT,
 )
 from tests.semantic.support.codex_harness import (
     CodexHarnessError,
@@ -153,9 +175,16 @@ from tests.semantic.support.codex_object_heavy_v3 import (
     ObjectHeavyRecipe,
     OperationRequestSpec,
     build_object_heavy_v3_recipe,
+    typed_input_business_query_recipe,
+    typed_input_merge_recipe,
+    typed_input_rename_recipe,
 )
 from tests.semantic.support.codex_object_business_plan_v3 import (
     ObjectBusinessPlanSections,
+    TYPED_PROFILE_OBJECT_METADATA_UNITS,
+    TYPED_PROFILE_QUERY_REPAIR_UNIT_ID,
+    TYPED_PROFILE_RENAME_UNIT_ID,
+    TYPED_PROFILE_SET03_UNIT_ID,
     build_object_merge_query_protocol,
     compile_object_business_plan,
     seal_object_input_file_manifest,
@@ -184,6 +213,8 @@ from tests.semantic.support.codex_soundbank_business_plan_v3 import (
     TOPIC_ACK_REQUIREMENT_CONTRACT,
     SoundBankBusinessPlanSections,
     compile_soundbank_business_plan,
+    soundbank_topic_protocol_steps,
+    soundbank_topic_lifecycle,
     validate_soundbank_business_plan,
 )
 from tests.semantic.support.codex_soundbank_runtime_v3 import (
@@ -213,6 +244,11 @@ from tests.semantic.support.codex_transaction_seal import (
     validate_transaction_show_confirmation_against_store,
 )
 from wwise_waapi.operation_registry import parse_operation_request, prepare_operation
+from wwise_waapi.builders.debug_lua import LUA_SOURCE_AUTHORITY
+
+
+GET_INFO_URI = "ak.wwise.core.getInfo"
+CORE_LUA_URI = "ak.wwise.core.executeLuaScript"
 
 
 HEAVY_PROJECT_RUN_CONTRACT = "waapi-skill.codex-heavy-project-run/v3"
@@ -251,6 +287,8 @@ PROJECT_RUNNER_APIS = frozenset(
         *SOUNDBANK_RUNTIME_APIS,
         AUDIO_CONVERT_URI,
         MEDIA_POOL_GET_URI,
+        GET_INFO_URI,
+        CORE_LUA_URI,
     }
 )
 # This is deliberately narrower than the set of hidden runtime fields.  The
@@ -335,6 +373,8 @@ class HeavyProjectRunnerOptions:
     timeout_seconds: float
     live_environment: Mapping[str, str]
     windows_powershell_core_host: WindowsPowerShellCoreHost | None = None
+    developer_instructions: str = ""
+    require_first_use_intro: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -753,7 +793,7 @@ class _PreparedCase:
     prompt: str
     visible_values: Mapping[str, Any]
     protocol: V3GatewayProtocol
-    required_reference: str
+    required_reference: str | None
     snapshot: Callable[[], Any]
     verify_final: Callable[[Mapping[str, Any] | None, CodexRunResult], Any]
     turn_reference_schedule: tuple[tuple[str, ...], ...] | None = None
@@ -763,6 +803,7 @@ class _PreparedCase:
         | AudioMediaBusinessPlanSections
         | SoundBankBusinessPlanSections
         | WorkflowBusinessPlanSections
+        | DirectBusinessPlanSections
         | None
     ) = None
     prompt_sources: Mapping[str, Any] = field(default_factory=dict)
@@ -781,6 +822,120 @@ class _PreparedCase:
     verify_turn: Callable[[int, CodexRunResult], Any] | None = None
     expected_dispatches: tuple[tuple[str, int], ...] = ()
     post_shutdown: Callable[[ScenarioRuntime], None] | None = None
+
+
+def typed_input_operations_protocol(
+    unit: Any,
+    protocol: V3GatewayProtocol,
+) -> V3GatewayProtocol:
+    """Expose named-operation discovery for natural-language typed-input units."""
+
+    unit_id = getattr(unit, "unit_id", None)
+    base_scenario_id = getattr(unit, "base_scenario_id", None)
+    if (
+        not isinstance(unit_id, str)
+        or not unit_id.startswith("TYP")
+        or not isinstance(base_scenario_id, str)
+        or not protocol.steps
+        or protocol.steps[0].subcommand not in {
+            "operation-schema",
+            "request-schema",
+        }
+    ):
+        return protocol
+    return build_operations_discovery_protocol(protocol)
+
+
+def final_response_reports_weak_verifier_boundary(value: str) -> bool:
+    """Accept equivalent clear wording without requiring one fixed sentence."""
+
+    if not isinstance(value, str):
+        return False
+    folded = value.casefold()
+    explicit_schema_limit = (
+        "验证仅限返回结果结构" in folded
+        or "verification is limited to the returned result schema" in folded
+        or "verification is limited to the result schema" in folded
+    )
+    equivalent_schema_limit = (
+        (
+            "验证仅确认返回结果符合预期结构" in folded
+            or "only confirms that the returned result matches the expected structure"
+            in folded
+            or (
+                (
+                    "仅确认" in folded
+                    or "仅已验证" in folded
+                    or "仅完成" in folded
+                )
+                and "返回结果" in folded
+                and "结构" in folded
+            )
+            or (
+                "验证仅限" in folded
+                and "返回" in folded
+                and "结构" in folded
+            )
+            or (
+                ("仅验证" in folded or "只验证" in folded)
+                and "返回结果" in folded
+                and "结构" in folded
+            )
+        )
+        and (
+            "未验证" in folded
+            or "不能声称已验证" in folded
+            or "不声称已验证" in folded
+            or "不代表已验证" in folded
+            or (
+                "不能" in folded
+                and "声称" in folded
+                and "已验证" in folded
+            )
+            or "not verified" in folded
+            or "does not verify" in folded
+        )
+        and (
+            "业务副作用" in folded
+            or "业务状态" in folded
+            or "business side effects" in folded
+            or "business state" in folded
+        )
+    )
+    explicit_negative_boundary = (
+        "反射结果结构" in folded
+        and (
+            "未验证" in folded
+            or "不能声称已验证" in folded
+            or "不声称已验证" in folded
+        )
+        and "业务副作用" in folded
+    )
+    overclaim_markers = (
+        "不仅限于结果结构",
+        "不限于结果结构",
+        "已验证全部业务副作用",
+        "验证了全部业务副作用",
+        "all business side effects were verified",
+        "verified all business side effects",
+        "business state verified",
+        "所有业务状态正确",
+        "全部业务状态正确",
+        "确认所有业务状态",
+        "all business state is correct",
+        "all business states are correct",
+        "confirmed all business state",
+    )
+    return bool(
+        "typed_input" in folded
+        and "3" in folded
+        and (
+            explicit_schema_limit
+            or equivalent_schema_limit
+            or explicit_negative_boundary
+        )
+        and not any(marker in folded for marker in overclaim_markers)
+    )
 
 
 def run_heavy_project_unit(
@@ -895,6 +1050,7 @@ def run_heavy_project_unit(
                 policy_mode or "ask_before_changes"
             ),
             enforce_policy_turn_oracles=policy_mode is not None,
+            require_first_use_intro=options.require_first_use_intro,
         )
 
         def observe_turn(
@@ -947,6 +1103,7 @@ def run_heavy_project_unit(
                 policy_mode or "ask_before_changes"
             ),
             expected_primary_dispatch_count=_unit_primary_dispatch_count(unit),
+            developer_instructions=options.developer_instructions,
         )
         checks["task_passed"] = bool(task.passed)
         _validate_task_run(
@@ -996,7 +1153,7 @@ def run_heavy_project_unit(
             task=task,
             topic_payload=observer.topic_payload,
             topic_subscription_ack=observer.checks.get("topic_subscription_ack"),
-            expected_count=_unit_primary_dispatch_count(unit),
+            expected_count=_unit_audited_dispatch_count(unit),
         )
         if prepared.expected_dispatches:
             checks["workflow_dispatch"] = _audit_workflow_dispatch(
@@ -1236,6 +1393,7 @@ class _CaseObservers:
         business_oracle_plan_sha256: str,
         project_modification_policy: str = "ask_before_changes",
         enforce_policy_turn_oracles: bool = False,
+        require_first_use_intro: bool = True,
         publisher_client_factory: Callable[[], OwnedDirectWaapiCall] | None = None,
         publisher_process_target: Callable[..., None] | None = None,
     ) -> None:
@@ -1246,6 +1404,7 @@ class _CaseObservers:
         self.version = version
         self.business_oracle_plan_sha256 = business_oracle_plan_sha256
         self.project_modification_policy = project_modification_policy
+        self.require_first_use_intro = require_first_use_intro
         self.policy_baseline = (
             prepared.snapshot()
             if enforce_policy_turn_oracles
@@ -1367,7 +1526,14 @@ class _CaseObservers:
         _evidence_directory: Path,
     ) -> None:
         self.payloads[step.name] = payload
-        if self.prepared.observe_payload is not None:
+        if (
+            not step.name.startswith("routing.operations")
+            and step.name not in {
+                "routing.query-schema",
+                "routing.query-schema.advanced",
+            }
+            and self.prepared.observe_payload is not None
+        ):
             self.prepared.observe_payload(step, payload)
         if step.name.endswith(".transaction-show"):
             self.checks[f"{step.name}.confirmation_binding"] = (
@@ -1422,7 +1588,7 @@ class _CaseObservers:
         result: CodexRunResult,
         _broker_evidence: Any,
     ) -> None:
-        if turn_index == 1:
+        if turn_index == 1 and self.require_first_use_intro:
             intro_response = first_gateway_backed_agent_message(
                 result.stdout,
                 validated_gateway_commands=result.command_facts.gateway_commands,
@@ -1439,6 +1605,8 @@ class _CaseObservers:
                 policy=self.project_modification_policy,
             )
             self.checks["first_use_intro"] = True
+        elif turn_index == 1:
+            self.checks["first_use_intro"] = "delegated_to_dedicated_profile"
         if self.policy_baseline is not None and (
             self.project_modification_policy == "read_only"
             or (
@@ -2269,6 +2437,13 @@ class _MediaSemanticVerification:
     evidence: Mapping[str, Any]
 
 
+@dataclass(frozen=True, slots=True)
+class _DirectSemanticVerification:
+    passed: bool
+    failures: tuple[str, ...]
+    evidence: Mapping[str, Any]
+
+
 class _PreparedMediaPoolAdapter:
     def __init__(
         self,
@@ -2337,7 +2512,17 @@ class _PreparedMediaPoolAdapter:
             return
         if step.name == "media.get":
             raw = _agent_result_mapping(payload, context=step.name)
-            verification = verify_media_pool_result(self.oracle, raw)
+            business_request = payload.get("business_request")
+            if not isinstance(business_request, Mapping):
+                raise HeavyProjectRunnerError(
+                    "Media Pool business result lacks its exact request evidence"
+                )
+            verification = verify_media_pool_business_projection(
+                self.oracle,
+                step,
+                raw,
+                business_request,
+            )
             _assert_verification(verification, context="Media Pool business result")
             unchanged = verify_media_pool_read_unchanged(self.staged, self.oracle)
             _assert_verification(unchanged, context="Media Pool read-only state")
@@ -2356,11 +2541,48 @@ class _PreparedMediaPoolAdapter:
             )
             self.model_reference_result = raw
 
+    def _restore_model_reads_from_gateway_results(
+        self,
+        result: CodexRunResult,
+    ) -> None:
+        """Restore exact reads from the already reconciled command evidence."""
+
+        requirements = (
+            ("media.get-fields", MEDIA_POOL_GET_FIELDS_URI),
+            ("media.get", MEDIA_POOL_GET_URI),
+        )
+        results = result.command_facts.gateway_results
+        for step_name, api in requirements:
+            steps = tuple(
+                step for step in self.protocol.steps if step.name == step_name
+            )
+            if len(steps) != 1:
+                raise HeavyProjectRunnerError(
+                    f"media protocol requires exactly one {step_name} step"
+                )
+            step = steps[0]
+            matches = tuple(
+                payload
+                for payload in results
+                if isinstance(payload, Mapping)
+                and payload.get("command") == step.subcommand
+                and payload.get("api_attempted") == api
+                and payload.get("ok") is True
+                and payload.get("status") == "ok"
+            )
+            if len(matches) != 1:
+                raise HeavyProjectRunnerError(
+                    f"expected exactly one reconciled {step_name} gateway result"
+                )
+            self.observe_payload(step, matches[0])
+
     def verify_final(
         self,
         _payload: Mapping[str, Any] | None,
         result: CodexRunResult,
     ) -> _MediaSemanticVerification:
+        if self.model_get_fields is None or self.model_media_result is None:
+            self._restore_model_reads_from_gateway_results(result)
         failures: list[str] = []
         if self.model_get_fields is None or self.model_media_result is None:
             failures.append("model did not complete both Media Pool reads")
@@ -2599,15 +2821,24 @@ def _prepare_media_pool_case(
         oracle=oracle,
     )
     steps: list[ExpectedGatewayStep] = [
-        call_step("media.get-fields", MEDIA_POOL_GET_FIELDS_URI),
-        call_step(
-            "media.get",
-            MEDIA_POOL_GET_URI,
-            args=request.args,
-            options=request.options,
-            post_filter=request.post_filter,
+        request_schema_step(
+            "media.get-fields.schema",
+            MEDIA_POOL_GET_FIELDS_URI,
         ),
+        call_step("media.get-fields", MEDIA_POOL_GET_FIELDS_URI, version=runtime.version),
     ]
+    steps.extend(
+        (
+            request_schema_step("media.operation-schema", MEDIA_POOL_GET_URI),
+            media_pool_business_call_step(
+                "media.get",
+                scenario_id=case.scenario_id,
+                args=request.args,
+                options=request.options,
+                post_filter=request.post_filter,
+            ),
+        )
+    )
     if reference_read is not None:
         steps.append(
             query_object_step(
@@ -3256,6 +3487,68 @@ def _exact_wwise_build(value: Any) -> str:
     return ".".join(str(item) for item in fields)
 
 
+def _final_response_has_complete_build_identity(
+    response: str,
+    *,
+    expected_build: str,
+) -> bool:
+    """Accept the exact build tuple either joined or explicitly split by label."""
+
+    folded = response.casefold()
+    expected = expected_build.casefold()
+    if expected in folded:
+        return True
+    release, separator, build = expected.rpartition(".")
+    if not separator or not release or not build.isdigit():
+        return False
+    line_pattern = re.compile(
+        rf"(?im)^[^\n]*\bwwise(?:console(?:\.exe)?)?\b[^\n]{{0,96}}"
+        rf"(?<![0-9.])v?{re.escape(release)}(?![0-9.])"
+        rf"[^\n]{{0,48}}(?:build|构建)\s*[:：#]?\s*"
+        rf"{re.escape(build)}(?!\d)[^\n]*$"
+    )
+    return any(
+        not any(token in match.group(0) for token in ("not ", "不是", "并非", "wrong"))
+        for match in line_pattern.finditer(folded)
+    )
+
+
+def _status_project_identity(
+    project_path: Path,
+    *,
+    version: str,
+) -> dict[str, str]:
+    path = Path(project_path).resolve(strict=True)
+    try:
+        root = ET.parse(path).getroot()
+    except (ET.ParseError, OSError) as exc:
+        raise HeavyProjectRunnerError(
+            "sandbox project identity document is unreadable"
+        ) from exc
+    project = root.find("./ProjectInfo/Project")
+    if project is None:
+        raise HeavyProjectRunnerError("sandbox project identity is missing")
+    name = project.get("Name")
+    project_id = project.get("ID")
+    if (
+        not isinstance(name, str)
+        or not name
+        or not isinstance(project_id, str)
+        or re.fullmatch(
+            r"\{[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}\}",
+            project_id,
+        )
+        is None
+    ):
+        raise HeavyProjectRunnerError("sandbox project identity is invalid")
+    return {
+        "id": project_id.upper(),
+        "name": name,
+        "type": "Project",
+        "path": "\\" if version == "2021.1" else path.name,
+    }
+
+
 def _agent_result_mapping(
     payload: Mapping[str, Any],
     *,
@@ -3471,13 +3764,31 @@ def _compound_object_metadata_binding(
     scenario: OnlineScenario,
     *,
     version: str,
+    profile_unit_id: str | None = None,
 ) -> tuple[str, tuple[str, ...], tuple[str, ...]] | None:
     """Parse the profile-owned live-metadata requirement for object mutation.
 
     Historical V3 object cases intentionally retain their original protocol.
-    Only the compound profile carries this closed hidden marker, so adding the
-    supporting read here cannot silently broaden an older campaign.
+    Compound cases carry a closed hidden marker; the typed-input profile adds
+    a fixed exact unit/scenario/version map for its metadata tasks. Neither path
+    can silently broaden another campaign or version.
     """
+
+    if profile_unit_id is not None:
+        reviewed = TYPED_PROFILE_OBJECT_METADATA_UNITS.get(profile_unit_id)
+        if reviewed is None or (
+            scenario.id,
+            scenario.api,
+            version,
+        ) != reviewed[:3]:
+            raise HeavyProjectRunnerError(
+                "typed-input object metadata unit is outside its reviewed lane"
+            )
+        return (
+            get_codex_version_layout_v3(version).reflected_type("ActorMixer"),
+            reviewed[3],
+            reviewed[4],
+        )
 
     asset_spec = scenario.fixture.get("asset_spec")
     if not isinstance(asset_spec, Mapping):
@@ -3536,15 +3847,24 @@ def _build_compound_object_metadata_protocol(
     recipe: ObjectHeavyRecipe,
     direct: OwnedDirectWaapiCall,
     version: str,
+    profile_unit_id: str | None = None,
 ) -> V3GatewayProtocol | None:
-    """Seal one object mutation behind an agent-visible live metadata read."""
+    """Build the remaining historical metadata protocol when still required."""
 
-    binding = _compound_object_metadata_binding(scenario, version=version)
+    binding = _compound_object_metadata_binding(
+        scenario,
+        version=version,
+        profile_unit_id=profile_unit_id,
+    )
     if binding is None:
         return None
     if not isinstance(recipe.request, OperationRequestSpec):
         raise HeavyProjectRunnerError(
             "compound object metadata binding requires one operation request"
+        )
+    if recipe.request.operation in {"object.create", "object.set"}:
+        return build_transaction_protocol(
+            (recipe.request.as_dict(version=version),)
         )
     object_type, queries, tokens = binding
     trusted_result = discover_metadata(
@@ -3593,7 +3913,7 @@ _INTEGRATION_WORKFLOW_IDS = frozenset(
 _INTEGRATION_QUERY_FIRST_WORKFLOW_IDS = frozenset(
     {"alarm_diagnose_and_repair", "weapons_query_guided_batch_cleanup"}
 )
-_ALARM_TURN_REFERENCE_SCHEDULE = (
+_QUERY_MUTATION_TURN_REFERENCE_SCHEDULE = (
     ("references/waapi-query.md",),
     ("references/waapi-operate.md",),
     (),
@@ -3791,6 +4111,11 @@ def _prepare_integration_workflow_case(
             f"integration workflow has no runtime: {workflow_id}"
         )
 
+    protocol, typed_sections = integration_operations_protocol_and_plan(
+        unit=unit,
+        protocol=prepared.protocol,
+        sections=typed_sections,
+    )
     visible_values = MappingProxyType(dict(prepared.visible_values))
     expected_dispatches = _integration_expected_dispatches(
         prepared.expected_dispatches
@@ -3802,7 +4127,7 @@ def _prepare_integration_workflow_case(
     return _PreparedCase(
         prompt=prompt,
         visible_values=visible_values,
-        protocol=prepared.protocol,
+        protocol=protocol,
         required_reference=(
             "references/waapi-query.md"
             if workflow_id in _INTEGRATION_QUERY_FIRST_WORKFLOW_IDS
@@ -3813,7 +4138,7 @@ def _prepare_integration_workflow_case(
             )
         ),
         turn_reference_schedule=(
-            _ALARM_TURN_REFERENCE_SCHEDULE
+            _QUERY_MUTATION_TURN_REFERENCE_SCHEDULE
             if workflow_id in _INTEGRATION_QUERY_FIRST_WORKFLOW_IDS
             else None
         ),
@@ -3935,11 +4260,31 @@ def _compile_integration_workflow_plan(
     }
     kind_by_subcommand = {
         "operation-schema": "operation_schema",
+        "request-array-item": "operation_compose",
+        "request-map-container": "operation_compose",
         "draft-start": "operation_compose",
         "draft-apply": "operation_compose",
+        "draft-bind-object": "operation_compose",
+        "draft-bind-field": "operation_compose",
+        "draft-discover-fields": "operation_compose",
+        "query-object": "operation_compose",
+        "draft-declare-field-change": "operation_compose",
+        "draft-declare-switch-assignment": "operation_compose",
+        "draft-declare-soundbank-plan": "operation_compose",
+        "draft-declare-artifact-plan": "operation_compose",
+        "draft-declare-ui-plan": "operation_compose",
+        "draft-add-ui-command": "operation_compose",
+        "draft-business-configure": "operation_compose",
+        "draft-declare-import-batch": "operation_compose",
+        "draft-declare-new": "operation_compose",
+        "draft-declare-existing": "operation_compose",
+        "draft-declare-existing-batch": "operation_compose",
+        "draft-revise-declaration": "operation_compose",
+        "draft-remove-declaration": "operation_compose",
         "draft-check": "operation_compose_check",
         "preview": "preview",
         "preview-from-draft": "preview",
+        "typed-operation": "preview",
         "transaction-show": "transaction_show",
         "confirm": "confirm",
         "execute": "execute",
@@ -4114,6 +4459,91 @@ def _compile_integration_workflow_plan(
     )
 
 
+def integration_operations_protocol_and_plan(
+    *,
+    unit: Any,
+    protocol: V3GatewayProtocol,
+    sections: WorkflowBusinessPlanSections,
+) -> tuple[V3GatewayProtocol, WorkflowBusinessPlanSections]:
+    """Bind reviewed optional discovery reads into a complete integration plan."""
+
+    if not isinstance(sections, WorkflowBusinessPlanSections):
+        raise HeavyProjectRunnerError(
+            "integration operations discovery requires one workflow plan"
+        )
+    query_ready = (
+        build_workflow_query_schema_discovery_protocol(protocol)
+        if unit.workflow_id in _INTEGRATION_QUERY_FIRST_WORKFLOW_IDS
+        else protocol
+    )
+    wrapped = build_workflow_operations_discovery_protocol(query_ready)
+    static = sections.static_expectation
+    live = sections.live_binding
+    transactions = tuple(dict(row) for row in static["transactions"])
+    workflow_steps = tuple(dict(row) for row in static["workflow_steps"])
+    if not transactions or not workflow_steps:
+        raise HeavyProjectRunnerError(
+            "integration operations discovery requires complete workflow topology"
+        )
+    workflow_by_name = {row["name"]: row for row in workflow_steps}
+    rebuilt_workflow_steps: list[dict[str, Any]] = []
+    for step in wrapped.steps:
+        if step.name in {
+            *wrapped.optional_workflow_operations_discovery_step_names,
+            *wrapped.optional_workflow_query_schema_step_names,
+        }:
+            rebuilt_workflow_steps.append(
+                {
+                    "name": step.name,
+                    "kind": "checkpoint",
+                    "phase": f"{unit.workflow_id}.checkpoint",
+                    "transaction_id": None,
+                    "api": None,
+                }
+            )
+            continue
+        row = workflow_by_name.pop(step.name, None)
+        if row is None:
+            raise HeavyProjectRunnerError(
+                "integration workflow plan omits a protocol step"
+            )
+        rebuilt_workflow_steps.append(row)
+    if workflow_by_name:
+        trailing = [
+            row for row in workflow_steps if row["name"] in workflow_by_name
+        ]
+        if any(row.get("kind") != "cleanup" for row in trailing):
+            raise HeavyProjectRunnerError(
+                "integration workflow plan contains non-cleanup steps outside "
+                "the protocol"
+            )
+        rebuilt_workflow_steps.extend(trailing)
+    diagnostic_evidence = tuple(
+        {
+            key: value
+            for key, value in dict(row).items()
+            if key != "expectation_sha256"
+        }
+        for row in static["diagnostic_evidence"]
+    )
+    transaction_expectations = tuple(
+        {
+            "transaction_id": row["transaction_id"],
+            "expectation": dict(row["expectation"]),
+        }
+        for row in sections.delta_rules
+    )
+    rebuilt = compile_workflow_business_plan_sections(
+        workflow_id=str(unit.workflow_id),
+        transactions=transactions,
+        workflow_steps=tuple(rebuilt_workflow_steps),
+        diagnostic_evidence=diagnostic_evidence,
+        live_bindings=dict(live["bindings"]),
+        transaction_expectations=transaction_expectations,
+    )
+    return wrapped, rebuilt
+
+
 def _prepare_case(
     scenario: OnlineScenario,
     *,
@@ -4134,11 +4564,385 @@ def _prepare_case(
             direct=direct,
             unit=unit,
         )
+    if scenario.api == GET_INFO_URI:
+        baseline = direct(GET_INFO_URI, {}, {})
+        if not isinstance(baseline, Mapping):
+            raise HeavyProjectRunnerError("getInfo baseline is not an object")
+        baseline_result = _strict_plain_json(
+            baseline,
+            field="getInfo baseline",
+        )
+        expected_build = _exact_wwise_build(baseline_result)
+        if not expected_build.startswith(runtime.version + "."):
+            raise HeavyProjectRunnerError(
+                "getInfo baseline differs from the exact scenario version"
+            )
+        process_id = baseline_result.get("processId")
+        ready_result = getattr(runtime.lifecycle, "ready_result", None)
+        ready_process_id = (
+            ready_result.get("processId")
+            if isinstance(ready_result, Mapping)
+            else None
+        )
+        launch_process_id = getattr(runtime.lifecycle.process, "pid", None)
+        if (
+            type(process_id) is not int
+            or type(ready_process_id) is not int
+            or type(launch_process_id) is not int
+            or process_id != ready_process_id
+        ):
+            raise HeavyProjectRunnerError(
+                "getInfo process identity differs from lifecycle readiness proof"
+            )
+        status_project = _status_project_identity(
+            runtime.sandbox.sandbox_project,
+            version=runtime.version,
+        )
+        status_binding = {
+            "wwise_build": expected_build,
+            "process_id": process_id,
+            "project": status_project,
+        }
+        expected_status_wwise = {
+            key: baseline_result.get(key)
+            for key in (
+                "apiVersion",
+                "displayName",
+                "isCommandLine",
+                "processId",
+                "processPath",
+                "sessionId",
+                "version",
+            )
+        }
+        protocol = build_direct_protocol(
+            [
+                ExpectedGatewayStep(
+                    "host.status",
+                    "status",
+                ),
+            ]
+        )
+        project_digest = _project_document_digest(runtime.sandbox.sandbox_path)
+        typed_sections = compile_direct_business_plan(
+            scenario_id=scenario.id,
+            api=GET_INFO_URI,
+            protocol_steps=tuple(
+                {"name": step.name, "subcommand": step.subcommand}
+                for step in protocol.steps
+            ),
+            live_bindings={
+                "version": runtime.version,
+                "build": expected_build,
+                "process_id": process_id,
+                "launch_process_id": launch_process_id,
+                "session_id": baseline_result.get("sessionId"),
+                "result_sha256": _json_sha256(expected_status_wwise),
+                "project_digest": project_digest,
+                "status": status_binding,
+            },
+            verification_boundary="exact_host_identity",
+        )
+        validate_direct_business_plan(
+            typed_sections,
+            scenario_id=scenario.id,
+            api=GET_INFO_URI,
+            protocol_steps=tuple(
+                {"name": step.name, "subcommand": step.subcommand}
+                for step in protocol.steps
+            ),
+            live_bindings={
+                "version": runtime.version,
+                "build": expected_build,
+                "process_id": process_id,
+                "launch_process_id": launch_process_id,
+                "session_id": baseline_result.get("sessionId"),
+                "result_sha256": _json_sha256(expected_status_wwise),
+                "project_digest": project_digest,
+                "status": status_binding,
+            },
+            verification_boundary="exact_host_identity",
+        )
+
+        status_observed = False
+
+        def observe_get_info(
+            step: ExpectedGatewayStep,
+            payload: Mapping[str, Any],
+        ) -> None:
+            nonlocal status_observed
+            if step.name != "host.status":
+                return
+            wwise = payload.get("wwise")
+            project = payload.get("project")
+            normalized_project: dict[str, Any] | None = None
+            if isinstance(project, Mapping):
+                normalized_project = {
+                    key: project.get(key)
+                    for key in ("id", "name", "type", "path")
+                }
+                if runtime.version != "2021.1":
+                    if normalized_project["type"] is None:
+                        normalized_project["type"] = "Project"
+                    try:
+                        localized = Path(
+                            localize_waapi_host_path(project.get("path"))
+                        ).resolve(strict=True)
+                    except (HostPathError, OSError, RuntimeError, TypeError):
+                        localized = None
+                    if localized == runtime.sandbox.sandbox_project.resolve(strict=True):
+                        normalized_project["path"] = status_project["path"]
+            if (
+                not isinstance(wwise, Mapping)
+                or _exact_wwise_build(wwise) != expected_build
+                or wwise.get("processId") != process_id
+                or normalized_project != status_project
+            ):
+                raise HeavyProjectRunnerError(
+                    "Gateway status differs from the sealed Wwise/project identity"
+                )
+            status_observed = True
+
+        def snapshot_get_info() -> str:
+            return _project_document_digest(runtime.sandbox.sandbox_path)
+
+        def verify_get_info(
+            payload: Mapping[str, Any] | None,
+            result: CodexRunResult,
+        ) -> _DirectSemanticVerification:
+            failures: list[str] = []
+            if not status_observed:
+                failures.append("Gateway status identity was not observed")
+            actual: Mapping[str, Any] | None = None
+            if payload is None:
+                failures.append("getInfo gateway payload is missing")
+            else:
+                value = payload.get("wwise")
+                if isinstance(value, Mapping):
+                    actual = value
+                else:
+                    failures.append("Gateway status lacks the live Wwise identity")
+            if actual is not None and dict(actual) != expected_status_wwise:
+                failures.append("model getInfo result differs from the sealed host identity")
+            if snapshot_get_info() != project_digest:
+                failures.append("read-only getInfo task changed project documents")
+            folded = result.final_response.casefold()
+            if str(process_id) not in folded or not (
+                _final_response_has_complete_build_identity(
+                    result.final_response,
+                    expected_build=expected_build,
+                )
+            ):
+                failures.append(
+                    "final response omits the exact process or complete build identity"
+                )
+            return _DirectSemanticVerification(
+                passed=not failures,
+                failures=tuple(failures),
+                evidence=MappingProxyType(
+                    {
+                        "expected_build": expected_build,
+                        "expected_process_id": process_id,
+                        "expected_result_sha256": _json_sha256(
+                            expected_status_wwise
+                        ),
+                        "actual_result_sha256": (
+                            _json_sha256(actual) if actual is not None else None
+                        ),
+                    }
+                ),
+            )
+
+        return _PreparedCase(
+            prompt=scenario.prompt,
+            visible_values=MappingProxyType({}),
+            protocol=protocol,
+            required_reference=None,
+            turn_reference_schedule=None,
+            snapshot=snapshot_get_info,
+            verify_final=verify_get_info,
+            observe_payload=observe_get_info,
+            typed_sections=typed_sections,
+        )
+
+    if scenario.api == CORE_LUA_URI:
+        script_root = runtime.asset_root / "typed-input-lua"
+        script_root.mkdir(parents=True, exist_ok=False)
+        script_path = script_root / "user-script.lua"
+        script_bytes = (
+            b'return { profile = "typed_input", count = wa_args.count }\n'
+        )
+        write_utf8_text_bytes(script_path, script_bytes.decode("utf-8"))
+        request_payload = {
+            "contract": "waapi-skill.operation-request/v1",
+            "version": runtime.version,
+            "operation": "lua.executeCoreFile",
+            "arguments": {
+                "script_file": str(script_path),
+                "io_root": str(script_root),
+                "source_authority": LUA_SOURCE_AUTHORITY,
+                "wa_args": {"count": 3},
+            },
+        }
+        parsed = parse_operation_request(
+            request_payload,
+            expected_version=runtime.version,
+        )
+        prepared_lua = prepare_operation(parsed, read_call=direct).as_dict()
+        protocol = typed_input_operations_protocol(
+            unit,
+            build_transaction_protocol([request_payload]),
+        )
+        project_digest = _project_document_digest(runtime.sandbox.sandbox_path)
+        script_sha256 = hashlib.sha256(script_bytes).hexdigest()
+        live_bindings = {
+            "version": runtime.version,
+            "script_file": str(script_path.resolve()),
+            "script_sha256": script_sha256,
+            "dispatch": prepared_lua["dispatch"],
+            "project_digest": project_digest,
+            "expected_return": {"profile": "typed_input", "count": 3},
+        }
+        plan_steps = tuple(
+            {"name": step.name, "subcommand": step.subcommand}
+            for step in protocol.steps
+        )
+        typed_sections = compile_direct_business_plan(
+            scenario_id=scenario.id,
+            api=CORE_LUA_URI,
+            protocol_steps=plan_steps,
+            live_bindings=live_bindings,
+            verification_boundary="result_schema_only",
+        )
+        validate_direct_business_plan(
+            typed_sections,
+            scenario_id=scenario.id,
+            api=CORE_LUA_URI,
+            protocol_steps=plan_steps,
+            live_bindings=live_bindings,
+            verification_boundary="result_schema_only",
+        )
+        execution_return: dict[str, Any] = {}
+
+        def snapshot_lua() -> tuple[str, str]:
+            return (
+                _project_document_digest(runtime.sandbox.sandbox_path),
+                hashlib.sha256(script_path.read_bytes()).hexdigest(),
+            )
+
+        def observe_lua(
+            step: ExpectedGatewayStep,
+            payload: Mapping[str, Any],
+        ) -> None:
+            if not step.name.endswith(".execute"):
+                return
+            dispatch_result = payload.get("dispatch_result")
+            raw_result = (
+                dispatch_result.get("result")
+                if isinstance(dispatch_result, Mapping)
+                else None
+            )
+            returned = raw_result.get("return") if isinstance(raw_result, Mapping) else None
+            execution_return["value"] = _json_value(returned)
+
+        def verify_lua(
+            payload: Mapping[str, Any] | None,
+            _result: CodexRunResult,
+        ) -> _DirectSemanticVerification:
+            failures: list[str] = []
+            if payload is None:
+                failures.append("Lua verification payload is missing")
+            else:
+                verification = payload.get("verification")
+                if (
+                    payload.get("status") != "result_schema_checked"
+                    or payload.get("result_schema_checked") is not True
+                    or payload.get("verified") is not False
+                    or not isinstance(verification, Mapping)
+                    or verification.get("business_state_verified") is not False
+                    or payload.get("verification_strength")
+                    not in {"complete_reflected_schema", "partial_reflected_schema"}
+                ):
+                    failures.append("Lua terminal boundary overstates business verification")
+            expected_return = {"profile": "typed_input", "count": 3}
+            if execution_return.get("value") != expected_return:
+                failures.append("Lua execution result differs from the sealed return value")
+            if snapshot_lua() != (project_digest, script_sha256):
+                failures.append("Lua task changed the project or user-supplied source")
+            return _DirectSemanticVerification(
+                passed=not failures,
+                failures=tuple(failures),
+                evidence=MappingProxyType(
+                    {
+                        "expected_return": expected_return,
+                        "actual_return": execution_return.get("value"),
+                        "business_state_verified": False,
+                        "script_sha256": script_sha256,
+                    }
+                ),
+            )
+
+        def verify_lua_turn(
+            turn_index: int,
+            result: CodexRunResult,
+        ) -> _DirectSemanticVerification | None:
+            if turn_index != 2:
+                return None
+            failures: list[str] = []
+            if not final_response_reports_weak_verifier_boundary(
+                result.final_response
+            ):
+                failures.append("final response omits the weak-verifier boundary")
+            return _DirectSemanticVerification(
+                passed=not failures,
+                failures=tuple(failures),
+                evidence=MappingProxyType(
+                    {
+                        "turn_index": turn_index,
+                        "weak_boundary_reported": not failures,
+                    }
+                ),
+            )
+
+        return _PreparedCase(
+            prompt=scenario.prompt.format_map(
+                {"script_file": str(script_path), "io_root": str(script_root)}
+            ),
+            visible_values=MappingProxyType(
+                {"script_file": str(script_path), "io_root": str(script_root)}
+            ),
+            protocol=protocol,
+            required_reference="references/waapi-operate.md",
+            snapshot=snapshot_lua,
+            verify_final=verify_lua,
+            verify_turn=verify_lua_turn,
+            observe_payload=observe_lua,
+            typed_sections=typed_sections,
+        )
     if scenario.api in OBJECT_APIS:
+        unit_id = (
+            unit.unit_id
+            if isinstance(getattr(unit, "unit_id", None), str)
+            else None
+        )
+        metadata_profile_unit_id = (
+            unit_id
+            if unit_id in TYPED_PROFILE_OBJECT_METADATA_UNITS
+            else None
+        )
         recipe = build_object_heavy_v3_recipe(
             scenario.id,
             version=runtime.version,
         )
+        if unit_id in {
+            "TYP21-QUERY-OBJECT-GET",
+            "TYP23-QUERY-OBJECT-GET",
+        }:
+            recipe = typed_input_business_query_recipe(recipe, unit_id=unit_id)
+        elif unit_id == "TYP21-DEDICATED-OBJECT-CREATE":
+            recipe = typed_input_merge_recipe(recipe, unit_id=unit_id)
+        elif unit_id == TYPED_PROFILE_RENAME_UNIT_ID:
+            recipe = typed_input_rename_recipe(recipe, unit_id=unit_id)
         if recipe.version != runtime.version:
             raise HeavyProjectRunnerError(
                 "object recipe version differs from the active lifecycle"
@@ -4154,23 +4958,62 @@ def _prepare_case(
             raise HeavyProjectRunnerError(
                 "object runtime did not retain its sealed before snapshot"
             )
-        protocol = _build_compound_object_metadata_protocol(
-            scenario,
-            recipe=recipe,
-            direct=direct,
-            version=runtime.version,
-        )
-        if protocol is None:
+        if unit_id == TYPED_PROFILE_RENAME_UNIT_ID:
+            protocol = object_runtime.gateway_protocol()
             protocol = build_object_merge_query_protocol(
                 scenario,
                 recipe,
+                base_protocol=protocol,
+                profile_unit_id=unit_id,
             )
-        if protocol is None:
+        elif metadata_profile_unit_id is not None:
             protocol = object_runtime.gateway_protocol()
+        else:
+            protocol = _build_compound_object_metadata_protocol(
+                scenario,
+                recipe=recipe,
+                direct=direct,
+                version=runtime.version,
+                profile_unit_id=metadata_profile_unit_id,
+            )
+            if protocol is None:
+                protocol = build_object_merge_query_protocol(
+                    scenario,
+                    recipe,
+                )
+            if protocol is None:
+                protocol = object_runtime.gateway_protocol()
+        if unit_id == TYPED_PROFILE_QUERY_REPAIR_UNIT_ID:
+            if (
+                len(protocol.steps) != 2
+                or protocol.steps[0].subcommand != "query-schema"
+                or protocol.steps[1].subcommand != "query-object"
+            ):
+                raise HeavyProjectRunnerError(
+                    "query repair unit requires one optional-schema business query"
+                )
+            protocol = build_optional_query_repair_protocol(protocol.steps[1])
+        elif unit_id in {
+            "TYP21-QUERY-OBJECT-GET",
+            "TYP23-QUERY-OBJECT-GET",
+        }:
+            if (
+                len(protocol.steps) != 2
+                or protocol.steps[0].subcommand != "query-schema"
+                or protocol.steps[1].subcommand != "query-object"
+            ):
+                raise HeavyProjectRunnerError(
+                    "typed business query requires one optional-schema query"
+                )
+            protocol = build_optional_query_schema_protocol(
+                protocol.steps[1],
+                allow_advanced=True,
+            )
         if project_modification_policy is not None:
             if _compound_object_metadata_binding(
                 scenario,
                 version=runtime.version,
+                profile_unit_id=metadata_profile_unit_id,
             ) is not None:
                 raise HeavyProjectRunnerError(
                     "compound object metadata cases do not run policy probes"
@@ -4179,6 +5022,7 @@ def _prepare_case(
                 protocol,
                 policy=project_modification_policy,
             )
+        protocol = typed_input_operations_protocol(unit, protocol)
         object_input_files = {
             item.key: (
                 runtime.asset_root / "object-query-audio" / f"{item.key}.wav"
@@ -4187,12 +5031,22 @@ def _prepare_case(
             if item.object_type == "Sound" and item.source_language is not None
         }
         input_file_manifest = seal_object_input_file_manifest(object_input_files)
+        business_plan_profile_unit_id = (
+            unit_id
+            if unit_id
+            in {
+                TYPED_PROFILE_QUERY_REPAIR_UNIT_ID,
+                TYPED_PROFILE_RENAME_UNIT_ID,
+            }
+            else metadata_profile_unit_id
+        )
         typed_sections = compile_object_business_plan(
             scenario,
             recipe,
             protocol,
             before,
             input_file_manifest,
+            profile_unit_id=business_plan_profile_unit_id,
         )
         validate_object_business_plan(
             typed_sections,
@@ -4202,6 +5056,7 @@ def _prepare_case(
             before=before,
             input_file_manifest=input_file_manifest,
             verify_files=True,
+            profile_unit_id=business_plan_profile_unit_id,
         )
 
         def verify(payload: Mapping[str, Any] | None, result: CodexRunResult) -> Any:
@@ -4239,7 +5094,10 @@ def _prepare_case(
             version=runtime.version,
             asset_root=runtime.asset_root / "import-case",
         )
-        import_backend = ClosedDirectWaapiBackend(direct)
+        import_backend = ClosedDirectWaapiBackend(
+            direct,
+            version=runtime.version,
+        )
         reference_fixtures = None
         metadata_discovery = None
         try:
@@ -4277,6 +5135,11 @@ def _prepare_case(
             backend=import_backend,
             reference_fixtures=reference_fixtures,
         )
+        before = import_runtime.hidden_before
+        if before is None:
+            raise HeavyProjectRunnerError(
+                "import runtime did not retain its sealed before snapshot"
+            )
         refusal_code = _REFUSAL_CODES.get(scenario.id)
         if metadata_discovery is not None:
             if refusal_code is not None:
@@ -4304,7 +5167,12 @@ def _prepare_case(
         else:
             protocol = (
                 build_audio_import_composer_protocol(
-                    materialized.operation_requests[0]
+                    materialized.operation_requests[0],
+                    existing_target_paths=frozenset(
+                        row.target_path
+                        for row in import_runtime.plan.rows
+                        if row.pre_state_existence == "existing"
+                    ),
                 )
                 if scenario.api == "ak.wwise.core.audio.import"
                 else build_transaction_protocol(
@@ -4314,11 +5182,7 @@ def _prepare_case(
                     ),
                 )
             )
-        before = import_runtime.hidden_before
-        if before is None:
-            raise HeavyProjectRunnerError(
-                "import runtime did not retain its sealed before snapshot"
-            )
+        protocol = typed_input_operations_protocol(unit, protocol)
         typed_sections = compile_import_business_plan(
             scenario,
             materialized,
@@ -4396,7 +5260,10 @@ def _prepare_case(
             raise HeavyProjectRunnerError(
                 "audio conversion runtime did not retain its sealed before snapshot"
             )
-        protocol = audio_runtime.gateway_protocol()
+        protocol = typed_input_operations_protocol(
+            unit,
+            audio_runtime.gateway_protocol(),
+        )
         typed_sections = compile_audio_conversion_business_plan(
             plan,
             before,
@@ -4461,7 +5328,7 @@ def _prepare_case(
         sandbox_project=runtime.sandbox.sandbox_project,
         io_root=runtime.owned_root,
         asset_root=runtime.asset_root / "soundbank-case",
-        backend=ClosedDirectWaapiSoundBankBackend(direct),
+        backend=ClosedDirectWaapiSoundBankBackend(direct, version=runtime.version),
     )
     soundbank_materialized = soundbank_runtime.materialized
     if soundbank_materialized is None:
@@ -4477,18 +5344,16 @@ def _prepare_case(
         topic = soundbank_runtime.topic_plan
         if topic is None:
             raise HeavyProjectRunnerError("SoundBank topic scenario has no topic plan")
-        step_name = "soundbank.generated.wait"
-        protocol = build_direct_protocol(
-            [
-                wait_topic_step(
-                    step_name,
-                    topic.topic,
-                    event_count=topic.event_count,
-                    match=topic.match,
-                    options=topic.options,
-                    timeout_seconds=120.0,
-                )
-            ]
+        step_name, _lifecycle_command = soundbank_topic_lifecycle(scenario.id)
+        protocol = build_optional_topic_schema_protocol(
+            soundbank_topic_protocol_steps(
+                scenario_id=scenario.id,
+                topic=topic.topic,
+                version=runtime.version,
+                event_count=topic.event_count,
+                match=topic.match,
+                options=topic.options,
+            )
         )
         typed_sections = compile_soundbank_business_plan(
             soundbank_materialized,
@@ -4534,6 +5399,7 @@ def _prepare_case(
         soundbank_runtime.operation_requests,
         refusal=StructuredRefusal(refusal_code) if refusal_code else None,
     )
+    protocol = typed_input_operations_protocol(unit, protocol)
     typed_sections = compile_soundbank_business_plan(
         soundbank_materialized,
         before,
@@ -5055,6 +5921,17 @@ def _unit_primary_dispatch_count(unit: Any) -> int:
     return declared
 
 
+def _unit_audited_dispatch_count(unit: Any) -> int:
+    declared = getattr(unit, "expected_audited_dispatch_count", None)
+    if declared is None:
+        return _unit_primary_dispatch_count(unit)
+    if type(declared) is not int or declared < 0:
+        raise _HeavyProjectInfrastructureError(
+            "unit has no closed expected audited-dispatch count"
+        )
+    return declared
+
+
 def _policy_notice_change_terms(
     scenario: OnlineScenario,
 ) -> tuple[str, ...]:
@@ -5445,15 +6322,35 @@ def _audit_primary_dispatch(
             raise HeavyProjectRunnerError("topic dispatch has no payload evidence")
         events = topic_payload.get("events")
         observed_events = len(events) if isinstance(events, list) else int(topic_payload.get("event") is not None)
-        if observed_calls != 1 or observed_events != scenario.primary_dispatch.count:
+        lifecycle = topic_payload.get("command")
+        if lifecycle == "wait-topic":
+            lifecycle_valid = observed_calls == 1
+        elif lifecycle == "stream-topic":
+            lifecycle_valid = (
+                observed_calls == 0
+                and topic_payload.get("contract") == TOPIC_STREAM_RECORD_CONTRACT
+                and topic_payload.get("record_type") == "terminal"
+                and topic_payload.get("status") == "completed"
+                and topic_payload.get("completion_reason") == "duration_elapsed"
+                and topic_payload.get("event_count") == observed_events
+                and topic_payload.get("cleanup") == "unsubscribed"
+            )
+        else:
+            lifecycle_valid = False
+        if (
+            not lifecycle_valid
+            or observed_events != scenario.primary_dispatch.count
+        ):
             raise HeavyProjectRunnerError(
-                f"topic evidence differs: calls={observed_calls}, events={observed_events}, "
+                f"topic evidence differs: lifecycle={lifecycle!r}, calls={observed_calls}, "
+                f"events={observed_events}, "
                 f"expected_events={scenario.primary_dispatch.count}"
             )
         return MappingProxyType(
             {
                 "api": scenario.api,
                 "gateway_dispatch_calls": observed_calls,
+                "topic_lifecycle": lifecycle,
                 "event_count": observed_events,
             }
         )
@@ -5462,6 +6359,27 @@ def _audit_primary_dispatch(
         if expected_count is None
         else expected_count
     )
+    if scenario.api == GET_INFO_URI:
+        versions = tuple(scenario.versions)
+        if versions == ("2021.1",):
+            status_project_api = "ak.wwise.core.object.get"
+        elif versions in {
+            ("2022.1",),
+            ("2023.1",),
+            ("2024.1",),
+            ("2025.1",),
+        }:
+            status_project_api = "ak.wwise.core.getProjectInfo"
+        else:
+            raise HeavyProjectRunnerError(
+                "getInfo dispatch audit has no exact reviewed version"
+            )
+        return _audit_get_info_dispatch_partition(
+            task=task,
+            rows=rows,
+            primary_count=primary_count,
+            status_project_api=status_project_api,
+        )
     if observed_calls != primary_count:
         raise HeavyProjectRunnerError(
             f"primary dispatch count differs for {scenario.api}: "
@@ -5471,6 +6389,73 @@ def _audit_primary_dispatch(
         {
             "api": scenario.api,
             "dispatch_count": observed_calls,
+        }
+    )
+
+
+def _audit_get_info_dispatch_partition(
+    *,
+    task: V3TaskRun,
+    rows: Sequence[Mapping[str, Any]],
+    primary_count: int,
+    status_project_api: str,
+) -> Mapping[str, Any]:
+    """Bind the sole public status route to getInfo plus its project read."""
+
+    records = tuple(task.broker_evidence.records)
+    if tuple(record.step_name for record in records) != ("host.status",):
+        raise HeavyProjectRunnerError(
+            "getInfo dispatch audit differs from its exact public protocol"
+        )
+    status_payload = records[0].payload
+    status_calls = (
+        status_payload.get("calls")
+        if isinstance(status_payload, Mapping)
+        else None
+    )
+    if (
+        primary_count != 1
+        or not isinstance(status_calls, list)
+        or len(status_calls) != 2
+        or not all(isinstance(row, Mapping) for row in status_calls)
+        or {row.get("api") for row in status_calls}
+        != {GET_INFO_URI, status_project_api}
+    ):
+        raise HeavyProjectRunnerError(
+            "getInfo status dispatch partition is invalid"
+        )
+    status_get_info = next(
+        row for row in status_calls if row.get("api") == GET_INFO_URI
+    )
+    status_project = next(
+        row
+        for row in status_calls
+        if row.get("api") == status_project_api
+    )
+    expected_bindings = (
+        (GET_INFO_URI, status_get_info.get("evidence_path")),
+        (status_project_api, status_project.get("evidence_path")),
+    )
+    expected_paths = tuple(path for _api, path in expected_bindings)
+    if not all(isinstance(path, str) and path for path in expected_paths):
+        raise HeavyProjectRunnerError(
+            "getInfo dispatcher evidence paths are invalid"
+        )
+    observed_bindings = tuple(
+        (row.get("api"), row.get("evidence_path")) for row in rows
+    )
+    if (
+        len(set(expected_paths)) != 2
+        or observed_bindings != expected_bindings
+    ):
+        raise HeavyProjectRunnerError(
+            "getInfo dispatcher evidence is not bound to its ordered status result"
+        )
+    return MappingProxyType(
+        {
+            "api": GET_INFO_URI,
+            "dispatch_count": 1,
+            "status_preflight_dispatch_count": 0,
         }
     )
 
@@ -5665,8 +6650,9 @@ def _require_natural_intro(
     policy: str,
 ) -> None:
     folded = text.casefold()
+    normalized_product_name = re.sub(r"[\s_-]+", "", folded)
     required = {
-        "skill": "waapi-skill" in folded,
+        "skill": "waapiskill" in normalized_product_name,
         "endpoint": endpoint.casefold() in folded,
         "version": version.casefold() in folded,
         "policy": policy.casefold() in folded,
@@ -5887,6 +6873,7 @@ def _write_common_business_oracle_plan(
         | AudioMediaBusinessPlanSections
         | SoundBankBusinessPlanSections
         | WorkflowBusinessPlanSections
+        | DirectBusinessPlanSections
         | None
     ),
     primary_dispatch_count: int | None = None,

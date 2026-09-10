@@ -57,14 +57,14 @@ def test_every_registry_row_has_one_complete_route_contract() -> None:
     assert len(rows) == 814
     assert len({(row.version, row.item_type, row.uri) for row in rows}) == 814
     assert Counter(row.route for row in rows) == {
-        "bounded_call": 60,
+        "bounded_call": 111,
         "bounded_topic_wait": 152,
         "excluded": 6,
         "fixed_command": 56,
         "isolated_transaction": 141,
-        "managed_transaction": 248,
+        "managed_transaction": 220,
         "compound_transaction_member": 15,
-        "transaction": 136,
+        "transaction": 113,
     }
 
     for row in rows:
@@ -106,8 +106,11 @@ def test_all_transaction_reads_are_explicit_confirmation_only() -> None:
         if entry.route in TRANSACTION_ROUTES and entry.effect == "read"
     ]
 
-    assert len(rows) == 59
-    assert len({row.uri for row in rows}) == 15
+    assert len(rows) == 8
+    assert {row.uri for row in rows} == {
+        "ak.wwise.core.remote.getAvailableConsoles",
+        "ak.wwise.core.transport.getList",
+    }
     assert all(
         row.accepted_authorization_modes
         == (AUTHORIZATION_MODE_EXPLICIT_CONFIRMATION,)
@@ -151,13 +154,21 @@ def test_only_reviewed_explicit_project_cli_calls_skip_the_post_execution_projec
         == POST_EXECUTION_PROJECT_GUARD_CONTEXT_RUNTIME_ONLY
     ]
 
-    assert len(context_only) == 20
+    assert len(context_only) == 59
     assert {entry.version for entry in context_only} == set(SUPPORTED_WWISE_VERSION_KEYS)
     assert {entry.uri for entry in context_only} == {
+        "ak.wwise.cli.addNewPlatform",
         "ak.wwise.cli.convertExternalSource",
+        "ak.wwise.cli.createNewProject",
+        "ak.wwise.cli.dumpObjects",
         "ak.wwise.cli.generateSoundbank",
         "ak.wwise.cli.migrate",
+        "ak.wwise.cli.moveMediaIdsToSingleFile",
+        "ak.wwise.cli.moveMediaIdsToWorkUnits",
         "ak.wwise.cli.tabDelimitedImport",
+        "ak.wwise.cli.updateMediaIdsInSingleFile",
+        "ak.wwise.cli.verify",
+        "ak.wwise.cli.waapiServer",
     }
     assert all(entry.project_guard_mode == PROJECT_GUARD_INVARIANT for entry in context_only)
     assert all(entry.verification_strategy == "result_schema" for entry in context_only)
@@ -196,10 +207,7 @@ def test_route_families_have_explicit_program_cleanup_or_confirmation_contracts(
 
     transactions = [entry for entry in executable if entry.route in TRANSACTION_ROUTES]
     assert transactions
-    assert all(
-        entry.gateway_commands == ("preview", "confirm", "execute", "verify")
-        for entry in transactions
-    )
+    assert all(entry.gateway_commands == ("request-schema",) for entry in transactions)
     assert all(entry.requires_authorization for entry in transactions)
 
 
@@ -263,29 +271,29 @@ def test_native_surface_policy_partitions_every_function_and_binds_high_risk_dif
             "wwise-console": {
                 "function_rows": 662,
                 "unique_function_uris": 167,
-                "generic_reflected_rows": 450,
-                "generic_reflected_unique_uris": 118,
-                "special_rows": 212,
-                "special_unique_uris": 49,
+                "generic_reflected_rows": 440,
+                "generic_reflected_unique_uris": 116,
+                "special_rows": 222,
+                "special_unique_uris": 51,
             },
             "wwise-authoring-ui": {
                 "function_rows": 670,
                 "unique_function_uris": 167,
-                "generic_reflected_rows": 452,
-                "generic_reflected_unique_uris": 118,
-                "special_rows": 218,
-                "special_unique_uris": 49,
+                "generic_reflected_rows": 442,
+                "generic_reflected_unique_uris": 116,
+                "special_rows": 228,
+                "special_unique_uris": 51,
             },
         },
-        "reviewed_special_uri_count": 49,
+        "reviewed_special_uri_count": 51,
         "reviewed_generic_restriction_count": 6,
     }
-    assert summary["version_rows"] == 67
-    assert summary["rules"] == 31
-    assert summary["scopes"] == 161
-    assert summary["schema_selectors"] == 738
-    assert summary["semantic_boundaries"] == 47
-    assert sum(summary["selectors_by_status"].values()) == 738
+    assert summary["version_rows"] == 111
+    assert summary["rules"] == 45
+    assert summary["scopes"] == 254
+    assert summary["schema_selectors"] == 870
+    assert summary["semantic_boundaries"] == 63
+    assert sum(summary["selectors_by_status"].values()) == 870
     assert summary["selectors_by_status"]["intentionally_blocked"] > 0
     assert summary["selectors_by_status"]["missing"] == 0
 
@@ -331,6 +339,61 @@ def test_native_surface_policy_records_closed_import_semantic_boundaries() -> No
         assert boundaries[
             "tab-columns.Audio File::relative-to-import-file"
         ] == "intentionally_blocked"
+
+
+def test_native_surface_policy_records_closed_switch_assignment_boundaries() -> None:
+    payload = load_native_surface_policy()
+    rules = {
+        rule["uri"]: rule
+        for rule in payload["rules"]
+        if rule["uri"].startswith("ak.wwise.core.switchContainer.")
+        and rule["uri"].endswith("Assignment")
+    }
+
+    assert set(rules) == {
+        "ak.wwise.core.switchContainer.addAssignment",
+        "ak.wwise.core.switchContainer.removeAssignment",
+    }
+    for uri, rule in rules.items():
+        args_scope = next(
+            scope for scope in rule["scopes"] if scope["pointer"] == "/argsSchema"
+        )
+        assert args_scope["classifications"]["normalized_equivalent"] == [
+            "child",
+            "stateOrSwitch",
+        ]
+        boundaries = {row["selector"]: row for row in rule["semantic_boundaries"]}
+        assert boundaries["gateway.switch_container::relationship-owner"]["status"] == (
+            "normalized_equivalent"
+        )
+        expected_prestate = (
+            "relationship.prestate::child-unassigned"
+            if uri.endswith("addAssignment")
+            else "relationship.prestate::exact-pair-present"
+        )
+        assert boundaries[expected_prestate]["status"] == "normalized_equivalent"
+
+
+def test_native_surface_policy_records_closed_soundbank_file_and_inclusion_boundaries() -> None:
+    payload = load_native_surface_policy()
+    rules = {rule["uri"]: rule for rule in payload["rules"]}
+    definitions = rules["ak.wwise.core.soundbank.processDefinitionFiles"]
+    assert definitions["versions"] == ["2022.1", "2023.1", "2024.1", "2025.1"]
+    assert definitions["scopes"][0]["classifications"]["normalized_equivalent"] == ["files"]
+    assert definitions["semantic_boundaries"][0]["selector"] == (
+        "gateway.io_root::required-confinement"
+    )
+
+    inclusions = rules["ak.wwise.core.soundbank.setInclusions"]
+    assert inclusions["versions"] == [
+        "2021.1", "2022.1", "2023.1", "2024.1", "2025.1"
+    ]
+    assert inclusions["scopes"][0]["classifications"]["normalized_equivalent"] == [
+        "inclusions", "operation", "soundbank"
+    ]
+    assert inclusions["semantic_boundaries"][0]["selector"] == (
+        "gateway.identities::closed-typed-resolution"
+    )
 
 
 def test_native_surface_policy_records_bounded_advanced_waql_equivalence() -> None:

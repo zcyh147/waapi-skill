@@ -958,14 +958,13 @@
       "scenario_index": 1,
       "prompt": "读取 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Vehicle_Engine` 的 `Speed_Layer` assignments；这个 Blend Track 的 GUID 是 `{speed_track_guid}`。按 index 列出每个 child 的名称、GUID 和左右边缘，再确认索引连续、没有重复 child，并指出是否存在边缘重叠。",
       "visible_inputs": [{"name": "speed_track_guid", "kind": "string", "description": "Vehicle_Engine 下 Speed_Layer Blend Track 的完整 GUID"}],
-      "protocol": "preview_confirm",
-      "confirmation_prompt": "可以，按这个轨道读取并分析。",
+      "protocol": "single",
+      "confirmation_prompt": null,
       "fixture": {"adapter": "blend_container_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create Speed_Layer with four ordered child assignments and deliberate overlapping/non-overlapping edge pairs", "record exact normalized assignments, child identities, and source hashes"]},
       "trigger": null,
       "expected_dispatches": [{"api": "ak.wwise.core.blendContainer.getAssignments", "count": 1, "effect": "read the complete Speed_Layer assignment array"}],
       "oracle_assertions": [
         {"phase": "before", "adapter": "blend_assignment_readback_oracle", "subject_api": "ak.wwise.core.blendContainer.getAssignments", "expectation": "runner direct baseline contains four known child/index/edge records"},
-        {"phase": "preview", "adapter": "sandbox_unchanged_oracle", "subject_api": "ak.wwise.core.blendContainer.getAssignments", "expectation": "generic transaction preview changes no assignment, object, or project file"},
         {"phase": "after", "adapter": "blend_assignment_readback_oracle", "subject_api": "ak.wwise.core.blendContainer.getAssignments", "expectation": "returned normalized array exactly equals baseline child GUIDs, indices, order, and two-edge documents"},
         {"phase": "after", "adapter": "assignment_analysis_oracle", "subject_api": "ak.wwise.core.blendContainer.getAssignments", "expectation": "reported continuity, uniqueness, and overlap decisions equal deterministic recomputation from returned edges"},
         {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.blendContainer.getAssignments", "expectation": "read leaves state unchanged; fixture removed and source hashes match"}
@@ -982,14 +981,13 @@
       "scenario_index": 2,
       "prompt": "比较 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab\\Footsteps_Blend` 的 `Speed_Layer`（GUID `{speed_track_guid}`）和 `Surface_Layer`（GUID `{surface_track_guid}`）。列出两个轨道各自 assignment 顺序、共有 child、只在单边的 child，以及同一 child 在两轨上的边缘差异。",
       "visible_inputs": [{"name": "speed_track_guid", "kind": "string", "description": "Footsteps_Blend 下 Speed_Layer Blend Track 的完整 GUID"}, {"name": "surface_track_guid", "kind": "string", "description": "Footsteps_Blend 下 Surface_Layer Blend Track 的完整 GUID"}],
-      "protocol": "preview_confirm",
-      "confirmation_prompt": "这一步预览没问题，执行它；如果还有下一步，先把下一步预览给我。",
+      "protocol": "single",
+      "confirmation_prompt": null,
       "fixture": {"adapter": "blend_container_fixture", "sandbox": "scenario_project_copy", "prerequisites": ["create two tracks with overlapping but non-identical child sets, orders, and edge pairs", "record exact arrays, child identities, and source hashes"]},
       "trigger": null,
       "expected_dispatches": [{"api": "ak.wwise.core.blendContainer.getAssignments", "count": 2, "effect": "read Speed_Layer and Surface_Layer assignment arrays independently"}],
       "oracle_assertions": [
         {"phase": "before", "adapter": "blend_assignment_readback_oracle", "subject_api": "ak.wwise.core.blendContainer.getAssignments", "expectation": "two distinct baseline arrays include shared and track-exclusive children with edge differences"},
-        {"phase": "preview", "adapter": "sandbox_unchanged_oracle", "subject_api": "ak.wwise.core.blendContainer.getAssignments", "expectation": "both arrays, child objects, and project files remain baseline"},
         {"phase": "after", "adapter": "blend_assignment_readback_oracle", "subject_api": "ak.wwise.core.blendContainer.getAssignments", "expectation": "each returned array matches its own track baseline without cross-assignment"},
         {"phase": "after", "adapter": "assignment_analysis_oracle", "subject_api": "ak.wwise.core.blendContainer.getAssignments", "expectation": "reported intersection, differences, order, and per-child edge diffs equal set/order comparison of the two arrays"},
         {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.blendContainer.getAssignments", "expectation": "read-only scenario leaves state unchanged; fixture removed and source hashes match"}

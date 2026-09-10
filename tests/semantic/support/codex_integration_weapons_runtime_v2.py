@@ -3,9 +3,8 @@
 The model receives only two reviewed object paths.  The runtime seals the
 copied SampleProject against the version manifest, requires one bounded audit
 query, one exact-ID hop per distinct returned OutputBus, and one exact-ID
-readback per selected Sound.  It builds one metadata-bound ``object.set`` batch
-from those revalidated GUIDs and independently reads back all selected and
-protected state.
+readback per selected Sound.  It builds one bound business ``object.set`` batch
+and independently reads back all selected and protected state.
 
 Direct WAAPI access is runner-owned and read-only.  The model can mutate only
 through the ordinary immutable Gateway transaction protocol.
@@ -28,11 +27,10 @@ from tests.semantic.support.codex_campaign import canonical_json_bytes
 from tests.semantic.support.codex_eval_protocol_v3 import (
     OPERATION_REQUEST_CONTRACT,
     V3GatewayProtocol,
-    build_object_set_composer_transaction_steps,
+    build_transaction_protocol,
 )
 from tests.semantic.support.codex_gateway_broker import (
     ExpectedGatewayStep,
-    SemanticJsonArgument,
     gateway_step_prefix_matches,
     gateway_step_sequence_matches,
 )
@@ -46,6 +44,7 @@ from tests.semantic.support.codex_integration_paths_v2 import (
     IntegrationOriginalPathError,
     localize_copied_original_path,
 )
+from wwise_waapi.builders.common import split_wwise_path
 
 
 WEAPONS_WORKFLOW_ID = "weapons_query_guided_batch_cleanup"
@@ -155,8 +154,8 @@ _AUDIT_RETURN_FIELDS = (
     "name",
     "type",
     "path",
-    "OutputBus",
-    "@Volume",
+    "output_bus",
+    "volume_db",
     "notes",
 )
 _IDENTITY_RETURN_FIELDS = ("id", "name", "type", "path")
@@ -411,40 +410,29 @@ def prepare_weapons_integration_runtime(
         before, visible_values, request = session.prepare()
         audit_step = _audit_query_step(visible_values["weapons_audit_root_path"])
         output_bus_steps = _output_bus_readback_steps(before)
-        output_bus_states = _distinct_output_bus_states(before)
-        reference_identity_sources = {
-            state.path: step.name
-            for state, step in zip(
-                output_bus_states,
-                output_bus_steps,
-                strict=True,
-            )
-        }
-        transaction_steps = build_object_set_composer_transaction_steps(
-            request,
-            label="tx01",
-            reference_identity_sources=reference_identity_sources,
-        )
+        transaction_steps = build_transaction_protocol((request,)).steps
         identity_steps = tuple(
             _identity_readback_step(role, before.objects_by_role()[role])
             for role in _SELECTED_ROLES
         )
+        identity_step_names = tuple(step.name for step in identity_steps)
         read_prefix = 1 + len(output_bus_steps)
-        transaction_prefix = read_prefix + len(identity_steps)
+        steps = (audit_step, *output_bus_steps, *identity_steps, *transaction_steps)
+        preview_prefix = next(
+            index
+            for index, step in enumerate(steps, start=1)
+            if step.name == "tx01.preview"
+        )
         protocol = V3GatewayProtocol(
-            (audit_step, *output_bus_steps, *identity_steps, *transaction_steps),
+            steps,
             (
                 read_prefix,
-                transaction_prefix
-                + next(
-                    index
-                    for index, step in enumerate(transaction_steps, start=1)
-                    if step.name == "tx01.preview"
-                ),
-                len(transaction_steps) + transaction_prefix,
+                preview_prefix,
+                len(steps),
             ),
             commutative_read_only_step_groups=(
                 tuple(step.name for step in output_bus_steps),
+                identity_step_names,
             ),
         )
         session.bind_protocol(protocol)
@@ -619,8 +607,16 @@ class _WeaponsSession:
             )
         output_bus_steps = _output_bus_readback_steps(self.before)
         output_bus_names = tuple(step.name for step in output_bus_steps)
+        identity_names = tuple(
+            f"identity.{role}" for role in _SELECTED_ROLES
+        )
         names = tuple(step.name for step in protocol.steps)
         transaction_names = names[6:]
+        expected_turn_prefixes = (
+            3,
+            names.index("tx01.preview") + 1,
+            len(names),
+        )
         if (
             names[:6]
             != (
@@ -632,10 +628,21 @@ class _WeaponsSession:
             )
             or transaction_names[:2]
             != ("tx01.operation-schema", "tx01.draft-start")
-            or tuple(
-                step.subcommand for step in protocol.steps[6:]
-            ).count("draft-apply")
-            != 3
+            or any(
+                step.subcommand == "draft-apply" for step in protocol.steps[6:]
+            )
+            or sum(
+                step.subcommand == "draft-bind-object"
+                for step in protocol.steps[6:]
+            ) < 4
+            or sum(
+                step.subcommand == "draft-declare-existing-batch"
+                for step in protocol.steps[6:]
+            ) != 1
+            or any(
+                step.subcommand == "draft-declare-existing"
+                for step in protocol.steps[6:]
+            )
             or transaction_names[-6:]
             != (
                 "tx01.check",
@@ -647,9 +654,9 @@ class _WeaponsSession:
             )
             or tuple(protocol.steps[1 : 1 + len(output_bus_steps)])
             != output_bus_steps
-            or protocol.turn_prefix_counts != (3, 13, 17)
+            or protocol.turn_prefix_counts != expected_turn_prefixes
             or protocol.commutative_read_only_step_groups
-            != (output_bus_names,)
+            != (output_bus_names, identity_names)
         ):
             raise WeaponsIntegrationRuntimeError(
                 "Weapons protocol is not the reviewed audit, distinct OutputBus "
@@ -886,8 +893,8 @@ class _WeaponsSession:
                                 {
                                     "name": "OutputBus",
                                     "target": {
-                                        "kind": "path",
-                                        "value": visible["weapons_bus_path"],
+                                        "kind": "id",
+                                        "value": objects["weapons_bus"].object_id,
                                     },
                                 }
                             ],
@@ -909,8 +916,8 @@ class _WeaponsSession:
                                 {
                                     "name": "OutputBus",
                                     "target": {
-                                        "kind": "path",
-                                        "value": visible["weapons_bus_path"],
+                                        "kind": "id",
+                                        "value": objects["weapons_bus"].object_id,
                                     },
                                 }
                             ],
@@ -1304,9 +1311,11 @@ class _WeaponsSession:
                 )
             _wwise_path(row.get("path"), f"{role} path")
             _text(row.get("name"), f"{role} name")
-            _number(row.get("@Volume"), f"{role} Volume")
+            _number(row.get("volume_db"), f"{role} Volume")
             _text(row.get("notes"), f"{role} notes")
-            bus_id = _identity(row.get("OutputBus"), f"{role} OutputBus").casefold()
+            bus_id = _identity(
+                row.get("output_bus"), f"{role} OutputBus"
+            ).casefold()
             if bus_id not in ordered_bus_ids:
                 ordered_bus_ids.append(bus_id)
             rows_by_role[role] = MappingProxyType(dict(row))
@@ -1335,8 +1344,8 @@ class _WeaponsSession:
                 "Weapons OutputBus hop ran before the scoped audit"
             )
         if (
-            len(step.arguments) < 2
-            or step.arguments[0] != "--object-id"
+            len(step.arguments) != 2
+            or step.arguments[0] != "--exact-id"
             or not isinstance(step.arguments[1], str)
         ):
             raise WeaponsIntegrationRuntimeError(
@@ -1424,7 +1433,7 @@ class _WeaponsSession:
             if not _text(row.get("name"), f"{role} name").startswith("RFL_"):
                 rules.append("name_prefix")
             output_bus_id = _identity(
-                row.get("OutputBus"), f"{role} OutputBus"
+                row.get("output_bus"), f"{role} OutputBus"
             ).casefold()
             output_bus_path = self.output_bus_paths.get(output_bus_id)
             if output_bus_path is None:
@@ -1433,7 +1442,7 @@ class _WeaponsSession:
                 )
             if output_bus_path != target_path:
                 rules.append("output_bus_path")
-            if _number(row.get("@Volume"), f"{role} Volume") > 0.0:
+            if _number(row.get("volume_db"), f"{role} Volume") > 0.0:
                 rules.append("volume")
             if "release-ready" not in _text(row.get("notes"), f"{role} notes"):
                 rules.append("notes")
@@ -1666,23 +1675,29 @@ class _WeaponsSession:
 
 
 def _audit_query_step(root_path: str) -> ExpectedGatewayStep:
-    # The natural prompt explicitly asks for every Sound below this sealed
-    # fixture subtree, so the Skill correctly selects its explicit
-    # ``--all-results`` route.  The runner independently rejects more than
-    # ``_AUDIT_TAKE`` rows before granting any business-oracle credit.
-    arguments: list[Any] = [
-        "--path",
-        root_path,
-        "--select",
-        "descendants",
-        "--where-json",
-        SemanticJsonArgument(
-            {"field": "type", "operator": "=", "value": "Sound"}
-        ),
-        "--all-results",
-    ]
-    for field in _AUDIT_RETURN_FIELDS:
-        arguments.extend(("--return-field", field))
+    # The fixed fixture contains six Sounds. The public business query owns
+    # native WAQL/type/projection construction; the runner still rejects any
+    # row outside the exact closed set.
+    arguments: list[Any] = []
+    for segment in split_wwise_path(root_path):
+        arguments.extend(("--path-segment", segment))
+    arguments.extend(
+        (
+            "--relationship",
+            "descendants",
+            "--predicate",
+            "kind-is",
+            "all-sounds",
+            "--max-results",
+            str(len(_IN_SCOPE_SOUND_ROLES)),
+            "--include",
+            "notes",
+            "--include",
+            "volume-db",
+            "--include",
+            "output-bus",
+        )
+    )
     return ExpectedGatewayStep(
         name="audit.scope",
         subcommand="query-object",
@@ -1731,14 +1746,11 @@ def _output_bus_readback_steps(
 ) -> tuple[ExpectedGatewayStep, ...]:
     steps: list[ExpectedGatewayStep] = []
     for index, state in enumerate(_distinct_output_bus_states(snapshot), start=1):
-        arguments: list[str] = ["--object-id", state.object_id]
-        for field in _IDENTITY_RETURN_FIELDS:
-            arguments.extend(("--return-field", field))
         steps.append(
             ExpectedGatewayStep(
                 name=f"{_OUTPUT_BUS_STEP_PREFIX}{index:02d}",
                 subcommand="query-object",
-                arguments=tuple(arguments),
+                arguments=("--exact-id", state.object_id),
             )
         )
     return tuple(steps)
@@ -1752,13 +1764,10 @@ def _identity_readback_step(
         raise WeaponsIntegrationRuntimeError(
             f"Weapons identity readback role is not selected: {role}"
         )
-    arguments: list[str] = ["--object-id", state.object_id]
-    for field in _IDENTITY_RETURN_FIELDS:
-        arguments.extend(("--return-field", field))
     return ExpectedGatewayStep(
         name=f"identity.{role}",
         subcommand="query-object",
-        arguments=tuple(arguments),
+        arguments=("--exact-id", state.object_id),
     )
 
 

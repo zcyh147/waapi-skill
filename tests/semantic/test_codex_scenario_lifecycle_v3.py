@@ -213,6 +213,7 @@ def test_launch_environment_uses_only_fresh_case_owned_user_state(
     assert runtime.runner_environment["WINEPREFIX"] == str(
         runtime.sandbox.wine_prefix_path
     )
+    assert runtime.runner_environment["PYTHONDONTWRITEBYTECODE"] == "1"
     assert runtime.sandbox.wine_prefix_path.is_relative_to(runtime.owned_root)
     controller.finish("PASS")
 

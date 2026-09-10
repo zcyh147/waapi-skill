@@ -3,6 +3,8 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import tomllib
+from importlib import metadata
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -65,6 +67,7 @@ LIVE_TEST_NODES = {
         "tests/live/test_2022_live_prerequisites.py::test_2022_live_environment_prerequisites_fail_fast",
         "tests/live/test_2022_reflection_inventory.py::test_2022_live_reflection_inventory_runs_against_sandbox",
         "tests/live/test_2022_waql_live_matrix.py::test_2022_live_waql_object_get_matrix_runs_read_only_against_sandbox",
+        "tests/live/test_2022_1_topic_business_sandbox.py::test_2022_1_topic_business_inputs_against_sandbox",
         "tests/live/test_gateway_live_matrix.py::test_gateway_read_only_matrix_runs_once_against_copied_sandbox",
     ),
     "2023.1": (
@@ -107,6 +110,10 @@ DESTRUCTIVE_TEST_NODES = {
 
 class TestDriverError(ValueError):
     """Raised when the public test-launcher request is invalid."""
+
+
+class TestEnvironmentError(ValueError):
+    """Raised before collection when the selected developer Python is incomplete."""
 
 
 @dataclass(frozen=True)
@@ -156,6 +163,7 @@ Notes:
       WWISE_TEST_CONFIG, WWISE_CONSOLE, WWISE_SAMPLE_PROJECT_PATH,
       WWISE_SANDBOX_ROOT, WWISE_STARTUP_TIMEOUT, WWISE_READINESS_TIMEOUT,
       WWISE_PROBE_TIMEOUT, WWISE_SHUTDOWN_TIMEOUT
+      WAAPI_TEST_PYTHON (exact pre-provisioned developer Python)
 {default_note}
   - Default sandbox root if not set:
       .waapi-skill-state/runtime/wwise-waapi-sandboxes/<version>-<mode>
@@ -232,6 +240,53 @@ def parse_request(arguments: Sequence[str]) -> TestRequest | None:
     if mode in {"smoke", "live", "destructive"} and version == "none":
         raise TestDriverError(f"mode '{mode}' requires a real Wwise version or 'all'")
     return TestRequest(version=version, mode=mode, pytest_args=pytest_args)
+
+
+def validate_test_environment(
+    *,
+    repo_root: Path = REPO_ROOT,
+    python_version: tuple[int, int] | None = None,
+    distribution_version: Callable[[str], str] = metadata.version,
+) -> None:
+    """Fail before test context or Wwise startup on an incomplete dev runtime."""
+
+    selected_version = (
+        (sys.version_info.major, sys.version_info.minor)
+        if python_version is None
+        else python_version
+    )
+    if not (3, 11) <= selected_version < (3, 14):
+        raise TestEnvironmentError(
+            "the selected interpreter must be Python 3.11 through 3.13; "
+            f"observed {selected_version[0]}.{selected_version[1]}"
+        )
+    try:
+        with (repo_root / "pyproject.toml").open("rb") as handle:
+            project = tomllib.load(handle)
+        locked = {
+            "waapi-client": project["tool"]["poetry"]["dependencies"]["waapi-client"],
+            "pytest": project["tool"]["poetry"]["group"]["dev"]["dependencies"]["pytest"],
+        }
+    except (KeyError, OSError, tomllib.TOMLDecodeError) as exc:
+        raise TestEnvironmentError(
+            "pyproject.toml does not expose the locked test runtime"
+        ) from exc
+    for distribution, constraint in locked.items():
+        if not isinstance(constraint, str) or not constraint.startswith("=="):
+            raise TestEnvironmentError(
+                f"{distribution} must use one exact pyproject version"
+            )
+        expected = constraint.removeprefix("==")
+        try:
+            observed = distribution_version(distribution)
+        except Exception as exc:  # noqa: BLE001 - metadata providers vary by host
+            raise TestEnvironmentError(
+                f"{distribution} is unavailable in {sys.executable}"
+            ) from exc
+        if observed != expected:
+            raise TestEnvironmentError(
+                f"{distribution} version {observed} does not match locked {expected}"
+            )
 
 
 def default_live_paths(
@@ -493,6 +548,16 @@ def main(
     if request is None:
         print(usage(windows=windows), end="")
         return 0
+    try:
+        validate_test_environment(repo_root=repo_root)
+    except TestEnvironmentError as exc:
+        print(f"TEST_ENVIRONMENT_BLOCKED: {exc}", file=sys.stderr)
+        print(
+            "Select a complete interpreter with WAAPI_TEST_PYTHON or provision "
+            "this worktree with Poetry before retrying.",
+            file=sys.stderr,
+        )
+        return 4
     try:
         return TestDriver(
             repo_root=repo_root,

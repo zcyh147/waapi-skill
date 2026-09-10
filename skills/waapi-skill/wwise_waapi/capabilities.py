@@ -356,6 +356,17 @@ class CapabilityCatalog:
                 policy_record = _policy_record(classification.category)
                 preferred_route = _preferred_route(execution_contract)
                 gateway_commands = execution_contract.gateway_commands
+                if execution_contract.route in {
+                    "transaction",
+                    "managed_transaction",
+                    "isolated_transaction",
+                    "compound_transaction_member",
+                } and transaction_operations and transaction_operations != ("waapi.call",):
+                    gateway_commands = ("operation-schema",)
+                execution_contract_projection = execution_contract.as_dict()
+                execution_contract_projection["gateway_commands"] = list(
+                    gateway_commands
+                )
                 authoring_profile = (
                     profile == AUTHORING_UI_EXECUTION_PROFILE
                 )
@@ -393,7 +404,7 @@ class CapabilityCatalog:
                         transaction_boundaries=transaction_boundaries,
                         policy=policy_record,
                         evidence=_evidence_record(deferred.get(uri)),
-                        execution_contract=execution_contract.as_dict(),
+                        execution_contract=execution_contract_projection,
                         selection_guidance=selection_guidance_for_uri(uri),
                         manifest_runtime_profile=(
                             str(

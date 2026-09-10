@@ -15,6 +15,7 @@ project proofs, and direct WAAPI access remain runner-owned.
 from __future__ import annotations
 
 import hashlib
+import json
 import math
 import os
 import re
@@ -36,15 +37,12 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     OPERATION_REQUEST_CONTRACT,
     V3GatewayProtocol,
     build_audio_import_composer_transaction_steps,
-    metadata_candidate_limit,
+    build_protocol_with_bounded_import_chunks,
 )
 from tests.semantic.support.codex_gateway_broker import (
-    DraftActionMetadataBinding,
     ExpectedGatewayStep,
-    MetadataQueryArgument,
     gateway_step_prefix_matches,
     gateway_step_sequence_matches,
-    project_required_metadata_tokens,
 )
 from tests.semantic.support.codex_integration_workflows_v2 import (
     BaselineManifest,
@@ -55,6 +53,9 @@ from tests.semantic.support.codex_integration_fixture_tree_v2 import (
 from tests.semantic.support.codex_integration_paths_v2 import (
     IntegrationOriginalPathError,
     localize_copied_original_path,
+)
+from wwise_waapi.audio_import_business_contracts import (
+    AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS,
 )
 from wwise_waapi.builders.metadata import (
     GET_PROPERTY_AND_REFERENCE_NAMES_URI,
@@ -71,19 +72,8 @@ OBJECT_GET_API = "ak.wwise.core.object.get"
 IMPORT_API = "ak.wwise.core.audio.import"
 METADATA_QUERIES = ("volume", "output bus")
 METADATA_TOKENS = ("Volume", "OutputBus")
-RIFLE_COMMUTATIVE_READ_ONLY_STEP_GROUPS = (
-    ("tx01.operation-schema", "metadata.discover"),
-)
-RIFLE_COMMUTATIVE_COMPOSER_SETUP_STEP_GROUPS = (
-    (
-        "metadata.discover",
-        "tx01.draft-start",
-        "tx01.action.001",
-        "tx01.action.002",
-        "tx01.action.003",
-        "tx01.action.004",
-    ),
-)
+RIFLE_COMMUTATIVE_READ_ONLY_STEP_GROUPS: tuple[tuple[str, ...], ...] = ()
+RIFLE_COMMUTATIVE_COMPOSER_SETUP_STEP_GROUPS: tuple[tuple[str, ...], ...] = ()
 
 _GUID_RE = re.compile(
     r"^\{[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-"
@@ -102,6 +92,44 @@ _RTPC_SNAPSHOT_FIELDS = (
     "@ControlInput",
     "@Curve",
 )
+
+
+def _rifle_expected_names_for_observed(
+    protocol: V3GatewayProtocol,
+    observed_names: Sequence[str],
+) -> tuple[str, ...]:
+    """Project the canonical protocol onto one Broker-legal import rebatch."""
+
+    expected_names = tuple(step.name for step in protocol.steps)
+    batch_names = tuple(
+        step.name
+        for step in protocol.steps
+        if step.subcommand == "draft-declare-import-batch"
+    )
+    if not batch_names:
+        return expected_names
+    last_batch_index = expected_names.index(batch_names[-1])
+    later_names = set(expected_names[last_batch_index + 1 :])
+    if not any(name in later_names for name in observed_names):
+        return expected_names
+    selected_batch_names = tuple(
+        name for name in observed_names if name in batch_names
+    )
+    if (
+        selected_batch_names != batch_names[: len(selected_batch_names)]
+        or not (
+            math.ceil(
+                len(batch_names) / AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS
+            )
+            <= len(selected_batch_names)
+            <= len(batch_names)
+        )
+    ):
+        return ()
+    omitted = set(batch_names[len(selected_batch_names) :])
+    return tuple(name for name in expected_names if name not in omitted)
+
+
 _NEW_SOUND_STATE_FIELDS = (
     "parent",
     "notes",
@@ -496,45 +524,18 @@ def prepare_rifle_integration_runtime(
         backend=backend,
     )
     try:
-        before, visible_values, operation_request, metadata_result = (
+        before, visible_values, operation_request, _metadata_result = (
             session.prepare()
         )
-        projection = project_required_metadata_tokens(
-            metadata_result,
-            object_type="Sound",
-            required_tokens=METADATA_TOKENS,
-        )
-        metadata_arguments: list[Any] = [
-            "discover",
-            "--object-type",
-            "Sound",
-        ]
-        for query in METADATA_QUERIES:
-            metadata_arguments.extend(("--query", MetadataQueryArgument(query)))
-        metadata_arguments.extend(
-            ("--limit", str(metadata_candidate_limit(METADATA_QUERIES)))
-        )
-        metadata_step = ExpectedGatewayStep(
-            name="metadata.discover",
-            subcommand="metadata",
-            arguments=tuple(metadata_arguments),
-        )
-        composer_steps = build_audio_import_composer_transaction_steps(
+        steps = build_audio_import_composer_transaction_steps(
             operation_request,
             label="tx01",
-            metadata_binding=DraftActionMetadataBinding(
-                step=metadata_step.name,
-                object_type="Sound",
-                required_tokens=METADATA_TOKENS,
-                expected_projection=projection,
+            existing_target_paths=frozenset(
+                before.objects_by_role()[role].path
+                for role in _EXISTING_SOUND_ROLES
             ),
         )
-        steps = (
-            composer_steps[0],
-            metadata_step,
-            *composer_steps[1:],
-        )
-        protocol = V3GatewayProtocol(
+        protocol = build_protocol_with_bounded_import_chunks(
             steps=steps,
             turn_prefix_counts=(
                 next(
@@ -840,7 +841,7 @@ class _RifleSession:
             != RIFLE_COMMUTATIVE_COMPOSER_SETUP_STEP_GROUPS
         ):
             raise RifleIntegrationRuntimeError(
-                "Rifle protocol is not one metadata-bound transaction"
+                "Rifle protocol is not one business-declaration transaction"
             )
         self.protocol = protocol
 
@@ -896,9 +897,9 @@ class _RifleSession:
             raise RifleIntegrationRuntimeError(
                 "Rifle observer received an invalid step or payload"
             )
-        expected_names = tuple(row.name for row in protocol.steps)
         candidate = (*self.observed_steps, step.name)
-        if not gateway_step_prefix_matches(
+        expected_names = _rifle_expected_names_for_observed(protocol, candidate)
+        if not expected_names or not gateway_step_prefix_matches(
             expected_names,
             candidate,
             protocol.commutative_read_only_step_groups,
@@ -1062,6 +1063,11 @@ class _RifleSession:
         bindings = self.workflow.fixture.visible_bindings
         values = {
             "rifle_source_directory": str(input_root),
+            "rifle_source_files": json.dumps(
+                [str(path) for path in self.input_paths.values()],
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ),
             "rifle_container_path": _binding_object_path(
                 bindings["rifle_container_path"], self.version
             ),
@@ -1074,6 +1080,7 @@ class _RifleSession:
         }
         if tuple(values) != (
             "rifle_source_directory",
+            "rifle_source_files",
             "rifle_container_path",
             "rifle_event_path",
             "rifle_bus_path",
@@ -1690,7 +1697,12 @@ class _RifleSession:
         record(
             "single_import_transaction",
             gateway_step_sequence_matches(
-                expected_steps,
+                _rifle_expected_names_for_observed(
+                    self.protocol,
+                    tuple(self.observed_steps),
+                )
+                if self.protocol is not None
+                else (),
                 tuple(self.observed_steps),
                 (
                     self.protocol.commutative_read_only_step_groups
@@ -1803,6 +1815,7 @@ def _validate_reviewed_inputs(
         raise RifleIntegrationRuntimeError("Rifle turn topology drifted")
     if tuple(item.name for item in workflow.visible_inputs) != (
         "rifle_source_directory",
+        "rifle_source_files",
         "rifle_container_path",
         "rifle_event_path",
         "rifle_bus_path",

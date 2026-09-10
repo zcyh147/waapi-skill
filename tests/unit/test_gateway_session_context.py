@@ -290,16 +290,14 @@ def test_explicit_gateway_flags_override_saved_session_context_without_connectin
             "31337",
             "--version",
             "2024.1",
-            "call",
-            "ak.wwise.core.object.get",
+            "query-schema",
         ],
         env=configured_env(tmp_path),
         client_factory=fail_if_connected,
     )
 
-    assert exit_code == 2
+    assert exit_code == 0
     assert called is False
-    assert payload["error_code"] == "QUERY_OBJECT_REQUIRED"
     assert payload["session_context"] == expected_context(
         version="2024.1",
         host="localhost",
@@ -386,27 +384,24 @@ def test_result_ceiling_replacement_preserves_session_context() -> None:
 
 def test_skill_contract_requests_one_natural_notice_without_an_extra_command() -> None:
     skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+    skill_compact = " ".join(skill.split())
     setup = (SKILL_ROOT / "references" / "waapi-setup.md").read_text(encoding="utf-8")
 
     for phrase in (
-        "The first time this Skill is used in a conversation",
-        "do not announce that it is loaded before the first gateway result",
-        "`session_context.one_time_introduction.facts`",
-        "the first Agent message after that result",
-        "one short, atomic introduction",
-        "Do not split those facts across an earlier message and a gateway-backed message",
-        "`waapi-skill` is loaded",
+        "When the visible conversation lacks an introduction",
+        "wait for the task's first required Gateway result",
+        "The very next Agent message",
+        "`session_context.one_time_introduction.facts` together",
+        "Skill loaded",
         "current WAAPI address",
-        "WAAPI adapter version",
-        "project modification policy",
-        "若有需要，可按需切换模式",
-        "ordinary prose, not a status bar, table, field list, or rigid template",
-        "Use the first gateway command already required by the user's task",
-        "An offline task stays offline",
-        "visible conversation does not already contain this introduction",
-        "do not use memory to make that decision",
+        "adapter version, policy, and three modes",
+        "A Skill/reference read is not a Gateway result",
+        "never announce early, split facts, use memory",
+        "status table",
+        "Use the task's first required Gateway command",
+        "For a pure explanation, use one offline `config-show`",
+        "never open a live connection only for the introduction",
+        "Repeat only on request or changed facts",
     ):
-        assert phrase in skill
-    assert "run exactly one offline `config-show` to obtain the introduction facts" in skill
-    assert "never run `status` or open a live WAAPI connection only for the introduction" in skill
+        assert phrase in skill_compact
     assert "Do not add policy or implementation narration to a simple read-only result" not in setup

@@ -35,6 +35,50 @@ ORG_FIXTURE_ROOT = REPO_ROOT / "tests" / "_org" / "2022.1"
 ORG_FIXTURE_2023_ROOT = REPO_ROOT / "tests" / "_org" / "2023.1"
 
 
+def test_wait_for_port_release_retries_until_the_exact_port_is_bindable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    attempts: list[tuple[str, int]] = []
+
+    def probe(host: str, port: int) -> None:
+        attempts.append((host, port))
+        if len(attempts) < 3:
+            raise sandbox_fixture.PortUnavailable("still occupied")
+
+    monkeypatch.setattr(sandbox_fixture, "assert_port_free", probe)
+
+    sandbox_fixture.wait_for_port_release(
+        "127.0.0.1",
+        30485,
+        timeout_seconds=1,
+        poll_interval_seconds=0,
+    )
+
+    assert attempts == [("127.0.0.1", 30485)] * 3
+
+
+def test_wait_for_port_release_fails_closed_after_its_bound(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monotonic_values = iter((10.0, 11.0))
+    monkeypatch.setattr(sandbox_fixture.time, "monotonic", lambda: next(monotonic_values))
+    monkeypatch.setattr(
+        sandbox_fixture,
+        "assert_port_free",
+        lambda _host, _port: (_ for _ in ()).throw(
+            sandbox_fixture.PortUnavailable("still occupied")
+        ),
+    )
+
+    with pytest.raises(SandboxFixtureError, match="remained occupied"):
+        sandbox_fixture.wait_for_port_release(
+            "127.0.0.1",
+            30485,
+            timeout_seconds=1,
+            poll_interval_seconds=0,
+        )
+
+
 def _hold_live_sandbox_lock(root: str, acquired: Any, release: Any, results: Any) -> None:
     try:
         with LiveSandboxLock(Path(root)):
@@ -74,6 +118,48 @@ def base_env(console: Path, project: Path, sandbox_root: Path) -> dict[str, str]
         "WWISE_SAMPLE_PROJECT_PATH": str(project),
         "WWISE_SANDBOX_ROOT": str(sandbox_root),
     }
+
+
+@pytest.mark.parametrize(
+    ("platform_name", "version", "expected"),
+    [
+        ("darwin", "2022.1", "version=n;winecoreaudio.drv="),
+        ("darwin", "2023.1", "version=n;winecoreaudio.drv=b"),
+        ("darwin", "2025.1", "version=n;winecoreaudio.drv=b"),
+        ("win32", "2022.1", "version=n;winecoreaudio.drv=b"),
+    ],
+)
+def test_headless_console_audio_environment_is_scoped_to_macos_2022(
+    platform_name: str,
+    version: str,
+    expected: str,
+) -> None:
+    prepared = sandbox_fixture.prepare_headless_console_environment(
+        {"WINEDLLOVERRIDES": "version=n;winecoreaudio.drv=b"},
+        version=version,
+        platform_name=platform_name,
+    )
+
+    assert prepared["WINEDLLOVERRIDES"] == expected
+    if platform_name == "darwin" and version == "2022.1":
+        assert prepared["CX_ENV"] == "WINEDLLOVERRIDES=winecoreaudio.drv="
+    else:
+        assert "CX_ENV" not in prepared
+
+
+def test_headless_console_audio_environment_survives_crossover_launcher() -> None:
+    prepared = sandbox_fixture.prepare_headless_console_environment(
+        {
+            "WINEDLLOVERRIDES": "version=n;winecoreaudio.drv=b",
+            "CX_ENV": "EXISTING=value",
+        },
+        version="2022.1",
+        platform_name="darwin",
+    )
+
+    assert prepared["CX_ENV"] == (
+        "EXISTING=value WINEDLLOVERRIDES=winecoreaudio.drv="
+    )
 
 
 class FakeProcess:
@@ -254,6 +340,27 @@ def test_keep_on_failure_preserves_under_evidence_root(monkeypatch: pytest.Monke
     shutil.rmtree(preserved)
 
 
+def test_explicit_keep_preserves_failure_without_environment_switch(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    console = make_console(tmp_path)
+    source_project = make_sample_project(tmp_path / "source")
+    sandbox = prepare_sample_project_sandbox(
+        base_env(console, source_project, tmp_path / "sandbox-root")
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv(ENV_WWISE_SANDBOX_KEEP_ON_FAILURE, raising=False)
+
+    preserved = cleanup_sandbox(sandbox, keep=True, failed=True)
+
+    assert preserved is not None and preserved.exists()
+    assert preserved.parent == (tmp_path / KEEP_ON_FAILURE_ROOT).resolve(strict=False)
+    metadata = json.loads((preserved / "sandbox-metadata.json").read_text(encoding="utf-8"))
+    assert metadata["keep_decision"] == f"kept:{preserved}"
+    shutil.rmtree(preserved)
+
+
 def test_rejects_sandbox_roots_that_overlap_source(tmp_path: Path) -> None:
     console = make_console(tmp_path)
     source_root = tmp_path / "source"
@@ -326,6 +433,7 @@ def test_launch_uses_sandbox_project_and_records_command(monkeypatch: pytest.Mon
     console = make_console(tmp_path)
     source_project = make_sample_project(tmp_path / "source")
     env = base_env(console, source_project, tmp_path / "sandbox-root")
+    monkeypatch.setattr(sandbox_fixture.sys, "platform", "darwin")
     env["WINEPREFIX"] = str(tmp_path / "caller-prefix-must-be-ignored")
     sandbox = prepare_sample_project_sandbox(env)
     seen_project_paths: list[Path] = []
@@ -394,6 +502,8 @@ def test_launch_uses_sandbox_project_and_records_command(monkeypatch: pytest.Mon
     assert sandbox.metadata.identity_verified is True
     assert sandbox.metadata.wine_prefix_path == str(sandbox.wine_prefix_path)
     assert lifecycle.launch_env["WINEPREFIX"] == str(sandbox.wine_prefix_path)
+    assert lifecycle.launch_env["WINEDLLOVERRIDES"] == "winecoreaudio.drv="
+    assert lifecycle.launch_env["CX_ENV"] == "WINEDLLOVERRIDES=winecoreaudio.drv="
     assert sandbox.metadata.process_cleanup_result == "cleaned"
     assert seen_project_paths == [sandbox.sandbox_project]
     cleanup_sandbox(sandbox)

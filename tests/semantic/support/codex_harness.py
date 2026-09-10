@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ctypes
 import hashlib
 import json
 import os
@@ -20,12 +21,22 @@ from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, Callable, Iterator, Mapping, Sequence
 
 from wwise_waapi.platform_commands import (
+    GATEWAY_SHELL_TOOL_TIMEOUT_MS,
     PlatformCommandError,
     WINDOWS_MODEL_COMMAND_FAMILY,
     WINDOWS_POWERSHELL_ENCODED_FAMILY,
     decode_windows_model_argv,
     decode_windows_powershell_argv,
+    encode_windows_model_argv,
 )
+from tests.semantic.support.codex_gateway_contracts import (
+    GATEWAY_RESULT_CONTRACT,
+    TASK_LOCAL_RUNNER_POSIX,
+    TASK_LOCAL_RUNNER_WINDOWS,
+    gateway_payload_contracts,
+    task_local_runner_matches_normalized,
+)
+from tests.semantic.support.codex_draft_commands import DRAFT_GATEWAY_SUBCOMMANDS
 
 
 MACOS_APP_CODEX_FALLBACK = Path("/Applications/ChatGPT.app/Contents/Resources/codex")
@@ -34,6 +45,159 @@ DEFAULT_MODEL = "gpt-5.6-sol"
 DEFAULT_REASONING_EFFORT = "medium"
 DEFAULT_SERVICE_TIER = "priority"
 DEFAULT_TIMEOUT_SECONDS = 180.0
+WINDOWS_UTF8_CODE_PAGE = 65001
+SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
+    "First read SKILL.md once, standalone. "
+    "Read now; no pre-read reply/questions. "
+    "copy source_field/fixed_argv_prefix_copy verbatim; keep quotes/runner; never reconstruct; "
+    "opaque IDs/handles/tokens/digests. draft-apply: 1 argv/fact; batch=6; "
+    "final=remaining; all facts. Rows obey returned max. "
+    "Composer: one action/call. "
+    "allowed_action_argv owns TYPE; not Real64/int16. unapplied "
+    "ancestor deferred_fact; execute_after=all_pending_ancestor_facts_in_response_"
+    "tree_preorder. branch constant/value. "
+    "Top facts first; exhaust tree. More=>ancestor_next_item_source; "
+    "none=>completion_candidate.copy_command incl task_authority. Metadata: obey "
+    "composer.start.preconditions; absent=none; prompt/schema!=live; all dynamic tokens "
+    "pre-draft; single existing=>--object GUID; --object-type "
+    "only new/imported/plural. "
+    "SoundBank=>role_route; exact bank=>soundbank.by_exact_name. "
+    "path=>by_path_segments one "
+    "arg/segment; name=>query>ID=>by_id; GUID=>by_id. "
+    "Else path=>path; no exact-type-name; subset reread only. "
+    "one query/hop; no merge. "
+    "enum/const exact. typed_operation: copy gateway_argv_prefix incl --apply; "
+    "selector kind/value separate. "
+    "Import type=Sound SFX; Sound query=all-sounds. Events: parents first. "
+    "New path=>parent; name=>declaration only. "
+    "POSIX path: single-quote; keep backslashes; one arg/child. "
+    "Files absolute; no traversal. "
+    "timeout_ms>=30000; use shell_tool_timeout_ms; scalars first. "
+    "Draft same turn; no progress reply. "
+    "draft-check!=Preview. Preview-now: finish schema/metadata/Preview now; "
+    "only execution waits for confirmation. next_command unless "
+    "requires_later_user_message. Omit workdir/cwd."
+)
+
+
+def semantic_skill_bootstrap_developer_instructions(
+    runner_path: str | Path,
+) -> str:
+    """Bind typed-profile model guidance to one exact packaged runner prefix."""
+
+    raw_runner = str(runner_path)
+    windows_path = PureWindowsPath(raw_runner)
+    posix_path = PurePosixPath(raw_runner)
+    if raw_runner == TASK_LOCAL_RUNNER_WINDOWS:
+        command_prefix = encode_windows_model_argv(
+            ("python", raw_runner, "gateway.py")
+        )
+    elif raw_runner == TASK_LOCAL_RUNNER_POSIX:
+        command_prefix = shlex.join(("python", raw_runner, "gateway.py"))
+    elif windows_path.is_absolute():
+        command_prefix = encode_windows_model_argv(
+            ("python", raw_runner, "gateway.py")
+        )
+    elif posix_path.is_absolute():
+        command_prefix = shlex.join(("python", raw_runner, "gateway.py"))
+    else:
+        raise CodexHarnessError(
+            "semantic Skill runner path must be absolute in its owning path flavor"
+        )
+    return (
+        SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS
+        + " No next_command: only "
+        + command_prefix
+        + "; append disclosed argv verbatim."
+    )
+
+
+def semantic_task_developer_instructions(
+    runner_path: str | Path,
+    *,
+    task_skill_source: str | Path,
+    expected_skill_reads: Sequence[Sequence[str]],
+    base_developer_instructions: str | None = None,
+) -> str:
+    """Seal exact host-native Skill reads into one formal task instruction."""
+
+    try:
+        schedule = tuple(tuple(row) for row in expected_skill_reads)
+    except TypeError as exc:
+        raise CodexHarnessError("semantic Skill read schedule is invalid") from exc
+    if not schedule or schedule[0][:1] != ("SKILL.md",):
+        raise CodexHarnessError(
+            "semantic Skill read schedule must begin with exactly one SKILL.md read"
+        )
+    flattened = tuple(value for row in schedule for value in row)
+    if (
+        any(value not in _ALLOWED_SKILL_READS for value in flattened)
+        or flattened.count("SKILL.md") != 1
+        or len(flattened) != len(set(flattened))
+    ):
+        raise CodexHarnessError("semantic Skill read schedule is not closed")
+
+    raw_skill_source = str(task_skill_source)
+    windows_source = PureWindowsPath(raw_skill_source)
+    posix_source = PurePosixPath(raw_skill_source)
+    is_windows = windows_source.is_absolute()
+    if not is_windows and not posix_source.is_absolute():
+        raise CodexHarnessError(
+            "semantic task Skill source must be absolute in its owning path flavor"
+        )
+
+    turn_rows: list[str] = []
+    for turn_index, reads in enumerate(schedule, start=1):
+        if not reads:
+            turn_rows.append(f"{turn_index} none")
+            continue
+        commands: list[str] = []
+        for relative in reads:
+            if is_windows:
+                relative_windows = relative.replace("/", "\\")
+                commands.append(
+                    "Get-Content -Raw -Encoding UTF8 "
+                    f"'.agents\\skills\\waapi-skill\\{relative_windows}'"
+                )
+            else:
+                path = PurePosixPath(".agents/skills/waapi-skill").joinpath(
+                    *PurePosixPath(relative).parts
+                )
+                quoted = "'" + str(path).replace("'", "'\"'\"'") + "'"
+                commands.append(f"cat {quoted}")
+        turn_rows.append(
+            f"{turn_index} "
+            + " then ".join(f"[{command}]" for command in commands)
+        )
+
+    candidate_base = semantic_skill_bootstrap_developer_instructions(runner_path)
+    base = (
+        candidate_base
+        if base_developer_instructions is None
+        else base_developer_instructions
+    )
+    if not isinstance(base, str) or not base or base != base.strip():
+        raise CodexHarnessError("semantic base developer instructions are invalid")
+    if base == candidate_base:
+        task_runner = (
+            TASK_LOCAL_RUNNER_WINDOWS
+            if is_windows
+            else TASK_LOCAL_RUNNER_POSIX
+        )
+        base = semantic_skill_bootstrap_developer_instructions(task_runner)
+    instructions = (
+        base
+        + " Reads: "
+        + "; ".join(turn_rows)
+        + ". Exact turn; no early/late/extra reads."
+    )
+    if len(instructions.encode("utf-8")) > 2048:
+        raise CodexHarnessError(
+            "semantic task developer instructions exceed the 2048-byte limit"
+        )
+    return instructions
+
+
 WINDOWS_SEMANTIC_SANDBOX_MODE = "unelevated"
 WINDOWS_HARD_REAP_SECONDS = 5.0
 PROMPT_AUDIT_TIMEOUT_SECONDS = 30.0
@@ -46,7 +210,7 @@ CODEX_VERSION_PATTERN = re.compile(
     r"(?:\+[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$"
 )
 CODEX_VERSION_OUTPUT_MAX_BYTES = 256
-POWERSHELL_CORE_PROBE_TIMEOUT_SECONDS = 15.0
+POWERSHELL_CORE_PROBE_TIMEOUT_SECONDS = 30.0
 POWERSHELL_CORE_VERSION_OUTPUT_MAX_BYTES = 256
 POWERSHELL_CORE_MINIMUM_VERSION = (7, 3, 0)
 POWERSHELL_CORE_VERSION_PATTERN = re.compile(
@@ -87,7 +251,6 @@ SOURCE_SUFFIXES = frozenset(
         ".rs",
     }
 )
-GATEWAY_RESULT_CONTRACT = "waapi-skill.gateway-result/v1"
 SUPPORTED_WWISE_VERSIONS = frozenset({"2021.1", "2022.1", "2023.1", "2024.1", "2025.1"})
 GATEWAY_SUBCOMMANDS = frozenset(
     {
@@ -96,31 +259,36 @@ GATEWAY_SUBCOMMANDS = frozenset(
         "config-set",
         "buses",
         "selected",
+        "query-schema",
         "query-object",
         "metadata",
+        "topic-schema",
         "wait-topic",
+        "stream-topic",
         "capabilities",
         "describe",
         "operations",
         "operation-schema",
+        "request-schema",
+        "request-map-container",
+        "request-array-item",
         "legacy-operation-schema",
-        "draft-start",
-        "draft-inspect",
-        "draft-apply",
-        "draft-check",
-        "draft-cancel",
+        *DRAFT_GATEWAY_SUBCOMMANDS,
         "transaction-show",
         "confirm",
         "reject",
         "preview",
         "legacy-preview",
-        "preview-from-draft",
+        "typed-zero-call",
+        "typed-call",
+        "typed-operation",
+        "core-call",
         "execute",
         "verify",
         "call",
     }
 )
-_PROTECTED_ENV_EXACT = frozenset({"HOME", "CODEX_HOME"})
+_PROTECTED_ENV_EXACT = frozenset({"HOME", "USERPROFILE", "CODEX_HOME"})
 _BROKER_COMMON_MODEL_ENV_NAMES = frozenset(
     {
         "WAAPI_CODEX_GATEWAY_BROKER_ENDPOINT",
@@ -170,6 +338,84 @@ _ALLOWED_SKILL_READS = frozenset(
         "references/waapi-coverage.md",
     }
 )
+
+
+def discover_windows_user_skill_paths(
+    *,
+    environment: Mapping[str, str] | None = None,
+    platform_name: str | None = None,
+) -> tuple[Path, ...]:
+    r"""Return exact user-global Skill files Codex may discover on Windows.
+
+    Native Codex resolves ``%USERPROFILE%\.agents\skills`` through the Windows
+    user profile Known Folder even when the child process receives disposable
+    HOME, USERPROFILE, and CODEX_HOME values.  Formal campaign commands disable
+    every pre-existing file by exact path while retaining the task-local
+    ``waapi-skill`` installed below the isolated workspace.
+    """
+
+    if not _is_windows(platform_name):
+        return ()
+    source = os.environ if environment is None else environment
+    user_profile = _environment_value_case_insensitive(source, "USERPROFILE")
+    if not user_profile:
+        raise CodexHarnessError(
+            "native Windows user Skill isolation requires USERPROFILE"
+        )
+    root = Path(user_profile).expanduser() / ".agents" / "skills"
+    if not root.exists():
+        return ()
+    if not root.is_dir() or is_link_or_junction(root):
+        raise CodexHarnessError(
+            f"native Windows user Skill root is not a regular directory: {root}"
+        )
+    paths: list[Path] = []
+    for entry in sorted(root.iterdir(), key=lambda value: value.name.casefold()):
+        skill_file = entry / "SKILL.md"
+        if not entry.is_dir() or is_link_or_junction(entry) or not skill_file.exists():
+            continue
+        if not skill_file.is_file() or is_link_or_junction(skill_file):
+            raise CodexHarnessError(
+                f"native Windows user Skill file is not regular: {skill_file}"
+            )
+        paths.append(skill_file.resolve(strict=True))
+    if len(paths) != len(set(paths)):
+        raise CodexHarnessError("native Windows user Skill paths are duplicated")
+    return tuple(paths)
+
+
+def _disabled_user_skill_config_argv(paths: Sequence[Path]) -> tuple[str, ...]:
+    if not paths:
+        return ()
+    normalized = tuple(Path(path).expanduser().resolve(strict=False) for path in paths)
+    if len(normalized) != len(set(normalized)) or any(
+        not path.is_absolute() or path.name != "SKILL.md" for path in normalized
+    ):
+        raise CodexHarnessError("disabled user Skill paths are invalid")
+    rows = ",".join(
+        "{path=" + json.dumps(str(path)) + ",enabled=false}"
+        for path in normalized
+    )
+    return ("-c", f"skills.config=[{rows}]")
+_POSIX_WORKSPACE_SKILL_READS = {
+    ".agents/skills/waapi-skill/SKILL.md": ("SKILL.md",),
+    ".agents/skills/waapi-skill/references/waapi-setup.md": (
+        "references",
+        "waapi-setup.md",
+    ),
+    ".agents/skills/waapi-skill/references/waapi-query.md": (
+        "references",
+        "waapi-query.md",
+    ),
+    ".agents/skills/waapi-skill/references/waapi-operate.md": (
+        "references",
+        "waapi-operate.md",
+    ),
+    ".agents/skills/waapi-skill/references/waapi-coverage.md": (
+        "references",
+        "waapi-coverage.md",
+    ),
+}
 _WINDOWS_WORKSPACE_SKILL_READS = {
     r".agents\skills\waapi-skill\SKILL.md": ("SKILL.md",),
     r".agents\skills\waapi-skill\references\waapi-setup.md": (
@@ -189,9 +435,20 @@ _WINDOWS_WORKSPACE_SKILL_READS = {
         "waapi-coverage.md",
     ),
 }
+_WORKSPACE_SKILL_READS_BY_SYNTAX = {
+    "posix": _POSIX_WORKSPACE_SKILL_READS,
+    "windows": _WINDOWS_WORKSPACE_SKILL_READS,
+}
 _SKILL_LINE_RE = re.compile(
     r"(?m)^\s*-\s+(?P<name>[A-Za-z0-9_.:-]+)\s*:\s*.*?"
     r"\((?:file|source|locator)\s*:\s*(?P<locator>[^)\n]+)\)\s*$"
+)
+_SKILL_ROOT_LINE_RE = re.compile(
+    r"(?m)^\s*-\s*`?(?P<alias>r[0-9]+)`?\s*=\s*"
+    r"`?(?P<root>[^`\r\n]+?)`?\s*$"
+)
+_SKILL_ALIAS_LOCATOR_RE = re.compile(
+    r"^(?P<alias>r[0-9]+)[/\\](?P<relative>.+)$"
 )
 _LEGACY_WORKSPACE_SKILL_RE = re.compile(r"(?im)^\s*workspace\s+skill\s*:\s*(?P<name>[A-Za-z0-9_.:-]+)\s*$")
 _CODEX_INFRASTRUCTURE_ERROR_MARKERS: tuple[tuple[str, tuple[str, ...]], ...] = (
@@ -534,6 +791,55 @@ def _is_windows(platform_name: str | None = None) -> bool:
 def _is_windows_platform(platform_name: str | None = None) -> bool:
     active = os.name if platform_name is None else str(platform_name)
     return active == "nt" or active.startswith("win")
+
+
+def enforce_windows_console_utf8(
+    *,
+    platform_name: str | None = None,
+    console_api: Any | None = None,
+) -> tuple[int, int] | None:
+    """Make every child Codex/pwsh console transport inherit UTF-8.
+
+    ``Get-Content -Encoding UTF8`` controls file decoding, not the encoding
+    used when PowerShell writes that text to an attached Windows console.  A
+    native Fresh task can otherwise inherit CP936 and archive mojibake even
+    though the exact read command succeeded.  Set and attest both directions
+    before launching any prompt audit or Codex task; byte-exact read grading
+    remains unchanged.
+    """
+
+    if not _is_windows(platform_name):
+        return None
+    if console_api is None:
+        try:
+            console_api = ctypes.windll.kernel32
+        except AttributeError as exc:  # pragma: no cover - native Windows only.
+            raise CodexHarnessError("Windows console API is unavailable") from exc
+
+    before_input = int(console_api.GetConsoleCP())
+    before_output = int(console_api.GetConsoleOutputCP())
+    if before_input != WINDOWS_UTF8_CODE_PAGE and not console_api.SetConsoleCP(
+        WINDOWS_UTF8_CODE_PAGE
+    ):
+        raise CodexHarnessError(
+            "Windows Fresh campaign could not set console input code page to UTF-8"
+        )
+    if before_output != WINDOWS_UTF8_CODE_PAGE and not console_api.SetConsoleOutputCP(
+        WINDOWS_UTF8_CODE_PAGE
+    ):
+        if before_input != WINDOWS_UTF8_CODE_PAGE:
+            console_api.SetConsoleCP(before_input)
+        raise CodexHarnessError(
+            "Windows Fresh campaign could not set console output code page to UTF-8"
+        )
+
+    current = (int(console_api.GetConsoleCP()), int(console_api.GetConsoleOutputCP()))
+    if current != (WINDOWS_UTF8_CODE_PAGE, WINDOWS_UTF8_CODE_PAGE):
+        raise CodexHarnessError(
+            "Windows Fresh campaign console code-page attestation failed: "
+            f"expected UTF-8/UTF-8, observed {current[0]}/{current[1]}"
+        )
+    return current
 
 
 @dataclass(frozen=True, slots=True)
@@ -1168,6 +1474,7 @@ class CodexPromptAudit:
     unexpected_skills: tuple[tuple[str, str], ...] = ()
     target_skill_count: int = 0
     target_skill_locator_matches: bool = False
+    developer_instructions_exact: bool = True
 
     @property
     def passed(self) -> bool:
@@ -1175,6 +1482,7 @@ class CodexPromptAudit:
             self.has_target_skill
             and self.target_skill_count == 1
             and self.target_skill_locator_matches
+            and self.developer_instructions_exact
             and not self.has_memory
             and not self.unexpected_skills
         )
@@ -1309,6 +1617,42 @@ class CodexCommandFacts:
     non_gateway_unexpected_commands: tuple[str, ...] = ()
 
 
+def recoverable_preprocess_attempt_indexes(
+    records: Sequence[CodexCommandRecord],
+) -> tuple[int, ...]:
+    """Return exact Windows commands retried after process creation failed.
+
+    The next record must preserve the complete command and argv.  The failed
+    record never entered PowerShell; the later record still receives all normal
+    Skill-read, Gateway, Broker, and lifecycle validation.
+    """
+
+    return tuple(
+        index
+        for index, record in enumerate(records[:-1])
+        if (
+            getattr(record, "status", "") == "failed"
+            and getattr(record, "exit_code", None) == -1
+            and not getattr(record, "parse_error", "")
+            and not getattr(record, "has_shell_operators", False)
+            and getattr(record, "parser_kind", "")
+            == _WINDOWS_POWERSHELL_CORE_PARSER_KIND
+            and getattr(record, "command", "")
+            == getattr(records[index + 1], "command", "")
+            and getattr(record, "argv", ()) == getattr(records[index + 1], "argv", ())
+            and getattr(records[index + 1], "exit_code", None) in {0, 2}
+            and not getattr(records[index + 1], "aggregated_output", "").startswith(
+                "execution error: Io("
+            )
+            and getattr(record, "aggregated_output", "").startswith(
+                "execution error: Io("
+            )
+            and "windows sandbox: CreateProcessAsUserW failed: 267"
+            in getattr(record, "aggregated_output", "")
+        )
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class CodexRunResult:
     command: tuple[str, ...]
@@ -1372,6 +1716,13 @@ class CodexHarnessConfig:
     workspace: Path
     skill_source: Path
     codex_binary: Path = field(default_factory=discover_codex_binary)
+    disabled_user_skill_paths: tuple[Path, ...] = field(
+        default_factory=lambda: (
+            discover_windows_user_skill_paths(platform_name="nt")
+            if os.name == "nt"
+            else ()
+        )
+    )
     windows_powershell_core_host: WindowsPowerShellCoreHost | None = None
     auth_json: Path = DEFAULT_AUTH_JSON
     model: str = DEFAULT_MODEL
@@ -1384,8 +1735,35 @@ class CodexHarnessConfig:
     allow_output_write: bool = True
     network_access: bool = True
     expected_gateway_errors: tuple[CodexGatewayErrorExpectation, ...] = ()
+    developer_instructions: str = ""
 
     def __post_init__(self) -> None:
+        normalized_skill_paths = tuple(
+            Path(path).expanduser().resolve(strict=False)
+            for path in self.disabled_user_skill_paths
+        )
+        if len(normalized_skill_paths) != len(set(normalized_skill_paths)) or any(
+            not path.is_absolute() or path.name != "SKILL.md"
+            for path in normalized_skill_paths
+        ):
+            raise ValueError(
+                "CodexHarnessConfig.disabled_user_skill_paths must contain "
+                "unique absolute SKILL.md paths"
+            )
+        object.__setattr__(
+            self,
+            "disabled_user_skill_paths",
+            normalized_skill_paths,
+        )
+        if self.developer_instructions and (
+            self.developer_instructions != self.developer_instructions.strip()
+            or "\x00" in self.developer_instructions
+            or len(self.developer_instructions.encode("utf-8")) > 2048
+        ):
+            raise ValueError(
+                "CodexHarnessConfig.developer_instructions must be trimmed, NUL-free, "
+                "and at most 2048 UTF-8 bytes"
+            )
         commands = tuple(expectation.command for expectation in self.expected_gateway_errors)
         if len(commands) != len(set(commands)):
             raise ValueError("CodexHarnessConfig.expected_gateway_errors commands must be unique")
@@ -1418,6 +1796,7 @@ class CodexCliHarness:
         if not auth.is_file():
             raise CodexHarnessError(f"Codex auth file is missing: {auth}")
         if _is_windows():
+            enforce_windows_console_utf8()
             discovered_host = discover_windows_powershell_core(
                 environment=os.environ,
                 platform_name="nt",
@@ -1457,7 +1836,10 @@ class CodexCliHarness:
         output_dir.mkdir(parents=True, exist_ok=True)
         before_workspace = snapshot_workspace(self.config.workspace)
         before_outputs = snapshot_workspace(output_dir)
-        before_skill = snapshot_workspace(self.config.skill_source)
+        before_skill = snapshot_workspace(
+            self.config.skill_source,
+            exclude_names=WORKSPACE_SKILL_EXCLUDED_NAMES,
+        )
         skill_tree_sha256_before = snapshot_tree_hash(before_skill)
 
         with isolated_codex_environment(self.config.auth_json, extra_env=extra_env) as audit_env:
@@ -1476,7 +1858,12 @@ class CodexCliHarness:
             raise CodexHarnessError("codex debug prompt-input modified the isolated agent workspace")
         if snapshot_workspace(output_dir) != before_outputs:
             raise CodexHarnessError("codex debug prompt-input modified the evaluation output directory")
-        if snapshot_tree_hash(snapshot_workspace(self.config.skill_source)) != skill_tree_sha256_before:
+        if snapshot_tree_hash(
+            snapshot_workspace(
+                self.config.skill_source,
+                exclude_names=WORKSPACE_SKILL_EXCLUDED_NAMES,
+            )
+        ) != skill_tree_sha256_before:
             raise CodexHarnessError("codex debug prompt-input modified the target Skill tree")
         with isolated_codex_environment(self.config.auth_json, extra_env=extra_env) as exec_env:
             exec_env = codex_process_environment(
@@ -1532,6 +1919,7 @@ class CodexCliHarness:
             payload,
             target_skill_source=workspace_skill_install_path(self.config.workspace),
             system_skill_root=Path(env["CODEX_HOME"]) / "skills" / ".system",
+            expected_developer_instructions=self.config.developer_instructions,
         )
 
 
@@ -1576,6 +1964,12 @@ class CodexCliTask:
         if self._execution_environment is None:
             raise CodexHarnessError("CodexCliTask has not entered its isolated environment")
         return self._execution_environment
+
+    @property
+    def windows_powershell_core_host(self) -> WindowsPowerShellCoreHost | None:
+        """Return the task's actually attested native Windows shell host."""
+
+        return self._windows_powershell_core_host
 
     def __enter__(self) -> CodexCliTask:
         if self._state != "new":
@@ -1700,7 +2094,10 @@ class CodexCliTask:
         output_dir.mkdir(parents=True, exist_ok=True)
         before_workspace = snapshot_workspace(self.config.workspace)
         before_outputs = snapshot_workspace(output_dir)
-        before_skill = snapshot_workspace(self.config.skill_source)
+        before_skill = snapshot_workspace(
+            self.config.skill_source,
+            exclude_names=WORKSPACE_SKILL_EXCLUDED_NAMES,
+        )
         skill_tree_sha256_before = snapshot_tree_hash(before_skill)
 
         with isolated_codex_environment(self.config.auth_json, extra_env=self._extra_env) as audit_env:
@@ -1724,7 +2121,12 @@ class CodexCliTask:
             raise CodexHarnessError("codex debug prompt-input modified the isolated agent workspace")
         if snapshot_workspace(output_dir) != before_outputs:
             raise CodexHarnessError("codex debug prompt-input modified the evaluation output directory")
-        if snapshot_tree_hash(snapshot_workspace(self.config.skill_source)) != skill_tree_sha256_before:
+        if snapshot_tree_hash(
+            snapshot_workspace(
+                self.config.skill_source,
+                exclude_names=WORKSPACE_SKILL_EXCLUDED_NAMES,
+            )
+        ) != skill_tree_sha256_before:
             raise CodexHarnessError("codex debug prompt-input modified the target Skill tree")
 
         completed = run_process(
@@ -1779,7 +2181,10 @@ def _finalize_codex_run(
     )
     after_workspace = snapshot_workspace(config.workspace)
     after_outputs = snapshot_workspace(output_dir)
-    after_skill = snapshot_workspace(config.skill_source)
+    after_skill = snapshot_workspace(
+        config.skill_source,
+        exclude_names=WORKSPACE_SKILL_EXCLUDED_NAMES,
+    )
     skill_tree_sha256_after = snapshot_tree_hash(after_skill)
     workspace_created, workspace_modified = workspace_changes(before_workspace, after_workspace)
     output_created, output_modified = workspace_changes(before_outputs, after_outputs)
@@ -2037,6 +2442,16 @@ def taskkill_process_tree(
         ) from exc
     if completed.returncode == 0:
         return
+    # ``taskkill /T`` can report a partial error for a console helper that is
+    # already disappearing after it successfully terminates the tracked Codex
+    # parent.  Reap that exit race here; the caller still requires
+    # ``communicate()`` to close every inherited pipe and fails if a descendant
+    # keeps the tree alive.
+    for _attempt in range(5):
+        process.poll()
+        if process.returncode is not None:
+            return
+        time.sleep(0.05)
     output = f"{completed.stdout or ''}\n{completed.stderr or ''}".casefold()
     not_found = completed.returncode == 128 or any(
         marker in output
@@ -2164,6 +2579,12 @@ def isolated_codex_environment(
                     "PYTHONDONTWRITEBYTECODE": "1",
                 }
             )
+            if _is_windows(platform_name):
+                # Native Codex resolves the user-level .agents tree through
+                # USERPROFILE even when HOME and CODEX_HOME are disposable.
+                # Bind all three identity roots to the same one-shot home so
+                # user skills cannot appear between campaign scenarios.
+                env["USERPROFILE"] = home_text
             yield env
 
 
@@ -2183,7 +2604,8 @@ def validate_extra_environment(
     protected = sorted(key for key in extra_env if is_protected_environment_key(key))
     if protected:
         raise CodexHarnessError(
-            "extra_env may not override isolated HOME/CODEX/XDG state: " + ", ".join(protected)
+            "extra_env may not override isolated HOME/USERPROFILE/CODEX/XDG state: "
+            + ", ".join(protected)
         )
 
     forbidden_sensitive = sorted(
@@ -2406,18 +2828,25 @@ def inspect_isolated_environment(
 
 
 def build_prompt_audit_command(config: CodexHarnessConfig, *, prompt: str) -> list[str]:
-    return [
+    command = [
         str(config.codex_binary),
         "--disable",
         "memories",
-        "-c",
-        f'model="{config.model}"',
-        "-c",
-        f'model_reasoning_effort="{config.reasoning_effort}"',
-        "debug",
-        "prompt-input",
-        prompt,
     ]
+    command.extend(_disabled_user_skill_config_argv(config.disabled_user_skill_paths))
+    command.extend(_developer_instructions_config_argv(config.developer_instructions))
+    command.extend(
+        (
+            "-c",
+            f'model="{config.model}"',
+            "-c",
+            f'model_reasoning_effort="{config.reasoning_effort}"',
+            "debug",
+            "prompt-input",
+            prompt,
+        )
+    )
+    return command
 
 
 def build_exec_command(config: CodexHarnessConfig, *, prompt: str, writable_dir: Path) -> list[str]:
@@ -2480,6 +2909,8 @@ def _build_exec_prefix(
                 f'windows.sandbox="{WINDOWS_SEMANTIC_SANDBOX_MODE}"',
             )
         )
+    command.extend(_disabled_user_skill_config_argv(config.disabled_user_skill_paths))
+    command.extend(_developer_instructions_config_argv(config.developer_instructions))
     command.extend(
         [
             "--model",
@@ -2507,29 +2938,47 @@ def _build_exec_prefix(
     return command
 
 
+def _developer_instructions_config_argv(value: str) -> tuple[str, ...]:
+    if not value:
+        return ()
+    return ("-c", f"developer_instructions={json.dumps(value)}")
+
+
 def audit_prompt_input_payload(
     payload: Any,
     *,
     target_skill_source: Path | None = None,
     system_skill_root: Path | None = None,
+    expected_developer_instructions: str = "",
 ) -> CodexPromptAudit:
     serialized = json.dumps(payload, ensure_ascii=False, sort_keys=True)
     serialized_casefold = serialized.casefold()
     entries = prompt_skill_inventory(payload)
+    skill_roots = prompt_skill_roots(payload)
     target_source = target_skill_source.expanduser().resolve(strict=False) if target_skill_source else None
     system_skills: list[tuple[str, str]] = []
     target_entries: list[tuple[str, str]] = []
     unexpected: list[tuple[str, str]] = []
+    unexpected_resolved: list[str] = []
     for name, locator in entries:
-        if is_codex_system_skill(locator, system_skill_root=system_skill_root):
+        resolved_locator = expand_short_skill_locator(locator, roots=skill_roots)
+        if is_codex_system_skill(
+            resolved_locator,
+            system_skill_root=system_skill_root,
+        ):
             system_skills.append((name, locator))
             continue
-        locator_matches = target_source is None or skill_locator_resolves_to(locator, target_source)
+        locator_matches = target_source is None or skill_locator_resolves_to(
+            resolved_locator,
+            target_source,
+        )
         if name == "waapi-skill" and locator_matches:
             target_entries.append((name, locator))
         else:
             unexpected.append((name, locator))
+            unexpected_resolved.append(resolved_locator)
     target_locator_matches = len(target_entries) == 1
+    instruction_texts = prompt_instruction_texts(payload)
     return CodexPromptAudit(
         item_count=len(payload) if isinstance(payload, list) else 0,
         prompt_sha256=hashlib.sha256(serialized.encode("utf-8")).hexdigest(),
@@ -2537,7 +2986,7 @@ def audit_prompt_input_payload(
         has_target_skill=bool(target_entries),
         has_user_agent_skills=any(
             local_locator_contains_parts(locator, (".agents", "skills"))
-            for _, locator in unexpected
+            for locator in unexpected_resolved
         ),
         has_codex_system_skills=bool(system_skills),
         skill_inventory=entries,
@@ -2545,6 +2994,10 @@ def audit_prompt_input_payload(
         unexpected_skills=tuple(unexpected),
         target_skill_count=len(target_entries),
         target_skill_locator_matches=target_locator_matches,
+        developer_instructions_exact=(
+            not expected_developer_instructions
+            or instruction_texts.count(expected_developer_instructions) == 1
+        ),
     )
 
 
@@ -2628,20 +3081,79 @@ def clean_skill_locator(locator: str) -> str:
     return locator.strip().strip("`\"'")
 
 
+def prompt_skill_roots(payload: Any) -> dict[str, str]:
+    candidates: dict[str, set[str]] = {}
+    for text in prompt_instruction_texts(payload):
+        for match in _SKILL_ROOT_LINE_RE.finditer(text):
+            alias = match.group("alias")
+            root = clean_skill_locator(match.group("root"))
+            if root:
+                candidates.setdefault(alias, set()).add(root)
+    return {
+        alias: next(iter(roots))
+        for alias, roots in candidates.items()
+        if len(roots) == 1
+    }
+
+
+def expand_short_skill_locator(
+    locator: str,
+    *,
+    roots: Mapping[str, str],
+) -> str:
+    match = _SKILL_ALIAS_LOCATOR_RE.fullmatch(locator)
+    if match is None:
+        return locator
+    root = roots.get(match.group("alias"))
+    relative = tuple(
+        part
+        for part in re.split(r"[/\\]", match.group("relative"))
+        if part
+    )
+    if root is None or not relative or any(part in {".", ".."} for part in relative):
+        return locator
+    pure_root, _windows = _skill_locator_pure_path(root)
+    if not pure_root.is_absolute():
+        return locator
+    return str(pure_root.joinpath(*relative))
+
+
+def _skill_locator_pure_path(
+    locator: str,
+) -> tuple[PurePosixPath | PureWindowsPath, bool]:
+    """Select a locator's owning lexical flavor without consulting the host."""
+
+    windows = PureWindowsPath(locator)
+    posix = PurePosixPath(locator)
+    if windows.drive:
+        return windows, True
+    if posix.is_absolute():
+        return posix, False
+    if "\\" in locator:
+        return windows, True
+    return posix, False
+
+
 def local_locator_contains_parts(
     locator: str,
     expected_parts: Sequence[str],
 ) -> bool:
-    """Match a locator using only the active host's filesystem semantics."""
+    """Match path components using the locator's owning lexical semantics."""
 
     if not locator or not expected_parts:
         return False
-    parts = Path(locator).expanduser().parts
+    pure, windows = _skill_locator_pure_path(locator)
+    parts = pure.parts
     width = len(expected_parts)
-    expected = Path(*expected_parts)
+    if windows:
+        comparable = tuple(part.casefold() for part in parts)
+        expected = tuple(part.casefold() for part in expected_parts)
+    else:
+        comparable = parts
+        expected = tuple(expected_parts)
     return any(
-        Path(*parts[index : index + width]) == expected
-        for index in range(len(parts) - width + 1)
+        comparable[index : index + width] == expected
+        for index in range(len(comparable) - width + 1)
     )
 
 
@@ -2721,6 +3233,7 @@ def classify_codex_infrastructure_failure(
     agent_item_event_count = sum(
         event.get("type") in {"item.started", "item.completed"}
         and isinstance(event.get("item"), Mapping)
+        and event["item"].get("type") != "error"
         for event in events
     )
     if agent_item_event_count:
@@ -2801,7 +3314,27 @@ def audit_session_events(
         and isinstance((item := event.get("item")), Mapping)
         and isinstance(item.get("type"), str)
     }
-    unexpected_item_types = tuple(sorted(observed_item_types - {"agent_message", "command_execution"}))
+    allowed_item_types = {"agent_message", "command_execution"}
+    completed_error_items = tuple(
+        item
+        for event in events
+        if event.get("type") == "item.completed"
+        and isinstance((item := event.get("item")), Mapping)
+        and item.get("type") == "error"
+    )
+    completed_turn = sum(
+        event.get("type") == "turn.completed" for event in events
+    ) == 1 and not any(event.get("type") == "turn.failed" for event in events)
+    if completed_turn and completed_error_items and all(
+        isinstance((message := item.get("message")), str)
+        and message.startswith(
+            "Falling back from WebSockets to HTTPS transport. "
+            "stream disconnected before completion:"
+        )
+        for item in completed_error_items
+    ):
+        allowed_item_types.add("error")
+    unexpected_item_types = tuple(sorted(observed_item_types - allowed_item_types))
     return CodexSessionAudit(
         thread_started_count=sum(event.get("type") == "thread.started" for event in events),
         turn_started_count=sum(event.get("type") == "turn.started" for event in events),
@@ -2913,12 +3446,131 @@ def completed_command_records(
     return tuple(records)
 
 
+_BUSINESS_DRAFT_NEXT_ACTION_CONTRACT = (
+    "waapi-skill.business-draft-next-action/v1"
+)
+_BUSINESS_DRAFT_COPY_INSTRUCTION_CONTRACT = (
+    "waapi-skill.operation-draft-command-copy-instruction/v1"
+)
+_BUSINESS_DRAFT_FORBIDDEN_TRANSFORMATIONS = (
+    "reconstruct",
+    "shorten",
+    "normalize",
+    "substitute_path_segments",
+    "select_another_field",
+)
+_BUSINESS_DRAFT_EXACT_COPY_ACTION = "copy_and_execute_verbatim_once"
+
+
+def _business_draft_copy_mode(
+    instruction: Any,
+    *,
+    source_field: str = "fixed_argv_prefix_copy",
+) -> str | None:
+    """Classify one closed copy instruction without coupling to business prose."""
+
+    if (
+        not isinstance(instruction, Mapping)
+        or set(instruction)
+        != {
+            "contract",
+            "source_field",
+            "action",
+            "forbidden_transformations",
+            "opaque_token_guard",
+        }
+        or instruction.get("contract")
+        != _BUSINESS_DRAFT_COPY_INSTRUCTION_CONTRACT
+        or instruction.get("source_field") != source_field
+        or instruction.get("forbidden_transformations")
+        != list(_BUSINESS_DRAFT_FORBIDDEN_TRANSFORMATIONS)
+        or instruction.get("opaque_token_guard")
+        != {
+            "task_authority": {
+                "prefix": "da1-",
+                "hex_characters_after_prefix": 40,
+                "truncate_to_32_hex_characters": "invalid",
+            }
+        }
+    ):
+        return None
+    action = instruction.get("action")
+    if isinstance(action, str) and action.startswith(
+        "copy_verbatim_then_append_"
+    ):
+        return "prefix"
+    if action == _BUSINESS_DRAFT_EXACT_COPY_ACTION:
+        return "exact"
+    return None
+
+
+def _business_draft_continuation_candidates(
+    payload: Mapping[str, Any],
+    *,
+    platform_name: str,
+) -> tuple[bool, tuple[tuple[str, str], ...]]:
+    """Return valid exact/prefix copies owned by one business continuation."""
+
+    found_contract = False
+    candidates: set[tuple[str, str]] = set()
+
+    def walk(value: Any, *, inside_business_binding: bool = False) -> None:
+        nonlocal found_contract
+        if isinstance(value, list):
+            for item in value:
+                walk(item, inside_business_binding=inside_business_binding)
+            return
+        if not isinstance(value, Mapping):
+            return
+        current_binding = inside_business_binding or (
+            value.get("contract") == _BUSINESS_DRAFT_NEXT_ACTION_CONTRACT
+        )
+        if value.get("contract") == _BUSINESS_DRAFT_NEXT_ACTION_CONTRACT:
+            found_contract = True
+        standard = _selected_gateway_continuation(
+            value.get("next_command"),
+            platform_name=platform_name,
+        )
+        if standard is not None:
+            _source_field, exact_command = standard
+            candidates.add(("exact", exact_command))
+        if current_binding:
+            instruction = value.get("fixed_argv_prefix_copy_instruction")
+            prefix = value.get("fixed_argv_prefix_copy")
+            copy_mode = _business_draft_copy_mode(instruction)
+            if (
+                isinstance(prefix, str)
+                and prefix
+                and copy_mode is not None
+            ):
+                candidates.add((copy_mode, prefix))
+            exact_instruction = value.get("copy_instruction")
+            exact = value.get("copy_command")
+            if (
+                isinstance(exact, str)
+                and exact
+                and value.get("copy_exactly") is True
+                and _business_draft_copy_mode(
+                    exact_instruction,
+                    source_field="copy_command",
+                )
+                == "exact"
+            ):
+                candidates.add(("exact", exact))
+        for item in value.values():
+            walk(item, inside_business_binding=current_binding)
+
+    walk(payload)
+    return found_contract, tuple(sorted(candidates))
+
+
 def gateway_continuation_binding_errors(
     command_records: Sequence[CodexCommandRecord | Mapping[str, Any]],
     broker_records: Sequence[Any],
     *,
     platform_name: str | None = None,
     windows_powershell_core_host: WindowsPowerShellCoreHost | None = None,
+    allow_compound_checked_child_handoff: bool = False,
 ) -> tuple[str, ...]:
     """Bind every response-derived continuation to its exact selected bytes.
 
@@ -2937,10 +3589,54 @@ def gateway_continuation_binding_errors(
 
     active_platform = os.name if platform_name is None else platform_name
     errors: list[str] = []
+    compound_parent_candidates: tuple[tuple[str, str], ...] = ()
+    compound_child_bindings: set[tuple[str, str]] = set()
+    if allow_compound_checked_child_handoff:
+        for record_index, broker_record in enumerate(broker_records):
+            arguments = _record_field(broker_record, "gateway_arguments", ())
+            if not isinstance(arguments, (list, tuple)):
+                continue
+            arguments = tuple(arguments)
+            if arguments[:2] == ("draft-start", "waapi.undoGroup"):
+                payload = _record_field(broker_record, "payload")
+                if (
+                    isinstance(payload, Mapping)
+                    and record_index < len(command_records)
+                    and _command_output_matches_payload(
+                        command_records[record_index],
+                        payload,
+                    )
+                ):
+                    _, compound_parent_candidates = (
+                        _business_draft_continuation_candidates(
+                            payload,
+                            platform_name=active_platform,
+                        )
+                    )
+            if arguments[:1] == ("draft-declare-undo-plan",):
+                for argument_index, item in enumerate(arguments[:-2]):
+                    if item == "--child-draft":
+                        child_id = arguments[argument_index + 1]
+                        child_authority = arguments[argument_index + 2]
+                        if isinstance(child_id, str) and isinstance(
+                            child_authority,
+                            str,
+                        ):
+                            compound_child_bindings.add(
+                                (child_id, child_authority)
+                            )
     for index in range(1, len(broker_records)):
         prior_broker = broker_records[index - 1]
         prior_payload = _record_field(prior_broker, "payload")
-        if not isinstance(prior_payload, Mapping) or "next_command" not in prior_payload:
+        if not isinstance(prior_payload, Mapping):
+            continue
+        business_contract, business_candidates = (
+            _business_draft_continuation_candidates(
+                prior_payload,
+                platform_name=active_platform,
+            )
+        )
+        if "next_command" not in prior_payload and not business_contract:
             continue
         command_number = index + 1
         if index >= len(command_records) or index - 1 >= len(command_records):
@@ -2954,6 +3650,120 @@ def gateway_continuation_binding_errors(
             errors.append(
                 f"command {command_number}: prior Gateway output does not match Broker evidence"
             )
+            continue
+        current_arguments = _record_field(
+            broker_records[index],
+            "gateway_arguments",
+            (),
+        )
+        current_arguments = (
+            tuple(current_arguments)
+            if isinstance(current_arguments, (list, tuple))
+            else ()
+        )
+        prior_arguments = _record_field(
+            prior_broker,
+            "gateway_arguments",
+            (),
+        )
+        prior_arguments = (
+            tuple(prior_arguments)
+            if isinstance(prior_arguments, (list, tuple))
+            else ()
+        )
+        if allow_compound_checked_child_handoff:
+            current_subcommand = (
+                current_arguments[0] if current_arguments else None
+            )
+            if current_subcommand == "draft-declare-undo-plan":
+                observed_command, _ = _raw_shell_tool_command(
+                    current_command,
+                    platform_name=active_platform,
+                    windows_powershell_core_host=windows_powershell_core_host,
+                )
+                matches = {
+                    command
+                    for mode, command in compound_parent_candidates
+                    if observed_command is not None
+                    and _business_draft_command_matches(
+                        mode=mode,
+                        expected_command=command,
+                        observed_command=observed_command,
+                        current_record=current_command,
+                        platform_name=active_platform,
+                    )
+                }
+                longest_matches = {
+                    command
+                    for command in matches
+                    if len(command)
+                    == max((len(item) for item in matches), default=-1)
+                }
+                if observed_command is None or len(longest_matches) != 1:
+                    errors.append(
+                        f"command {command_number}: deferred compound Draft "
+                        "continuation was not copied from its selected source field"
+                    )
+                continue
+            if (
+                isinstance(prior_payload.get("draft"), Mapping)
+                and isinstance(
+                    prior_payload["draft"].get("next_action_binding"),
+                    Mapping,
+                )
+                and prior_payload["draft"]["next_action_binding"].get(
+                    "required_next_phase"
+                )
+                == "declare_ordered_checked_child_business_drafts"
+            ):
+                continue
+            if prior_arguments[:1] == ("draft-check",):
+                try:
+                    authority_index = prior_arguments.index("--task-authority")
+                except ValueError:
+                    authority_index = -1
+                child_binding = (
+                    (
+                        prior_arguments[1],
+                        prior_arguments[authority_index + 1],
+                    )
+                    if authority_index > 0
+                    and authority_index + 1 < len(prior_arguments)
+                    else None
+                )
+                if (
+                    child_binding in compound_child_bindings
+                    and current_subcommand != "preview-from-draft"
+                ):
+                    continue
+        if "next_command" not in prior_payload:
+            observed_command, _ = _raw_shell_tool_command(
+                current_command,
+                platform_name=active_platform,
+                windows_powershell_core_host=windows_powershell_core_host,
+            )
+            matches = {
+                command
+                for mode, command in business_candidates
+                if observed_command is not None
+                and _business_draft_command_matches(
+                    mode=mode,
+                    expected_command=command,
+                    observed_command=observed_command,
+                    current_record=current_command,
+                    platform_name=active_platform,
+                )
+            }
+            longest_matches = {
+                command
+                for command in matches
+                if len(command) == max((len(item) for item in matches), default=-1)
+            }
+            if observed_command is None or len(longest_matches) != 1:
+                errors.append(
+                    f"command {command_number}: Gateway business Draft "
+                    "continuation was not copied from its selected source field"
+                )
             continue
         selected = _selected_gateway_continuation(
             prior_payload.get("next_command"),
@@ -2997,6 +3807,49 @@ def gateway_continuation_binding_errors(
     return tuple(errors)
 
 
+def _business_draft_command_matches(
+    *,
+    mode: str,
+    expected_command: str,
+    observed_command: str,
+    current_record: CodexCommandRecord | Mapping[str, Any],
+    platform_name: str,
+) -> bool:
+    """Match exact bytes, allowing only the sealed task-local runner expansion."""
+
+    def matches(candidate: str) -> bool:
+        return observed_command == candidate or (
+            mode == "prefix" and observed_command.startswith(candidate + " ")
+        )
+
+    if matches(expected_command):
+        return True
+    if not _is_windows(platform_name):
+        return False
+    try:
+        expected_argv = decode_windows_model_argv(expected_command)
+    except PlatformCommandError:
+        return False
+    observed_argv = _record_field(current_record, "argv", ())
+    if (
+        not isinstance(observed_argv, (list, tuple))
+        or len(expected_argv) < 3
+        or len(observed_argv) < len(expected_argv)
+        or expected_argv[0] != "python"
+        or observed_argv[0] != "python"
+        or not isinstance(observed_argv[1], str)
+        or not task_local_runner_matches_normalized(
+            expected_argv[1],
+            observed_argv[1],
+        )
+    ):
+        return False
+    expanded = encode_windows_model_argv(
+        (expected_argv[0], observed_argv[1], *expected_argv[2:])
+    )
+    return matches(expanded)
+
+
 def _record_field(record: Any, name: str, default: Any = None) -> Any:
     if isinstance(record, Mapping):
         return record.get(name, default)
@@ -3032,6 +3885,7 @@ def _selected_gateway_continuation(
         "gateway_argv",
         "full_argv",
         "copy_exactly",
+        "shell_tool_timeout_ms",
         "shell_family",
         "copy_instruction",
     }
@@ -3043,6 +3897,7 @@ def _selected_gateway_continuation(
     if (
         value.get("contract") != _TRANSACTION_NEXT_COMMAND_CONTRACT
         or value.get("copy_exactly") is not True
+        or value.get("shell_tool_timeout_ms") != GATEWAY_SHELL_TOOL_TIMEOUT_MS
         or not isinstance(value.get("command"), str)
         or not value.get("command")
         or not isinstance(instruction, Mapping)
@@ -3089,11 +3944,24 @@ def _selected_gateway_continuation(
         ):
             return None
         try:
+            model_argv = decode_windows_model_argv(str(value["model_command"]))
+            full_argv_tuple = tuple(full_argv)
+            model_runner_matches = (
+                model_argv == full_argv_tuple
+                or (
+                    len(model_argv) == len(full_argv_tuple)
+                    and model_argv[0] == "python"
+                    and model_argv[2:] == full_argv_tuple[2:]
+                    and task_local_runner_matches_normalized(
+                        model_argv[1],
+                        full_argv_tuple[1],
+                    )
+                )
+            )
             if (
-                decode_windows_model_argv(str(value["model_command"]))
-                != tuple(full_argv)
+                not model_runner_matches
                 or decode_windows_powershell_argv(str(value["shell_command"]))
-                != tuple(full_argv)
+                != full_argv_tuple
             ):
                 return None
         except PlatformCommandError:
@@ -3509,7 +4377,28 @@ def classify_commands(
             raise ValueError("expected_gateway_errors commands must be unique")
         error_expectations[expectation.command] = expectation.error_code
 
-    for record in records:
+    validated_reads_by_index: dict[int, str] = {}
+    for index, record in enumerate(records):
+        candidates = tuple(
+            value
+            for source in skill_read_sources
+            if (
+                value := allowed_skill_read(
+                    record,
+                    skill_source=source,
+                    skill_read_content_source=skill_read_content_source,
+                )
+            )
+        )
+        if candidates and len(set(candidates)) == 1:
+            validated_reads_by_index[index] = candidates[0]
+    recoverable_preprocess_indexes = frozenset(
+        recoverable_preprocess_attempt_indexes(records)
+    )
+
+    for record_index, record in enumerate(records):
+        if record_index in recoverable_preprocess_indexes:
+            continue
         command = record.command
         lowered = command.lower()
         executable = Path(record.argv[0]).name.lower() if record.argv else ""
@@ -3569,23 +4458,7 @@ def classify_commands(
         )
         if is_python and not is_gateway and not is_packaged_runner_attempt:
             inline_python.append(command)
-        allowed_read_candidates = tuple(
-            value
-            for source in skill_read_sources
-            if (
-                value := allowed_skill_read(
-                    record,
-                    skill_source=source,
-                    skill_read_content_source=skill_read_content_source,
-                )
-            )
-        )
-        allowed_read = (
-            allowed_read_candidates[0]
-            if allowed_read_candidates
-            and len(set(allowed_read_candidates)) == 1
-            else None
-        )
+        allowed_read = validated_reads_by_index.get(record_index)
         if direct_waapi_command(record):
             direct_client.append(command)
         if write_like_command(record) and not allowed_read:
@@ -3598,7 +4471,10 @@ def classify_commands(
             read_files.append(allowed_read)
             if allowed_read == "SKILL.md":
                 skill_read = True
-        if not is_gateway and not allowed_read:
+        if (
+            not is_gateway
+            and not allowed_read
+        ):
             unexpected.append(command)
             if gateway_shape is None:
                 non_gateway_unexpected.append(command)
@@ -3805,9 +4681,10 @@ def gateway_invocation(
     runner = argv[1]
     expected_runner = _absolute_lexical_path(skill_source) / "scripts" / "run.py"
     candidate = _supplied_absolute_lexical_path(runner)
-    if candidate is None:
-        return None
-    if candidate != expected_runner:
+    if candidate != expected_runner and not task_local_runner_matches_normalized(
+        runner,
+        str(expected_runner),
+    ):
         return None
     if argv[2] != "gateway.py":
         return None
@@ -3864,13 +4741,28 @@ def successful_gateway_payload(
     if not record.succeeded:
         return None
     try:
-        payload = json.loads(record.aggregated_output.strip())
+        if subcommand == "stream-topic":
+            stream_records = tuple(
+                json.loads(line)
+                for line in record.aggregated_output.splitlines()
+                if line.strip()
+            )
+            if (
+                len(stream_records) < 2
+                or not all(isinstance(item, Mapping) for item in stream_records)
+                or stream_records[0].get("record_type") != "started"
+                or stream_records[-1].get("record_type") != "terminal"
+            ):
+                return None
+            payload = stream_records[-1]
+        else:
+            payload = json.loads(record.aggregated_output.strip())
     except json.JSONDecodeError:
         return None
     if not isinstance(payload, Mapping):
         return None
     if (
-        payload.get("contract") != GATEWAY_RESULT_CONTRACT
+        payload.get("contract") not in gateway_payload_contracts(subcommand)
         or payload.get("command") != subcommand
         or payload.get("ok") is not True
     ):
@@ -4005,8 +4897,10 @@ def allowed_skill_read(
         record.aggregated_output,
         skill_source=skill_source,
         skill_read_content_source=skill_read_content_source,
-        allow_exact_windows_workspace_relative=(
-            executable == "get-content"
+        exact_workspace_relative_syntax=(
+            "posix"
+            if executable == "cat"
+            else "windows" if executable == "get-content" else None
         ),
         allow_one_terminal_newline=(executable == "get-content"),
     )
@@ -4076,11 +4970,25 @@ def validated_skill_read(
     *,
     skill_source: Path,
     skill_read_content_source: Path | None = None,
-    allow_exact_windows_workspace_relative: bool = False,
+    exact_workspace_relative_syntax: str | None = None,
     allow_one_terminal_newline: bool = False,
 ) -> tuple[str, str] | None:
     """Prove a complete approved Skill read from one closed locator."""
 
+    workspace_path_text = path_text
+    windows_absolute = PureWindowsPath(path_text).is_absolute()
+    host_absolute = Path(path_text).is_absolute()
+    if (
+        exact_workspace_relative_syntax == "windows"
+        and not windows_absolute
+        and not host_absolute
+    ):
+        if "/" in path_text or path_text.startswith("\\") or ":" in path_text:
+            return None
+        windows_parts = tuple(re.split(r"\\+", path_text))
+        if not windows_parts or any(part in {"", ".."} for part in windows_parts):
+            return None
+        workspace_path_text = "\\".join(windows_parts)
     candidate = Path(path_text)
     if ".." in candidate.parts:
         return None
@@ -4091,9 +4999,12 @@ def validated_skill_read(
         else locator
     )
     if not candidate.is_absolute():
+        workspace_reads = _WORKSPACE_SKILL_READS_BY_SYNTAX.get(
+            exact_workspace_relative_syntax or ""
+        )
         relative_parts = (
-            _WINDOWS_WORKSPACE_SKILL_READS.get(path_text)
-            if allow_exact_windows_workspace_relative
+            workspace_reads.get(workspace_path_text)
+            if workspace_reads is not None
             else None
         )
         source_parts = tuple(part.casefold() for part in locator.parts[-3:])
@@ -4238,7 +5149,11 @@ def turn_usage(events: Sequence[Mapping[str, Any]]) -> dict[str, int]:
     return {}
 
 
-def snapshot_workspace(root: Path) -> dict[str, str]:
+def snapshot_workspace(
+    root: Path,
+    *,
+    exclude_names: Sequence[str] = (),
+) -> dict[str, str]:
     """Hash final file state and link targets without following Skill symlinks.
 
     File bytes are the portable change boundary.  On filesystems where ctime
@@ -4248,11 +5163,14 @@ def snapshot_workspace(root: Path) -> dict[str, str]:
     """
 
     resolved = root.expanduser().resolve(strict=True)
+    excluded = frozenset(str(name) for name in exclude_names)
     snapshot: dict[str, str] = {}
     for directory, dirnames, filenames in os.walk(resolved, followlinks=False):
         directory_path = Path(directory)
         retained_dirnames: list[str] = []
         for name in dirnames:
+            if name in excluded:
+                continue
             path = directory_path / name
             if path.is_symlink():
                 relative = path.relative_to(resolved).as_posix()
@@ -4266,6 +5184,8 @@ def snapshot_workspace(root: Path) -> dict[str, str]:
                 retained_dirnames.append(name)
         dirnames[:] = retained_dirnames
         for filename in filenames:
+            if filename in excluded:
+                continue
             path = directory_path / filename
             relative = path.relative_to(resolved).as_posix()
             if path.is_symlink():
@@ -4337,7 +5257,9 @@ __all__ = [
     "completed_commands",
     "count_invalid_jsonl_lines",
     "discover_codex_binary",
+    "enforce_windows_console_utf8",
     "discover_windows_powershell_core",
+    "discover_windows_user_skill_paths",
     "final_agent_message",
     "first_gateway_backed_agent_message",
     "gateway_continuation_binding_errors",

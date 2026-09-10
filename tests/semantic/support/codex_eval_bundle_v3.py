@@ -126,6 +126,7 @@ VISIBLE_INPUT_KINDS = frozenset(
         "absolute_directory_path",
         "absolute_file_path",
         "endpoint",
+        "gateway_handle",
         "integer",
         "number",
         "object_path",

@@ -66,6 +66,63 @@ _WORD = re.compile(r"[^\W_]+", re.UNICODE)
 _MAX_METADATA_SEARCH_STRINGS = 96
 _MAX_METADATA_SEARCH_STRING_CHARS = 512
 
+_BOOLEAN_METADATA_TYPES = frozenset({"bool", "boolean"})
+_INTEGER_METADATA_TYPES = frozenset(
+    {
+        "int8",
+        "int16",
+        "int32",
+        "int64",
+        "uint8",
+        "uint16",
+        "uint32",
+        "uint64",
+    }
+)
+_NUMBER_METADATA_TYPES = frozenset({"real32", "real64", "float", "double"})
+
+
+def metadata_candidate_limit_for_query_count(query_count: int) -> int:
+    """Return the one public candidate budget for 1..8 metadata queries."""
+
+    if (
+        isinstance(query_count, bool)
+        or not isinstance(query_count, int)
+        or not 1 <= query_count <= MAX_METADATA_DISCOVERY_QUERIES
+    ):
+        raise ValueError(
+            "metadata query count must be an integer from 1 through "
+            f"{MAX_METADATA_DISCOVERY_QUERIES}"
+        )
+    return 8 if query_count <= 2 else 3 if query_count <= 4 else 2
+
+
+def metadata_candidate_limit_contract() -> dict[str, int]:
+    """Project the reviewed query-count mapping into Gateway contracts."""
+
+    return {
+        "1..2": metadata_candidate_limit_for_query_count(1),
+        "3..4": metadata_candidate_limit_for_query_count(3),
+        "5..8": metadata_candidate_limit_for_query_count(5),
+    }
+
+
+def metadata_typed_value_type(metadata_type: str) -> str | None:
+    """Map one reflected Wwise scalar type to the public typed-action token."""
+
+    if not isinstance(metadata_type, str):
+        return None
+    normalized = metadata_type.casefold()
+    if normalized in _BOOLEAN_METADATA_TYPES:
+        return "boolean"
+    if normalized in _INTEGER_METADATA_TYPES:
+        return "integer"
+    if normalized in _NUMBER_METADATA_TYPES:
+        return "number"
+    if normalized == "string":
+        return "string"
+    return None
+
 ReadCall = Callable[
     [str, Mapping[str, Any], Mapping[str, Any]],
     Mapping[str, Any],
@@ -132,6 +189,19 @@ class MetadataDiscoveryResult:
                 )
                 for item in self.candidates
             ],
+            "mutation_authoring_policy": {
+                "action_field_selection": "explicit_user_settings_only",
+                "dependency_candidates": {
+                    "required_by_only": "omit_from_action",
+                    "matched_queries_nonempty": (
+                        "still_requires_explicit_user_selection_but_may_copy_name_and_type"
+                    ),
+                    "independently_requested_exact_token": (
+                        "may_copy_name_and_type"
+                    ),
+                    "activation_owner": "gateway_draft_check_and_preview",
+                },
+            },
             "dependency_candidates": [
                 (
                     dict(item)
@@ -279,6 +349,7 @@ def discover_metadata(
         live_scope_args,
         available_names=names,
         candidates=selected,
+        query_order=normalized_queries,
     )
 
     candidate_payloads = tuple(
@@ -750,6 +821,7 @@ def _resolve_dependency_closure(
     *,
     available_names: Sequence[str],
     candidates: Sequence[_Candidate],
+    query_order: Sequence[str],
 ) -> tuple[
     tuple[Mapping[str, Any], ...],
     Mapping[str, tuple[str, ...]],
@@ -864,6 +936,16 @@ def _resolve_dependency_closure(
         {
             "name": name,
             "kind": _metadata_kind(info_by_name[name]),
+            "matched_queries": [
+                query
+                for query in query_order
+                if _candidate_score(
+                    query,
+                    name=name,
+                    info=info_by_name[name],
+                )
+                > 0
+            ],
             "required_by": sorted(
                 required_by[name],
                 key=lambda value: (value.casefold(), value),
@@ -962,6 +1044,7 @@ def _compact_dependency_candidate_payload(
     return {
         "name": name,
         "kind": candidate["kind"],
+        "matched_queries": list(candidate["matched_queries"]),
         "required_by": list(candidate["required_by"]),
         "dependency_requirements": _compact_dependency_requirements(
             metadata,
@@ -995,6 +1078,9 @@ def _compact_metadata(metadata: Mapping[str, Any]) -> dict[str, Any]:
         "display": compact_display,
         "restriction": compact_restriction,
     }
+    typed_value_type = metadata_typed_value_type(str(metadata["type"]))
+    if typed_value_type is not None:
+        payload["typed_value_type"] = typed_value_type
     if (
         str(compact_restriction.get("type", "")).casefold() == "range"
         and (

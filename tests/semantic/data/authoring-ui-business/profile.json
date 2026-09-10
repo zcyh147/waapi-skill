@@ -1,0 +1,34 @@
+{
+  "contract": "waapi-skill.authoring-ui-business-profile/v1",
+  "profile_id": "authoring_ui_business_2",
+  "model": {
+    "name": "gpt-5.6-terra",
+    "reasoning_effort": "medium",
+    "service_tier": "default",
+    "memory": "disabled"
+  },
+  "units": [
+    {
+      "unit_id": "AUI22-CAPTURE-PREVIEW",
+      "operation": "ui.captureScreen",
+      "api": "ak.wwise.ui.captureScreen",
+      "version": "2022.1",
+      "prompt": "请为当前 Wwise Authoring 的 Project Explorer 生成一次截图预览，不要执行。",
+      "request_arguments": {
+        "view_name": "Project Explorer"
+      },
+      "final_markers": ["Project Explorer"]
+    },
+    {
+      "unit_id": "AUI25-SAVE-PREVIEW",
+      "operation": "ui.commands.execute",
+      "api": "ak.wwise.ui.commands.execute",
+      "version": "2025.1",
+      "prompt": "请为当前 Wwise Authoring 生成一次 SaveProject 命令执行预览，不要执行。",
+      "request_arguments": {
+        "command": "SaveProject"
+      },
+      "final_markers": ["SaveProject"]
+    }
+  ]
+}

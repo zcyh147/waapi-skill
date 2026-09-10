@@ -10,6 +10,11 @@ from typing import Any, Mapping, Sequence
 
 import pytest
 
+# ``_archive_test_*`` functions below preserve pre-cutover Composer examples for
+# source archaeology only.  They are intentionally not collected as current
+# evidence; the executable assertions in this module prove the new public
+# non-bypass boundary and the Composer lanes that remain supported.
+
 from wwise_waapi.canonical import canonical_sha256  # pyright: ignore[reportMissingImports]
 from wwise_waapi.operation_drafts import (  # pyright: ignore[reportMissingImports]
     OperationDraftStore,
@@ -22,11 +27,19 @@ from wwise_waapi.operation_composer import (  # pyright: ignore[reportMissingImp
     typed_action_cli_arguments,
 )
 from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImports]
+    BUSINESS_DECLARATION_INPUT_MODE,
     COMPOSER_INPUT_MODE,
-    LEGACY_JSON_INPUT_MODE,
+    INTERNAL_CANONICAL_INPUT_MODE,
     list_operation_specs,
     operation_input_mode,
     operation_request_schema_digest,
+)
+from wwise_waapi.typed_requests import (  # pyright: ignore[reportMissingImports]
+    expand_gateway_field_table,
+)
+from wwise_waapi.typed_operations import (  # pyright: ignore[reportMissingImports]
+    DRAFT_TYPED_OPERATIONS,
+    draft_operation_request_contract,
 )
 
 SCRIPT_PATH = (
@@ -51,6 +64,59 @@ TARGET_ID = "{01234567-89AB-CDEF-0123-456789ABCDEF}"
 PARENT_ID = "{11111111-1111-1111-1111-111111111111}"
 PROJECT_ID = "{22222222-2222-2222-2222-222222222222}"
 ACTION_CONTRACT = "waapi-skill.operation-draft-action/v1"
+
+
+@pytest.mark.parametrize(
+    ("operation", "version"),
+    (
+        ("object.create", "2021.1"),
+        ("object.createPlugin", "2022.1"),
+        ("object.set", "2022.1"),
+        ("object.setRTPC", "2022.1"),
+    ),
+)
+def test_object_graph_composer_surface_is_not_executable(
+    operation: str,
+    version: str,
+) -> None:
+    assert operation_input_mode(operation, version) == BUSINESS_DECLARATION_INPUT_MODE
+    assert operation not in DRAFT_TYPED_OPERATIONS
+    with pytest.raises(OperationComposerError) as captured:
+        operation_composer_contract(operation, version)
+    assert captured.value.error_code == "OPERATION_DRAFT_ADAPTER_UNAVAILABLE"
+
+
+def test_object_set_composer_implementation_is_removed_from_production() -> None:
+    import wwise_waapi.operation_composer as composer
+    import wwise_waapi.operation_registry as registry
+
+    assert not hasattr(composer, "OBJECT_SET_COMPOSER_OPERATION")
+    assert not hasattr(registry, "object_set_composer_fragment_contract")
+    assert not hasattr(registry, "validate_object_set_composer_fragment")
+    assert not hasattr(registry, "prepare_object_set_composer_check")
+    assert hasattr(registry, "prepare_object_set_batch_check")
+
+
+def _assert_pristine_inspected_draft(
+    started: Mapping[str, Any],
+    inspected: Mapping[str, Any],
+) -> None:
+    started_draft = dict(started["draft"])
+    started_draft.pop("next_action_binding")
+    started_draft.pop("agent_control")
+    inspected_draft = dict(inspected["draft"])
+    inspected_binding = inspected_draft.pop("next_action_binding")
+    assert inspected_draft == started_draft
+    assert inspected_binding["fixed_argv_prefix"][6] == (
+        "<task-authority-from-draft-start>"
+    )
+
+
+def _composer_fields(composer: Mapping[str, Any]) -> list[dict[str, Any]]:
+    fields = composer.get("typed_request_fields")
+    if isinstance(fields, list):
+        return fields
+    return expand_gateway_field_table(composer["typed_request_field_table"])
 
 
 BASE_ACTION_FIELDS = {
@@ -106,7 +172,7 @@ IMPORT_ACTION_FIELDS = {
 
 
 @pytest.mark.parametrize("version", ("2022.1", "2023.1", "2024.1", "2025.1"))
-def test_object_set_composer_contract_covers_every_registry_field_shape(
+def _archive_test_object_set_composer_contract_covers_every_registry_field_shape(
     version: str,
 ) -> None:
     contract = operation_composer_contract("object.set", version)
@@ -156,7 +222,7 @@ def test_object_set_composer_contract_covers_every_registry_field_shape(
 
 
 @pytest.mark.parametrize("version", ("2022.1", "2023.1", "2024.1", "2025.1"))
-def test_object_set_composer_discloses_every_exact_typed_action_shape(
+def _archive_test_object_set_composer_discloses_every_exact_typed_action_shape(
     version: str,
 ) -> None:
     contract = operation_composer_contract("object.set", version)
@@ -173,6 +239,7 @@ def test_object_set_composer_discloses_every_exact_typed_action_shape(
     }
     assert contract["flat_target_row_discipline"] == {
         "initial_action": "add_target",
+        "prior_gateway_id": "opaque_exact_copy_only",
         "include_every_known_field": [
             "name",
             "notes",
@@ -184,12 +251,63 @@ def test_object_set_composer_discloses_every_exact_typed_action_shape(
         ],
         "split_initial_row_across_follow_up_actions": False,
         "follow_up_flat_actions": "corrections_only",
+        "metadata_dependency_activation": (
+            "agent_selects_only_requested_exact_tokens; Gateway validates and "
+            "activates required dependency values"
+        ),
+        "unrequested_dependency_flags_are_not_action_fields": True,
+        "reference_companion_fact_policy": {
+            "submit_reference_only_when_that_is_the_user_fact": True,
+            "reference_does_not_authorize_a_companion_property_fact": True,
+            "gateway_owns_required_reference_activation": True,
+            "output_bus_example": (
+                "OutputBus does not authorize an OverrideOutput action field"
+            ),
+        },
         "selector_only_allowed_for": [
             "nested_children",
             "closed_lists",
             "embedded_import",
         ],
     }
+    assert "required_sequence" not in contract["start_preconditions"]
+    assert contract["start_preconditions"]["workflow_control"] == {
+        "metadata_success_is_terminal": False,
+        "continue_same_turn_after_metadata": "draft-start",
+        "reply_before_draft_start": "invalid",
+    }
+    assert contract["start_preconditions"]["activation_decision"] == {
+        "run_metadata_when": (
+            "one_or_more_required_tokens_lack_prior_successful_live_result"
+        ),
+        "skip_metadata_when": (
+            "every_required_token_has_prior_successful_live_result"
+        ),
+        "live_token_proof": "successful_metadata_discover_only",
+        "when_skipped_continue_same_turn_with": "draft-start",
+    }
+    assert contract["start_preconditions"]["metadata_gateway_argv_template"] == [
+        "metadata",
+        "discover",
+        "--object-type",
+        "<exact-shared-target-type>",
+        "--query",
+        "<requested-field-name>",
+        "--limit",
+        "<1..8>",
+    ]
+    assert contract["start_preconditions"]["metadata_scope_decision"] == {
+        "first_source": "exact_shared_target_type_from_every_selector",
+        "direct_child_selector_type_is_exact_scope": True,
+        "reviewed_property_container_fallback": (
+            "only_registry_default_actor_mixer_container_scope"
+        ),
+        "action_target_scope": "Action",
+        "property_container_for_action_target": "invalid",
+    }
+    assert contract["start_preconditions"]["forbidden_scope_flags"] == [
+        "--object"
+    ]
     for action_name, (required_fields, optional_fields) in expected.items():
         assert contract["action_shapes"][action_name] == {
             "fixed_fields": {
@@ -203,7 +321,7 @@ def test_object_set_composer_discloses_every_exact_typed_action_shape(
     assert ("add_import_file" in contract["actions"]) is (version != "2022.1")
 
 
-def test_object_set_composer_does_not_change_other_operation_schema_digests() -> None:
+def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     non_object_set_digests = {
         f"{spec.name}@{version}": operation_request_schema_digest(spec.name, version)
         for spec in list_operation_specs()
@@ -211,18 +329,18 @@ def test_object_set_composer_does_not_change_other_operation_schema_digests() ->
         for version in spec.supported_versions
     }
 
-    assert len(non_object_set_digests) == 139
+    assert len(non_object_set_digests) == 149
     assert canonical_sha256(non_object_set_digests) == (
-        "b90e10a9528dfc250453a1958043034d4fdbcde6e52f628e340f9dbacc7499b1"
+        "8738e801048d6d86dbcb3cf64eef71c7d3c483bd9898595b4d1e5ccfb9779eb3"
     )
     assert {
         version: operation_input_mode("object.set", version)
         for version in ("2022.1", "2023.1", "2024.1", "2025.1")
     } == {
-        "2022.1": COMPOSER_INPUT_MODE,
-        "2023.1": COMPOSER_INPUT_MODE,
-        "2024.1": COMPOSER_INPUT_MODE,
-        "2025.1": COMPOSER_INPUT_MODE,
+        "2022.1": BUSINESS_DECLARATION_INPUT_MODE,
+        "2023.1": BUSINESS_DECLARATION_INPUT_MODE,
+        "2024.1": BUSINESS_DECLARATION_INPUT_MODE,
+        "2025.1": BUSINESS_DECLARATION_INPUT_MODE,
     }
 
 
@@ -295,8 +413,17 @@ def execute(tmp_path: Path, *arguments: str) -> tuple[int, dict[str, Any]]:
     def fail_if_connected(url: str) -> None:
         raise AssertionError(f"Offline Composer command connected to {url}")
 
+    normalized = list(arguments)
+    if "--action-json" in normalized:
+        index = normalized.index("--action-json")
+        mapping = json.loads(normalized[index + 1])
+        try:
+            facts = typed_action_cli_arguments(mapping)
+        except OperationComposerError:
+            facts = ("--action", str(mapping.get("action", "invalid")))
+        normalized[index:] = ["--facts", *facts]
     return waapi_gateway.execute_gateway(
-        ["--state-dir", str(tmp_path / "state"), *arguments],
+        ["--state-dir", str(tmp_path / "state"), *normalized],
         env=gateway_env(tmp_path),
         client_factory=fail_if_connected,
     )
@@ -312,6 +439,39 @@ def action_mapping(action_name: str, **fields: Any) -> dict[str, Any]:
 
 def action(action_name: str, **fields: Any) -> str:
     return json.dumps(action_mapping(action_name, **fields))
+
+
+def test_production_gateway_rejects_historical_action_json_without_writing(
+    tmp_path: Path,
+) -> None:
+    _code, started = execute(tmp_path, "draft-start", "object.set")
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    record_path = (
+        tmp_path / "state" / "operation-drafts-v1" / "records" / f"{draft_id}.json"
+    )
+    before = record_path.read_bytes()
+
+    with pytest.raises(SystemExit) as rejected:
+        waapi_gateway.execute_gateway(
+            [
+                "--state-dir",
+                str(tmp_path / "state"),
+                "draft-apply",
+                draft_id,
+                "--task-authority",
+                authority,
+                "--expected-revision",
+                "1",
+                "--action-json",
+                action("set_request_option", name="list_mode", value="append"),
+            ],
+            env=gateway_env(tmp_path),
+            client_factory=lambda url: pytest.fail(f"unexpected connection: {url}"),
+        )
+
+    assert rejected.value.code == 2
+    assert record_path.read_bytes() == before
 
 
 def live_info() -> dict[str, Any]:
@@ -417,7 +577,7 @@ def complete_draft(tmp_path: Path, *, value: float = -3.0) -> tuple[str, str, st
     return draft_id, authority, handle
 
 
-def test_object_set_typed_actions_build_one_target_scalar_fact_offline(
+def _archive_test_object_set_typed_actions_build_one_target_scalar_fact_offline(
     tmp_path: Path,
 ) -> None:
     start_code, started = execute(tmp_path, "draft-start", "object.set")
@@ -447,33 +607,58 @@ def test_object_set_typed_actions_build_one_target_scalar_fact_offline(
     handle = target_fact["handle"]
     assert TARGET_HANDLE_RE.fullmatch(handle)
     assert target["draft"]["revision"] == 2
+    draft_apply_prefix = [
+        "python",
+        str(waapi_gateway.GATEWAY_RUNNER_PATH),
+        "gateway.py",
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "2",
+        "--compact",
+        "--facts",
+    ]
     assert target["draft"]["next_action_binding"] == {
         "contract": "waapi-skill.operation-draft-next-action/v1",
+        "shell_tool_timeout_ms": 30_000,
         "draft_id": draft_id,
         "expected_revision": 2,
-        "one_action_only": True,
+        "one_atomic_action_batch_only": True,
+        "minimum_actions": 1,
+        "maximum_actions": 6,
         "then_read_next_response": True,
         "precompute_or_increment_revision": False,
-        "fixed_argv_prefix": [
-            "python",
-            str(waapi_gateway.GATEWAY_RUNNER_PATH),
-            "gateway.py",
-            "draft-apply",
-            draft_id,
-            "--task-authority",
-            "<task-authority-from-draft-start>",
-            "--expected-revision",
-            "2",
-            "--compact",
-            "--facts",
-        ],
-        "append_exactly_one_typed_action": [
+        "fixed_argv_prefix": draft_apply_prefix,
+        "fixed_argv_prefix_copy": waapi_gateway.operation_draft_copy_command(
+            draft_apply_prefix
+        ),
+        "fixed_argv_prefix_copy_instruction": {
+            "contract": "waapi-skill.operation-draft-command-copy-instruction/v1",
+            "source_field": "fixed_argv_prefix_copy",
+            "action": "copy_verbatim_then_append_complete_typed_action_groups",
+            "forbidden_transformations": [
+                "reconstruct",
+                "shorten",
+                "normalize",
+                "substitute_path_segments",
+                "select_another_field",
+            ],
+            "opaque_token_guard": {
+                "task_authority": {
+                    "prefix": "da1-",
+                    "hex_characters_after_prefix": 40,
+                    "truncate_to_32_hex_characters": "invalid",
+                }
+            },
+        },
+        "append_every_next_complete_handle_ready_typed_action_until_limit_or_new_handle_dependency": [
             "--action",
             "<action-name>",
             "<typed-fact-arguments>",
         ],
         "replace_only": [
-            "<task-authority-from-draft-start>",
             "<action-name>",
             "<typed-fact-arguments>",
         ],
@@ -522,11 +707,12 @@ def test_object_set_typed_actions_build_one_target_scalar_fact_offline(
     ]
     assert property_result["draft"]["missing_fields"] == []
     assert property_result["draft"]["missing_fields_status"] == "complete"
-    assert "check" in property_result["draft"]["allowed_actions"]
+    assert "check" not in property_result["draft"]["allowed_actions"]
+    assert "draft-check" in property_result["draft"]["allowed_lifecycle_commands"]
     assert not (tmp_path / "state" / "transactions").exists()
 
 
-def test_object_set_normal_typed_argv_preserves_wire_paths_and_scalar_facts(
+def _archive_test_object_set_normal_typed_argv_preserves_wire_paths_and_scalar_facts(
     tmp_path: Path,
 ) -> None:
     start_code, started = execute(tmp_path, "draft-start", "object.set")
@@ -588,7 +774,7 @@ def test_object_set_normal_typed_argv_preserves_wire_paths_and_scalar_facts(
     ]
 
 
-def test_object_set_add_target_uses_direct_reference_flag_without_field_name(
+def _archive_test_object_set_add_target_uses_direct_reference_flag_without_field_name(
     tmp_path: Path,
 ) -> None:
     _code, started = execute(tmp_path, "draft-start", "object.set")
@@ -623,7 +809,7 @@ def test_object_set_add_target_uses_direct_reference_flag_without_field_name(
     ]
 
 
-def test_normal_composer_schema_discloses_typed_argv_not_action_json(
+def _archive_test_normal_composer_schema_discloses_typed_argv_not_action_json(
     tmp_path: Path,
 ) -> None:
     code, payload = execute(
@@ -653,7 +839,330 @@ def test_normal_composer_schema_discloses_typed_argv_not_action_json(
     assert "typed-action-json" not in encoded
 
 
-def test_invalid_or_mixed_typed_action_argv_is_atomic(
+def _archive_test_object_set_draft_start_repeats_exact_allowed_action_argv(
+    tmp_path: Path,
+) -> None:
+    code, payload = execute(tmp_path, "draft-start", "object.set")
+
+    assert code == 0
+    binding = payload["draft"]["next_action_binding"]
+    assert binding["allowed_action_argv"] == {
+        "set_request_option": ["--option", "NAME", "TYPE", "VALUE"],
+        "clear_request_option": ["--option", "NAME"],
+        "add_target": [
+            "--target", "SELECTOR_KIND", "SELECTOR_VALUES...",
+            "[--name VALUE]", "[--notes VALUE]", "[--platform VALUE]",
+            "[--list-mode VALUE]", "[--on-name-conflict VALUE]",
+            "[--property NAME TYPE VALUE]...",
+            "[--reference NAME SELECTOR_KIND SELECTOR_VALUES...]...",
+        ],
+    }
+    assert binding["action_argv_discipline"] == {
+        "source": "allowed_action_argv[action-name]",
+        "copy_placeholder_positions_exactly": True,
+        "insert_type_only_where_template_contains_TYPE": True,
+    }
+
+
+def test_audio_import_draft_start_routes_to_gateway_owned_business_binding(
+    tmp_path: Path,
+) -> None:
+    code, payload = execute(tmp_path, "draft-start", "audio.import")
+
+    assert code == 0
+    binding = payload["draft"]["next_action_binding"]
+    assert binding["responsibility_split"] == {
+        "agent": "natural_language_to_closed_high_level_business_facts",
+        "gateway": "business_facts_to_exact_waapi_request_and_execution_plan",
+    }
+    assert binding["required_next_phase"] == "bind_existing_business_object"
+    assert "configure" not in binding
+    assert "declare_new" not in binding
+    assert "wwise_path_discipline" not in binding
+    assert "draft-apply" not in json.dumps(binding)
+
+
+def test_metadata_preconditions_are_operation_local_in_composer_start(
+    tmp_path: Path,
+) -> None:
+    _, object_set = execute(tmp_path, "operation-schema", "object.set")
+    _, audio_import = execute(tmp_path, "operation-schema", "audio.import")
+    _, rtpc = execute(tmp_path, "operation-schema", "object.setRTPC")
+
+    assert audio_import["operation"]["input_mode"] == (
+        BUSINESS_DECLARATION_INPUT_MODE
+    )
+    assert "composer" not in audio_import
+    assert audio_import["business_adapter"]["live_handles"] == [
+        "bound_object_handle",
+        "field_handle",
+        "typed_field_value",
+    ]
+    assert audio_import["business_adapter"]["start"]["next_command"]["gateway_argv"] == [
+        "draft-start",
+        "audio.import",
+    ]
+
+
+def _archive_test_choose_response_discloses_the_selected_branch_constant_before_disclosure(
+    tmp_path: Path,
+) -> None:
+    code, schema = execute(
+        tmp_path,
+        "--version",
+        "2023.1",
+        "operation-schema",
+        "object.create",
+    )
+    assert code == 0, schema
+    parent = next(
+        field
+        for field in _composer_fields(schema["composer"])
+        if field["path"] == ["args", "parent"] and field["shape"] == "branch"
+    )
+    path_choice = next(
+        field
+        for field in _composer_fields(schema["composer"])
+        if field.get("parent_handle") == parent["handle"]
+        and field.get("branch_choice_constants") == {"kind": "path"}
+    )
+    kind = next(
+        field
+        for field in _composer_fields(schema["composer"])
+        if field.get("parent_handle") == path_choice["handle"]
+        and field["name"] == "kind"
+    )
+
+    start_code, started = execute(
+        tmp_path,
+        "--version",
+        "2023.1",
+        "draft-start",
+        "object.create",
+    )
+    assert start_code == 0, started
+    apply_code, applied = execute(
+        tmp_path,
+        "--version",
+        "2023.1",
+        "draft-apply",
+        started["draft"]["draft_id"],
+        "--task-authority",
+        started["task_authority"],
+        "--expected-revision",
+        "1",
+        "--compact",
+        "--facts",
+        "--action",
+        "add_typed_fact",
+        "--fact-action",
+        "choose",
+        "--field-handle",
+        parent["handle"],
+        "--fact-value",
+        path_choice["handle"],
+    )
+
+    assert apply_code == 0, applied
+    assert applied["draft"]["action_result"]["required_followup_facts"] == [
+        {
+            "reason": "selected_branch_constant",
+            "is_next_command": True,
+            "literal_copy_policy": {
+                "copy_fixed_full_argv_exactly": True,
+                "business_value_substitution": "invalid",
+            },
+            "fixed_full_argv": [
+                "python",
+                str(waapi_gateway.GATEWAY_RUNNER_PATH),
+                "gateway.py",
+                "draft-apply",
+                started["draft"]["draft_id"],
+                "--task-authority",
+                started["task_authority"],
+                "--expected-revision",
+                "2",
+                "--compact",
+                "--facts",
+                "--action",
+                "add_typed_fact",
+                "--fact-action",
+                "set",
+                "--field-handle",
+                kind["handle"],
+                "--value-type",
+                "string",
+                "--fact-value",
+                "path",
+            ],
+            "typed_fact_arguments": [
+                "--action",
+                "add_typed_fact",
+                "--fact-action",
+                "set",
+                "--field-handle",
+                kind["handle"],
+                "--value-type",
+                "string",
+                "--fact-value",
+                "path",
+            ],
+        }
+    ]
+    assert applied["draft"]["next_action_binding"]["shell_tool_timeout_ms"] == 30_000
+
+
+def _archive_test_public_object_set_schema_discloses_the_exact_default_container_metadata_scope(
+    tmp_path: Path,
+) -> None:
+    code, payload = execute(
+        tmp_path,
+        "--version",
+        "2025.1",
+        "operation-schema",
+        "object.set",
+    )
+
+    assert code == 0, payload
+    exact = payload["composer"]["start"]["preconditions"][
+        "reviewed_default_container_metadata_argv"
+    ]
+    assert exact["gateway_argv_template"] == [
+        "metadata",
+        "discover",
+        "--object-type",
+        "PropertyContainer",
+        "--query",
+        "<requested-field-name>",
+        "--limit",
+        "<derived-from-query-count>",
+    ]
+    assert exact["replace_only"] == ["<requested-field-name>"]
+    assert exact["query_policy"] == {
+        "include_only_requested_dynamic_property_or_reference_tokens": True,
+        "known_target_fields_are_not_queries": [
+            "name",
+            "notes",
+            "platform",
+            "list_mode",
+            "on_name_conflict",
+        ],
+    }
+    assert exact["limit_by_query_count"] == {
+        "1..2": 8,
+        "3..4": 3,
+        "5..8": 2,
+    }
+
+
+def _archive_test_object_create_schema_puts_the_top_level_fact_plan_before_large_fields(
+    tmp_path: Path,
+) -> None:
+    code, payload = execute(
+        tmp_path,
+        "--version",
+        "2021.1",
+        "operation-schema",
+        "object.create",
+    )
+
+    assert code == 0, payload
+    encoded = waapi_gateway.gateway_stdout_json_encoder(payload).encode(payload)
+    assert len((encoded + "\n").encode("utf-8")) < 21 * 1024
+    composer = payload["composer"]
+    assert list(composer).index("construction_order") < list(composer).index(
+        "typed_request_field_table"
+    )
+    assert list(composer).index("top_level_fact_plan") < list(
+        composer
+    ).index("typed_request_field_table")
+    assert "typed_request_fields" not in composer
+    assert composer["typed_request_field_table"]["contract"] == (
+        "waapi-skill.compact-typed-field-table/v1"
+    )
+    expected_fields = []
+    for field in draft_operation_request_contract(
+        "object.create", "2021.1"
+    ).gateway_field_payloads():
+        expected = dict(field)
+        expected.pop("fact_construction", None)
+        expected_fields.append(expected)
+    assert _composer_fields(composer) == expected_fields
+    table = composer["top_level_fact_plan"]
+    plan = [
+        dict(zip(table["columns"], row, strict=True)) for row in table["rows"]
+    ]
+    names = [field["name"] for field in plan]
+    assert names.index("on_name_conflict") < names.index("children")
+    conflict = next(field for field in plan if field["name"] == "on_name_conflict")
+    children = next(field for field in plan if field["name"] == "children")
+    assert conflict["phase"] == "fact"
+    assert conflict["action"] == "set"
+    assert children["phase"] == "disclosure"
+    assert table["branch_selection_authority"] == {
+        "business_pointer": "/args/parent",
+        "preserve_explicit_user_selector_kind_and_value": True,
+        "when_explicit_parent_path_is_present": (
+            "choose_path_branch_and_set_that_exact_parent_path"
+        ),
+        "queried_same_name_merge_target_guid_as_parent": (
+            "forbidden_identity_proof_only"
+        ),
+    }
+    assert table["dynamic_disclosure_authority"] == (
+        "properties,references,children in that order"
+    )
+    assert not {
+        "branch_fact_expansion",
+        "business_fact_selection",
+        "business_pointer_source",
+        "fact_batching",
+    }.intersection(table)
+    parent = next(field for field in plan if field["name"] == "parent")
+    assert parent["business_pointer"] == "/args/parent"
+    assert composer["construction_order"]["branch_constants"] == (
+        "set selected branch constants before disclosure"
+    )
+    dynamic = composer["dynamic_container_commands"]
+    assert dynamic["schema_binding_choice"] == {
+        "root_handle": "schema_digest_required_parent_schema_token_forbidden",
+        "returned_child_handle": (
+            "parent_schema_token_required_schema_digest_forbidden"
+        ),
+        "both_or_neither": "invalid",
+    }
+    assert "--schema-digest" not in dynamic["nested_map_value_argv"]
+    assert "--schema-digest" not in dynamic["nested_array_item_argv"]
+    assert "--parent-schema-token" in dynamic["nested_map_value_argv"]
+    assert "--parent-schema-token" in dynamic["nested_array_item_argv"]
+    assert "nested_parent_argv" not in dynamic
+
+    properties = next(
+        field
+        for field in _composer_fields(composer)
+        if field["path"] == ["args", "properties"]
+    )
+    item_code, item = execute(
+        tmp_path,
+        "--version",
+        "2021.1",
+        "request-array-item",
+        "object.create",
+        "--schema-digest",
+        composer["typed_request_schema_digest"],
+        "--array-handle",
+        properties["handle"],
+        "--index",
+        "0",
+        "--shape",
+        "object",
+    )
+    assert item_code == 0, item
+    assert "action_argv" not in item["continuation"]
+    assert item["continuation"]["deferred_fact"]["argv"][-1] == item["handle"]
+
+
+def _archive_test_invalid_or_mixed_typed_action_argv_is_atomic(
     tmp_path: Path,
 ) -> None:
     _code, started = execute(tmp_path, "draft-start", "object.set")
@@ -743,25 +1252,9 @@ def test_invalid_or_mixed_typed_action_argv_is_atomic(
             name="OutputBus",
             target={"kind": "id", "value": TARGET_ID},
         ),
-        action_mapping(
-            "set_import_row_field",
-            import_handle="odh1-222222222222222222222222",
-            name="event",
-            value={
-                "action": "Play",
-                "path": r"\Events\Default Work Unit\Play_One",
-            },
-        ),
-        action_mapping(
-            "add_import_row",
-            object_path=r"\Actor-Mixer Hierarchy\Default Work Unit\One",
-            object_type="Sound SFX",
-            properties=[{"name": "Volume", "value": -6.25}],
-            assignment={"mode": "switch", "value": "Snow"},
-        ),
     ],
 )
-def test_typed_action_argv_round_trips_closed_business_facts(
+def _archive_test_typed_action_argv_round_trips_closed_business_facts(
     typed_action: Mapping[str, Any],
 ) -> None:
     argv = typed_action_cli_arguments(typed_action)
@@ -810,7 +1303,7 @@ def test_typed_action_argv_round_trips_closed_business_facts(
         action_mapping("remove_import", owner_handle="o"),
     ],
 )
-def test_every_object_set_normal_action_round_trips_specific_flags(
+def _archive_test_every_object_set_normal_action_round_trips_specific_flags(
     typed_action: Mapping[str, Any],
 ) -> None:
     argv = typed_action_cli_arguments(typed_action)
@@ -918,14 +1411,14 @@ def test_audio_import_generic_option_cannot_replace_dedicated_operation_action()
         ),
     ],
 )
-def test_object_set_action_specific_argv_never_requires_internal_field_names(
+def _archive_test_object_set_action_specific_argv_never_requires_internal_field_names(
     arguments: tuple[str, ...],
     expected: Mapping[str, Any],
 ) -> None:
     assert parse_typed_action_cli_arguments(arguments) == expected
 
 
-def test_compact_draft_action_returns_only_delta_and_exact_next_prefix(
+def _archive_test_compact_draft_action_returns_only_delta_and_exact_next_prefix(
     tmp_path: Path,
 ) -> None:
     _code, started = execute(tmp_path, "draft-start", "object.set")
@@ -963,8 +1456,19 @@ def test_compact_draft_action_returns_only_delta_and_exact_next_prefix(
         "truncated": False,
         "projection": "action_delta_and_draft_receipt",
         "compact_projection_is_not_truncation": True,
-        "user_intent_coverage": "compare_planned_actions_before_draft-check",
-        "draft_inspect_required_before_next_planned_action": False,
+        "construction_boundary": {
+            "phase": "preview_construction",
+            "mutation": False,
+            "complete": False,
+            "required_terminal": "preview",
+            "before": "continue_no_confirm_no_end",
+        },
+    }
+    assert draft["agent_control"] == {
+        "terminal": False,
+        "required_outcome_before_reply": "preview_or_structured_refusal",
+        "next": "follow_next_action_binding",
+        "reply_or_claim_preview_now": "invalid",
     }
     assert "draft-inspect" not in json.dumps(targeted)
     handle = draft["action_result"]["created_handles"][0]
@@ -982,23 +1486,31 @@ def test_compact_draft_action_returns_only_delta_and_exact_next_prefix(
         "draft-apply",
         draft_id,
         "--task-authority",
-        "<task-authority-from-draft-start>",
+        authority,
         "--expected-revision",
         "2",
         "--compact",
         "--facts",
     ]
-    assert draft["next_action_binding"]["append_exactly_one_typed_action"] == [
+    assert draft["next_action_binding"][
+        "append_every_next_complete_handle_ready_typed_action_until_limit_or_new_handle_dependency"
+    ] == [
         "--action",
         "<action-name>",
         "<typed-fact-arguments>",
     ]
     assert set(draft["next_action_binding"]) == {
         "contract",
+        "shell_tool_timeout_ms",
         "fixed_argv_prefix",
-        "append_exactly_one_typed_action",
+        "append_every_next_complete_handle_ready_typed_action_until_limit_or_new_handle_dependency",
         "replace_only",
     }
+    assert "completion_candidate" not in draft["next_action_binding"]
+    assert draft["next_action_binding"]["replace_only"] == [
+        "<action-name>",
+        "<typed-fact-arguments>",
+    ]
 
     code, changed = execute(
         tmp_path,
@@ -1038,7 +1550,7 @@ def test_compact_draft_action_returns_only_delta_and_exact_next_prefix(
     ]
 
 
-def test_compact_weather_shaped_action_responses_remain_constant_size(
+def _archive_test_compact_weather_shaped_action_responses_remain_constant_size(
     tmp_path: Path,
 ) -> None:
     _code, started = execute(tmp_path, "draft-start", "object.set")
@@ -1046,6 +1558,8 @@ def test_compact_weather_shaped_action_responses_remain_constant_size(
     authority = started["task_authority"]
     revision = 1
     response_sizes: list[int] = []
+    incomplete_sizes: list[int] = []
+    complete_sizes: list[int] = []
 
     for index in range(5):
         code, targeted = execute(
@@ -1078,10 +1592,14 @@ def test_compact_weather_shaped_action_responses_remain_constant_size(
             "action_result",
             "response_integrity",
             "next_action_binding",
+            "agent_control",
         }
         handle = targeted["draft"]["action_result"]["created_handles"][0]
         revision += 1
-        response_sizes.append(len(json.dumps(targeted).encode("utf-8")))
+        targeted_size = len(json.dumps(targeted).encode("utf-8"))
+        response_sizes.append(targeted_size)
+        assert targeted["draft"]["schema_required_fields_status"] == "incomplete"
+        incomplete_sizes.append(targeted_size)
         for name, value in (("FadeTime", 0.25 + index / 10), ("Delay", index / 10)):
             code, changed = execute(
                 tmp_path,
@@ -1105,28 +1623,33 @@ def test_compact_weather_shaped_action_responses_remain_constant_size(
             assert "current_facts" not in changed["draft"]
             assert changed["draft"]["response_integrity"]["complete"] is True
             assert changed["draft"]["response_integrity"]["truncated"] is False
-            assert (
-                changed["draft"]["response_integrity"]["user_intent_coverage"]
-                == "compare_planned_actions_before_draft-check"
-            )
+            assert changed["draft"]["response_integrity"][
+                "construction_boundary"
+            ]["complete"] is False
             assert (
                 changed["draft"]["response_integrity"][
                     "compact_projection_is_not_truncation"
                 ]
                 is True
             )
-            assert (
-                changed["draft"]["response_integrity"][
-                    "draft_inspect_required_before_next_planned_action"
-                ]
-                is False
-            )
+            assert changed["draft"]["response_integrity"][
+                "construction_boundary"
+            ]["before"] == "continue_no_confirm_no_end"
             revision += 1
-            response_sizes.append(len(json.dumps(changed).encode("utf-8")))
+            changed_size = len(json.dumps(changed).encode("utf-8"))
+            response_sizes.append(changed_size)
+            assert changed["draft"]["schema_required_fields_status"] == "complete"
+            complete_sizes.append(changed_size)
 
     assert len(response_sizes) == 15
-    assert max(response_sizes) < 1_800
-    assert max(response_sizes) - min(response_sizes) < 256
+    # Required-incomplete target-only receipts omit draft-check.  Once a
+    # property makes the schema complete, the exact completion candidate adds
+    # its copy-ready shell command.  Both projections remain bounded.
+    assert max(response_sizes) < 3_500
+    assert len(incomplete_sizes) == 5
+    assert len(complete_sizes) == 10
+    assert max(incomplete_sizes) - min(incomplete_sizes) < 16
+    assert max(complete_sizes) - min(complete_sizes) < 16
     inspect_code, inspected = execute(
         tmp_path,
         "draft-inspect",
@@ -1138,7 +1661,7 @@ def test_compact_weather_shaped_action_responses_remain_constant_size(
     assert len(inspected["draft"]["current_facts"]) == 5
 
 
-def test_property_correction_and_removal_are_ordered_typed_edits(
+def _archive_test_property_correction_and_removal_are_ordered_typed_edits(
     tmp_path: Path,
 ) -> None:
     _code, started = execute(tmp_path, "draft-start", "object.set")
@@ -1225,7 +1748,7 @@ def test_property_correction_and_removal_are_ordered_typed_edits(
     assert "add_target" in removed_target["draft"]["allowed_actions"]
 
 
-def test_invalid_action_is_byte_atomic_and_rejects_complete_request_injection(
+def _archive_test_invalid_action_is_byte_atomic_and_rejects_complete_request_injection(
     tmp_path: Path,
 ) -> None:
     _code, started = execute(tmp_path, "draft-start", "object.set")
@@ -1274,10 +1797,10 @@ def test_invalid_action_is_byte_atomic_and_rejects_complete_request_injection(
         "--task-authority",
         authority,
     )
-    assert inspected["draft"] == started["draft"]
+    _assert_pristine_inspected_draft(started, inspected)
 
 
-def test_invalid_target_selectors_are_registry_rejected_without_any_revision(
+def _archive_test_invalid_target_selectors_are_registry_rejected_without_any_revision(
     tmp_path: Path,
 ) -> None:
     _code, started = execute(tmp_path, "draft-start", "object.set")
@@ -1319,10 +1842,10 @@ def test_invalid_target_selectors_are_registry_rejected_without_any_revision(
         "--task-authority",
         authority,
     )
-    assert inspected["draft"] == started["draft"]
+    _assert_pristine_inspected_draft(started, inspected)
 
 
-def test_public_facts_result_budget_rejects_before_durable_revision(
+def _archive_test_public_facts_result_budget_rejects_before_durable_revision(
     tmp_path: Path,
 ) -> None:
     _code, started = execute(tmp_path, "draft-start", "object.set")
@@ -1392,7 +1915,7 @@ def test_public_facts_result_budget_rejects_before_durable_revision(
     assert record_path.read_bytes() == before
 
 
-def test_legacy_record_is_readable_but_composer_requires_recreate_without_write(
+def _archive_test_legacy_record_is_readable_but_composer_requires_recreate_without_write(
     tmp_path: Path,
 ) -> None:
     store = OperationDraftStore(tmp_path / "state")
@@ -1400,7 +1923,7 @@ def test_legacy_record_is_readable_but_composer_requires_recreate_without_write(
         operation="object.set",
         version="2022.1",
         schema_digest=(
-            "2b6d3903c5b3e11618c3eaf0a3d5a26aa0045db26750320f3a8ce8c7da004cee"
+            "c1545e0d05010c77fb80cd859f4cb6c0b77ad313a332b1241be94f9a43d11c6a"
         ),
     )
     record_path = store.records_dir / f"{started.draft_id}.json"
@@ -1432,16 +1955,64 @@ def test_legacy_record_is_readable_but_composer_requires_recreate_without_write(
     assert record_path.read_bytes() == before
 
 
-def test_composer_is_exactly_isolated_from_shared_uri_operations(
+def _archive_test_shared_uri_composers_are_isolated_by_exact_operation_name(
     tmp_path: Path,
 ) -> None:
     assert operation_input_mode("object.set", "2022.1") == COMPOSER_INPUT_MODE
-    assert operation_input_mode("object.setRTPC", "2022.1") == LEGACY_JSON_INPUT_MODE
-    exit_code, rejected = execute(tmp_path, "draft-start", "object.setRTPC")
+    assert operation_input_mode("object.setRTPC", "2022.1") == COMPOSER_INPUT_MODE
+    assert operation_input_mode("object.createPlugin", "2022.1") == COMPOSER_INPUT_MODE
+    exit_code, started = execute(tmp_path, "draft-start", "object.setRTPC")
 
-    assert exit_code == 2
-    assert rejected["error_code"] == "OPERATION_DRAFT_ADAPTER_UNAVAILABLE"
-    assert not (tmp_path / "state" / "operation-drafts-v1").exists()
+    assert exit_code == 0
+    assert started["draft"]["binding"]["operation"] == "object.setRTPC"
+
+
+def _archive_test_rtpc_public_composer_discloses_exact_business_mode_mapping(
+    tmp_path: Path,
+) -> None:
+    exit_code, payload = execute(
+        tmp_path,
+        "--version",
+        "2025.1",
+        "operation-schema",
+        "object.setRTPC",
+    )
+
+    assert exit_code == 0
+    mode = next(
+        field
+        for field in payload["composer"]["typed_request_fields"]
+        if field["name"] == "mode"
+    )
+    assert mode["enum"] == ["add", "add_or_replace"]
+    assert mode["description"] == (
+        "Use add_or_replace when the user asks to replace the matching RTPC if "
+        "present and add it if absent; use add only when an existing exact "
+        "property and ControlInput match must fail."
+    )
+
+
+def test_audio_import_schema_requires_one_complete_metadata_query_batch(
+    tmp_path: Path,
+) -> None:
+    exit_code, payload = execute(
+        tmp_path,
+        "--version",
+        "2025.1",
+        "operation-schema",
+        "audio.import",
+    )
+
+    assert exit_code == 0, payload
+    assert "composer" not in payload
+    assert payload["business_adapter"]["input_mode"] == (
+        BUSINESS_DECLARATION_INPUT_MODE
+    )
+    assert payload["business_adapter"]["commands"][:2] == [
+        "draft-bind-object",
+        "draft-bind-field",
+    ]
+    assert payload["business_adapter"]["legacy_shallow_composer_public"] is False
 
 
 def test_registry_composer_lanes_and_real_adapters_are_one_to_one() -> None:
@@ -1460,16 +2031,25 @@ def test_registry_composer_lanes_and_real_adapters_are_one_to_one() -> None:
             else:
                 assert contract["operation"] == spec.name
                 assert contract["version"] == version
+                if spec.name == "audio.import":
+                    assert operation_input_mode(*lane) == (
+                        BUSINESS_DECLARATION_INPUT_MODE
+                    )
+                    continue
                 adapter_lanes.add(lane)
 
     assert adapter_lanes == composer_lanes
-    assert {operation for operation, _version in composer_lanes} == {
-        "audio.import",
-        "object.set",
-    }
+    assert composer_lanes == set()
 
 
-def test_live_check_is_bounded_durable_and_any_edit_invalidates_it(
+def test_soundbank_generate_shallow_composer_is_removed() -> None:
+    with pytest.raises(OperationComposerError) as error:
+        operation_composer_contract("soundbank.generate", "2022.1")
+
+    assert error.value.error_code == "OPERATION_DRAFT_ADAPTER_UNAVAILABLE"
+
+
+def _archive_test_live_check_is_bounded_durable_and_any_edit_invalidates_it(
     tmp_path: Path,
 ) -> None:
     draft_id, authority, handle = complete_draft(tmp_path)
@@ -1497,7 +2077,8 @@ def test_live_check_is_bounded_durable_and_any_edit_invalidates_it(
     assert checked["draft"]["check"]["status"] == "passed"
     assert checked["draft"]["check"]["source_revision"] == 3
     assert checked["draft"]["check"]["request_digest"]
-    assert "preview-from-draft" in checked["draft"]["allowed_actions"]
+    assert "preview-from-draft" not in checked["draft"]["allowed_actions"]
+    assert "preview-from-draft" in checked["draft"]["allowed_lifecycle_commands"]
     assert "current_facts" not in checked["draft"]
     facts_summary = checked["draft"]["current_facts_summary"]
     assert facts_summary == {
@@ -1512,6 +2093,19 @@ def test_live_check_is_bounded_durable_and_any_edit_invalidates_it(
         "projection": "checked_draft_receipt",
         "compact_projection_is_not_truncation": True,
         "draft_inspect_required_before_preview": False,
+    }
+    assert checked["draft"]["construction_state"] == {
+        "draft_complete": True,
+        "preview_created": False,
+        "required_next_phase": "preview-from-draft",
+        "execute_returned_next_command_exactly": True,
+        "construction_boundary": {
+            "phase": "preview_construction",
+            "mutation": False,
+            "complete": False,
+            "required_terminal": "preview",
+            "before": "continue_no_confirm_no_end",
+        },
     }
     assert "next_action_binding" not in checked["draft"]
     next_command = checked["next_command"]
@@ -1560,11 +2154,11 @@ def test_live_check_is_bounded_durable_and_any_edit_invalidates_it(
     assert edit_code == 0
     assert edited["draft"]["revision"] == 5
     assert edited["draft"]["check"] is None
-    assert "preview-from-draft" not in edited["draft"]["allowed_actions"]
-    assert "check" in edited["draft"]["allowed_actions"]
+    assert "preview-from-draft" not in edited["draft"]["allowed_lifecycle_commands"]
+    assert "draft-check" in edited["draft"]["allowed_lifecycle_commands"]
 
 
-def test_live_check_reports_all_invalid_target_rows_without_writing(
+def _archive_test_live_check_reports_all_invalid_target_rows_without_writing(
     tmp_path: Path,
 ) -> None:
     _code, started = execute(tmp_path, "draft-start", "object.set")
@@ -1686,7 +2280,7 @@ def test_live_check_reports_all_invalid_target_rows_without_writing(
     assert client.disconnected is True
 
 
-def test_weather_shape_keeps_multiple_targets_and_request_options_in_business_order(
+def _archive_test_weather_shape_keeps_multiple_targets_and_request_options_in_business_order(
     tmp_path: Path,
 ) -> None:
     selectors = [
@@ -1774,7 +2368,7 @@ def test_weather_shape_keeps_multiple_targets_and_request_options_in_business_or
     assert [row["handle"] for row in targeted["draft"]["current_facts"]] == handles
 
 
-def test_complete_target_row_is_atomic_when_one_inline_reference_is_invalid(
+def _archive_test_complete_target_row_is_atomic_when_one_inline_reference_is_invalid(
     tmp_path: Path,
 ) -> None:
     _code, started = execute(tmp_path, "draft-start", "object.set")
@@ -1826,7 +2420,7 @@ def test_complete_target_row_is_atomic_when_one_inline_reference_is_invalid(
     ).revision == 1
 
 
-def test_target_and_recursive_child_facts_materialize_without_raw_tree_patches(
+def _archive_test_target_and_recursive_child_facts_materialize_without_raw_tree_patches(
     tmp_path: Path,
 ) -> None:
     _code, started = execute(tmp_path, "draft-start", "object.set")
@@ -1917,7 +2511,7 @@ def test_target_and_recursive_child_facts_materialize_without_raw_tree_patches(
     assert final["draft"]["missing_fields"] == []
 
 
-def test_closed_object_list_members_use_handles_and_keep_insertion_order(
+def _archive_test_closed_object_list_members_use_handles_and_keep_insertion_order(
     tmp_path: Path,
 ) -> None:
     _code, started = execute(tmp_path, "draft-start", "object.set")
@@ -1991,7 +2585,7 @@ def test_closed_object_list_members_use_handles_and_keep_insertion_order(
     ] == [first_handle, second_handle]
 
 
-def test_embedded_import_files_are_versioned_correctable_and_handle_addressed(
+def _archive_test_embedded_import_files_are_versioned_correctable_and_handle_addressed(
     tmp_path: Path,
 ) -> None:
     source = tmp_path / "Rain Source.wav"
@@ -2070,7 +2664,7 @@ def test_embedded_import_files_are_versioned_correctable_and_handle_addressed(
     assert final["draft"]["missing_fields"] == []
 
 
-def test_embedded_import_is_rejected_before_revision_on_wwise_2022(
+def _archive_test_embedded_import_is_rejected_before_revision_on_wwise_2022(
     tmp_path: Path,
 ) -> None:
     _code, started = execute(tmp_path, "draft-start", "object.set")
@@ -2116,7 +2710,7 @@ def test_embedded_import_is_rejected_before_revision_on_wwise_2022(
     assert record_path.read_bytes() == before
 
 
-def test_invalid_options_duplicates_and_target_ceiling_are_byte_atomic(
+def _archive_test_invalid_options_duplicates_and_target_ceiling_are_byte_atomic(
     tmp_path: Path,
 ) -> None:
     _code, started = execute(tmp_path, "draft-start", "object.set")
@@ -2192,7 +2786,7 @@ def test_invalid_options_duplicates_and_target_ceiling_are_byte_atomic(
     assert record_path.read_bytes() == before_limit
 
 
-def test_empty_append_list_remains_incomplete_but_replace_all_can_clear_it(
+def _archive_test_empty_append_list_remains_incomplete_but_replace_all_can_clear_it(
     tmp_path: Path,
 ) -> None:
     _code, started = execute(tmp_path, "draft-start", "object.set")
@@ -2267,7 +2861,7 @@ def test_empty_append_list_remains_incomplete_but_replace_all_can_clear_it(
     }
 
 
-def test_reference_facts_are_typed_correctable_and_keep_exact_selectors(
+def _archive_test_reference_facts_are_typed_correctable_and_keep_exact_selectors(
     tmp_path: Path,
 ) -> None:
     _code, started = execute(tmp_path, "draft-start", "object.set")

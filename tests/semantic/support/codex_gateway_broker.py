@@ -13,6 +13,8 @@ audit trail writable by the evaluated model.
 from __future__ import annotations
 
 import hashlib
+import hmac
+import itertools
 import json
 import math
 import os
@@ -29,7 +31,8 @@ import tempfile
 import threading
 import time
 from dataclasses import asdict, dataclass, replace
-from pathlib import Path
+from decimal import Decimal, InvalidOperation
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from types import MappingProxyType
 from typing import Any, Callable, Mapping, Sequence
 
@@ -38,27 +41,82 @@ from tests.semantic.support.codex_filesystem_security import (
     path_is_link_or_reparse,
     read_bounded_exclusive_regular_file,
 )
+from tests.semantic.support.codex_draft_commands import (
+    DRAFT_GATEWAY_SUBCOMMANDS,
+    DRAFT_REVISION_SUBCOMMANDS,
+    DRAFT_START_SUBCOMMANDS,
+)
 from wwise_waapi.operation_composer import (
+    MAX_TYPED_ACTIONS_PER_APPLY,
     OperationComposerError,
     apply_composer_action,
     composition_projection,
     materialize_operation_request,
     new_composition,
+    operation_draft_public_projection,
     parse_typed_action_cli_arguments,
+    parse_typed_action_cli_argument_sequence,
+    typed_action_cli_arguments,
+)
+from wwise_waapi.operation_drafts import (
+    OperationDraftStore,
+    load_operation_draft_archive_records,
+    operation_draft_authority_digest,
+)
+from wwise_waapi.business_declaration_state import BusinessDeclarationSession
+from wwise_waapi.business_adapters import (
+    business_adapter,
+    business_adapter_operations,
+)
+from wwise_waapi.audio_import_business_contracts import (
+    AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS,
+)
+from wwise_waapi.operation_registry import (
+    OperationContractError,
+    parse_operation_request,
+)
+from wwise_waapi.typed_operations import (
+    inline_operation_cli_argument_variants,
+    inline_operation_cli_arguments,
+)
+from wwise_waapi.typed_requests import (
+    MAX_TYPED_ARRAY_ITEMS,
+    TypedRequestContract,
+    TypedRequestError,
+    TypedRequestFact,
+    materialize_typed_request,
+    request_contract,
 )
 from wwise_waapi.platform_commands import (
+    GATEWAY_SHELL_TOOL_TIMEOUT_MS,
     PlatformCommandError,
     WINDOWS_MODEL_COMMAND_FAMILY,
     WINDOWS_POWERSHELL_ENCODED_FAMILY,
+    decode_windows_model_argv,
+    decode_windows_powershell_argv,
     encode_windows_model_argv,
     encode_windows_powershell_argv,
 )
+from tests.semantic.support.codex_gateway_contracts import (
+    GATEWAY_RESULT_CONTRACT,
+    TYPED_ARRAY_ITEM_CHOICES_CONTRACT,
+    TYPED_CONTAINER_HANDLE_CONTRACT,
+    TYPED_MAP_CONTAINER_CHOICES_CONTRACT,
+    TYPED_REQUEST_SCHEMA_CONTRACT,
+    TASK_LOCAL_RUNNER_POSIX,
+    TASK_LOCAL_RUNNER_WINDOWS,
+    gateway_payload_contracts,
+    metadata_candidate_limit_for_query_count,
+    task_local_runner_matches_normalized,
+)
 
 
-GATEWAY_RESULT_CONTRACT = "waapi-skill.gateway-result/v1"
 TRANSACTION_NEXT_COMMAND_CONTRACT = "waapi-skill.gateway-next-command/v2"
 TRANSACTION_COPY_INSTRUCTION_CONTRACT = (
     "waapi-skill.gateway-command-copy-instruction/v2"
+)
+OPERATION_DRAFT_COPY_INSTRUCTION_CONTRACT = (
+    "waapi-skill.operation-draft-command-copy-instruction/v1"
 )
 TRANSACTION_COPY_ACTION = "execute_verbatim_as_one_shell_tool_call"
 TRANSACTION_FORBIDDEN_TRANSFORMATIONS = (
@@ -112,6 +170,7 @@ _BROKER_ENV_NAMES = frozenset(
     }
 )
 _PYTHON_IO_ENCODING_ENV = "PYTHONIOENCODING"
+_PYTHON_DONT_WRITE_BYTECODE_ENV = "PYTHONDONTWRITEBYTECODE"
 _PYTHON_NAMES = frozenset({"python", "python3"})
 WINDOWS_SHIM_SCRIPT_NAME = "broker_shim.py"
 WINDOWS_COMMAND_SHIM_NAMES = tuple(
@@ -219,6 +278,7 @@ _AUDIO_IMPORT_SCALAR_ROW_FIELD_LIMITS = MappingProxyType(
 _AUDIO_IMPORT_EVENT_ACTIONS = frozenset(
     {"Play", "Stop", "Pause", "Resume", "Break", "Seek"}
 )
+_COMPOSER_HANDLE_PRODUCING_ACTIONS = frozenset({"add_target", "add_child"})
 _AUDIO_IMPORT_IDENTITY_MAX_NAME_LENGTH = 255
 _AUDIO_IMPORT_IDENTITY_MAX_TYPE_LENGTH = 128
 _AUDIO_IMPORT_IDENTITY_MAX_PARENT_LENGTH = 4096
@@ -830,6 +890,7 @@ _DRAFT_HANDLE_ARGUMENT_NAMES = frozenset(
     }
 )
 _DRAFT_HANDLE_POINTERS = frozenset(f"/{name}" for name in _DRAFT_HANDLE_ARGUMENT_NAMES)
+_DRAFT_TYPED_FACT_BINDING_POINTERS = frozenset({"/field_handle", "/value"})
 _DRAFT_FORBIDDEN_ACTION_KEYS = frozenset(
     {"request", "arguments", "uri", "args", "options", "waql", "request_json"}
 )
@@ -877,6 +938,25 @@ _DRAFT_ACTION_HANDLE_FIELDS_BY_OPERATION = {
         "remove_import_row": "import_handle",
     },
 }
+for _typed_operation in (
+    "object.create",
+    "object.createPlugin",
+    "object.setRTPC",
+    "soundbank.convertExternalSources",
+    "soundbank.generate",
+    "soundbank.setInclusions",
+    "ui.commands.register",
+    "ui.commands.unregister",
+    "lua.executeCliFile",
+    "lua.executeCoreFile",
+    "lua.executeCoreInline",
+    "ak.wwise.core.mediaPool.get",
+):
+    _DRAFT_ACTION_HANDLE_FIELDS_BY_OPERATION[_typed_operation] = {
+        "add_typed_fact": None,
+        "correct_typed_fact": None,
+        "remove_typed_fact": None,
+    }
 
 
 def _draft_action_contains_forbidden_key(value: Any) -> bool:
@@ -904,7 +984,7 @@ class DraftActionResponseBinding:
     response_pointer: str
 
     def __post_init__(self) -> None:
-        if self.pointer not in _DRAFT_HANDLE_POINTERS:
+        if self.pointer not in _DRAFT_HANDLE_POINTERS | _DRAFT_TYPED_FACT_BINDING_POINTERS:
             raise ValueError(
                 "DraftActionResponseBinding.pointer must name one reviewed handle field"
             )
@@ -922,8 +1002,17 @@ class DraftActionResponseBinding:
                     self.response_pointer.startswith("/draft/current_facts/")
                     and self.response_pointer.endswith("/handle")
                 )
-                or self.response_pointer
-                == "/draft/action_result/created_handles/0"
+                or re.fullmatch(
+                    r"/draft/action_result/created_handles/(0|[1-9][0-9]*)",
+                    self.response_pointer,
+                )
+                or self.response_pointer == "/handle"
+                or re.fullmatch(r"/choices/(0|[1-9][0-9]*)/handle", self.response_pointer)
+                or re.fullmatch(
+                    r"/child_contract/branch_choices/(0|[1-9][0-9]*)/"
+                    r"choices/(0|[1-9][0-9]*)/handle",
+                    self.response_pointer,
+                )
             )
             or len(self.response_pointer) > 512
         ):
@@ -1012,7 +1101,7 @@ class DraftActionMetadataBinding:
 
 
 @dataclass(frozen=True, slots=True)
-class DraftActionJsonArgument:
+class DraftTypedActionArgument:
     """One fixed business action carried by the typed argv Interface."""
 
     expected: Mapping[str, Any]
@@ -1031,7 +1120,7 @@ class DraftActionJsonArgument:
             UnicodeError,
             ValueError,
         ) as exc:
-            raise ValueError("DraftActionJsonArgument.expected must be strict JSON") from exc
+            raise ValueError("DraftTypedActionArgument.expected must be strict JSON") from exc
         if (
             not isinstance(normalized, dict)
             or normalized.get("contract") != "waapi-skill.operation-draft-action/v1"
@@ -1041,13 +1130,13 @@ class DraftActionJsonArgument:
             or len(normalized["action"]) > 80
         ):
             raise ValueError(
-                "DraftActionJsonArgument requires one versioned typed action"
+                "DraftTypedActionArgument requires one versioned typed action"
             )
         forbidden = _draft_action_contains_forbidden_key(normalized)
         authored_handles = _DRAFT_HANDLE_ARGUMENT_NAMES & set(normalized)
         if forbidden or authored_handles:
             raise ValueError(
-                "DraftActionJsonArgument cannot contain a complete request, native payload, "
+                "DraftTypedActionArgument cannot contain a complete request, native payload, "
                 "or model-authored handle"
             )
         if (
@@ -1056,13 +1145,13 @@ class DraftActionJsonArgument:
             or self.operation != self.operation.strip()
             or len(self.operation) > 160
         ):
-            raise ValueError("DraftActionJsonArgument operation must be bounded")
+            raise ValueError("DraftTypedActionArgument operation must be bounded")
         operation_actions = _DRAFT_ACTION_HANDLE_FIELDS_BY_OPERATION.get(self.operation)
         if operation_actions is None:
-            raise ValueError("DraftActionJsonArgument operation is not reviewed")
+            raise ValueError("DraftTypedActionArgument operation is not reviewed")
         expected_handle = operation_actions.get(str(normalized["action"]), ...)
         if expected_handle is ...:
-            raise ValueError("DraftActionJsonArgument action is not in the reviewed vocabulary")
+            raise ValueError("DraftTypedActionArgument action is not in the reviewed vocabulary")
         if (
             not isinstance(self.response_bindings, tuple)
             or any(
@@ -1073,19 +1162,27 @@ class DraftActionJsonArgument:
             != len(self.response_bindings)
         ):
             raise ValueError(
-                "DraftActionJsonArgument.response_bindings must target unique handles"
+                "DraftTypedActionArgument.response_bindings must target unique handles"
             )
         bound_handle_fields = {
             binding.pointer.removeprefix("/") for binding in self.response_bindings
         }
-        if bound_handle_fields != ({expected_handle} if expected_handle is not None else set()):
+        expected_bound_fields = (
+            {expected_handle}
+            if expected_handle is not None
+            else (
+                bound_handle_fields
+                if normalized["action"] == "add_typed_fact"
+                and bound_handle_fields.issubset({"field_handle", "value"})
+                else set()
+            )
+        )
+        if bound_handle_fields != expected_bound_fields:
             raise ValueError(
-                "DraftActionJsonArgument must bind exactly the handle required by its action"
+                "DraftTypedActionArgument must bind exactly the handle required by its action"
             )
         if self.metadata_binding is not None:
-            if self.operation not in {"audio.import", "object.set"} or not isinstance(
-                self.metadata_binding, DraftActionMetadataBinding
-            ):
+            if not isinstance(self.metadata_binding, DraftActionMetadataBinding):
                 raise ValueError(
                     "Draft action metadata binding requires a reviewed Composer operation"
                 )
@@ -1125,6 +1222,10 @@ class DraftActionJsonArgument:
                     if isinstance(row, Mapping)
                     and isinstance(row.get("name"), str)
                 )
+            elif normalized["action"] == "add_typed_fact":
+                value = normalized.get("value")
+                if isinstance(value, str):
+                    dynamic_tokens.add(value)
             if not dynamic_tokens or not dynamic_tokens.issubset(
                 set(self.metadata_binding.required_tokens)
             ):
@@ -1143,14 +1244,14 @@ class DraftActionJsonArgument:
             != len(self.query_identity_bindings)
         ):
             raise ValueError(
-                "DraftActionJsonArgument query identity bindings must be unique"
+                "DraftTypedActionArgument query identity bindings must be unique"
             )
         for binding in self.query_identity_bindings:
             try:
                 target = _json_pointer(normalized, binding.pointer)
             except GatewayInvocationError as exc:
                 raise ValueError(
-                    "DraftActionJsonArgument query-bound target is absent"
+                    "DraftTypedActionArgument query-bound target is absent"
                 ) from exc
             valid_binding_shape = (
                 normalized.get("action") == "set_reference"
@@ -1168,9 +1269,120 @@ class DraftActionJsonArgument:
                 or not target["value"].startswith("\\")
             ):
                 raise ValueError(
-                    "DraftActionJsonArgument query identity is valid only for "
+                    "DraftTypedActionArgument query identity is valid only for "
                     "one exact path reference target"
                 )
+
+
+@dataclass(frozen=True, slots=True)
+class DraftTypedActionBatchArgument:
+    """One atomic ordered batch of independent typed Draft actions."""
+
+    actions: tuple[DraftTypedActionArgument, ...]
+
+    def __post_init__(self) -> None:
+        if (
+            not isinstance(self.actions, tuple)
+            or not 2 <= len(self.actions) <= MAX_TYPED_ACTIONS_PER_APPLY
+            or any(
+                not isinstance(action, DraftTypedActionArgument)
+                for action in self.actions
+            )
+            or len({action.operation for action in self.actions}) != 1
+        ):
+            raise ValueError(
+                "DraftTypedActionBatchArgument requires 2-6 ordered independent actions"
+            )
+
+    @property
+    def operation(self) -> str:
+        return self.actions[0].operation
+
+
+def _draft_typed_actions(
+    value: Any,
+) -> tuple[DraftTypedActionArgument, ...] | None:
+    if isinstance(value, DraftTypedActionArgument):
+        return (value,)
+    if isinstance(value, DraftTypedActionBatchArgument):
+        return value.actions
+    return None
+
+
+@dataclass(frozen=True, slots=True)
+class TypedRequestFactsArgument:
+    """One variable typed-fact tail bound to an exact packaged contract."""
+
+    contract: TypedRequestContract
+    expected_args: Mapping[str, Any]
+    expected_options: Mapping[str, Any]
+    prefix: str = ""
+    metadata_binding: DraftActionMetadataBinding | None = None
+    io_root: str | None = None
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.contract, TypedRequestContract):
+            raise ValueError("TypedRequestFactsArgument requires one typed contract")
+        if self.prefix not in {"", "option", "match", "typed"}:
+            raise ValueError("TypedRequestFactsArgument prefix is invalid")
+        if self.metadata_binding is not None and not isinstance(
+            self.metadata_binding, DraftActionMetadataBinding
+        ):
+            raise ValueError("TypedRequestFactsArgument metadata binding is invalid")
+        if self.io_root is not None and (
+            not isinstance(self.io_root, str)
+            or not self.io_root
+            or self.io_root != self.io_root.strip()
+        ):
+            raise ValueError("TypedRequestFactsArgument io_root is invalid")
+        try:
+            args = json.loads(_canonical_json_bytes(dict(self.expected_args)))
+            options = json.loads(_canonical_json_bytes(dict(self.expected_options)))
+        except (RecursionError, TypeError, UnicodeError, ValueError) as exc:
+            raise ValueError(
+                "TypedRequestFactsArgument values must be strict JSON objects"
+            ) from exc
+        if not isinstance(args, dict) or not isinstance(options, dict):
+            raise ValueError("TypedRequestFactsArgument values must be objects")
+
+
+@dataclass(frozen=True, slots=True)
+class InlineTypedOperationArgument:
+    """Broker-owned witness for one concise typed operation argv tail.
+
+    The canonical request is evidence, not a model-facing argument.  The
+    evaluated Agent still submits only the public typed-operation flags; the
+    Broker derives the accepted public spelling from this request and binds
+    exact reviewed selector equivalents to the same canonical digest.
+    """
+
+    expected: Mapping[str, Any]
+    operation: str
+
+    def __post_init__(self) -> None:
+        try:
+            normalized = json.loads(
+                _canonical_json_bytes(dict(self.expected)).decode("utf-8")
+            )
+            operation = normalized.get("operation")
+            version = normalized.get("version")
+            if not isinstance(operation, str) or not isinstance(version, str):
+                raise ValueError("inline typed operation identity is incomplete")
+            if self.operation is not None and self.operation != operation:
+                raise ValueError("inline typed operation identity is misbound")
+            parse_operation_request(normalized, expected_version=version)
+            inline_operation_cli_arguments(normalized)
+        except (
+            GatewayInvocationError,
+            OperationContractError,
+            RecursionError,
+            TypeError,
+            UnicodeError,
+            ValueError,
+        ) as exc:
+            raise ValueError(
+                "InlineTypedOperationArgument requires one canonical inline request"
+            ) from exc
 
 
 ExpectedArgument = (
@@ -1183,8 +1395,549 @@ ExpectedArgument = (
     | MetadataBoundJsonArgument
     | ResponseBinding
     | ResponseBindingOrExactArgument
-    | DraftActionJsonArgument
+    | DraftTypedActionArgument
+    | DraftTypedActionBatchArgument
+    | TypedRequestFactsArgument
+    | InlineTypedOperationArgument
 )
+
+
+def _inline_operation_cli_argument_variants(
+    expected: Mapping[str, Any],
+) -> tuple[tuple[str, ...], ...]:
+    variants = [
+        json.loads(_canonical_json_bytes(dict(expected)).decode("utf-8"))
+    ]
+    if expected.get("operation") == "switchContainer.removeAssignment":
+        arguments = variants[0].get("arguments")
+        if isinstance(arguments, Mapping):
+            for field in ("child", "state_or_switch"):
+                current_variants = list(variants)
+                for request in current_variants:
+                    request_arguments = request.get("arguments")
+                    selector = (
+                        request_arguments.get(field)
+                        if isinstance(request_arguments, Mapping)
+                        else None
+                    )
+                    parent = (
+                        selector.get("parent")
+                        if isinstance(selector, Mapping)
+                        else None
+                    )
+                    if (
+                        not isinstance(selector, Mapping)
+                        or selector.get("kind") != "scoped-name"
+                        or not isinstance(selector.get("name"), str)
+                        or not isinstance(parent, Mapping)
+                        or parent.get("kind") != "path"
+                        or not isinstance(parent.get("value"), str)
+                    ):
+                        continue
+                    equivalent = json.loads(
+                        _canonical_json_bytes(request).decode("utf-8")
+                    )
+                    equivalent["arguments"][field] = {
+                        "kind": "path",
+                        "value": parent["value"] + "\\" + selector["name"],
+                    }
+                    variants.append(equivalent)
+    return tuple(
+        dict.fromkeys(
+            argv
+            for request in variants
+            for argv in inline_operation_cli_argument_variants(request)
+        )
+    )
+
+
+def _parse_typed_request_fact_argv(
+    arguments: Sequence[str],
+    *,
+    prefix: str,
+) -> tuple[TypedRequestFact, ...]:
+    flag_prefix = f"{prefix}-" if prefix else ""
+    flags = {
+        f"--{flag_prefix}set": ("set", 3),
+        f"--{flag_prefix}append": ("append", 3),
+        f"--{flag_prefix}present": ("present", 1),
+        f"--{flag_prefix}choose": ("choose", 2),
+        f"--{flag_prefix}choose-dynamic": ("choose-dynamic", 3),
+        f"--{flag_prefix}map-put": ("map-put", 4),
+        f"--{flag_prefix}map-correct": ("map-correct", 4),
+        f"--{flag_prefix}map-remove": ("map-remove", 2),
+    }
+    result: list[TypedRequestFact] = []
+    index = 0
+    while index < len(arguments):
+        flag = arguments[index]
+        spec = flags.get(flag)
+        if spec is None:
+            raise ValueError(f"unknown typed request fact flag {flag!r}")
+        action, width = spec
+        values = tuple(arguments[index + 1 : index + 1 + width])
+        if len(values) != width:
+            raise ValueError(f"typed request fact {flag!r} is incomplete")
+        if action in {"set", "append"}:
+            result.append(TypedRequestFact(action, values[0], values[1], values[2]))
+        elif action == "present":
+            result.append(TypedRequestFact(action, values[0], "null", "null"))
+        elif action == "choose":
+            result.append(TypedRequestFact(action, values[0], "branch", values[1]))
+        elif action == "choose-dynamic":
+            result.append(
+                TypedRequestFact(action, values[0], "choice", values[2], key=values[1])
+            )
+        elif action in {"map-put", "map-correct"}:
+            result.append(
+                TypedRequestFact(
+                    action,
+                    values[0],
+                    values[2],
+                    values[3],
+                    key=values[1],
+                )
+            )
+        else:
+            result.append(
+                TypedRequestFact(action, values[0], "null", "null", key=values[1])
+            )
+        index += 1 + width
+    return tuple(result)
+
+
+_TOPIC_BUSINESS_GROUP_WIDTHS = {
+    "--topic-option": 3,
+    "--topic-option-as": 4,
+    "--topic-option-empty": 2,
+    "--event-match": 3,
+    "--event-match-as": 4,
+    "--event-empty": 2,
+    "--event-row": 5,
+    "--event-row-as": 6,
+    "--event-row-empty": 3,
+    "--event-entry": 5,
+    "--event-entry-as": 6,
+    "--event-entry-empty": 5,
+    "--event-entry-object": 6,
+    "--event-entry-object-as": 7,
+    "--event-entry-row": 7,
+    "--event-entry-row-as": 8,
+}
+
+
+def _topic_fact_groups(
+    values: Sequence[Any],
+) -> tuple[tuple[str, ...], ...] | None:
+    groups: list[tuple[str, ...]] = []
+    index = 0
+    while index < len(values):
+        flag = values[index]
+        if not isinstance(flag, str):
+            return None
+        width = _TOPIC_BUSINESS_GROUP_WIDTHS.get(flag)
+        if width is None or index + width > len(values):
+            return None
+        group = tuple(values[index : index + width])
+        if not all(isinstance(token, str) for token in group):
+            return None
+        groups.append(group)
+        index += width
+    return tuple(groups)
+
+
+def _commutative_topic_match_destination(
+    group: Sequence[str],
+) -> tuple[str, ...] | None:
+    flag = group[0]
+    if flag.startswith("--topic-option"):
+        return None
+    if flag in {"--event-empty", "--event-row-empty"}:
+        return tuple(group[1:])
+    if flag == "--event-entry-empty":
+        return tuple(group[1:-1])
+    value_tail = 2 if flag.endswith("-as") else 1
+    return tuple(group[1:-value_tail])
+
+
+def _normalize_commutative_wait_topic_facts(
+    step: "ExpectedGatewayStep",
+    supplied: Sequence[str],
+) -> tuple[str, ...]:
+    """Canonicalize only declared independent match assignments.
+
+    Option appends preserve result projection order. Match assignments may be
+    reordered only when the exact same fact groups target distinct slots.
+    """
+
+    actual = _expand_soundbank_topic_business_shortcuts(step, supplied)
+    if step.subcommand not in {"wait-topic", "stream-topic"} or actual == step.arguments:
+        return actual
+    fact_start = next(
+        (
+            index
+            for index, value in enumerate(step.arguments)
+            if isinstance(value, str)
+            and value in _TOPIC_BUSINESS_GROUP_WIDTHS
+        ),
+        None,
+    )
+    if fact_start is None or len(actual) != len(step.arguments):
+        return actual
+    expected_groups = _topic_fact_groups(step.arguments[fact_start:])
+    actual_groups = _topic_fact_groups(actual[fact_start:])
+    if expected_groups is None or actual_groups is None:
+        return actual
+    expected_options = tuple(
+        group for group in expected_groups if group[0].startswith("--topic-option")
+    )
+    actual_options = tuple(
+        group for group in actual_groups if group[0].startswith("--topic-option")
+    )
+    expected_matches = tuple(
+        group for group in expected_groups if not group[0].startswith("--topic-option")
+    )
+    actual_matches = tuple(
+        group for group in actual_groups if not group[0].startswith("--topic-option")
+    )
+    if (
+        expected_groups != (*expected_options, *expected_matches)
+        or actual_options != expected_options
+        or sorted(actual_matches) != sorted(expected_matches)
+    ):
+        return actual
+    destinations = tuple(
+        _commutative_topic_match_destination(group)
+        for group in actual_matches
+    )
+    if any(destination is None for destination in destinations) or len(
+        set(destinations)
+    ) != len(destinations):
+        return actual
+    return (
+        *actual[:fact_start],
+        *(token for group in expected_groups for token in group),
+    )
+
+
+def _expand_soundbank_topic_business_shortcuts(
+    step: "ExpectedGatewayStep",
+    supplied: Sequence[str],
+) -> tuple[str, ...]:
+    """Expand only the three closed soundbank.generated business aliases."""
+
+    actual = tuple(supplied)
+    topic = "ak.wwise.core.soundbank.generated"
+    shortcuts = {
+        "--include-object-identity",
+        "--match-platform-name",
+        "--match-soundbank-name",
+    }
+    if (
+        step.subcommand not in {"wait-topic", "stream-topic"}
+        or not step.arguments
+        or step.arguments[0] != topic
+        or not actual
+        or actual[0] != topic
+        or not any(token in shortcuts for token in actual)
+    ):
+        return actual
+
+    expected = tuple(step.arguments)
+    identity = (
+        "--topic-option",
+        "include",
+        "id",
+        "--topic-option",
+        "include",
+        "name",
+        "--topic-option",
+        "include",
+        "type",
+        "--topic-option",
+        "include",
+        "path",
+    )
+    if not _contains_exact_argument_group(expected, identity):
+        return actual
+
+    expanded: list[str] = []
+    index = 0
+    while index < len(actual):
+        token = actual[index]
+        if token == "--include-object-identity":
+            expanded.extend(identity)
+            index += 1
+            continue
+        if token == "--match-soundbank-name":
+            if index + 1 >= len(actual):
+                return actual
+            value = actual[index + 1]
+            expected_group = ("--event-match", "soundbank-name", value)
+            if not _contains_exact_argument_group(expected, expected_group):
+                return actual
+            expanded.extend(expected_group)
+            index += 2
+            continue
+        if token == "--match-platform-name":
+            if index + 1 >= len(actual):
+                return actual
+            value = actual[index + 1]
+            matches = [
+                tuple(str(item) for item in expected[cursor : cursor + 6])
+                for cursor in range(len(expected) - 5)
+                if expected[cursor : cursor + 4]
+                == ("--event-entry-as", "platform", "-", "name")
+                and expected[cursor + 5] == value
+            ]
+            if len(matches) != 1:
+                return actual
+            expanded.extend(matches[0])
+            index += 2
+            continue
+        expanded.append(token)
+        index += 1
+    return tuple(expanded)
+
+
+def _contains_exact_argument_group(
+    values: Sequence[Any],
+    group: Sequence[str],
+) -> bool:
+    return any(
+        tuple(values[index : index + len(group)]) == tuple(group)
+        for index in range(len(values) - len(group) + 1)
+    )
+
+
+def _normalize_commutative_option_pairs(
+    step: "ExpectedGatewayStep",
+    supplied: Sequence[str],
+) -> tuple[str, ...]:
+    """Canonicalize one explicitly declared unordered high-level flag map."""
+
+    actual = tuple(supplied)
+    if not step.commutative_option_pairs or actual == step.arguments:
+        return actual
+
+    def parse(values: Sequence[str]) -> dict[str, str | bool] | None:
+        parsed: dict[str, str | bool] = {}
+        index = 0
+        while index < len(values):
+            token = values[index]
+            if not isinstance(token, str) or not token.startswith("--"):
+                return None
+            if "=" in token:
+                name, value = token.split("=", 1)
+                if not value or name in parsed or name in step.commutative_boolean_flags:
+                    return None
+                parsed[name] = value
+                index += 1
+                continue
+            if token in step.commutative_boolean_flags:
+                if token in parsed:
+                    return None
+                parsed[token] = True
+                index += 1
+                continue
+            if index + 1 >= len(values) or token in parsed:
+                return None
+            parsed[token] = values[index + 1]
+            index += 2
+        return parsed
+
+    expected = parse(step.arguments)
+    observed = parse(actual)
+    return step.arguments if expected is not None and observed == expected else actual
+
+
+def _normalize_object_lifecycle_business_argument_order(
+    step: "ExpectedGatewayStep",
+    supplied: Sequence[str],
+) -> tuple[Any, ...]:
+    """Order independent lifecycle options without changing supplied values."""
+
+    actual = tuple(supplied)
+    if step.subcommand != "draft-declare-object-change" or actual == step.arguments:
+        return actual
+    arities = {
+        "--new-name": 1,
+        "--notes": 1,
+        "--name-conflict": 1,
+        "--add-to-source-control": 0,
+        "--no-add-to-source-control": 0,
+        "--check-out-from-source-control": 0,
+        "--no-check-out-from-source-control": 0,
+    }
+    try:
+        prefix_length = next(
+            index
+            for index, value in enumerate(step.arguments)
+            if isinstance(value, str) and value in arities
+        )
+    except StopIteration:
+        return actual
+    if len(actual) < prefix_length:
+        return actual
+
+    def parse(values: Sequence[Any]) -> dict[str, tuple[Any, ...]] | None:
+        groups: dict[str, tuple[Any, ...]] = {}
+        index = prefix_length
+        while index < len(values):
+            option = values[index]
+            arity = arities.get(option) if isinstance(option, str) else None
+            if arity is None or option in groups or index + arity >= len(values):
+                return None
+            groups[option] = tuple(values[index : index + arity + 1])
+            index += arity + 1
+        return groups
+
+    expected = parse(step.arguments)
+    observed = parse(actual)
+    if expected is None or observed is None or set(observed) != set(expected):
+        return actual
+    return (
+        *actual[:prefix_length],
+        *(value for option in expected for value in observed[option]),
+    )
+
+
+def _normalize_query_repair_stable_kind(
+    step: "ExpectedGatewayStep",
+    supplied: Sequence[str],
+    payloads_by_step: Mapping[str, Mapping[str, Any]],
+) -> tuple[str, ...]:
+    """Accept a stable closed kind only when it names the exact live candidate."""
+
+    actual = tuple(supplied)
+    if (
+        step.name != "query-repair.refined-kind"
+        or step.subcommand != "query-object"
+        or len(step.arguments) != 4
+        or actual[:1] != ("--kind",)
+        or actual[2:] != ("--max-results", "1")
+    ):
+        return actual
+    payload = payloads_by_step.get("query-repair.ambiguous-kind")
+    agent_result = payload.get("agent_result") if isinstance(payload, Mapping) else None
+    candidates = (
+        agent_result.get("candidates")
+        if isinstance(agent_result, Mapping)
+        else None
+    )
+    first = candidates[0] if isinstance(candidates, list) and candidates else None
+    exact_name = first.get("name") if isinstance(first, Mapping) else None
+    stable_kinds = {
+        "MusicSegment": "music-segment",
+        "MusicTrack": "music-track",
+        "MusicPlaylistContainer": "music-playlist-container",
+        "MusicSwitchContainer": "music-switch-container",
+    }
+    if not isinstance(exact_name, str) or stable_kinds.get(exact_name) != actual[1]:
+        return actual
+    return ("--custom-kind", exact_name, "--max-results", "1")
+
+
+def _normalize_media_pool_business_argument_order(
+    step: "ExpectedGatewayStep",
+    supplied: Sequence[str],
+) -> tuple[str, ...]:
+    """Canonicalize the unordered public Media Pool business declaration."""
+
+    actual = tuple(supplied)
+    if (
+        step.subcommand != "core-call"
+        or not step.arguments
+        or step.arguments[0] != "ak.wwise.core.mediaPool.get"
+        or not actual
+        or actual[0] != "ak.wwise.core.mediaPool.get"
+        or actual == step.arguments
+    ):
+        return actual
+    arities = {
+        "--max-results": 1,
+        "--database-scope": 1,
+        "--database-id": 1,
+        "--search-text": 1,
+        "--text-filter": 3,
+        "--number-filter": 3,
+        "--audio-description": 1,
+        "--weighted-audio-description": 2,
+        "--audio-similarity-file": 1,
+        "--weighted-audio-similarity-file": 2,
+        "--include-field": 1,
+        "--exact-name-contains": 1,
+        "--final-limit": 1,
+        "--sort-by": 2,
+    }
+
+    def parse(values: Sequence[Any]) -> list[tuple[Any, ...]] | None:
+        groups: list[tuple[Any, ...]] = []
+        index = 1
+        while index < len(values):
+            option = values[index]
+            arity = arities.get(option) if isinstance(option, str) else None
+            if arity is None or index + arity >= len(values):
+                return None
+            groups.append(tuple(values[index : index + arity + 1]))
+            index += arity + 1
+        return groups
+
+    def equivalent(expected: Any, observed: Any) -> bool:
+        if isinstance(expected, ExactArgumentAlternatives):
+            return observed in expected.values
+        return expected == observed
+
+    expected_groups = parse(step.arguments)
+    actual_groups = parse(actual)
+    if expected_groups is None or actual_groups is None:
+        return actual
+    canonical_projection_fields = {
+        "Path",
+        "FileId",
+        "Db",
+        "Filename",
+        "WAV/Duration",
+        "WAV/Sample Rate",
+        "WAV/Bit Depth",
+        "WAV/Channels",
+    }
+    remaining = [
+        group
+        for group in actual_groups
+        if not (
+            len(group) == 2
+            and group[0] == "--include-field"
+            and group[1] in canonical_projection_fields
+            and not any(
+                len(expected_group) == 2
+                and expected_group[0] == "--include-field"
+                and equivalent(expected_group[1], group[1])
+                for expected_group in expected_groups
+            )
+        )
+    ]
+    ordered: list[tuple[Any, ...]] = []
+    for expected_group in expected_groups:
+        matches = [
+            index
+            for index, observed_group in enumerate(remaining)
+            if len(observed_group) == len(expected_group)
+            and all(
+                equivalent(expected, observed)
+                for expected, observed in zip(
+                    expected_group,
+                    observed_group,
+                    strict=True,
+                )
+            )
+        ]
+        if len(matches) != 1:
+            return actual
+        ordered.append(remaining.pop(matches[0]))
+    if remaining:
+        return actual
+    return (actual[0], *(value for group in ordered for value in group))
 
 
 @dataclass(frozen=True, slots=True)
@@ -1201,12 +1954,108 @@ class ExpectedGatewayStep:
     expected_error_code: str = ""
     expected_result_command: str = ""
     terminal_execute: bool = False
+    metadata_binding: DraftActionMetadataBinding | None = None
+    commutative_option_pairs: bool = False
+    commutative_boolean_flags: tuple[str, ...] = ()
+    allow_explicit_derived_sfx_language: bool = False
+    expected_operation_request: Mapping[str, Any] | None = None
 
     def __post_init__(self) -> None:
         if not self.name or not self.name.strip():
             raise ValueError("ExpectedGatewayStep.name must be non-empty")
         if not self.subcommand or not self.subcommand.strip():
             raise ValueError("ExpectedGatewayStep.subcommand must be non-empty")
+        if self.expected_operation_request is not None:
+            if self.subcommand != "preview-from-draft":
+                raise ValueError(
+                    "ExpectedGatewayStep operation request witness is limited to "
+                    "preview-from-draft"
+                )
+            try:
+                normalized_request = json.loads(
+                    _canonical_json_bytes(
+                        dict(self.expected_operation_request)
+                    ).decode("utf-8")
+                )
+            except (RecursionError, TypeError, UnicodeError, ValueError) as exc:
+                raise ValueError(
+                    "ExpectedGatewayStep operation request witness must be strict JSON"
+                ) from exc
+            if not isinstance(normalized_request, Mapping):
+                raise ValueError(
+                    "ExpectedGatewayStep operation request witness must be an object"
+                )
+            operation = normalized_request.get("operation")
+            arguments = normalized_request.get("arguments")
+            business_operations = business_adapter_operations()
+            is_business_request = operation in business_operations or (
+                operation == "waapi.call"
+                and isinstance(arguments, Mapping)
+                and arguments.get("api") in business_operations
+            )
+            if (
+                normalized_request.get("contract")
+                != "waapi-skill.operation-request/v1"
+                or not is_business_request
+            ):
+                raise ValueError(
+                    "ExpectedGatewayStep operation request witness is limited to "
+                    "canonical Business Adapter requests"
+                )
+            object.__setattr__(
+                self,
+                "expected_operation_request",
+                MappingProxyType(normalized_request),
+            )
+        if self.metadata_binding is not None and not isinstance(
+            self.metadata_binding, DraftActionMetadataBinding
+        ):
+            raise ValueError("ExpectedGatewayStep metadata binding is invalid")
+        if type(self.commutative_option_pairs) is not bool or (
+            self.commutative_boolean_flags and not self.commutative_option_pairs
+        ):
+            raise ValueError(
+                "ExpectedGatewayStep commutative option policy is invalid"
+            )
+        if type(self.allow_explicit_derived_sfx_language) is not bool or (
+            self.allow_explicit_derived_sfx_language
+            and self.subcommand
+            not in {
+                "draft-declare-new",
+                "draft-declare-existing",
+                "draft-declare-import-batch",
+            }
+        ):
+            raise ValueError(
+                "ExpectedGatewayStep derived SFX-language policy is invalid"
+            )
+        if (
+            len(set(self.commutative_boolean_flags))
+            != len(self.commutative_boolean_flags)
+            or any(
+                not isinstance(flag, str) or not flag.startswith("--")
+                for flag in self.commutative_boolean_flags
+            )
+        ):
+            raise ValueError(
+                "ExpectedGatewayStep commutative boolean flags are invalid"
+            )
+        inline_witnesses = tuple(
+            argument
+            for argument in self.arguments
+            if isinstance(argument, InlineTypedOperationArgument)
+        )
+        if inline_witnesses:
+            if (
+                self.subcommand != "typed-operation"
+                or len(self.arguments) != 2
+                or not isinstance(self.arguments[0], str)
+                or len(inline_witnesses) != 1
+                or inline_witnesses[0].operation != self.arguments[0]
+            ):
+                raise ValueError(
+                    "typed-operation must bind one exact operation to its canonical witness"
+                )
         if type(self.allow_omitted_default_event_count_one) is not bool:
             raise ValueError(
                 "ExpectedGatewayStep.allow_omitted_default_event_count_one must be a bool"
@@ -1314,7 +2163,7 @@ TrustedStepPreObserver = Callable[
 
 @dataclass(frozen=True, slots=True)
 class TrustedSubscriptionAckSpec:
-    """One broker-owned wait-topic step that requires a post-subscribe ACK."""
+    """One broker-owned Topic lifecycle step requiring a post-subscribe ACK."""
 
     step_name: str
     topic: str
@@ -1345,7 +2194,7 @@ class TrustedSubscriptionAckExpectation:
 
 @dataclass(frozen=True, slots=True)
 class _TrustedSubscriptionAckCredential:
-    """Broker-private raw credential for one exact wait-topic step."""
+    """Broker-private raw credential for one exact Topic lifecycle step."""
 
     expectation: TrustedSubscriptionAckExpectation
     nonce: str
@@ -1419,7 +2268,69 @@ class GatewayBrokerRecord:
 
 CommutativeReadOnlyStepGroups = tuple[tuple[str, ...], ...]
 CommutativeComposerSetupStepGroups = tuple[tuple[str, ...], ...]
+OptionalTopicSchemaStepGroups = tuple[tuple[str, ...], ...]
 _MAX_COMMUTATIVE_READ_ONLY_GROUP_SIZE = 4
+_MAX_OPTIONAL_TOPIC_SCHEMA_GROUP_SIZE = 8
+
+
+def validate_optional_topic_schema_step_groups(
+    expected_steps: Sequence[ExpectedGatewayStep],
+    groups: Sequence[Sequence[str]],
+) -> OptionalTopicSchemaStepGroups:
+    """Validate bounded optional Topic disclosures between schema and lifecycle."""
+
+    steps = tuple(expected_steps)
+    names = tuple(step.name for step in steps)
+    indexes = {name: index for index, name in enumerate(names)}
+    normalized: list[tuple[str, ...]] = []
+    claimed: set[str] = set()
+    for raw_group in groups:
+        group = tuple(raw_group)
+        if (
+            not 1 <= len(group) <= _MAX_OPTIONAL_TOPIC_SCHEMA_GROUP_SIZE
+            or any(not isinstance(name, str) or not name for name in group)
+            or len(set(group)) != len(group)
+            or any(name not in indexes or name in claimed for name in group)
+        ):
+            raise ValueError(
+                "optional Topic schema groups must name between 1 and 8 "
+                "disjoint expected steps"
+            )
+        group_indexes = tuple(indexes[name] for name in group)
+        if group_indexes != tuple(
+            range(group_indexes[0], group_indexes[0] + len(group))
+        ):
+            raise ValueError(
+                "optional Topic schema groups must be contiguous in canonical order"
+            )
+        if group_indexes[0] == 0 or group_indexes[-1] + 1 >= len(steps):
+            raise ValueError(
+                "optional Topic schema groups require enclosing schema and lifecycle steps"
+            )
+        before = steps[group_indexes[0] - 1]
+        after = steps[group_indexes[-1] + 1]
+        grouped = tuple(steps[index] for index in group_indexes)
+        if (
+            before.subcommand != "topic-schema"
+            or before.arguments[1:]
+            or after.subcommand not in {"wait-topic", "stream-topic"}
+            or not before.arguments
+            or not after.arguments
+            or any(step.subcommand != "topic-schema" for step in grouped)
+            or any(
+                not step.arguments
+                or step.arguments[0] != before.arguments[0]
+                for step in grouped
+            )
+            or after.arguments[0] != before.arguments[0]
+        ):
+            raise ValueError(
+                "optional Topic schema groups must stay between one exact base "
+                "topic-schema and its wait/stream step"
+            )
+        claimed.update(group)
+        normalized.append(group)
+    return tuple(normalized)
 
 
 def _is_closed_exact_identity_query_step(
@@ -1431,6 +2342,16 @@ def _is_closed_exact_identity_query_step(
     """Return whether one read is exact, bounded, and group-independent."""
 
     arguments = step.arguments
+    if (
+        step.subcommand == "query-object"
+        and len(arguments) == 2
+        and arguments[0] == "--exact-id"
+    ):
+        identity = arguments[1]
+        if isinstance(identity, ResponseBinding):
+            source_index = indexes.get(identity.step)
+            return source_index is not None and source_index < group_start_index
+        return isinstance(identity, str) and bool(identity)
     if (
         step.subcommand != "query-object"
         or len(arguments) < 4
@@ -1546,7 +2467,7 @@ def validate_commutative_composer_setup_step_groups(
             )
             or any(
                 not any(
-                    isinstance(argument, DraftActionJsonArgument)
+                    isinstance(argument, DraftTypedActionArgument)
                     and argument.operation == "audio.import"
                     and argument.metadata_binding is None
                     for argument in step.arguments
@@ -1578,20 +2499,35 @@ def _commutative_composer_setup_pairs(
     return pairs
 
 
-_DRAFT_SUBCOMMANDS = frozenset(
-    {
-        "draft-start",
-        "draft-inspect",
-        "draft-apply",
-        "draft-check",
-        "draft-cancel",
-        "preview-from-draft",
-    }
-)
+_DRAFT_SUBCOMMANDS = DRAFT_GATEWAY_SUBCOMMANDS
 _DRAFT_ID_RE = re.compile(r"^od1-[0-9a-f]{32}$")
 _DRAFT_AUTHORITY_RE = re.compile(r"^da1-[0-9a-f]{40}$")
-_DRAFT_HANDLE_RE = re.compile(r"^odh1-[0-9a-f]{24}$")
+_DRAFT_HANDLE_RE = re.compile(
+    r"^(?:odh1|odn1|tdh1|trm1|trh1|trc1)-[0-9a-f]{24}$"
+)
 _NUMBERED_DRAFT_ACTION_STEP_RE = re.compile(r"^(?P<prefix>.+\.action\.)\d{3}$")
+_BUSINESS_DRAFT_SETUP_STEP_RE = re.compile(
+    r"^(?P<prefix>.+)\.(?:configure|bind-(?:object|field)\.\d{3}|"
+    r"bind-(?:target|reference)-\d{2}-\d{2}|discover-field-\d{2}|"
+    r"declare-(?:(?:new|existing)-\d{2}|existing-batch))$"
+)
+
+
+def business_draft_setup_step_prefix(step_name: str) -> str | None:
+    """Return the sealed transaction prefix for a dependency-ready setup step."""
+
+    match = _BUSINESS_DRAFT_SETUP_STEP_RE.fullmatch(step_name)
+    return match.group("prefix") if match is not None else None
+_BUSINESS_DRAFT_REVISION_SUBCOMMANDS = DRAFT_REVISION_SUBCOMMANDS - {
+    "draft-apply",
+    "draft-cancel",
+}
+_TASK_LOCAL_DECLARATION_ID_RE = re.compile(
+    r"^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$"
+)
+_BOUND_OBJECT_HANDLE_RE = re.compile(r"^boh1-[0-9a-f]{32}$")
+_MAX_REQUIRED_FOLLOWUP_FACTS = 64
+_MAX_REQUIRED_FOLLOWUP_BYTES = 32 * 1024
 
 
 def _draft_projection_handles(value: Any) -> set[str]:
@@ -1608,18 +2544,660 @@ def _draft_projection_handles(value: Any) -> set[str]:
     return handles
 
 
+def _draft_projection_handles_in_order(value: Any) -> tuple[str, ...]:
+    handles: list[str] = []
+    seen: set[str] = set()
+
+    def visit(item: Any) -> None:
+        if isinstance(item, Mapping):
+            handle = item.get("handle")
+            if isinstance(handle, str) and handle not in seen:
+                seen.add(handle)
+                handles.append(handle)
+            for nested in item.values():
+                visit(nested)
+        elif isinstance(item, list):
+            for nested in item:
+                visit(nested)
+
+    visit(value)
+    return tuple(handles)
+
+
+def _valid_required_followup_facts(value: Any) -> bool:
+    """Validate the one closed compact-response extension emitted by Gateway."""
+
+    if value is None:
+        return True
+    if (
+        not isinstance(value, list)
+        or not value
+        or len(value) > _MAX_REQUIRED_FOLLOWUP_FACTS
+    ):
+        return False
+    try:
+        if len(_canonical_json_bytes(value)) > _MAX_REQUIRED_FOLLOWUP_BYTES:
+            return False
+    except (RecursionError, TypeError, UnicodeError, ValueError):
+        return False
+    handles: list[str] = []
+    for row in value:
+        if (
+            not isinstance(row, Mapping)
+            or set(row)
+            != {
+                "reason",
+                "is_next_command",
+                "literal_copy_policy",
+                "fixed_full_argv",
+                "typed_fact_arguments",
+            }
+            or row.get("reason") != "selected_branch_constant"
+            or row.get("is_next_command") is not True
+            or row.get("literal_copy_policy")
+            != {
+                "copy_fixed_full_argv_exactly": True,
+                "business_value_substitution": "invalid",
+            }
+            or not isinstance(row.get("fixed_full_argv"), list)
+            or not all(
+                isinstance(token, str) and token
+                for token in row["fixed_full_argv"]
+            )
+            or not isinstance(row.get("typed_fact_arguments"), list)
+            or not all(
+                isinstance(token, str) and token
+                for token in row["typed_fact_arguments"]
+            )
+        ):
+            return False
+        try:
+            action = parse_typed_action_cli_arguments(
+                row["typed_fact_arguments"]
+            )
+        except OperationComposerError:
+            return False
+        full_argv = row["fixed_full_argv"]
+        fact_arguments = row["typed_fact_arguments"]
+        if len(full_argv) != 11 + len(fact_arguments):
+            return False
+        prefix = full_argv[:11]
+        if (
+            full_argv[11:] != fact_arguments
+            or prefix[2:4] != ["gateway.py", "draft-apply"]
+            or _DRAFT_ID_RE.fullmatch(prefix[4]) is None
+            or prefix[5] != "--task-authority"
+            or _DRAFT_AUTHORITY_RE.fullmatch(prefix[6]) is None
+            or prefix[7] != "--expected-revision"
+            or not prefix[8].isdigit()
+            or int(prefix[8]) <= 0
+            or prefix[9:] != ["--compact", "--facts"]
+        ):
+            return False
+        handle = action.get("field_handle")
+        if (
+            set(action)
+            != {
+                "contract",
+                "action",
+                "fact_action",
+                "field_handle",
+                "value_type",
+                "value",
+            }
+            or action.get("contract")
+            != "waapi-skill.operation-draft-action/v1"
+            or action.get("action") != "add_typed_fact"
+            or action.get("fact_action") != "set"
+            or not isinstance(handle, str)
+            or _DRAFT_HANDLE_RE.fullmatch(handle) is None
+        ):
+            return False
+        handles.append(handle)
+    return len(handles) == len(set(handles))
+
+
+def _valid_request_schema_terminal_arguments(value: Any) -> bool:
+    result_filter = request_contract(
+        "2025.1",
+        "ak.wwise.core.mediaPool.get",
+    ).as_gateway_payload().get("result_filter")
+    return value == {
+        "source_pointer": "/request-schema/result_filter",
+        "append_before_execute": True,
+        "contract": result_filter,
+    }
+
+
+def _valid_draft_completion_candidate(value: Any) -> bool:
+    required_keys = {
+        "condition",
+        "business_completion_check",
+        "is_next_command_when_condition_true",
+        "fixed_argv_prefix",
+        "copy_exactly",
+        "copy_instruction",
+        "copy_command",
+        "allowed_suffix_source",
+        "draft_apply_action_check",
+        "when_condition_false",
+    }
+    if (
+        not isinstance(value, Mapping)
+        or set(value)
+        not in (
+            required_keys,
+            required_keys | {"request_schema_terminal_arguments"},
+        )
+        or value.get("condition")
+        != "all_current_business_request_facts_and_disclosures_submitted"
+        or value.get("business_completion_check")
+        != {
+            "source": "current_user_business_request",
+            "schema_required_fields_complete_is_insufficient": True,
+            "all_user_present_optional_map_and_constant_facts_required": True,
+            "exact_values_and_object_types_required": True,
+        }
+        or value.get("is_next_command_when_condition_true") is not True
+        or value.get("copy_exactly") is not True
+        or value.get("allowed_suffix_source")
+        != "request_schema_terminal_arguments_only"
+        or value.get("draft_apply_action_check") != "invalid"
+        or value.get("when_condition_false")
+        != "continue_with_one_atomic_typed_action_batch_or_dynamic_disclosure"
+        or not isinstance(value.get("fixed_argv_prefix"), list)
+        or not isinstance(value.get("copy_command"), str)
+        or (
+            "request_schema_terminal_arguments" in value
+            and not _valid_request_schema_terminal_arguments(
+                value.get("request_schema_terminal_arguments")
+            )
+        )
+    ):
+        return False
+    prefix = value["fixed_argv_prefix"]
+    instruction = value.get("copy_instruction")
+    if (
+        not isinstance(instruction, Mapping)
+        or instruction
+        != {
+            "contract": (
+                "waapi-skill.operation-draft-command-copy-instruction/v1"
+            ),
+            "source_field": "copy_command",
+            "action": "execute_verbatim_as_one_shell_tool_call",
+            "forbidden_transformations": [
+                "reconstruct",
+                "shorten",
+                "normalize",
+                "substitute_path_segments",
+                "select_another_field",
+            ],
+        }
+    ):
+        return False
+    prefix_valid = (
+        len(prefix) == 9
+        and all(isinstance(token, str) and token for token in prefix)
+        and prefix[0] == "python"
+        and prefix[2:4] == ["gateway.py", "draft-check"]
+        and _DRAFT_ID_RE.fullmatch(prefix[4]) is not None
+        and prefix[5] == "--task-authority"
+        and _DRAFT_AUTHORITY_RE.fullmatch(prefix[6]) is not None
+        and prefix[7] == "--expected-revision"
+        and prefix[8].isdigit()
+        and int(prefix[8]) > 0
+    )
+    if not prefix_valid:
+        return False
+    runner_path = prefix[1]
+    if PureWindowsPath(runner_path).is_absolute():
+        exact_commands = {encode_windows_powershell_argv(prefix)}
+        try:
+            exact_commands.add(encode_windows_model_argv(prefix))
+        except PlatformCommandError:
+            pass
+    elif PurePosixPath(runner_path).is_absolute():
+        exact_commands = {shlex.join(prefix)}
+    else:
+        return False
+    return value["copy_command"] in exact_commands
+
+
+def _valid_draft_construction_continuation(
+    value: Any,
+    *,
+    action: Any,
+    created_handles: Sequence[str],
+    affected_handles: Sequence[str],
+) -> bool:
+    """Validate the closed node-local continuation emitted by compact Draft apply."""
+
+    if value is None:
+        return True
+    if not isinstance(value, Mapping) or action not in {"add_typed_fact", "batch"}:
+        return False
+    required = {
+        "source",
+        "response_was_complete_not_truncated",
+        "current_handle",
+        "completed_fact_action",
+        "next_rule",
+        "stop_cancel_or_claim_truncation_before_current_root_is_complete",
+    }
+    if not required.issubset(value) or not set(value).issubset(
+        required | {"current_key", "resume_previous_container_response"}
+    ):
+        return False
+    current_handle = value.get("current_handle")
+    completed_fact_action = value.get("completed_fact_action")
+    expected_rules = {
+        "append": "continue_with_child_contract_facts_for_the_appended_value",
+        "batch": (
+            "resume_previous_container_response_after_current_node_fact_batch"
+        ),
+        "set": (
+            "continue_with_the_next_business_present_child_contract_"
+            "fact_in_queue_index_order"
+        ),
+        "map-put": (
+            "continue_with_the_next_business_present_child_contract_"
+            "fact_in_queue_index_order"
+        ),
+        "choose-dynamic": "map_put_the_same_key_from_its_disclosed_choice",
+    }
+    current_key = value.get("current_key")
+    key_required = completed_fact_action in {"map-put", "choose-dynamic"}
+    resume = value.get("resume_previous_container_response")
+    resume_base_keys = {
+        "contract",
+        "response_handle",
+        "completed_candidate",
+        "decision_pointer",
+        "selection",
+        "continue_in_same_turn",
+        "after_exhausted",
+        "ancestor_resume_gate",
+        "ancestor_next_item_source",
+        "retype_schema_digest",
+    }
+    ancestor_disclosure = (
+        resume.get("ancestor_next_item_disclosure")
+        if isinstance(resume, Mapping)
+        else None
+    )
+    business_sibling = (
+        resume.get("business_sibling_transition")
+        if isinstance(resume, Mapping)
+        else None
+    )
+    resume_valid = resume is None or (
+        completed_fact_action in {"map-put", "batch"}
+        and isinstance(resume, Mapping)
+        and set(resume)
+        == resume_base_keys
+        | ({"ancestor_next_item_disclosure"} if ancestor_disclosure is not None else set())
+        | ({"business_sibling_transition"} if business_sibling is not None else set())
+        and resume.get("contract") == "waapi-skill.typed-container-handle/v1"
+        and isinstance(resume.get("response_handle"), str)
+        and str(resume["response_handle"]).startswith("trm1-")
+        and _DRAFT_HANDLE_RE.fullmatch(str(resume["response_handle"])) is not None
+        and resume.get("completed_candidate")
+        == (
+            "current_node_fact_batch"
+            if completed_fact_action == "batch"
+            else "deferred_fact_queue"
+        )
+        and resume.get("decision_pointer")
+        == (
+            "/business_sibling_transition"
+            if business_sibling is not None
+            else "/continuation/next_command_decision/evaluate_in_order"
+        )
+        and resume.get("selection")
+        == (
+            "business_present_sibling_before_ancestor_item"
+            if business_sibling is not None
+            else "first_remaining_business_present_candidate_in_order"
+        )
+        and resume.get("continue_in_same_turn") is True
+        and resume.get("after_exhausted") == "resume_ancestor_response_stack"
+        and resume.get("ancestor_resume_gate")
+        == "current_response_and_all_descendant_business_candidates_exhausted"
+        and resume.get("ancestor_next_item_source")
+        == (
+            "ancestor_next_item_disclosure.copy_command_by_shape"
+            if ancestor_disclosure is not None
+            else "next_item_disclosure.copy_command_by_shape"
+        )
+        and (
+            _valid_ancestor_next_item_disclosure(ancestor_disclosure)
+            if ancestor_disclosure is not None
+            else True
+        )
+        and (
+            _valid_resume_business_sibling_transition(business_sibling)
+            if business_sibling is not None
+            else True
+        )
+        and resume.get("retype_schema_digest") == "invalid"
+    )
+    try:
+        key_valid = (
+            isinstance(current_key, str)
+            and bool(current_key)
+            and len(current_key.encode("utf-8")) <= 64 * 1024
+        )
+    except UnicodeError:
+        key_valid = False
+    return (
+        value.get("source") == "most_recent_typed_container_handle_response"
+        and value.get("response_was_complete_not_truncated") is True
+        and isinstance(current_handle, str)
+        and current_handle.startswith("trm1-")
+        and _DRAFT_HANDLE_RE.fullmatch(current_handle) is not None
+        and current_handle in {*created_handles, *affected_handles}
+        and completed_fact_action in expected_rules
+        and (
+            (action == "batch" and completed_fact_action == "batch")
+            or (action == "add_typed_fact" and completed_fact_action != "batch")
+        )
+        and value.get("next_rule")
+        == (
+            (
+                "resume_previous_container_response_after_current_node_fact_batch"
+                if completed_fact_action == "batch"
+                else "resume_previous_container_response_after_deferred_fact_queue"
+            )
+            if resume is not None
+            else expected_rules.get(completed_fact_action)
+        )
+        and value.get(
+            "stop_cancel_or_claim_truncation_before_current_root_is_complete"
+        )
+        == "invalid"
+        and (key_valid if key_required else "current_key" not in value)
+        and resume_valid
+    )
+
+
+def _valid_resume_business_sibling_transition(value: Any) -> bool:
+    if not isinstance(value, Mapping) or set(value) != {
+        "condition",
+        "business_value_pointer",
+        "key",
+        "after",
+        "after_current_node_facts",
+        "absent_member_forbidden",
+        "is_next_command",
+        "argv_by_shape",
+        "copy_command_by_shape",
+    }:
+        return False
+    pointer = value.get("business_value_pointer")
+    key = value.get("key")
+    argv_by_shape = value.get("argv_by_shape")
+    copy_by_shape = value.get("copy_command_by_shape")
+    escaped_key = (
+        key.replace("~", "~0").replace("/", "~1")
+        if isinstance(key, str)
+        else None
+    )
+    if (
+        value.get("condition")
+        != "current_business_request_contains_next_complex_member"
+        or not isinstance(pointer, str)
+        or not pointer.startswith("/args/")
+        or not isinstance(escaped_key, str)
+        or not escaped_key
+        or not pointer.endswith(f"/{escaped_key}")
+        or value.get("after") != "current_branch_descendant_disclosures"
+        or value.get("after_current_node_facts") is not True
+        or value.get("absent_member_forbidden") is not True
+        or value.get("is_next_command") is not False
+        or not isinstance(argv_by_shape, Mapping)
+        or not argv_by_shape
+        or not isinstance(copy_by_shape, Mapping)
+        or set(argv_by_shape) != set(copy_by_shape)
+        or not set(argv_by_shape).issubset({"object", "array"})
+    ):
+        return False
+    sealed_identity: tuple[str, str, str, str] | None = None
+    for shape, raw_argv in argv_by_shape.items():
+        copy_command = copy_by_shape.get(shape)
+        if (
+            not isinstance(raw_argv, list)
+            or len(raw_argv) != 10
+            or any(not isinstance(token, str) or not token for token in raw_argv)
+            or raw_argv[0] != "request-map-container"
+            or raw_argv[2:4] != ["--map-handle", raw_argv[3]]
+            or _DRAFT_HANDLE_RE.fullmatch(raw_argv[3]) is None
+            or not raw_argv[3].startswith("trm1-")
+            or raw_argv[4:8] != ["--key", key, "--shape", shape]
+            or raw_argv[8] != "--parent-schema-token"
+            or not raw_argv[9].startswith("trl2-")
+            or not isinstance(copy_command, str)
+            or not copy_command
+        ):
+            return False
+        identity = (raw_argv[1], raw_argv[3], key, raw_argv[9])
+        if sealed_identity is not None and identity != sealed_identity:
+            return False
+        sealed_identity = identity
+        candidates: list[list[str]] = []
+        try:
+            candidates.append(shlex.split(copy_command))
+        except ValueError:
+            pass
+        for decoder in (decode_windows_model_argv, decode_windows_powershell_argv):
+            try:
+                decoded = list(decoder(copy_command))
+            except PlatformCommandError:
+                continue
+            if decoded not in candidates:
+                candidates.append(decoded)
+        if not any(
+            len(argv) == 13
+            and argv[0] == "python"
+            and (
+                PurePosixPath(argv[1]).is_absolute()
+                or PureWindowsPath(argv[1]).is_absolute()
+            )
+            and argv[2] == "gateway.py"
+            and argv[3:] == raw_argv
+            for argv in candidates
+        ):
+            return False
+    return True
+
+
+def _valid_ancestor_next_item_disclosure(value: Any) -> bool:
+    if not isinstance(value, Mapping) or set(value) != {
+        "condition",
+        "business_cardinality_authority",
+        "index",
+        "copy_command_by_shape",
+    }:
+        return False
+    index = value.get("index")
+    copies = value.get("copy_command_by_shape")
+    if (
+        value.get("condition")
+        != "current_business_request_contains_next_complex_item"
+        or value.get("business_cardinality_authority")
+        != "current_business_request"
+        or type(index) is not int
+        or not 1 <= index < MAX_TYPED_ARRAY_ITEMS
+        or not isinstance(copies, Mapping)
+        or not copies
+        or not set(copies).issubset({"object", "array"})
+    ):
+        return False
+    sealed_identity: tuple[str, str, str] | None = None
+    for shape, command in copies.items():
+        if not isinstance(command, str) or not command:
+            return False
+        candidates: list[list[str]] = []
+        try:
+            candidates.append(shlex.split(command))
+        except ValueError:
+            pass
+        for decoder in (decode_windows_model_argv, decode_windows_powershell_argv):
+            try:
+                decoded = list(decoder(command))
+            except PlatformCommandError:
+                continue
+            if decoded not in candidates:
+                candidates.append(decoded)
+        valid = False
+        for argv in candidates:
+            if (
+                len(argv) != 13
+                or argv[0] != "python"
+                or argv[2] != "gateway.py"
+                or argv[3] != "request-array-item"
+                or not argv[4]
+            ):
+                continue
+            runner = argv[1]
+            if not (
+                PurePosixPath(runner).is_absolute()
+                or PureWindowsPath(runner).is_absolute()
+            ):
+                continue
+            if (
+                argv[5] == "--schema-digest"
+                and re.fullmatch(r"[0-9a-f]{64}", argv[6]) is not None
+                and argv[7] == "--array-handle"
+                and _DRAFT_HANDLE_RE.fullmatch(argv[8]) is not None
+                and argv[8].startswith("trh1-")
+                and argv[9:13] == ["--index", str(index), "--shape", shape]
+            ):
+                identity = (argv[4], argv[6], argv[8])
+                if sealed_identity is not None and identity != sealed_identity:
+                    continue
+                sealed_identity = identity
+                valid = True
+                break
+        if not valid:
+            return False
+    return True
+
+
+def _valid_draft_resume_action_binding(
+    value: Any,
+    *,
+    construction_continuation: Any,
+) -> bool:
+    if not isinstance(construction_continuation, Mapping):
+        return True
+    resume = construction_continuation.get("resume_previous_container_response")
+    if resume is None:
+        return True
+    if not isinstance(value, Mapping):
+        return False
+    expected_keys = {
+        "contract",
+        "shell_tool_timeout_ms",
+        "fixed_argv_prefix",
+        "append_every_next_complete_handle_ready_typed_action_until_limit_or_new_handle_dependency",
+        "replace_only",
+        "resume_previous_container_response",
+        "prompt_fact_completion_guard",
+    }
+    if value.get("completion_candidate") is not None:
+        expected_keys.add("completion_candidate")
+    if (
+        set(value) != expected_keys
+        or value.get("contract")
+        != "waapi-skill.operation-draft-next-action/v1"
+        or value.get("shell_tool_timeout_ms") != GATEWAY_SHELL_TOOL_TIMEOUT_MS
+        or value.get("resume_previous_container_response") != resume
+        or value.get(
+            "append_every_next_complete_handle_ready_typed_action_until_limit_or_new_handle_dependency"
+        )
+        != ["--action", "<action-name>", "<typed-fact-arguments>"]
+        or value.get("replace_only")
+        != ["<action-name>", "<typed-fact-arguments>"]
+        or value.get("prompt_fact_completion_guard")
+        != {
+            "schema_optional_is_not_evidence_of_prompt_absence": True,
+            "account_for_every_prompt_present_scalar_array_item_and_map_entry": True,
+            "copy_boolean_values_exactly": True,
+            "infer_or_replace_prompt_values": "invalid",
+        }
+        or not isinstance(value.get("fixed_argv_prefix"), list)
+    ):
+        return False
+    prefix = value["fixed_argv_prefix"]
+    return (
+        len(prefix) == 11
+        and all(isinstance(token, str) and token for token in prefix)
+        and prefix[0] == "python"
+        and prefix[2:4] == ["gateway.py", "draft-apply"]
+        and _DRAFT_ID_RE.fullmatch(prefix[4]) is not None
+        and prefix[5] == "--task-authority"
+        and _DRAFT_AUTHORITY_RE.fullmatch(prefix[6]) is not None
+        and prefix[7] == "--expected-revision"
+        and prefix[8].isdigit()
+        and int(prefix[8]) > 0
+        and prefix[9:] == ["--compact", "--facts"]
+    )
+
+
 def _draft_compact_action_result(
     draft: Mapping[str, Any],
 ) -> tuple[str, set[str], set[str], Mapping[str, Any]]:
     result = draft.get("action_result")
     summary = draft.get("current_facts_summary")
+    next_action_binding = draft.get("next_action_binding")
+    required_fields_status = draft.get("schema_required_fields_status")
+    completion_candidate = (
+        next_action_binding.get("completion_candidate")
+        if isinstance(next_action_binding, Mapping)
+        else None
+    )
     if (
         not isinstance(result, Mapping)
-        or set(result)
-        != {"contract", "action", "created_handles", "affected_handles"}
+        or not set(result).issubset(
+            {
+                "contract",
+                "action",
+                "created_handles",
+                "affected_handles",
+                "required_followup_facts",
+                "construction_continuation",
+                "last_action",
+                "action_count",
+                "applied_atomically",
+            }
+        )
+        or not {
+            "contract",
+            "action",
+            "created_handles",
+            "affected_handles",
+        }.issubset(result)
         or result.get("contract")
         != "waapi-skill.operation-draft-action-result/v1"
         or not isinstance(result.get("action"), str)
+        or (
+            result.get("action") == "batch"
+            and (
+                not isinstance(result.get("last_action"), str)
+                or type(result.get("action_count")) is not int
+                or not 2 <= result["action_count"] <= MAX_TYPED_ACTIONS_PER_APPLY
+                or result.get("applied_atomically") is not True
+                or "required_followup_facts" in result
+            )
+        )
+        or (
+            result.get("action") != "batch"
+            and any(
+                key in result
+                for key in ("last_action", "action_count", "applied_atomically")
+            )
+        )
         or not isinstance(result.get("created_handles"), list)
         or not isinstance(result.get("affected_handles"), list)
         or any(
@@ -1630,6 +3208,15 @@ def _draft_compact_action_result(
         )
         or len(set(result["created_handles"])) != len(result["created_handles"])
         or len(set(result["affected_handles"])) != len(result["affected_handles"])
+        or not _valid_required_followup_facts(
+            result.get("required_followup_facts")
+        )
+        or not _valid_draft_construction_continuation(
+            result.get("construction_continuation"),
+            action=result.get("action"),
+            created_handles=result.get("created_handles", ()),
+            affected_handles=result.get("affected_handles", ()),
+        )
         or not isinstance(summary, Mapping)
         or set(summary)
         != {
@@ -1646,6 +3233,27 @@ def _draft_compact_action_result(
         or summary["handle_count"] < 0
         or not isinstance(summary.get("canonical_sha256"), str)
         or re.fullmatch(r"[0-9a-f]{64}", summary["canonical_sha256"]) is None
+        or not isinstance(next_action_binding, Mapping)
+        or next_action_binding.get("shell_tool_timeout_ms")
+        != GATEWAY_SHELL_TOOL_TIMEOUT_MS
+        or required_fields_status not in {None, "complete", "incomplete"}
+        or (
+            required_fields_status == "incomplete"
+            and completion_candidate is not None
+        )
+        or (
+            required_fields_status == "complete"
+            and not _valid_draft_completion_candidate(completion_candidate)
+        )
+        or (
+            required_fields_status is None
+            and "construction_continuation" not in result
+            and not _valid_draft_completion_candidate(completion_candidate)
+        )
+        or not _valid_draft_resume_action_binding(
+            next_action_binding,
+            construction_continuation=result.get("construction_continuation"),
+        )
         or "current_facts" in draft
     ):
         raise GatewayInvocationError(
@@ -1659,6 +3267,134 @@ def _draft_compact_action_result(
     )
 
 
+def draft_compact_action_result(
+    draft: Mapping[str, Any],
+) -> tuple[str, set[str], set[str], Mapping[str, Any]]:
+    """Validate the one current compact Draft action evidence projection."""
+
+    return _draft_compact_action_result(draft)
+
+
+def _validate_compound_undo_draft_protocol_steps(
+    steps: tuple[ExpectedGatewayStep, ...],
+    starts: tuple[ExpectedGatewayStep, ...],
+) -> None:
+    """Validate checked child Draft flows consumed by one parent Preview."""
+
+    indexes = {step.name: index for index, step in enumerate(steps)}
+    declarations = tuple(
+        step for step in steps if step.subcommand == "draft-declare-undo-plan"
+    )
+    if len(declarations) != 1:
+        raise ValueError("compound Undo protocol requires one parent declaration")
+    declaration = declarations[0]
+    if not declaration.arguments or not isinstance(
+        declaration.arguments[0], ResponseBinding
+    ):
+        raise ValueError("compound Undo declaration must bind its parent Draft")
+    parent_start_name = declaration.arguments[0].step
+    starts_by_name = {step.name: step for step in starts}
+    parent_start = starts_by_name.get(parent_start_name)
+    if parent_start is None:
+        raise ValueError("compound Undo declaration names an unknown parent Draft")
+
+    for child_start in starts:
+        if child_start is parent_start:
+            continue
+        arguments = child_start.arguments
+        if (
+            child_start.subcommand != "draft-start-undo-child"
+            or len(arguments) != 7
+            or arguments[0]
+            != ResponseBinding(parent_start_name, "/draft/draft_id")
+            or arguments[1] != "--task-authority"
+            or arguments[2]
+            != ResponseBinding(parent_start_name, "/task_authority")
+            or arguments[3] != "--expected-revision"
+            or arguments[4]
+            != ResponseBinding(parent_start_name, "/draft/revision")
+            or arguments[5] != "--operation"
+        ):
+            raise ValueError(
+                "compound Undo child start must bind its exact compound parent"
+            )
+
+    child_start_names: list[str] = []
+    arguments = declaration.arguments
+    for index, value in enumerate(arguments):
+        if value != "--child-draft":
+            continue
+        if index + 2 >= len(arguments):
+            raise ValueError("compound Undo child capability is incomplete")
+        draft_id = arguments[index + 1]
+        authority = arguments[index + 2]
+        if (
+            not isinstance(draft_id, ResponseBinding)
+            or draft_id.pointer != "/draft/draft_id"
+            or not isinstance(authority, ResponseBinding)
+            or authority.pointer != "/task_authority"
+            or authority.step != draft_id.step
+            or draft_id.step == parent_start_name
+            or draft_id.step not in starts_by_name
+        ):
+            raise ValueError(
+                "compound Undo children must bind one exact checked child capability"
+            )
+        child_start_names.append(draft_id.step)
+    expected_children = {step.name for step in starts if step is not parent_start}
+    if (
+        not child_start_names
+        or len(child_start_names) != len(set(child_start_names))
+        or set(child_start_names) != expected_children
+    ):
+        raise ValueError(
+            "compound Undo declaration must consume every child Draft exactly once"
+        )
+
+    covered: set[str] = set()
+    for start in starts:
+        owned = [start]
+        for step in steps:
+            if (
+                step.subcommand not in _DRAFT_SUBCOMMANDS
+                or step in starts
+            ):
+                continue
+            first = step.arguments[0] if step.arguments else None
+            if isinstance(first, ResponseBinding) and first.step == start.name:
+                owned.append(step)
+        owned.sort(key=lambda step: indexes[step.name])
+        schema = next(
+            (
+                step
+                for step in reversed(steps[: indexes[start.name]])
+                if step.subcommand == "operation-schema"
+                and step.arguments == start.arguments
+            ),
+            None,
+        )
+        segment = tuple(([schema] if schema is not None else []) + owned)
+        validate_operation_draft_protocol_steps(segment)
+        covered.update(step.name for step in owned)
+        if start is parent_start:
+            if owned[-1].subcommand != "preview-from-draft":
+                raise ValueError("compound Undo parent must end in one Preview")
+        else:
+            if owned[-1].subcommand != "draft-check":
+                raise ValueError(
+                    "compound Undo child Draft must end checked without a child Preview"
+                )
+            if indexes[owned[-1].name] >= indexes[declaration.name]:
+                raise ValueError(
+                    "compound Undo children must be checked before parent declaration"
+                )
+    draft_names = {
+        step.name for step in steps if step.subcommand in _DRAFT_SUBCOMMANDS
+    }
+    if covered != draft_names:
+        raise ValueError("compound Undo Draft command has no owning flow")
+
+
 def validate_operation_draft_protocol_steps(
     expected_steps: Sequence[ExpectedGatewayStep],
 ) -> None:
@@ -1668,8 +3404,17 @@ def validate_operation_draft_protocol_steps(
     draft_steps = tuple(step for step in steps if step.subcommand in _DRAFT_SUBCOMMANDS)
     if not draft_steps:
         return
-    starts = tuple(step for step in draft_steps if step.subcommand == "draft-start")
+    starts = tuple(
+        step
+        for step in draft_steps
+        if step.subcommand in {"draft-start", "draft-start-undo-child"}
+    )
     if len(starts) > 1:
+        if any(
+            step.subcommand == "draft-declare-undo-plan" for step in draft_steps
+        ):
+            _validate_compound_undo_draft_protocol_steps(steps, starts)
+            return
         indexes = {step.name: index for index, step in enumerate(steps)}
         start_indexes = tuple(indexes[step.name] for step in starts)
         terminal_indexes: list[int] = []
@@ -1691,11 +3436,25 @@ def validate_operation_draft_protocol_steps(
                 )
             terminal_indexes.append(terminals[0])
         covered_draft_indexes: set[int] = set()
+        shared_pre_draft_reads = tuple(
+            step
+            for step in steps[: start_indexes[0]]
+            if step.subcommand in {"metadata", "query-object"}
+        )
         for flow_index, terminal_index in enumerate(terminal_indexes):
             segment_start = (
                 0 if flow_index == 0 else terminal_indexes[flow_index - 1] + 1
             )
-            segment = steps[segment_start : terminal_index + 1]
+            segment_body = steps[segment_start : terminal_index + 1]
+            # One bounded metadata/query discovery may intentionally bind
+            # several later transactions. Preserve that authenticated
+            # pre-Draft evidence while validating each independent Draft
+            # segment; do not require or duplicate another live read.
+            segment = (
+                segment_body
+                if flow_index == 0
+                else (*shared_pre_draft_reads, *segment_body)
+            )
             validate_operation_draft_protocol_steps(segment)
             covered_draft_indexes.update(
                 range(segment_start, terminal_index + 1)
@@ -1710,14 +3469,56 @@ def validate_operation_draft_protocol_steps(
     if len(starts) != 1:
         raise ValueError("a typed Draft protocol requires exactly one draft-start step")
     start = starts[0]
+    if start.subcommand == "draft-start-undo-child":
+        if (
+            len(start.arguments) != 7
+            or start.arguments[1] != "--task-authority"
+            or start.arguments[3] != "--expected-revision"
+            or start.arguments[5] != "--operation"
+            or not isinstance(start.arguments[6], str)
+            or not start.arguments[6]
+            or start.arguments[6] != start.arguments[6].strip()
+        ):
+            raise ValueError(
+                "draft-start-undo-child must bind one parent and one exact child operation"
+            )
+        draft_operation = start.arguments[6]
+    else:
+        if (
+            len(start.arguments) != 1
+            or not isinstance(start.arguments[0], str)
+            or not start.arguments[0]
+            or start.arguments[0] != start.arguments[0].strip()
+        ):
+            raise ValueError("draft-start must bind one exact operation name")
+        draft_operation = start.arguments[0]
+    preceding_schema = next(
+        (
+            step
+            for step in reversed(steps[: steps.index(start)])
+            if step.subcommand == "operation-schema"
+        ),
+        None,
+    )
     if (
-        len(start.arguments) != 1
-        or not isinstance(start.arguments[0], str)
-        or not start.arguments[0]
-        or start.arguments[0] != start.arguments[0].strip()
+        preceding_schema is not None
+        and preceding_schema.arguments != (draft_operation,)
     ):
-        raise ValueError("draft-start must bind one exact operation name")
-    draft_operation = start.arguments[0]
+        raise ValueError(
+            "draft-start must follow the exact matching operation-schema"
+        )
+    for step in steps:
+        if step.subcommand != "preview-from-draft" or (
+            step.expected_operation_request is None
+        ):
+            continue
+        if not _business_request_matches_draft_operation(
+            step.expected_operation_request,
+            draft_operation,
+        ):
+            raise ValueError(
+                "Business request witness must match its exact draft-start"
+            )
     for step in steps:
         if step.subcommand not in {"preview", "legacy-preview"}:
             continue
@@ -1759,12 +3560,12 @@ def validate_operation_draft_protocol_steps(
     )
     if any(
         step.subcommand not in _DRAFT_SUBCOMMANDS
+        | {"request-map-container", "request-array-item"}
         for step in steps[start_index : draft_end_index + 1]
     ):
         raise ValueError(
             "typed Draft composition cannot be interrupted by another Gateway route"
         )
-
     def require_prior_binding(
         value: Any,
         *,
@@ -1823,47 +3624,46 @@ def validate_operation_draft_protocol_steps(
             or revision_binding.step != latest_revision_step
             or indexes.get(revision_binding.step, len(steps)) >= index
             or steps[indexes[revision_binding.step]].subcommand
-            not in {"draft-start", "draft-apply", "draft-check", "draft-inspect"}
+            not in _DRAFT_SUBCOMMANDS - {"draft-cancel", "preview-from-draft"}
         ):
             raise ValueError(
                 f"{step.subcommand} expected revision must come from one prior Draft response"
             )
         if step.subcommand == "draft-apply":
-            compact_action = (
-                len(arguments) == 8
+            typed_actions = (
+                _draft_typed_actions(arguments[7])
+                if len(arguments) == 8
                 and arguments[5:7] == ("--compact", "--facts")
-                and isinstance(arguments[7], DraftActionJsonArgument)
+                else None
             )
-            hidden_compatibility_action = (
-                len(arguments) == 8
-                and arguments[5:7] == ("--compact", "--action-json")
-                and isinstance(arguments[7], DraftActionJsonArgument)
-            ) or (
-                len(arguments) == 7
-                and arguments[5] == "--action-json"
-                and isinstance(arguments[6], DraftActionJsonArgument)
-            )
-            if not compact_action and not hidden_compatibility_action:
+            if not typed_actions:
                 raise ValueError(
-                    "draft-apply must carry exactly one typed Draft action"
+                    "draft-apply must carry one bounded typed Draft action batch"
                 )
-            action_argument = arguments[-1]
-            assert isinstance(action_argument, DraftActionJsonArgument)
-            if action_argument.operation != draft_operation:
+            if any(action.operation != draft_operation for action in typed_actions):
                 raise ValueError(
                     "typed Draft action operation must match draft-start"
                 )
-            for binding in action_argument.response_bindings:
+            for binding in (
+                binding
+                for action in typed_actions
+                for binding in action.response_bindings
+            ):
                 source_index = indexes.get(binding.step)
                 if (
                     source_index is None
                     or source_index >= index
-                    or steps[source_index].subcommand != "draft-apply"
+                    or steps[source_index].subcommand
+                    not in {"draft-apply", "request-map-container", "request-array-item"}
                 ):
                     raise ValueError(
                         "typed Draft action handles must come from one prior draft-apply response"
                     )
-            for binding in action_argument.query_identity_bindings:
+            for binding in (
+                binding
+                for action in typed_actions
+                for binding in action.query_identity_bindings
+            ):
                 source_index = indexes.get(binding.step)
                 if (
                     source_index is None
@@ -1874,8 +3674,11 @@ def validate_operation_draft_protocol_steps(
                         "typed Draft action query identities must come from one "
                         "pre-Draft query-object response"
                     )
-            metadata_binding = action_argument.metadata_binding
-            if metadata_binding is not None:
+            for metadata_binding in (
+                action.metadata_binding
+                for action in typed_actions
+                if action.metadata_binding is not None
+            ):
                 source_index = indexes.get(metadata_binding.step)
                 if (
                     source_index is None
@@ -1885,10 +3688,28 @@ def validate_operation_draft_protocol_steps(
                     raise ValueError(
                         "typed Draft action metadata must come from one pre-Draft read"
                     )
-        elif any(isinstance(value, DraftActionJsonArgument) for value in arguments):
+        elif any(_draft_typed_actions(value) is not None for value in arguments):
             raise ValueError("typed Draft actions are valid only on draft-apply")
-        if step.subcommand in {"draft-check", "draft-cancel"} and len(arguments) != 5:
-            raise ValueError(f"{step.subcommand} accepts only bound Draft authority and revision")
+        if step.subcommand == "draft-check":
+            media_pool_filter = (
+                draft_operation == "ak.wwise.core.mediaPool.get"
+                and len(arguments) == 9
+                and arguments[5] == "--post-filter-value"
+                and isinstance(arguments[6], str)
+                and arguments[7] == "--post-filter-limit"
+                and isinstance(arguments[8], str)
+                and arguments[8].isdigit()
+                and int(arguments[8]) > 0
+            )
+            if len(arguments) != 5 and not media_pool_filter:
+                raise ValueError(
+                    "draft-check accepts only bound Draft authority/revision "
+                    "and the closed Media Pool result filter"
+                )
+        if step.subcommand == "draft-cancel" and len(arguments) != 5:
+            raise ValueError(
+                "draft-cancel accepts only bound Draft authority and revision"
+            )
         if step.subcommand == "preview-from-draft":
             trailing = arguments[5:]
             valid_trailing = trailing in {
@@ -1907,6 +3728,21 @@ def validate_operation_draft_protocol_steps(
                     "preview-from-draft trailing policy arguments must be fixed literals"
                 )
         latest_revision_step = step.name
+
+
+def _business_request_matches_draft_operation(
+    request: Mapping[str, Any],
+    draft_operation: str,
+) -> bool:
+    """Match a named adapter or its reviewed raw-Core ``waapi.call`` envelope."""
+
+    operation = request.get("operation")
+    arguments = request.get("arguments")
+    return operation == draft_operation or (
+        operation == "waapi.call"
+        and isinstance(arguments, Mapping)
+        and arguments.get("api") == draft_operation
+    )
 
 
 def gateway_step_prefix_matches(
@@ -1959,6 +3795,32 @@ def _gateway_step_prefix_matches_one_order(
 
     index = 0
     while index < len(actual_names):
+        business_setup = _BUSINESS_DRAFT_SETUP_STEP_RE.fullmatch(
+            expected_names[index]
+        )
+        if business_setup is not None:
+            prefix = business_setup.group("prefix")
+            end = index
+            while (
+                end < len(expected_names)
+                and (
+                    candidate := _BUSINESS_DRAFT_SETUP_STEP_RE.fullmatch(
+                        expected_names[end]
+                    )
+                )
+                is not None
+                and candidate.group("prefix") == prefix
+            ):
+                end += 1
+            expected_group = expected_names[index:end]
+            supplied_group = actual_names[index : min(end, len(actual_names))]
+            if (
+                len(set(supplied_group)) != len(supplied_group)
+                or not set(supplied_group) <= set(expected_group)
+            ):
+                return False
+            index += len(supplied_group)
+            continue
         numbered = _NUMBERED_DRAFT_ACTION_STEP_RE.fullmatch(
             expected_names[index]
         )
@@ -2002,6 +3864,80 @@ def gateway_step_sequence_matches(
         actual,
         groups,
         composer_setup_groups,
+    )
+
+
+def dependency_free_draft_action_block(
+    steps: Sequence[ExpectedGatewayStep],
+    start_index: int,
+) -> tuple[tuple[int, ...], tuple[DraftTypedActionArgument, ...]] | None:
+    """Return one adjacent Composer fact block whose transport order may vary."""
+
+    if not 0 <= start_index < len(steps):
+        return None
+    first = steps[start_index]
+    first_match = _NUMBERED_DRAFT_ACTION_STEP_RE.fullmatch(first.name)
+    first_actions = (
+        _draft_typed_actions(first.arguments[-1])
+        if first.subcommand == "draft-apply" and first.arguments
+        else None
+    )
+    if (
+        first_match is None
+        or not first_actions
+        or first_actions[0].operation == "audio.import"
+    ):
+        return None
+    prefix = first_match.group("prefix")
+    indexes: list[int] = []
+    actions: list[DraftTypedActionArgument] = []
+    for index in range(start_index, len(steps)):
+        candidate = steps[index]
+        candidate_match = _NUMBERED_DRAFT_ACTION_STEP_RE.fullmatch(
+            candidate.name
+        )
+        candidate_actions = (
+            _draft_typed_actions(candidate.arguments[-1])
+            if candidate.subcommand == "draft-apply" and candidate.arguments
+            else None
+        )
+        if (
+            candidate_match is None
+            or candidate_match.group("prefix") != prefix
+            or not candidate_actions
+        ):
+            break
+        indexes.append(index)
+        actions.extend(candidate_actions)
+    if (
+        not actions
+        or any(action.operation != first_actions[0].operation for action in actions)
+        or any(action.response_bindings for action in actions)
+        or any(
+            action.expected.get("action") in _COMPOSER_HANDLE_PRODUCING_ACTIONS
+            for action in actions
+        )
+    ):
+        return None
+    return tuple(indexes), tuple(actions)
+
+
+def _commutative_typed_draft_fact(
+    first: DraftTypedActionArgument,
+    second: DraftTypedActionArgument,
+) -> bool:
+    """Return whether two sealed scalar facts may cross transport batches."""
+
+    first_value = first.expected
+    second_value = second.expected
+    return (
+        first_value.get("action") == "add_typed_fact"
+        and second_value.get("action") == "add_typed_fact"
+        and first_value.get("fact_action") == "set"
+        and second_value.get("fact_action") == "set"
+        and isinstance(first_value.get("field_handle"), str)
+        and isinstance(second_value.get("field_handle"), str)
+        and first_value["field_handle"] != second_value["field_handle"]
     )
 
 
@@ -2193,6 +4129,684 @@ def _query_object_return_field_value_indexes(
             "query-object supplied --return-field set must match the allow-list"
         )
     return frozenset(index + 1 for index in expected_option_indexes)
+
+
+def _normalize_query_object_default_identity_projection(
+    step: "ExpectedGatewayStep",
+    supplied_arguments: Sequence[str],
+) -> tuple[str, ...]:
+    """Match the deep exact-identity query to its legacy sealed witness.
+
+    The current business seam accepts path segments or one exact GUID and owns
+    the fixed ``id/name/type/path`` projection. Older integration witnesses
+    spell the same request as one native path/GUID plus four explicit return
+    fields. Only that complete default projection is eligible; custom fields,
+    transformations, and broader sources remain exact.
+    """
+
+    actual = tuple(supplied_arguments)
+    expected = tuple(step.arguments)
+    if (
+        step.subcommand != "query-object"
+        or not all(isinstance(value, str) for value in expected)
+        or len(expected) != 10
+    ):
+        return actual
+    source_option = expected[0]
+    business_source = {
+        "--path": "--path-segment",
+        "--object-id": "--exact-id",
+    }.get(source_option)
+    if business_source is None:
+        return actual
+    projection = expected[2:]
+    if projection[::2] != ("--return-field",) * 4 or set(
+        projection[1::2]
+    ) != {"id", "name", "type", "path"}:
+        return actual
+
+    if business_source == "--exact-id":
+        return expected if actual == (business_source, expected[1]) else actual
+
+    if len(actual) < 2 or len(actual) % 2 or actual[::2] != (
+        business_source,
+    ) * (len(actual) // 2):
+        return actual
+    segments = actual[1::2]
+    if any(
+        not segment or segment != segment.strip() or "\\" in segment
+        for segment in segments
+    ):
+        return actual
+    return expected if "\\" + "\\".join(segments) == expected[1] else actual
+
+
+def _normalize_query_object_event_actions(
+    step: "ExpectedGatewayStep",
+    supplied_arguments: Sequence[str],
+) -> tuple[Any, ...]:
+    """Expand the closed Event Action preset to its legacy protocol witness."""
+
+    actual = tuple(supplied_arguments)
+    expected_tail = (
+        "--select",
+        "children",
+        "--take",
+        "100",
+        "--return-field",
+        "id",
+        "--return-field",
+        "name",
+        "--return-field",
+        "type",
+        "--return-field",
+        "path",
+        "--return-field",
+        "ActionType",
+        "--return-field",
+        "Target",
+    )
+    if (
+        step.subcommand != "query-object"
+        or len(step.arguments) != 18
+        or tuple(step.arguments[2:]) != expected_tail
+        or not isinstance(step.arguments[0], ExactArgumentAlternatives)
+    ):
+        return actual
+
+    groups: list[tuple[str, str]] = []
+    index = 0
+    while index < len(actual):
+        option = actual[index]
+        if option not in {
+            "--exact-id",
+            "--path-segment",
+            "--relationship",
+            "--max-results",
+        } or index + 1 >= len(actual):
+            return actual
+        groups.append((option, actual[index + 1]))
+        index += 2
+    if groups.count(("--relationship", "event-actions")) != 1:
+        return actual
+    bounds = [value for option, value in groups if option == "--max-results"]
+    if bounds not in ([], ["100"]):
+        return actual
+    sources = [
+        (option, value)
+        for option, value in groups
+        if option in {"--exact-id", "--path-segment"}
+    ]
+    if not sources:
+        return actual
+    if sources[0][0] == "--exact-id":
+        if len(sources) != 1:
+            return actual
+        source_option = "--object-id"
+        source_value = sources[0][1]
+    elif all(option == "--path-segment" for option, _value in sources):
+        segments = [value for _option, value in sources]
+        if any(not value or "\\" in value for value in segments):
+            return actual
+        source_option = "--path"
+        source_value = "\\" + "\\".join(segments)
+    else:
+        return actual
+    if source_option not in step.arguments[0].values:
+        return actual
+    return (source_option, source_value, *expected_tail)
+
+
+def _normalize_query_object_sound_routing_view(
+    step: "ExpectedGatewayStep",
+    supplied_arguments: Sequence[str],
+) -> tuple[Any, ...]:
+    """Expand the closed Sound routing view to its legacy protocol witness."""
+
+    actual = tuple(supplied_arguments)
+    expected_tail = (
+        "--return-field",
+        "id",
+        "--return-field",
+        "name",
+        "--return-field",
+        "type",
+        "--return-field",
+        "path",
+        "--return-field",
+        "OverrideOutput",
+        "--return-field",
+        "activeSource",
+        "--return-field",
+        "OutputBus",
+    )
+    if (
+        step.subcommand != "query-object"
+        or len(step.arguments) != 16
+        or step.arguments[0] != "--object-id"
+        or tuple(step.arguments[2:]) != expected_tail
+        or len(actual) != 4
+        or actual[0] != "--exact-id"
+        or actual[2:] != ("--view", "sound-routing-diagnostics")
+    ):
+        return actual
+    return ("--object-id", actual[1], *expected_tail)
+
+
+def _normalize_query_object_exact_id_unit_ceiling(
+    step: "ExpectedGatewayStep",
+    supplied_arguments: Sequence[str],
+) -> tuple[Any, ...]:
+    """Ignore an explicit one-row ceiling on an already exact GUID source."""
+
+    actual = tuple(supplied_arguments)
+    expected = tuple(step.arguments)
+    if (
+        step.subcommand != "query-object"
+        or len(expected) != 2
+        or expected[0] != "--exact-id"
+        or len(actual) != 4
+    ):
+        return actual
+    pairs = tuple(zip(actual[::2], actual[1::2], strict=True))
+    if len({option for option, _value in pairs}) != 2:
+        return actual
+    values = dict(pairs)
+    if (
+        values.get("--exact-id") == expected[1]
+        and values.get("--max-results") == "1"
+    ):
+        return expected
+    return actual
+
+
+def _normalize_query_object_business_projection(
+    step: "ExpectedGatewayStep",
+    supplied_arguments: Sequence[str],
+) -> tuple[Any, ...]:
+    """Expand reviewed identity selectors/includes to legacy field witnesses."""
+
+    actual = tuple(supplied_arguments)
+    expected = tuple(step.arguments)
+    if (
+        step.subcommand != "query-object"
+        or len(expected) < 4
+        or expected[0] not in {"--object-id", "--path"}
+        or len(expected[2:]) % 2
+        or expected[2::2] != ("--return-field",) * (len(expected[2:]) // 2)
+    ):
+        return actual
+    expected_fields = tuple(expected[3::2])
+    business_includes = {
+        (
+            "id",
+            "name",
+            "type",
+            "path",
+            "originalFilePath",
+            "audioSource:language",
+        ): frozenset({"original-file-path", "source-language"}),
+        (
+            "id",
+            "name",
+            "type",
+            "path",
+            "@Volume",
+        ): frozenset({"volume-db"}),
+    }.get(expected_fields)
+    if business_includes is None or len(actual) < 4 or len(actual) % 2:
+        return actual
+    pairs = tuple(zip(actual[::2], actual[1::2], strict=True))
+    source_pairs = tuple(
+        pair for pair in pairs if pair[0] in {"--exact-id", "--path-segment"}
+    )
+    include_pairs = tuple(pair for pair in pairs if pair[0] == "--include")
+    if len(source_pairs) + len(include_pairs) != len(pairs):
+        return actual
+    if source_pairs and source_pairs[0][0] == "--exact-id":
+        if expected[0] != "--object-id" or len(source_pairs) != 1:
+            return actual
+        normalized_source = ("--object-id", source_pairs[0][1])
+    elif source_pairs and all(pair[0] == "--path-segment" for pair in source_pairs):
+        segments = tuple(pair[1] for pair in source_pairs)
+        if (
+            expected[0] != "--path"
+            or any(not segment or "\\" in segment for segment in segments)
+            or "\\" + "\\".join(segments) != expected[1]
+        ):
+            return actual
+        normalized_source = ("--path", expected[1])
+    else:
+        return actual
+    supplied_includes = tuple(pair[1] for pair in include_pairs)
+    if (
+        len(supplied_includes) != len(set(supplied_includes))
+        or frozenset(supplied_includes) != business_includes
+    ):
+        return actual
+    return (*normalized_source, *expected[2:])
+
+
+def _normalize_draft_bind_object_query_identity(
+    step: "ExpectedGatewayStep",
+    supplied_arguments: Sequence[str],
+    payloads_by_step: Mapping[str, Mapping[str, Any]],
+) -> tuple[Any, ...]:
+    """Accept a prior proven object by GUID or its exact returned path.
+
+    Business object binding owns path construction. If a prior bounded query
+    returned the exact GUID and path for one object, repeating that exact path
+    as Gateway path segments is semantically equivalent to copying its GUID.
+    No unqueried path, name-only selector, or alternate object is admitted.
+    """
+
+    actual = tuple(supplied_arguments)
+    if step.subcommand != "draft-bind-object":
+        return actual
+    identity_indexes = tuple(
+        index for index, value in enumerate(step.arguments) if value == "--object-id"
+    )
+    if len(identity_indexes) != 1:
+        return actual
+    identity_index = identity_indexes[0]
+    if identity_index + 1 >= len(step.arguments):
+        return actual
+    expected_identity = step.arguments[identity_index + 1]
+    if isinstance(expected_identity, str):
+        expected_id = expected_identity
+    elif isinstance(expected_identity, ResponseBinding):
+        source = payloads_by_step.get(expected_identity.step)
+        if source is None:
+            return actual
+        value = _json_pointer(source, expected_identity.pointer)
+        if not isinstance(value, str):
+            return actual
+        expected_id = value
+    elif isinstance(expected_identity, ResponseBindingOrExactArgument):
+        source = payloads_by_step.get(expected_identity.binding.step)
+        if source is None:
+            return actual
+        value = _json_pointer(source, expected_identity.binding.pointer)
+        if not isinstance(value, str):
+            return actual
+        expected_id = value
+    else:
+        return actual
+    tail = actual[identity_index:]
+    if (
+        len(tail) < 2
+        or len(tail) % 2
+        or tail[::2] != ("--object-path-segment",) * (len(tail) // 2)
+    ):
+        return actual
+    segments = tuple(tail[1::2])
+    if any(not segment or segment != segment.strip() or "\\" in segment for segment in segments):
+        return actual
+    supplied_path = "\\" + "\\".join(segments)
+    matching_rows = []
+    for payload in payloads_by_step.values():
+        rows = payload.get("objects")
+        if not isinstance(rows, list):
+            continue
+        matching_rows.extend(
+            row
+            for row in rows
+            if isinstance(row, Mapping)
+            and isinstance(row.get("id"), str)
+            and row["id"].casefold() == expected_id.casefold()
+            and row.get("path") == supplied_path
+        )
+    if not matching_rows:
+        return actual
+    return (*actual[:identity_index], "--object-id", expected_id)
+
+
+def _normalize_scoped_child_draft_binding(
+    step: "ExpectedGatewayStep",
+    supplied_arguments: Sequence[str],
+) -> tuple[Any, ...]:
+    """Normalize one closed parent-path plus exact child-name binding.
+
+    The public Gateway owns path joining for this selector. The semantic
+    protocol still seals the resulting exact full path, so only the same
+    parent segments and final child name are accepted.
+    """
+
+    actual = tuple(supplied_arguments)
+    if step.subcommand != "draft-bind-object":
+        return actual
+    try:
+        selector_index = step.arguments.index("--object-path-segment")
+    except ValueError:
+        return actual
+    expected_tail = tuple(step.arguments[selector_index:])
+    if (
+        not expected_tail
+        or len(expected_tail) % 2
+        or expected_tail[::2]
+        != ("--object-path-segment",) * (len(expected_tail) // 2)
+        or len(actual) <= selector_index
+    ):
+        return actual
+    supplied_tail = actual[selector_index:]
+    if len(supplied_tail) % 2:
+        return actual
+    pairs = tuple(zip(supplied_tail[::2], supplied_tail[1::2], strict=True))
+    if (
+        any(
+            option not in {"--parent-path-segment", "--scoped-child-name"}
+            or not value
+            or value != value.strip()
+            or "\\" in value
+            or "/" in value
+            for option, value in pairs
+        )
+        or sum(option == "--scoped-child-name" for option, _value in pairs) != 1
+        or not any(option == "--parent-path-segment" for option, _value in pairs)
+    ):
+        return actual
+    parent_segments = tuple(
+        value for option, value in pairs if option == "--parent-path-segment"
+    )
+    child_name = next(
+        value for option, value in pairs if option == "--scoped-child-name"
+    )
+    if (*parent_segments, child_name) != expected_tail[1::2]:
+        return actual
+    return (*actual[:selector_index], *expected_tail)
+
+
+def _normalize_redundant_single_role_object_binding(
+    step: "ExpectedGatewayStep",
+    supplied_arguments: Sequence[str],
+) -> tuple[Any, ...]:
+    """Ignore only an exact redundant role on a single-object binding.
+
+    Multi-role Drafts retain their required Gateway-owned role.  For a Draft
+    whose sealed protocol has no role flag, spelling the sole role as
+    ``object`` changes neither target identity nor business meaning.
+    """
+
+    actual = tuple(supplied_arguments)
+    if step.subcommand != "draft-bind-object" or "--role" in step.arguments:
+        return actual
+    role_indexes = tuple(
+        index for index, value in enumerate(actual) if value == "--role"
+    )
+    if len(role_indexes) != 1:
+        return actual
+    role_index = role_indexes[0]
+    if role_index + 1 >= len(actual) or actual[role_index + 1] != "object":
+        return actual
+    return (*actual[:role_index], *actual[role_index + 2 :])
+
+
+def _normalize_event_action_draft_binding(
+    step: "ExpectedGatewayStep",
+    supplied_arguments: Sequence[str],
+) -> tuple[Any, ...]:
+    """Expand one Event path into the sealed direct-Action child selector."""
+
+    actual = tuple(supplied_arguments)
+    fixed_count = 5
+    expected_tail = tuple(step.arguments[fixed_count:])
+    if (
+        step.subcommand != "draft-bind-object"
+        or expected_tail[:2] != ("--direct-child-type", "Action")
+        or len(actual) <= fixed_count
+    ):
+        return actual
+    expected_path = expected_tail[2:]
+    if len(expected_path) % 2 or expected_path[::2] != (
+        "--parent-path-segment",
+    ) * (len(expected_path) // 2):
+        return actual
+    actual_path = actual[fixed_count:]
+    if len(actual_path) % 2 or actual_path[::2] != (
+        "--event-action-of-path-segment",
+    ) * (len(actual_path) // 2):
+        return actual
+    if actual_path[1::2] != expected_path[1::2]:
+        return actual
+    return (*actual[:fixed_count], *expected_tail)
+
+
+_BUSINESS_QUERY_OPTION_ARITIES = {
+    "--path-segment": 1,
+    "--exact-id": 1,
+    "--kind": 1,
+    "--custom-kind": 1,
+    "--search-text": 1,
+    "--query-id": 1,
+    "--query-path-segment": 1,
+    "--advanced-waql": 1,
+    "--max-results": 1,
+    "--include": 1,
+    "--include-field": 1,
+    "--predicate": 2,
+    "--match-original-file-path": 1,
+    "--relationship": 1,
+    "--view": 1,
+    "--detail": 0,
+}
+_BUSINESS_QUERY_SOURCE_OPTIONS = frozenset(
+    {
+        "--path-segment",
+        "--exact-id",
+        "--kind",
+        "--custom-kind",
+        "--search-text",
+        "--query-id",
+        "--query-path-segment",
+        "--advanced-waql",
+    }
+)
+_BUSINESS_QUERY_KIND_ALIASES = {"sound": "all-sounds"}
+def _closed_business_literal_equivalent(
+    step: ExpectedGatewayStep,
+    index: int,
+    supplied: str,
+    expected: str,
+) -> bool:
+    """Accept only reviewed display/root spellings for one canonical literal."""
+
+    if index <= 0:
+        return False
+    prior = step.arguments[index - 1]
+    if prior == "--meaning":
+        supplied_token = re.sub(r"[^a-z0-9]", "", supplied.casefold())
+        expected_token = re.sub(r"[^a-z0-9]", "", expected.casefold())
+        if bool(supplied_token) and supplied_token == expected_token:
+            return True
+        prefix_qualifiers = {
+            "action",
+            "field",
+            "play",
+            "property",
+            "value",
+        }
+        suffix_qualifiers = {
+            "in",
+            "millisecond",
+            "milliseconds",
+            "ms",
+            "second",
+            "seconds",
+            "time",
+        }
+
+        def meaning_core(value: str) -> str:
+            core = re.sub(r"[^a-z0-9]", "", value.casefold())
+            changed = True
+            while core and changed:
+                changed = False
+                for qualifier in sorted(prefix_qualifiers, key=len, reverse=True):
+                    if core.startswith(qualifier) and len(core) > len(qualifier):
+                        core = core[len(qualifier) :]
+                        changed = True
+                        break
+                if changed:
+                    continue
+                for qualifier in sorted(suffix_qualifiers, key=len, reverse=True):
+                    if core.endswith(qualifier) and len(core) > len(qualifier):
+                        core = core[: -len(qualifier)]
+                        changed = True
+                        break
+            return core
+
+        supplied_core = meaning_core(supplied)
+        expected_core = meaning_core(expected)
+        return bool(supplied_core) and supplied_core == expected_core
+    return False
+
+
+def _normalize_business_query_arguments(
+    supplied_arguments: Sequence[str],
+    expected_arguments: Sequence[ExpectedArgument],
+) -> tuple[str, ...]:
+    """Accept equivalent business declarations without making CLI order semantic."""
+
+    if not all(isinstance(value, str) for value in expected_arguments):
+        raise GatewayInvocationError(
+            "business query allow-list must contain only exact string arguments"
+        )
+
+    def parse(values: Sequence[str]) -> dict[str, Any]:
+        parsed: dict[str, Any] = {
+            "sources": [],
+            "single": {},
+            "includes": [],
+            "custom_includes": [],
+            "predicates": [],
+            "relationships": [],
+            "original_paths": [],
+            "detail": False,
+        }
+        index = 0
+        while index < len(values):
+            option = values[index]
+            arity = _BUSINESS_QUERY_OPTION_ARITIES.get(option)
+            if arity is None:
+                raise GatewayInvocationError(
+                    f"query-object business declaration contains unsupported option {option!r}"
+                )
+            if index + arity >= len(values):
+                raise GatewayInvocationError(
+                    f"query-object business option {option!r} lacks its value"
+                )
+            arguments = tuple(values[index + 1 : index + 1 + arity])
+            if option in _BUSINESS_QUERY_SOURCE_OPTIONS:
+                parsed["sources"].append((option, arguments))
+            elif option == "--include":
+                parsed["includes"].append(arguments)
+            elif option == "--include-field":
+                parsed["custom_includes"].append(arguments)
+            elif option == "--predicate":
+                parsed["predicates"].append(arguments)
+            elif option == "--relationship":
+                parsed["relationships"].append(arguments)
+            elif option == "--match-original-file-path":
+                parsed["original_paths"].append(arguments)
+            elif option == "--detail":
+                if parsed["detail"]:
+                    raise GatewayInvocationError(
+                        "query-object business declaration repeats --detail"
+                    )
+                parsed["detail"] = True
+            else:
+                if option in parsed["single"]:
+                    raise GatewayInvocationError(
+                        f"query-object business declaration repeats {option}"
+                    )
+                parsed["single"][option] = arguments
+            index += arity + 1
+
+        parsed["sources"] = [
+            (
+                option,
+                (
+                    _BUSINESS_QUERY_KIND_ALIASES.get(arguments[0], arguments[0]),
+                ),
+            )
+            if option == "--kind"
+            else (option, arguments)
+            for option, arguments in parsed["sources"]
+        ]
+        parsed["predicates"] = [
+            (
+                arguments[0],
+                _BUSINESS_QUERY_KIND_ALIASES.get(arguments[1], arguments[1]),
+            )
+            if arguments[0] == "kind-is"
+            else arguments
+            for arguments in parsed["predicates"]
+        ]
+
+        source_kinds = {option for option, _arguments in parsed["sources"]}
+        if len(source_kinds) != 1:
+            raise GatewayInvocationError(
+                "query-object business declaration requires one source kind"
+            )
+        source_kind = next(iter(source_kinds))
+        if source_kind not in {"--path-segment", "--query-path-segment"} and len(
+            parsed["sources"]
+        ) != 1:
+            raise GatewayInvocationError(
+                "query-object business declaration repeats a scalar source"
+            )
+        parsed["includes"] = sorted(parsed["includes"])
+        parsed["custom_includes"] = sorted(parsed["custom_includes"])
+        parsed["predicates"] = sorted(parsed["predicates"])
+        return parsed
+
+    supplied = parse(tuple(str(value) for value in supplied_arguments))
+    expected = parse(tuple(str(value) for value in expected_arguments))
+    supplied_ceiling = supplied["single"].get("--max-results")
+    expected_ceiling = expected["single"].get("--max-results")
+    if supplied_ceiling is not None and expected_ceiling is not None:
+        try:
+            supplied_limit = int(supplied_ceiling[0])
+            expected_limit = int(expected_ceiling[0])
+        except (TypeError, ValueError, IndexError):
+            pass
+        else:
+            # The sealed value is the minimum row capacity needed by the
+            # scenario, not a user-visible answer. A larger Gateway-bounded
+            # ceiling cannot truncate required rows; the live observer still
+            # rejects extras outside the reviewed scope. Keep a smaller value
+            # semantic because it could hide a required candidate.
+            if 1 <= expected_limit <= supplied_limit <= 1000:
+                supplied["single"]["--max-results"] = expected_ceiling
+    numeric_predicates = {"volume-db-at-most", "volume-db-at-least"}
+    supplied_predicates = []
+    for name, value in supplied["predicates"]:
+        normalized_value = value
+        if name in numeric_predicates:
+            expected_values = [
+                expected_value
+                for expected_name, expected_value in expected["predicates"]
+                if expected_name == name
+            ]
+            if len(expected_values) == 1:
+                try:
+                    observed_number = Decimal(value)
+                    expected_number = Decimal(expected_values[0])
+                except InvalidOperation:
+                    pass
+                else:
+                    if (
+                        observed_number.is_finite()
+                        and expected_number.is_finite()
+                        and observed_number == expected_number
+                    ):
+                        normalized_value = expected_values[0]
+        supplied_predicates.append((name, normalized_value))
+    supplied["predicates"] = sorted(supplied_predicates)
+    if supplied != expected:
+        raise GatewayInvocationError(
+            "query-object business declaration differs from its sealed semantic inputs"
+        )
+    return tuple(str(value) for value in expected_arguments)
 
 
 def _canonical_json_bytes(value: Any) -> bytes:
@@ -3834,6 +6448,17 @@ def _validate_metadata_discover_query_arguments(
     )
     if not query_specs:
         return None
+    if step.subcommand == "draft-discover-fields":
+        if (
+            len(query_specs) != 1
+            or "--meaning" not in step.arguments
+            or step.arguments.index(query_specs[0])
+            != step.arguments.index("--meaning") + 1
+        ):
+            raise GatewayInvocationError(
+                "Draft field discovery must bind one bounded meaning argument"
+            )
+        return None
     if step.subcommand != "metadata" or step.arguments[0] != "discover":
         raise GatewayInvocationError(
             "MetadataQueryArgument is valid only for metadata discover"
@@ -3842,20 +6467,17 @@ def _validate_metadata_discover_query_arguments(
         raise GatewayInvocationError(
             "metadata discover allow-list must contain 1..8 bounded queries"
         )
-    object_type = (
-        step.arguments[2]
-        if len(step.arguments) >= 3
-        and step.arguments[:2] == ("discover", "--object-type")
-        else None
-    )
+    scope_flag = step.arguments[1] if len(step.arguments) >= 3 else None
+    scope_value = step.arguments[2] if len(step.arguments) >= 3 else None
     if (
-        not isinstance(object_type, str)
-        or not object_type
-        or object_type != object_type.strip()
-        or len(object_type) > 256
+        scope_flag not in {"--object-type", "--object"}
+        or not isinstance(scope_value, str)
+        or not scope_value
+        or scope_value != scope_value.strip()
+        or len(scope_value) > (256 if scope_flag == "--object-type" else 4096)
     ):
         raise GatewayInvocationError(
-            "metadata discover allow-list must use one bounded object-type scope"
+            "metadata discover allow-list must use one bounded object or object-type scope"
         )
     configured_limit = (
         step.arguments[-1]
@@ -3874,8 +6496,8 @@ def _validate_metadata_discover_query_arguments(
         )
     configured_shape: list[Any] = [
         "discover",
-        "--object-type",
-        object_type,
+        scope_flag,
+        scope_value,
     ]
     for query_spec in query_specs:
         configured_shape.extend(("--query", query_spec))
@@ -3883,7 +6505,7 @@ def _validate_metadata_discover_query_arguments(
     if list(step.arguments) != configured_shape:
         raise GatewayInvocationError(
             "metadata discover allow-list must contain only its exact "
-            "object-type, 1..8 query slots, and configured --limit"
+            "object or object-type, 1..8 query slots, and configured --limit"
         )
 
     if (
@@ -3897,21 +6519,21 @@ def _validate_metadata_discover_query_arguments(
             "object-type, 1..8 bounded --query pairs, and configured --limit"
         )
 
-    supplied_object_types: list[str] = []
+    supplied_scopes: list[tuple[str, str]] = []
     supplied_limits: list[str] = []
     queries: list[str] = []
     for index in range(1, len(supplied_arguments), 2):
         flag = supplied_arguments[index]
         value = supplied_arguments[index + 1]
-        if flag == "--object-type":
-            supplied_object_types.append(value)
+        if flag in {"--object-type", "--object"}:
+            supplied_scopes.append((flag, value))
         elif flag == "--query":
             queries.append(value)
         elif flag == "--limit":
             supplied_limits.append(value)
         else:
             raise GatewayInvocationError(
-                "metadata discover accepts only its configured --object-type, "
+                "metadata discover accepts only its configured object scope, "
                 "--query, and --limit options"
             )
     supplied_limit = supplied_limits[0] if len(supplied_limits) == 1 else ""
@@ -3920,21 +6542,34 @@ def _validate_metadata_discover_query_arguments(
             "metadata discover --limit must be one canonical decimal integer"
         )
     supplied_limit_value = int(supplied_limit)
-    limit_matches = (
-        supplied_limit == configured_limit
-        if isinstance(configured_limit, str)
-        else configured_limit.minimum
-        <= supplied_limit_value
-        <= configured_limit.maximum
-    )
     if (
-        supplied_object_types != [object_type]
-        or not limit_matches
+        supplied_scopes != [(scope_flag, scope_value)]
         or not 1 <= len(queries) <= 8
     ):
         raise GatewayInvocationError(
             "metadata discover scope must be exactly one configured "
-            "--object-type, 1..8 --query values, and one matching --limit"
+            "--object-type and 1..8 --query values"
+        )
+    if isinstance(configured_limit, str) and len(queries) != len(query_specs):
+        raise GatewayInvocationError(
+            "metadata discover query slot count must match the fixed reviewed "
+            "property/reference checklist"
+        )
+    actual_limit = metadata_candidate_limit_for_query_count(len(queries))
+    configured_limit_allows_actual = (
+        isinstance(configured_limit, str)
+        and int(configured_limit)
+        == metadata_candidate_limit_for_query_count(len(query_specs))
+        or isinstance(configured_limit, BoundedIntegerArgument)
+        and configured_limit.minimum <= actual_limit <= configured_limit.maximum
+    )
+    if not configured_limit_allows_actual:
+        raise GatewayInvocationError(
+            "metadata discover configured limit does not match its query slots"
+        )
+    if supplied_limit_value != actual_limit:
+        raise GatewayInvocationError(
+            "metadata discover --limit must match the actual query count"
         )
     query_values = tuple(queries)
     maximum_chars = min(item.maximum_chars for item in query_specs)
@@ -3972,6 +6607,8 @@ def _metadata_discovery_live_projection(
     payload: Mapping[str, Any],
     *,
     object_type: str,
+    scope_flag: str = "--object-type",
+    scope_value: str | None = None,
 ) -> Mapping[str, MetadataTokenProjection]:
     """Return stable exact-token fields from one brokered discovery result."""
 
@@ -3991,15 +6628,26 @@ def _metadata_discovery_live_projection(
         )
     scope = agent_result.get("scope")
     resolved = scope.get("resolved") if isinstance(scope, Mapping) else None
-    if (
-        not isinstance(scope, Mapping)
-        or scope.get("kind") != "object_type"
-        or scope.get("requested") != object_type
-        or not isinstance(resolved, Mapping)
-        or resolved.get("name") != object_type
-    ):
+    object_type_scope = (
+        scope_flag == "--object-type"
+        and isinstance(scope, Mapping)
+        and scope.get("kind") == "object_type"
+        and scope.get("requested") == object_type
+        and isinstance(resolved, Mapping)
+        and resolved.get("name") == object_type
+    )
+    object_scope = (
+        scope_flag == "--object"
+        and isinstance(scope_value, str)
+        and isinstance(scope, Mapping)
+        and scope.get("kind") == "object"
+        and scope.get("object") == scope_value
+    )
+    if not object_type_scope and not object_scope:
+        scope_name = "object-type" if scope_flag == "--object-type" else "object"
         raise GatewayInvocationError(
-            "metadata-bound mutation requires the exact configured live object-type scope"
+            "metadata-bound mutation requires the exact configured live "
+            f"{scope_name} scope"
         )
     projections: list[MetadataTokenProjection] = []
     for key in ("candidates", "dependency_candidates"):
@@ -4057,6 +6705,8 @@ def project_required_metadata_tokens(
     *,
     object_type: str,
     required_tokens: Sequence[str],
+    scope_flag: str = "--object-type",
+    scope_value: str | None = None,
 ) -> tuple[MetadataTokenProjection, ...]:
     """Project only mutation-relevant stable fields from live discovery.
 
@@ -4082,6 +6732,8 @@ def project_required_metadata_tokens(
     available = _metadata_discovery_live_projection(
         payload,
         object_type=object_type,
+        scope_flag=scope_flag,
+        scope_value=scope_value,
     )
     missing = [token for token in tokens if token not in available]
     if missing:
@@ -4089,6 +6741,31 @@ def project_required_metadata_tokens(
             f"required metadata tokens are absent from live discovery: {missing!r}"
         )
     return tuple(available[token] for token in tokens)
+
+
+def _metadata_binding_scope(
+    step: ExpectedGatewayStep,
+    *,
+    object_type: str,
+) -> tuple[str, str]:
+    if (
+        step.subcommand != "metadata"
+        or len(step.arguments) < 3
+        or step.arguments[0] != "discover"
+        or step.arguments[1] not in {"--object-type", "--object"}
+        or not isinstance(step.arguments[2], str)
+        or not step.arguments[2]
+    ):
+        raise GatewayInvocationError(
+            "metadata source does not use one exact reviewed scope"
+        )
+    scope_flag = step.arguments[1]
+    scope_value = step.arguments[2]
+    if scope_flag == "--object-type" and scope_value != object_type:
+        raise GatewayInvocationError(
+            "metadata source does not bind the reviewed object type"
+        )
+    return scope_flag, scope_value
 
 
 def _metadata_reference_activation_rules(
@@ -4274,8 +6951,39 @@ def _normalize_audio_import_draft_action_named_fields(value: Any) -> Any:
     return normalized
 
 
+def _normalize_typed_draft_number_value(
+    actual: Any,
+    expected: Any,
+) -> Any:
+    """Treat finite typed ``number`` spellings as their numeric value."""
+
+    if not isinstance(actual, Mapping) or not isinstance(expected, Mapping):
+        return actual
+    if (
+        actual.get("value_type") != "number"
+        or expected.get("value_type") != "number"
+        or not isinstance(actual.get("value"), str)
+        or not isinstance(expected.get("value"), str)
+    ):
+        return actual
+    try:
+        actual_number = Decimal(actual["value"])
+        expected_number = Decimal(expected["value"])
+    except InvalidOperation:
+        return actual
+    if (
+        not actual_number.is_finite()
+        or not expected_number.is_finite()
+        or actual_number != expected_number
+    ):
+        return actual
+    normalized = dict(actual)
+    normalized["value"] = expected["value"]
+    return normalized
+
+
 def _normalize_audio_import_request_named_fields(value: Any) -> Any:
-    """Canonicalize only name-keyed fields while preserving import row order."""
+    """Canonicalize name-keyed fields and Gateway-owned typed path segments."""
 
     if not isinstance(value, Mapping) or value.get("operation") != "audio.import":
         return value
@@ -4287,6 +6995,13 @@ def _normalize_audio_import_request_named_fields(value: Any) -> Any:
         if not isinstance(owner, Mapping):
             raise ValueError(f"{path} must be an object")
         normalized_owner = dict(owner)
+        object_path = normalized_owner.get("object_path")
+        if isinstance(object_path, str):
+            normalized_owner["object_path"] = re.sub(
+                r"(?<=\\)<[^<>\\]+>",
+                "",
+                object_path,
+            )
         for field, kind in (
             ("properties", "property"),
             ("references", "reference"),
@@ -4312,16 +7027,123 @@ def _normalize_audio_import_request_named_fields(value: Any) -> Any:
             imports = normalized_arguments["imports"]
             if not isinstance(imports, list):
                 return value
-            normalized_arguments["imports"] = [
+            normalized_imports = [
                 normalize_owner(row, path=f"arguments.imports[{index}]")
                 for index, row in enumerate(imports)
             ]
+            if all(
+                isinstance(row.get("object_path"), str)
+                and row["object_path"]
+                for row in normalized_imports
+            ):
+                structure_rows = [
+                    row
+                    for row in normalized_imports
+                    if not any(
+                        field in row
+                        for field in ("audio_file", "audio_file_base64", "inline_wav")
+                    )
+                ]
+                media_rows = [
+                    row for row in normalized_imports if row not in structure_rows
+                ]
+                structure_rows.sort(
+                    key=lambda row: (
+                        str(row["object_path"]).count("\\"),
+                        str(row["object_path"]),
+                    )
+                )
+                normalized_imports = [*structure_rows, *media_rows]
+            normalized_arguments["imports"] = normalized_imports
     except ValueError:
         return value
 
     normalized = dict(value)
     normalized["arguments"] = normalized_arguments
     return normalized
+
+
+def _normalize_bound_business_reference_paths(
+    value: Any,
+    *,
+    path_to_id: Mapping[str, str],
+    type_name_to_id: Mapping[tuple[str, str], str] | None = None,
+    direct_child_to_id: Mapping[tuple[str, str], str] | None = None,
+) -> Any:
+    """Replace exact live-bound business identities with their sealed GUIDs."""
+
+    if isinstance(value, Mapping):
+        if value.get("operation") == "waapi.call":
+            arguments = value.get("arguments")
+            api = arguments.get("api") if isinstance(arguments, Mapping) else None
+            args = arguments.get("args") if isinstance(arguments, Mapping) else None
+            objects = args.get("objects") if isinstance(args, Mapping) else None
+            if api == "ak.wwise.core.audio.convert" and isinstance(objects, list):
+                normalized = dict(value)
+                normalized_arguments = dict(arguments)
+                normalized_args = dict(args)
+                normalized_args["objects"] = [
+                    path_to_id.get(item, item) if isinstance(item, str) else item
+                    for item in objects
+                ]
+                normalized_arguments["args"] = normalized_args
+                normalized["arguments"] = normalized_arguments
+                value = normalized
+        if (
+            set(value) == {"kind", "value"}
+            and value.get("kind") == "path"
+            and isinstance(value.get("value"), str)
+            and value["value"] in path_to_id
+        ):
+            return {"kind": "id", "value": path_to_id[value["value"]]}
+        if (
+            set(value) == {"kind", "type", "name"}
+            and value.get("kind") == "exact-type-name"
+            and isinstance(value.get("type"), str)
+            and isinstance(value.get("name"), str)
+            and type_name_to_id is not None
+            and (value["type"], value["name"]) in type_name_to_id
+        ):
+            return {
+                "kind": "id",
+                "value": type_name_to_id[(value["type"], value["name"])],
+            }
+        parent = value.get("parent")
+        if (
+            set(value) == {"kind", "parent", "type"}
+            and value.get("kind") == "direct-child"
+            and isinstance(parent, Mapping)
+            and set(parent) == {"kind", "value"}
+            and parent.get("kind") == "path"
+            and isinstance(parent.get("value"), str)
+            and isinstance(value.get("type"), str)
+            and direct_child_to_id is not None
+            and (parent["value"], value["type"]) in direct_child_to_id
+        ):
+            return {
+                "kind": "id",
+                "value": direct_child_to_id[(parent["value"], value["type"])],
+            }
+        return {
+            str(key): _normalize_bound_business_reference_paths(
+                nested,
+                path_to_id=path_to_id,
+                type_name_to_id=type_name_to_id,
+                direct_child_to_id=direct_child_to_id,
+            )
+            for key, nested in value.items()
+        }
+    if isinstance(value, list):
+        return [
+            _normalize_bound_business_reference_paths(
+                nested,
+                path_to_id=path_to_id,
+                type_name_to_id=type_name_to_id,
+                direct_child_to_id=direct_child_to_id,
+            )
+            for nested in value
+        ]
+    return value
 
 
 def _normalize_audio_import_request_activation_properties(
@@ -4404,6 +7226,7 @@ def _object_operation_json_equal(actual: Any, expected: Any) -> bool:
         "object.set",
     }:
         return False
+    operation = expected.get("operation")
 
     def compare(
         left: Any,
@@ -4458,6 +7281,72 @@ def _object_operation_json_equal(actual: Any, expected: Any) -> bool:
                 if key not in ignored_right
             )
         if isinstance(right, list):
+            if operation == "object.set" and path == ("arguments", "objects"):
+                def object_identity(item: Any) -> tuple[str, str] | None:
+                    if not isinstance(item, Mapping):
+                        return None
+                    selector = item.get("object")
+                    if not isinstance(selector, Mapping):
+                        return None
+                    kind = selector.get("kind")
+                    value = selector.get("value")
+                    if not isinstance(kind, str) or not isinstance(value, str):
+                        return None
+                    return kind, value
+
+                left_rows = left if isinstance(left, list) else []
+                left_keys = [object_identity(item) for item in left_rows]
+                right_keys = [object_identity(item) for item in right]
+                if (
+                    len(left_rows) == len(right)
+                    and None not in left_keys
+                    and None not in right_keys
+                    and len(set(left_keys)) == len(left_keys)
+                    and len(set(right_keys)) == len(right_keys)
+                    and set(left_keys) == set(right_keys)
+                ):
+                    left_by_identity = dict(zip(left_keys, left_rows, strict=True))
+                    return all(
+                        compare(
+                            left_by_identity[identity],
+                            item,
+                            (*path, f"{identity[0]}:{identity[1]}"),
+                        )
+                        for identity, item in zip(right_keys, right, strict=True)
+                    )
+            if path and path[-1] in {"properties", "references"}:
+                left_by_name = (
+                    {
+                        item["name"]: item
+                        for item in left
+                        if isinstance(item, Mapping)
+                        and isinstance(item.get("name"), str)
+                        and item["name"]
+                    }
+                    if isinstance(left, list)
+                    else {}
+                )
+                right_by_name = {
+                    item["name"]: item
+                    for item in right
+                    if isinstance(item, Mapping)
+                    and isinstance(item.get("name"), str)
+                    and item["name"]
+                }
+                if (
+                    isinstance(left, list)
+                    and len(left_by_name) == len(left)
+                    and len(right_by_name) == len(right)
+                    and set(left_by_name) == set(right_by_name)
+                ):
+                    return all(
+                        compare(
+                            left_by_name[name],
+                            item,
+                            (*path, name),
+                        )
+                        for name, item in right_by_name.items()
+                    )
             return (
                 isinstance(left, list)
                 and len(left) == len(right)
@@ -4753,9 +7642,21 @@ def resolve_gateway_invocation(
         else candidate_runner
     )
     allowed_runners = tuple(dict.fromkeys((invocation_runner, candidate_runner)))
-    supplied_runner = Path(values[1])
+    raw_runner = values[1]
+    if (
+        invocation_skill_source is not None
+        and task_local_runner_matches_normalized(
+            raw_runner,
+            str(invocation_runner),
+        )
+    ):
+        supplied_runner = invocation_runner
+    else:
+        supplied_runner = Path(raw_runner)
     if not supplied_runner.is_absolute() or supplied_runner not in allowed_runners:
         expected = " or ".join(str(path) for path in allowed_runners)
+        if invocation_skill_source is not None:
+            expected += " or the exact task-local runner"
         raise GatewayInvocationError(f"runner path must be exactly {expected}")
     if values[2] == "gateway.py":
         gateway_arguments = values[3:]
@@ -5211,6 +8112,77 @@ def _extract_payload(stdout: str, *, required_contract: str | None = None) -> Ma
     return payload
 
 
+def _extract_topic_stream_records(stdout: str) -> tuple[Mapping[str, Any], ...]:
+    """Validate the public stream-topic NDJSON lifecycle and return its records."""
+
+    lines = stdout.splitlines()
+    if not lines or any(not line.strip() for line in lines):
+        raise GatewayInvocationError(
+            "stream-topic output must be contiguous non-empty NDJSON records"
+        )
+    records: list[Mapping[str, Any]] = []
+    for line in lines:
+        value = _decode_json_argument(line, reject_duplicate_keys=True)
+        if not isinstance(value, Mapping):
+            raise GatewayInvocationError(
+                "stream-topic NDJSON record must be one JSON object"
+            )
+        if value.get("contract") != "waapi-skill.topic-stream/v1":
+            raise GatewayInvocationError(
+                "stream-topic NDJSON record has the wrong contract"
+            )
+        records.append(dict(value))
+    if len(records) < 2:
+        raise GatewayInvocationError(
+            "stream-topic output must contain started and terminal records"
+        )
+    started = records[0]
+    terminal = records[-1]
+    if (
+        started.get("record_type") != "started"
+        or started.get("command") != "stream-topic"
+        or started.get("ok") is not True
+        or started.get("status") != "streaming"
+        or terminal.get("record_type") != "terminal"
+        or terminal.get("command") != "stream-topic"
+        or terminal.get("ok") is not True
+        or terminal.get("status") != "completed"
+        or terminal.get("completion_reason") != "duration_elapsed"
+        or terminal.get("cleanup") != "unsubscribed"
+        or terminal.get("topic") != started.get("topic")
+        or terminal.get("topic_contract_digest")
+        != started.get("topic_contract_digest")
+        or terminal.get("subscription_timeout")
+        != started.get("subscription_timeout")
+    ):
+        raise GatewayInvocationError(
+            "stream-topic started/terminal lifecycle is not the exact successful finite stream"
+        )
+    events = records[1:-1]
+    for sequence, event in enumerate(events, start=1):
+        if (
+            event.get("record_type") != "event"
+            or event.get("sequence") != sequence
+            or event.get("topic") != started.get("topic")
+            or not isinstance(event.get("event"), Mapping)
+            or not isinstance(event.get("event_validation"), Mapping)
+        ):
+            raise GatewayInvocationError(
+                "stream-topic event records are malformed or out of sequence"
+            )
+    if terminal.get("event_count") != len(events):
+        raise GatewayInvocationError(
+            "stream-topic terminal event count differs from emitted records"
+        )
+    return tuple(records)
+
+
+def _gateway_payload_contracts(step: ExpectedGatewayStep) -> frozenset[str]:
+    """Return the exact public response envelopes allowed for one command."""
+
+    return gateway_payload_contracts(step.subcommand)
+
+
 def _project_next_command_runner(
     value: Mapping[str, Any],
     *,
@@ -5230,6 +8202,7 @@ def _project_next_command_runner(
         "gateway_argv",
         "full_argv",
         "copy_exactly",
+        "shell_tool_timeout_ms",
         "shell_family",
         "copy_instruction",
     }
@@ -5249,6 +8222,7 @@ def _project_next_command_runner(
     if (
         value.get("contract") != TRANSACTION_NEXT_COMMAND_CONTRACT
         or value.get("copy_exactly") is not True
+        or value.get("shell_tool_timeout_ms") != GATEWAY_SHELL_TOOL_TIMEOUT_MS
         or not isinstance(value.get("command"), str)
         or not value.get("command")
         or not isinstance(gateway_argv, list)
@@ -5332,6 +8306,7 @@ def _project_next_command_runner(
         "gateway_argv": list(gateway_argv),
         "full_argv": projected_argv,
         "copy_exactly": True,
+        "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
     }
     for key in ("requires_explicit_user_confirmation", "requires_later_user_message"):
         if key in value:
@@ -5342,7 +8317,14 @@ def _project_next_command_runner(
         result["shell_family"] = WINDOWS_POWERSHELL_ENCODED_FAMILY
         shell_command = encode_windows_powershell_argv(projected_argv)
         try:
-            model_command = encode_windows_model_argv(projected_argv)
+            model_command = encode_windows_model_argv(
+                [
+                    "python",
+                    TASK_LOCAL_RUNNER_WINDOWS,
+                    "gateway.py",
+                    *gateway_argv,
+                ]
+            )
         except PlatformCommandError:
             model_command = None
     elif platform_name == "posix":
@@ -5362,6 +8344,483 @@ def _project_next_command_runner(
     return result
 
 
+def _draft_copy_command(
+    argv: Sequence[str],
+    *,
+    platform_name: str,
+) -> str:
+    """Render the one exact model-facing Draft command for a sealed argv."""
+
+    if platform_name == "nt":
+        try:
+            return encode_windows_model_argv(argv)
+        except PlatformCommandError:
+            return encode_windows_powershell_argv(argv)
+    if platform_name == "posix":
+        return shlex.join(argv)
+    raise GatewayInvocationError(
+        f"unsupported Gateway continuation platform {platform_name!r}"
+    )
+
+
+def _decode_draft_copy_command(
+    command: str,
+    *,
+    platform_name: str,
+) -> list[str]:
+    """Decode either canonical host envelope before runner projection."""
+
+    if platform_name == "nt":
+        try:
+            return list(decode_windows_model_argv(command))
+        except PlatformCommandError:
+            return list(decode_windows_powershell_argv(command))
+    if platform_name == "posix":
+        return shlex.split(command)
+    raise GatewayInvocationError(
+        f"unsupported Gateway continuation platform {platform_name!r}"
+    )
+
+
+def _project_operation_draft_runner(
+    value: Mapping[str, Any],
+    *,
+    candidate_runner: Path,
+    invocation_runner: Path,
+    platform_name: str,
+) -> dict[str, Any]:
+    """Project closed Draft argv bindings onto the detached task Skill path."""
+
+    expected_candidate = str(candidate_runner.resolve(strict=True))
+
+    def project_disclosure_commands(nested: Any) -> Any:
+        if isinstance(nested, list):
+            return [project_disclosure_commands(item) for item in nested]
+        if not isinstance(nested, Mapping):
+            return nested
+        if nested.get("contract") == TRANSACTION_NEXT_COMMAND_CONTRACT:
+            return _project_next_command_runner(
+                nested,
+                candidate_runner=candidate_runner,
+                invocation_runner=invocation_runner,
+                platform_name=platform_name,
+            )
+        projected = {
+            key: project_disclosure_commands(item)
+            for key, item in nested.items()
+        }
+        argv_by_shape = nested.get("argv_by_shape")
+        copy_by_shape = nested.get("copy_command_by_shape")
+        concrete_shapes = (
+            {
+                shape
+                for shape, gateway_argv in argv_by_shape.items()
+                if isinstance(shape, str)
+                and isinstance(gateway_argv, list)
+                and gateway_argv
+                and gateway_argv[0]
+                in {"request-map-container", "request-array-item"}
+                and all(
+                    isinstance(token, str) and "<" not in token
+                    for token in gateway_argv
+                )
+            }
+            if isinstance(argv_by_shape, Mapping)
+            else set()
+        )
+        if concrete_shapes or copy_by_shape is not None:
+            if (
+                not isinstance(copy_by_shape, Mapping)
+                or (
+                    concrete_shapes
+                    and set(copy_by_shape) != concrete_shapes
+                )
+            ):
+                raise GatewayInvocationError(
+                    "Gateway Draft disclosure copy commands are incomplete"
+                )
+            projected_copies: dict[str, str] = {}
+            for shape, copy_command in copy_by_shape.items():
+                gateway_argv = (
+                    argv_by_shape.get(shape)
+                    if isinstance(argv_by_shape, Mapping)
+                    else None
+                )
+                if (
+                    not isinstance(shape, str)
+                    or not isinstance(copy_command, str)
+                    or not copy_command
+                ):
+                    raise GatewayInvocationError(
+                        "Gateway Draft disclosure copy command is invalid"
+                    )
+                try:
+                    candidate_argv = _decode_draft_copy_command(
+                        copy_command,
+                        platform_name=platform_name,
+                    )
+                except (PlatformCommandError, ValueError) as exc:
+                    raise GatewayInvocationError(
+                        "Gateway Draft disclosure copy command cannot be decoded"
+                    ) from exc
+                if (
+                    len(candidate_argv) < 4
+                    or candidate_argv[:3]
+                    != ["python", expected_candidate, "gateway.py"]
+                    or candidate_argv[3]
+                    not in {"request-map-container", "request-array-item"}
+                    or _draft_copy_command(
+                        candidate_argv,
+                        platform_name=platform_name,
+                    )
+                    != copy_command
+                    or (
+                        isinstance(gateway_argv, list)
+                        and candidate_argv[3:] != gateway_argv
+                    )
+                ):
+                    raise GatewayInvocationError(
+                        "Gateway Draft disclosure command representation is not exact"
+                    )
+                projected_copies[shape] = _draft_copy_command(
+                    [
+                        "python",
+                        str(invocation_runner),
+                        "gateway.py",
+                        *candidate_argv[3:],
+                    ],
+                    platform_name=platform_name,
+                )
+            projected["copy_command_by_shape"] = projected_copies
+            instruction = nested.get("copy_instruction")
+            expected_instruction = (
+                {
+                    "contract": OPERATION_DRAFT_COPY_INSTRUCTION_CONTRACT,
+                    "source_field": (
+                        "copy_command_by_shape." + next(iter(concrete_shapes))
+                    ),
+                    "action": TRANSACTION_COPY_ACTION,
+                    "forbidden_transformations": list(
+                        TRANSACTION_FORBIDDEN_TRANSFORMATIONS
+                    ),
+                }
+                if len(concrete_shapes) == 1
+                else None
+            )
+            if instruction is not None and instruction != expected_instruction:
+                raise GatewayInvocationError(
+                    "Gateway Draft disclosure copy instruction is invalid"
+                )
+        gateway_argv = nested.get("argv")
+        concrete_argv = (
+            isinstance(gateway_argv, list)
+            and bool(gateway_argv)
+            and gateway_argv[0]
+            in {"request-map-container", "request-array-item"}
+            and all(
+                isinstance(token, str) and "<" not in token
+                for token in gateway_argv
+            )
+        )
+        if concrete_argv and "copy_command" not in nested:
+            raise GatewayInvocationError(
+                "Gateway Draft disclosure copy commands are incomplete"
+            )
+        if concrete_argv:
+            if (
+                not gateway_argv
+                or gateway_argv[0]
+                not in {"request-map-container", "request-array-item"}
+                or any(not isinstance(token, str) for token in gateway_argv)
+            ):
+                raise GatewayInvocationError(
+                    "Gateway Draft disclosure argv is invalid"
+                )
+            candidate_argv = [
+                "python",
+                expected_candidate,
+                "gateway.py",
+                *gateway_argv,
+            ]
+            if nested.get("copy_command") != _draft_copy_command(
+                candidate_argv,
+                platform_name=platform_name,
+            ):
+                raise GatewayInvocationError(
+                    "Gateway Draft disclosure command representation is not exact"
+                )
+            projected["copy_command"] = _draft_copy_command(
+                [
+                    "python",
+                    str(invocation_runner),
+                    "gateway.py",
+                    *gateway_argv,
+                ],
+                platform_name=platform_name,
+            )
+        return projected
+
+    def project_prefix(
+        mapping: Mapping[str, Any],
+        prefix_key: str,
+        *,
+        copy_key: str | None = None,
+    ) -> dict[str, Any]:
+        projected = dict(mapping)
+        prefix = mapping.get(prefix_key)
+        if (
+            not isinstance(prefix, list)
+            or len(prefix) < 4
+            or any(not isinstance(token, str) for token in prefix)
+            or prefix[:1] != ["python"]
+            or prefix[1] != expected_candidate
+            or prefix[2] != "gateway.py"
+        ):
+            raise GatewayInvocationError(
+                "Gateway Draft continuation is not bound to the sealed candidate "
+                "runner"
+            )
+        projected_prefix = [*prefix]
+        projected_prefix[1] = str(invocation_runner)
+        projected[prefix_key] = projected_prefix
+        if copy_key is not None:
+            if mapping.get(copy_key) != _draft_copy_command(
+                prefix,
+                platform_name=platform_name,
+            ):
+                raise GatewayInvocationError(
+                    "Gateway Draft continuation command representation is not exact"
+                )
+            projected[copy_key] = _draft_copy_command(
+                projected_prefix,
+                platform_name=platform_name,
+            )
+        return projected
+
+    def project_business_binding(binding: Mapping[str, Any]) -> dict[str, Any]:
+        if (
+            binding.get("contract")
+            != "waapi-skill.business-draft-next-action/v1"
+            or binding.get("shell_tool_timeout_ms")
+            != GATEWAY_SHELL_TOOL_TIMEOUT_MS
+        ):
+            raise GatewayInvocationError(
+                "Gateway business Draft continuation contract is invalid"
+            )
+        projected_count = 0
+
+        def walk(nested: Any) -> Any:
+            nonlocal projected_count
+            if isinstance(nested, list):
+                if (
+                    len(nested) >= 3
+                    and nested[0] == "python"
+                    and nested[2] == "gateway.py"
+                ):
+                    if (
+                        any(not isinstance(token, str) for token in nested)
+                        or nested[1] != expected_candidate
+                    ):
+                        raise GatewayInvocationError(
+                            "Gateway business Draft continuation is not bound to "
+                            "the sealed candidate runner"
+                        )
+                    projected_count += 1
+                    return [
+                        "python",
+                        str(invocation_runner),
+                        "gateway.py",
+                        *nested[3:],
+                    ]
+                return [walk(item) for item in nested]
+            if not isinstance(nested, Mapping):
+                return nested
+            projected = {key: walk(item) for key, item in nested.items()}
+            if "copy_command" in nested:
+                argv_key = next(
+                    (
+                        key
+                        for key in ("fixed_full_argv", "fixed_argv_prefix")
+                        if isinstance(nested.get(key), list)
+                    ),
+                    None,
+                )
+                compact_copy_only = argv_key is None
+                source_argv = nested.get(argv_key) if argv_key is not None else None
+                if compact_copy_only and isinstance(
+                    nested.get("copy_command"), str
+                ):
+                    try:
+                        source_argv = _decode_draft_copy_command(
+                            nested["copy_command"],
+                            platform_name=platform_name,
+                        )
+                    except (PlatformCommandError, ValueError):
+                        source_argv = None
+                if (
+                    not isinstance(source_argv, list)
+                    or len(source_argv) < 4
+                    or source_argv[:3]
+                    != ["python", expected_candidate, "gateway.py"]
+                    or nested.get("copy_command")
+                    != _draft_copy_command(
+                        source_argv,
+                        platform_name=platform_name,
+                    )
+                ):
+                    raise GatewayInvocationError(
+                        "Gateway business Draft continuation command representation "
+                        "is not exact"
+                    )
+                if compact_copy_only:
+                    projected_count += 1
+                projected["copy_command"] = _draft_copy_command(
+                    [
+                        "python",
+                        (
+                            TASK_LOCAL_RUNNER_WINDOWS
+                            if compact_copy_only and platform_name == "nt"
+                            else TASK_LOCAL_RUNNER_POSIX
+                            if compact_copy_only
+                            else str(invocation_runner)
+                        ),
+                        "gateway.py",
+                        *source_argv[3:],
+                    ],
+                    platform_name=platform_name,
+                )
+            if "fixed_argv_prefix_copy" in nested:
+                argv = nested.get("fixed_argv_prefix")
+                instruction = nested.get("fixed_argv_prefix_copy_instruction")
+                copy_command = nested.get("fixed_argv_prefix_copy")
+                compact_copy_only = not isinstance(argv, list)
+                if compact_copy_only and isinstance(copy_command, str):
+                    try:
+                        argv = _decode_draft_copy_command(
+                            copy_command,
+                            platform_name=platform_name,
+                        )
+                    except (PlatformCommandError, ValueError):
+                        argv = None
+                if (
+                    not isinstance(argv, list)
+                    or len(argv) < 4
+                    or argv[:3]
+                    != ["python", expected_candidate, "gateway.py"]
+                    or copy_command
+                    != _draft_copy_command(argv, platform_name=platform_name)
+                    or not isinstance(instruction, Mapping)
+                    or instruction.get("source_field")
+                    != "fixed_argv_prefix_copy"
+                ):
+                    raise GatewayInvocationError(
+                        "Gateway business Draft copy-ready prefix is not exact"
+                    )
+                if compact_copy_only:
+                    projected_count += 1
+                projected_runner = (
+                    TASK_LOCAL_RUNNER_WINDOWS
+                    if compact_copy_only and platform_name == "nt"
+                    else TASK_LOCAL_RUNNER_POSIX
+                    if compact_copy_only
+                    else str(invocation_runner)
+                )
+                projected["fixed_argv_prefix_copy"] = _draft_copy_command(
+                    [
+                        "python",
+                        projected_runner,
+                        "gateway.py",
+                        *argv[3:],
+                    ],
+                    platform_name=platform_name,
+                )
+            return projected
+
+        projected = walk(binding)
+        if projected_count == 0 or not isinstance(projected, dict):
+            raise GatewayInvocationError(
+                "Gateway business Draft continuation has no sealed command"
+            )
+        return projected
+
+    def project_binding(binding: Mapping[str, Any]) -> dict[str, Any]:
+        projected = project_disclosure_commands(binding)
+        root_disclosures = binding.get("root_dynamic_disclosure_commands")
+        if isinstance(root_disclosures, Mapping):
+            rows = root_disclosures.get("rows")
+            if not isinstance(rows, list):
+                raise GatewayInvocationError(
+                    "Gateway Draft root disclosure rows are invalid"
+                )
+            for row in rows:
+                if not isinstance(row, Mapping):
+                    raise GatewayInvocationError(
+                        "Gateway Draft root disclosure row is invalid"
+                    )
+                copies = row.get("copy_command_by_shape")
+                disclosure_argv = row.get("argv_by_shape")
+                if (
+                    isinstance(copies, Mapping)
+                    and len(copies) == 1
+                    and isinstance(disclosure_argv, Mapping)
+                    and len(disclosure_argv) == 1
+                    and row.get("copy_instruction") is None
+                ):
+                    raise GatewayInvocationError(
+                        "Gateway Draft root disclosure copy instruction is missing"
+                    )
+        if "fixed_argv_prefix" in binding:
+            projected = project_prefix(
+                projected,
+                "fixed_argv_prefix",
+                copy_key=(
+                    "fixed_argv_prefix_copy"
+                    if "fixed_argv_prefix_copy" in binding
+                    else None
+                ),
+            )
+        if "fixed_full_argv_template" in binding:
+            projected = project_prefix(projected, "fixed_full_argv_template")
+        completion = binding.get("completion_candidate")
+        if isinstance(completion, Mapping):
+            projected["completion_candidate"] = project_prefix(
+                completion,
+                "fixed_argv_prefix",
+                copy_key="copy_command",
+            )
+        return projected
+
+    if value.get("contract") == "waapi-skill.operation-draft-next-action/v1":
+        return project_binding(value)
+    if value.get("contract") == "waapi-skill.business-draft-next-action/v1":
+        return project_business_binding(value)
+    if value.get("contract") == "waapi-skill.typed-container-handle/v1":
+        return project_disclosure_commands(value)
+
+    projected_draft = project_disclosure_commands(value)
+    binding = value.get("next_action_binding")
+    if isinstance(binding, Mapping):
+        projected_draft["next_action_binding"] = (
+            project_business_binding(binding)
+            if binding.get("contract")
+            == "waapi-skill.business-draft-next-action/v1"
+            else project_binding(binding)
+        )
+    action_result = value.get("action_result")
+    if isinstance(action_result, Mapping):
+        projected_action = project_disclosure_commands(action_result)
+        followups = action_result.get("required_followup_facts")
+        if isinstance(followups, list):
+            projected_action["required_followup_facts"] = [
+                project_prefix(row, "fixed_full_argv")
+                if isinstance(row, Mapping) and "fixed_full_argv" in row
+                else row
+                for row in followups
+            ]
+        projected_draft["action_result"] = projected_action
+    return projected_draft
+
+
 def _project_model_visible_runner(
     value: Any,
     *,
@@ -5374,6 +8833,18 @@ def _project_model_visible_runner(
     if isinstance(value, Mapping):
         if value.get("contract") == TRANSACTION_NEXT_COMMAND_CONTRACT:
             return _project_next_command_runner(
+                value,
+                candidate_runner=candidate_runner,
+                invocation_runner=invocation_runner,
+                platform_name=platform_name,
+            )
+        if value.get("contract") in {
+            "waapi-skill.operation-draft/v1",
+            "waapi-skill.operation-draft-next-action/v1",
+            "waapi-skill.business-draft-next-action/v1",
+            "waapi-skill.typed-container-handle/v1",
+        }:
+            return _project_operation_draft_runner(
                 value,
                 candidate_runner=candidate_runner,
                 invocation_runner=invocation_runner,
@@ -5646,6 +9117,7 @@ class CodexGatewayBroker:
         expected_steps: Sequence[ExpectedGatewayStep],
         commutative_read_only_step_groups: Sequence[Sequence[str]] = (),
         commutative_composer_setup_step_groups: Sequence[Sequence[str]] = (),
+        optional_topic_schema_step_groups: Sequence[Sequence[str]] = (),
         gateway_global_arguments: Sequence[str] = (),
         expected_wwise_version: str = "",
         project_modification_policy: str = "ask_before_changes",
@@ -5661,6 +9133,16 @@ class CodexGatewayBroker:
         trusted_step_observer: TrustedStepObserver | None = None,
         trusted_subscription_ack: TrustedSubscriptionAckSpec | None = None,
         trusted_subscription_ack_observer: TrustedSubscriptionAckObserver | None = None,
+        offline_replay_preview_requests: (
+            Mapping[str, Mapping[str, Any]] | None
+        ) = None,
+        optional_expected_initial_operations_discovery: bool = False,
+        optional_expected_operations_discovery_step_names: Sequence[str] = (),
+        optional_expected_workflow_read_step_names: Sequence[str] = (),
+        optional_initial_operations_discovery_operation: str | None = None,
+        optional_initial_query_object_arguments: Sequence[str] | None = None,
+        optional_initial_query_schema: bool = False,
+        optional_query_schema_step_names: Sequence[str] = (),
     ) -> None:
         self.skill_source = _absolute_lexical(skill_source)
         self.runner_path = self.skill_source / "scripts" / "run.py"
@@ -5684,7 +9166,69 @@ class CodexGatewayBroker:
                 commutative_composer_setup_step_groups,
             )
         )
+        self.optional_topic_schema_step_groups = (
+            validate_optional_topic_schema_step_groups(
+                self.expected_steps,
+                optional_topic_schema_step_groups,
+            )
+        )
         self._execution_steps = list(self.expected_steps)
+        self._selected_expected_steps = list(self.expected_steps)
+        if type(optional_expected_initial_operations_discovery) is not bool:
+            raise TypeError(
+                "optional_expected_initial_operations_discovery must be a boolean"
+            )
+        self.optional_expected_initial_operations_discovery = (
+            optional_expected_initial_operations_discovery
+        )
+        self.optional_expected_operations_discovery_step_names = tuple(
+            optional_expected_operations_discovery_step_names
+        )
+        self._optional_expected_operations_discovery_step_names = frozenset(
+            self.optional_expected_operations_discovery_step_names
+        )
+        self.optional_expected_workflow_read_step_names = tuple(
+            optional_expected_workflow_read_step_names
+        )
+        self._optional_expected_workflow_read_step_names = frozenset(
+            self.optional_expected_workflow_read_step_names
+        )
+        if optional_initial_operations_discovery_operation is not None and (
+            not isinstance(optional_initial_operations_discovery_operation, str)
+            or not optional_initial_operations_discovery_operation.strip()
+        ):
+            raise TypeError(
+                "optional_initial_operations_discovery_operation must be a "
+                "non-empty operation name or None"
+            )
+        self.optional_initial_operations_discovery_operation = (
+            optional_initial_operations_discovery_operation
+        )
+        self._optional_initial_operations_step: ExpectedGatewayStep | None = None
+        if optional_initial_query_object_arguments is not None and (
+            not isinstance(optional_initial_query_object_arguments, (list, tuple))
+            or not optional_initial_query_object_arguments
+            or any(
+                not isinstance(argument, str) or not argument
+                for argument in optional_initial_query_object_arguments
+            )
+        ):
+            raise TypeError(
+                "optional_initial_query_object_arguments must be a non-empty "
+                "string sequence or None"
+            )
+        self.optional_initial_query_object_arguments = (
+            None
+            if optional_initial_query_object_arguments is None
+            else tuple(optional_initial_query_object_arguments)
+        )
+        self._optional_initial_query_object_step: ExpectedGatewayStep | None = None
+        if type(optional_initial_query_schema) is not bool:
+            raise TypeError("optional_initial_query_schema must be a boolean")
+        self.optional_initial_query_schema = optional_initial_query_schema
+        self.optional_query_schema_step_names = tuple(
+            optional_query_schema_step_names
+        )
         self._commutative_read_only_step_sets = tuple(
             frozenset(group)
             for group in self.commutative_read_only_step_groups
@@ -5697,6 +9241,9 @@ class CodexGatewayBroker:
             if first != second
         } | _commutative_composer_setup_pairs(
             self.commutative_composer_setup_step_groups
+        )
+        self._optional_topic_schema_step_sets = tuple(
+            frozenset(group) for group in self.optional_topic_schema_step_groups
         )
         self.gateway_global_arguments = tuple(str(value) for value in gateway_global_arguments)
         self.expected_wwise_version = str(expected_wwise_version)
@@ -5716,6 +9263,16 @@ class CodexGatewayBroker:
         self.trusted_step_observer = trusted_step_observer
         self.trusted_subscription_ack = trusted_subscription_ack
         self.trusted_subscription_ack_observer = trusted_subscription_ack_observer
+        if offline_replay_preview_requests and runner_environment != {}:
+            raise ValueError(
+                "cleaned-file Preview requests are restricted to offline replay"
+            )
+        self._offline_replay_preview_requests = {
+            str(name): json.loads(
+                _canonical_json_bytes(dict(request)).decode("utf-8")
+            )
+            for name, request in (offline_replay_preview_requests or {}).items()
+        }
         self._runner_environment = dict(os.environ if runner_environment is None else runner_environment)
 
         if transport not in {"auto", "unix", "tcp"}:
@@ -5777,6 +9334,115 @@ class CodexGatewayBroker:
         names = [step.name for step in self.expected_steps]
         if len(names) != len(set(names)):
             raise ValueError("ExpectedGatewayStep names must be unique")
+        if (
+            len(self.optional_expected_operations_discovery_step_names)
+            != len(self._optional_expected_operations_discovery_step_names)
+            or any(name not in names for name in self._optional_expected_operations_discovery_step_names)
+            or any(
+                step.subcommand != "operations" or step.arguments
+                for step in self.expected_steps
+                if step.name in self._optional_expected_operations_discovery_step_names
+            )
+        ):
+            raise ValueError(
+                "optional workflow operations discovery names must identify "
+                "unique empty operations steps"
+            )
+        if (
+            len(self.optional_expected_workflow_read_step_names)
+            != len(self._optional_expected_workflow_read_step_names)
+            or any(
+                name not in names
+                for name in self._optional_expected_workflow_read_step_names
+            )
+            or any(
+                step.subcommand not in {"query-schema", "query-object"}
+                for step in self.expected_steps
+                if step.name in self._optional_expected_workflow_read_step_names
+            )
+        ):
+            raise ValueError(
+                "optional workflow read names must identify unique query-schema "
+                "or query-object steps"
+            )
+        if self.optional_expected_initial_operations_discovery:
+            if (
+                len(self.expected_steps) < 2
+                or self.expected_steps[0].subcommand != "operations"
+                or self.expected_steps[0].arguments
+            ):
+                raise ValueError(
+                    "optional expected operations discovery requires one leading "
+                    "operations step before the exact workflow"
+                )
+        if self.optional_initial_operations_discovery_operation is not None:
+            first = self.expected_steps[0]
+            if first.subcommand not in {
+                "operation-schema",
+                "request-schema",
+            } or first.arguments != (
+                self.optional_initial_operations_discovery_operation,
+            ):
+                raise ValueError(
+                    "optional operations discovery must bind the exact first "
+                    "schema operation"
+                )
+            label = first.name.rsplit(".", 1)[0]
+            discovery = ExpectedGatewayStep(
+                name=f"{label}.operations",
+                subcommand="operations",
+            )
+            if discovery.name in names:
+                raise ValueError(
+                    "optional operations discovery step name collides with a "
+                    "required step"
+                )
+            self._optional_initial_operations_step = discovery
+        if self.optional_initial_query_object_arguments is not None:
+            schema_index = (
+                1
+                if len(self.expected_steps) >= 2
+                and self.expected_steps[0].subcommand == "operations"
+                else 0
+            )
+            first = self.expected_steps[schema_index]
+            if first.subcommand not in {"operation-schema", "request-schema"}:
+                raise ValueError(
+                    "optional initial query-object requires an exact first schema "
+                    "step, optionally after one required operations catalog"
+                )
+            label = first.name.rsplit(".", 1)[0]
+            self._optional_initial_query_object_step = ExpectedGatewayStep(
+                name=f"{label}.query-object-preflight",
+                subcommand="query-object",
+                arguments=self.optional_initial_query_object_arguments,
+            )
+        if self.optional_initial_query_schema:
+            if (
+                len(self.expected_steps) < 2
+                or self.expected_steps[0].subcommand != "query-schema"
+                or self.expected_steps[0].arguments
+                or self.expected_steps[1].subcommand != "query-object"
+            ):
+                raise ValueError(
+                    "optional query schema must be the exact first step before query-object"
+                )
+        if self.optional_query_schema_step_names:
+            optional_names = self.optional_query_schema_step_names
+            optional_steps = self.expected_steps[: len(optional_names)]
+            if (
+                len(optional_names) >= len(self.expected_steps)
+                or len(optional_names) != len(set(optional_names))
+                or tuple(step.name for step in optional_steps) != optional_names
+                or any(step.subcommand != "query-schema" for step in optional_steps)
+                or self.expected_steps[len(optional_names)].subcommand
+                != "query-object"
+                or len(self.expected_steps) != len(optional_names) + 1
+            ):
+                raise ValueError(
+                    "optional query disclosures must be the exact leading "
+                    "query-schema steps before one query-object"
+                )
         validate_operation_draft_protocol_steps(self.expected_steps)
         terminal_execute_steps = tuple(
             index
@@ -5801,12 +9467,12 @@ class CodexGatewayBroker:
                 )
             ack_step = matching_steps[0]
             if (
-                ack_step.subcommand != "wait-topic"
+                ack_step.subcommand not in {"wait-topic", "stream-topic"}
                 or not ack_step.arguments
                 or ack_step.arguments[0] != self.trusted_subscription_ack.topic
             ):
                 raise ValueError(
-                    "trusted subscription ACK must bind the exact literal wait-topic URI"
+                    "trusted subscription ACK must bind the exact literal wait/stream URI"
                 )
 
         self._temporary_directory: tempfile.TemporaryDirectory[str] | None = None
@@ -5831,9 +9497,15 @@ class CodexGatewayBroker:
         self._active_process_done = threading.Event()
         self._active_process_done.set()
         self._records: list[GatewayBrokerRecord] = []
+        self._replayed_successful_gateway_arguments: list[tuple[str, ...]] = []
         self._next_step = 0
         self._payloads_by_step: dict[str, Mapping[str, Any]] = {}
-        self._submitted_draft_actions_by_step: dict[str, Mapping[str, Any]] = {}
+        self._import_declaration_ids_by_draft: dict[
+            str, dict[str, str]
+        ] = {}
+        self._submitted_draft_actions_by_step: dict[
+            str, tuple[Mapping[str, Any], ...]
+        ] = {}
         self._terminal_state = _BROKER_READY
         self._started = False
         self._ever_started = False
@@ -5990,7 +9662,7 @@ class CodexGatewayBroker:
             self._config_path.write_text(
                 json.dumps(
                     {
-                        "wwise_version": None,
+                        "wwise_version": self.expected_wwise_version or None,
                         "waapi_host": "127.0.0.1",
                         "waapi_port": None,
                         "project_modification_policy": self.project_modification_policy,
@@ -6226,14 +9898,16 @@ class CodexGatewayBroker:
             successful_count = sum(record.succeeded for record in records)
             complete = (
                 self._terminal_state == _BROKER_COMPLETE
-                and self._next_step == len(self.expected_steps)
-                and successful_count == len(self.expected_steps)
-                and len(records) == len(self.expected_steps)
+                and self._next_step == len(self._selected_expected_steps)
+                and successful_count == len(self._selected_expected_steps)
+                and len(records) == len(self._selected_expected_steps)
                 and all(record.succeeded for record in records)
             )
             terminal_state = self._terminal_state
         return GatewayBrokerEvidence(
-            expected_step_names=tuple(step.name for step in self.expected_steps),
+            expected_step_names=tuple(
+                step.name for step in self._selected_expected_steps
+            ),
             consumed_step_names=consumed,
             records=records,
             state_directory=str(self.state_directory),
@@ -6753,15 +10427,100 @@ class CodexGatewayBroker:
                     f"broker is terminal {self._terminal_state}",
                     authenticated=True,
                 )
-            step = self._execution_steps[self._next_step]
             try:
+                optional_workflow_discovery_names = {
+                    *self._optional_expected_operations_discovery_step_names,
+                    *self._optional_expected_workflow_read_step_names,
+                }
+                while (
+                    self._next_step < len(self._execution_steps)
+                    and self._execution_steps[self._next_step].name
+                    in optional_workflow_discovery_names
+                    and resolved.gateway_arguments
+                    != (
+                        self._execution_steps[self._next_step].subcommand,
+                        *self._execution_steps[self._next_step].arguments,
+                    )
+                ):
+                    self._execution_steps.pop(self._next_step)
+                    self._selected_expected_steps.pop(self._next_step)
+                if (
+                    self._next_step == 0
+                    and not self._records
+                    and self.optional_expected_initial_operations_discovery
+                    and resolved.gateway_arguments
+                    == (
+                        self._execution_steps[1].subcommand,
+                        *self._execution_steps[1].arguments,
+                    )
+                ):
+                    self._execution_steps.pop(0)
+                    self._selected_expected_steps.pop(0)
+                if (
+                    self._next_step == 0
+                    and not self._records
+                    and self._optional_initial_operations_step is not None
+                    and resolved.gateway_arguments == ("operations",)
+                ):
+                    self._execution_steps.insert(
+                        0,
+                        self._optional_initial_operations_step,
+                    )
+                    self._selected_expected_steps.insert(
+                        0,
+                        self._optional_initial_operations_step,
+                    )
+                optional_query_index = (
+                    1
+                    if self._execution_steps
+                    and self._execution_steps[0].subcommand == "operations"
+                    else 0
+                )
+                if (
+                    self._next_step == optional_query_index
+                    and len(self._records) == optional_query_index
+                    and self._optional_initial_query_object_step is not None
+                    and resolved.gateway_arguments
+                    == (
+                        "query-object",
+                        *self.optional_initial_query_object_arguments,
+                    )
+                ):
+                    self._execution_steps.insert(
+                        optional_query_index,
+                        self._optional_initial_query_object_step,
+                    )
+                    self._selected_expected_steps.insert(
+                        optional_query_index,
+                        self._optional_initial_query_object_step,
+                    )
+                if (
+                    self._next_step == 0
+                    and not self._records
+                    and self.optional_initial_query_schema
+                    and resolved.gateway_arguments
+                    and resolved.gateway_arguments[0] == "query-object"
+                ):
+                    self._execution_steps.pop(0)
+                    self._selected_expected_steps.pop(0)
+                step = self._execution_steps[self._next_step]
+                step = self._rebase_business_draft_revision(step)
+                step = self._bind_task_local_declaration_id(
+                    step,
+                    resolved.gateway_arguments,
+                )
+                self._execution_steps[self._next_step] = step
                 semantic_hash, execution_arguments = self._validate_step(
                     step,
                     resolved.gateway_arguments,
                 )
             except GatewayInvocationError as first_error:
                 try:
-                    reordered = self._match_dependency_ready_draft_action(
+                    reordered = self._match_dependency_ready_draft_batch(
+                        resolved.gateway_arguments,
+                    ) or self._match_rebatched_import_rows(
+                        resolved.gateway_arguments,
+                    ) or self._match_dependency_ready_draft_action(
                         resolved.gateway_arguments,
                     )
                 except GatewayInvocationError as reorder_error:
@@ -6772,6 +10531,32 @@ class CodexGatewayBroker:
                     )
                 if reordered is not None:
                     step, semantic_hash, execution_arguments = reordered
+                elif (
+                    business_setup_reordered := (
+                        self._match_dependency_ready_business_setup_step(
+                            resolved.gateway_arguments,
+                        )
+                    )
+                ) is not None:
+                    step, semantic_hash, execution_arguments = (
+                        business_setup_reordered
+                    )
+                elif (
+                    optional_query_step := (
+                        self._match_or_skip_optional_query_schema_step(
+                            resolved.gateway_arguments,
+                        )
+                    )
+                ) is not None:
+                    step, semantic_hash, execution_arguments = optional_query_step
+                elif (
+                    optional_topic_step := (
+                        self._match_or_skip_optional_topic_schema_step(
+                            resolved.gateway_arguments,
+                        )
+                    )
+                ) is not None:
+                    step, semantic_hash, execution_arguments = optional_topic_step
                 elif (
                     read_only_reordered := self._match_commutative_read_only_step(
                         resolved.gateway_arguments,
@@ -6819,32 +10604,22 @@ class CodexGatewayBroker:
                     payload_error=str(exc),
                 )
 
-        submitted_draft_action: Mapping[str, Any] | None = None
+        submitted_draft_actions: tuple[Mapping[str, Any], ...] | None = None
         if step.subcommand == "draft-apply":
             try:
-                if "--action-json" in resolved.gateway_arguments:
-                    action_index = (
-                        resolved.gateway_arguments.index("--action-json") + 1
-                    )
-                    decoded_action = _decode_json_argument(
-                        resolved.gateway_arguments[action_index],
-                        reject_duplicate_keys=True,
-                    )
-                else:
-                    action_index = (
-                        resolved.gateway_arguments.index("--facts") + 1
-                    )
-                    decoded_action = parse_typed_action_cli_arguments(
-                        resolved.gateway_arguments[action_index:]
-                    )
+                action_index = resolved.gateway_arguments.index("--facts") + 1
+                decoded_actions = parse_typed_action_cli_argument_sequence(
+                    resolved.gateway_arguments[action_index:]
+                )
             except (OperationComposerError, ValueError) as exc:
                 return self._reject(
                     resolved.raw_model_argv,
                     f"validated typed Draft action argv is invalid: {exc}",
                     authenticated=True,
                 )
-            submitted_draft_action = json.loads(
-                _canonical_json_bytes(decoded_action).decode("utf-8")
+            submitted_draft_actions = tuple(
+                json.loads(_canonical_json_bytes(action).decode("utf-8"))
+                for action in decoded_actions
             )
 
         return self._execute(
@@ -6852,29 +10627,890 @@ class CodexGatewayBroker:
             resolved,
             semantic_hash,
             execution_arguments=execution_arguments,
-            submitted_draft_action=submitted_draft_action,
+            submitted_draft_actions=submitted_draft_actions,
         )
+
+    def _rebase_business_draft_revision(
+        self,
+        step: ExpectedGatewayStep,
+    ) -> ExpectedGatewayStep:
+        """Bind one business command to the latest actual Draft receipt."""
+
+        if (
+            step.subcommand not in _BUSINESS_DRAFT_REVISION_SUBCOMMANDS
+            or self._next_step <= 0
+            or "." not in step.name
+        ):
+            return step
+        prefix = step.name.split(".", 1)[0]
+        business_start = next(
+            (
+                candidate
+                for candidate in self._execution_steps
+                if candidate.name == f"{prefix}.draft-start"
+                and candidate.subcommand == "draft-start"
+                and len(candidate.arguments) == 1
+                and isinstance(candidate.arguments[0], str)
+                and bool(candidate.arguments[0])
+            ),
+            None,
+        )
+        if business_start is None:
+            return step
+        previous = self._execution_steps[self._next_step - 1]
+        if not previous.name.startswith(f"{prefix}."):
+            return step
+        arguments = list(step.arguments)
+        if (
+            len(arguments) < 5
+            or arguments[3] != "--expected-revision"
+            or not isinstance(arguments[4], ResponseBinding)
+            or previous.name not in self._payloads_by_step
+        ):
+            return step
+        arguments[4] = ResponseBinding(previous.name, "/draft/revision")
+        return replace(step, arguments=tuple(arguments))
+
+    def _latest_payload_for_bound_draft(
+        self,
+        step: ExpectedGatewayStep,
+        source: Mapping[str, Any] | None,
+    ) -> Mapping[str, Any] | None:
+        """Select the latest receipt for this step's exact Draft identity."""
+
+        source_draft = source.get("draft") if isinstance(source, Mapping) else None
+        source_draft_id = (
+            source_draft.get("draft_id")
+            if isinstance(source_draft, Mapping)
+            else None
+        )
+        if not isinstance(source_draft_id, str):
+            draft_identity_binding = next(
+                (
+                    argument
+                    for argument in step.arguments
+                    if isinstance(argument, ResponseBinding)
+                    and argument.pointer == "/draft/draft_id"
+                ),
+                None,
+            )
+            identity_source = (
+                self._payloads_by_step.get(draft_identity_binding.step)
+                if draft_identity_binding is not None
+                else None
+            )
+            identity_draft = (
+                identity_source.get("draft")
+                if isinstance(identity_source, Mapping)
+                else None
+            )
+            source_draft_id = (
+                identity_draft.get("draft_id")
+                if isinstance(identity_draft, Mapping)
+                else None
+            )
+        if not isinstance(source_draft_id, str):
+            return source
+        for prior in reversed(self._execution_steps[: self._next_step]):
+            prior_payload = self._payloads_by_step.get(prior.name)
+            prior_draft = (
+                prior_payload.get("draft")
+                if isinstance(prior_payload, Mapping)
+                else None
+            )
+            if (
+                isinstance(prior_draft, Mapping)
+                and prior_draft.get("draft_id") == source_draft_id
+            ):
+                return prior_payload
+        return source
+
+    def _draft_start_for_step(
+        self,
+        step: ExpectedGatewayStep,
+    ) -> ExpectedGatewayStep:
+        """Resolve a Draft command to its exact owning draft-start step."""
+
+        if step.subcommand in DRAFT_START_SUBCOMMANDS:
+            return step
+        binding = step.arguments[0] if step.arguments else None
+        if (
+            not isinstance(binding, ResponseBinding)
+            or binding.pointer != "/draft/draft_id"
+        ):
+            raise GatewayInvocationError(
+                "Draft response is missing its flow-local draft-start binding"
+            )
+        matches = tuple(
+            candidate
+            for candidate in self._execution_steps[
+                : self._execution_steps.index(step) + 1
+            ]
+            if candidate.name == binding.step
+            and candidate.subcommand in DRAFT_START_SUBCOMMANDS
+        )
+        if len(matches) != 1:
+            raise GatewayInvocationError(
+                "Draft response is missing its flow-local draft-start"
+            )
+        return matches[0]
+
+    def _bind_task_local_declaration_id(
+        self,
+        step: ExpectedGatewayStep,
+        actual: Sequence[str],
+    ) -> ExpectedGatewayStep:
+        """Accept one bounded unique declaration label without making it business data."""
+
+        if step.subcommand == "draft-declare-existing-batch":
+            actual_values = tuple(str(value) for value in actual)
+
+            def option_rows(
+                values: Sequence[Any], option: str, arity: int
+            ) -> list[tuple[Any, ...]]:
+                rows: list[tuple[Any, ...]] = []
+                for index, value in enumerate(values):
+                    if value == option and index + arity < len(values):
+                        rows.append(tuple(values[index + 1 : index + arity + 1]))
+                return rows
+
+            actual_rows = option_rows(actual_values, "--row", 2)
+            expected_rows = option_rows(step.arguments, "--row", 2)
+            if not actual_rows or len(actual_rows) != len(expected_rows):
+                raise GatewayInvocationError(
+                    "business batch requires every bounded task-local row"
+                )
+            handle_first_rows: set[str] = set()
+            normalized_actual_rows = []
+            for first, second in actual_rows:
+                if (
+                    _BOUND_OBJECT_HANDLE_RE.fullmatch(str(first)) is not None
+                    and _BOUND_OBJECT_HANDLE_RE.fullmatch(str(second)) is None
+                ):
+                    handle_first_rows.add(str(first))
+                    normalized_actual_rows.append((second, first))
+                else:
+                    normalized_actual_rows.append((first, second))
+            actual_rows = normalized_actual_rows
+            actual_ids = [str(row[0]) for row in actual_rows]
+            if (
+                len(actual_ids) != len(set(actual_ids))
+                or any(
+                    _TASK_LOCAL_DECLARATION_ID_RE.fullmatch(value) is None
+                    for value in actual_ids
+                )
+            ):
+                raise GatewayInvocationError(
+                    "business batch task-local ids must be bounded and unique"
+                )
+
+            def bound_text(value: Any) -> str | None:
+                if isinstance(value, str):
+                    return value
+                if not isinstance(value, ResponseBinding):
+                    return None
+                source = self._payloads_by_step.get(value.step)
+                if source is None:
+                    return None
+                try:
+                    resolved = _json_pointer(source, value.pointer)
+                except (GatewayInvocationError, KeyError, TypeError, ValueError):
+                    return None
+                return str(resolved) if isinstance(resolved, str) else None
+
+            actual_by_handle = {str(row[1]): str(row[0]) for row in actual_rows}
+            expected_to_actual: dict[str, str] = {}
+            for expected_id, expected_handle in expected_rows:
+                resolved_handle = bound_text(expected_handle)
+                if not isinstance(expected_id, str) or resolved_handle is None:
+                    raise GatewayInvocationError(
+                        "sealed business batch row binding is invalid"
+                    )
+                actual_id = actual_by_handle.get(resolved_handle)
+                if actual_id is None:
+                    raise GatewayInvocationError(
+                        "business batch row does not match its exact bound object"
+                    )
+                expected_to_actual[expected_id] = actual_id
+            arguments = list(step.arguments)
+            declaration_options = {
+                "--row-order": 1,
+                "--row": 2,
+                "--field": 3,
+                "--field-meaning-value": 3,
+            }
+            cursor = 5
+            while cursor < len(arguments):
+                option = arguments[cursor]
+                arity = declaration_options.get(option)
+                if arity is None or cursor + arity >= len(arguments):
+                    raise GatewayInvocationError(
+                        "sealed business batch declaration shape is invalid"
+                    )
+                expected_id = arguments[cursor + 1]
+                if not isinstance(expected_id, str) or expected_id not in expected_to_actual:
+                    raise GatewayInvocationError(
+                        "sealed business batch declaration id is invalid"
+                    )
+                actual_id = expected_to_actual[expected_id]
+                if option == "--row":
+                    expected_handle = arguments[cursor + 2]
+                    resolved_handle = bound_text(expected_handle)
+                    if resolved_handle in handle_first_rows:
+                        arguments[cursor + 1] = expected_handle
+                        arguments[cursor + 2] = actual_id
+                    else:
+                        arguments[cursor + 1] = actual_id
+                else:
+                    arguments[cursor + 1] = actual_id
+                cursor += arity + 1
+            return replace(step, arguments=tuple(arguments))
+
+        if step.subcommand not in {
+            "draft-declare-new",
+            "draft-declare-existing",
+        }:
+            return step
+        actual_values = tuple(str(value) for value in actual)
+        declaration_count = actual_values.count("--declaration-id")
+        if declaration_count > 1:
+            raise GatewayInvocationError(
+                f"{step.subcommand} accepts exactly one declaration per command; "
+                "copy the next response revision before submitting the next declaration"
+            )
+        if declaration_count != 1:
+            raise GatewayInvocationError(
+                "business declaration requires one bounded task-local id"
+            )
+        actual_index = actual_values.index("--declaration-id")
+        if actual_index + 1 >= len(actual_values):
+            raise GatewayInvocationError(
+                "business declaration requires one bounded task-local id"
+            )
+        declaration_id = actual_values[actual_index + 1]
+        if _TASK_LOCAL_DECLARATION_ID_RE.fullmatch(declaration_id) is None:
+            raise GatewayInvocationError(
+                "business declaration requires one bounded task-local id"
+            )
+        prior_ids: set[str] = set()
+        for candidate in self._execution_steps[: self._next_step]:
+            if candidate.subcommand not in {
+                "draft-declare-new",
+                "draft-declare-existing",
+            }:
+                continue
+            try:
+                marker_index = candidate.arguments.index("--declaration-id")
+            except ValueError:
+                continue
+            value = candidate.arguments[marker_index + 1]
+            if isinstance(value, str):
+                prior_ids.add(value)
+        if declaration_id in prior_ids:
+            raise GatewayInvocationError(
+                "business declaration task-local ids must be unique"
+            )
+        arguments = list(step.arguments)
+        try:
+            expected_index = arguments.index("--declaration-id")
+        except ValueError as exc:
+            raise GatewayInvocationError(
+                "sealed business declaration lacks its task-local id slot"
+            ) from exc
+        if (
+            expected_index + 1 >= len(arguments)
+            or not isinstance(arguments[expected_index + 1], str)
+        ):
+            raise GatewayInvocationError(
+                "sealed business declaration id slot is invalid"
+            )
+        arguments[expected_index + 1] = declaration_id
+        return replace(step, arguments=tuple(arguments))
+
+    def _match_dependency_ready_business_setup_step(
+        self,
+        actual: Sequence[str],
+    ) -> tuple[ExpectedGatewayStep, str, tuple[str, ...]] | None:
+        """Select one unique exact business binding/configuration in any safe order."""
+
+        current = self._execution_steps[self._next_step]
+        current_match = _BUSINESS_DRAFT_SETUP_STEP_RE.fullmatch(current.name)
+        if current_match is None:
+            return None
+        prefix = current_match.group("prefix")
+        matches: list[
+            tuple[int, ExpectedGatewayStep, str, tuple[str, ...]]
+        ] = []
+        for index in range(self._next_step, len(self._execution_steps)):
+            candidate = self._execution_steps[index]
+            candidate_match = _BUSINESS_DRAFT_SETUP_STEP_RE.fullmatch(
+                candidate.name
+            )
+            if candidate_match is None or candidate_match.group("prefix") != prefix:
+                break
+            candidate = self._rebase_business_draft_revision(candidate)
+            if actual and actual[0] == candidate.subcommand:
+                candidate = self._bind_task_local_declaration_id(
+                    candidate,
+                    actual,
+                )
+            try:
+                semantic_hash, execution_arguments = self._validate_step(
+                    candidate,
+                    actual,
+                )
+            except GatewayInvocationError:
+                continue
+            matches.append(
+                (index, candidate, semantic_hash, execution_arguments)
+            )
+        if not matches:
+            return None
+        if len(matches) != 1:
+            raise GatewayInvocationError(
+                "business Draft setup matches multiple dependency-ready sealed steps"
+            )
+        index, candidate, semantic_hash, execution_arguments = matches[0]
+        self._execution_steps.pop(index)
+        self._execution_steps.insert(self._next_step, candidate)
+        return candidate, semantic_hash, execution_arguments
+
+    def _match_dependency_ready_draft_batch(
+        self,
+        actual: Sequence[str],
+    ) -> tuple[ExpectedGatewayStep, str, tuple[str, ...]] | None:
+        """Repack one adjacent dependency-free fact block without changing meaning.
+
+        Composer construction facts are business semantics; the arbitrary
+        grouping of at most six independent facts into one ``draft-apply`` is
+        transport.  Accept a different dependency-free grouping only when
+        every submitted action uniquely matches one still-sealed action and
+        the remaining facts still fit the already-sealed number of adjacent
+        action steps.  Dynamic parent/child facts retain their exact response
+        binding and are therefore excluded from this commutative block.
+        """
+
+        current = self._execution_steps[self._next_step]
+        block_contract = dependency_free_draft_action_block(
+            self._execution_steps,
+            self._next_step,
+        )
+        if block_contract is None:
+            return None
+        block_indexes, pool = block_contract
+        block = tuple(
+            (index, self._execution_steps[index]) for index in block_indexes
+        )
+
+        try:
+            action_start = tuple(actual).index("--facts") + 1
+        except ValueError:
+            return None
+        if len(actual) <= action_start:
+            return None
+        try:
+            submitted = parse_typed_action_cli_argument_sequence(
+                actual[action_start:]
+            )
+        except OperationComposerError:
+            return None
+        if not 1 <= len(submitted) <= MAX_TYPED_ACTIONS_PER_APPLY:
+            return None
+
+        unmatched = list(enumerate(pool))
+        matched: list[DraftTypedActionArgument] = []
+        matched_indexes: list[int] = []
+        for submitted_action in submitted:
+            candidate_actual = (
+                *actual[:action_start],
+                *typed_action_cli_arguments(submitted_action),
+            )
+            matches: list[tuple[int, DraftTypedActionArgument]] = []
+            for remaining_index, (pool_index, expected_action) in enumerate(unmatched):
+                candidate_step = replace(
+                    current,
+                    arguments=(*current.arguments[:-1], expected_action),
+                )
+                try:
+                    self._validate_step(candidate_step, candidate_actual)
+                except GatewayInvocationError:
+                    continue
+                matches.append((remaining_index, expected_action))
+            if len(matches) != 1:
+                return None
+            remaining_index, expected_action = matches[0]
+            pool_index = unmatched[remaining_index][0]
+            matched.append(expected_action)
+            matched_indexes.append(pool_index)
+            unmatched.pop(remaining_index)
+
+        scheduled = (*matched_indexes, *(index for index, _action in unmatched))
+        for left_position, left_index in enumerate(scheduled):
+            for right_index in scheduled[left_position + 1 :]:
+                if left_index <= right_index:
+                    continue
+                if not _commutative_typed_draft_fact(
+                    pool[left_index],
+                    pool[right_index],
+                ):
+                    return None
+
+        unmatched_actions = [action for _index, action in unmatched]
+
+        remaining_steps = len(block) - 1
+        if (
+            (remaining_steps == 0 and unmatched_actions)
+            or (
+                remaining_steps > 0
+                and not (
+                    remaining_steps
+                    <= len(unmatched_actions)
+                    <= remaining_steps * MAX_TYPED_ACTIONS_PER_APPLY
+                )
+            )
+        ):
+            return None
+
+        matched_argument: DraftTypedActionArgument | DraftTypedActionBatchArgument
+        matched_argument = (
+            matched[0]
+            if len(matched) == 1
+            else DraftTypedActionBatchArgument(tuple(matched))
+        )
+        matched_step = replace(
+            current,
+            arguments=(*current.arguments[:-1], matched_argument),
+        )
+        semantic_hash, execution_arguments = self._validate_step(
+            matched_step,
+            actual,
+        )
+
+        cursor = 0
+        for position, (index, candidate) in enumerate(block[1:], start=1):
+            slots_after = remaining_steps - position
+            width = min(
+                MAX_TYPED_ACTIONS_PER_APPLY,
+                len(unmatched_actions) - cursor - slots_after,
+            )
+            actions = tuple(unmatched_actions[cursor : cursor + width])
+            cursor += width
+            argument: DraftTypedActionArgument | DraftTypedActionBatchArgument
+            argument = (
+                actions[0]
+                if len(actions) == 1
+                else DraftTypedActionBatchArgument(actions)
+            )
+            self._execution_steps[index] = replace(
+                candidate,
+                arguments=(*candidate.arguments[:-1], argument),
+            )
+        if cursor != len(unmatched_actions):
+            raise GatewayInvocationError(
+                "dependency-free typed Draft facts could not be repartitioned"
+            )
+        self._execution_steps[self._next_step] = matched_step
+        return matched_step, semantic_hash, execution_arguments
+
+    def _match_rebatched_import_rows(
+        self,
+        actual: Sequence[str],
+    ) -> tuple[ExpectedGatewayStep, str, tuple[str, ...]] | None:
+        """Accept a different 1..6-row transport partition of sealed imports.
+
+        Every row and field remains sealed.  Only the command boundary may
+        move, and only when parent dependencies are already present or travel
+        in the same topological chunk.  The remaining rows are repartitioned
+        deterministically so later commands still consume one exact protocol.
+        """
+
+        if not actual or actual[0] != "draft-declare-import-batch":
+            return None
+
+        block_start = self._next_step
+        current = self._execution_steps[block_start]
+        if current.subcommand != "draft-declare-import-batch":
+            current_match = _BUSINESS_DRAFT_SETUP_STEP_RE.fullmatch(
+                current.name
+            )
+            if current_match is None:
+                return None
+            prefix = current_match.group("prefix")
+            while block_start < len(self._execution_steps):
+                candidate_match = _BUSINESS_DRAFT_SETUP_STEP_RE.fullmatch(
+                    self._execution_steps[block_start].name
+                )
+                if (
+                    candidate_match is None
+                    or candidate_match.group("prefix") != prefix
+                ):
+                    break
+                block_start += 1
+            if (
+                block_start >= len(self._execution_steps)
+                or self._execution_steps[block_start].subcommand
+                != "draft-declare-import-batch"
+                or not self._execution_steps[block_start].name.startswith(
+                    f"{prefix}.declare-batch"
+                )
+            ):
+                return None
+            current = self._execution_steps[block_start]
+        current = self._rebase_business_draft_revision(current)
+
+        block_end = block_start
+        while (
+            block_end < len(self._execution_steps)
+            and self._execution_steps[block_end].subcommand
+            == "draft-declare-import-batch"
+        ):
+            block_end += 1
+        block = self._execution_steps[block_start:block_end]
+        if not block:
+            return None
+
+        option_arity = {
+            "--media-directory": 1,
+            "--row-order": 1,
+            "--new-root-row": 4,
+            "--new-child-row": 4,
+            "--new-row": 4,
+            "--existing-row": 2,
+            "--field": 3,
+            "--field-value": 3,
+            "--media-file": 2,
+            "--switch-value": 2,
+            "--event": 4,
+        }
+
+        def parse_groups(
+            values: Sequence[Any],
+            *,
+            grouped_row_order: bool = False,
+        ) -> list[tuple[Any, ...]] | None:
+            groups: list[tuple[Any, ...]] = []
+            cursor = 5
+            while cursor < len(values):
+                option = values[cursor]
+                if grouped_row_order and option == "--row-order":
+                    cursor += 1
+                    start = cursor
+                    while (
+                        cursor < len(values)
+                        and values[cursor] not in option_arity
+                    ):
+                        groups.append(("--row-order", values[cursor]))
+                        cursor += 1
+                    if cursor == start:
+                        return None
+                    continue
+                arity = option_arity.get(option) if isinstance(option, str) else None
+                if arity is None or cursor + arity >= len(values):
+                    return None
+                groups.append(tuple(values[cursor : cursor + arity + 1]))
+                cursor += arity + 1
+            return groups
+
+        def step_rows(
+            step: ExpectedGatewayStep,
+        ) -> list[tuple[str, tuple[tuple[Any, ...], ...], tuple[Any, ...] | None]] | None:
+            groups = parse_groups(step.arguments)
+            if groups is None:
+                return None
+            media_directories = [
+                group for group in groups if group[0] == "--media-directory"
+            ]
+            if len(media_directories) > 1:
+                return None
+            media_directory = media_directories[0] if media_directories else None
+            order = [group[1] for group in groups if group[0] == "--row-order"]
+            if (
+                not order
+                or any(not isinstance(row_id, str) for row_id in order)
+                or len(set(order)) != len(order)
+            ):
+                return None
+            rows: list[
+                tuple[str, tuple[tuple[Any, ...], ...], tuple[Any, ...] | None]
+            ] = []
+            for row_id in order:
+                row_groups = tuple(
+                    group
+                    for group in groups
+                    if group[0] != "--media-directory"
+                    and len(group) >= 2
+                    and group[1] == row_id
+                )
+                declarations = [
+                    group
+                    for group in row_groups
+                    if group[0]
+                    in {
+                        "--new-root-row",
+                        "--new-child-row",
+                        "--new-row",
+                        "--existing-row",
+                    }
+                ]
+                if (
+                    len(declarations) != 1
+                    or sum(group[0] == "--row-order" for group in row_groups) != 1
+                ):
+                    return None
+                row_media_directory = (
+                    media_directory
+                    if any(group[0] == "--media-file" for group in row_groups)
+                    else None
+                )
+                rows.append((row_id, row_groups, row_media_directory))
+            assigned_ids = {
+                group[1]
+                for _row_id, row_groups, _directory in rows
+                for group in row_groups
+            }
+            if any(
+                group[0] != "--media-directory" and group[1] not in assigned_ids
+                for group in groups
+            ):
+                return None
+            return rows
+
+        pool: list[
+            tuple[str, tuple[tuple[Any, ...], ...], tuple[Any, ...] | None]
+        ] = []
+        for sealed_step in block:
+            rows = step_rows(sealed_step)
+            if rows is None:
+                return None
+            pool.extend(rows)
+        all_ids = {row_id for row_id, _groups, _directory in pool}
+        if len(all_ids) != len(pool):
+            return None
+
+        actual_groups = parse_groups(actual[1:], grouped_row_order=True)
+        if actual_groups is None:
+            return None
+        actual_order = [
+            group[1] for group in actual_groups if group[0] == "--row-order"
+        ]
+        if not 1 <= len(actual_order) <= AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS:
+            return None
+
+        draft_key = str(actual[1]) if len(actual) > 1 else ""
+        prior_map = getattr(self, "_import_declaration_ids_by_draft", {}).get(
+            draft_key,
+            {},
+        )
+        prior_expected_ids = frozenset(prior_map.values())
+
+        def dependencies_ready(indexes: tuple[int, ...]) -> bool:
+            selected_ids = {pool[index][0] for index in indexes}
+            for index in indexes:
+                _row_id, row_groups, _directory = pool[index]
+                declaration = next(
+                    group
+                    for group in row_groups
+                    if group[0]
+                    in {
+                        "--new-root-row",
+                        "--new-child-row",
+                        "--new-row",
+                        "--existing-row",
+                    }
+                )
+                if declaration[0] not in {"--new-child-row", "--new-row"}:
+                    continue
+                parent = declaration[2]
+                if (
+                    isinstance(parent, str)
+                    and parent in all_ids
+                    and parent not in selected_ids
+                    and parent not in prior_expected_ids
+                ):
+                    return False
+            return True
+
+        def arguments_for_rows(
+            prefix: Sequence[Any],
+            rows: Sequence[
+                tuple[str, tuple[tuple[Any, ...], ...], tuple[Any, ...] | None]
+            ],
+        ) -> tuple[Any, ...] | None:
+            directories = {
+                directory for _row_id, _groups, directory in rows if directory
+            }
+            if len(directories) > 1:
+                return None
+            groups: list[Any] = []
+            if directories:
+                groups.extend(next(iter(directories)))
+            for _row_id, row_groups, _directory in rows:
+                for group in row_groups:
+                    groups.extend(group)
+            return (*prefix, *groups)
+
+        initial_maps = {
+            draft: dict(mapping)
+            for draft, mapping in getattr(
+                self,
+                "_import_declaration_ids_by_draft",
+                {},
+            ).items()
+        }
+        matches: list[
+            tuple[
+                tuple[int, ...],
+                ExpectedGatewayStep,
+                str,
+                tuple[str, ...],
+                dict[str, dict[str, str]],
+            ]
+        ] = []
+        normalized_actual = (
+            *actual[:6],
+            *(
+                value
+                for group in actual_groups
+                for value in group
+            ),
+        )
+        for indexes in itertools.combinations(
+            range(len(pool)),
+            len(actual_order),
+        ):
+            if not dependencies_ready(indexes):
+                continue
+            candidate_arguments = arguments_for_rows(
+                current.arguments[:5],
+                [pool[index] for index in indexes],
+            )
+            if candidate_arguments is None:
+                continue
+            candidate = replace(current, arguments=candidate_arguments)
+            self._import_declaration_ids_by_draft = {
+                draft: dict(mapping) for draft, mapping in initial_maps.items()
+            }
+            try:
+                semantic_hash, execution_arguments = self._validate_step(
+                    candidate,
+                    normalized_actual,
+                )
+            except GatewayInvocationError:
+                continue
+            matched_maps = {
+                draft: dict(mapping)
+                for draft, mapping in getattr(
+                    self,
+                    "_import_declaration_ids_by_draft",
+                    {},
+                ).items()
+            }
+            matches.append(
+                (
+                    indexes,
+                    candidate,
+                    semantic_hash,
+                    execution_arguments,
+                    matched_maps,
+                )
+            )
+        if not matches:
+            self._import_declaration_ids_by_draft = initial_maps
+            return None
+        if len(matches) != 1:
+            self._import_declaration_ids_by_draft = initial_maps
+            raise GatewayInvocationError(
+                "import chunk matches multiple sealed row subsets"
+            )
+        indexes, matched, semantic_hash, execution_arguments, matched_maps = matches[0]
+        self._import_declaration_ids_by_draft = matched_maps
+
+        selected_indexes = set(indexes)
+        remaining = [
+            row for index, row in enumerate(pool) if index not in selected_indexes
+        ]
+        partitions: list[
+            list[tuple[str, tuple[tuple[Any, ...], ...], tuple[Any, ...] | None]]
+        ] = []
+        cursor = 0
+        while cursor < len(remaining):
+            chunk = remaining[
+                cursor : cursor + AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS
+            ]
+            while len(chunk) > 1:
+                directories = {
+                    directory
+                    for _row_id, _groups, directory in chunk
+                    if directory
+                }
+                if len(directories) <= 1:
+                    break
+                chunk.pop()
+            if not chunk:
+                raise GatewayInvocationError(
+                    "remaining import rows could not be repartitioned"
+                )
+            partitions.append(chunk)
+            cursor += len(chunk)
+
+        name_match = re.fullmatch(r"(.+\.declare-batch)(?:-(\d{2}))?", current.name)
+        if name_match is None:
+            self._import_declaration_ids_by_draft = initial_maps
+            return None
+        base_name = name_match.group(1)
+        sequence = int(name_match.group(2) or "1")
+        replacement_steps = [matched]
+        previous_name = matched.name
+        for offset, rows in enumerate(partitions, start=1):
+            name = f"{base_name}-{sequence + offset:02d}"
+            prefix = (
+                *current.arguments[:4],
+                ResponseBinding(previous_name, "/draft/revision"),
+            )
+            arguments = arguments_for_rows(prefix, rows)
+            if arguments is None:
+                raise GatewayInvocationError(
+                    "remaining import rows have incompatible media directories"
+                )
+            replacement_steps.append(
+                replace(current, name=name, arguments=arguments)
+            )
+            previous_name = name
+
+        pending_setup = self._execution_steps[self._next_step:block_start]
+        reordered = [matched, *pending_setup, *replacement_steps[1:]]
+        self._execution_steps[self._next_step:block_end] = reordered
+        self._selected_expected_steps[self._next_step:block_end] = reordered
+        return matched, semantic_hash, execution_arguments
 
     def _match_dependency_ready_draft_action(
         self,
         actual: Sequence[str],
     ) -> tuple[ExpectedGatewayStep, str, tuple[str, ...]] | None:
-        """Select one equivalent typed action without fixing its linearization."""
+        """Select one handle-independent typed action without fixing its linearization."""
 
         current = self._execution_steps[self._next_step]
         current_match = _NUMBERED_DRAFT_ACTION_STEP_RE.fullmatch(current.name)
         if current.subcommand != "draft-apply" or current_match is None:
             return None
+        if any(
+            isinstance(argument, DraftTypedActionBatchArgument)
+            for argument in current.arguments
+        ):
+            # One batch already seals its internal business order and revision
+            # transition.  It is never eligible for the single-action
+            # dependency-ready reordering used by older dedicated Composers.
+            return None
         current_argument = next(
             (
                 argument
                 for argument in current.arguments
-                if isinstance(argument, DraftActionJsonArgument)
+                if isinstance(argument, DraftTypedActionArgument)
             ),
             None,
         )
         if (
-            isinstance(current_argument, DraftActionJsonArgument)
+            isinstance(current_argument, DraftTypedActionArgument)
             and current_argument.operation == "audio.import"
         ):
             # Import row order is part of the canonical operation request and
@@ -6897,6 +11533,23 @@ class CodexGatewayBroker:
                 or candidate_match.group("prefix") != prefix
             ):
                 break
+            candidate_argument = next(
+                (
+                    argument
+                    for argument in candidate.arguments
+                    if isinstance(argument, DraftTypedActionArgument)
+                ),
+                None,
+            )
+            if (
+                isinstance(candidate_argument, DraftTypedActionArgument)
+                and candidate_argument.response_bindings
+            ):
+                # A response-bound fact can depend on an earlier parent append,
+                # branch selection, or child attachment even when all opaque
+                # handles have already been disclosed.  Only handle-independent
+                # business facts are safe to commute across that boundary.
+                continue
             try:
                 semantic_hash, execution_arguments = self._validate_step(
                     candidate,
@@ -6967,6 +11620,1163 @@ class CodexGatewayBroker:
         )
         return candidate, semantic_hash, execution_arguments
 
+    def _match_or_skip_optional_topic_schema_step(
+        self,
+        actual: Sequence[str],
+    ) -> tuple[ExpectedGatewayStep, str, tuple[str, ...]] | None:
+        """Accept one sealed Topic disclosure or skip the unused remainder."""
+
+        current = self._execution_steps[self._next_step]
+        group = next(
+            (
+                candidate
+                for candidate in self._optional_topic_schema_step_sets
+                if current.name in candidate
+            ),
+            None,
+        )
+        if group is None:
+            return None
+
+        group_end = self._next_step
+        while (
+            group_end < len(self._execution_steps)
+            and self._execution_steps[group_end].name in group
+        ):
+            group_end += 1
+
+        matches: list[
+            tuple[int, ExpectedGatewayStep, str, tuple[str, ...]]
+        ] = []
+        for index in range(self._next_step, group_end):
+            candidate = self._execution_steps[index]
+            try:
+                semantic_hash, execution_arguments = self._validate_step(
+                    candidate,
+                    actual,
+                )
+            except GatewayInvocationError:
+                continue
+            matches.append(
+                (index, candidate, semantic_hash, execution_arguments)
+            )
+        if len(matches) > 1:
+            raise GatewayInvocationError(
+                "command matches multiple optional Topic schema disclosures"
+            )
+        if matches:
+            index, candidate, semantic_hash, execution_arguments = matches[0]
+            self._execution_steps.insert(
+                self._next_step,
+                self._execution_steps.pop(index),
+            )
+            selected_index = next(
+                index
+                for index in range(self._next_step, len(self._selected_expected_steps))
+                if self._selected_expected_steps[index].name == candidate.name
+            )
+            self._selected_expected_steps.insert(
+                self._next_step,
+                self._selected_expected_steps.pop(selected_index),
+            )
+            return candidate, semantic_hash, execution_arguments
+
+        lifecycle = self._execution_steps[group_end]
+        try:
+            semantic_hash, execution_arguments = self._validate_step(
+                lifecycle,
+                actual,
+            )
+        except GatewayInvocationError:
+            return None
+
+        skipped_names = {
+            step.name
+            for step in self._execution_steps[self._next_step:group_end]
+        }
+        del self._execution_steps[self._next_step:group_end]
+        self._selected_expected_steps[:] = [
+            step
+            for step in self._selected_expected_steps
+            if step.name not in skipped_names
+        ]
+        return lifecycle, semantic_hash, execution_arguments
+
+    def _match_or_skip_optional_query_schema_step(
+        self,
+        actual: Sequence[str],
+    ) -> tuple[ExpectedGatewayStep, str, tuple[str, ...]] | None:
+        """Accept a sealed query disclosure or skip unused disclosures."""
+
+        optional_names = frozenset(self.optional_query_schema_step_names)
+        if not optional_names:
+            return None
+        current = self._execution_steps[self._next_step]
+        if current.name not in optional_names:
+            return None
+
+        group_end = self._next_step
+        while (
+            group_end < len(self._execution_steps)
+            and self._execution_steps[group_end].name in optional_names
+        ):
+            group_end += 1
+
+        matches: list[
+            tuple[int, ExpectedGatewayStep, str, tuple[str, ...]]
+        ] = []
+        for index in range(self._next_step, group_end):
+            candidate = self._execution_steps[index]
+            try:
+                semantic_hash, execution_arguments = self._validate_step(
+                    candidate,
+                    actual,
+                )
+            except GatewayInvocationError:
+                continue
+            matches.append(
+                (index, candidate, semantic_hash, execution_arguments)
+            )
+        if len(matches) > 1:
+            raise GatewayInvocationError(
+                "command matches multiple optional query schema disclosures"
+            )
+        if matches:
+            index, candidate, semantic_hash, execution_arguments = matches[0]
+            self._execution_steps.insert(
+                self._next_step,
+                self._execution_steps.pop(index),
+            )
+            selected_index = next(
+                selected_index
+                for selected_index in range(
+                    self._next_step,
+                    len(self._selected_expected_steps),
+                )
+                if self._selected_expected_steps[selected_index].name
+                == candidate.name
+            )
+            self._selected_expected_steps.insert(
+                self._next_step,
+                self._selected_expected_steps.pop(selected_index),
+            )
+            return candidate, semantic_hash, execution_arguments
+
+        query_step = self._execution_steps[group_end]
+        try:
+            semantic_hash, execution_arguments = self._validate_step(
+                query_step,
+                actual,
+            )
+        except GatewayInvocationError:
+            return None
+
+        skipped_names = {
+            step.name
+            for step in self._execution_steps[self._next_step:group_end]
+        }
+        del self._execution_steps[self._next_step:group_end]
+        self._selected_expected_steps[:] = [
+            step
+            for step in self._selected_expected_steps
+            if step.name not in skipped_names
+        ]
+        return query_step, semantic_hash, execution_arguments
+
+    def _normalize_business_declaration_fact_order(
+        self,
+        step: ExpectedGatewayStep,
+        actual: Sequence[str],
+    ) -> tuple[str, ...]:
+        """Order declaration fields by identity without weakening their values."""
+
+        if step.subcommand == "draft-declare-import-batch":
+            return CodexGatewayBroker._normalize_import_batch_fact_order(
+                self,
+                step,
+                actual,
+            )
+        if step.subcommand == "draft-declare-existing-batch":
+            return CodexGatewayBroker._normalize_existing_batch_fact_order(
+                self,
+                step,
+                actual,
+            )
+        if step.subcommand == "draft-declare-soundbank-plan":
+            return CodexGatewayBroker._normalize_soundbank_plan_fact_order(
+                self,
+                step,
+                actual,
+            )
+        if step.subcommand in {
+            "draft-declare-cli-console-plan",
+            "draft-declare-core-plan",
+            "draft-declare-project-setting-plan",
+            "draft-declare-soundengine-plan",
+        }:
+            return CodexGatewayBroker._normalize_closed_plan_fact_order(
+                self,
+                step,
+                actual,
+            )
+        if step.subcommand == "draft-declare-host-plan":
+            return CodexGatewayBroker._normalize_host_plan_fact_order(
+                self,
+                step,
+                actual,
+            )
+        if step.subcommand not in {
+            "draft-declare-new",
+            "draft-declare-existing",
+            "draft-revise-declaration",
+        }:
+            return tuple(actual)
+        fixed_count = 5
+        if len(step.arguments) < fixed_count or len(actual) < fixed_count:
+            return tuple(actual)
+        option_arity = {
+            "--declaration-id": 1,
+            "--parent-handle": 1,
+            "--name": 1,
+            "--kind": 1,
+            "--object-handle": 1,
+            "--field": 2,
+            "--field-value": 2,
+            "--event-parent-handle": 1,
+            "--event-name": 1,
+            "--event-action": 1,
+        }
+
+        def parse(values: Sequence[Any]) -> list[tuple[Any, ...]] | None:
+            groups: list[tuple[Any, ...]] = []
+            cursor = fixed_count
+            while cursor < len(values):
+                option = values[cursor]
+                arity = option_arity.get(option) if isinstance(option, str) else None
+                if arity is None or cursor + arity >= len(values):
+                    return None
+                groups.append(tuple(values[cursor : cursor + arity + 1]))
+                cursor += arity + 1
+            return groups
+
+        def bound_text(value: Any) -> str | None:
+            if isinstance(value, str):
+                return value
+            if not isinstance(value, ResponseBinding):
+                return None
+            source = self._payloads_by_step.get(value.step)
+            if source is None:
+                return None
+            try:
+                result = _json_pointer(source, value.pointer)
+            except (GatewayInvocationError, KeyError, TypeError, ValueError):
+                return None
+            return str(result) if isinstance(result, (str, int, float, bool)) else None
+
+        def key(group: tuple[Any, ...], *, expected: bool) -> tuple[str, ...] | None:
+            option = group[0]
+            if not isinstance(option, str):
+                return None
+            if option == "--field":
+                name = group[1]
+                return (option, name) if isinstance(name, str) else None
+            if option == "--field-value":
+                handle = bound_text(group[1]) if expected else group[1]
+                return (option, handle) if isinstance(handle, str) else None
+            return (option,)
+
+        expected_groups = parse(step.arguments)
+        actual_groups = parse(tuple(actual))
+        if expected_groups is None or actual_groups is None:
+            return tuple(actual)
+        if step.allow_explicit_derived_sfx_language:
+            derived_language = ("--field", "language", "SFX")
+            occurrences = actual_groups.count(derived_language)
+            if occurrences == 1 and derived_language not in expected_groups:
+                actual_groups.remove(derived_language)
+        expected_keys = [key(group, expected=True) for group in expected_groups]
+        actual_keys = [key(group, expected=False) for group in actual_groups]
+        if (
+            any(item is None for item in (*expected_keys, *actual_keys))
+            or len(set(expected_keys)) != len(expected_keys)
+            or len(set(actual_keys)) != len(actual_keys)
+            or set(expected_keys) != set(actual_keys)
+        ):
+            return tuple(actual)
+        actual_by_key = dict(zip(actual_keys, actual_groups, strict=True))
+        return (
+            *tuple(actual[:fixed_count]),
+            *(
+                token
+                for expected_key in expected_keys
+                for token in actual_by_key[expected_key]
+            ),
+        )
+
+    def _normalize_existing_batch_fact_order(
+        self,
+        step: ExpectedGatewayStep,
+        actual: Sequence[str],
+    ) -> tuple[str, ...]:
+        """Canonicalize independent object-set batch rows and field facts."""
+
+        fixed_count = 5
+        arities = {
+            "--row-order": 1,
+            "--row": 2,
+            "--field": 3,
+            "--field-meaning-value": 3,
+        }
+
+        def parse(values: Sequence[Any]) -> list[tuple[Any, ...]] | None:
+            groups: list[tuple[Any, ...]] = []
+            cursor = fixed_count
+            while cursor < len(values):
+                option = values[cursor]
+                arity = arities.get(option) if isinstance(option, str) else None
+                if arity is None or cursor + arity >= len(values):
+                    return None
+                groups.append(tuple(values[cursor : cursor + arity + 1]))
+                cursor += arity + 1
+            return groups
+
+        expected_groups = parse(step.arguments)
+        actual_groups = parse(actual)
+        if expected_groups is None or actual_groups is None:
+            return tuple(actual)
+        expected_stable_fields = {
+            (group[1], group[2])
+            for group in expected_groups
+            if group[0] == "--field"
+            and isinstance(group[1], str)
+            and isinstance(group[2], str)
+        }
+
+        def key(group: tuple[Any, ...]) -> tuple[str, ...] | None:
+            option = group[0]
+            declaration_id = group[1]
+            if not isinstance(option, str) or not isinstance(declaration_id, str):
+                return None
+            if option in {"--field", "--field-meaning-value"}:
+                field = group[2]
+                if not isinstance(field, str):
+                    return None
+                if (
+                    option == "--field"
+                    and (declaration_id, field) in expected_stable_fields
+                ):
+                    return (option, declaration_id, field)
+                field_key = "".join(
+                    character for character in field.casefold() if character.isalnum()
+                )
+                return ("--field-meaning-value", declaration_id, field_key)
+            return (option, declaration_id)
+
+        expected_keys = [key(group) for group in expected_groups]
+        actual_keys = [key(group) for group in actual_groups]
+        if (
+            any(item is None for item in (*expected_keys, *actual_keys))
+            or len(set(expected_keys)) != len(expected_keys)
+            or len(set(actual_keys)) != len(actual_keys)
+            or set(expected_keys) != set(actual_keys)
+        ):
+            return tuple(actual)
+        actual_by_key = dict(zip(actual_keys, actual_groups, strict=True))
+        expected_by_key = dict(zip(expected_keys, expected_groups, strict=True))
+
+        def normalized_business_value(expected_key: tuple[str, ...]) -> Any:
+            actual_group = actual_by_key[expected_key]
+            expected_group = expected_by_key[expected_key]
+            actual_value = actual_group[3]
+            if (
+                expected_key[0] != "--field-meaning-value"
+                or expected_key[2] not in {"fadetime", "delay"}
+                or not isinstance(actual_value, str)
+            ):
+                return actual_value
+            expected_value = expected_group[3]
+            expected_values = (
+                expected_value.values
+                if isinstance(expected_value, ExactArgumentAlternatives)
+                else (expected_value,)
+                if isinstance(expected_value, str)
+                else ()
+            )
+            if not expected_values:
+                return actual_value
+            matched = re.fullmatch(
+                r"([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)\s*"
+                r"(ms|millisecond|milliseconds|s|sec|secs|second|seconds|秒)",
+                actual_value.strip(),
+                flags=re.IGNORECASE,
+            )
+            if matched is None:
+                return actual_value
+            try:
+                value = Decimal(matched.group(1))
+                if matched.group(2).casefold() in {
+                    "ms",
+                    "millisecond",
+                    "milliseconds",
+                }:
+                    value /= Decimal(1000)
+                for candidate in expected_values:
+                    if value == Decimal(candidate):
+                        return candidate
+            except InvalidOperation:
+                return actual_value
+            return actual_value
+
+        return (
+            *tuple(actual[:fixed_count]),
+            *(
+                token
+                for expected_key in expected_keys
+                for token in (
+                    (
+                        "--field-meaning-value",
+                        actual_by_key[expected_key][1],
+                        expected_by_key[expected_key][2],
+                        normalized_business_value(expected_key),
+                    )
+                    if expected_key[0] == "--field-meaning-value"
+                    else actual_by_key[expected_key]
+                )
+            ),
+        )
+
+    def _normalize_soundbank_plan_fact_order(
+        self,
+        step: ExpectedGatewayStep,
+        actual: Sequence[str],
+    ) -> tuple[str, ...]:
+        """Canonicalize independent high-level SoundBank plan flag groups."""
+
+        fixed_count = 5
+        if len(step.arguments) < fixed_count or len(actual) < fixed_count:
+            return tuple(actual)
+        fixed_arities = {
+            "--mode": 1,
+            "--soundbank-handle": 1,
+            "--soundbank": 2,
+            "--event": 2,
+            "--aux-bus": 2,
+            "--soundbank-rebuild": 2,
+            "--platform": 1,
+            "--language": 1,
+            "--rebuild-soundbanks": 1,
+            "--clear-audio-file-cache": 1,
+            "--rebuild-init-bank": 1,
+            "--source": 3,
+            "--definition-file": 1,
+            "--io-root": 1,
+        }
+        variable_options = {"--inclusion", "--generation-inclusion"}
+
+        def parse(values: Sequence[Any]) -> list[tuple[Any, ...]] | None:
+            groups: list[tuple[Any, ...]] = []
+            cursor = fixed_count
+            while cursor < len(values):
+                option = values[cursor]
+                if not isinstance(option, str):
+                    return None
+                if option in variable_options:
+                    end = cursor + 1
+                    while (
+                        end < len(values)
+                        and not (
+                            isinstance(values[end], str)
+                            and values[end].startswith("--")
+                        )
+                    ):
+                        end += 1
+                    if end - cursor < 3:
+                        return None
+                    groups.append(tuple(values[cursor:end]))
+                    cursor = end
+                    continue
+                arity = fixed_arities.get(option)
+                if arity is None or cursor + arity >= len(values):
+                    return None
+                groups.append(tuple(values[cursor : cursor + arity + 1]))
+                cursor += arity + 1
+            return groups
+
+        def resolve_expected(value: Any) -> Any:
+            if not isinstance(value, ResponseBinding):
+                return value
+            source = self._payloads_by_step.get(value.step)
+            if source is None:
+                return value
+            try:
+                bound = _json_pointer(source, value.pointer)
+            except (GatewayInvocationError, KeyError, TypeError, ValueError):
+                return value
+            return (
+                str(bound)
+                if isinstance(bound, (str, int, float, bool)) and bound is not None
+                else value
+            )
+
+        expected_groups = parse(step.arguments)
+        actual_groups = parse(tuple(actual))
+        if expected_groups is None or actual_groups is None:
+            return tuple(actual)
+        resolved_expected = [
+            tuple(resolve_expected(value) for value in group)
+            for group in expected_groups
+        ]
+        default_false_options = {
+            "--soundbank-rebuild",
+            "--rebuild-soundbanks",
+            "--clear-audio-file-cache",
+            "--rebuild-init-bank",
+        }
+
+        def default_identity(group: tuple[Any, ...]) -> tuple[Any, ...]:
+            return (
+                (group[0], group[1])
+                if group[0] == "--soundbank-rebuild"
+                else (group[0],)
+            )
+
+        expected_default_identities = {
+            default_identity(group)
+            for group in resolved_expected
+            if group[0] in default_false_options
+        }
+        actual_groups = [
+            group
+            for group in actual_groups
+            if not (
+                group[0] in default_false_options
+                and group[-1] == "false"
+                and default_identity(group) not in expected_default_identities
+            )
+        ]
+        expected_by_option: dict[Any, list[tuple[Any, ...]]] = {}
+        actual_by_option: dict[Any, list[tuple[Any, ...]]] = {}
+        for group in resolved_expected:
+            expected_by_option.setdefault(group[0], []).append(group)
+        for group in actual_groups:
+            actual_by_option.setdefault(group[0], []).append(group)
+        if expected_by_option != actual_by_option:
+            return tuple(actual)
+        return (
+            *tuple(actual[:fixed_count]),
+            *(
+                token
+                for expected_group in resolved_expected
+                for token in expected_group
+            ),
+        )
+
+    def _normalize_closed_plan_fact_order(
+        self,
+        step: ExpectedGatewayStep,
+        actual: Sequence[str],
+    ) -> tuple[str, ...]:
+        """Canonicalize independent groups in one closed business plan."""
+
+        fixed_count = 5
+        if len(step.arguments) < fixed_count or len(actual) < fixed_count:
+            return tuple(actual)
+        option_arity = {
+            "--value": 2,
+            "--item": 2,
+            "--role": 2,
+            "--mapping": 3,
+            "--toggle": 2,
+            "--game-parameter-handle": 1,
+            "--minimum": 1,
+            "--maximum": 1,
+            "--curve-update-outcome": 1,
+            "--event-handle": 1,
+            "--action": 1,
+            "--fade-duration-ms": 1,
+            "--fade-curve": 1,
+        }
+
+        def parse(values: Sequence[Any]) -> list[tuple[Any, ...]] | None:
+            groups: list[tuple[Any, ...]] = []
+            cursor = fixed_count
+            while cursor < len(values):
+                option = values[cursor]
+                arity = option_arity.get(option) if isinstance(option, str) else None
+                if arity is None or cursor + arity >= len(values):
+                    return None
+                groups.append(tuple(values[cursor : cursor + arity + 1]))
+                cursor += arity + 1
+            return groups
+
+        def resolve_expected(value: Any) -> Any:
+            if not isinstance(value, ResponseBinding):
+                return value
+            source = self._payloads_by_step.get(value.step)
+            if source is None:
+                return value
+            try:
+                bound = _json_pointer(source, value.pointer)
+            except (GatewayInvocationError, KeyError, TypeError, ValueError):
+                return value
+            return (
+                str(bound)
+                if isinstance(bound, (str, int, float, bool)) and bound is not None
+                else value
+            )
+
+        def key(
+            group: tuple[Any, ...],
+            *,
+            expected: bool,
+        ) -> tuple[Any, ...] | None:
+            resolved_group = tuple(
+                resolve_expected(value) if expected else value
+                for value in group
+            )
+            option = resolved_group[0]
+            field = resolved_group[1] if len(resolved_group) > 1 else None
+            if not isinstance(option, str) or not isinstance(field, str):
+                return None
+            if option in {"--value", "--toggle"}:
+                return (option, field)
+            return resolved_group
+
+        expected_groups = parse(step.arguments)
+        actual_groups = parse(tuple(actual))
+        if expected_groups is None or actual_groups is None:
+            return tuple(actual)
+        expected_keys = [key(group, expected=True) for group in expected_groups]
+        actual_keys = [key(group, expected=False) for group in actual_groups]
+        if (
+            any(item is None for item in (*expected_keys, *actual_keys))
+            or len(set(expected_keys)) != len(expected_keys)
+            or len(set(actual_keys)) != len(actual_keys)
+            or set(expected_keys) != set(actual_keys)
+        ):
+            return tuple(actual)
+        actual_by_key = dict(zip(actual_keys, actual_groups, strict=True))
+        return (
+            *tuple(actual[:fixed_count]),
+            *(
+                token
+                for expected_key in expected_keys
+                for token in actual_by_key[expected_key]
+            ),
+        )
+
+    def _normalize_host_plan_fact_order(
+        self,
+        step: ExpectedGatewayStep,
+        actual: Sequence[str],
+    ) -> tuple[str, ...]:
+        """Canonicalize group order and equivalent numeric spellings."""
+
+        reordered = CodexGatewayBroker._normalize_closed_plan_fact_order(
+            self,
+            step,
+            actual,
+        )
+        fixed_count = 5
+        option_arity = {
+            "--value": 2,
+            "--item": 2,
+            "--mapping": 3,
+            "--toggle": 2,
+        }
+        numeric_fields = {
+            "frequency_hz",
+            "sample_rate_hz",
+            "attack_seconds",
+            "sustain_seconds",
+            "release_seconds",
+            "sustain_db",
+        }
+
+        def parse(values: Sequence[Any]) -> list[list[Any]] | None:
+            groups: list[list[Any]] = []
+            cursor = fixed_count
+            while cursor < len(values):
+                option = values[cursor]
+                arity = option_arity.get(option) if isinstance(option, str) else None
+                if arity is None or cursor + arity >= len(values):
+                    return None
+                groups.append(list(values[cursor : cursor + arity + 1]))
+                cursor += arity + 1
+            return groups
+
+        expected_groups = parse(step.arguments)
+        actual_groups = parse(reordered)
+        if expected_groups is None or actual_groups is None:
+            return reordered
+        if len(expected_groups) != len(actual_groups):
+            return reordered
+        for expected, observed in zip(expected_groups, actual_groups, strict=True):
+            if expected[:2] != observed[:2]:
+                return reordered
+            if expected[0] != "--value" or expected[1] not in numeric_fields:
+                continue
+            try:
+                expected_number = Decimal(str(expected[2]))
+                observed_number = Decimal(str(observed[2]))
+            except InvalidOperation:
+                continue
+            if (
+                expected_number.is_finite()
+                and observed_number.is_finite()
+                and expected_number == observed_number
+            ):
+                observed[2] = expected[2]
+        return (
+            *tuple(reordered[:fixed_count]),
+            *(token for group in actual_groups for token in group),
+        )
+
+    def _normalize_import_batch_fact_order(
+        self,
+        step: ExpectedGatewayStep,
+        actual: Sequence[str],
+    ) -> tuple[str, ...]:
+        """Canonicalize closed batch groups while preserving exact row order."""
+
+        fixed_count = 5
+        if len(step.arguments) < fixed_count or len(actual) < fixed_count:
+            return tuple(actual)
+        option_arity = {
+            "--media-directory": 1,
+            "--row-order": 1,
+            "--new-root-row": 4,
+            "--new-child-row": 4,
+            "--new-row": 4,
+            "--existing-row": 2,
+            "--field": 3,
+            "--field-value": 3,
+            "--media-file": 2,
+            "--switch-value": 2,
+            "--event": 4,
+        }
+
+        def parse(values: Sequence[Any]) -> list[tuple[Any, ...]] | None:
+            groups: list[tuple[Any, ...]] = []
+            cursor = fixed_count
+            while cursor < len(values):
+                option = values[cursor]
+                arity = option_arity.get(option) if isinstance(option, str) else None
+                if arity is None or cursor + arity >= len(values):
+                    return None
+                groups.append(tuple(values[cursor : cursor + arity + 1]))
+                cursor += arity + 1
+            return groups
+
+        def bound_text(value: Any) -> str | None:
+            if isinstance(value, str):
+                return value
+            if not isinstance(value, ResponseBinding):
+                return None
+            source = self._payloads_by_step.get(value.step)
+            if source is None:
+                return None
+            try:
+                result = _json_pointer(source, value.pointer)
+            except (GatewayInvocationError, KeyError, TypeError, ValueError):
+                return None
+            return str(result) if isinstance(result, (str, int, float, bool)) else None
+
+        def key(group: tuple[Any, ...], *, expected: bool) -> tuple[str, ...] | None:
+            option = group[0]
+            if not isinstance(option, str):
+                return None
+            if option in {
+                "--media-directory",
+            }:
+                return (option,)
+            declaration_id = group[1]
+            if not isinstance(declaration_id, str):
+                return None
+            if option == "--field":
+                field_name = group[2]
+                return (
+                    option,
+                    declaration_id,
+                    field_name,
+                ) if isinstance(field_name, str) else None
+            if option == "--field-value":
+                handle = bound_text(group[2]) if expected else group[2]
+                return (
+                    option,
+                    declaration_id,
+                    handle,
+                ) if isinstance(handle, str) else None
+            return (option, declaration_id)
+
+        actual_values = tuple(actual)
+        expected_groups = parse(step.arguments)
+        actual_groups = parse(actual_values)
+        if (
+            actual_groups is not None
+            and any(group[0] == "--media-file" for group in actual_groups)
+            and not any(
+                group[0] == "--media-directory" for group in actual_groups
+            )
+        ):
+            draft_key = str(actual_values[0])
+            replayed_arguments = getattr(
+                self,
+                "_replayed_successful_gateway_arguments",
+                (),
+            )
+            prior_media_directories = {
+                arguments[index + 1]
+                for arguments in (
+                    *(
+                        record.gateway_arguments
+                        for record in getattr(self, "_records", ())
+                        if record.succeeded
+                    ),
+                    *replayed_arguments,
+                )
+                if len(arguments) > 1
+                and arguments[0] == "draft-declare-import-batch"
+                and arguments[1] == draft_key
+                for index, value in enumerate(arguments[:-1])
+                if value == "--media-directory"
+            }
+            if len(prior_media_directories) == 1:
+                actual_values = (
+                    *actual_values[:fixed_count],
+                    "--media-directory",
+                    next(iter(prior_media_directories)),
+                    *actual_values[fixed_count:],
+                )
+                actual_groups = parse(actual_values)
+        if expected_groups is None or actual_groups is None:
+            return tuple(actual)
+        expected_order = [
+            group[1] for group in expected_groups if group[0] == "--row-order"
+        ]
+        actual_order = [
+            group[1] for group in actual_groups if group[0] == "--row-order"
+        ]
+        if (
+            len(actual_order) != len(expected_order)
+            or len(set(actual_order)) != len(actual_order)
+            or len(set(expected_order)) != len(expected_order)
+        ):
+            return tuple(actual)
+        draft_key = str(actual[0])
+        declaration_ids_by_draft = getattr(
+            self,
+            "_import_declaration_ids_by_draft",
+            {},
+        )
+        prior_declaration_id_map = declaration_ids_by_draft.get(
+            draft_key,
+            {},
+        )
+        prior_expected_ids = frozenset(prior_declaration_id_map.values())
+        declaration_options = {
+            "--new-root-row",
+            "--new-child-row",
+            "--new-row",
+            "--existing-row",
+        }
+
+        def declarations(
+            groups: Sequence[tuple[Any, ...]],
+        ) -> dict[str, tuple[Any, ...]] | None:
+            result: dict[str, tuple[Any, ...]] = {}
+            for group in groups:
+                if group[0] not in declaration_options:
+                    continue
+                declaration_id = group[1]
+                if not isinstance(declaration_id, str) or declaration_id in result:
+                    return None
+                result[declaration_id] = group
+            return result
+
+        expected_declarations = declarations(expected_groups)
+        actual_declarations = declarations(actual_groups)
+        if (
+            expected_declarations is None
+            or actual_declarations is None
+            or set(expected_declarations) != set(expected_order)
+            or set(actual_declarations) != set(actual_order)
+        ):
+            return tuple(actual)
+
+        def declaration_signature(
+            declaration_id: str,
+            declaration_rows: Mapping[str, tuple[Any, ...]],
+            *,
+            expected: bool,
+            stack: frozenset[str] = frozenset(),
+        ) -> tuple[Any, ...] | None:
+            if declaration_id in stack:
+                return None
+            group = declaration_rows.get(declaration_id)
+            if group is None:
+                return None
+            option = group[0]
+            if option == "--existing-row":
+                handle = bound_text(group[2]) if expected else group[2]
+                return (
+                    ("existing", handle)
+                    if isinstance(handle, str) and handle
+                    else None
+                )
+            parent = group[2]
+            if not isinstance(parent, (str, ResponseBinding)):
+                return None
+            if isinstance(parent, str) and parent in declaration_rows:
+                parent_signature = declaration_signature(
+                    parent,
+                    declaration_rows,
+                    expected=expected,
+                    stack=stack | {declaration_id},
+                )
+                if parent_signature is None:
+                    return None
+                parent_identity: tuple[Any, ...] = (
+                    "declaration-parent",
+                    parent_signature,
+                )
+            elif (
+                isinstance(parent, str)
+                and (
+                    (expected and parent in prior_expected_ids)
+                    or (
+                        not expected
+                        and parent in prior_declaration_id_map
+                    )
+                )
+            ):
+                parent_identity = (
+                    "prior-declaration-parent",
+                    (
+                        parent
+                        if expected
+                        else prior_declaration_id_map[parent]
+                    ),
+                )
+            else:
+                external_parent = bound_text(parent) if expected else parent
+                if not isinstance(external_parent, str) or not external_parent:
+                    return None
+                parent_identity = ("bound-parent", external_parent)
+            name = group[3]
+            kind = group[4]
+            if not isinstance(name, str) or not isinstance(kind, str):
+                return None
+            return ("new", parent_identity, name, kind)
+
+        def signatures(
+            declaration_rows: Mapping[str, tuple[Any, ...]],
+            *,
+            expected: bool,
+        ) -> dict[tuple[Any, ...], str] | None:
+            result: dict[tuple[Any, ...], str] = {}
+            for declaration_id in declaration_rows:
+                signature = declaration_signature(
+                    declaration_id,
+                    declaration_rows,
+                    expected=expected,
+                )
+                if signature is None or signature in result:
+                    return None
+                result[signature] = declaration_id
+            return result
+
+        expected_signatures = signatures(expected_declarations, expected=True)
+        actual_signatures = signatures(actual_declarations, expected=False)
+        if (
+            expected_signatures is None
+            or actual_signatures is None
+            or set(expected_signatures) != set(actual_signatures)
+        ):
+            return tuple(actual)
+        declaration_id_map = {
+            actual_id: expected_signatures[signature]
+            for signature, actual_id in actual_signatures.items()
+        }
+        if any(
+            (
+                actual_id in prior_declaration_id_map
+                and prior_declaration_id_map[actual_id] != expected_id
+            )
+            or (
+                expected_id in prior_expected_ids
+                and prior_declaration_id_map.get(actual_id) != expected_id
+            )
+            for actual_id, expected_id in declaration_id_map.items()
+        ):
+            return tuple(actual)
+
+        def topological(
+            order: Sequence[str],
+            declaration_rows: Mapping[str, tuple[Any, ...]],
+        ) -> bool:
+            positions = {declaration_id: index for index, declaration_id in enumerate(order)}
+            return all(
+                not (
+                    group[0] in {"--new-child-row", "--new-row"}
+                    and isinstance(group[2], str)
+                    and group[2] in declaration_rows
+                    and positions[group[2]] >= positions[declaration_id]
+                )
+                for declaration_id, group in declaration_rows.items()
+            )
+
+        if not topological(expected_order, expected_declarations) or not topological(
+            actual_order,
+            actual_declarations,
+        ):
+            return tuple(actual)
+
+        def ordered_media_rows(
+            order: Sequence[str],
+            groups: Sequence[tuple[Any, ...]],
+        ) -> tuple[str, ...]:
+            media_ids = {
+                group[1]
+                for group in groups
+                if group[0] == "--media-file"
+                or (
+                    group[0] == "--field"
+                    and group[2] in {"media_file", "inline_wav"}
+                )
+            }
+            return tuple(declaration_id for declaration_id in order if declaration_id in media_ids)
+
+        if tuple(
+            declaration_id_map[declaration_id]
+            for declaration_id in ordered_media_rows(actual_order, actual_groups)
+        ) != ordered_media_rows(expected_order, expected_groups):
+            return tuple(actual)
+
+        def canonicalize_declaration_ids(
+            group: tuple[Any, ...],
+        ) -> tuple[Any, ...] | None:
+            option = group[0]
+            if option in {
+                "--media-directory",
+            }:
+                return group
+            declaration_id = group[1]
+            if not isinstance(declaration_id, str):
+                return None
+            canonical_id = declaration_id_map.get(declaration_id)
+            if canonical_id is None:
+                return None
+            canonical = list(group)
+            canonical[1] = canonical_id
+            if option == "--new-child-row":
+                parent_id = group[2]
+                if not isinstance(parent_id, str):
+                    return None
+                canonical_parent_id = declaration_id_map.get(parent_id)
+                if canonical_parent_id is None:
+                    return None
+                canonical[2] = canonical_parent_id
+            elif option == "--new-row":
+                parent_id = group[2]
+                if not isinstance(parent_id, str):
+                    return None
+                canonical_parent_id = declaration_id_map.get(parent_id)
+                if canonical_parent_id is None:
+                    canonical_parent_id = prior_declaration_id_map.get(
+                        parent_id
+                    )
+                if canonical_parent_id is not None:
+                    canonical[2] = canonical_parent_id
+            return tuple(canonical)
+
+        canonical_actual_groups = [
+            canonicalize_declaration_ids(group) for group in actual_groups
+        ]
+        if any(group is None for group in canonical_actual_groups):
+            return tuple(actual)
+        actual_groups = [
+            group for group in canonical_actual_groups if group is not None
+        ]
+        expected_fields = {
+            key(group, expected=True): group
+            for group in expected_groups
+            if group[0] == "--field"
+        }
+        normalized_numeric_groups: list[tuple[Any, ...]] = []
+        for group in actual_groups:
+            group_key = key(group, expected=False)
+            expected_group = expected_fields.get(group_key)
+            if (
+                group[0] == "--field"
+                and group[2] == "volume_db"
+                and expected_group is not None
+            ):
+                try:
+                    expected_number = Decimal(str(expected_group[3]))
+                    actual_number = Decimal(str(group[3]))
+                except InvalidOperation:
+                    pass
+                else:
+                    if (
+                        expected_number.is_finite()
+                        and actual_number.is_finite()
+                        and expected_number == actual_number
+                    ):
+                        normalized = list(group)
+                        normalized[3] = expected_group[3]
+                        group = tuple(normalized)
+            normalized_numeric_groups.append(group)
+        actual_groups = normalized_numeric_groups
+        if step.allow_explicit_derived_sfx_language:
+            expected_language_keys = {
+                ("--field", group[1], "language")
+                for group in expected_groups
+                if group[0] == "--field" and group[2] == "language"
+            }
+            optional_language_groups = [
+                group
+                for group in actual_groups
+                if group[0] == "--field"
+                and group[2] == "language"
+                and ("--field", group[1], "language")
+                not in expected_language_keys
+            ]
+            if any(group[3] != "SFX" for group in optional_language_groups):
+                return tuple(actual)
+            optional_language_keys = [
+                (group[0], group[1], group[2])
+                for group in optional_language_groups
+            ]
+            if len(optional_language_keys) != len(set(optional_language_keys)):
+                return tuple(actual)
+            actual_groups = [
+                group for group in actual_groups if group not in optional_language_groups
+            ]
+        expected_keys = [key(group, expected=True) for group in expected_groups]
+        actual_keys = [key(group, expected=False) for group in actual_groups]
+        if (
+            any(item is None for item in (*expected_keys, *actual_keys))
+            or len(set(expected_keys)) != len(expected_keys)
+            or len(set(actual_keys)) != len(actual_keys)
+            or set(expected_keys) != set(actual_keys)
+        ):
+            return tuple(actual)
+        actual_by_key = dict(zip(actual_keys, actual_groups, strict=True))
+        declaration_ids_by_draft[draft_key] = {
+            **prior_declaration_id_map,
+            **declaration_id_map,
+        }
+        self._import_declaration_ids_by_draft = declaration_ids_by_draft
+        return (
+            *actual_values[:fixed_count],
+            *(
+                token
+                for expected_key in expected_keys
+                for token in actual_by_key[expected_key]
+            ),
+        )
+
     def _validate_step(
         self,
         step: ExpectedGatewayStep,
@@ -7034,6 +12844,48 @@ class CodexGatewayBroker:
                 *supplied_arguments[event_count_index:],
             )
             execution_arguments = (*expected_prefix, *validation_arguments)
+        validation_arguments = _normalize_query_object_default_identity_projection(
+            step,
+            validation_arguments,
+        )
+        validation_arguments = _normalize_query_object_event_actions(
+            step,
+            validation_arguments,
+        )
+        validation_arguments = _normalize_query_object_business_projection(
+            step,
+            validation_arguments,
+        )
+        validation_arguments = _normalize_query_object_exact_id_unit_ceiling(
+            step,
+            validation_arguments,
+        )
+        validation_arguments = _normalize_query_repair_stable_kind(
+            step,
+            validation_arguments,
+            self._payloads_by_step,
+        )
+        validation_arguments = _normalize_query_object_sound_routing_view(
+            step,
+            validation_arguments,
+        )
+        validation_arguments = _normalize_redundant_single_role_object_binding(
+            step,
+            validation_arguments,
+        )
+        validation_arguments = _normalize_scoped_child_draft_binding(
+            step,
+            validation_arguments,
+        )
+        validation_arguments = _normalize_draft_bind_object_query_identity(
+            step,
+            validation_arguments,
+            self._payloads_by_step,
+        )
+        validation_arguments = _normalize_event_action_draft_binding(
+            step,
+            validation_arguments,
+        )
         metadata_discovery = _validate_metadata_discover_query_arguments(
             step,
             validation_arguments,
@@ -7042,11 +12894,7 @@ class CodexGatewayBroker:
             metadata_discovery is None
             and step.subcommand == "draft-apply"
             and step.arguments
-            and isinstance(step.arguments[-1], DraftActionJsonArgument)
-            and (
-                len(step.arguments) < 2
-                or step.arguments[-2] != "--action-json"
-            )
+            and _draft_typed_actions(step.arguments[-1]) is not None
         ):
             fixed_count = len(step.arguments) - 1
             if len(validation_arguments) <= fixed_count:
@@ -7054,16 +12902,142 @@ class CodexGatewayBroker:
                     f"step {step.name!r} typed Draft action argv is missing"
                 )
             try:
-                typed_action = parse_typed_action_cli_arguments(
+                expected_typed_actions = _draft_typed_actions(step.arguments[-1])
+                assert expected_typed_actions is not None
+                typed_actions = parse_typed_action_cli_argument_sequence(
                     validation_arguments[fixed_count:]
                 )
             except OperationComposerError as exc:
                 raise GatewayInvocationError(
                     f"step {step.name!r} typed Draft action argv is invalid: {exc}"
                 ) from exc
+            if len(typed_actions) != len(expected_typed_actions):
+                raise GatewayInvocationError(
+                    f"step {step.name!r} typed Draft action count drifted"
+                )
             validation_arguments = (
                 *validation_arguments[:fixed_count],
-                _canonical_json_bytes(typed_action).decode("utf-8"),
+                _canonical_json_bytes(
+                    typed_actions[0]
+                    if len(expected_typed_actions) == 1
+                    else list(typed_actions)
+                ).decode("utf-8"),
+            )
+        typed_request_argument = next(
+            (
+                item
+                for item in step.arguments
+                if isinstance(item, TypedRequestFactsArgument)
+            ),
+            None,
+        )
+        if metadata_discovery is None and typed_request_argument is not None:
+            if not isinstance(step.arguments[-1], TypedRequestFactsArgument):
+                raise GatewayInvocationError(
+                    "typed request fact binding must be the final protocol argument"
+                )
+            fixed_count = len(step.arguments) - 1
+            try:
+                typed_facts = _parse_typed_request_fact_argv(
+                    validation_arguments[fixed_count:],
+                    prefix=typed_request_argument.prefix,
+                )
+                materialized = materialize_typed_request(
+                    typed_request_argument.contract,
+                    schema_digest=typed_request_argument.contract.schema_digest,
+                    facts=typed_facts,
+                )
+            except (TypedRequestError, ValueError) as exc:
+                raise GatewayInvocationError(
+                    f"step {step.name!r} typed request facts are invalid: {exc}"
+                ) from exc
+            if (
+                materialized.args != dict(typed_request_argument.expected_args)
+                or materialized.options
+                != dict(typed_request_argument.expected_options)
+            ):
+                raise GatewayInvocationError(
+                    f"step {step.name!r} typed facts do not materialize the sealed request"
+                )
+            validation_arguments = (
+                *validation_arguments[:fixed_count],
+                _canonical_json_bytes(
+                    {
+                        "schema_digest": typed_request_argument.contract.schema_digest,
+                        "facts": [
+                            {
+                                "action": fact.action,
+                                "handle": fact.handle,
+                                "value_type": fact.value_type,
+                                "value": fact.value,
+                                **({"key": fact.key} if fact.key is not None else {}),
+                            }
+                            for fact in typed_facts
+                        ],
+                        "args": materialized.args,
+                        "options": materialized.options,
+                    }
+                ).decode("utf-8"),
+            )
+        inline_operation_argument = next(
+            (
+                item
+                for item in step.arguments
+                if isinstance(item, InlineTypedOperationArgument)
+            ),
+            None,
+        )
+        if metadata_discovery is None and inline_operation_argument is not None:
+            if not isinstance(step.arguments[-1], InlineTypedOperationArgument):
+                raise GatewayInvocationError(
+                    "inline typed operation binding must be the final protocol argument"
+                )
+            fixed_count = len(step.arguments) - 1
+            supplied_tail = validation_arguments[fixed_count:]
+            accepted_tails = tuple(
+                argv[fixed_count:]
+                for argv in _inline_operation_cli_argument_variants(
+                    inline_operation_argument.expected
+                )
+            )
+            if tuple(supplied_tail) not in accepted_tails:
+                raise GatewayInvocationError(
+                    f"step {step.name!r} inline typed argv differs from its sealed request"
+                )
+            validation_arguments = (
+                *validation_arguments[:fixed_count],
+                _canonical_json_bytes(dict(inline_operation_argument.expected)).decode(
+                    "utf-8"
+                ),
+            )
+        validation_arguments = _normalize_commutative_wait_topic_facts(
+            step,
+            validation_arguments,
+        )
+        validation_arguments = _normalize_media_pool_business_argument_order(
+            step,
+            validation_arguments,
+        )
+        validation_arguments = self._normalize_business_declaration_fact_order(
+            step,
+            validation_arguments,
+        )
+        validation_arguments = _normalize_object_lifecycle_business_argument_order(
+            step,
+            validation_arguments,
+        )
+        validation_arguments = _normalize_commutative_option_pairs(
+            step,
+            validation_arguments,
+        )
+        if (
+            step.subcommand == "query-object"
+            and "--max-results" in step.arguments
+            and all(isinstance(value, str) for value in step.arguments)
+        ):
+            validation_arguments = _normalize_business_query_arguments(
+                validation_arguments,
+                step.arguments,
             )
         if (
             metadata_discovery is None
@@ -7118,6 +13092,12 @@ class CodexGatewayBroker:
                     if (
                         index not in unordered_return_field_indexes
                         and supplied != expected
+                        and not _closed_business_literal_equivalent(
+                            step,
+                            index,
+                            supplied,
+                            expected,
+                        )
                     ):
                         raise GatewayInvocationError(
                             f"step {step.name!r} argument {index} must be exactly {expected!r}"
@@ -7180,14 +13160,40 @@ class CodexGatewayBroker:
                         )
                     semantic_values.append(expected.expected)
                 elif isinstance(expected, MetadataQueryArgument):
-                    raise GatewayInvocationError(
-                        "metadata query slot escaped its closed discover validator"
+                    if (
+                        step.subcommand != "draft-discover-fields"
+                        or index < 1
+                        or step.arguments[index - 1] != "--meaning"
+                        or not supplied
+                        or supplied != supplied.strip()
+                        or len(supplied) > expected.maximum_chars
+                        or any(
+                            ord(character) < 32 or ord(character) == 127
+                            for character in supplied
+                        )
+                    ):
+                        raise GatewayInvocationError(
+                            "metadata query slot escaped its bounded natural-language validator"
+                        )
+                    semantic_values.append(
+                        {
+                            "bounded_metadata_meaning": supplied,
+                            "maximum_chars": expected.maximum_chars,
+                        }
                     )
                 elif isinstance(expected, BoundedIntegerArgument):
-                    raise GatewayInvocationError(
-                        "bounded integer slot escaped its closed metadata "
-                        "discover validator"
-                    )
+                    if not re.fullmatch(r"0|[1-9][0-9]*", supplied):
+                        raise GatewayInvocationError(
+                            f"step {step.name!r} argument {index} is not one "
+                            "canonical non-negative integer"
+                        )
+                    value = int(supplied)
+                    if not expected.minimum <= value <= expected.maximum:
+                        raise GatewayInvocationError(
+                            f"step {step.name!r} argument {index} is outside "
+                            f"the closed range {expected.minimum}..{expected.maximum}"
+                        )
+                    semantic_values.append(value)
                 elif isinstance(expected, MetadataBoundJsonArgument):
                     actual_json = _decode_json_argument(
                         supplied,
@@ -7217,22 +13223,21 @@ class CodexGatewayBroker:
                         for candidate in self.expected_steps
                         if candidate.name == expected.metadata_step
                     )
-                    if (
-                        len(source_steps) != 1
-                        or source_steps[0].subcommand != "metadata"
-                        or len(source_steps[0].arguments) < 3
-                        or source_steps[0].arguments[:2]
-                        != ("discover", "--object-type")
-                        or source_steps[0].arguments[2] != expected.object_type
-                    ):
+                    if len(source_steps) != 1:
                         raise GatewayInvocationError(
                             f"step {step.name!r} metadata source does not bind "
                             f"object type {expected.object_type!r}"
                         )
+                    scope_flag, scope_value = _metadata_binding_scope(
+                        source_steps[0],
+                        object_type=expected.object_type,
+                    )
                     actual_projection = project_required_metadata_tokens(
                         source,
                         object_type=expected.object_type,
                         required_tokens=expected.required_tokens,
+                        scope_flag=scope_flag,
+                        scope_value=scope_value,
                     )
                     expected_projection = (
                         expected.expected_required_token_projection
@@ -7271,7 +13276,195 @@ class CodexGatewayBroker:
                             ],
                         )
                     )
-                elif isinstance(expected, DraftActionJsonArgument):
+                elif isinstance(expected, DraftTypedActionBatchArgument):
+                    actual_json = _decode_json_argument(
+                        supplied,
+                        reject_duplicate_keys=True,
+                    )
+                    if (
+                        not isinstance(actual_json, list)
+                        or len(actual_json) != len(expected.actions)
+                    ):
+                        raise GatewayInvocationError(
+                            f"step {step.name!r} typed Draft batch length drifted"
+                        )
+                    batch_evidence: list[dict[str, Any]] = []
+                    for actual_action, expected_action in zip(
+                        actual_json,
+                        expected.actions,
+                    ):
+                        bound_expected = json.loads(
+                            _canonical_json_bytes(
+                                dict(expected_action.expected)
+                            ).decode("utf-8")
+                        )
+                        bindings: list[dict[str, Any]] = []
+                        for binding in expected_action.response_bindings:
+                            source = self._payloads_by_step.get(binding.step)
+                            if source is None:
+                                raise GatewayInvocationError(
+                                    f"step {step.name!r} Draft handle source "
+                                    f"{binding.step!r} is unavailable"
+                                )
+                            bound = _json_pointer(source, binding.response_pointer)
+                            if (
+                                not isinstance(bound, str)
+                                or _DRAFT_HANDLE_RE.fullmatch(bound) is None
+                            ):
+                                raise GatewayInvocationError(
+                                    f"step {step.name!r} Draft handle binding is invalid"
+                                )
+                            bound_expected[binding.pointer.removeprefix("/")] = bound
+                            bindings.append(
+                                {
+                                    "pointer": binding.pointer,
+                                    "step": binding.step,
+                                    "response_pointer": binding.response_pointer,
+                                    "value": bound,
+                                }
+                            )
+                        normalized_actual = json.loads(
+                            _canonical_json_bytes(actual_action).decode("utf-8")
+                        )
+                        identity_evidence: list[dict[str, Any]] = []
+                        for binding in expected_action.query_identity_bindings:
+                            source = self._payloads_by_step.get(binding.step)
+                            if source is None:
+                                raise GatewayInvocationError(
+                                    f"step {step.name!r} query identity source "
+                                    f"{binding.step!r} is unavailable"
+                                )
+                            source_steps = tuple(
+                                candidate
+                                for candidate in self.expected_steps
+                                if candidate.name == binding.step
+                            )
+                            if len(source_steps) != 1:
+                                raise GatewayInvocationError(
+                                    f"step {step.name!r} query identity source "
+                                    "is not unique"
+                                )
+                            identity = _exact_query_bus_identity(
+                                source_payload=source,
+                                source_step=source_steps[0],
+                                expected_step_name=binding.step,
+                            )
+                            expected_target = _json_pointer(
+                                bound_expected,
+                                binding.pointer,
+                            )
+                            actual_target = _json_pointer(
+                                actual_action,
+                                binding.pointer,
+                            )
+                            normalized_target = _json_pointer(
+                                normalized_actual,
+                                binding.pointer,
+                            )
+                            path_identity = {
+                                "kind": "path",
+                                "value": identity["path"],
+                            }
+                            id_identity = {
+                                "kind": "id",
+                                "value": identity["id"],
+                            }
+                            if (
+                                expected_target != path_identity
+                                or actual_target not in (path_identity, id_identity)
+                                or not isinstance(normalized_target, dict)
+                            ):
+                                raise GatewayInvocationError(
+                                    f"step {step.name!r} typed Draft batch "
+                                    "query-bound identity does not match the "
+                                    "exact Bus row"
+                                )
+                            normalized_target.clear()
+                            normalized_target.update(path_identity)
+                            identity_evidence.append(
+                                {
+                                    "pointer": binding.pointer,
+                                    "step": binding.step,
+                                    "id": identity["id"],
+                                    "path": identity["path"],
+                                }
+                            )
+                        if expected_action.operation == "audio.import":
+                            normalized_actual = (
+                                _normalize_audio_import_draft_action_named_fields(
+                                    normalized_actual
+                                )
+                            )
+                            bound_expected = (
+                                _normalize_audio_import_draft_action_named_fields(
+                                    bound_expected
+                                )
+                            )
+                        normalized_actual = _normalize_typed_draft_number_value(
+                            normalized_actual,
+                            bound_expected,
+                        )
+                        metadata_evidence: dict[str, Any] | None = None
+                        metadata_binding = expected_action.metadata_binding
+                        if metadata_binding is not None:
+                            source = self._payloads_by_step.get(metadata_binding.step)
+                            source_steps = tuple(
+                                candidate
+                                for candidate in self.expected_steps
+                                if candidate.name == metadata_binding.step
+                            )
+                            if source is None or len(source_steps) != 1:
+                                raise GatewayInvocationError(
+                                    f"step {step.name!r} Draft metadata source is unavailable"
+                                )
+                            scope_flag, scope_value = _metadata_binding_scope(
+                                source_steps[0],
+                                object_type=metadata_binding.object_type,
+                            )
+                            projection = project_required_metadata_tokens(
+                                source,
+                                object_type=metadata_binding.object_type,
+                                required_tokens=metadata_binding.required_tokens,
+                                scope_flag=scope_flag,
+                                scope_value=scope_value,
+                            )
+                            if (
+                                metadata_binding.expected_projection is not None
+                                and projection != metadata_binding.expected_projection
+                            ):
+                                raise GatewayInvocationError(
+                                    f"step {step.name!r} live metadata projection differs "
+                                    "from the trusted Draft projection"
+                                )
+                            metadata_evidence = {
+                                "step": metadata_binding.step,
+                                "object_type": metadata_binding.object_type,
+                                "required_tokens": list(
+                                    metadata_binding.required_tokens
+                                ),
+                                "projection": [item.as_dict() for item in projection],
+                            }
+                        if normalized_actual != bound_expected:
+                            raise GatewayInvocationError(
+                                f"step {step.name!r} typed Draft batch differs from "
+                                "its ordered business facts and bindings"
+                            )
+                        batch_evidence.append(
+                            {
+                                "action": dict(expected_action.expected),
+                                "response_bindings": bindings,
+                                "query_identity_bindings": identity_evidence,
+                                "metadata": metadata_evidence,
+                            }
+                        )
+                    semantic_values.extend(
+                        (
+                            "draft-typed-action-batch-argv/v1",
+                            expected.operation,
+                            batch_evidence,
+                        )
+                    )
+                elif isinstance(expected, DraftTypedActionArgument):
                     actual_json = _decode_json_argument(
                         supplied,
                         reject_duplicate_keys=True,
@@ -7381,6 +13574,10 @@ class CodexGatewayBroker:
                                 bound_expected
                             )
                         )
+                    normalized_actual = _normalize_typed_draft_number_value(
+                        normalized_actual,
+                        bound_expected,
+                    )
                     if metadata_binding is not None:
                         source = self._payloads_by_step.get(metadata_binding.step)
                         source_steps = tuple(
@@ -7388,23 +13585,20 @@ class CodexGatewayBroker:
                             for candidate in self.expected_steps
                             if candidate.name == metadata_binding.step
                         )
-                        if (
-                            source is None
-                            or len(source_steps) != 1
-                            or source_steps[0].subcommand != "metadata"
-                            or len(source_steps[0].arguments) < 3
-                            or source_steps[0].arguments[:2]
-                            != ("discover", "--object-type")
-                            or source_steps[0].arguments[2]
-                            != metadata_binding.object_type
-                        ):
+                        if source is None or len(source_steps) != 1:
                             raise GatewayInvocationError(
                                 f"step {step.name!r} Draft metadata source is unavailable"
                             )
+                        scope_flag, scope_value = _metadata_binding_scope(
+                            source_steps[0],
+                            object_type=metadata_binding.object_type,
+                        )
                         actual_projection = project_required_metadata_tokens(
                             source,
                             object_type=metadata_binding.object_type,
                             required_tokens=metadata_binding.required_tokens,
+                            scope_flag=scope_flag,
+                            scope_value=scope_value,
                         )
                         if (
                             metadata_binding.expected_projection is not None
@@ -7459,6 +13653,81 @@ class CodexGatewayBroker:
                                 metadata_evidence,
                             )
                         )
+                elif isinstance(expected, TypedRequestFactsArgument):
+                    actual_json = _decode_json_argument(
+                        supplied,
+                        reject_duplicate_keys=True,
+                    )
+                    if (
+                        not isinstance(actual_json, Mapping)
+                        or actual_json.get("schema_digest")
+                        != expected.contract.schema_digest
+                        or actual_json.get("args") != dict(expected.expected_args)
+                        or actual_json.get("options")
+                        != dict(expected.expected_options)
+                    ):
+                        raise GatewayInvocationError(
+                            f"step {step.name!r} typed materialization binding drifted"
+                        )
+                    semantic_values.append(actual_json)
+                    metadata_binding = expected.metadata_binding
+                    if metadata_binding is not None:
+                        source = self._payloads_by_step.get(metadata_binding.step)
+                        source_steps = tuple(
+                            candidate
+                            for candidate in self.expected_steps
+                            if candidate.name == metadata_binding.step
+                        )
+                        if source is None or len(source_steps) != 1:
+                            raise GatewayInvocationError(
+                                f"step {step.name!r} typed metadata source is unavailable"
+                            )
+                        scope_flag, scope_value = _metadata_binding_scope(
+                            source_steps[0],
+                            object_type=metadata_binding.object_type,
+                        )
+                        projection = project_required_metadata_tokens(
+                            source,
+                            object_type=metadata_binding.object_type,
+                            required_tokens=metadata_binding.required_tokens,
+                            scope_flag=scope_flag,
+                            scope_value=scope_value,
+                        )
+                        if (
+                            metadata_binding.expected_projection is not None
+                            and projection != metadata_binding.expected_projection
+                        ):
+                            raise GatewayInvocationError(
+                                f"step {step.name!r} typed metadata projection drifted"
+                            )
+                        semantic_values.append(
+                            {
+                                "typed_metadata_step": metadata_binding.step,
+                                "object_type": metadata_binding.object_type,
+                                "required_tokens": list(
+                                    metadata_binding.required_tokens
+                                ),
+                                "projection": [item.as_dict() for item in projection],
+                            }
+                        )
+                elif isinstance(expected, InlineTypedOperationArgument):
+                    actual_json = _decode_json_argument(
+                        supplied,
+                        reject_duplicate_keys=True,
+                    )
+                    if actual_json != dict(expected.expected):
+                        raise GatewayInvocationError(
+                            f"step {step.name!r} inline typed materialization drifted"
+                        )
+                    semantic_values.extend(
+                        (
+                            actual_json,
+                            "inline-typed-operation-materialization/v1",
+                            hashlib.sha256(
+                                _canonical_json_bytes(actual_json)
+                            ).hexdigest(),
+                        )
+                    )
                 elif isinstance(expected, ResponseBindingOrExactArgument):
                     source = self._payloads_by_step.get(expected.binding.step)
                     if source is None:
@@ -7498,25 +13767,10 @@ class CodexGatewayBroker:
                         and validation_arguments[index - 1]
                         == "--expected-revision"
                     ):
-                        latest_source = next(
-                            (
-                                self._payloads_by_step.get(prior.name)
-                                for prior in reversed(
-                                    self._execution_steps[: self._next_step]
-                                )
-                                if isinstance(
-                                    self._payloads_by_step.get(prior.name),
-                                    Mapping,
-                                )
-                                and isinstance(
-                                    self._payloads_by_step[prior.name].get("draft"),
-                                    Mapping,
-                                )
-                            ),
-                            None,
+                        source = self._latest_payload_for_bound_draft(
+                            step,
+                            source,
                         )
-                        if latest_source is not None:
-                            source = latest_source
                     if source is None:
                         raise GatewayInvocationError(
                             f"step {step.name!r} binding source {expected.step!r} is unavailable"
@@ -7533,6 +13787,44 @@ class CodexGatewayBroker:
                     semantic_values.append(bound)
                 else:  # pragma: no cover - type checker prevents this for normal callers
                     raise GatewayInvocationError(f"unsupported expected argument at index {index}")
+        if step.metadata_binding is not None:
+            metadata_binding = step.metadata_binding
+            source = self._payloads_by_step.get(metadata_binding.step)
+            source_steps = tuple(
+                candidate
+                for candidate in self.expected_steps
+                if candidate.name == metadata_binding.step
+            )
+            if source is None or len(source_steps) != 1:
+                raise GatewayInvocationError(
+                    f"step {step.name!r} metadata source is unavailable"
+                )
+            scope_flag, scope_value = _metadata_binding_scope(
+                source_steps[0],
+                object_type=metadata_binding.object_type,
+            )
+            projection = project_required_metadata_tokens(
+                source,
+                object_type=metadata_binding.object_type,
+                required_tokens=metadata_binding.required_tokens,
+                scope_flag=scope_flag,
+                scope_value=scope_value,
+            )
+            if (
+                metadata_binding.expected_projection is not None
+                and projection != metadata_binding.expected_projection
+            ):
+                raise GatewayInvocationError(
+                    f"step {step.name!r} metadata projection drifted"
+                )
+            semantic_values.append(
+                {
+                    "step_metadata_binding": metadata_binding.step,
+                    "object_type": metadata_binding.object_type,
+                    "required_tokens": list(metadata_binding.required_tokens),
+                    "projection": [item.as_dict() for item in projection],
+                }
+            )
         return (
             _sha256_bytes(_canonical_json_bytes(semantic_values)),
             tuple(execution_arguments),
@@ -7545,7 +13837,7 @@ class CodexGatewayBroker:
         semantic_hash: str,
         *,
         execution_arguments: Sequence[str],
-        submitted_draft_action: Mapping[str, Any] | None,
+        submitted_draft_actions: tuple[Mapping[str, Any], ...] | None,
     ) -> dict[str, Any]:
         started_at_unix_ns = time.time_ns()
         started = started_at_unix_ns / 1_000_000_000
@@ -7568,13 +13860,18 @@ class CodexGatewayBroker:
             runner_env = dict(self._runner_environment)
             _remove_environment_names(
                 runner_env,
-                (*_BROKER_ENV_NAMES, _PYTHON_IO_ENCODING_ENV),
+                (
+                    *_BROKER_ENV_NAMES,
+                    _PYTHON_IO_ENCODING_ENV,
+                    _PYTHON_DONT_WRITE_BYTECODE_ENV,
+                ),
                 platform_name=self.platform_name,
             )
             # The parent reads strict UTF-8.  Own the packaged Python runner's
             # stream encoding too, including case-insensitive Windows aliases,
             # so locale/ACP settings cannot corrupt structured gateway output.
             runner_env[_PYTHON_IO_ENCODING_ENV] = "utf-8:strict"
+            runner_env[_PYTHON_DONT_WRITE_BYTECODE_ENV] = "1"
             runner_env[STATE_DIRECTORY_ENV] = str(self.state_directory)
             runner_env[EVIDENCE_DIRECTORY_ENV] = str(self.evidence_directory)
             runner_env[CONFIG_PATH_ENV] = str(self.config_path)
@@ -7645,6 +13942,8 @@ class CodexGatewayBroker:
             failures.append(f"packaged gateway runner failed: {type(exc).__name__}: {exc}")
 
         payload: Mapping[str, Any] | None = None
+        stream_records: tuple[Mapping[str, Any], ...] | None = None
+        observer_payload: Mapping[str, Any] | None = None
         payload_start = 0
         payload_end = 0
         if exit_code not in step.allowed_exit_codes:
@@ -7653,13 +13952,24 @@ class CodexGatewayBroker:
                 f"expected one of {step.allowed_exit_codes!r}"
             )
         try:
-            payload, payload_start, payload_end = _extract_payload_span(
-                stdout,
-                required_contract=self.required_contract,
+            allowed_payload_contracts = _gateway_payload_contracts(step)
+            preferred_contract = (
+                self.required_contract
+                if self.required_contract in allowed_payload_contracts
+                else None
             )
-            if payload.get("contract") != self.required_contract:
+            if step.subcommand == "stream-topic":
+                stream_records = _extract_topic_stream_records(stdout)
+                payload = stream_records[-1]
+            else:
+                payload, payload_start, payload_end = _extract_payload_span(
+                    stdout,
+                    required_contract=preferred_contract,
+                )
+            if payload.get("contract") not in allowed_payload_contracts:
                 raise GatewayInvocationError(
-                    f"gateway payload contract must be {self.required_contract!r}"
+                    "gateway payload contract must be one of the exact command contracts "
+                    f"{tuple(sorted(allowed_payload_contracts))!r}"
                 )
             confirmation_is_consumed_later = any(
                 isinstance(argument, ResponseBinding)
@@ -7721,12 +14031,34 @@ class CodexGatewayBroker:
                     invocation_runner=self.invocation_runner_path,
                     platform_name=self.platform_name,
                 )
-                if projected_payload != payload:
+                if stream_records is not None:
+                    projected_records = tuple(
+                        _project_model_visible_runner(
+                            record,
+                            candidate_runner=self.runner_path,
+                            invocation_runner=self.invocation_runner_path,
+                            platform_name=self.platform_name,
+                        )
+                        for record in stream_records
+                    )
+                    stdout = "".join(
+                        json.dumps(
+                            record,
+                            ensure_ascii=False,
+                            allow_nan=False,
+                            separators=(",", ":"),
+                        )
+                        + "\n"
+                        for record in projected_records
+                    )
+                    stream_records = projected_records
+                    payload = projected_records[-1]
+                elif projected_payload != payload:
                     projected_json = json.dumps(
                         projected_payload,
                         ensure_ascii=False,
                         allow_nan=False,
-                        indent=2,
+                        separators=(",", ":"),
                     )
                     stdout = (
                         stdout[:payload_start]
@@ -7748,11 +14080,21 @@ class CodexGatewayBroker:
                 payload_hash = _sha256_bytes(_canonical_json_bytes(payload))
             except GatewayInvocationError as exc:
                 failures.append(str(exc))
-        if not failures and payload is not None and self.trusted_step_observer is not None:
+        if payload is not None:
+            observer_payload = payload
+            if stream_records is not None:
+                observer_payload = {
+                    **payload,
+                    "events": [
+                        record["event"]
+                        for record in stream_records[1:-1]
+                    ],
+                }
+        if not failures and observer_payload is not None and self.trusted_step_observer is not None:
             try:
                 self.trusted_step_observer(
                     step,
-                    MappingProxyType(dict(payload)),
+                    MappingProxyType(dict(observer_payload)),
                     self.state_directory,
                     self.evidence_directory,
                 )
@@ -7804,14 +14146,14 @@ class CodexGatewayBroker:
             record = self._append_record_locked(record)
             if record.succeeded:
                 self._payloads_by_step[step.name] = payload
-                if submitted_draft_action is not None:
+                if submitted_draft_actions is not None:
                     self._submitted_draft_actions_by_step[step.name] = (
-                        submitted_draft_action
+                        submitted_draft_actions
                     )
                 self._next_step += 1
                 if terminal_indeterminate:
                     self._terminal_state = _BROKER_INDETERMINATE
-                elif self._next_step == len(self.expected_steps):
+                elif self._next_step == len(self._execution_steps):
                     self._terminal_state = _BROKER_COMPLETE
             else:
                 self._terminal_state = _BROKER_FAILED
@@ -7825,11 +14167,22 @@ class CodexGatewayBroker:
     ) -> None:
         """Bind every successful Draft response to the reviewed Draft flow."""
 
-        if "task_authority" in payload and step.subcommand != "draft-start":
+        if "task_authority" in payload and step.subcommand not in DRAFT_START_SUBCOMMANDS:
             raise GatewayInvocationError(
                 "only draft-start may disclose the task authority"
             )
         if step.subcommand == "preview-from-draft":
+            if step.allowed_exit_codes == (2,):
+                if (
+                    payload.get("ok") is not False
+                    or payload.get("command") != step.expected_result_command
+                    or payload.get("error_code") != step.expected_error_code
+                ):
+                    raise GatewayInvocationError(
+                        "preview-from-draft structured refusal does not match its "
+                        "reviewed boundary"
+                    )
+                return
             if not isinstance(payload.get("transaction_id"), str) or not payload[
                 "transaction_id"
             ]:
@@ -7864,7 +14217,13 @@ class CodexGatewayBroker:
             expected_request = _normalize_audio_import_request_named_fields(
                 expected_request
             )
-            if actual_request != expected_request:
+            if (
+                actual_request != expected_request
+                and not _object_operation_json_equal(
+                    actual_request,
+                    expected_request,
+                )
+            ):
                 raise GatewayInvocationError(
                     "preview-from-draft canonical request does not replay from "
                     "the reviewed typed actions"
@@ -7873,6 +14232,13 @@ class CodexGatewayBroker:
                 raise GatewayInvocationError(
                     "preview-from-draft must keep agent_result final"
                 )
+            return
+
+        if (
+            step.subcommand == "draft-check"
+            and self._operation_draft_step_is_read_only(step)
+        ):
+            self._validate_read_only_operation_draft_payload(step, payload)
             return
 
         draft = payload.get("draft")
@@ -7892,17 +14258,8 @@ class CodexGatewayBroker:
             raise GatewayInvocationError("Draft response is missing its immutable binding")
 
         step_index = self._execution_steps.index(step)
-        prior_starts = tuple(
-            value
-            for value in self._execution_steps[: step_index + 1]
-            if value.subcommand == "draft-start"
-        )
-        if not prior_starts:
-            raise GatewayInvocationError(
-                "Draft response is missing its flow-local draft-start"
-            )
-        start = prior_starts[-1]
-        operation = start.arguments[0]
+        start = self._draft_start_for_step(step)
+        operation = self._draft_start_operation(start)
         version = binding.get("version")
         if binding.get("operation") != operation:
             raise GatewayInvocationError(
@@ -7915,7 +14272,7 @@ class CodexGatewayBroker:
                 "Draft response version does not match the sealed Wwise version"
             )
 
-        if step.subcommand == "draft-start":
+        if step.subcommand in DRAFT_START_SUBCOMMANDS:
             authority = payload.get("task_authority")
             if (
                 not isinstance(authority, str)
@@ -7946,7 +14303,10 @@ class CodexGatewayBroker:
             if not isinstance(prior_payload, Mapping):
                 continue
             candidate = prior_payload.get("draft")
-            if isinstance(candidate, Mapping):
+            if (
+                isinstance(candidate, Mapping)
+                and candidate.get("draft_id") == draft_id
+            ):
                 previous_draft = candidate
                 break
         if previous_draft is None or type(previous_draft.get("revision")) is not int:
@@ -7955,7 +14315,12 @@ class CodexGatewayBroker:
             )
         expected_revision = int(previous_draft["revision"])
         if step.subcommand != "draft-inspect":
-            expected_revision += 1
+            typed_actions = (
+                _draft_typed_actions(step.arguments[-1])
+                if step.subcommand == "draft-apply" and step.arguments
+                else None
+            )
+            expected_revision += len(typed_actions) if typed_actions else 1
         if revision != expected_revision:
             raise GatewayInvocationError(
                 "Draft response revision does not follow the reviewed transition"
@@ -7966,51 +14331,256 @@ class CodexGatewayBroker:
                 "Draft response lifecycle state does not follow the reviewed transition"
             )
 
+    @staticmethod
+    def _draft_start_operation(start: ExpectedGatewayStep) -> str:
+        """Read the operation from the validated ordinary or parent-owned start."""
+
+        value = start.arguments[6 if start.subcommand == "draft-start-undo-child" else 0]
+        if not isinstance(value, str):
+            raise GatewayInvocationError("Draft start has no exact operation")
+        return value
+
+    def _operation_draft_step_is_read_only(
+        self,
+        step: ExpectedGatewayStep,
+    ) -> bool:
+        """Classify one Draft flow from its exact prior start binding."""
+
+        start = self._draft_start_for_step(step)
+        operation = self._draft_start_operation(start)
+        if not isinstance(operation, str) or not operation.startswith("ak."):
+            return False
+        start_payload = self._payloads_by_step.get(start.name)
+        start_draft = (
+            start_payload.get("draft")
+            if isinstance(start_payload, Mapping)
+            else None
+        )
+        binding = (
+            start_draft.get("binding")
+            if isinstance(start_draft, Mapping)
+            else None
+        )
+        version = binding.get("version") if isinstance(binding, Mapping) else None
+        if not isinstance(version, str):
+            raise GatewayInvocationError(
+                "Draft response is missing its immutable start version"
+            )
+        try:
+            return request_contract(version, operation).effect == "read"
+        except TypedRequestError as exc:
+            raise GatewayInvocationError(
+                "Draft response has no exact typed request contract"
+            ) from exc
+
+    def _validate_read_only_operation_draft_payload(
+        self,
+        step: ExpectedGatewayStep,
+        payload: Mapping[str, Any],
+    ) -> None:
+        """Bind a direct read terminal to its exact typed Draft composition."""
+
+        start = self._draft_start_for_step(step)
+        start_payload = self._payloads_by_step.get(start.name)
+        start_draft = (
+            start_payload.get("draft")
+            if isinstance(start_payload, Mapping)
+            else None
+        )
+        binding = (
+            start_draft.get("binding")
+            if isinstance(start_draft, Mapping)
+            else None
+        )
+        if not isinstance(binding, Mapping):
+            raise GatewayInvocationError(
+                "read-only Draft result is missing its immutable start binding"
+            )
+        operation = binding.get("operation")
+        version = binding.get("version")
+        schema_digest = binding.get("schema_digest")
+        if (
+            not isinstance(operation, str)
+            or not operation.startswith("ak.")
+            or not isinstance(version, str)
+            or not isinstance(schema_digest, str)
+        ):
+            raise GatewayInvocationError(
+                "read-only Draft result contains an invalid start binding"
+            )
+        try:
+            contract = request_contract(version, operation)
+        except TypedRequestError as exc:
+            raise GatewayInvocationError(
+                "read-only Draft result has no exact typed request contract"
+            ) from exc
+        if contract.effect != "read" or contract.schema_digest != schema_digest:
+            raise GatewayInvocationError(
+                "read-only Draft result differs from its typed request binding"
+            )
+        expected_request = self._replay_expected_operation_draft_request(step)
+        arguments = expected_request.get("arguments")
+        if (
+            expected_request.get("operation") != "waapi.call"
+            or expected_request.get("version") != version
+            or not isinstance(arguments, Mapping)
+            or arguments.get("api") != operation
+            or not isinstance(arguments.get("args"), Mapping)
+            or not isinstance(arguments.get("options"), Mapping)
+        ):
+            raise GatewayInvocationError(
+                "read-only Draft result does not replay one canonical typed call"
+            )
+        typed_request = payload.get("typed_request")
+        if typed_request != {
+            "contract": "waapi-skill.typed-request/v1",
+            "schema_digest": schema_digest,
+        }:
+            raise GatewayInvocationError(
+                "read-only Draft result differs from its typed request binding"
+            )
+        call = payload.get("call")
+        if (
+            payload.get("ok") is not True
+            or payload.get("status") != "ok"
+            or payload.get("api_attempted") != operation
+            or not isinstance(call, Mapping)
+            or call.get("api") != operation
+            or call.get("version") != version
+            or call.get("ok") is not True
+            or call.get("dry_run") is not False
+            or not isinstance(call.get("evidence_path"), str)
+            or not call["evidence_path"]
+        ):
+            raise GatewayInvocationError(
+                "read-only Draft result differs from its exact live call binding"
+            )
+        validation = payload.get("schema_validation")
+        request_validation = (
+            validation.get("request")
+            if isinstance(validation, Mapping)
+            else None
+        )
+        result_validation = (
+            validation.get("result")
+            if isinstance(validation, Mapping)
+            else None
+        )
+        if any(
+            not isinstance(row, Mapping)
+            or row.get("uri") != operation
+            or row.get("version") != version
+            for row in (request_validation, result_validation)
+        ):
+            raise GatewayInvocationError(
+                "read-only Draft result differs from its schema validation binding"
+            )
+        if "agent_result" not in payload or list(payload)[-1] != "agent_result":
+            raise GatewayInvocationError(
+                "read-only Draft result must keep its exact agent_result final"
+            )
+
     def _normalize_operation_draft_query_identities(
         self,
         value: Any,
         *,
         preview_step: ExpectedGatewayStep,
     ) -> Any:
-        """Normalize only exact pre-Draft Bus GUIDs to their reviewed paths."""
+        """Normalize only exact live-bound GUIDs to their reviewed paths."""
 
         preview_index = self._execution_steps.index(preview_step)
         identities: dict[str, str] = {}
+
+        def strings(item: Any) -> set[str]:
+            if isinstance(item, str):
+                return {item}
+            if isinstance(item, Mapping):
+                return {
+                    value
+                    for nested in item.values()
+                    for value in strings(nested)
+                }
+            if isinstance(item, list):
+                return {value for nested in item for value in strings(nested)}
+            return set()
+
+        referenced_strings = strings(value)
         for action_step in self._execution_steps[:preview_index]:
             if action_step.subcommand != "draft-apply":
                 continue
-            argument = action_step.arguments[-1]
-            if not isinstance(argument, DraftActionJsonArgument):
-                continue
-            for binding in argument.query_identity_bindings:
-                source = self._payloads_by_step.get(binding.step)
-                source_step = next(
-                    (
-                        candidate
-                        for candidate in self.expected_steps
-                        if candidate.name == binding.step
-                    ),
-                    None,
-                )
-                if not isinstance(source, Mapping) or source_step is None:
-                    raise GatewayInvocationError(
-                        "Draft query identity normalization lacks its exact source"
+            arguments = _draft_typed_actions(action_step.arguments[-1]) or ()
+            for argument in arguments:
+                for binding in argument.query_identity_bindings:
+                    source = self._payloads_by_step.get(binding.step)
+                    source_step = next(
+                        (
+                            candidate
+                            for candidate in self.expected_steps
+                            if candidate.name == binding.step
+                        ),
+                        None,
                     )
-                identity = _exact_query_bus_identity(
-                    source_payload=source,
-                    source_step=source_step,
-                    expected_step_name=binding.step,
-                )
-                expected_target = _json_pointer(argument.expected, binding.pointer)
-                if expected_target != {
-                    "kind": "path",
-                    "value": identity["path"],
-                }:
-                    raise GatewayInvocationError(
-                        "Draft query identity normalization differs from the reviewed path"
+                    if not isinstance(source, Mapping) or source_step is None:
+                        raise GatewayInvocationError(
+                            "Draft query identity normalization lacks its exact source"
+                        )
+                    identity = _exact_query_bus_identity(
+                        source_payload=source,
+                        source_step=source_step,
+                        expected_step_name=binding.step,
                     )
-                identities[identity["id"]] = identity["path"]
+                    expected_target = _json_pointer(
+                        argument.expected,
+                        binding.pointer,
+                    )
+                    if expected_target != {
+                        "kind": "path",
+                        "value": identity["path"],
+                    }:
+                        raise GatewayInvocationError(
+                            "Draft query identity normalization differs from the "
+                            "reviewed path"
+                        )
+                    identities[identity["id"]] = identity["path"]
 
+        for bind_step in self._execution_steps[:preview_index]:
+            if bind_step.subcommand != "draft-bind-object":
+                continue
+            segments = tuple(
+                str(bind_step.arguments[index + 1])
+                for index, item in enumerate(bind_step.arguments[:-1])
+                if item == "--object-path-segment"
+            )
+            if not segments:
+                continue
+            source = self._payloads_by_step.get(bind_step.name)
+            bound = source.get("bound_object") if isinstance(source, Mapping) else None
+            object_id = bound.get("id") if isinstance(bound, Mapping) else None
+            object_path = bound.get("path") if isinstance(bound, Mapping) else None
+            if not isinstance(object_id, str) or object_id not in referenced_strings:
+                continue
+            expected_path = "\\" + "\\".join(segments)
+            if (
+                not isinstance(object_path, str)
+                or object_path != expected_path
+            ):
+                raise GatewayInvocationError(
+                    "Business Draft identity normalization differs from the "
+                    "reviewed bound path"
+                )
+            identities[object_id] = object_path
+
+        expected_request = preview_step.expected_operation_request
+        expected_arguments = (
+            expected_request.get("arguments")
+            if isinstance(expected_request, Mapping)
+            else None
+        )
+        audio_convert = (
+            isinstance(expected_arguments, Mapping)
+            and expected_request.get("operation") == "waapi.call"
+            and expected_arguments.get("api") == "ak.wwise.core.audio.convert"
+        )
         def normalize(item: Any) -> Any:
             if isinstance(item, Mapping):
                 if (
@@ -8025,6 +14595,8 @@ class CodexGatewayBroker:
                 return {str(key): normalize(nested) for key, nested in item.items()}
             if isinstance(item, list):
                 return [normalize(nested) for nested in item]
+            if audio_convert and isinstance(item, str) and item in identities:
+                return identities[item]
             return item
 
         return normalize(value)
@@ -8045,31 +14617,31 @@ class CodexGatewayBroker:
         for action_step in self._execution_steps[:preview_index]:
             if action_step.subcommand != "draft-apply":
                 continue
-            argument = action_step.arguments[-1]
-            if (
-                not isinstance(argument, DraftActionJsonArgument)
-                or argument.operation != "audio.import"
-                or argument.metadata_binding is None
-            ):
-                continue
-            binding = argument.metadata_binding
-            source = self._payloads_by_step.get(binding.step)
-            if not isinstance(source, Mapping):
-                raise GatewayInvocationError(
-                    "Draft reference activation normalization lacks live metadata"
-                )
-            projected = _metadata_reference_activation_rules(
-                source,
-                object_type=binding.object_type,
-                required_tokens=binding.required_tokens,
-            )
-            for reference_name, activations in projected.items():
-                prior = rules.get(reference_name)
-                if prior is not None and prior != activations:
+            arguments = _draft_typed_actions(action_step.arguments[-1]) or ()
+            for argument in arguments:
+                if (
+                    argument.operation != "audio.import"
+                    or argument.metadata_binding is None
+                ):
+                    continue
+                binding = argument.metadata_binding
+                source = self._payloads_by_step.get(binding.step)
+                if not isinstance(source, Mapping):
                     raise GatewayInvocationError(
-                        "Draft reference activation metadata is inconsistent"
+                        "Draft reference activation normalization lacks live metadata"
                     )
-                rules[reference_name] = activations
+                projected = _metadata_reference_activation_rules(
+                    source,
+                    object_type=binding.object_type,
+                    required_tokens=binding.required_tokens,
+                )
+                for reference_name, activations in projected.items():
+                    prior = rules.get(reference_name)
+                    if prior is not None and prior != activations:
+                        raise GatewayInvocationError(
+                            "Draft reference activation metadata is inconsistent"
+                        )
+                    rules[reference_name] = activations
         return _normalize_audio_import_request_activation_properties(
             value,
             expected_request,
@@ -8080,17 +14652,214 @@ class CodexGatewayBroker:
         self,
         preview_step: ExpectedGatewayStep,
     ) -> Mapping[str, Any]:
-        preview_index = self._execution_steps.index(preview_step)
-        prior_starts = tuple(
-            step
-            for step in self._execution_steps[:preview_index]
-            if step.subcommand == "draft-start"
-        )
-        if not prior_starts:
-            raise GatewayInvocationError(
-                "Draft canonical replay is missing its flow-local draft-start"
+        if preview_step.expected_operation_request is not None:
+            expected_operation = preview_step.expected_operation_request.get(
+                "operation"
             )
-        start = prior_starts[-1]
+            if not isinstance(expected_operation, str) or not expected_operation:
+                raise GatewayInvocationError(
+                    "Business request witness has no exact operation"
+                )
+            start = self._draft_start_for_step(preview_step)
+            draft_operation = (
+                start.arguments[0] if len(start.arguments) == 1 else None
+            )
+            if not isinstance(draft_operation, str) or not (
+                _business_request_matches_draft_operation(
+                    preview_step.expected_operation_request,
+                    draft_operation,
+                )
+            ):
+                raise GatewayInvocationError(
+                    "Business request witness is missing its exact flow-local "
+                    "draft-start"
+                )
+            offline_request = self._offline_replay_preview_requests.get(
+                preview_step.name
+            )
+            durable_state_directory = (
+                self._state_directory or self._existing_state_directory
+            )
+            durable_business_replay = (
+                (self.skill_source / "wwise_waapi").is_dir()
+                and durable_state_directory is not None
+            )
+            if offline_request is not None and not durable_business_replay:
+                if _normalize_audio_import_request_named_fields(
+                    offline_request
+                ) != _normalize_audio_import_request_named_fields(
+                    preview_step.expected_operation_request
+                ):
+                    raise GatewayInvocationError(
+                        "Offline business request replay differs from its sealed witness"
+                    )
+                return offline_request
+            if durable_business_replay:
+                start_payload = self._payloads_by_step.get(start.name)
+                start_draft = (
+                    start_payload.get("draft")
+                    if isinstance(start_payload, Mapping)
+                    else None
+                )
+                draft_id = (
+                    start_draft.get("draft_id")
+                    if isinstance(start_draft, Mapping)
+                    else None
+                )
+                authority = (
+                    start_payload.get("task_authority")
+                    if isinstance(start_payload, Mapping)
+                    else None
+                )
+                if not isinstance(draft_id, str) or not isinstance(authority, str):
+                    raise GatewayInvocationError(
+                        "Business request replay is missing its durable Draft binding"
+                    )
+                try:
+                    archive_replay = (
+                        self._runner_environment == {}
+                        and self._existing_state_directory is not None
+                    )
+                    if archive_replay:
+                        records_directory = (
+                            durable_state_directory
+                            / "operation-drafts-v1"
+                            / "records"
+                        )
+                        archive_draft_ids = tuple(
+                            sorted(
+                                path.stem
+                                for path in records_directory.iterdir()
+                                if path.name.endswith(".json")
+                            )
+                        )
+                        archive_records = load_operation_draft_archive_records(
+                            durable_state_directory,
+                            archive_draft_ids,
+                            allow_cleaned_file_evidence=True,
+                        )
+                        record = archive_records.get(draft_id)
+                        if record is None:
+                            raise GatewayInvocationError(
+                                "Archived business Draft record is missing"
+                            )
+                        if not hmac.compare_digest(
+                            record.authority_digest,
+                            operation_draft_authority_digest(authority),
+                        ):
+                            raise GatewayInvocationError(
+                                "Archived business Draft authority is invalid"
+                            )
+                    else:
+                        record = OperationDraftStore(
+                            durable_state_directory
+                        ).inspect(
+                            draft_id,
+                            task_authority=authority,
+                        )
+                    raw_session = (
+                        record.composition.get("business_session")
+                        if isinstance(record.composition, Mapping)
+                        else None
+                    )
+                    session = BusinessDeclarationSession.from_dict(raw_session)
+                    adapter = business_adapter(draft_operation)
+                    replayed = adapter.materialize(
+                        session,
+                        allow_cleaned_file_evidence=(
+                            archive_replay
+                            and adapter.supports_cleaned_file_evidence
+                        ),
+                    )
+                except Exception as exc:
+                    raise GatewayInvocationError(
+                        "Business request cannot be replayed from the durable Draft"
+                    ) from exc
+                handle_rows = session.handles.as_dict().get("objects", [])
+                path_to_id = {
+                    str(row["path"]): str(row["object_id"])
+                    for row in handle_rows
+                    if isinstance(row, Mapping)
+                    and isinstance(row.get("path"), str)
+                    and isinstance(row.get("object_id"), str)
+                }
+                type_name_rows: dict[tuple[str, str], set[str]] = {}
+                for row in handle_rows:
+                    if not isinstance(row, Mapping):
+                        continue
+                    object_type = row.get("object_type")
+                    name = row.get("name")
+                    object_id = row.get("object_id")
+                    if not all(
+                        isinstance(item, str)
+                        for item in (object_type, name, object_id)
+                    ):
+                        continue
+                    type_name_rows.setdefault((object_type, name), set()).add(
+                        object_id
+                    )
+                type_name_to_id = {
+                    key: next(iter(object_ids))
+                    for key, object_ids in type_name_rows.items()
+                    if len(object_ids) == 1
+                }
+                direct_child_rows: dict[tuple[str, str], set[str]] = {}
+                for row in handle_rows:
+                    if not isinstance(row, Mapping):
+                        continue
+                    object_type = row.get("object_type")
+                    object_path = row.get("path")
+                    object_id = row.get("object_id")
+                    if not all(
+                        isinstance(item, str)
+                        for item in (object_type, object_path, object_id)
+                    ):
+                        continue
+                    parent_path, separator, _child_segment = object_path.rpartition(
+                        "\\"
+                    )
+                    if not separator or not parent_path:
+                        continue
+                    direct_child_rows.setdefault(
+                        (parent_path, object_type), set()
+                    ).add(object_id)
+                direct_child_to_id = {
+                    key: next(iter(object_ids))
+                    for key, object_ids in direct_child_rows.items()
+                    if len(object_ids) == 1
+                }
+                bound_witness = _normalize_bound_business_reference_paths(
+                    preview_step.expected_operation_request,
+                    path_to_id=path_to_id,
+                    type_name_to_id=type_name_to_id,
+                    direct_child_to_id=direct_child_to_id,
+                )
+                normalized_replayed = _normalize_audio_import_request_named_fields(
+                    replayed
+                )
+                normalized_witness = _normalize_audio_import_request_named_fields(
+                    bound_witness
+                )
+                request_matches = (
+                    _object_operation_json_equal(
+                        normalized_replayed,
+                        normalized_witness,
+                    )
+                    if draft_operation in {"object.create", "object.set"}
+                    else normalized_replayed == normalized_witness
+                )
+                if not request_matches:
+                    raise GatewayInvocationError(
+                        "Durable business declarations differ from the sealed request "
+                        "witness"
+                    )
+                return replayed
+            return preview_step.expected_operation_request
+        sealed_request = self._offline_replay_preview_requests.get(preview_step.name)
+        if sealed_request is not None:
+            return sealed_request
+        preview_index = self._execution_steps.index(preview_step)
+        start = self._draft_start_for_step(preview_step)
         start_index = self._execution_steps.index(start)
         operation = str(start.arguments[0])
         start_payload = self._payloads_by_step.get(start.name)
@@ -8099,6 +14868,54 @@ class CodexGatewayBroker:
             if isinstance(start_payload, Mapping)
             else None
         )
+        if (self.skill_source / "wwise_waapi").is_dir():
+            draft_id = (
+                start_draft.get("draft_id")
+                if isinstance(start_draft, Mapping)
+                else None
+            )
+            authority = (
+                start_payload.get("task_authority")
+                if isinstance(start_payload, Mapping)
+                else None
+            )
+            state_directory = self._state_directory or self._existing_state_directory
+            if (
+                isinstance(draft_id, str)
+                and isinstance(authority, str)
+                and state_directory is not None
+            ):
+                try:
+                    record = OperationDraftStore(state_directory).inspect(
+                        draft_id,
+                        task_authority=authority,
+                    )
+                except Exception as exc:
+                    raise GatewayInvocationError(
+                        "Dynamic business request replay cannot inspect its durable "
+                        "Draft"
+                    ) from exc
+                raw_session = (
+                    record.composition.get("business_session")
+                    if isinstance(record.composition, Mapping)
+                    else None
+                )
+                if raw_session is not None:
+                    try:
+                        session = BusinessDeclarationSession.from_dict(raw_session)
+                        adapter = business_adapter(operation)
+                        return adapter.materialize(
+                            session,
+                            allow_cleaned_file_evidence=(
+                                self._runner_environment == {}
+                                and adapter.supports_cleaned_file_evidence
+                            ),
+                        )
+                    except Exception as exc:
+                        raise GatewayInvocationError(
+                            "Dynamic business request cannot be replayed from the "
+                            "durable Draft"
+                        ) from exc
         version = (
             start_draft.get("binding", {}).get("version")
             if isinstance(start_draft, Mapping)
@@ -8114,80 +14931,93 @@ class CodexGatewayBroker:
         for action_step in self._execution_steps[start_index + 1 : preview_index]:
             if action_step.subcommand != "draft-apply":
                 continue
-            argument = action_step.arguments[-1]
-            if not isinstance(argument, DraftActionJsonArgument):
+            arguments = _draft_typed_actions(action_step.arguments[-1])
+            if not arguments:
                 raise GatewayInvocationError(
                     "Draft canonical replay found an untyped action"
                 )
-            action = json.loads(
-                _canonical_json_bytes(dict(argument.expected)).decode("utf-8")
-            )
-            for binding in argument.response_bindings:
-                source = self._payloads_by_step.get(binding.step)
-                if source is None:
-                    raise GatewayInvocationError(
-                        "Draft canonical replay is missing a handle source"
-                    )
-                bound = _json_pointer(source, binding.response_pointer)
-                if not isinstance(bound, str) or _DRAFT_HANDLE_RE.fullmatch(bound) is None:
-                    raise GatewayInvocationError(
-                        "Draft canonical replay received an invalid handle"
-                    )
-                action[binding.pointer.removeprefix("/")] = bound
-
-            submitted_action = self._submitted_draft_actions_by_step.get(
+            submitted_actions = self._submitted_draft_actions_by_step.get(
                 action_step.name
             )
-            actual_action = json.loads(
-                _canonical_json_bytes(
-                    submitted_action if submitted_action is not None else action
-                ).decode("utf-8")
-            )
-            for binding in argument.query_identity_bindings:
-                source = self._payloads_by_step.get(binding.step)
-                source_step = next(
-                    (
-                        candidate
-                        for candidate in self.expected_steps
-                        if candidate.name == binding.step
-                    ),
-                    None,
+            if submitted_actions is not None and len(submitted_actions) != len(arguments):
+                raise GatewayInvocationError(
+                    "Draft canonical replay action batch length drifted"
                 )
-                if not isinstance(source, Mapping) or source_step is None:
-                    raise GatewayInvocationError(
-                        "Draft canonical replay lacks its exact query identity"
-                    )
-                identity = _exact_query_bus_identity(
-                    source_payload=source,
-                    source_step=source_step,
-                    expected_step_name=binding.step,
+            expected_replay_actions: list[Mapping[str, Any]] = []
+            actual_replay_actions: list[Mapping[str, Any]] = []
+            for action_index, argument in enumerate(arguments):
+                action = json.loads(
+                    _canonical_json_bytes(dict(argument.expected)).decode("utf-8")
                 )
-                expected_target = _json_pointer(action, binding.pointer)
-                if expected_target != {
-                    "kind": "path",
-                    "value": identity["path"],
-                }:
-                    raise GatewayInvocationError(
-                        "Draft canonical replay query identity differs from the "
-                        "reviewed path"
+                for binding in argument.response_bindings:
+                    source = self._payloads_by_step.get(binding.step)
+                    if source is None:
+                        raise GatewayInvocationError(
+                            "Draft canonical replay is missing a handle source"
+                        )
+                    bound = _json_pointer(source, binding.response_pointer)
+                    if (
+                        not isinstance(bound, str)
+                        or _DRAFT_HANDLE_RE.fullmatch(bound) is None
+                    ):
+                        raise GatewayInvocationError(
+                            "Draft canonical replay received an invalid handle"
+                        )
+                    action[binding.pointer.removeprefix("/")] = bound
+                submitted_action = (
+                    submitted_actions[action_index]
+                    if submitted_actions is not None
+                    else None
+                )
+                actual_action = json.loads(
+                    _canonical_json_bytes(
+                        submitted_action if submitted_action is not None else action
+                    ).decode("utf-8")
+                )
+                for binding in argument.query_identity_bindings:
+                    source = self._payloads_by_step.get(binding.step)
+                    source_step = next(
+                        (
+                            candidate
+                            for candidate in self.expected_steps
+                            if candidate.name == binding.step
+                        ),
+                        None,
                     )
-                if submitted_action is None:
-                    _set_json_pointer(
-                        actual_action,
-                        binding.pointer,
-                        {
-                            "kind": "id",
-                            "value": identity["id"],
-                        },
+                    if not isinstance(source, Mapping) or source_step is None:
+                        raise GatewayInvocationError(
+                            "Draft canonical replay lacks its exact query identity"
+                        )
+                    identity = _exact_query_bus_identity(
+                        source_payload=source,
+                        source_step=source_step,
+                        expected_step_name=binding.step,
                     )
-                elif _json_pointer(actual_action, binding.pointer) not in (
-                    expected_target,
-                    {"kind": "id", "value": identity["id"]},
-                ):
-                    raise GatewayInvocationError(
-                        "Draft canonical replay submitted query identity differs "
-                        "from the exact Bus row"
-                    )
+                    expected_target = _json_pointer(action, binding.pointer)
+                    if expected_target != {
+                        "kind": "path",
+                        "value": identity["path"],
+                    }:
+                        raise GatewayInvocationError(
+                            "Draft canonical replay query identity differs from the "
+                            "reviewed path"
+                        )
+                    if submitted_action is None:
+                        _set_json_pointer(
+                            actual_action,
+                            binding.pointer,
+                            {"kind": "id", "value": identity["id"]},
+                        )
+                    elif _json_pointer(actual_action, binding.pointer) not in (
+                        expected_target,
+                        {"kind": "id", "value": identity["id"]},
+                    ):
+                        raise GatewayInvocationError(
+                            "Draft canonical replay submitted query identity differs "
+                            "from the exact Bus row"
+                        )
+                expected_replay_actions.append(action)
+                actual_replay_actions.append(actual_action)
 
             response = self._payloads_by_step.get(action_step.name)
             response_draft = (
@@ -8211,10 +15041,23 @@ class CodexGatewayBroker:
                     ]
                 )
                 after_handles = _draft_projection_handles(response_facts)
-                remaining_handles = sorted(after_handles - before_handles)
+                remaining_handles = [
+                    handle
+                    for handle in _draft_projection_handles_in_order(response_facts)
+                    if handle not in before_handles
+                ]
             else:
                 compact_result = _draft_compact_action_result(response_draft)
-                remaining_handles = sorted(compact_result[1])
+                result = response_draft.get("action_result")
+                remaining_handles = (
+                    list(result.get("created_handles", []))
+                    if isinstance(result, Mapping)
+                    else []
+                )
+                if set(remaining_handles) != compact_result[1]:
+                    raise GatewayInvocationError(
+                        "Draft compact created-handle order is invalid"
+                    )
 
             created_handles = list(remaining_handles)
 
@@ -8225,14 +15068,17 @@ class CodexGatewayBroker:
                     )
                 return remaining_handles.pop(0)
 
+            action_names: list[str] = []
             try:
-                composition, action_name = apply_composer_action(
-                    operation,
-                    version,
-                    composition,
-                    action,
-                    handle_factory=handle_factory,
-                )
+                for action in expected_replay_actions:
+                    composition, action_name = apply_composer_action(
+                        operation,
+                        version,
+                        composition,
+                        action,
+                        handle_factory=handle_factory,
+                    )
+                    action_names.append(action_name)
             except OperationComposerError as exc:
                 raise GatewayInvocationError(
                     f"Draft canonical replay rejected one reviewed action: {exc}"
@@ -8246,31 +15092,111 @@ class CodexGatewayBroker:
                     )
                 return actual_handles.pop(0)
 
+            actual_action_names: list[str] = []
             try:
-                actual_composition, actual_action_name = apply_composer_action(
-                    operation,
-                    version,
-                    actual_composition,
-                    actual_action,
-                    handle_factory=actual_handle_factory,
-                )
+                for actual_action in actual_replay_actions:
+                    actual_composition, actual_action_name = apply_composer_action(
+                        operation,
+                        version,
+                        actual_composition,
+                        actual_action,
+                        handle_factory=actual_handle_factory,
+                    )
+                    actual_action_names.append(actual_action_name)
             except OperationComposerError as exc:
                 raise GatewayInvocationError(
                     f"Draft canonical replay rejected one query-bound action: {exc}"
                 ) from exc
-            if actual_handles or actual_action_name != action_name:
+            if actual_handles or actual_action_names != action_names:
                 raise GatewayInvocationError(
                     "Draft canonical replay produced inconsistent action facts"
                 )
-            actual_projection = composition_projection(
-                operation,
-                version,
-                actual_composition,
+            actual_projection = operation_draft_public_projection(
+                composition_projection(
+                    operation,
+                    version,
+                    actual_composition,
+                )
             )
             if compact_result is not None:
                 result_action, _created, affected, summary = compact_result
+                action_result = response_draft.get("action_result")
+                construction_continuation = (
+                    action_result.get("construction_continuation")
+                    if isinstance(action_result, Mapping)
+                    else None
+                )
+                resume_previous = (
+                    construction_continuation.get(
+                        "resume_previous_container_response"
+                    )
+                    if isinstance(construction_continuation, Mapping)
+                    else None
+                )
+                expected_last_action = (
+                    expected_replay_actions[-1]
+                    if expected_replay_actions
+                    else {}
+                )
+                expected_first_action = (
+                    expected_replay_actions[0]
+                    if expected_replay_actions
+                    else {}
+                )
+                if resume_previous is None:
+                    resume_matches = True
+                elif result_action == "batch":
+                    response_handle = expected_first_action.get("value")
+                    reachable_handles = (
+                        {response_handle}
+                        if isinstance(response_handle, str)
+                        else set()
+                    )
+                    connected_batch = True
+                    for action in expected_replay_actions[1:]:
+                        if (
+                            action.get("action") != "add_typed_fact"
+                            or action.get("field_handle") not in reachable_handles
+                        ):
+                            connected_batch = False
+                            break
+                        nested_handle = action.get("value")
+                        if (
+                            action.get("fact_action")
+                            in {"append", "map-put", "set"}
+                            and isinstance(nested_handle, str)
+                            and nested_handle.startswith("trm1-")
+                        ):
+                            reachable_handles.add(nested_handle)
+                    resume_matches = (
+                        isinstance(resume_previous, Mapping)
+                        and expected_first_action.get("fact_action")
+                        in {"append", "map-put", "set"}
+                        and isinstance(response_handle, str)
+                        and response_handle.startswith("trm1-")
+                        and resume_previous.get("response_handle")
+                        == response_handle
+                        and resume_previous.get("completed_candidate")
+                        == "current_node_fact_batch"
+                        and construction_continuation.get("current_handle")
+                        == response_handle
+                        and "current_key" not in construction_continuation
+                        and connected_batch
+                    )
+                else:
+                    resume_matches = (
+                        isinstance(resume_previous, Mapping)
+                        and expected_last_action.get("fact_action") == "map-put"
+                        and resume_previous.get("response_handle")
+                        == expected_last_action.get("value")
+                        and construction_continuation.get("current_handle")
+                        == expected_last_action.get("field_handle")
+                        and construction_continuation.get("current_key")
+                        == expected_last_action.get("key")
+                    )
                 expected_affected = {
                     value
+                    for action in expected_replay_actions
                     for key, value in action.items()
                     if key.endswith("_handle") and isinstance(value, str)
                 }
@@ -8278,7 +15204,9 @@ class CodexGatewayBroker:
                 projected_handles = _draft_projection_handles(projected_facts)
                 compact_matches = (
                     not remaining_handles
-                    and result_action == action_name
+                    and resume_matches
+                    and result_action
+                    == ("batch" if len(action_names) > 1 else action_names[0])
                     and affected == expected_affected
                     and summary["target_count"] == len(projected_facts)
                     and summary["handle_count"] == len(projected_handles)
@@ -8381,6 +15309,19 @@ class CodexGatewayBroker:
         self._append_record_locked(record)
         return {"exit_code": response_exit, "stdout": "", "stderr": response_stderr}
 
+    def _remember_replayed_successful_gateway_arguments(
+        self,
+        gateway_arguments: Sequence[str],
+    ) -> None:
+        """Retain only the prior argv state needed by archive normalization."""
+
+        values = tuple(gateway_arguments)
+        if not values or any(not isinstance(value, str) for value in values):
+            raise GatewayInvocationError(
+                "replayed successful Gateway arguments must be non-empty strings"
+            )
+        self._replayed_successful_gateway_arguments.append(values)
+
     def _append_record_locked(self, record: GatewayBrokerRecord) -> GatewayBrokerRecord:
         numbered = replace(record, sequence=len(self._records) + 1)
         self._records.append(numbered)
@@ -8396,7 +15337,8 @@ __all__ = [
     "WINDOWS_COMMAND_SHIM_NAMES",
     "WINDOWS_SHIM_SCRIPT_NAME",
     "CodexGatewayBroker",
-    "DraftActionJsonArgument",
+    "DraftTypedActionArgument",
+    "DraftTypedActionBatchArgument",
     "DraftActionMetadataBinding",
     "DraftActionQueryIdentityBinding",
     "DraftActionResponseBinding",
@@ -8430,6 +15372,9 @@ __all__ = [
     "TrustedSubscriptionAckSpec",
     "TrustedStepObserver",
     "TrustedStepPreObserver",
+    "TypedRequestFactsArgument",
+    "InlineTypedOperationArgument",
+    "dependency_free_draft_action_block",
     "reconcile_gateway_commands",
     "project_required_metadata_tokens",
     "resolve_gateway_invocation",

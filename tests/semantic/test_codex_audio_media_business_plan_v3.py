@@ -36,7 +36,11 @@ from tests.semantic.support.codex_audio_media_business_plan_v3 import (
     validate_media_archived_verification,
     validate_media_pool_business_plan,
 )
-from tests.semantic.support.codex_eval_protocol_v3 import build_direct_protocol, build_transaction_protocol, call_step
+from tests.semantic.support.codex_eval_protocol_v3 import (
+    build_direct_protocol,
+    build_operations_discovery_protocol,
+    build_transaction_protocol,
+)
 from tests.semantic.support.codex_eval_bundle_v3 import load_eval_bundle_v3
 from tests.semantic.support.codex_media_pool_runtime_v3 import (
     REFERENCE_MATCH_RESULT_CONTRACT,
@@ -223,6 +227,41 @@ def test_audio_all_five_cases_compile_and_recompute(index: int, tmp_path: Path) 
     ]
 
 
+def test_audio_plan_accepts_optional_named_operation_discovery(
+    tmp_path: Path,
+) -> None:
+    plan, before = _audio_case(3, tmp_path)
+    protocol = build_operations_discovery_protocol(
+        build_transaction_protocol([plan.operation_request])
+    )
+    reviewed_fixture = _audio_reviewed_fixture(plan)
+
+    sections = compile_audio_conversion_business_plan(
+        plan,
+        before,
+        protocol,
+        reviewed_scenario_fixture=reviewed_fixture,
+    )
+    validate_audio_conversion_business_plan(
+        sections,
+        plan,
+        before,
+        protocol,
+        reviewed_scenario_fixture=reviewed_fixture,
+        verify_files=True,
+    )
+    validate_audio_media_business_plan_archive(
+        sections,
+        protocol,
+        **_archive_identity(
+            plan.scenario_id,
+            AUDIO_CONVERT_URI,
+            "2024.1",
+            reviewed_fixture,
+        ),
+    )
+
+
 @pytest.mark.parametrize("index", range(1, 6))
 def test_media_all_five_cases_compile_and_recompute(index: int, tmp_path: Path) -> None:
     case, staged, oracle = _media_case(index, tmp_path, associations=index == 4)
@@ -299,7 +338,8 @@ def test_audio_rejects_preview_only_protocol_and_noop_stale_output(tmp_path: Pat
         build_transaction_protocol([plan.operation_request]),
         reviewed_scenario_fixture=reviewed_fixture,
     )
-    preview_only = build_direct_protocol([call_step("preview", AUDIO_CONVERT_URI)])
+    complete = build_transaction_protocol([plan.operation_request])
+    preview_only = build_direct_protocol([complete.steps[1]])
     with pytest.raises(AudioMediaBusinessPlanError, match="protocol"):
         validate_audio_conversion_business_plan(
             sections,
@@ -684,6 +724,31 @@ def test_persisted_sections_and_archived_verification_are_independently_bound(tm
             protocol,
             **identity,
         )
+
+
+def test_audio_archive_accepts_sealed_path_identities_resolved_to_live_guids(
+    tmp_path: Path,
+) -> None:
+    plan, before = _audio_case(1, tmp_path)
+    sections = compile_audio_conversion_business_plan(
+        plan,
+        before,
+        build_transaction_protocol([plan.operation_request]),
+        reviewed_scenario_fixture=_audio_reviewed_fixture(plan),
+    )
+    after = _materialize_audio_after(sections)
+    evidence = _audio_verification_evidence(sections, after)
+    request = _json_clone(evidence["operation_request"])
+    request["arguments"]["args"]["objects"] = ["{object-1}"]
+    evidence["operation_request"] = request
+    evidence["operation_request_sha256"] = _canonical_sha(request)
+
+    validate_audio_archived_verification(sections, {"evidence": evidence})
+
+    request["arguments"]["args"]["objects"] = ["{wrong-object}"]
+    evidence["operation_request_sha256"] = _canonical_sha(request)
+    with pytest.raises(AudioMediaBusinessPlanError, match="request drifted"):
+        validate_audio_archived_verification(sections, {"evidence": evidence})
 
 
 def test_audio_archive_rejects_resigned_request_target_and_artifact_drift(

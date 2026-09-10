@@ -33,11 +33,18 @@ from tests.support.runtime_evidence_paths import (  # pyright: ignore[reportMiss
     localize_runtime_evidence_path,
 )
 from wwise_waapi.subscriptions import SubscriptionEvent, SubscriptionManager, SubscriptionTimeout  # pyright: ignore[reportMissingImports]
+from wwise_waapi.subscriptions import payload_matches  # pyright: ignore[reportMissingImports]
+from wwise_waapi.topic_business import (  # pyright: ignore[reportMissingImports]
+    MaterializedTopicBusinessInputs,
+    TopicBusinessFact,
+    materialize_topic_business_inputs,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 EVIDENCE_ROOT = REPO_ROOT / ".waapi-skill-state" / "evidence" / "waapi-test-remediation" / "topic-behavior"
-SUPPORTED_VERSIONS = {"2021.1", "2024.1", "2025.1"}
+SUPPORTED_VERSIONS = {"2021.1", "2022.1", "2024.1", "2025.1"}
+TRANSPORT_EVIDENCE_VERSIONS = {"2022.1", "2025.1"}
 ACTOR_PARENT = r"\Actor-Mixer Hierarchy\Default Work Unit"
 READBACK_FIELDS = ["id", "name", "type", "path", "notes", "Volume"]
 TOPIC_RETURN_FIELDS = ["id", "name", "type", "path", "notes", "Volume"]
@@ -88,6 +95,197 @@ def run_versioned_topic_plan(version: str, plan_path: Path, test_node: str) -> N
             shutdown_sandboxed_wwise(lifecycle, sandbox)
         if sandbox is not None:
             cleanup_sandbox(sandbox, failed=failed)
+
+
+def run_versioned_transport_topic(version: str, test_node: str) -> None:
+    """Prove the transport-state structural family on one exact real host."""
+
+    if version not in TRANSPORT_EVIDENCE_VERSIONS:
+        raise AssertionError(f"unsupported transport Topic evidence version: {version!r}")
+    env = dict(os.environ)
+    sandbox = None
+    lifecycle = None
+    client = None
+    failed = True
+    try:
+        sandbox_root = _safe_lock_root(env, version)
+        with LiveSandboxLock(sandbox_root):
+            sandbox = prepare_sample_project_sandbox(
+                env,
+                sandbox_root=sandbox_root,
+                hash_strategy="bounded",
+            )
+            source_mtime_before = sandbox.source_project.stat().st_mtime
+            source_hash_before = hash_project(
+                sandbox.source_root,
+                preferred_strategy="bounded",
+            )
+            lifecycle = launch_sandboxed_wwise(sandbox, env)
+            client = default_waapi_client_factory(lifecycle.waapi_url)
+            evidence = _run_transport_topic_case(client, version)
+            _write_transport_topic_evidence(version, evidence)
+            assert sandbox.source_project.stat().st_mtime == source_mtime_before
+            assert (
+                hash_project(
+                    sandbox.source_root,
+                    preferred_strategy="bounded",
+                ).digest
+                == source_hash_before.digest
+            )
+            failed = False
+    except (LiveEnvironmentError, SandboxFixtureError, HeadlessLifecycleError, OSError) as exc:
+        context = f"{version} live transport Topic sandbox environment blocked execution"
+        _write_run_blocker(version, test_node, exc)
+        skip_or_fail_unavailable(exc, context)
+    finally:
+        if client is not None:
+            client.disconnect()
+        if lifecycle is not None and sandbox is not None:
+            shutdown_sandboxed_wwise(lifecycle, sandbox)
+        if sandbox is not None:
+            cleanup_sandbox(sandbox, failed=failed)
+
+
+def _run_transport_topic_case(client: Any, version: str) -> Mapping[str, Any]:
+    target_result = client.call(
+        "ak.wwise.core.object.get",
+        {"waql": '$ where type = "Event"'},
+        options={"return": ["id", "name", "type", "path"]},
+    )
+    assert isinstance(target_result, Mapping), target_result
+    target_rows = target_result.get("return")
+    assert isinstance(target_rows, list) and target_rows, target_result
+    target = target_rows[0]
+    assert isinstance(target, Mapping) and isinstance(target.get("id"), str), target
+
+    transport_id: int | None = None
+    capture_started = False
+    manager = SubscriptionManager(client)
+    listener = None
+    events: queue.Queue[SubscriptionEvent] = queue.Queue(maxsize=8)
+    try:
+        capture_result = client.call(
+            "ak.wwise.core.profiler.startCapture",
+            {},
+            options={},
+        )
+        assert isinstance(capture_result, Mapping), capture_result
+        assert isinstance(capture_result.get("return"), int), capture_result
+        capture_started = True
+
+        transport_result = client.call(
+            "ak.wwise.core.transport.create",
+            {"object": target["id"]},
+            options={},
+        )
+        assert isinstance(transport_result, Mapping), transport_result
+        transport_id = transport_result.get("transport")
+        assert isinstance(transport_id, int), transport_result
+
+        listener = manager.listen(
+            "ak.wwise.core.transport.stateChanged",
+            callback=lambda event: _put_transport_event(events, event),
+            options={"transport": transport_id},
+            join_timeout=1.0,
+        )
+        client.call(
+            "ak.wwise.core.transport.executeAction",
+            {"transport": transport_id, "action": "play"},
+            options={},
+        )
+        deadline = time.monotonic() + 5.0
+        matching: Mapping[str, Any] | None = None
+        seen: list[Any] = []
+        while time.monotonic() < deadline:
+            try:
+                event = events.get(
+                    timeout=max(0.01, min(0.1, deadline - time.monotonic()))
+                )
+            except queue.Empty:
+                continue
+            payload = event.payload
+            seen.append(_json_safe(payload))
+            if (
+                isinstance(payload, Mapping)
+                and payload.get("transport") == transport_id
+                and payload.get("state") in {"playing", "stopped", "paused"}
+            ):
+                matching = payload
+                break
+        assert matching is not None, (
+            "transport action produced no matching stateChanged event payload; "
+            f"seen={seen!r}"
+        )
+        return {
+            "version": version,
+            "topic": "ak.wwise.core.transport.stateChanged",
+            "publisher": "ak.wwise.core.transport.executeAction",
+            "target": _json_safe(target),
+            "transport": transport_id,
+            "payload": _json_safe(matching),
+            "bounded_wait_seconds": 5.0,
+            "unsubscribe_proof": True,
+        }
+    finally:
+        if listener is not None:
+            listener.cancel()
+        if transport_id is not None:
+            try:
+                client.call(
+                    "ak.wwise.core.transport.executeAction",
+                    {"transport": transport_id, "action": "stop"},
+                    options={},
+                )
+            except BaseException:
+                pass
+            try:
+                client.call(
+                    "ak.wwise.core.transport.destroy",
+                    {"transport": transport_id},
+                    options={},
+                )
+            except BaseException:
+                pass
+        if capture_started:
+            try:
+                client.call("ak.wwise.core.profiler.stopCapture", {}, options={})
+            except BaseException:
+                pass
+        assert manager.active_topics == set()
+
+
+def _put_transport_event(
+    events: queue.Queue[SubscriptionEvent],
+    event: SubscriptionEvent,
+) -> None:
+    try:
+        events.put_nowait(event)
+    except queue.Full:
+        events.get_nowait()
+        events.put_nowait(event)
+
+
+def _write_transport_topic_evidence(
+    version: str,
+    evidence: Mapping[str, Any],
+) -> None:
+    path = _version_evidence_root(version) / "transport-state-changed.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "status": "passed",
+                **dict(evidence),
+                "evidence_path": path.relative_to(REPO_ROOT).as_posix(),
+                "source_project_unchanged": True,
+                "recorded_at_unix": int(time.time()),
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
 
 def _run_topic_case(client: Any, version: str, case: Mapping[str, Any]) -> None:
@@ -159,6 +357,13 @@ def _run_topic_case(client: Any, version: str, case: Mapping[str, Any]) -> None:
                 assert updated["Volume"] == -3.0
                 return updated
 
+        elif uri == "ak.wwise.core.object.structureChanged":
+            parent_id = tracked.create(ACTOR_PARENT, "ActorMixer", _unique_name(version, "topic_structure_parent"))
+
+            def mutate() -> Mapping[str, Any]:
+                child_id = tracked.create(parent_id, "ActorMixer", _unique_name(version, "topic_structure_child"))
+                return _read_one(client, child_id)
+
         elif uri == "ak.wwise.core.log.itemAdded":
             message = f"Task 8 {version} log topic {uuid.uuid4().hex}"
 
@@ -171,12 +376,67 @@ def _run_topic_case(client: Any, version: str, case: Mapping[str, Any]) -> None:
             raise AssertionError(f"unsupported topic case {uri}")
 
         subscription_options = _subscription_options(case, dynamic_subscription_values)
-        event, expected = _subscribe_then_mutate(client, case, mutate, subscription_options=subscription_options)
+        business = _business_subscription_inputs(
+            version,
+            case,
+            subscription_options,
+        )
+        event, expected = _subscribe_then_mutate(
+            client,
+            case,
+            mutate,
+            subscription_options=business.options,
+            match=business.match,
+        )
         if uri == "ak.wwise.core.log.itemAdded":
             _assert_log_payload(case, event.payload, expected)
         else:
             _assert_topic_payload_identity(case, event.payload, expected)
-        _write_topic_evidence(version, case, payload=event.payload, expected=expected)
+        _write_topic_evidence(
+            version,
+            case,
+            payload=event.payload,
+            expected=expected,
+            business=business,
+        )
+
+
+def _business_subscription_inputs(
+    version: str,
+    case: Mapping[str, Any],
+    subscription_options: Mapping[str, Any],
+) -> MaterializedTopicBusinessInputs:
+    option_facts: list[TopicBusinessFact] = []
+    for field_name, value in subscription_options.items():
+        token = "include" if field_name == "return" else field_name
+        values = value if isinstance(value, list) else [value]
+        option_facts.extend(
+            TopicBusinessFact(token, _business_scalar_text(item))
+            for item in values
+        )
+    match_facts = (
+        (TopicBusinessFact("new", "-3", kind="number"),)
+        if case["uri"] == "ak.wwise.core.object.propertyChanged"
+        else ()
+    )
+    return materialize_topic_business_inputs(
+        version=version,
+        topic=str(case["uri"]),
+        option_facts=tuple(option_facts),
+        match_facts=match_facts,
+    )
+
+
+def _business_scalar_text(value: Any) -> str:
+    if value is True:
+        return "true"
+    if value is False:
+        return "false"
+    if value is None:
+        return "null"
+    if isinstance(value, (str, int, float)):
+        return str(value)
+    raise AssertionError(f"Topic business option must be scalar: {value!r}")
 
 
 def _subscription_options(case: Mapping[str, Any], dynamic_values: Mapping[str, Any] | None = None) -> dict[str, Any]:
@@ -196,6 +456,7 @@ def _subscribe_then_mutate(
     mutate: Callable[[], Mapping[str, Any]],
     *,
     subscription_options: Mapping[str, Any],
+    match: Mapping[str, Any],
 ) -> tuple[Any, Mapping[str, Any]]:
     manager = SubscriptionManager(client)
     event_queue: queue.Queue[SubscriptionEvent] = queue.Queue(maxsize=1)
@@ -203,9 +464,16 @@ def _subscribe_then_mutate(
     publisher_errors: list[BaseException] = []
 
     def callback(*args: Any, **kwargs: Any) -> None:
+        candidate = SubscriptionEvent(
+            topic=str(case["uri"]),
+            args=args,
+            kwargs=dict(kwargs),
+        )
+        if match and not payload_matches(candidate.payload, match):
+            return
         if event_queue.full():
             event_queue.get_nowait()
-        event_queue.put_nowait(SubscriptionEvent(topic=str(case["uri"]), args=args, kwargs=dict(kwargs)))
+        event_queue.put_nowait(candidate)
 
     def publish() -> None:
         try:
@@ -350,7 +618,14 @@ def _safe_evidence_path(version: str, path: str) -> Path:
     return localize_runtime_evidence_path(_version_evidence_root(version), path)
 
 
-def _write_topic_evidence(version: str, case: Mapping[str, Any], *, payload: Any, expected: Mapping[str, Any]) -> None:
+def _write_topic_evidence(
+    version: str,
+    case: Mapping[str, Any],
+    *,
+    payload: Any,
+    expected: Mapping[str, Any],
+    business: MaterializedTopicBusinessInputs,
+) -> None:
     path = _safe_evidence_path(version, str(case["evidence_path"]))
     path.parent.mkdir(parents=True, exist_ok=True)
     body = {
@@ -363,6 +638,8 @@ def _write_topic_evidence(version: str, case: Mapping[str, Any], *, payload: Any
         "bounded_wait_seconds": case["bounded_wait_seconds"],
         "payload": _json_safe(payload),
         "expected": _json_safe(expected),
+        "business_options": _json_safe(business.options),
+        "business_match": _json_safe(business.match),
         "unsubscribe_proof": True,
         "cleanup": case["cleanup"],
         "recorded_at_unix": int(time.time()),

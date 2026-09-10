@@ -28,6 +28,9 @@ from tests.semantic.support.codex_integration_soundbank_runtime_v1 import (
     _validated_generation_request,
     prepare_harbor_integration_runtime,
 )
+from tests.semantic.support.codex_eval_protocol_v3 import (
+    materialize_typed_transaction_protocol_requests,
+)
 from tests.semantic.support.codex_integration_workflows_v1 import (
     IntegrationWorkflowCase,
     IntegrationWorkflowUnit,
@@ -191,28 +194,47 @@ def test_harbor_runtime_materializes_closed_dual_platform_workflow_and_cleans(
 ) -> None:
     prepared, backend, workflow = _prepare(tmp_path, version=version)
 
-    assert prepared.protocol.turn_prefix_counts == (2, 8, 12)
-    assert tuple(
-        row.name for row in prepared.protocol.steps
-    ) == (
-        "tx01.operation-schema",
-        "tx01.preview",
-        "tx01.transaction-show",
-        "tx01.confirm",
-        "tx01.execute",
-        "tx01.verify",
-        "tx02.operation-schema",
-        "tx02.preview",
-        "tx02.transaction-show",
-        "tx02.confirm",
-        "tx02.execute",
-        "tx02.verify",
-    )
     previews = [
-        row.arguments[2].expected
-        for row in prepared.protocol.steps
-        if row.subcommand == "preview"
+        request
+        for _pointer, request in materialize_typed_transaction_protocol_requests(
+            prepared.protocol,
+            version=version,
+        )
     ]
+    preview_indexes = tuple(
+        index + 1
+        for index, row in enumerate(prepared.protocol.steps)
+        if row.subcommand == "preview-from-draft"
+    )
+    assert prepared.protocol.turn_prefix_counts == (
+        preview_indexes[0],
+        preview_indexes[1],
+        len(prepared.protocol.steps),
+    )
+    for transaction_id in ("tx01", "tx02"):
+        names = tuple(
+            row.name
+            for row in prepared.protocol.steps
+            if row.name.startswith(f"{transaction_id}.")
+        )
+        assert names[0] == f"{transaction_id}.operation-schema"
+        draft_start_index = names.index(f"{transaction_id}.draft-start")
+        assert draft_start_index >= 1
+        assert all(
+            name.startswith(f"{transaction_id}.query-object.")
+            for name in names[1:draft_start_index]
+        )
+        assert all(
+            not name.startswith(f"{transaction_id}.query-object.")
+            for name in names[draft_start_index + 1 :]
+        )
+        assert names[-5:] == (
+            f"{transaction_id}.preview",
+            f"{transaction_id}.transaction-show",
+            f"{transaction_id}.confirm",
+            f"{transaction_id}.execute",
+            f"{transaction_id}.verify",
+        )
     assert previews[0]["operation"] == "soundbank.setInclusions"
     assert previews[0]["arguments"]["mode"] == "replace"
     assert previews[0]["arguments"]["soundbank"] == {
@@ -244,6 +266,16 @@ def test_harbor_runtime_materializes_closed_dual_platform_workflow_and_cleans(
     )
     assert prepared.visible_values["soundbank_io_root"] in prepared.prompt
     assert prepared.visible_values["soundbank_output_directory"] in prepared.prompt
+    assert "逐项使用我给出的三个完整 Event 路径作为对象身份" in prepared.prompt
+    assert "不要改成按同名对象查找" in prepared.prompt
+    assert "Event 或 Aux Bus" not in prepared.prompt
+    assert "清单明确为空" not in prepared.prompt
+    assert (
+        "Harbor_Release 这一行的 "
+        "rebuild 明确设为 false，跳过语言变体，"
+        "不要重建全部 SoundBank，不要清空音频缓存，也不要重建 Init Bank"
+        in prepared.prompt
+    )
     assert tuple(row.api for row in prepared.expected_dispatches) == (
         SET_INCLUSIONS_API,
         GENERATE_API,
@@ -503,9 +535,12 @@ def test_harbor_generation_preflight_rejects_output_directory_as_io_root(
 ) -> None:
     prepared, _backend, _workflow = _prepare(tmp_path)
     request = next(
-        row.arguments[2].expected
-        for row in prepared.protocol.steps
-        if row.name == "tx02.preview"
+        request
+        for pointer, request in materialize_typed_transaction_protocol_requests(
+            prepared.protocol,
+            version="2022.1",
+        )
+        if pointer == "/composer/tx02.preview"
     )
     invalid = {
         **request,

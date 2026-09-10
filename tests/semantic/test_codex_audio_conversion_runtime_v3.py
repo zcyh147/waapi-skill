@@ -33,7 +33,6 @@ from tests.semantic.support.codex_audio_conversion_runtime_v3 import (
     make_audio_conversion_prelaunch_hook,
 )
 from tests.semantic.support.codex_eval_bundle_v3 import load_eval_bundle_v3
-from tests.semantic.support.codex_gateway_broker import SemanticJsonArgument
 from wwise_waapi.operation_registry import parse_operation_request
 
 
@@ -108,19 +107,28 @@ def test_all_five_cases_build_closed_waapi_call_protocols(tmp_path: Path) -> Non
             backend=object(),
         )
         protocol = runtime.gateway_protocol()
-        assert protocol.turn_prefix_counts == (2, 6)
+        assert protocol.turn_prefix_counts == (
+            len(plan.objects) + 5,
+            len(plan.objects) + 9,
+        )
         assert [step.subcommand for step in protocol.steps] == [
-            "operation-schema",
-            "preview",
+            "request-schema",
+            "draft-start",
+            *(["draft-bind-object"] * len(plan.objects)),
+            "draft-declare-core-plan",
+            "draft-check",
+            "preview-from-draft",
             "transaction-show",
             "confirm",
             "execute",
             "verify",
         ]
-        assert protocol.steps[1].arguments[:2] == ("--apply", "--request-json")
-        preview_request = protocol.steps[1].arguments[2]
-        assert isinstance(preview_request, SemanticJsonArgument)
-        assert preview_request.expected == plan.operation_request
+        preview = next(
+            step
+            for step in protocol.steps
+            if step.subcommand == "preview-from-draft"
+        )
+        assert preview.expected_operation_request == plan.operation_request
         assert runtime.render_prompt() == _scenario(plan.scenario_id).render_prompt(
             {"io_root": str(io.resolve())}
         )
@@ -793,6 +801,17 @@ def _write_fake_wem(
 
 
 def _gateway_verify_payload(runtime, result: Mapping[str, Any]) -> Mapping[str, Any]:
+    assert runtime.before is not None
+    object_ids = {
+        artifact.object_path: artifact.object_id
+        for artifact in runtime.before.artifacts
+        if artifact.object_path in runtime.plan.objects
+    }
+    assert set(object_ids) == set(runtime.plan.objects)
+    request = copy.deepcopy(runtime.plan.operation_request)
+    request["arguments"]["args"]["objects"] = [
+        object_ids[path] for path in runtime.plan.objects
+    ]
     return {
         "ok": True,
         "status": "result_schema_checked",
@@ -801,7 +820,7 @@ def _gateway_verify_payload(runtime, result: Mapping[str, Any]) -> Mapping[str, 
         "agent_result": {
             "operation": "waapi.call",
             "executed": True,
-            "request": runtime.plan.operation_request,
+            "request": request,
             "result": dict(result),
         },
     }

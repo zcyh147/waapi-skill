@@ -52,22 +52,27 @@ inherited from the canonical Console manifest.
 ## Route meanings
 
 - `fixed_command`: a dedicated packaged gateway command.
-- `bounded_call`: a reviewed, read-only `call` route with recursive reflected
-  request/result validation, a timeout, and a result-size ceiling.
+- `bounded_call`: a reviewed read-only route selected by `request-schema`; its
+  typed continuation has recursive reflected request/result validation, a
+  timeout, and a result-size ceiling.
 - `bounded_topic_wait`: a configurable finite or explicitly no-timeout wait
   that remains event-count/result bounded and always unsubscribes. Explicit
-  continuous requests use `stream-topic`, whose persistent subscription emits
-  bounded records and also unsubscribes on termination.
-- `transaction`, `managed_transaction`, or `isolated_transaction`: the
-  manifest-registered `waapi.call` operation through immutable
-  preview -> accepted authorization -> execute once -> result verification.
+  continuous requests use `stream-topic`, whose persistent subscription has an
+  explicit event-count and cumulative-output bound, emits bounded records, and
+  also unsubscribes on termination.
+- `transaction`, `managed_transaction`, or `isolated_transaction`: a named
+  `operation-schema` or exact-URI `request-schema` typed route through immutable
+  Preview -> accepted authorization -> execute once -> result verification.
+  The materialized canonical request may use `waapi.call` internally, but that
+  representation is never a caller or model input.
   For project changes, `ask_before_changes` presents the expected result and
   waits for a later explicit confirmation, while `allow_changes` gives notice
   and may continue from durable policy authorization in the same user turn;
   `read_only` blocks the change.
 - `compound_transaction_member`: one Undo member row that remains executable
   only inside the closed `waapi.undoGroup` same-connection composite; it is
-  rejected from independent `waapi.call` execution.
+  not independently executable and is constructed only through the Undo
+  child typed contract.
 - `excluded`: no public execution route and no connection attempt.
 
 Every route is implemented in the Skill runtime. An agent must not replace a
@@ -176,9 +181,17 @@ The catalog and execution registry are tied to an immutable per-version
 inventory digest. A URI addition, removal, or same-count substitution fails
 closed until the packaged contract is reviewed and updated.
 
+The deterministic [full-surface release report](../../../docs/full-surface-release-report.json)
+binds the exact 824-lane inventory digest to its zero/inline/draft/Topic
+construction totals, host overlays, execution routes, public continuations,
+blocked fields, duplicate-lane audit, schema keywords, and references. It is a
+code-only construction report, not real-host or Fresh Agent evidence.
+
 ## Verification scope
 
-The focused program gate currently contains 2833 passing tests and exercises
+The focused Program gate currently contains 4738 passing tests with two
+platform-specific skips on macOS and 4715 passing tests with 25
+platform-specific skips on native Windows. It exercises
 all 808 packaged route-contract version/API rows with
 in-process fake clients. It validates exact URI dispatch, reflected request and
 result/event schemas, timeout/result ceilings, all three modification-policy
@@ -187,11 +200,11 @@ isolated path confinement, and topic subscribe/event/unsubscribe behavior for
 configurable finite or explicitly no-timeout event-count-bounded waits plus
 continuous `stream-topic`. Separate negative tests cover exclusions,
 route bypass attempts, model-authored external command hooks, malformed nested
-payloads, and manifest drift. Direct and isolated generic transactions also run
+payloads, and manifest drift. Reflected and isolated typed transactions also run
 through complete preview/confirm/execute/verify program chains. Dedicated tests
 separately validate the 824-row Authoring overlay and its UI-command routes;
 this is not a second 824-row per-API fake-dispatch matrix. The query tests cover
-all five versions of the closed Builder plus the advanced WAQL route's fixed
+all five versions of the closed business compiler plus the advanced WAQL route's fixed
 read-only URI, UTF-8 byte limits, trimmed single-line framing (no comments,
 semicolons, or unclosed string/regex literals), Gateway-appended final `take`,
 response cap, and explicit lack of a mutation-identity bridge. Dedicated

@@ -33,6 +33,7 @@ from types import MappingProxyType
 from typing import Any, Protocol
 
 from .codex_eval_bundle_v3 import OnlineScenario
+from .codex_filesystem_security import path_is_link_or_reparse
 from .codex_import_assets_v3 import (
     MaterializedFile,
     MaterializedImportCase,
@@ -60,6 +61,26 @@ IMPORT_APIS = frozenset(
 )
 SUPPORTED_VERSION = "2022.1"
 COMPOUND_SUPPORTED_VERSIONS = ("2022.1", "2025.1")
+PROFILE_CROSS_VERSION_SCENARIOS = MappingProxyType(
+    {
+        "O22-AUDIO-IMPORT-02": ("2021.1",),
+        "O22-AUDIO-TAB-04": ("2025.1",),
+    }
+)
+
+
+def import_runtime_version_is_reviewed(
+    scenario_id: str,
+    version: str,
+    *,
+    compound: bool,
+) -> bool:
+    if compound:
+        return version in COMPOUND_SUPPORTED_VERSIONS
+    return version == SUPPORTED_VERSION or version in PROFILE_CROSS_VERSION_SCENARIOS.get(
+        scenario_id,
+        (),
+    )
 ACTOR_DWU = r"\Actor-Mixer Hierarchy\Default Work Unit"
 EVENTS_DWU = r"\Events\Default Work Unit"
 GUID_RE = re.compile(
@@ -86,6 +107,11 @@ OBJECT_FIELDS = (
     "sound:originalWavFilePath",
     "audioSource:language",
 )
+OBJECT_FIELDS_2021 = tuple(
+    field
+    for field in OBJECT_FIELDS
+    if field not in {"activeSource", "originalFilePath"}
+)
 AUDIO_SOURCE_FIELDS = (
     "id",
     "name",
@@ -96,6 +122,9 @@ AUDIO_SOURCE_FIELDS = (
     "originalFilePath",
     "audioSource:language",
 )
+AUDIO_SOURCE_FIELDS_2021 = tuple(
+    field for field in AUDIO_SOURCE_FIELDS if field != "originalFilePath"
+) + ("originalWavFilePath",)
 EVENT_FIELDS = ("id", "name", "type", "path", "parent", "notes")
 ACTION_FIELDS = (*EVENT_FIELDS, "ActionType", "Target")
 PLAY_ACTION_TYPE = 1
@@ -389,10 +418,11 @@ class ImportRuntimeBackend(Protocol):
 class ClosedDirectWaapiBackend:
     """Strict direct-WAAPI adapter for trusted setup/read/save/cleanup only."""
 
-    def __init__(self, call: DirectWaapiCall) -> None:
+    def __init__(self, call: DirectWaapiCall, *, version: str = "2022.1") -> None:
         if not callable(call):
             raise TypeError("call must be callable")
         self._call = call
+        self._version = _required_text(version, "version")
 
     def read_objects(
         self,
@@ -538,7 +568,13 @@ class ClosedDirectWaapiBackend:
                 "imports": [row],
                 "autoAddToSourceControl": False,
             },
-            {"return": list(OBJECT_FIELDS)},
+            {
+                "return": list(
+                    OBJECT_FIELDS_2021
+                    if self._version == "2021.1"
+                    else OBJECT_FIELDS
+                )
+            },
         )
         if not isinstance(result, Mapping):
             raise ImportRuntimeError("audio.import setup result must be an object")
@@ -1298,7 +1334,11 @@ class PreparedImportRuntime:
     def _snapshot_row(self, plan: ImportRowPlan) -> ImportRowState:
         rows = self.backend.read_objects(
             path=plan.target_path,
-            fields=OBJECT_FIELDS,
+            fields=(
+                OBJECT_FIELDS_2021
+                if self.plan.version == "2021.1"
+                else OBJECT_FIELDS
+            ),
             language=plan.language,
         )
         if len(rows) > 1:
@@ -1320,11 +1360,48 @@ class PreparedImportRuntime:
         path = _required_wwise_path(row.get("path"), "object path")
         active_source = _identity_value(_field_value(row, "activeSource"))
         source_state: ImportAudioSourceState | None = None
+        if self.plan.version == "2021.1":
+            direct_sources = tuple(
+                source
+                for source in self.backend.read_direct_children(
+                    object_id,
+                    fields=AUDIO_SOURCE_FIELDS_2021,
+                )
+                if _object_type_matches(source.get("type"), "AudioFileSource")
+                and (
+                    _identity_value(source.get("parent")) is None
+                    or _identity_value(source.get("parent")) == object_id
+                )
+            )
+            active_source = _legacy_active_source_id_from_project(
+                object_id,
+                sandbox_root=self.plan.sandbox_root,
+            )
+            active_rows = tuple(
+                source
+                for source in direct_sources
+                if (
+                    (_identity_value(source.get("id")) or "").casefold()
+                    == active_source.casefold()
+                )
+                and _language_name(_field_value(source, "audioSource:language"))
+                == language
+            )
+            if len(active_rows) != 1:
+                raise ImportRuntimeError(
+                    "2021 persisted active Audio Source must bind exactly one "
+                    f"direct {language} AudioFileSource: {path}"
+                )
+            direct_sources = active_rows
         if active_source is not None:
-            source_rows = self.backend.read_objects(
-                object_id=active_source,
-                fields=AUDIO_SOURCE_FIELDS,
-                language=language,
+            source_rows = (
+                direct_sources
+                if self.plan.version == "2021.1"
+                else self.backend.read_objects(
+                    object_id=active_source,
+                    fields=AUDIO_SOURCE_FIELDS,
+                    language=language,
+                )
             )
             if len(source_rows) != 1:
                 raise ImportRuntimeError(
@@ -1333,6 +1410,8 @@ class PreparedImportRuntime:
             source = source_rows[0]
             source_id = _required_guid(source.get("id"), "Audio Source id")
             copied = _field_value(source, "originalFilePath")
+            if copied is None:
+                copied = _field_value(source, "originalWavFilePath")
             if copied is None:
                 copied = _field_value(row, "originalFilePath")
             if copied is None:
@@ -1407,13 +1486,13 @@ def build_import_runtime_plan(
         raise ImportRuntimeError("import runtime requires one exact Wwise version")
     version = scenario.versions[0]
     compound = materialized.compound_spec is not None
-    if not compound and version != SUPPORTED_VERSION:
+    if not import_runtime_version_is_reviewed(
+        scenario.id,
+        version,
+        compound=compound,
+    ):
         raise ImportRuntimeError(
-            f"core import runtime is pinned to Wwise {SUPPORTED_VERSION}"
-        )
-    if compound and version not in COMPOUND_SUPPORTED_VERSIONS:
-        raise ImportRuntimeError(
-            f"compound import runtime does not support Wwise {version}"
+            f"{scenario.id} import runtime does not support Wwise {version}"
         )
     if compound:
         if materialized.requires_metadata_binding or materialized.metadata_binding is None:
@@ -2784,16 +2863,122 @@ def _tree_proofs(
     include: Callable[[Path], bool],
     limit: int,
 ) -> tuple[FileProof, ...]:
+    candidate = root.expanduser()
+    try:
+        root_metadata = candidate.lstat()
+    except OSError as exc:
+        raise ImportRuntimeError(f"sandbox evidence root is unavailable: {candidate}") from exc
+    if path_is_link_or_reparse(candidate, metadata=root_metadata):
+        raise ImportRuntimeError(
+            f"sandbox evidence root is a symlink or reparse point: {candidate}"
+        )
+    resolved = candidate.resolve(strict=True)
+    if not resolved.is_dir():
+        raise ImportRuntimeError("sandbox evidence root must be a real directory")
     result: list[FileProof] = []
-    for path in sorted(root.rglob("*")):
-        if path.is_symlink():
-            raise ImportRuntimeError(f"sandbox evidence contains a symlink: {path}")
-        if not path.is_file() or not include(path):
-            continue
-        result.append(_regular_file_proof(path, relative_to=root, require_contained=True))
-        if len(result) > limit:
-            raise ImportRuntimeError("sandbox evidence file count exceeded its bound")
+    for current, directory_names, file_names in os.walk(resolved, followlinks=False):
+        directory_names.sort()
+        file_names.sort()
+        current_path = Path(current)
+        for name in directory_names:
+            path = current_path / name
+            metadata = path.lstat()
+            if path_is_link_or_reparse(path, metadata=metadata):
+                raise ImportRuntimeError(
+                    f"sandbox evidence contains a symlink or reparse directory: {path}"
+                )
+        for name in file_names:
+            path = current_path / name
+            metadata = path.lstat()
+            if path_is_link_or_reparse(path, metadata=metadata):
+                raise ImportRuntimeError(
+                    f"sandbox evidence contains a symlink or reparse file: {path}"
+                )
+            if not include(path):
+                continue
+            result.append(
+                _regular_file_proof(path, relative_to=resolved, require_contained=True)
+            )
+            if len(result) > limit:
+                raise ImportRuntimeError("sandbox evidence file count exceeded its bound")
     return tuple(result)
+
+
+def _legacy_active_source_id_from_project(
+    sound_id: str,
+    *,
+    sandbox_root: Path,
+) -> str:
+    """Read Wwise 2021's saved Linked ActiveSource for one exact Sound."""
+
+    expected_sound_id = _required_guid(sound_id, "2021 Sound id")
+    proofs = _tree_proofs(
+        sandbox_root,
+        include=lambda path: path.suffix.casefold() == ".wwu",
+        limit=MAX_PROJECT_XML_FILES,
+    )
+    matches: list[str] = []
+    for proof in proofs:
+        path = Path(proof.path)
+        current = _regular_file_proof(
+            path,
+            relative_to=sandbox_root,
+            require_contained=True,
+        )
+        if current != proof:
+            raise ImportRuntimeError(
+                f"saved Wwise XML changed before ActiveSource read: {path}"
+            )
+        try:
+            tree = ET.parse(path)
+        except (ET.ParseError, OSError) as exc:
+            raise ImportRuntimeError(
+                f"cannot parse saved Wwise XML {path}: {exc}"
+            ) from exc
+        after = _regular_file_proof(
+            path,
+            relative_to=sandbox_root,
+            require_contained=True,
+        )
+        if after != proof:
+            raise ImportRuntimeError(
+                f"saved Wwise XML changed during ActiveSource read: {path}"
+            )
+        for sound in tree.iter():
+            if sound.tag.rsplit("}", 1)[-1] != "Sound":
+                continue
+            if sound.attrib.get("ID", "").casefold() != expected_sound_id.casefold():
+                continue
+            lists = tuple(
+                child
+                for child in sound
+                if child.tag.rsplit("}", 1)[-1] == "ActiveSourceList"
+            )
+            if len(lists) != 1:
+                raise ImportRuntimeError(
+                    "persisted 2021 Sound must contain exactly one ActiveSourceList"
+                )
+            active_rows = tuple(
+                child
+                for child in lists[0]
+                if child.tag.rsplit("}", 1)[-1] == "ActiveSource"
+                and child.attrib.get("Platform", "").casefold() == "linked"
+            )
+            if len(active_rows) != 1:
+                raise ImportRuntimeError(
+                    "persisted 2021 Sound must contain exactly one Linked ActiveSource"
+                )
+            matches.append(
+                _required_guid(
+                    active_rows[0].attrib.get("ID"),
+                    "persisted 2021 ActiveSource id",
+                )
+            )
+    if len(matches) != 1:
+        raise ImportRuntimeError(
+            "persisted 2021 Sound GUID must resolve to exactly one ActiveSource"
+        )
+    return matches[0]
 
 
 def _is_originals_file(path: Path) -> bool:
@@ -2846,8 +3031,14 @@ def _regular_file_proof(
     if not isinstance(value, (str, os.PathLike)):
         raise ImportRuntimeError("file proof requires a path")
     candidate = Path(value).expanduser()
-    if candidate.is_symlink():
-        raise ImportRuntimeError(f"file proof refuses a symlink: {candidate}")
+    try:
+        candidate_metadata = candidate.lstat()
+    except OSError as exc:
+        raise ImportRuntimeError(f"file proof path is unavailable: {candidate}") from exc
+    if path_is_link_or_reparse(candidate, metadata=candidate_metadata):
+        raise ImportRuntimeError(
+            f"file proof refuses a symlink or reparse point: {candidate}"
+        )
     path = candidate.resolve(strict=True)
     if not path.is_file():
         raise ImportRuntimeError(f"file proof requires a regular file: {path}")
@@ -3086,7 +3277,15 @@ def _validated_fields(fields: Sequence[str]) -> tuple[str, ...]:
     if isinstance(fields, (str, bytes)):
         raise ImportRuntimeError("return fields must be a sequence")
     values = tuple(fields)
-    allowed = frozenset({*OBJECT_FIELDS, *AUDIO_SOURCE_FIELDS, *ACTION_FIELDS})
+    allowed = frozenset(
+        {
+            *OBJECT_FIELDS,
+            *OBJECT_FIELDS_2021,
+            *AUDIO_SOURCE_FIELDS,
+            *AUDIO_SOURCE_FIELDS_2021,
+            *ACTION_FIELDS,
+        }
+    )
     if not values or len(values) != len(set(values)) or any(value not in allowed for value in values):
         raise ImportRuntimeError("direct read fields are outside the closed import oracle")
     return values
@@ -3318,6 +3517,7 @@ def _sha256(path: Path) -> str:
 
 __all__ = [
     "COMPOUND_SUPPORTED_VERSIONS",
+    "PROFILE_CROSS_VERSION_SCENARIOS",
     "ClosedDirectWaapiBackend",
     "FileProof",
     "ImportAudioSourceState",
@@ -3345,6 +3545,7 @@ __all__ = [
     "SetupImport",
     "XmlIdentityEvidence",
     "build_import_runtime_plan",
+    "import_runtime_version_is_reviewed",
     "prepare_import_reference_fixtures",
     "prepare_import_runtime",
 ]

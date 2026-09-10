@@ -906,7 +906,7 @@ def test_process_definition_files_resolves_every_identity_and_checks_exact_inclu
     io_root, project = _project(tmp_path)
     definition = Path(project["directories"]["root"]) / "banks.tsv"
     definition.write_text(
-        'Gameplay_Main\t"Play_Test"\tEvent\tStructure\tMedia\n',
+        f"Gameplay_Main\t{EVENT_ID}\tEvent\tStructure\tMedia\n",
         encoding="utf-8",
     )
     reader = DefinitionReader(project)
@@ -947,7 +947,7 @@ def test_process_definition_files_preserves_preexisting_inclusions_additively(
     io_root, project = _project(tmp_path)
     definition = Path(project["directories"]["root"]) / "banks.tsv"
     definition.write_text(
-        'Gameplay_Main\t"Play_Test"\tEvent\tStructure\tMedia\n',
+        f"Gameplay_Main\t{EVENT_ID}\tEvent\tStructure\tMedia\n",
         encoding="utf-8",
     )
     reader = DefinitionReader(project)

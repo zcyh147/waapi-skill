@@ -1,0 +1,40 @@
+{
+  "contract": "waapi-skill.soundengine-business-profile/v1",
+  "profile_id": "soundengine_business_4",
+  "model": {
+    "name": "gpt-5.6-terra",
+    "reasoning_effort": "medium",
+    "service_tier": "default",
+    "memory": "disabled"
+  },
+  "units": [
+    {
+      "unit_id": "SOUND22-MONITOR-PREVIEW",
+      "operation": "ak.soundengine.postMsgMonitor",
+      "version": "2022.1",
+      "prompt": "请向当前 Wwise 的 SoundEngine 运行时 Profiler Capture Log 写入“Fresh Agent SoundEngine business probe”。只生成预览，不要执行。",
+      "final_markers": ["Fresh Agent SoundEngine business probe"]
+    },
+    {
+      "unit_id": "SOUND22-GAME-OBJECT-PREVIEW",
+      "operation": "ak.soundengine.registerGameObj",
+      "version": "2022.1",
+      "prompt": "请为当前 Wwise 注册一个名为“Fresh Weather Listener”的游戏对象。只生成预览，不要执行。",
+      "final_markers": ["Fresh Weather Listener"]
+    },
+    {
+      "unit_id": "SOUND22-EVENT-PREVIEW",
+      "operation": "ak.soundengine.executeActionOnEvent",
+      "version": "2022.1",
+      "prompt": "请对事件“Fresh Alarm Event”执行 Stop，淡出 250 毫秒，曲线使用 Linear。只生成预览，不要执行。",
+      "final_markers": ["Fresh Alarm Event", "Stop", "250", "Linear"]
+    },
+    {
+      "unit_id": "SOUND22-LISTENER-PREVIEW",
+      "operation": "ak.soundengine.setListenerSpatialization",
+      "version": "2022.1",
+      "prompt": "此前 Gateway 已返回监听器句柄 goh1-11111111111111111111111111111111。请为该监听器启用空间化，输出布局使用 Wwise 5.1。只生成预览，不要执行。",
+      "final_markers": ["5.1"]
+    }
+  ]
+}

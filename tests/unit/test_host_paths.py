@@ -11,6 +11,9 @@ from wwise_waapi.host_paths import (  # pyright: ignore[reportMissingImports]
     parse_absolute_host_path,
     parse_relative_host_path,
 )
+from tests.support.host_path_relatives import (  # pyright: ignore[reportMissingImports]
+    relative_host_path,
+)
 
 
 def test_absolute_host_path_parser_keeps_pathlib_flavors_separate() -> None:
@@ -157,6 +160,56 @@ def test_relative_host_path_parser_uses_explicit_pathlib_flavors() -> None:
     assert posix.components == ("GeneratedSoundBanks", "Linux", "Bank.bnk")
     assert parent.components == ("..", "GeneratedSoundBanks", "Windows")
     assert current.components == ()
+
+
+def test_relative_host_path_preserves_posix_case_and_hostile_components() -> None:
+    target = PurePosixPath("/Workspace/Owned/External Media/音频;$HOME&mix")
+    base = PurePosixPath("/workspace/Owned/Sandbox/Project")
+
+    assert relative_host_path(target, base).as_posix() == (
+        "../../../../Workspace/Owned/External Media/音频;$HOME&mix"
+    )
+
+
+def test_relative_host_path_uses_windows_drive_case_and_mixed_separator_rules() -> None:
+    target = PureWindowsPath(r"C:\Work/Owned\External Media/音频;$HOME&mix")
+    base = PureWindowsPath(r"c:/work\owned/Sandbox/Project")
+
+    assert relative_host_path(target, base).as_posix() == (
+        "../../External Media/音频;$HOME&mix"
+    )
+
+
+def test_relative_host_path_uses_unc_share_case_semantics() -> None:
+    target = PureWindowsPath(
+        r"\\StudioNas\Release Share\Owned\External Media\音频;$HOME&mix"
+    )
+    base = PureWindowsPath(
+        r"\\studionas\release share\Owned\Sandbox\Project"
+    )
+
+    assert relative_host_path(target, base).as_posix() == (
+        "../../External Media/音频;$HOME&mix"
+    )
+
+
+@pytest.mark.parametrize(
+    ("target", "base"),
+    (
+        (PureWindowsPath(r"C:\Media\file.wav"), PureWindowsPath(r"D:\Project")),
+        (
+            PureWindowsPath(r"\\server\share-a\Media\file.wav"),
+            PureWindowsPath(r"\\server\share-b\Project"),
+        ),
+        (PurePosixPath("/srv/media/file.wav"), PureWindowsPath(r"C:\Project")),
+    ),
+)
+def test_relative_host_path_rejects_cross_namespace_inputs(
+    target: PurePosixPath | PureWindowsPath,
+    base: PurePosixPath | PureWindowsPath,
+) -> None:
+    with pytest.raises(ValueError):
+        relative_host_path(target, base)
 
 
 @pytest.mark.parametrize(

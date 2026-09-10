@@ -46,7 +46,7 @@ except ImportError:  # pragma: no cover - exercised on POSIX, not Windows CI.
 
 
 STATE_DIRECTORY_ENV = "WAAPI_SKILL_STATE_DIR"
-TRANSACTION_SCHEMA_VERSION = 1
+TRANSACTION_SCHEMA_VERSION = 2
 CONFIRMATION_TOKEN_MATERIAL_CONTRACT = (
     "waapi-skill.confirmation-token-material/v1"
 )
@@ -113,6 +113,12 @@ class ConfirmationTokenMismatch(TransactionError, ValueError):
 
 class StateCorruptionError(TransactionError):
     """Durable transaction metadata or its event journal is malformed."""
+
+
+class TransactionRecreateRequired(TransactionError):
+    """A pre-cutover durable transaction cannot execute under current contracts."""
+
+    error_code = "TRANSACTION_RECREATE_REQUIRED"
 
 
 class FileLockUnavailable(TransactionError):
@@ -240,6 +246,7 @@ class TransactionState(str, Enum):
     REJECTED = "rejected"
     EXECUTING = "executing"
     EXECUTION_CANCELLED = "execution_cancelled"
+    EXECUTION_FAILED = "execution_failed"
     EXECUTED_UNVERIFIED = "executed_unverified"
     RESULT_SCHEMA_CHECKED = "result_schema_checked"
     VERIFIED = "verified"
@@ -268,11 +275,13 @@ ALLOWED_TRANSITIONS: Mapping[TransactionState, frozenset[TransactionState]] = {
     TransactionState.EXECUTING: frozenset(
         {
             TransactionState.EXECUTION_CANCELLED,
+            TransactionState.EXECUTION_FAILED,
             TransactionState.EXECUTED_UNVERIFIED,
             TransactionState.INDETERMINATE,
         }
     ),
     TransactionState.EXECUTION_CANCELLED: frozenset(),
+    TransactionState.EXECUTION_FAILED: frozenset(),
     TransactionState.EXECUTED_UNVERIFIED: frozenset(
         {
             TransactionState.VERIFIED,
@@ -386,7 +395,9 @@ def load_transaction_archive_snapshot(
     }:
         raise StateCorruptionError("Immutable transaction preview fields are invalid")
     if preview_payload.get("schema_version") != TRANSACTION_SCHEMA_VERSION:
-        raise StateCorruptionError("Unsupported transaction preview schema")
+        raise TransactionRecreateRequired(
+            "This pre-cutover transaction Preview must be recreated through the typed Gateway."
+        )
     if preview_payload.get("transaction_id") != transaction_id:
         raise ArtifactIntegrityError("Transaction preview id does not match its directory")
     artifact_hash = preview_payload.get("artifact_hash")
@@ -920,7 +931,7 @@ class TransactionStore:
         confirmation_token: str | None = None,
         artifact_hash: str | None = None,
     ) -> TransactionRecord:
-        """Confirm by one state-scoped token or the legacy full artifact hash."""
+        """Confirm through the public token or an internal artifact-hash seam."""
 
         if (confirmation_token is None) == (artifact_hash is None):
             raise ValueError(
@@ -987,6 +998,19 @@ class TransactionStore:
             TransactionState.EXECUTION_CANCELLED,
             expected_state=TransactionState.EXECUTING,
             event_type="execution_cancelled",
+            details=details,
+        )
+
+    def mark_execution_failed(
+        self, transaction_id: str, *, details: Mapping[str, Any] | None = None
+    ) -> TransactionRecord:
+        """Record one explicit non-OK dispatch result as a terminal failure."""
+
+        return self.transition(
+            transaction_id,
+            TransactionState.EXECUTION_FAILED,
+            expected_state=TransactionState.EXECUTING,
+            event_type="execution_failed",
             details=details,
         )
 
@@ -1141,7 +1165,9 @@ class TransactionStore:
         path = self._preview_path(transaction_id)
         payload = _read_json_object(path, transaction_id)
         if payload.get("schema_version") != TRANSACTION_SCHEMA_VERSION:
-            raise StateCorruptionError(f"Unsupported preview schema in {path}")
+            raise TransactionRecreateRequired(
+                "This pre-cutover transaction Preview must be recreated through the typed Gateway."
+            )
         if payload.get("transaction_id") != transaction_id:
             raise ArtifactIntegrityError(f"Preview transaction id mismatch in {path}")
         if "artifact" not in payload or not isinstance(payload.get("artifact_hash"), str):
@@ -1299,7 +1325,9 @@ class TransactionStore:
 
 def _record_from_payload(payload: Mapping[str, Any], transaction_id: str) -> TransactionRecord:
     if payload.get("schema_version") != TRANSACTION_SCHEMA_VERSION:
-        raise StateCorruptionError("Unsupported transaction state schema")
+        raise TransactionRecreateRequired(
+            "This pre-cutover transaction state must be recreated through the typed Gateway."
+        )
     if payload.get("transaction_id") != transaction_id:
         raise StateCorruptionError("Transaction state id does not match its directory")
     try:

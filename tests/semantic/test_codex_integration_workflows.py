@@ -194,6 +194,23 @@ def test_public_units_retain_component_runtime_and_closed_legacy_ids(profile) ->
         profile.legacy_unit_ids["INT22-WEATHER"] = "not-a-legacy-id"
 
 
+def test_weather_prompt_distinguishes_the_boolean_instance_limit_from_its_value(
+    profile,
+) -> None:
+    prompt = next(
+        unit.turns[0].prompt
+        for unit in profile.units
+        if unit.unit_id == "INT25-WEATHER"
+    )
+
+    assert "自身播放实例限制这个开关设为启用" in prompt
+    assert "另行设置每个 Sound 的最大播放实例数数值" in prompt
+    assert (
+        "这七类字段彼此独立、都要保留：循环启用、循环模式、忽略父对象限制、"
+        "自身实例限制启用、最大实例数、输出总线、音量"
+    ) in prompt
+
+
 @pytest.mark.parametrize(
     ("case_id", "expected"),
     [
@@ -240,6 +257,10 @@ def test_filters_keep_public_version_major_order(profile) -> None:
     ]
     assert selected.definition_sha256 == profile.definition_sha256
     assert version_only.source_digests == profile.source_digests
+
+
+def test_public_integration_units_delegate_first_use_intro(profile) -> None:
+    assert all(unit.delegates_first_use_intro for unit in profile.units)
 
 
 def test_component_source_digests_are_namespaced_and_include_baselines(

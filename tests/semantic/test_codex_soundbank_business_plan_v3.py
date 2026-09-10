@@ -10,10 +10,11 @@ import pytest
 
 from tests.semantic.support.codex_eval_protocol_v3 import (
     StructuredRefusal,
-    build_direct_protocol,
+    build_operations_discovery_protocol,
+    build_optional_topic_schema_protocol,
     build_transaction_protocol,
-    wait_topic_step,
 )
+from tests.semantic.support.codex_gateway_broker import BoundedIntegerArgument
 from tests.semantic.support.codex_soundbank_business_plan_v3 import (
     TOPIC_ACK_CONTRACT,
     TOPIC_ACK_REQUIREMENT_CONTRACT,
@@ -27,6 +28,7 @@ from tests.semantic.support.codex_soundbank_business_plan_v3 import (
     compile_soundbank_business_plan,
     parse_soundbank_business_plan_sections,
     soundbank_archive_identity,
+    soundbank_topic_protocol_steps,
     validate_soundbank_archived_verification,
     validate_soundbank_business_plan,
     validate_soundbank_business_plan_archive,
@@ -65,8 +67,38 @@ APIS = (
 IDS = tuple(f"O22-SB-{kind}-{index:02d}" for kind in ("GENERATE", "PROCESS-DEF", "CONVERT-EXT", "SET-INCLUSIONS", "GENERATED") for index in range(1, 6))
 
 
-def _request(api: str) -> MappingProxyType:
-    return MappingProxyType({"contract": OPERATION_REQUEST_CONTRACT, "version": "2022.1", "operation": "waapi.call", "arguments": {"api": api, "args": {}, "options": {}}})
+def _request(api: str, arguments: MappingProxyType | dict[str, object]) -> MappingProxyType:
+    operations = {
+        "ak.wwise.core.soundbank.generate": "soundbank.generate",
+        "ak.wwise.core.soundbank.processDefinitionFiles": "soundbank.processDefinitionFiles",
+        "ak.wwise.core.soundbank.convertExternalSources": "soundbank.convertExternalSources",
+        "ak.wwise.core.soundbank.setInclusions": "soundbank.setInclusions",
+    }
+    return MappingProxyType(
+        {
+            "contract": OPERATION_REQUEST_CONTRACT,
+            "version": "2022.1",
+            "operation": operations[api],
+            "arguments": dict(arguments),
+        }
+    )
+
+
+def test_fixed_duration_topic_stream_uses_a_ceiling_not_expected_event_total() -> None:
+    steps = soundbank_topic_protocol_steps(
+        scenario_id="O22-SB-GENERATED-03",
+        topic=SOUNDBANK_TOPIC,
+        version="2024.1",
+        event_count=2,
+        match={"soundbank": {"name": "Weapons_Core"}},
+        options={"return": ["id", "name", "type", "path"]},
+    )
+
+    stream = steps[-1]
+    index = stream.arguments.index("--event-count")
+    ceiling = stream.arguments[index + 1]
+    assert isinstance(ceiling, BoundedIntegerArgument)
+    assert (ceiling.minimum, ceiling.maximum) == (3, 64)
 
 
 def _case(api: str, scenario_id: str, root: Path, *, refusal: bool = False, topic: bool = False):
@@ -86,11 +118,58 @@ def _case(api: str, scenario_id: str, root: Path, *, refusal: bool = False, topi
     reviewed = MappingProxyType({"id": scenario_id, "api": api, "asset_spec": asset_spec})
     blue = SoundBankBlueprint(scenario_id, api, "2022.1", SimpleNamespace(fixture=reviewed), root / "p.wproj", root, root, root, root, asset_spec, (event_fixture,), (), (bank,), (definition,), (external,), count, PROCESS_REFUSAL_ERROR_CODE if refusal else None)
     topic_plan = None
-    requests = (_request(api),)
+    operation_arguments: dict[str, object]
+    if api in {APIS[0], SOUNDBANK_TOPIC}:
+        operation_arguments = {
+            "soundbanks": [
+                {"name": "Bank", "artifact_expectation": "nonlocalized"}
+            ],
+            "platforms": ["Windows"],
+            "skip_languages": True,
+            "write_to_disk": True,
+            "io_root": str(root),
+        }
+    elif api == APIS[1]:
+        operation_arguments = {
+            "files": [str(source)],
+            "io_root": str(root),
+        }
+    elif api == APIS[2]:
+        operation_arguments = {
+            "sources": [
+                {
+                    "input": str(source),
+                    "platform": "Windows",
+                    "output": str(root / "external.wem"),
+                }
+            ],
+            "io_root": str(root),
+        }
+    else:
+        operation_arguments = {
+            "soundbank": {"kind": "path", "value": bank.path},
+            "mode": "replace",
+            "inclusions": [
+                {
+                    "object": {"kind": "path", "value": event_fixture.path},
+                    "filters": ["events"],
+                }
+            ],
+        }
+    requests = () if topic else (_request(api, operation_arguments),)
     if topic:
         events = tuple(TopicExpectedEvent("Bank", "Windows", "SFX", f"{{00000000-0000-0000-0000-{i:012x}}}", f"{{00000000-0000-0000-0001-{i:012x}}}", f"{{00000000-0000-0000-0002-{i:012x}}}") for i in range(1, topic_count + 1))
-        topic_plan = TopicPlan(api, topic_count, MappingProxyType({}), MappingProxyType({}), events, (TopicPublisher(_request("ak.wwise.core.soundbank.generate"), events),), True, True, True)
-        requests = ()
+        topic_plan = TopicPlan(
+            api,
+            topic_count,
+            MappingProxyType({}),
+            MappingProxyType({}),
+            events,
+            (TopicPublisher(_request(APIS[0], operation_arguments), events),),
+            True,
+            True,
+            True,
+        )
     dynamic_roots = (
         ((root / "io" / "cache").resolve(strict=False),)
         if api in {APIS[0], SOUNDBANK_TOPIC}
@@ -99,9 +178,28 @@ def _case(api: str, scenario_id: str, root: Path, *, refusal: bool = False, topi
     materialized = MaterializedSoundBankCase(blue, MappingProxyType({}), MappingProxyType({}), requests, topic_plan, (proof,), (artifact,), dynamic_roots, MappingProxyType({"bank:Bank": "{00000000-0000-0000-0000-000000000010}", "event": "{00000000-0000-0000-0000-000000000040}"}), MappingProxyType({"bank:Bank": 1}), MappingProxyType({}), MappingProxyType({"Windows": "{00000000-0000-0000-0000-000000000020}"}), MappingProxyType({"SFX": "{00000000-0000-0000-0000-000000000030}"}))
     snapshot = SoundBankSnapshot(scenario_id, (ObjectState("event", "{00000000-0000-0000-0000-000000000040}", r"\Events\Default Work Unit\Hero", "Event"),), (BankState("Bank", "{00000000-0000-0000-0000-000000000010}", (("{00000000-0000-0000-0000-000000000040}", ()),)),), (), (proof,), (tree,))
     if topic:
-        protocol = build_direct_protocol([wait_topic_step("soundbank.generated.wait", api, event_count=topic_count, match={}, options={})])
+        protocol = build_optional_topic_schema_protocol(
+            soundbank_topic_protocol_steps(
+                scenario_id=scenario_id,
+                topic=api,
+                version="2022.1",
+                event_count=topic_count,
+                match={},
+                options={},
+            )
+        )
     else:
-        protocol = build_transaction_protocol(requests, refusal=StructuredRefusal(PROCESS_REFUSAL_ERROR_CODE) if refusal else None)
+        protocol = build_transaction_protocol(
+            requests,
+            refusal=(
+                StructuredRefusal(
+                    PROCESS_REFUSAL_ERROR_CODE,
+                    result_command="preview-from-draft",
+                )
+                if refusal
+                else None
+            ),
+        )
     return materialized, snapshot, protocol
 
 
@@ -946,6 +1044,27 @@ def test_archive_parser_protocol_and_cross_api_drift(tmp_path: Path) -> None:
     topic, topic_before, topic_protocol = _case(SOUNDBANK_TOPIC, "O22-SB-GENERATED-01", tmp_path / "topic", topic=True)
     with pytest.raises(SoundBankBusinessPlanError):
         validate_soundbank_business_plan_archive(parsed, topic_protocol, scenario=soundbank_archive_identity(materialized))
+
+
+def test_archive_preserves_optional_operations_discovery_in_payload_bindings(
+    tmp_path: Path,
+) -> None:
+    materialized, before, base_protocol = _case(
+        APIS[3],
+        "O22-SB-SET-INCLUSIONS-01",
+        tmp_path,
+    )
+    protocol = build_operations_discovery_protocol(base_protocol)
+    sections = compile_soundbank_business_plan(materialized, before, protocol)
+    parsed = parse_soundbank_business_plan_sections(sections.writer_kwargs())
+
+    validate_soundbank_business_plan_archive(
+        parsed,
+        protocol,
+        scenario=soundbank_archive_identity(materialized),
+    )
+
+    assert parsed.payload_bindings["verification_steps"][0] == "tx01.operations"
 
 
 @pytest.mark.parametrize(

@@ -70,7 +70,7 @@ def execute(
     )
 
 
-def test_public_draft_lifecycle_is_offline_task_bound_and_cross_invocation(
+def test_public_business_draft_lifecycle_is_offline_task_bound_and_cross_invocation(
     tmp_path: Path,
 ) -> None:
     start_code, started = execute(tmp_path, "draft-start", "object.set")
@@ -83,69 +83,24 @@ def test_public_draft_lifecycle_is_offline_task_bound_and_cross_invocation(
     task_authority = started["task_authority"]
     assert DRAFT_ID_RE.fullmatch(draft_id)
     assert TASK_AUTHORITY_RE.fullmatch(task_authority)
-    assert started["draft"] == {
-        "contract": "waapi-skill.operation-draft/v1",
-        "draft_id": draft_id,
-        "lifecycle_state": "editable",
-        "revision": 1,
-        "next_action_binding": {
-            "contract": "waapi-skill.operation-draft-next-action/v1",
-            "draft_id": draft_id,
-            "expected_revision": 1,
-            "one_action_only": True,
-            "then_read_next_response": True,
-            "precompute_or_increment_revision": False,
-            "fixed_argv_prefix": [
-                "python",
-                str(waapi_gateway.GATEWAY_RUNNER_PATH),
-                "gateway.py",
-                "draft-apply",
-                draft_id,
-                "--task-authority",
-                "<task-authority-from-draft-start>",
-                "--expected-revision",
-                "1",
-                "--compact",
-                "--facts",
-            ],
-            "append_exactly_one_typed_action": [
-                "--action",
-                "<action-name>",
-                "<typed-fact-arguments>",
-            ],
-            "replace_only": [
-                "<task-authority-from-draft-start>",
-                "<action-name>",
-                "<typed-fact-arguments>",
-            ],
-            "copy_all_other_values_exactly": True,
-        },
-        "binding": {
-            "operation": "object.set",
-            "version": "2022.1",
-            "schema_digest": (
-                "2b6d3903c5b3e11618c3eaf0a3d5a26aa0045db26750320f3a8ce8c7da004cee"
-            ),
-        },
-        "created_at": started["draft"]["created_at"],
-        "updated_at": started["draft"]["updated_at"],
-        "expires_at": started["draft"]["expires_at"],
-        "current_facts": [],
-        "request_options": {},
-        "missing_fields": ["target"],
-        "missing_fields_status": "incomplete",
-        "allowed_actions": [
-            "set_request_option",
-            "clear_request_option",
-            "add_target",
-            "inspect",
-            "cancel",
-        ],
-        "check": None,
-        "seal": None,
+
+    draft = started["draft"]
+    assert draft["lifecycle_state"] == "editable"
+    assert draft["revision"] == 1
+    assert draft["binding"]["operation"] == "object.set"
+    assert draft["binding"]["version"] == "2022.1"
+    assert draft["business_revision"] == 0
+    assert draft["declarations"] == []
+    assert draft["missing_fields"] == ["business_declaration"]
+    assert draft["allowed_actions"] == ["bind-object"]
+    binding = draft["next_action_binding"]
+    assert binding["contract"] == "waapi-skill.business-draft-next-action/v1"
+    assert binding["required_next_phase"] == "bind_existing_business_object"
+    assert binding["responsibility_split"] == {
+        "agent": "natural_language_to_closed_high_level_business_facts",
+        "gateway": "business_facts_to_exact_waapi_request_and_execution_plan",
     }
-    assert started["draft"]["created_at"] == started["draft"]["updated_at"]
-    assert started["draft"]["expires_at"] > started["draft"]["created_at"]
+    assert "draft-apply" not in json.dumps(binding)
     assert task_authority not in json.dumps(started["session_context"])
 
     inspect_code, inspected = execute(
@@ -157,9 +112,12 @@ def test_public_draft_lifecycle_is_offline_task_bound_and_cross_invocation(
     )
 
     assert inspect_code == 0
-    assert inspected["draft"] == started["draft"]
     assert "task_authority" not in inspected
     assert task_authority not in json.dumps(inspected)
+    inspected_binding = inspected["draft"]["next_action_binding"]
+    assert "<task-authority-from-draft-start>" in json.dumps(inspected_binding)
+    assert inspected["draft"]["binding"] == draft["binding"]
+    assert inspected["draft"]["declarations"] == []
 
     cancel_code, cancelled = execute(
         tmp_path,
@@ -174,13 +132,11 @@ def test_public_draft_lifecycle_is_offline_task_bound_and_cross_invocation(
     assert cancel_code == 0
     assert cancelled["draft"]["lifecycle_state"] == "cancelled"
     assert cancelled["draft"]["revision"] == 2
-    assert cancelled["draft"]["current_facts"] == []
+    assert cancelled["draft"]["declarations"] == []
     assert cancelled["draft"]["missing_fields"] == []
     assert cancelled["draft"]["allowed_actions"] == []
     assert "task_authority" not in cancelled
     assert not (tmp_path / "state" / "transactions").exists()
-
-
 def test_public_draft_denial_is_non_enumerable_and_does_not_echo_authority(
     tmp_path: Path,
 ) -> None:
@@ -212,14 +168,10 @@ def test_public_draft_denial_is_non_enumerable_and_does_not_echo_authority(
 def test_public_draft_start_rejects_invalid_registry_bindings_before_state_write(
     tmp_path: Path,
 ) -> None:
-    for arguments, error_code in (
-        (("draft-start", "missing.operation"), "UNKNOWN_OPERATION"),
-        (("draft-start", "object.copy"), "OPERATION_BOUNDARY"),
-    ):
-        exit_code, payload = execute(tmp_path, *arguments)
+    exit_code, payload = execute(tmp_path, "draft-start", "missing.operation")
 
-        assert exit_code == 2
-        assert payload["error_code"] == error_code
+    assert exit_code == 2
+    assert payload["error_code"] == "UNKNOWN_OPERATION"
 
     assert not (tmp_path / "state").exists()
 
@@ -232,7 +184,7 @@ def test_public_draft_expiry_is_bounded_offline_and_does_not_create_preview(
         operation="object.set",
         version="2022.1",
         schema_digest=(
-            "2b6d3903c5b3e11618c3eaf0a3d5a26aa0045db26750320f3a8ce8c7da004cee"
+            "c1545e0d05010c77fb80cd859f4cb6c0b77ad313a332b1241be94f9a43d11c6a"
         ),
         now=datetime(2000, 1, 1, tzinfo=timezone.utc),
     )

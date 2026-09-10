@@ -237,6 +237,7 @@ def test_prompts_are_natural_and_encode_the_three_business_acceptance_cases() ->
 
     assert "沿用这三个 Sound，不要替换或重建对象" in rifle.turns[0].prompt
     assert "合成一次变更" in rifle.turns[0].prompt
+    assert "{rifle_source_files}" in rifle.turns[0].prompt
     assert rifle.fixture.parameters["import_operation"] == "useExisting"
     assert [row.key for row in rifle.fixture.source_files] == list(EXPECTED_SOURCE_KEYS["rifle_safe_reimport"])
 
@@ -251,6 +252,8 @@ def test_prompts_are_natural_and_encode_the_three_business_acceptance_cases() ->
     assert footsteps.fixture.parameters["structure_row"]["switch_assignment"] == "Snow"
 
     assert "这一轮不要修改工程" in audit.turns[0].prompt
+    assert "最多返回 6 个 Sound" in audit.turns[0].prompt
+    assert "逐字保留这个审计范围路径" in audit.turns[0].prompt
     assert "Legacy_Rifle_Reference 和 RFL_Intentional_Hot 是有意保留的例外" in audit.turns[1].prompt
     assert audit.fixture.parameters["identity_readback"] == "exact_id_before_preview"
     assert len(audit.fixture.parameters["selected_corrections"]) == 3
@@ -261,6 +264,12 @@ def test_scenario_proxy_renders_only_declared_runner_owned_values() -> None:
     rendered = scenario.render_prompt(
         {
             "rifle_source_directory": "/tmp/owned/rifle/incoming",
+            "rifle_source_files": (
+                '["/tmp/owned/rifle/incoming/rifle_close_v2.wav",'
+                '"/tmp/owned/rifle/incoming/rifle_tail_v2.wav",'
+                '"/tmp/owned/rifle/incoming/rifle_mechanical_v2.wav",'
+                '"/tmp/owned/rifle/incoming/rifle_distant.wav"]'
+            ),
             "rifle_container_path": r"\Actor-Mixer Hierarchy\Default Work Unit\WAAPI Skill Integration V2\RifleRevision\Rifle",
             "rifle_event_path": r"\Events\Default Work Unit\WAAPI_Skill_Integration_V2\RifleRevision\Play_Rifle",
             "rifle_bus_path": r"\Master-Mixer Hierarchy\Default Work Unit\WAAPI_V2_Weapons",
@@ -268,6 +277,7 @@ def test_scenario_proxy_renders_only_declared_runner_owned_values() -> None:
     )
     assert "{" not in rendered
     assert "/tmp/owned/rifle/incoming" in rendered
+    assert "/tmp/owned/rifle/incoming/rifle_mechanical_v2.wav" in rendered
     with pytest.raises(IntegrationWorkflowV2Error, match="input mismatch"):
         scenario.render_prompt({})
 

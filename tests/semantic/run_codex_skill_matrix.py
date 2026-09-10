@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import importlib
 import json
+import math
 import os
 import re
 import shutil
@@ -81,11 +82,13 @@ from tests.semantic.support.codex_harness import (  # noqa: E402  # pyright: ign
     CodexHarnessConfig,
     CodexInfrastructureError,
     CodexRunResult,
+    SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS,
     WindowsPowerShellCoreHost,
     is_evaluation_sensitive_environment_key,
     normalized_gateway_command_argv,
     prepare_workspace_skill_install,
     resolve_codex_binary,
+    semantic_skill_bootstrap_developer_instructions,
 )
 from tests.semantic.support.codex_transaction_seal import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     PreviewSealEvidence,
@@ -118,6 +121,135 @@ DEFAULT_MODIFICATION_POLICY_V3_SUITE = (
 )
 DEFAULT_COMPOUND_HEAVY_V1_SUITE = (
     REPO_ROOT / "tests" / "semantic" / "data" / "compound-heavy-v1" / "profile.json"
+)
+DEFAULT_TYPED_INPUT_SUITE = (
+    REPO_ROOT / "tests" / "semantic" / "data" / "typed-input-v1" / "profile.json"
+)
+DEFAULT_DEEP_BUSINESS_ACCEPTANCE_SUITE = (
+    REPO_ROOT
+    / "tests"
+    / "semantic"
+    / "data"
+    / "deep-business-acceptance"
+    / "profile.json"
+)
+DEFAULT_DEEP_INTERFACE_MVP_SUITE = (
+    REPO_ROOT / "tests" / "semantic" / "data" / "deep-interface-mvp" / "profile.json"
+)
+DEFAULT_AUDIO_IMPORT_BUSINESS_SUITE = (
+    REPO_ROOT
+    / "tests"
+    / "semantic"
+    / "data"
+    / "audio-import-business"
+    / "profile.json"
+)
+DEFAULT_OBJECT_LIFECYCLE_BUSINESS_SUITE = (
+    REPO_ROOT
+    / "tests"
+    / "semantic"
+    / "data"
+    / "object-lifecycle-business"
+    / "profile.json"
+)
+DEFAULT_OBJECT_METADATA_BUSINESS_SUITE = (
+    REPO_ROOT
+    / "tests"
+    / "semantic"
+    / "data"
+    / "object-metadata-business"
+    / "profile.json"
+)
+DEFAULT_OBJECT_GRAPH_BUSINESS_SUITE = (
+    REPO_ROOT
+    / "tests"
+    / "semantic"
+    / "data"
+    / "object-graph-business"
+    / "profile.json"
+)
+DEFAULT_SWITCH_ASSIGNMENT_BUSINESS_SUITE = (
+    REPO_ROOT
+    / "tests"
+    / "semantic"
+    / "data"
+    / "switch-assignment-business"
+    / "profile.json"
+)
+DEFAULT_CORE_BUSINESS_SUITE = (
+    REPO_ROOT
+    / "tests"
+    / "semantic"
+    / "data"
+    / "core-business"
+    / "profile.json"
+)
+DEFAULT_PROJECT_SETTING_BUSINESS_SUITE = (
+    REPO_ROOT
+    / "tests"
+    / "semantic"
+    / "data"
+    / "project-setting-business"
+    / "profile.json"
+)
+DEFAULT_RUNTIME_CONTROL_BUSINESS_SUITE = (
+    REPO_ROOT
+    / "tests"
+    / "semantic"
+    / "data"
+    / "runtime-control-business"
+    / "profile.json"
+)
+DEFAULT_DEBUG_CONTROL_BUSINESS_SUITE = (
+    REPO_ROOT
+    / "tests"
+    / "semantic"
+    / "data"
+    / "debug-control-business"
+    / "profile.json"
+)
+DEFAULT_SOUNDENGINE_BUSINESS_SUITE = (
+    REPO_ROOT
+    / "tests"
+    / "semantic"
+    / "data"
+    / "soundengine-business"
+    / "profile.json"
+)
+DEFAULT_CLI_CONSOLE_BUSINESS_SUITE = (
+    REPO_ROOT
+    / "tests"
+    / "semantic"
+    / "data"
+    / "cli-console-business"
+    / "profile.json"
+)
+DEFAULT_HOST_UI_DEBUG_BUSINESS_SUITE = (
+    REPO_ROOT
+    / "tests"
+    / "semantic"
+    / "data"
+    / "host-ui-debug-business"
+    / "profile.json"
+)
+DEFAULT_COMPOUND_UNDO_BUSINESS_SUITE = (
+    REPO_ROOT
+    / "tests"
+    / "semantic"
+    / "data"
+    / "compound-undo-business"
+    / "profile.json"
+)
+DEFAULT_AUTHORING_UI_BUSINESS_SUITE = (
+    REPO_ROOT
+    / "tests"
+    / "semantic"
+    / "data"
+    / "authoring-ui-business"
+    / "profile.json"
+)
+DEFAULT_DEEP_INTERFACE_MVP_SKILL = (
+    REPO_ROOT / "tests" / "semantic" / "data" / "deep-interface-mvp" / "skill"
 )
 DEFAULT_INTEGRATION_WORKFLOWS_V1_SUITE = (
     REPO_ROOT
@@ -152,6 +284,56 @@ DEFAULT_MODIFICATION_POLICY_V3_ITERATION_ROOT = (
 )
 DEFAULT_COMPOUND_HEAVY_V1_ITERATION_ROOT = (
     SKILL_ROOT.parent / "waapi-skill-workspace" / "compound-heavy-cross-version-24"
+)
+DEFAULT_TYPED_INPUT_ITERATION_ROOT = (
+    SKILL_ROOT.parent / "waapi-skill-workspace" / "typed-input-cross-version-25"
+)
+DEFAULT_DEEP_BUSINESS_ACCEPTANCE_ITERATION_ROOT = (
+    SKILL_ROOT.parent
+    / "waapi-skill-workspace"
+    / "deep-business-cross-version-19"
+)
+DEFAULT_AUDIO_IMPORT_BUSINESS_ITERATION_ROOT = (
+    SKILL_ROOT.parent / "waapi-skill-workspace" / "audio-import-business-8"
+)
+DEFAULT_OBJECT_LIFECYCLE_BUSINESS_ITERATION_ROOT = (
+    SKILL_ROOT.parent / "waapi-skill-workspace" / "object-lifecycle-business-3"
+)
+DEFAULT_OBJECT_METADATA_BUSINESS_ITERATION_ROOT = (
+    SKILL_ROOT.parent / "waapi-skill-workspace" / "object-metadata-business-1"
+)
+DEFAULT_OBJECT_GRAPH_BUSINESS_ITERATION_ROOT = (
+    SKILL_ROOT.parent / "waapi-skill-workspace" / "object-graph-business-1"
+)
+DEFAULT_SWITCH_ASSIGNMENT_BUSINESS_ITERATION_ROOT = (
+    SKILL_ROOT.parent / "waapi-skill-workspace" / "switch-assignment-business-1"
+)
+DEFAULT_CORE_BUSINESS_ITERATION_ROOT = (
+    SKILL_ROOT.parent / "waapi-skill-workspace" / "core-business-1"
+)
+DEFAULT_PROJECT_SETTING_BUSINESS_ITERATION_ROOT = (
+    SKILL_ROOT.parent / "waapi-skill-workspace" / "project-setting-business-1"
+)
+DEFAULT_RUNTIME_CONTROL_BUSINESS_ITERATION_ROOT = (
+    SKILL_ROOT.parent / "waapi-skill-workspace" / "runtime-control-business-1"
+)
+DEFAULT_DEBUG_CONTROL_BUSINESS_ITERATION_ROOT = (
+    SKILL_ROOT.parent / "waapi-skill-workspace" / "debug-control-business-1"
+)
+DEFAULT_SOUNDENGINE_BUSINESS_ITERATION_ROOT = (
+    SKILL_ROOT.parent / "waapi-skill-workspace" / "soundengine-business-1"
+)
+DEFAULT_CLI_CONSOLE_BUSINESS_ITERATION_ROOT = (
+    SKILL_ROOT.parent / "waapi-skill-workspace" / "cli-console-business-1"
+)
+DEFAULT_HOST_UI_DEBUG_BUSINESS_ITERATION_ROOT = (
+    SKILL_ROOT.parent / "waapi-skill-workspace" / "host-ui-debug-business-1"
+)
+DEFAULT_COMPOUND_UNDO_BUSINESS_ITERATION_ROOT = (
+    SKILL_ROOT.parent / "waapi-skill-workspace" / "compound-undo-business-1"
+)
+DEFAULT_AUTHORING_UI_BUSINESS_ITERATION_ROOT = (
+    SKILL_ROOT.parent / "waapi-skill-workspace" / "authoring-ui-business-2"
 )
 DEFAULT_INTEGRATION_WORKFLOWS_V1_ITERATION_ROOT = (
     SKILL_ROOT.parent
@@ -198,16 +380,277 @@ _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 HEAVY_V3_PROFILE_ID = "heavy_cross_version_80"
 MODIFICATION_POLICY_V3_PROFILE_ID = "modification_policy_9"
 COMPOUND_HEAVY_V1_PROFILE_ID = "compound_heavy_cross_version_24"
+TYPED_INPUT_PROFILE_ID = "typed_input_cross_version_25"
+DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID = "deep_business_cross_version_19"
+DEEP_INTERFACE_MVP_PROFILE_ID = "deep_interface_mvp_8"
+AUDIO_IMPORT_BUSINESS_PROFILE_ID = "audio_import_business_8"
+OBJECT_LIFECYCLE_BUSINESS_PROFILE_ID = "object_lifecycle_business_3"
+OBJECT_METADATA_BUSINESS_PROFILE_ID = "object_metadata_business_1"
+OBJECT_GRAPH_BUSINESS_PROFILE_ID = "object_graph_business_1"
+SWITCH_ASSIGNMENT_BUSINESS_PROFILE_ID = "switch_assignment_business_1"
+CORE_BUSINESS_PROFILE_ID = "core_business_1"
+PROJECT_SETTING_BUSINESS_PROFILE_ID = "project_setting_business_1"
+RUNTIME_CONTROL_BUSINESS_PROFILE_ID = "runtime_control_business_1"
+DEBUG_CONTROL_BUSINESS_PROFILE_ID = "debug_control_business_1"
+SOUNDENGINE_BUSINESS_PROFILE_ID = "soundengine_business_4"
+CLI_CONSOLE_BUSINESS_PROFILE_ID = "cli_console_business_1"
+HOST_UI_DEBUG_BUSINESS_PROFILE_ID = "host_ui_debug_business_1"
+COMPOUND_UNDO_BUSINESS_PROFILE_ID = "compound_undo_business_1"
+AUTHORING_UI_BUSINESS_PROFILE_ID = "authoring_ui_business_2"
 INTEGRATION_WORKFLOWS_V1_PROFILE_ID = "integration_workflows_cross_version_6"
 INTEGRATION_WORKFLOWS_V2_PROFILE_ID = "integration_workflows_v2_cross_version_6"
 INTEGRATION_PROFILE_ID = "integration"
+
+
+@dataclass(frozen=True, slots=True)
+class OfflineBusinessAgentProfileDescriptor:
+    suite_path: Path
+    iteration_root: Path
+    supported_versions: frozenset[str]
+    preflight_contract: str
+    profile_module: str
+    loader_name: str
+    runner_module: str
+    options_name: str
+    run_name: str
+
+
+OFFLINE_BUSINESS_AGENT_PROFILES = {
+    AUDIO_IMPORT_BUSINESS_PROFILE_ID: OfflineBusinessAgentProfileDescriptor(
+        suite_path=DEFAULT_AUDIO_IMPORT_BUSINESS_SUITE,
+        iteration_root=DEFAULT_AUDIO_IMPORT_BUSINESS_ITERATION_ROOT,
+        supported_versions=frozenset({"2022.1", "2025.1"}),
+        preflight_contract="waapi-skill.audio-import-business-preflight/v1",
+        profile_module="tests.semantic.support.codex_import_business_profile",
+        loader_name="load_import_business_profile",
+        runner_module="tests.semantic.support.codex_import_business_agent_runner",
+        options_name="ImportBusinessAgentOptions",
+        run_name="run_import_business_agent_unit",
+    ),
+    OBJECT_LIFECYCLE_BUSINESS_PROFILE_ID: OfflineBusinessAgentProfileDescriptor(
+        suite_path=DEFAULT_OBJECT_LIFECYCLE_BUSINESS_SUITE,
+        iteration_root=DEFAULT_OBJECT_LIFECYCLE_BUSINESS_ITERATION_ROOT,
+        supported_versions=frozenset({"2022.1"}),
+        preflight_contract="waapi-skill.object-lifecycle-business-preflight/v1",
+        profile_module=(
+            "tests.semantic.support.codex_object_lifecycle_business_profile"
+        ),
+        loader_name="load_object_lifecycle_business_profile",
+        runner_module=(
+            "tests.semantic.support.codex_object_lifecycle_business_agent_runner"
+        ),
+        options_name="ObjectLifecycleBusinessAgentOptions",
+        run_name="run_object_lifecycle_business_agent_unit",
+    ),
+    OBJECT_METADATA_BUSINESS_PROFILE_ID: OfflineBusinessAgentProfileDescriptor(
+        suite_path=DEFAULT_OBJECT_METADATA_BUSINESS_SUITE,
+        iteration_root=DEFAULT_OBJECT_METADATA_BUSINESS_ITERATION_ROOT,
+        supported_versions=frozenset({"2022.1"}),
+        preflight_contract="waapi-skill.object-metadata-business-preflight/v1",
+        profile_module=(
+            "tests.semantic.support.codex_object_metadata_business_profile"
+        ),
+        loader_name="load_object_metadata_business_profile",
+        runner_module=(
+            "tests.semantic.support.codex_object_metadata_business_agent_runner"
+        ),
+        options_name="ObjectMetadataBusinessAgentOptions",
+        run_name="run_object_metadata_business_agent_unit",
+    ),
+    OBJECT_GRAPH_BUSINESS_PROFILE_ID: OfflineBusinessAgentProfileDescriptor(
+        suite_path=DEFAULT_OBJECT_GRAPH_BUSINESS_SUITE,
+        iteration_root=DEFAULT_OBJECT_GRAPH_BUSINESS_ITERATION_ROOT,
+        supported_versions=frozenset({"2022.1"}),
+        preflight_contract="waapi-skill.object-graph-business-preflight/v1",
+        profile_module=(
+            "tests.semantic.support.codex_object_graph_business_profile"
+        ),
+        loader_name="load_object_graph_business_profile",
+        runner_module=(
+            "tests.semantic.support.codex_object_graph_business_agent_runner"
+        ),
+        options_name="ObjectGraphBusinessAgentOptions",
+        run_name="run_object_graph_business_agent_unit",
+    ),
+    SWITCH_ASSIGNMENT_BUSINESS_PROFILE_ID: OfflineBusinessAgentProfileDescriptor(
+        suite_path=DEFAULT_SWITCH_ASSIGNMENT_BUSINESS_SUITE,
+        iteration_root=DEFAULT_SWITCH_ASSIGNMENT_BUSINESS_ITERATION_ROOT,
+        supported_versions=frozenset({"2022.1"}),
+        preflight_contract="waapi-skill.switch-assignment-business-preflight/v1",
+        profile_module=(
+            "tests.semantic.support.codex_switch_assignment_business_profile"
+        ),
+        loader_name="load_switch_assignment_business_profile",
+        runner_module=(
+            "tests.semantic.support.codex_switch_assignment_business_agent_runner"
+        ),
+        options_name="SwitchAssignmentBusinessAgentOptions",
+        run_name="run_switch_assignment_business_agent_unit",
+    ),
+    CORE_BUSINESS_PROFILE_ID: OfflineBusinessAgentProfileDescriptor(
+        suite_path=DEFAULT_CORE_BUSINESS_SUITE,
+        iteration_root=DEFAULT_CORE_BUSINESS_ITERATION_ROOT,
+        supported_versions=frozenset({"2025.1"}),
+        preflight_contract="waapi-skill.core-business-preflight/v1",
+        profile_module="tests.semantic.support.codex_core_business_profile",
+        loader_name="load_core_business_profile",
+        runner_module="tests.semantic.support.codex_core_business_agent_runner",
+        options_name="CoreBusinessAgentOptions",
+        run_name="run_core_business_agent_unit",
+    ),
+    PROJECT_SETTING_BUSINESS_PROFILE_ID: OfflineBusinessAgentProfileDescriptor(
+        suite_path=DEFAULT_PROJECT_SETTING_BUSINESS_SUITE,
+        iteration_root=DEFAULT_PROJECT_SETTING_BUSINESS_ITERATION_ROOT,
+        supported_versions=frozenset({"2025.1"}),
+        preflight_contract="waapi-skill.project-setting-business-preflight/v1",
+        profile_module=(
+            "tests.semantic.support.codex_project_setting_business_profile"
+        ),
+        loader_name="load_project_setting_business_profile",
+        runner_module=(
+            "tests.semantic.support.codex_project_setting_business_agent_runner"
+        ),
+        options_name="ProjectSettingBusinessAgentOptions",
+        run_name="run_project_setting_business_agent_unit",
+    ),
+    RUNTIME_CONTROL_BUSINESS_PROFILE_ID: OfflineBusinessAgentProfileDescriptor(
+        suite_path=DEFAULT_RUNTIME_CONTROL_BUSINESS_SUITE,
+        iteration_root=DEFAULT_RUNTIME_CONTROL_BUSINESS_ITERATION_ROOT,
+        supported_versions=frozenset({"2025.1"}),
+        preflight_contract="waapi-skill.runtime-control-business-preflight/v1",
+        profile_module=(
+            "tests.semantic.support.codex_runtime_control_business_profile"
+        ),
+        loader_name="load_runtime_control_business_profile",
+        runner_module=(
+            "tests.semantic.support.codex_runtime_control_business_agent_runner"
+        ),
+        options_name="RuntimeControlBusinessAgentOptions",
+        run_name="run_runtime_control_business_agent_unit",
+    ),
+    DEBUG_CONTROL_BUSINESS_PROFILE_ID: OfflineBusinessAgentProfileDescriptor(
+        suite_path=DEFAULT_DEBUG_CONTROL_BUSINESS_SUITE,
+        iteration_root=DEFAULT_DEBUG_CONTROL_BUSINESS_ITERATION_ROOT,
+        supported_versions=frozenset({"2021.1"}),
+        preflight_contract="waapi-skill.debug-control-business-preflight/v1",
+        profile_module=(
+            "tests.semantic.support.codex_debug_control_business_profile"
+        ),
+        loader_name="load_debug_control_business_profile",
+        runner_module=(
+            "tests.semantic.support.codex_debug_control_business_agent_runner"
+        ),
+        options_name="DebugControlBusinessAgentOptions",
+        run_name="run_debug_control_business_agent_unit",
+    ),
+    SOUNDENGINE_BUSINESS_PROFILE_ID: OfflineBusinessAgentProfileDescriptor(
+        suite_path=DEFAULT_SOUNDENGINE_BUSINESS_SUITE,
+        iteration_root=DEFAULT_SOUNDENGINE_BUSINESS_ITERATION_ROOT,
+        supported_versions=frozenset({"2022.1"}),
+        preflight_contract="waapi-skill.soundengine-business-preflight/v1",
+        profile_module=(
+            "tests.semantic.support.codex_soundengine_business_profile"
+        ),
+        loader_name="load_soundengine_business_profile",
+        runner_module=(
+            "tests.semantic.support.codex_soundengine_business_agent_runner"
+        ),
+        options_name="SoundEngineBusinessAgentOptions",
+        run_name="run_soundengine_business_agent_unit",
+    ),
+    CLI_CONSOLE_BUSINESS_PROFILE_ID: OfflineBusinessAgentProfileDescriptor(
+        suite_path=DEFAULT_CLI_CONSOLE_BUSINESS_SUITE,
+        iteration_root=DEFAULT_CLI_CONSOLE_BUSINESS_ITERATION_ROOT,
+        supported_versions=frozenset({"2025.1"}),
+        preflight_contract="waapi-skill.cli-console-business-preflight/v1",
+        profile_module=(
+            "tests.semantic.support.codex_cli_console_business_profile"
+        ),
+        loader_name="load_cli_console_business_profile",
+        runner_module=(
+            "tests.semantic.support.codex_cli_console_business_agent_runner"
+        ),
+        options_name="CliConsoleBusinessAgentOptions",
+        run_name="run_cli_console_business_agent_unit",
+    ),
+    HOST_UI_DEBUG_BUSINESS_PROFILE_ID: OfflineBusinessAgentProfileDescriptor(
+        suite_path=DEFAULT_HOST_UI_DEBUG_BUSINESS_SUITE,
+        iteration_root=DEFAULT_HOST_UI_DEBUG_BUSINESS_ITERATION_ROOT,
+        supported_versions=frozenset({"2025.1"}),
+        preflight_contract="waapi-skill.host-ui-debug-business-preflight/v1",
+        profile_module=(
+            "tests.semantic.support.codex_host_ui_debug_business_profile"
+        ),
+        loader_name="load_host_ui_debug_business_profile",
+        runner_module=(
+            "tests.semantic.support.codex_host_ui_debug_business_agent_runner"
+        ),
+        options_name="HostUiDebugBusinessAgentOptions",
+        run_name="run_host_ui_debug_business_agent_unit",
+    ),
+    COMPOUND_UNDO_BUSINESS_PROFILE_ID: OfflineBusinessAgentProfileDescriptor(
+        suite_path=DEFAULT_COMPOUND_UNDO_BUSINESS_SUITE,
+        iteration_root=DEFAULT_COMPOUND_UNDO_BUSINESS_ITERATION_ROOT,
+        supported_versions=frozenset({"2022.1"}),
+        preflight_contract="waapi-skill.compound-undo-business-preflight/v1",
+        profile_module=(
+            "tests.semantic.support.codex_compound_undo_business_profile"
+        ),
+        loader_name="load_compound_undo_business_profile",
+        runner_module=(
+            "tests.semantic.support.codex_compound_undo_business_agent_runner"
+        ),
+        options_name="CompoundUndoBusinessAgentOptions",
+        run_name="run_compound_undo_business_agent_unit",
+    ),
+    AUTHORING_UI_BUSINESS_PROFILE_ID: OfflineBusinessAgentProfileDescriptor(
+        suite_path=DEFAULT_AUTHORING_UI_BUSINESS_SUITE,
+        iteration_root=DEFAULT_AUTHORING_UI_BUSINESS_ITERATION_ROOT,
+        supported_versions=frozenset({"2022.1", "2025.1"}),
+        preflight_contract="waapi-skill.authoring-ui-business-preflight/v1",
+        profile_module=(
+            "tests.semantic.support.codex_authoring_ui_business_profile"
+        ),
+        loader_name="load_authoring_ui_business_profile",
+        runner_module=(
+            "tests.semantic.support.codex_authoring_ui_business_agent_runner"
+        ),
+        options_name="AuthoringUiBusinessAgentOptions",
+        run_name="run_authoring_ui_business_agent_unit",
+    ),
+}
+SEMANTIC_BOOTSTRAP_PROFILE_IDS = frozenset(
+    {
+        TYPED_INPUT_PROFILE_ID,
+        DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID,
+        INTEGRATION_PROFILE_ID,
+    }
+)
 DEFAULT_CODEX_TIMEOUT_SECONDS = 240.0
+TYPED_INPUT_CODEX_TIMEOUT_SECONDS = 360.0
 INTEGRATION_CODEX_TIMEOUT_SECONDS = 360.0
 EXECUTABLE_V3_PROFILE_IDS = frozenset(
     {
         HEAVY_V3_PROFILE_ID,
         MODIFICATION_POLICY_V3_PROFILE_ID,
         COMPOUND_HEAVY_V1_PROFILE_ID,
+        TYPED_INPUT_PROFILE_ID,
+        DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID,
+        DEEP_INTERFACE_MVP_PROFILE_ID,
+        AUDIO_IMPORT_BUSINESS_PROFILE_ID,
+        OBJECT_LIFECYCLE_BUSINESS_PROFILE_ID,
+        OBJECT_METADATA_BUSINESS_PROFILE_ID,
+        OBJECT_GRAPH_BUSINESS_PROFILE_ID,
+        SWITCH_ASSIGNMENT_BUSINESS_PROFILE_ID,
+        CORE_BUSINESS_PROFILE_ID,
+        PROJECT_SETTING_BUSINESS_PROFILE_ID,
+        RUNTIME_CONTROL_BUSINESS_PROFILE_ID,
+        DEBUG_CONTROL_BUSINESS_PROFILE_ID,
+        SOUNDENGINE_BUSINESS_PROFILE_ID,
+        CLI_CONSOLE_BUSINESS_PROFILE_ID,
+        HOST_UI_DEBUG_BUSINESS_PROFILE_ID,
+        COMPOUND_UNDO_BUSINESS_PROFILE_ID,
+        AUTHORING_UI_BUSINESS_PROFILE_ID,
         INTEGRATION_WORKFLOWS_V1_PROFILE_ID,
         INTEGRATION_WORKFLOWS_V2_PROFILE_ID,
         INTEGRATION_PROFILE_ID,
@@ -359,7 +802,9 @@ class RunnerOptions:
     pair_ids: tuple[str, ...]
     offline_only: bool
     overwrite: bool
+    wwise_readiness_timeout_seconds: float = 60.0
     windows_powershell_core_host: WindowsPowerShellCoreHost | None = None
+    require_first_use_intro: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -400,6 +845,36 @@ HeavyV3DependencyPreflight = Callable[[], Mapping[str, Any]]
 def load_heavy_v3_units(options: RunnerOptions) -> tuple[Any, ...]:
     """Load and filter the reviewed V3 bundle without importing live runners."""
 
+    if options.profile == DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID:
+        acceptance_module = importlib.import_module(
+            "tests.semantic.support.codex_deep_business_acceptance_profile"
+        )
+        profile = acceptance_module.load_deep_business_acceptance_profile(
+            options.suite_path,
+            unit_ids=options.case_ids,
+            versions=options.versions,
+        )
+        return tuple(profile.units)
+    if options.profile == DEEP_INTERFACE_MVP_PROFILE_ID:
+        mvp_module = importlib.import_module(
+            "tests.semantic.support.codex_import_mvp_profile"
+        )
+        profile = mvp_module.load_import_mvp_profile(
+            options.suite_path,
+            unit_ids=options.case_ids,
+            versions=options.versions,
+        )
+        return tuple(profile.units)
+    business_profile = OFFLINE_BUSINESS_AGENT_PROFILES.get(options.profile)
+    if business_profile is not None:
+        profile_module = importlib.import_module(business_profile.profile_module)
+        loader = getattr(profile_module, business_profile.loader_name)
+        profile = loader(
+            options.suite_path,
+            unit_ids=options.case_ids,
+            versions=options.versions,
+        )
+        return tuple(profile.units)
     if options.profile == INTEGRATION_PROFILE_ID:
         integration_module = importlib.import_module(
             "tests.semantic.support.codex_integration_workflows"
@@ -438,6 +913,16 @@ def load_heavy_v3_units(options: RunnerOptions) -> tuple[Any, ...]:
             "tests.semantic.support.codex_compound_heavy_v1"
         )
         profile = compound_module.load_compound_heavy_profile(
+            options.suite_path,
+            unit_ids=options.case_ids,
+            versions=options.versions,
+        )
+        return tuple(profile.units)
+    if options.profile == TYPED_INPUT_PROFILE_ID:
+        typed_input_module = importlib.import_module(
+            "tests.semantic.support.codex_typed_input_profile"
+        )
+        profile = typed_input_module.load_typed_input_profile(
             options.suite_path,
             unit_ids=options.case_ids,
             versions=options.versions,
@@ -514,12 +999,38 @@ def run_heavy_v3_matrix(
         )
     if options.pair_ids:
         raise HeavyV3MatrixError("V3 heavy execution does not accept pair filters")
-    if options.offline_only:
+    is_offline_semantic = options.profile in {
+        DEEP_INTERFACE_MVP_PROFILE_ID,
+        *OFFLINE_BUSINESS_AGENT_PROFILES,
+    }
+    if options.offline_only and not is_offline_semantic:
         raise HeavyV3MatrixError("V3 heavy execution is real-Wwise only")
 
     load_units = unit_loader or load_heavy_v3_units
     execute_unit = unit_runner or run_heavy_v3_unit
-    preflight = dependency_preflight or require_live_runner_dependencies
+    preflight = dependency_preflight or (
+        (
+            lambda: {
+                "contract": (
+                    OFFLINE_BUSINESS_AGENT_PROFILES[options.profile].preflight_contract
+                    if options.profile in OFFLINE_BUSINESS_AGENT_PROFILES
+                    else "waapi-skill.deep-interface-mvp-preflight/v1"
+                ),
+                "ok": True,
+                "mode": (
+                    "offline-production-gateway"
+                    if options.profile in OFFLINE_BUSINESS_AGENT_PROFILES
+                    else "offline-test-only"
+                ),
+                "wwise_started": False,
+                "production_gateway": (
+                    options.profile in OFFLINE_BUSINESS_AGENT_PROFILES
+                ),
+            }
+        )
+        if is_offline_semantic
+        else require_live_runner_dependencies
+    )
     units = tuple(load_units(options))
     if not units:
         raise HeavyV3MatrixError("no V3 heavy units matched the requested filters")
@@ -537,7 +1048,7 @@ def run_heavy_v3_matrix(
     run_errors: list[str] = []
     stop_reason = ""
     preflight_state = "pending"
-    policy_thread_ids: set[str] = set()
+    fresh_thread_ids: set[str] = set()
 
     def persist(*, terminal: bool) -> None:
         completed_at = utc_now() if terminal else None
@@ -613,21 +1124,26 @@ def run_heavy_v3_matrix(
                 scenario_root=scenario_root,
                 options=options,
             )
-            if options.profile == MODIFICATION_POLICY_V3_PROFILE_ID:
+            if options.profile in {
+                MODIFICATION_POLICY_V3_PROFILE_ID,
+                TYPED_INPUT_PROFILE_ID,
+                DEEP_INTERFACE_MVP_PROFILE_ID,
+                AUDIO_IMPORT_BUSINESS_PROFILE_ID,
+            }:
                 thread_id = getattr(outcome, "thread_id", None)
                 outcome_status = getattr(outcome, "status", None)
                 if outcome_status == "PASS" and (
                     not isinstance(thread_id, str) or not thread_id
                 ):
                     raise HeavyV3MatrixError(
-                        f"{scenario_id} policy outcome has no fresh thread identity"
+                        f"{scenario_id} outcome has no fresh thread identity"
                     )
-                if isinstance(thread_id, str) and thread_id in policy_thread_ids:
+                if isinstance(thread_id, str) and thread_id in fresh_thread_ids:
                     raise HeavyV3MatrixError(
-                        f"{scenario_id} reused a prior policy task thread identity"
+                        f"{scenario_id} reused a prior task thread identity"
                     )
                 if isinstance(thread_id, str) and thread_id:
-                    policy_thread_ids.add(thread_id)
+                    fresh_thread_ids.add(thread_id)
             record = _heavy_v3_case_record(
                 unit_row,
                 scenario_root=scenario_root,
@@ -689,10 +1205,82 @@ def run_heavy_v3_unit(
 ) -> Any:
     """Dispatch one V3 unit only through a closed project or CLI runner."""
 
+    if options.profile == DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID:
+        component_profile = getattr(unit, "component_profile_id", None)
+        component_suite = getattr(unit, "component_suite_path", None)
+        component_unit = getattr(unit, "component_unit", None)
+        if (
+            not isinstance(component_profile, str)
+            or component_profile not in EXECUTABLE_V3_PROFILE_IDS
+            or component_profile == DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID
+            or not isinstance(component_suite, Path)
+            or component_unit is None
+        ):
+            raise HeavyV3RunnerUnavailableError(
+                "deep-business acceptance unit has no reviewed component runner"
+            )
+        return run_heavy_v3_unit(
+            component_unit,
+            scenario_root=scenario_root,
+            options=replace(
+                options,
+                profile=component_profile,
+                suite_path=component_suite,
+                # The public deep-business profile grades the operation's
+                # business boundary.  First-use wording remains covered by
+                # the dedicated semantic profiles instead of multiplying the
+                # same prose oracle across all 19 API cases.
+                require_first_use_intro=False,
+            ),
+        )
     unit_row = _heavy_v3_unit_row(unit, sequence=1)
     api = unit_row["api"]
+    if options.profile == DEEP_INTERFACE_MVP_PROFILE_ID:
+        runner_module = importlib.import_module(
+            "tests.semantic.support.codex_import_mvp_agent_runner"
+        )
+        runner_options = runner_module.ImportMvpAgentOptions(
+            skill_source=options.skill_source,
+            codex_binary=options.codex_binary,
+            auth_json=options.auth_json,
+            model=options.model,
+            reasoning_effort=options.reasoning_effort,
+            service_tier=options.service_tier,
+            timeout_seconds=options.timeout_seconds,
+            windows_powershell_core_host=options.windows_powershell_core_host,
+        )
+        return runner_module.run_import_mvp_agent_unit(
+            unit,
+            scenario_root=scenario_root,
+            options=runner_options,
+        )
+    business_profile = OFFLINE_BUSINESS_AGENT_PROFILES.get(options.profile)
+    if business_profile is not None:
+        runner_module = importlib.import_module(business_profile.runner_module)
+        options_type = getattr(runner_module, business_profile.options_name)
+        runner = getattr(runner_module, business_profile.run_name)
+        runner_options = options_type(
+            skill_source=options.skill_source,
+            codex_binary=options.codex_binary,
+            auth_json=options.auth_json,
+            model=options.model,
+            reasoning_effort=options.reasoning_effort,
+            service_tier=options.service_tier,
+            timeout_seconds=options.timeout_seconds,
+            windows_powershell_core_host=options.windows_powershell_core_host,
+        )
+        return runner(
+            unit,
+            scenario_root=scenario_root,
+            options=runner_options,
+        )
     live_environment = trusted_gateway_environment(
-        {"WWISE_TEST_CONFIG": str(options.live_config)}
+        {
+            "WWISE_TEST_CONFIG": str(options.live_config),
+            "WWISE_READINESS_TIMEOUT": str(
+                options.wwise_readiness_timeout_seconds
+            ),
+        }
     )
     if api.startswith("ak.wwise.cli."):
         module_name = "tests.semantic.support.codex_heavy_cli_case_runner_v3"
@@ -745,6 +1333,14 @@ def run_heavy_v3_unit(
             timeout_seconds=options.timeout_seconds,
             live_environment=live_environment,
             windows_powershell_core_host=options.windows_powershell_core_host,
+            developer_instructions=(
+                semantic_skill_bootstrap_developer_instructions(
+                    options.skill_source / "scripts" / "run.py"
+                )
+                if options.profile in SEMANTIC_BOOTSTRAP_PROFILE_IDS
+                else ""
+            ),
+            require_first_use_intro=options.require_first_use_intro,
         )
         return runner(unit, scenario_root=scenario_root, options=project_options)
 
@@ -809,12 +1405,17 @@ def _heavy_v3_unit_row(unit: Any, *, sequence: int) -> dict[str, Any]:
         raise HeavyV3MatrixError(
             f"V3 heavy scenario id is not path-safe: {scenario_id!r}"
         )
+    runner_lane = getattr(unit, "runner_lane", None)
+    if runner_lane is None:
+        runner_lane = "cli" if api.startswith("ak.wwise.cli.") else "project"
+    if runner_lane not in {"project", "cli", "agent"}:
+        raise HeavyV3MatrixError("V3 heavy unit has an invalid runner lane")
     row = {
         "sequence": sequence,
         "scenario_id": scenario_id,
         "version": version,
         "api": api,
-        "runner": "cli" if api.startswith("ak.wwise.cli.") else "project",
+        "runner": runner_lane,
     }
     base_scenario_id = getattr(unit, "base_scenario_id", None)
     if base_scenario_id is not None:
@@ -823,6 +1424,24 @@ def _heavy_v3_unit_row(unit: Any, *, sequence: int) -> dict[str, Any]:
                 "V3 heavy unit has an invalid base-scenario identity"
             )
         row["base_scenario_id"] = base_scenario_id
+    component_profile_id = getattr(unit, "component_profile_id", None)
+    family = getattr(unit, "family", None)
+    if component_profile_id is not None:
+        if (
+            not isinstance(component_profile_id, str)
+            or not component_profile_id
+            or not isinstance(family, str)
+            or not family
+        ):
+            raise HeavyV3MatrixError(
+                "deep-business acceptance unit metadata is invalid"
+            )
+        row.update(
+            {
+                "component_profile_id": component_profile_id,
+                "family": family,
+            }
+        )
     policy = getattr(unit, "project_modification_policy", None)
     if policy is not None:
         repetition = getattr(unit, "repetition", None)
@@ -932,11 +1551,14 @@ def _heavy_v3_run_config(
         "case_ids": list(options.case_ids),
         "versions": list(options.versions),
         "pair_ids": [],
-        "offline_only": False,
+        "offline_only": options.offline_only,
         "model": options.model,
         "reasoning_effort": options.reasoning_effort,
         "service_tier": options.service_tier,
         "timeout_seconds": options.timeout_seconds,
+        "wwise_readiness_timeout_seconds": (
+            options.wwise_readiness_timeout_seconds
+        ),
         "memory": "disabled",
         "fresh_process_thread_and_task_per_scenario": True,
         "sequential_wwise_lifecycles": True,
@@ -1034,6 +1656,8 @@ def _heavy_v3_summary(
                     "api",
                     "runner",
                     "base_scenario_id",
+                    "component_profile_id",
+                    "family",
                     "policy_mode",
                     "project_modification_policy",
                     "repetition",
@@ -2440,6 +3064,9 @@ def live_version_environment(
             "WWISE_VERSION": version,
             "WWISE_TEST_CONFIG": str(options.live_config),
             "WWISE_SANDBOX_ROOT": str(version_root / "sandbox-root"),
+            "WWISE_READINESS_TIMEOUT": str(
+                options.wwise_readiness_timeout_seconds
+            ),
         }
     )
 
@@ -3445,6 +4072,11 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
     )
     parser.add_argument("--service-tier")
     parser.add_argument("--timeout", type=float)
+    parser.add_argument(
+        "--wwise-readiness-timeout",
+        type=float,
+        default=60.0,
+    )
     parser.add_argument("--case-id", action="append", default=[])
     parser.add_argument("--version", action="append", choices=SUPPORTED_VERSIONS, default=[])
     parser.add_argument("--pair-id", action="append", default=[])
@@ -3458,6 +4090,12 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
     is_executable_v3 = args.profile in EXECUTABLE_V3_PROFILE_IDS
     is_policy_v3 = args.profile == MODIFICATION_POLICY_V3_PROFILE_ID
     is_compound_v1 = args.profile == COMPOUND_HEAVY_V1_PROFILE_ID
+    is_typed_input = args.profile == TYPED_INPUT_PROFILE_ID
+    is_deep_business_acceptance = (
+        args.profile == DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID
+    )
+    is_deep_interface_mvp = args.profile == DEEP_INTERFACE_MVP_PROFILE_ID
+    business_agent_profile = OFFLINE_BUSINESS_AGENT_PROFILES.get(args.profile)
     is_integration_v1 = args.profile == INTEGRATION_WORKFLOWS_V1_PROFILE_ID
     is_integration_v2 = args.profile == INTEGRATION_WORKFLOWS_V2_PROFILE_ID
     is_integration = args.profile == INTEGRATION_PROFILE_ID
@@ -3467,11 +4105,17 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
         else (
             INTEGRATION_CODEX_TIMEOUT_SECONDS
             if is_integration
+            else TYPED_INPUT_CODEX_TIMEOUT_SECONDS
+            if is_typed_input or is_deep_business_acceptance
             else DEFAULT_CODEX_TIMEOUT_SECONDS
         )
     )
     is_terra_v3 = (
         is_policy_v3
+        or is_typed_input
+        or is_deep_business_acceptance
+        or is_deep_interface_mvp
+        or business_agent_profile is not None
         or is_compound_v1
         or is_integration_v1
         or is_integration_v2
@@ -3479,6 +4123,11 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
     )
     if timeout_seconds <= 0:
         parser.error("--timeout must be greater than zero")
+    if (
+        not math.isfinite(args.wwise_readiness_timeout)
+        or args.wwise_readiness_timeout <= 0
+    ):
+        parser.error("--wwise-readiness-timeout must be positive and finite")
     if len(set(args.version)) != len(args.version):
         parser.error("--version values must be unique")
     if len(set(args.pair_id)) != len(args.pair_id):
@@ -3493,7 +4142,11 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
         parser.error(str(exc))
     if is_executable_v3 and args.pair_id:
         parser.error(f"--pair-id is not supported by {args.profile}")
-    if is_executable_v3 and args.offline_only:
+    if (
+        is_executable_v3
+        and args.offline_only
+        and business_agent_profile is None
+    ):
         parser.error(f"--offline-only is not supported by {args.profile}")
     if not is_executable_v3:
         unknown_case_ids = sorted(set(args.case_id) - set(CASE_IDS))
@@ -3504,6 +4157,21 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
     if is_policy_v3 and args.version and args.version != ["2022.1"]:
         parser.error(
             f"{MODIFICATION_POLICY_V3_PROFILE_ID} supports only --version 2022.1"
+        )
+    if is_deep_interface_mvp and any(
+        version not in {"2022.1", "2025.1"} for version in args.version
+    ):
+        parser.error(
+            f"{args.profile} supports only "
+            "--version 2022.1 and 2025.1"
+        )
+    if business_agent_profile is not None and any(
+        version not in business_agent_profile.supported_versions
+        for version in args.version
+    ):
+        parser.error(
+            f"{args.profile} supports only --version "
+            + " and ".join(sorted(business_agent_profile.supported_versions))
         )
     if (
         is_compound_v1
@@ -3536,6 +4204,14 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
         (
             DEFAULT_MODIFICATION_POLICY_V3_SUITE
             if is_policy_v3
+            else DEFAULT_DEEP_INTERFACE_MVP_SUITE
+            if is_deep_interface_mvp
+            else business_agent_profile.suite_path
+            if business_agent_profile is not None
+            else DEFAULT_TYPED_INPUT_SUITE
+            if is_typed_input
+            else DEFAULT_DEEP_BUSINESS_ACCEPTANCE_SUITE
+            if is_deep_business_acceptance
             else (
                 DEFAULT_INTEGRATION_SUITE
                 if is_integration
@@ -3557,6 +4233,18 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
         (
             DEFAULT_MODIFICATION_POLICY_V3_ITERATION_ROOT
             if is_policy_v3
+            else (
+                SKILL_ROOT.parent
+                / "waapi-skill-workspace"
+                / "deep-interface-mvp-8"
+            )
+            if is_deep_interface_mvp
+            else business_agent_profile.iteration_root
+            if business_agent_profile is not None
+            else DEFAULT_TYPED_INPUT_ITERATION_ROOT
+            if is_typed_input
+            else DEFAULT_DEEP_BUSINESS_ACCEPTANCE_ITERATION_ROOT
+            if is_deep_business_acceptance
             else (
                 DEFAULT_INTEGRATION_ITERATION_ROOT
                 if is_integration
@@ -3589,7 +4277,11 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
         profile=str(args.profile),
         iteration_root=Path(iteration_root).expanduser().resolve(strict=False),
         suite_path=Path(suite).expanduser().resolve(strict=True),
-        skill_source=Path(args.skill_source).expanduser().resolve(strict=True),
+        skill_source=Path(
+            DEFAULT_DEEP_INTERFACE_MVP_SKILL
+            if is_deep_interface_mvp
+            else args.skill_source
+        ).expanduser().resolve(strict=True),
         codex_binary=codex_binary,
         auth_json=Path(args.auth_json).expanduser().resolve(strict=True),
         # This is a machine-local prerequisite, not part of argument syntax.
@@ -3606,7 +4298,14 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
         pair_ids=tuple(str(value) for value in args.pair_id),
         offline_only=bool(args.offline_only),
         overwrite=bool(args.overwrite),
+        wwise_readiness_timeout_seconds=float(
+            args.wwise_readiness_timeout
+        ),
         windows_powershell_core_host=windows_powershell_core_host,
+        # Public integration acceptance grades cross-operation Wwise outcomes.
+        # First-use prose remains a dedicated semantic-profile requirement and
+        # must not abort a correct multi-turn workflow before its state oracle.
+        require_first_use_intro=not is_integration,
     )
 
 

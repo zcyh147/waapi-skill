@@ -32,6 +32,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     V3GatewayProtocol,
     build_audio_import_composer_protocol,
     build_metadata_transaction_protocol,
+    build_operations_discovery_protocol,
     build_transaction_protocol,
 )
 from tests.semantic.support.codex_filesystem_security import (
@@ -46,10 +47,9 @@ from tests.semantic.support.codex_import_assets_v3 import (
     compound_dynamic_modes_by_row,
 )
 from tests.semantic.support.codex_import_runtime_v3 import (
-    COMPOUND_SUPPORTED_VERSIONS,
     IMPORT_APIS,
     MAX_FILE_BYTES,
-    SUPPORTED_VERSION,
+    import_runtime_version_is_reviewed,
     ImportCompoundRuntimeSnapshot,
     ImportRuntimePlan,
     ImportRuntimeSnapshot,
@@ -268,15 +268,21 @@ def _validate_runtime_inputs(
     compound = plan.metadata_binding is not None
     if (
         plan.api not in IMPORT_APIS
-        or (
-            plan.version not in COMPOUND_SUPPORTED_VERSIONS
-            if compound
-            else plan.version != SUPPORTED_VERSION
+        or not import_runtime_version_is_reviewed(
+            plan.scenario_id,
+            plan.version,
+            compound=compound,
         )
         or getattr(scenario, "id", None) != plan.scenario_id
         or getattr(scenario, "api", None) != plan.api
+        or tuple(getattr(scenario, "versions", ())) != (plan.version,)
     ):
         raise ImportBusinessPlanError("import scenario/runtime identity is misbound")
+    _validate_request_contract_versions(
+        plan.operation_requests,
+        api=plan.api,
+        version=plan.version,
+    )
     if compound != isinstance(before, ImportCompoundRuntimeSnapshot):
         raise ImportBusinessPlanError(
             "compound import plan/snapshot shape is misbound"
@@ -319,16 +325,37 @@ def _validate_expected_protocol(
                 else "audio_import_tab_v1"
             ),
         )
+        expected_variants = (expected,)
     else:
-        expected = (
-            build_audio_import_composer_protocol(plan.operation_requests[0])
-            if plan.api == "ak.wwise.core.audio.import"
-            else build_transaction_protocol(
-                plan.operation_requests,
-                refusal=StructuredRefusal(refusal) if refusal else None,
+        if plan.api == "ak.wwise.core.audio.import":
+            expected_variants = (
+                build_audio_import_composer_protocol(
+                    plan.operation_requests[0],
+                    existing_target_paths=frozenset(
+                        row.target_path
+                        for row in plan.rows
+                        if row.pre_state_existence == "existing"
+                    ),
+                ),
+                build_audio_import_composer_protocol(
+                    plan.operation_requests[0]
+                ),
             )
+        else:
+            expected_variants = (
+                build_transaction_protocol(
+                    plan.operation_requests,
+                    refusal=StructuredRefusal(refusal) if refusal else None,
+                ),
+            )
+    if protocol.steps[0].subcommand == "operations":
+        expected_variants = tuple(
+            build_operations_discovery_protocol(expected)
+            for expected in expected_variants
         )
-    if _plain(serialize_protocol(protocol)) != _plain(serialize_protocol(expected)):
+    if _plain(serialize_protocol(protocol)) not in tuple(
+        _plain(serialize_protocol(expected)) for expected in expected_variants
+    ):
         raise ImportBusinessPlanError("import protocol does not exactly bind sealed requests and transaction order")
 
 
@@ -628,14 +655,15 @@ def _validate_static_archive(static: Mapping[str, Any], live: Mapping[str, Any],
     )
     if (
         static["api"] not in IMPORT_APIS
-        or (
-            static["version"] not in COMPOUND_SUPPORTED_VERSIONS
-            if compound
-            else static["version"] != SUPPORTED_VERSION
+        or not import_runtime_version_is_reviewed(
+            static["scenario_id"],
+            static["version"],
+            compound=compound,
         )
         or static["family"] != "audio_import"
         or static["scenario_id"] != getattr(scenario, "id", None)
         or static["api"] != getattr(scenario, "api", None)
+        or tuple(getattr(scenario, "versions", ())) != (static["version"],)
         or static["scenario_api"] != static["api"]
     ):
         raise ImportBusinessPlanError("archived import scenario identity is misbound")
@@ -645,6 +673,11 @@ def _validate_static_archive(static: Mapping[str, Any], live: Mapping[str, Any],
     requests = static["operation_requests"]
     if not isinstance(requests, list) or static["operation_requests_sha256"] != _hash(requests):
         raise ImportBusinessPlanError("archived import requests digest is invalid")
+    _validate_request_contract_versions(
+        requests,
+        api=static["api"],
+        version=static["version"],
+    )
     if count == 0 and (len(requests) != 1 or static["refusal_error_code"] != _REFUSAL_CODES.get(static["scenario_id"])):
         raise ImportBusinessPlanError("archived zero-dispatch refusal is not closed")
     if count > 0 and (len(requests) != count or static["refusal_error_code"] is not None):
@@ -694,20 +727,39 @@ def _validate_static_archive(static: Mapping[str, Any], live: Mapping[str, Any],
                 else "audio_import_tab_v1"
             ),
         )
+        expected_variants = (expected,)
     else:
-        expected = (
-            build_audio_import_composer_protocol(requests[0])
-            if static["api"] == "ak.wwise.core.audio.import"
-            else build_transaction_protocol(
-                requests,
-                refusal=(
-                    StructuredRefusal(static["refusal_error_code"])
-                    if count == 0
-                    else None
+        if static["api"] == "ak.wwise.core.audio.import":
+            expected_variants = (
+                build_audio_import_composer_protocol(
+                    requests[0],
+                    existing_target_paths=frozenset(
+                        str(row["target_path"])
+                        for row in static["row_contracts"]
+                        if row.get("pre_state_existence") == "existing"
+                    ),
+                ),
+                build_audio_import_composer_protocol(requests[0]),
+            )
+        else:
+            expected_variants = (
+                build_transaction_protocol(
+                    requests,
+                    refusal=(
+                        StructuredRefusal(static["refusal_error_code"])
+                        if count == 0
+                        else None
+                    ),
                 ),
             )
+    if protocol.steps[0].subcommand == "operations":
+        expected_variants = tuple(
+            build_operations_discovery_protocol(expected)
+            for expected in expected_variants
         )
-    if _plain(serialize_protocol(protocol)) != _plain(serialize_protocol(expected)) or static["protocol_sha256"] != _hash(serialize_protocol(protocol)):
+    if _plain(serialize_protocol(protocol)) not in tuple(
+        _plain(serialize_protocol(expected)) for expected in expected_variants
+    ) or static["protocol_sha256"] != _hash(serialize_protocol(protocol)):
         raise ImportBusinessPlanError("archived import protocol/request order drifted")
     if not isinstance(static["row_contracts"], list) or not static["row_contracts"] or len({row.get("row_key") for row in static["row_contracts"] if isinstance(row, Mapping)}) != len(static["row_contracts"]):
         raise ImportBusinessPlanError("archived import row contracts are invalid")
@@ -749,6 +801,29 @@ def _validate_static_archive(static: Mapping[str, Any], live: Mapping[str, Any],
     if any(row["import_operation"] not in request_operations for row in static["row_contracts"]):
         raise ImportBusinessPlanError("archived import row operation is not bound to a request")
     _validate_rows_against_fixture_and_requests(static, live, scenario)
+
+
+def _validate_request_contract_versions(
+    requests: Sequence[Mapping[str, Any]],
+    *,
+    api: str,
+    version: str,
+) -> None:
+    expected_operation = (
+        "audio.import"
+        if api == "ak.wwise.core.audio.import"
+        else "audio.importTabDelimited"
+    )
+    if not requests or any(
+        not isinstance(request, Mapping)
+        or request.get("contract") != "waapi-skill.operation-request/v1"
+        or request.get("version") != version
+        or request.get("operation") != expected_operation
+        for request in requests
+    ):
+        raise ImportBusinessPlanError(
+            "import request contract/version is misbound"
+        )
 
 
 def _validate_rows_against_fixture_and_requests(static: Mapping[str, Any], live: Mapping[str, Any], scenario: Any) -> None:
@@ -802,7 +877,20 @@ def _validate_rows_against_fixture_and_requests(static: Mapping[str, Any], live:
             if not all(isinstance(value, str) for value in (name, language, operation)) or name not in table_paths:
                 raise ImportBusinessPlanError("tab import fixture table binding is invalid")
             operation_by_table[name] = operation
-            expected_requests.append({"contract": "waapi-skill.operation-request/v1", "version": SUPPORTED_VERSION, "operation": "audio.importTabDelimited", "arguments": {"import_file": table_paths[name], "import_location": {"kind": "path", "value": spec.get("import_location")}, "import_language": canonical_wwise_language(language), "import_operation": operation}})
+            location = spec.get("import_location")
+            if not isinstance(location, str):
+                raise ImportBusinessPlanError(
+                    "tab import fixture location is invalid"
+                )
+            try:
+                location = get_codex_version_layout_v3(
+                    str(static["version"])
+                ).translate_2022_path(location)
+            except CodexVersionLayoutError as exc:
+                raise ImportBusinessPlanError(
+                    "tab import fixture location cannot be version-projected"
+                ) from exc
+            expected_requests.append({"contract": "waapi-skill.operation-request/v1", "version": static["version"], "operation": "audio.importTabDelimited", "arguments": {"import_file": table_paths[name], "import_location": {"kind": "path", "value": location}, "import_language": canonical_wwise_language(language), "import_operation": operation}})
         if requests != expected_requests:
             raise ImportBusinessPlanError("tab import requests do not exactly bind fixture tables")
     expected_contracts = []
@@ -811,8 +899,18 @@ def _validate_rows_against_fixture_and_requests(static: Mapping[str, Any], live:
             raise ImportBusinessPlanError("import fixture row is invalid")
         table_key = "__audio_import__" if static["api"] == "ak.wwise.core.audio.import" else raw.get("tsv_name")
         event = raw.get("event")
+        target_path = raw.get("target_path")
+        if isinstance(target_path, str) and target_path.startswith("\\"):
+            try:
+                target_path = get_codex_version_layout_v3(
+                    str(static["version"])
+                ).translate_2022_path(target_path)
+            except CodexVersionLayoutError as exc:
+                raise ImportBusinessPlanError(
+                    "import row target path cannot be version-projected"
+                ) from exc
         expected_contracts.append({
-            "row_key": raw.get("row_key"), "target_path": raw.get("target_path"), "object_type": raw.get("object_type"),
+            "row_key": raw.get("row_key"), "target_path": target_path, "object_type": raw.get("object_type"),
             "language": canonical_wwise_language(str(raw.get("language") or "")), "import_operation": operation_by_table.get(str(table_key)),
             "guid_policy": raw.get("guid_policy"), "event": None if event is None else {"path": event.get("path"), "action": event.get("action")},
             "source_key": raw.get("source_key"), "pre_state_existence": raw.get("pre_state", {}).get("existence") if isinstance(raw.get("pre_state"), Mapping) else None,

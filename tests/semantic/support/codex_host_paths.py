@@ -28,6 +28,87 @@ class WindowsDrivePath:
     relative_parts: tuple[str, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class RelativeHostPath:
+    """One exact semantic-fixture relative path and its lexical flavor."""
+
+    flavor: str
+    pure: PurePosixPath | PureWindowsPath
+    relative_parts: tuple[str, ...]
+
+
+_WINDOWS_COMPONENT_SEPARATOR = re.compile(r"[\\/]")
+_WINDOWS_UNSAFE_COMPONENT = re.compile(r'[<>:"|?*]')
+_WINDOWS_RESERVED_COMPONENTS = frozenset(
+    {"con", "prn", "aux", "nul"}
+    | {f"com{number}" for number in range(1, 10)}
+    | {f"lpt{number}" for number in range(1, 10)}
+)
+
+
+def parse_relative_host_path(
+    value: str,
+    *,
+    allow_parent_segments: bool = False,
+    allow_trailing_separator: bool = False,
+) -> RelativeHostPath:
+    """Parse a semantic-fixture relative path before pathlib normalization."""
+
+    if not isinstance(value, str) or not value or value != value.strip():
+        raise ReflectedHostPathError(
+            "relative host path must be nonempty and have no outer whitespace"
+        )
+    if any(
+        ord(character) < 32
+        or ord(character) == 127
+        or character in {"\u2028", "\u2029"}
+        for character in value
+    ):
+        raise ReflectedHostPathError("relative host path contains a control character")
+    windows = PureWindowsPath(value)
+    posix = PurePosixPath(value)
+    if windows.drive or windows.root or posix.is_absolute():
+        raise ReflectedHostPathError("host path must be relative")
+
+    windows_flavor = "\\" in value
+    suffix = value
+    trailing = ("\\", "/") if windows_flavor else ("/",)
+    if allow_trailing_separator and suffix.endswith(trailing):
+        suffix = suffix[:-1]
+    elif suffix.endswith(trailing):
+        raise ReflectedHostPathError("relative host path has a trailing separator")
+    if windows_flavor:
+        parts = tuple(_WINDOWS_COMPONENT_SEPARATOR.split(suffix))
+        flavor = "windows"
+        pure: PurePosixPath | PureWindowsPath = PureWindowsPath(*parts)
+    else:
+        parts = tuple(suffix.split("/"))
+        flavor = "posix"
+        pure = PurePosixPath(*parts)
+    if not parts or any(part in {"", "."} for part in parts):
+        raise ReflectedHostPathError(
+            "relative host path must use normalized nonempty components"
+        )
+    if not allow_parent_segments and ".." in parts:
+        raise ReflectedHostPathError("relative host path contains parent traversal")
+    for part in parts:
+        if part == "..":
+            continue
+        if _WINDOWS_UNSAFE_COMPONENT.search(part) is not None:
+            raise ReflectedHostPathError(
+                "relative host path has a non-portable component"
+            )
+        if part.endswith((" ", ".")):
+            raise ReflectedHostPathError(
+                "relative host path component has an unsafe suffix"
+            )
+        if part.split(".", 1)[0].casefold() in _WINDOWS_RESERVED_COMPONENTS:
+            raise ReflectedHostPathError(
+                "relative host path contains a reserved Windows component"
+            )
+    return RelativeHostPath(flavor, pure, parts)
+
+
 def parse_windows_drive_path(
     value: str,
     *,
@@ -125,7 +206,9 @@ def parse_posix_absolute_path(
 
 __all__ = [
     "ReflectedHostPathError",
+    "RelativeHostPath",
     "WindowsDrivePath",
     "parse_posix_absolute_path",
+    "parse_relative_host_path",
     "parse_windows_drive_path",
 ]

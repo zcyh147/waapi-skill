@@ -226,10 +226,8 @@ def _gateway_payload(
 
 def test_public_gateway_routes_reads_only_through_reviewed_public_lanes() -> None:
     calls: list[tuple[str, ...]] = []
-    transaction_roots: list[tuple[Path, Path]] = []
-    transaction_id = "tx1-collector-read"
-    artifact_hash = "a" * 64
-    confirmation_token = "confirmation-token"
+    branch_handle = "trh1-branch"
+    guid_handle = "trh1-guid"
 
     def run(argv: tuple[str, ...]) -> collector.CommandResult:
         calls.append(argv)
@@ -247,122 +245,54 @@ def test_public_gateway_routes_reads_only_through_reviewed_public_lanes() -> Non
                     }
                 ],
             )
-        command = next(
-            value
-            for value in (
-                "preview",
-                "transaction-show",
-                "confirm",
-                "execute",
-                "verify",
-            )
-            if value in argv
-        )
-        state_dir = Path(argv[argv.index("--state-dir") + 1])
-        evidence_dir = Path(argv[argv.index("--evidence-dir") + 1])
-        assert state_dir.is_dir()
-        assert evidence_dir.is_dir()
-        transaction_roots.append((state_dir, evidence_dir))
-        if command == "preview":
-            request = json.loads(argv[argv.index("--request-json") + 1])
-            assert request == {
-                "contract": "waapi-skill.operation-request/v1",
-                "version": "2022.1",
-                "operation": "waapi.call",
-                "arguments": {
-                    "api": collector.GET_ASSIGNMENTS_API,
-                    "args": {"id": _guid(2)},
-                    "options": {},
-                },
-            }
+        if "request-schema" in argv:
             return _gateway_payload(
                 version="2022.1",
-                command=command,
-                state="awaiting_confirmation",
-                transaction_id=transaction_id,
-                artifact_hash=artifact_hash,
-                executed=False,
-                preview_summary={"request": request},
+                command="request-schema",
+                schema_digest="d" * 64,
+                fields=[
+                    {"name": "id", "shape": "branch", "handle": branch_handle},
+                    {
+                        "name": "string",
+                        "shape": "scalar",
+                        "handle": guid_handle,
+                        "parent_handle": branch_handle,
+                        "patterns": [
+                            r"^\{[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}\}$"
+                        ],
+                    },
+                ],
             )
-        if command == "transaction-show":
-            assert argv[-3:] == ("transaction-show", transaction_id, "--summary-only")
+        if "typed-call" in argv:
+            assert argv[-10:] == (
+                "typed-call",
+                collector.GET_ASSIGNMENTS_API,
+                "--schema-digest",
+                "d" * 64,
+                "--choose",
+                branch_handle,
+                guid_handle,
+                "--set",
+                guid_handle,
+                "string",
+                _guid(2),
+            )[-10:]
             return _gateway_payload(
                 version="2022.1",
-                command=command,
-                state="awaiting_confirmation",
-                transaction_id=transaction_id,
-                artifact_hash=artifact_hash,
-                confirmation={"token": confirmation_token},
+                command="typed-call",
+                agent_result={"return": []},
             )
-        if command == "confirm":
-            assert argv[-4:] == (
-                "confirm",
-                transaction_id,
-                "--confirmation-token",
-                confirmation_token,
-            )
-            return _gateway_payload(
-                version="2022.1",
-                command=command,
-                state="confirmed",
-                transaction_id=transaction_id,
-                artifact_hash=artifact_hash,
-            )
-        if command == "execute":
-            assert argv[-2:] == ("execute", transaction_id)
-            return _gateway_payload(
-                version="2022.1",
-                command=command,
-                state="executed_unverified",
-                transaction_id=transaction_id,
-                artifact_hash=artifact_hash,
-                executed=True,
-            )
-        assert command == "verify"
-        assert argv[-2:] == ("verify", transaction_id)
-        request = json.loads(
-            next(
-                previous[previous.index("--request-json") + 1]
-                for previous in calls
-                if "preview" in previous
-            )
-        )
-        return _gateway_payload(
-            version="2022.1",
-            command=command,
-            state="result_schema_checked",
-            transaction_id=transaction_id,
-            artifact_hash=artifact_hash,
-            result_schema_checked=True,
-            agent_result={
-                "request": request,
-                "executed": True,
-                "result": {"return": []},
-            },
-        )
+        raise AssertionError(argv)
 
     gateway = collector.PublicGateway(version="2022.1", runner=run)
     gateway.query_path("\\Dummy", fields=("id", "name", "type", "path"))
     gateway.get_assignments(_guid(2))
 
     assert "query-object" in calls[0]
-    assert [
-        next(
-            value
-            for value in (
-                "preview",
-                "transaction-show",
-                "confirm",
-                "execute",
-                "verify",
-            )
-            if value in command
-        )
-        for command in calls[1:]
-    ] == ["preview", "transaction-show", "confirm", "execute", "verify"]
-    assert all("call" not in command for command in calls)
-    assert len({roots for roots in transaction_roots}) == 1
-    assert all(not path.exists() for path in transaction_roots[-1])
+    assert "request-schema" in calls[1]
+    assert "typed-call" in calls[2]
+    assert all("preview" not in command for command in calls)
+    assert all("--request-json" not in command for command in calls)
     assert not any(
         "ak.wwise.core.object.get" in command for command in calls
     )

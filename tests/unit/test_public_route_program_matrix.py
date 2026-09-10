@@ -11,6 +11,7 @@ from tests.support.public_route_probes import (
     request_and_result_from_schema,
     synthesize_schema_value,
 )
+from tests.support.compound_undo import compound_undo_request
 from wwise_waapi.builders.schema import (
     validate_semantic_event,
     validate_semantic_payload,
@@ -28,6 +29,11 @@ from wwise_waapi.operation_registry import (
     validate_prepared_roles,
     verify_prepared_operation,
 )
+from wwise_waapi.soundengine_business_contracts import (
+    soundengine_control_business_operations,
+)
+from wwise_waapi.typed_operations import compound_child_request_contract
+from wwise_waapi.typed_requests import TypedRequestFact, materialize_typed_request
 from wwise_waapi.transaction_cleanup import CLEANUP_SPEC_CONTRACT
 from wwise_waapi.versions import SUPPORTED_WWISE_VERSION_KEYS
 
@@ -45,8 +51,11 @@ BUSINESS_STATE_VERIFIED_APIS = frozenset(
         "ak.wwise.core.remote.disconnect",
         "ak.wwise.core.transport.create",
         "ak.wwise.core.transport.destroy",
+        "ak.wwise.core.sound.setActiveSource",
+        "ak.wwise.core.gameParameter.setRange",
     }
 )
+SOUNDENGINE_BUSINESS_APIS = frozenset(soundengine_control_business_operations())
 
 
 def _row_id(entry: CapabilityRecord) -> str:
@@ -88,9 +97,9 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
 
     args, options, expected_result = request_and_result_from_schema(entry.schema)
     if entry.uri == "ak.wwise.core.transport.create":
-        # The reflected result schema makes transport optional, but the packaged
-        # business verifier deliberately requires a real non-zero uint32 ID.
-        expected_result = {"transport": 1}
+        # The reflected field is optional, but the business verifier requires
+        # a real uint32 ID. Wwise 2022.1 may assign zero to the first transport.
+        expected_result = {"transport": 0}
     if (
         entry.version in {"2024.1", "2025.1"}
         and entry.uri == "ak.wwise.core.audio.convert"
@@ -132,6 +141,15 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
     )
     assert result_validation.section == "result"
 
+    if entry.uri in SOUNDENGINE_BUSINESS_APIS:
+        # This matrix still proves the reflected native bottom call above.  The
+        # public route is now the closed business Draft/read contract exercised
+        # in test_soundengine_business_gateway; feeding synthesized native args
+        # into Registry preparation would test the retired caller boundary.
+        assert contract["gateway_commands"] == ["request-schema"]
+        assert entry.preferred_route in {"transaction_operation", "manifest_dispatch"}
+        return
+
     if contract["route"] == "compound_transaction_member":
         assert entry.transaction_operations == ("waapi.undoGroup",)
         with pytest.raises(OperationContractError, match="waapi.undoGroup"):
@@ -143,23 +161,49 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
                     "arguments": {"api": entry.uri, "args": args, "options": options},
                 }
             )
-        inner_uri = sorted(UNDO_GROUP_INNER_URIS_BY_VERSION[entry.version])[0]
+        inner_operation = "ak.wwise.core.object.setRandomizer"
+        inner_uri = inner_operation
         inner_capability = CATALOG.describe(entry.version, inner_uri)
-        inner_args, inner_options, inner_result = request_and_result_from_schema(
+        _inner_args, _inner_options, inner_result = request_and_result_from_schema(
             inner_capability.schema
         )
+        child_contract = compound_child_request_contract(
+            inner_operation, entry.version
+        )
+        # The reflected anyOf route is easiest to exercise with explicit
+        # object/property/enabled facts and its disclosed object branch.
+        object_field = next(
+            field for field in child_contract.fields
+            if field.path == ("object",) and field.shape == "scalar"
+            and any(variant.get("pattern") == r"^\\" for variant in field.variants)
+        )
+        child_facts = [
+            TypedRequestFact("choose", object_field.parent_handle, "branch", object_field.handle),
+            TypedRequestFact("set", object_field.handle, "string", r"\ProgramObject"),
+            TypedRequestFact("set", next(field.handle for field in child_contract.fields if field.path == ("property",) and field.shape == "scalar"), "string", "Volume"),
+            TypedRequestFact("set", next(field.handle for field in child_contract.fields if field.path == ("enabled",)), "boolean", "true"),
+        ]
+        materialized = materialize_typed_request(
+            child_contract,
+            schema_digest=child_contract.schema_digest,
+            facts=child_facts,
+        )
+        child_request = {
+            "contract": OPERATION_REQUEST_CONTRACT,
+            "version": entry.version,
+            "operation": "waapi.call",
+            "arguments": {
+                "api": inner_operation,
+                "args": dict(materialized.args),
+                "options": dict(materialized.options),
+            },
+        }
         undo_request = parse_operation_request(
-            {
-                "contract": OPERATION_REQUEST_CONTRACT,
-                "version": entry.version,
-                "operation": "waapi.undoGroup",
-                "arguments": {
-                    "display_name": "Program probe",
-                    "calls": [
-                        {"api": inner_uri, "args": inner_args, "options": inner_options}
-                    ],
-                },
-            }
+            compound_undo_request(
+                version=entry.version,
+                child_requests=[child_request],
+                display_name="Program probe",
+            )
         )
         undo_prepared = prepare_operation(
             undo_request,
@@ -237,6 +281,34 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
         read_call=lambda uri, call_args, call_options: {},
     )
     def readback(uri: str, call_args: Mapping[str, Any], call_options: Mapping[str, Any]) -> Mapping[str, Any]:
+        if uri == "ak.wwise.core.object.get":
+            if entry.uri == "ak.wwise.core.sound.setActiveSource":
+                assert call_args == {"from": {"id": [args["sound"]]}}
+                return {
+                    "return": [
+                        {
+                            "id": args["sound"],
+                            "name": "Program Sound",
+                            "type": "Sound",
+                            "path": r"\Program Sound",
+                            "activeSource": {"id": args["source"]},
+                        }
+                    ]
+                }
+            if entry.uri == "ak.wwise.core.gameParameter.setRange":
+                assert call_args == {"from": {"id": [args["object"]]}}
+                return {
+                    "return": [
+                        {
+                            "id": args["object"],
+                            "name": "Program Game Parameter",
+                            "type": "GameParameter",
+                            "path": r"\Game Parameters\Program Game Parameter",
+                            "@Min": args["min"],
+                            "@Max": args["max"],
+                        }
+                    ]
+                }
         assert call_options == {}
         if uri == "ak.wwise.core.remote.getConnectionStatus":
             return {
@@ -245,11 +317,11 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
             }
         if uri == "ak.wwise.core.transport.getList":
             if entry.uri == "ak.wwise.core.transport.create":
-                return {"list": [{"transport": 1}]}
+                return {"list": [{"transport": 0}]}
             if entry.uri == "ak.wwise.core.transport.destroy":
                 return {"list": []}
         if uri == "ak.wwise.core.transport.getState":
-            assert call_args == {"transport": 1}
+            assert call_args == {"transport": 0}
             return {"state": "stopped"}
         raise AssertionError(f"unexpected program verification readback: {uri}")
 

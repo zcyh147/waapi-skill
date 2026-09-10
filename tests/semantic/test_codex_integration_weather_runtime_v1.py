@@ -9,11 +9,7 @@ from typing import Mapping
 
 import pytest
 
-from tests.semantic.support.codex_gateway_broker import (
-    DraftActionJsonArgument,
-    MetadataBoundJsonArgument,
-    MetadataTokenProjection,
-)
+from tests.semantic.support.codex_gateway_broker import MetadataTokenProjection
 from tests.semantic.support.codex_integration_weather_runtime_v1 import (
     ACTION_METADATA_QUERIES,
     ACTION_TOKENS,
@@ -179,37 +175,34 @@ def test_weather_requests_close_five_sound_action_and_rtpc_requirements(
         weather_bus=bus,
     )
     rows = import_request["arguments"]["imports"]
-    assert rows[:4] == [
-        {
-            "object_path": (
-                r"\Actor-Mixer Hierarchy\Default Work Unit"
-                r"\IntegrationLab\Weather_Interactive"
-            ),
-            "object_type": "ActorMixer",
-        },
-        {
-            "object_path": (
-                r"\Actor-Mixer Hierarchy\Default Work Unit"
-                r"\IntegrationLab\Weather_Interactive\Rain"
-            ),
-            "object_type": "ActorMixer",
-        },
-        {
-            "object_path": (
-                r"\Actor-Mixer Hierarchy\Default Work Unit"
-                r"\IntegrationLab\Weather_Interactive\Wind"
-            ),
-            "object_type": "ActorMixer",
-        },
-        {
-            "object_path": (
-                r"\Actor-Mixer Hierarchy\Default Work Unit"
-                r"\IntegrationLab\Weather_Interactive\Thunder"
-            ),
-            "object_type": "RandomSequenceContainer",
-        },
+    assert [(row["object_path"], row["object_type"]) for row in rows] == [
+        (
+            r"\Actor-Mixer Hierarchy\Default Work Unit"
+            r"\IntegrationLab\Weather_Interactive",
+            "ActorMixer",
+        ),
+        (
+            r"\Actor-Mixer Hierarchy\Default Work Unit"
+            r"\IntegrationLab\Weather_Interactive\Rain",
+            "ActorMixer",
+        ),
+        (
+            r"\Actor-Mixer Hierarchy\Default Work Unit"
+            r"\IntegrationLab\Weather_Interactive\Wind",
+            "ActorMixer",
+        ),
+        (
+            r"\Actor-Mixer Hierarchy\Default Work Unit"
+            r"\IntegrationLab\Weather_Interactive\Thunder",
+            "RandomSequenceContainer",
+        ),
+        (targets[0].logical_path, "Sound SFX"),
+        (targets[1].logical_path, "Sound SFX"),
+        (targets[2].logical_path, "Sound SFX"),
+        (targets[3].logical_path, "Sound SFX"),
+        (targets[4].logical_path, "Sound SFX"),
     ]
-    media_rows = rows[4:]
+    media_rows = [row for row in rows if "audio_file" in row]
     assert len(media_rows) == 5
     assert [row["event"]["path"] for row in media_rows] == [
         target.event_path for target in targets
@@ -401,33 +394,30 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
             (),
             (),
         ),
-        reused_metadata_steps={"tx03": "tx01"},
     )
     assert len(protocol.turn_prefix_counts) == 4
     metadata_steps = [
         step for step in protocol.steps if step.subcommand == "metadata"
     ]
-    assert [step.name for step in metadata_steps] == [
-        "tx01.metadata",
-        "tx02.metadata",
-    ]
-    assert [step.arguments[-2:] for step in metadata_steps] == [
-        ("--limit", "2"),
-        ("--limit", "8"),
-    ]
-    assert protocol.commutative_read_only_step_groups == (
-        ("tx01.operation-schema", "tx01.metadata"),
-        ("tx02.operation-schema", "tx02.metadata"),
+    assert metadata_steps == []
+    from tests.semantic.support.codex_typed_draft_evidence_v3 import (
+        _composer_flow_step_indexes,
     )
+
+    tx03_archive_names = tuple(
+        protocol.steps[index].name
+        for index in _composer_flow_step_indexes(protocol.steps, "tx03")
+    )
+    assert "tx03.metadata" not in tx03_archive_names
+    assert "tx01.draft-start" not in tx03_archive_names
+    assert protocol.commutative_read_only_step_groups == ()
     assert [
         (step.name, step.subcommand)
         for step in protocol.steps
         if step.subcommand in {"metadata", "operation-schema"}
     ] == [
         ("tx01.operation-schema", "operation-schema"),
-        ("tx01.metadata", "metadata"),
         ("tx02.operation-schema", "operation-schema"),
-        ("tx02.metadata", "metadata"),
         ("tx03.operation-schema", "operation-schema"),
     ]
     assert [step.name for step in protocol.steps if step.subcommand == "execute"] == [
@@ -440,119 +430,104 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
     )
     assert import_preview.subcommand == "preview-from-draft"
     assert "--request-json" not in import_preview.arguments
-    import_actions = [
-        step.arguments[-1]
+    import_declarations = [
+        step
         for step in protocol.steps
-        if step.name.startswith("tx01.action.")
+        if step.name.startswith("tx01.declare-batch")
     ]
-    assert import_actions
+    assert len(import_declarations) == 9
     assert all(
-        isinstance(argument, DraftActionJsonArgument)
-        and argument.operation == "audio.import"
-        for argument in import_actions
+        step.subcommand == "draft-declare-import-batch"
+        for step in import_declarations
     )
-    bound_import_actions = [
-        argument for argument in import_actions if argument.metadata_binding is not None
-    ]
-    assert bound_import_actions
+    assert not any(
+        step.name.startswith("tx01.") and step.subcommand == "draft-bind-field"
+        for step in protocol.steps
+    )
     assert all(
-        argument.metadata_binding.step == "tx01.metadata"
-        for argument in bound_import_actions
+        step.arguments.count("--row-order") == 1
+        for step in import_declarations
+    )
+    assert sum(
+        step.arguments.count("--row-order") for step in import_declarations
+    ) == 9
+    assert sum(
+        step.arguments.count("ignore_parent_instance_limit")
+        for step in import_declarations
+    ) == 5
+    assert sum(
+        step.arguments.count("true") for step in import_declarations
+    ) >= 5
+    assert all(
+        "IgnoreParentMaxSoundInstance" not in step.arguments
+        for step in import_declarations
     )
     action_preview = next(
         step for step in protocol.steps if step.name == "tx02.preview"
     )
     assert action_preview.subcommand == "preview-from-draft"
     assert "--request-json" not in action_preview.arguments
-    action_steps = [
+    action_bindings = [
         step
         for step in protocol.steps
-        if step.name.startswith("tx02.action.")
+        if step.name.startswith("tx02.bind-target-")
     ]
-    assert len(action_steps) == 5
-    assert all(step.subcommand == "draft-apply" for step in action_steps)
+    assert len(action_bindings) == 5
     assert all(
-        isinstance(step.arguments[-1], DraftActionJsonArgument)
-        for step in action_steps
+        step.subcommand == "draft-bind-object" for step in action_bindings
     )
-    assert all(
-        step.arguments[-1].metadata_binding is not None
-        and step.arguments[-1].metadata_binding.step == "tx02.metadata"
-        for step in action_steps
+    assert all("--direct-child-type" in step.arguments for step in action_bindings)
+    action_disclosures = [
+        step
+        for step in protocol.steps
+        if step.name.startswith("tx02.discover-field-")
+    ]
+    assert action_disclosures == []
+    action_declarations = [
+        step
+        for step in protocol.steps
+        if step.name.startswith("tx02.declare-existing-")
+    ]
+    assert len(action_declarations) == 1
+    assert action_declarations[0].subcommand == "draft-declare-existing-batch"
+    assert not any(
+        step.subcommand == "draft-apply" and step.name.startswith("tx02.")
+        for step in protocol.steps
     )
-    assert action_steps[0].arguments[-1].expected == {
-        "contract": "waapi-skill.operation-draft-action/v1",
-        "action": "add_target",
-        "selector": {
-            "kind": "direct-child",
-            "parent": {
-                "kind": "path",
-                "value": targets[0].event_path,
-            },
-            "type": "Action",
-        },
-        "properties": [
-            {"name": "FadeTime", "value": targets[0].fade_time},
-            {"name": "Delay", "value": targets[0].delay},
-        ],
-    }
-    add_targets = [
-        step.arguments[-1].expected
-        for step in action_steps
-        if step.arguments[-1].expected["action"] == "add_target"
-    ]
-    assert [
-        (row["selector"], row["properties"])
-        for row in add_targets
-    ] == [
-        (
-            {
-                "kind": "direct-child",
-                "parent": {
-                    "kind": "path",
-                    "value": target.event_path,
-                },
-                "type": "Action",
-            },
-            [
-                {"name": "FadeTime", "value": target.fade_time},
-                {"name": "Delay", "value": target.delay},
-            ],
-        )
-        for target in targets
-    ]
+    first_binding = action_bindings[0].arguments
+    expected_selector = (
+        "--direct-child-type",
+        "Action",
+        *(
+            item
+            for segment in targets[0].event_path.split("\\")
+            if segment
+            for item in ("--parent-path-segment", segment)
+        ),
+    )
+    assert first_binding[-len(expected_selector) :] == expected_selector
+    assert action_declarations[0].arguments.count("--row") == 5
+    assert action_declarations[0].arguments.count("--field-meaning-value") == 10
     assert not any(
         step.subcommand == "preview" and step.name.startswith("tx02.")
         for step in protocol.steps
     )
-    rtpc_schema_index = next(
-        index
-        for index, step in enumerate(protocol.steps)
-        if step.name == "tx03.operation-schema"
-    )
-    assert protocol.steps[rtpc_schema_index + 1].name == "tx03.preview"
-    rtpc_preview = protocol.steps[rtpc_schema_index + 1]
-    assert isinstance(rtpc_preview.arguments[2], MetadataBoundJsonArgument)
-    assert rtpc_preview.arguments[2].metadata_step == "tx01.metadata"
-    assert rtpc_preview.arguments[2].object_type == "Sound"
-    assert rtpc_preview.arguments[2].required_tokens == ("Volume",)
-    assert tuple(
-        item.name
-        for item in (
-            rtpc_preview.arguments[2].expected_required_token_projection or ()
-        )
-    ) == ("Volume",)
-    assert rtpc_preview.arguments[2].equivalence == "object_set_rtpc_v1"
-    serialized = serialize_protocol(protocol)
-    serialized_action_steps = [
-        step
-        for step in serialized["steps"]
-        if step["name"].startswith("tx02.action.")
+    rtpc_steps = [
+        step for step in protocol.steps if step.name.startswith("tx03.")
     ]
-    assert all(
-        step["arguments"][-1]["kind"] == "draft_action_json"
-        for step in serialized_action_steps
+    assert [step.name for step in rtpc_steps[:2]] == [
+        "tx03.operation-schema",
+        "tx03.draft-start",
+    ]
+    rtpc_preview = next(step for step in rtpc_steps if step.name == "tx03.preview")
+    assert rtpc_preview.subcommand == "preview-from-draft"
+    assert not any(step.subcommand == "draft-apply" for step in rtpc_steps)
+    rtpc_declaration = next(
+        step for step in rtpc_steps if step.subcommand == "draft-declare-rtpc"
     )
+    assert rtpc_declaration.arguments.count("--point") == 3
+    assert rtpc_declaration.arguments[-2:] == ("--mode", "add-or-update")
+    serialized = serialize_protocol(protocol)
     assert deserialize_protocol(serialized) == protocol
     plan_steps = _workflow_plan_steps(
         protocol,
