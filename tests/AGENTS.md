@@ -615,6 +615,19 @@ passed 462 / skipped 6 POSIX-only cases. Commit
 changes only domain/planning docs, one unit test, and the program manifest, so
 it does not replace the frozen Skill, suite, runner, or semantic harness.
 
+Final public `integration` candidate
+`ebcfde245bcbcacd2b8842e5ec205e7111b86743` passed all 12 units in one fresh
+root on each host: macOS `imac-int-ebcfde2-r67-full12` and native Windows
+`iwin-int-ebcfde2-r56-full12`. Both roots then passed identical
+`--resume --verify-only`. Across the 24 PASS lifecycle records, source-project
+full hashes and mtimes remained unchanged, passing sandboxes were removed, and
+final scoped-process checks were empty. The macOS LaunchAgent and Windows
+`InteractiveToken` / `Limited` Scheduled Tasks were deleted. This is
+independent single-root 12/12 evidence on both hosts, not cumulative repair-root
+credit. Exact-candidate gates passed macOS Program 4727 / 2 skipped, native
+Windows Program 4704 / 25 skipped, and macOS Non-live 10310 / 113 skipped / 27
+deselected.
+
 Composer migration evidence is focused Adapter evidence, not public
 `integration` acceptance. For `object.set`, candidate
 `68697244063e02304eea79da54da502270be3704` passed Weather and Weapons on
