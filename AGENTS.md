@@ -519,6 +519,23 @@ skipped / 27 deselected. Batch-order repair candidate
 2 skipped, native Windows Program 4715 / 25 skipped, and macOS Non-live 10325 /
 113 skipped / 27 deselected before its targeted Weapons reruns.
 
+Final semantic-harness candidate
+`0682c1a979f7ce5bfb648914914b7393148a6495` keeps the packaged Skill tree
+byte-identical to `0edaf1a` and accepts permutations of independent existing-
+object edit rows while still rejecting missing, extra, duplicate, or changed
+objects, fields, handles, and values. Native-Windows root
+`iwin-int-0682c1a-r63-full12` passed the public `integration` profile 12/12 in
+one root plus identical verify-only. MacOS root
+`imac-int-0682c1a-r73-full12` passed 11/12; only INT22 Rifle stopped before
+Preview after the Agent incorrectly called an explicit
+`complete=true, truncated=false` response truncated. Fresh queued root
+`imac-int-0682c1a-r74-int22-rifle` then passed that sole unit plus identical
+verify-only without any code, suite, harness, or option change. MacOS therefore
+has same-candidate cumulative 12/12 evidence, not a single-root 12/12 claim.
+Every source hash and project mtime remained unchanged, passing sandboxes were
+removed, the failed sandbox stayed sealed, and all temporary LaunchAgents,
+Scheduled Tasks, and Wwise processes were cleared.
+
 Composer migration evidence is focused Adapter evidence, not public
 `integration` acceptance. For `object.set`, candidate
 `68697244063e02304eea79da54da502270be3704` passed Weather and Weapons on

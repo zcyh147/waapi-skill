@@ -503,11 +503,16 @@ profile, candidate, immutable options, and evidence root remain unchanged and
 each selected unit still runs at most once. If the priority units pass, continue
 the remaining units in that same root; do not rerun the priority units.
 
-Do not combine targeted roots into a full-profile PASS. If the runner cannot
-change priority without changing its sealed selection contract, keep the normal
-full-profile order instead of adding a second campaign path. A failed root stays
-frozen without verify-only replay; final acceptance still requires one complete
-passing root per host followed by its identical verify-only audit.
+Classify failures before scheduling another broad root. A repeatable product,
+suite, or oracle defect requires a repair and proportional regression. A
+one-off Agent deviation on an unchanged exact candidate instead enters a
+failure queue: let the current full root finish, then run only the queued units
+in fresh targeted roots and replay each passing root with identical
+`--resume --verify-only`. Combine those roots only as explicitly labelled
+same-candidate cumulative evidence; never call them a single-root PASS. Run a
+new full root only after the candidate, suite, harness, immutable options, or an
+explicit single-root acceptance criterion makes the earlier completed units
+insufficient. A failed root always stays frozen without verify-only replay.
 
 ### Multi-Draft Broker flow identity
 
@@ -635,6 +640,23 @@ skipped / 27 deselected. Batch-order repair candidate
 `fd2f9ed2c9fd2336e76545b1aef6f0ce4e99acfe` then passed macOS Program 4738 /
 2 skipped, native Windows Program 4715 / 25 skipped, and macOS Non-live 10325 /
 113 skipped / 27 deselected before its targeted Weapons reruns.
+
+Final semantic-harness candidate
+`0682c1a979f7ce5bfb648914914b7393148a6495` keeps the packaged Skill tree
+byte-identical to `0edaf1a` and accepts permutations of independent existing-
+object edit rows while still rejecting missing, extra, duplicate, or changed
+objects, fields, handles, and values. Native-Windows root
+`iwin-int-0682c1a-r63-full12` passed the public `integration` profile 12/12 in
+one root plus identical verify-only. MacOS root
+`imac-int-0682c1a-r73-full12` passed 11/12; only INT22 Rifle stopped before
+Preview after the Agent incorrectly called an explicit
+`complete=true, truncated=false` response truncated. Fresh queued root
+`imac-int-0682c1a-r74-int22-rifle` then passed that sole unit plus identical
+verify-only without any code, suite, harness, or option change. MacOS therefore
+has same-candidate cumulative 12/12 evidence, not a single-root 12/12 claim.
+Every source hash and project mtime remained unchanged, passing sandboxes were
+removed, the failed sandbox stayed sealed, and all temporary LaunchAgents,
+Scheduled Tasks, and Wwise processes were cleared.
 
 Composer migration evidence is focused Adapter evidence, not public
 `integration` acceptance. For `object.set`, candidate

@@ -615,6 +615,16 @@ Freeze ordinary semantic failures and repair them only in a new campaign root
 and candidate. A fully passing fresh root may receive identical
 `--resume --verify-only` replay; a failed root remains frozen without replay.
 
+After any full profile completes, separate reproducible product/suite/oracle
+defects from one-off Agent deviations before spending another full campaign.
+Repair reproducible causes and run proportional regressions. Queue one-off
+Agent deviations on an otherwise unchanged exact candidate, rerun only those
+units in fresh targeted roots, and replay only passing roots with identical
+`--resume --verify-only`. Report the result as same-candidate cumulative
+coverage, never as a single-root pass. A new full root is required only when a
+candidate, suite, harness, immutable option, or explicit release criterion has
+made the already completed units stale.
+
 `deep_business_cross_version_19` is the stricter #60 release contract. It
 composes reviewed component runners into one immutable campaign and contains
 exactly one task for every migration family owned by #54, #56, and #57. It

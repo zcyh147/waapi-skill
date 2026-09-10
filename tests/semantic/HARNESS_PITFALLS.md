@@ -3311,6 +3311,14 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   Separately, the Gateway must derive its stable field set from the operation
   business contract and must not rewrite an unchanged handle registry for a
   stable-only batch.
+- Regression evidence: macOS root `imac-int-0edaf1a-r71-full12` was frozen at
+  11/12 after it supplied the exact Close, Tail, and Mechanical edits in the
+  permutation Mechanical, Tail, Close and the then-current Broker rejected the
+  order before Gateway/Wwise. Harness-only candidate `0682c1a` accepts that
+  permutation; focused regression passed 14/14, macOS INT22 Weapons passed in
+  `imac-int-0682c1a-r72-int22-weapons`, and both Weapons units subsequently
+  passed inside the final Mac and Windows full roots. The frozen r71 status is
+  not rewritten retroactively.
 
 ## New-root preflight
 
