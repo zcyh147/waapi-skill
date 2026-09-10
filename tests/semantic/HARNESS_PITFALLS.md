@@ -3273,6 +3273,23 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   retaining the absolute `full_argv` for audit. Other installations keep the
   absolute command. Continue inheriting the campaign cwd and never set workdir.
 
+### Batch field shorthand still needs Gateway-owned meaning resolution
+
+- Trigger: native-Windows `INT25-WEATHER` used the public
+  `draft-declare-existing-batch --field` spelling with `fade_time` and `delay`
+  instead of copying the longer `--field-meaning-value` spelling. The earlier
+  Broker rejected it before Gateway or Wwise, even though `--field` was already
+  a public batch parameter and the names were unambiguous user-facing field
+  meanings.
+- Prevention: `--field` first matches the six exact stable business fields; any
+  other bounded name is resolved as a live field meaning with the same metadata
+  scope, uniqueness checks, typed value parsing, and atomic Draft revision as
+  `--field-meaning-value`. The Broker canonicalizes only that same distinction:
+  an exact stable field remains stable, while an unknown shorthand must match
+  the sealed normalized meaning and value. Wrong names, duplicate meanings,
+  ambiguous metadata, changed values, and stable/dynamic contradictions still
+  fail closed. Do not solve this by adding another Prompt-only copy warning.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:

@@ -1426,9 +1426,19 @@ def test_object_set_discovers_two_business_field_meanings_in_one_revision(
 
 
 @pytest.mark.parametrize("swapped_row_values", (False, True))
+@pytest.mark.parametrize(
+    ("field_option", "fade_meaning", "delay_meaning"),
+    (
+        ("--field-meaning-value", "Fade Time", "Delay"),
+        ("--field", "fade_time", "delay"),
+    ),
+)
 def test_object_set_batch_declares_meanings_with_per_object_metadata_revalidation(
     tmp_path: Path,
     swapped_row_values: bool,
+    field_option: str,
+    fade_meaning: str,
+    delay_meaning: str,
 ) -> None:
     start_code, started = _offline(tmp_path, "draft-start", "object.set")
     assert start_code == 0, started
@@ -1544,29 +1554,29 @@ def test_object_set_batch_declares_meanings_with_per_object_metadata_revalidatio
             "--row-order",
             "thunder",
             *row_arguments,
-            "--field-meaning-value",
+            field_option,
             "rain",
-            "Fade Time",
+            fade_meaning,
             "0.25 seconds",
-            "--field-meaning-value",
+            field_option,
             "rain",
-            "Delay",
+            delay_meaning,
             "0",
-            "--field-meaning-value",
+            field_option,
             "wind",
-            "Fade Time",
+            fade_meaning,
             "0.4",
-            "--field-meaning-value",
+            field_option,
             "wind",
-            "Delay",
+            delay_meaning,
             "0.1",
-            "--field-meaning-value",
+            field_option,
             "thunder",
-            "Fade Time",
+            fade_meaning,
             "0.05",
-            "--field-meaning-value",
+            field_option,
             "thunder",
-            "Delay",
+            delay_meaning,
             "0",
         ],
         env=_env(tmp_path),

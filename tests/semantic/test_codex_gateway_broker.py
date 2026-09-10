@@ -14331,6 +14331,94 @@ def test_object_set_batch_normalizes_zero_seconds_to_one_sealed_numeric_spelling
     assert normalized[-1] in step.arguments[-1].values
 
 
+def test_object_set_batch_accepts_unambiguous_field_meaning_shorthand(
+    tmp_path: Path,
+) -> None:
+    step = ExpectedGatewayStep(
+        "tx01.declare-existing-batch",
+        "draft-declare-existing-batch",
+        (
+            "draft-id",
+            "--task-authority",
+            "authority",
+            "--expected-revision",
+            "6",
+            "--row-order",
+            "rain",
+            "--row",
+            "rain",
+            "rain-handle",
+            "--field-meaning-value",
+            "rain",
+            "FadeTime",
+            "0.25",
+            "--field-meaning-value",
+            "rain",
+            "Delay",
+            "0",
+        ),
+    )
+    actual = (
+        *step.arguments[:10],
+        "--field",
+        "rain",
+        "fade_time",
+        "0.25 seconds",
+        "--field",
+        "rain",
+        "delay",
+        "0 seconds",
+    )
+    broker = object.__new__(CodexGatewayBroker)
+
+    normalized = broker._normalize_business_declaration_fact_order(  # noqa: SLF001
+        step,
+        actual,
+    )
+
+    assert normalized == step.arguments
+
+
+def test_object_set_batch_does_not_reinterpret_exact_stable_field_as_meaning(
+    tmp_path: Path,
+) -> None:
+    step = ExpectedGatewayStep(
+        "tx01.declare-existing-batch",
+        "draft-declare-existing-batch",
+        (
+            "draft-id",
+            "--task-authority",
+            "authority",
+            "--expected-revision",
+            "6",
+            "--row-order",
+            "rain",
+            "--row",
+            "rain",
+            "rain-handle",
+            "--field-meaning-value",
+            "rain",
+            "Volume",
+            "-4",
+        ),
+    )
+    actual = (
+        *step.arguments[:10],
+        "--field",
+        "rain",
+        "volume_db",
+        "-4",
+    )
+    broker = object.__new__(CodexGatewayBroker)
+
+    normalized = broker._normalize_business_declaration_fact_order(  # noqa: SLF001
+        step,
+        actual,
+    )
+
+    assert normalized != step.arguments
+
+
 @pytest.mark.parametrize("read_schema", (False, True))
 def test_broker_accepts_one_optional_initial_query_schema(
     tmp_path: Path,

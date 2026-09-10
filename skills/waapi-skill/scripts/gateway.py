@@ -398,6 +398,7 @@ from wwise_waapi.runtime_playing_handles import (  # noqa: E402  # pyright: igno
     RuntimePlayingHandleStore,
 )
 from wwise_waapi.business_declarations import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    COMMON_BUSINESS_FIELDS,
     MAX_BUSINESS_NAME_BYTES,
     MAX_BUSINESS_PATH_BYTES,
     SUPPORTED_BUSINESS_KINDS,
@@ -17962,9 +17963,12 @@ def dispatch_business_existing_batch(
         )
 
     stable_by_id: dict[str, list[tuple[str, str]]] = {}
-    for declaration_id, field_name, value in args.field:
-        stable_by_id.setdefault(declaration_id, []).append((field_name, value))
     meanings_by_id: dict[str, list[tuple[str, str]]] = {}
+    for declaration_id, field_name, value in args.field:
+        target = (
+            stable_by_id if field_name in COMMON_BUSINESS_FIELDS else meanings_by_id
+        )
+        target.setdefault(declaration_id, []).append((field_name, value))
     for declaration_id, meaning, value in args.field_meaning_value:
         meanings_by_id.setdefault(declaration_id, []).append((meaning, value))
     if (set(stable_by_id) | set(meanings_by_id)) - set(rows):
@@ -18003,7 +18007,9 @@ def dispatch_business_existing_batch(
         project=binding.project,
         state_dir=binding.state_dir,
     )
-    field_count = sum(len(pairs) for pairs in meanings_by_id.values())
+    field_count = sum(len(pairs) for pairs in stable_by_id.values()) + sum(
+        len(pairs) for pairs in meanings_by_id.values()
+    )
     adapter = business_adapter(binding.record.operation)
 
     def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
@@ -25807,6 +25813,10 @@ def _business_next_action_binding(
                     ],
                     "gateway_disambiguation": (
                         "the_exact_boh1_object_handle_contract_identifies_the_handle"
+                    ),
+                    "field_resolution": (
+                        "--field_uses_a_disclosed_stable_field_when_exactly_matched_"
+                        "otherwise_it_is_a_live_user_facing_field_meaning"
                     ),
                     "maximum_rows": OBJECT_SET_BUSINESS_BATCH_MAX_ROWS,
                     "gateway_owned_behavior": (

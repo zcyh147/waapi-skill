@@ -11949,16 +11949,20 @@ class CodexGatewayBroker:
                 field = group[2]
                 if not isinstance(field, str):
                     return None
-                field_key = (
-                    "".join(
-                        character
-                        for character in field.casefold()
-                        if character.isalnum()
-                    )
-                    if option == "--field-meaning-value"
-                    else field
+                stable_fields = {
+                    "delay_ms",
+                    "fade_time_ms",
+                    "loop",
+                    "max_instances",
+                    "output_bus",
+                    "volume_db",
+                }
+                if option == "--field" and field in stable_fields:
+                    return (option, declaration_id, field)
+                field_key = "".join(
+                    character for character in field.casefold() if character.isalnum()
                 )
-                return (option, declaration_id, field_key)
+                return ("--field-meaning-value", declaration_id, field_key)
             return (option, declaration_id)
 
         expected_groups = parse(step.arguments)
@@ -11982,7 +11986,7 @@ class CodexGatewayBroker:
             expected_group = expected_by_key[expected_key]
             actual_value = actual_group[3]
             if (
-                actual_group[0] != "--field-meaning-value"
+                expected_key[0] != "--field-meaning-value"
                 or expected_key[2] not in {"fadetime", "delay"}
                 or not isinstance(actual_value, str)
             ):
@@ -12027,13 +12031,12 @@ class CodexGatewayBroker:
                 for expected_key in expected_keys
                 for token in (
                     (
-                        actual_by_key[expected_key][0],
+                        "--field-meaning-value",
                         actual_by_key[expected_key][1],
                         expected_by_key[expected_key][2],
                         normalized_business_value(expected_key),
                     )
-                    if actual_by_key[expected_key][0]
-                    == "--field-meaning-value"
+                    if expected_key[0] == "--field-meaning-value"
                     else actual_by_key[expected_key]
                 )
             ),
