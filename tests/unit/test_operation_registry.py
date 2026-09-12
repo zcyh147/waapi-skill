@@ -2904,7 +2904,7 @@ def test_reference_can_be_explicitly_cleared_and_null_is_verified(version: str, 
     assert prepared["dispatch"]["args"] == {
         "object": GUID,
         "reference": "OutputBus",
-        "value": None,
+        "value": "{00000000-0000-0000-0000-000000000000}",
     }
     assert "target" not in prepared["resolved_roles"]
     assert prepared["verification_plan"]["expected_clear"] is True
