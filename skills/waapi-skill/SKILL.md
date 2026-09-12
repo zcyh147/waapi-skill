@@ -20,14 +20,15 @@ When the visible conversation lacks an introduction:
 - With a request, reuse its first required Gateway result; no extra call.
 - Pure explanation: one offline `config-show`.
 
-The next Agent message states `session_context.one_time_introduction.facts`
-together: Skill loaded, WAAPI address, adapter version, policy, and modes, in
-natural prose. The same introduction must name them exactly: `read_only`,
+The next reply states `session_context.one_time_introduction.facts` together
+in the user's language, in two short paragraphs: Skill loaded, WAAPI address,
+adapter version; then current policy and modes. Keep mode names exact: `read_only`,
 `ask_before_changes`, and `allow_changes`. Never announce before Gateway,
 split facts, use memory, or a status table. Say
-“当前连接的” only for a proved live connection; otherwise “当前使用的/配置的”.
-Never connect to Wwise solely for welcome. Repeat only on request or changed
-facts, not later Skill invocations. Put exact machine answers in a separate update.
+configured, not connected unless proved live. Closing questions are free prose,
+in a new paragraph.
+Never connect solely for welcome. Repeat only on request or changed
+facts, not later Skill invocations. Send machine answers separately.
 
 ## Entry rules
 

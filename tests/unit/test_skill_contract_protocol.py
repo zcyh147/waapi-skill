@@ -29,7 +29,7 @@ def test_skill_entry_stays_within_one_complete_agent_tool_read() -> None:
 def test_first_gateway_backed_introduction_names_all_three_policy_modes() -> None:
     introduction = SKILL.split("## Setup", 1)[0]
 
-    assert "same introduction must name them exactly" in introduction
+    assert "Keep mode names exact" in introduction
     for policy in ("`read_only`", "`ask_before_changes`", "`allow_changes`"):
         assert policy in introduction
 
@@ -1238,19 +1238,22 @@ def test_one_time_onboarding_is_global_natural_and_does_not_add_a_gateway_call()
         "Only `/waapi-skill` or a Skill link: run one offline `config-show`",
         "Read the injected `SKILL.md` exactly once",
         "A successful read is complete; a second `SKILL.md` read is forbidden",
-        "The next Agent message",
+        "The next reply",
         "`session_context.one_time_introduction.facts` together",
         "Skill loaded",
         "WAAPI address",
-        "adapter version, policy, and modes",
+        "in the user's language, in two short paragraphs",
+        "adapter version; then current policy and modes",
+        "configured, not connected unless proved live",
+        "Closing questions are free prose, in a new paragraph",
         "Never announce before Gateway, split facts, use memory",
         "status table",
         "With a request, reuse its first required Gateway result; no extra call",
         "Pure explanation: one offline `config-show`",
-        "Never connect to Wwise solely for welcome",
+        "Never connect solely for welcome",
         "Repeat only on request or changed facts",
         "not later Skill invocations",
-        "separate update",
+        "Send machine answers separately",
     ):
         assert phrase in skill_compact
     assert "The entry file owns the one-time conversation introduction for every lane" in SETUP
