@@ -504,6 +504,7 @@ from wwise_waapi.transactions import (  # noqa: E402  # pyright: ignore[reportMi
     STATE_DIRECTORY_ENV,
     InvalidTransition,
     PreviewAlreadyExists,
+    TransactionExecutionInProgress,
     TransactionNotFound,
     TransactionState,
     TransactionStore,
@@ -19105,13 +19106,54 @@ def dispatch_transaction_command(
     dispatcher: WwiseDispatcher,
     common: Mapping[str, Any],
 ) -> dict[str, Any]:
+    store = resolve_transaction_store(args, env=env)
+    transaction_id = args.transaction_id
+    try:
+        with store.execution_lease(transaction_id):
+            return _dispatch_transaction_command_with_execution_lease(
+                args,
+                env=env,
+                connection=connection,
+                detected_version=detected_version,
+                live_info=live_info,
+                dispatcher=dispatcher,
+                common=common,
+                store=store,
+            )
+    except TransactionExecutionInProgress:
+        record = store.load(transaction_id)
+        return {
+            "ok": False,
+            "status": "execution_in_progress",
+            **common,
+            "transaction_id": transaction_id,
+            "state": record.state.value,
+            "error_code": "TRANSACTION_EXECUTION_IN_PROGRESS",
+            "message": (
+                "Another command currently owns this transaction's execution lease; "
+                "no durable state was changed. Try again after that command finishes."
+            ),
+            "automatic_retry": False,
+        }
+
+
+def _dispatch_transaction_command_with_execution_lease(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+    store: TransactionStore,
+) -> dict[str, Any]:
     read_call = transaction_read_call(
         dispatcher,
         connection=connection,
         version=detected_version,
     )
 
-    store = resolve_transaction_store(args, env=env)
     transaction_id = args.transaction_id
     record = store.load(transaction_id)
     preview = store.load_preview(transaction_id)

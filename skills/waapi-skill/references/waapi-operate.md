@@ -153,6 +153,8 @@ For every later phase, execute only the field named by `next_command.copy_instru
 - executed-unverified runs verify only;
 - a verify-only request never executes.
 
+`execution_in_progress`: no state change. Report busy; retry only in a later turn.
+
 The confirmation token binds the exact stored Preview. Never reconstruct/substitute it or run `confirm --help`. For ordered multi-transaction work, after the prior item reaches terminal verification, a successful `verify` immediately starts the next already-requested transaction in the same turn and stops only when its executable Preview is visible. Never infer, add, combine, reorder, or turn later items design-only.
 
 ## Terminal states

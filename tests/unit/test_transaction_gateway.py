@@ -5681,6 +5681,157 @@ def test_load_bank_cleanup_binding_cannot_be_overridden_by_execution_result(
     assert stored_spec["companion_request"]["args"] == {"soundBank": SOUND_BANK_GUID}
 
 
+def test_concurrent_transaction_command_cannot_poison_active_execution(
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "concurrent-execution-state"
+    transport_id = 73
+    transaction = preview_and_confirm_public_call(
+        generic_public_call_request(
+            "ak.wwise.core.transport.create",
+            {"object": OBJECT_GUID},
+        ),
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+    )
+    dispatch_started = threading.Event()
+    release_dispatch = threading.Event()
+
+    class BlockingTransportClient(FakeClient):
+        def call(
+            self,
+            uri: str,
+            args: Mapping[str, Any] | None = None,
+            options: Mapping[str, Any] | None = None,
+        ) -> Any:
+            if uri == "ak.wwise.core.transport.create":
+                dispatch_started.set()
+                if not release_dispatch.wait(timeout=10):
+                    raise TimeoutError(
+                        "test did not release the blocked WAAPI dispatch"
+                    )
+            return super().call(uri, args, options)
+
+    active_client = BlockingTransportClient(
+        {
+            "ak.wwise.core.getInfo": [live_info(year=2025)],
+            "ak.wwise.core.getProjectInfo": [project()],
+            "ak.wwise.core.transport.create": [{"transport": transport_id}],
+        }
+    )
+    active_result: list[tuple[int, dict[str, Any]]] = []
+
+    def run_active_execution() -> None:
+        active_result.append(
+            execute(
+                ["execute", transaction["transaction_id"]],
+                tmp_path=tmp_path,
+                state_dir=state_dir,
+                version="2025.1",
+                client=active_client,
+            )
+        )
+
+    active_thread = threading.Thread(target=run_active_execution)
+    active_thread.start()
+    assert dispatch_started.wait(timeout=10)
+    assert TransactionStore(state_dir).load(transaction["transaction_id"]).state is (
+        TransactionState.EXECUTING
+    )
+
+    contender_exit, contender_payload = execute(
+        ["verify", transaction["transaction_id"]],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        version="2025.1",
+        client=FakeClient(
+            {"ak.wwise.core.getInfo": [live_info(year=2025)]}
+        ),
+    )
+
+    assert contender_exit == 2
+    assert contender_payload["status"] == "execution_in_progress"
+    assert contender_payload["error_code"] == "TRANSACTION_EXECUTION_IN_PROGRESS"
+    assert contender_payload["state"] == TransactionState.EXECUTING.value
+    assert contender_payload["automatic_retry"] is False
+    assert TransactionStore(state_dir).load(transaction["transaction_id"]).state is (
+        TransactionState.EXECUTING
+    )
+
+    release_dispatch.set()
+    active_thread.join(timeout=10)
+    assert not active_thread.is_alive()
+    assert len(active_result) == 1
+    active_exit, active_payload = active_result[0]
+    assert active_exit == 0, active_payload
+    assert active_payload["state"] == TransactionState.EXECUTED_UNVERIFIED.value
+    assert [call[0] for call in active_client.calls].count(
+        "ak.wwise.core.transport.create"
+    ) == 1
+
+    replay_client = FakeClient(
+        {"ak.wwise.core.getInfo": [live_info(year=2025)]}
+    )
+    replay_exit, replay_payload = execute(
+        ["execute", transaction["transaction_id"]],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        version="2025.1",
+        client=replay_client,
+    )
+    assert replay_exit == 2
+    assert "must be explicitly confirmed" in replay_payload["message"]
+    assert not any(
+        call[0] == "ak.wwise.core.transport.create" for call in replay_client.calls
+    )
+
+
+def test_stale_executing_transaction_recovers_without_replaying_dispatch(
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "stale-execution-state"
+    transaction = preview_and_confirm_public_call(
+        generic_public_call_request(
+            "ak.wwise.core.transport.create",
+            {"object": OBJECT_GUID},
+        ),
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+    )
+    store = TransactionStore(state_dir)
+    store.begin_execution(
+        transaction["transaction_id"],
+        expected_authorization=TransactionState.CONFIRMED,
+    )
+    stale_client = FakeClient(
+        {"ak.wwise.core.getInfo": [live_info(year=2025)]}
+    )
+
+    exit_code, payload = execute(
+        ["execute", transaction["transaction_id"]],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        version="2025.1",
+        client=stale_client,
+    )
+
+    assert exit_code == 2
+    assert payload["status"] == "indeterminate"
+    assert payload["state"] == TransactionState.INDETERMINATE.value
+    assert payload["automatic_retry"] is False
+    assert not any(
+        call[0] == "ak.wwise.core.transport.create" for call in stale_client.calls
+    )
+    assert store.load(transaction["transaction_id"]).state is (
+        TransactionState.INDETERMINATE
+    )
+    event_types = [
+        event["event_type"]
+        for event in store.read_events(transaction["transaction_id"])
+    ]
+    assert event_types[-2:] == ["execution_started", "execution_indeterminate"]
+
+
 def test_transport_create_materializes_destroy_request_in_execute_verify_and_agent_result(
     tmp_path: Path,
 ) -> None:

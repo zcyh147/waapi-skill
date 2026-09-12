@@ -350,6 +350,8 @@ def test_public_readmes_keep_setup_and_usage_user_facing() -> None:
             "--path-segment",
             "4738",
             "4715",
+            "4743",
+            "4720",
         ):
             assert internal_detail not in readme
 
@@ -372,6 +374,8 @@ def test_public_readmes_link_exact_coverage_instead_of_inlining_it() -> None:
         assert "反射总行数" not in readme
         assert "4738" not in readme
         assert "4715" not in readme
+        assert "4743" not in readme
+        assert "4720" not in readme
 
-    assert "currently contains 4738 passing tests" in coverage_contract
-    assert "4715 passing tests with 25" in coverage_contract
+    assert "currently contains 4743 passing tests" in coverage_contract
+    assert "4720 passing tests with 25" in coverage_contract

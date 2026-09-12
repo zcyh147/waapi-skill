@@ -1119,6 +1119,8 @@ def test_operate_policy_and_gateway_owned_continuation_are_closed() -> None:
     assert "run `confirm --help`" in compact
     assert "a status/check request stops after `transaction-show`" in compact
     assert "a verify-only request never executes" in compact
+    assert "`execution_in_progress`: no state change" in compact
+    assert "retry only in a later turn" in compact
     assert "after the prior item reaches terminal verification" in compact
     assert (
         "a successful `verify` immediately starts the next already-requested "
