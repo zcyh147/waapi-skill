@@ -87,7 +87,24 @@ ci/test.sh --version 2024.1 --mode destructive -- -q -ra \
   -k 'rtpc_empty_create_update_delete_recreate or object_lifecycle_business_draft_executes_all_five or object_metadata_business_draft_executes_field'
 ```
 
-Final Program and Non-live gate totals are recorded below after completion.
+### Broader code gates
+
+- Program at `f30c477`: **4930 passed, 2 skipped** (182.39 s). The skips
+  require native Windows. Packaged runtime is byte-identical to `a18110c`.
+- Full Non-live at `f30c477`: **10525 passed, 1 failed, 113 skipped,
+  27 deselected** (678.08 s). Keep this original run as a failed run.
+- The sole Non-live failure was the pre-existing 2021 reference-layout scanner:
+  it classified any `scripts/run.py` text as a NotebookLM runtime dependency.
+  The matching line is the Skill's own runner in `platform_commands.py:59`,
+  already present in baseline `0db5ceb`. No NotebookLM dependency was added.
+  The test now targets `notebooklm/scripts/run.py` and includes five genuine
+  dependency patterns plus the legitimate Skill runner as a negative control.
+  Focused reference-layout/platform-command rerun: **40 passed, 1 skipped**.
+  This last change is test-only. The full Non-live run was not repeated or
+  retroactively renamed an all-pass result.
+
+The Program inventory golden was separately reviewed and updated: only the
+five `object.delete` constraint descriptions changed; its 149 entries remain.
 
 ## Actual demonstration preservation
 
@@ -108,6 +125,15 @@ It is not in the demonstration task's normal state directory.
 No weather import, Action edit, old Draft/transaction replay or project reset
 was performed. The RTPC remains uncreated in the user's demonstration; Console
 mutation success must not be described as completing that demonstration.
+
+After validation, the three production files (`operation_registry.py`,
+`operation_plugin.py`, `builders/properties.py`) were synchronized to
+`/Users/xiye/Documents/Git/waapi_skill_test/.agents/skills/waapi-skill`.
+Before copying, each installed file was checked against `0db5ceb` to avoid
+overwriting independent edits; originals were backed up in `installed-before/`.
+After copying, all three files compared byte-for-byte with the tested source.
+Configuration, environment, media and project files were not synchronized or
+rewritten. The original failed Draft hash was rechecked unchanged.
 
 Durable evidence includes the final category ledger snapshot and detailed final
 2023/2024/2025 Console state/dispatcher artifacts. The 2021/2022 final outcomes

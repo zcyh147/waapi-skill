@@ -208,15 +208,30 @@ def test_2021_1_runtime_layout_checks_have_no_notebooklm_dependency() -> None:
     assert status.reason == 'Semantic source note is grounded.'
 
 
-def _runtime_package_has_no_notebooklm_calls() -> bool:
+def test_dependency_check_distinguishes_skill_runner_from_notebooklm(tmp_path: Path) -> None:
+    source = tmp_path / 'runner.py'
+    source.write_text('RUNNER = ".agents/skills/waapi-skill/scripts/run.py"\n', encoding='utf-8')
+    assert _runtime_package_has_no_notebooklm_calls(tmp_path)
+    for dependency in (
+        'import notebooklm',
+        'from notebooklm import query',
+        'RUNNER = ".agents/skills/notebooklm/scripts/run.py"',
+        'SCRIPT = "ask_question.py"',
+        'URL = "https://notebooklm.google.com/notebook/id"',
+    ):
+        source.write_text(dependency + '\n', encoding='utf-8')
+        assert not _runtime_package_has_no_notebooklm_calls(tmp_path), dependency
+
+
+def _runtime_package_has_no_notebooklm_calls(package_root: Path = RUNTIME_PACKAGE_ROOT) -> bool:
     forbidden_patterns = (
         'import notebooklm',
         'from notebooklm',
-        'scripts/run.py',
+        'notebooklm/scripts/run.py',
         'ask_question.py',
         'notebooklm.google.com/notebook/',
     )
-    for path in RUNTIME_PACKAGE_ROOT.glob('**/*.py'):
+    for path in package_root.glob('**/*.py'):
         text = path.read_text(encoding='utf-8')
         lowered = text.lower()
         for pattern in forbidden_patterns:
