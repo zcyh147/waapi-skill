@@ -187,7 +187,7 @@ def test_set_reference_preview_supports_an_explicit_null_clear() -> None:
     assert_mutating_preview(
         preview,
         SET_REFERENCE_URI,
-        {"object": exact_sound().id, "reference": "OutputBus", "value": None},
+        {"object": exact_sound().id, "reference": "OutputBus", "value": "{00000000-0000-0000-0000-000000000000}"},
     )
     applicability = preview.envelope.metadata["applicability"]
     assert applicability["target_identity"] is None

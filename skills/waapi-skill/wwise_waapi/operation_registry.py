@@ -20674,7 +20674,14 @@ def _reference_identity(value: Any) -> Any:
 def _reference_value_is_null(value: Any) -> bool:
     if value is None:
         return True
-    identity = _reference_identity(value)
+    if isinstance(value, Mapping):
+        if "id" not in value or set(value) - {"id", "name", "type", "path"}:
+            return False
+        if any(key in value and not isinstance(value[key], str) for key in value):
+            return False
+        identity = value["id"]
+    else:
+        identity = value
     return (
         isinstance(identity, str)
         and identity.casefold()

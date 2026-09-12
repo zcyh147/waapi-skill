@@ -2857,7 +2857,7 @@ def test_property_and_reference_metadata_are_live_runtime_inputs_not_request_fie
 
 
 @pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
-@pytest.mark.parametrize("case, succeeds", (("null", True), ("zero-guid", True), ("missing", False), ("wrong-id", False), ("malformed", False)))
+@pytest.mark.parametrize("case, succeeds", (("null", True), ("zero-guid", True), ("missing", False), ("wrong-id", False), ("malformed", False), ("malformed-zero", False)))
 def test_reference_can_be_explicitly_cleared_and_null_is_verified(version: str, case: str, succeeds: bool) -> None:
     reader = ScriptedReader(
         {
@@ -2919,6 +2919,8 @@ def test_reference_can_be_explicitly_cleared_and_null_is_verified(version: str, 
         result_row["id"] = TARGET_GUID
     elif case == "malformed":
         result_row["OutputBus"] = {}
+    elif case == "malformed-zero":
+        result_row["OutputBus"] = {"id": "{00000000-0000-0000-0000-000000000000}", "unexpected": True}
     verified = verify_prepared_operation(
         prepared,
         execution_result={},
