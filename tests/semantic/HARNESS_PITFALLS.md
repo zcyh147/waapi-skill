@@ -3332,6 +3332,29 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   passed inside the final Mac and Windows full roots. The frozen r71 status is
   not rewritten retroactively.
 
+## Real CRUD readbacks after endpoint-version screening
+
+- Trigger: an id-only RTPC owner row, an embedded Effect without `parent`, or
+  a null-GUID reference is rejected after tests concentrated on 2022/2025.
+  Inspect the matching version's actual projection and owner/list semantics;
+  use isolated Console CRUD checks before spending another Fresh turn. See
+  `docs/research/rtpc-crud-readback-audit-2026-09-13.md` for the reproduction,
+  related defects, repair boundaries and exact evidence.
+- Continue public Gateway tests through `draft-check` and immutable preview.
+  Declaration/materialization success alone does not exercise native reads.
+  Keep missing fields, explicit nulls, empty lists and malformed results as
+  separate fixtures. Include both first creation and an already-populated list.
+- Use the current business Draft commands in real fixtures. The old typed
+  metadata adapter may produce an unsupported `MetadataQueryArgument`; this is
+  a fixture failure, not Wwise or Agent failure. Read sealed verification events
+  and compare their published digest when successful stdout contains a compact
+  verification summary instead of raw readbacks.
+- `--mode destructive` already supplies its paths: select nodes with `-k`
+  rather than adding the same module path again (which collects it twice).
+  Preserve detailed evidence under a task-owned durable directory before later
+  pytest runs rotate their default temporary roots. A Console run is not a
+  Fresh Agent result; a successful preview is not an executed modification.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:
