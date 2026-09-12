@@ -2639,7 +2639,15 @@ def test_object_metadata_business_draft_executes_field_verifiers(
             target_id=target_bus_id,
             platform="Windows",
         )
-        if runtime.version == "2025.1":
+        _complete_object_metadata_business_transaction(
+            runtime,
+            operation="object.setReference",
+            object_id=source_id,
+            field_name="Attenuation",
+            clear_reference=True,
+            platform="Windows",
+        )
+        if runtime.version in {"2023.1", "2024.1", "2025.1"}:
             _complete_object_metadata_business_transaction(
                 runtime,
                 operation="object.setLinked",
