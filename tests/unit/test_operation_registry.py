@@ -2193,6 +2193,20 @@ def test_set_name_reports_the_non_intrinsic_name_boundary(object_type: str) -> N
     assert error.value.error_code == "DERIVED_OBJECT_NAME_BOUNDARY"
 
 
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_delete_rtpc_reports_embedded_list_boundary_before_dispatch(version: str) -> None:
+    parsed = parse_operation_request(request(
+        "object.delete", {"object": {"kind": "id", "value": GUID}}, version=version,
+    ))
+    with pytest.raises(OperationContractError) as error:
+        prepare_operation(parsed, read_call=ScriptedReader({
+            "ak.wwise.core.object.get": [{"return": [object_row(
+                name="", object_type="RTPC", path=r"\Fixture\[RTPC]",
+            )]}],
+        }))
+    assert error.value.error_code == "EMBEDDED_OBJECT_DELETE_BOUNDARY"
+
+
 @pytest.mark.parametrize(
     "object_type",
     (

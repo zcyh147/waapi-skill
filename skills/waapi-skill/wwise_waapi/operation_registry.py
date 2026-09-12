@@ -2334,6 +2334,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         ),
         identity_arguments=("object",),
         constraints=(
+            "embedded RTPC entries reject direct deletion before preview; this operation never deletes their owner as a fallback",
             "auto_check_out_to_source_control defaults to false and is accepted only in Wwise 2023.1-2025.1; explicit use on 2021.1/2022.1 fails before connection",
         ),
         selection_guidance=_selection_guidance(
@@ -8509,6 +8510,17 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
     elif request.operation == "object.delete":
         target = _resolve_identity(arguments["object"], role="object", read=read)
         _reject_protected_delete(target)
+        if target.row.get("type") == "RTPC":
+            raise OperationContractError(
+                "EMBEDDED_OBJECT_DELETE_BOUNDARY",
+                "RTPC bindings are embedded list entries; Wwise does not support direct object.delete for them.",
+                details={
+                    "object_id": target.object,
+                    "object_type": "RTPC",
+                    "operation": "object.delete",
+                    "repair": "Remove this binding in Wwise Authoring; do not retry object.delete or delete the owning Sound as a workaround.",
+                },
+            )
         roles["object"] = target
         try:
             auto_check_out = normalize_auto_check_out_to_source_control(

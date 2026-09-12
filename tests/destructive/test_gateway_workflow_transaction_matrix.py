@@ -2341,7 +2341,7 @@ def _complete_object_metadata_business_transaction(
     if operation == "object.setReference":
         outcome = ["--clear-reference"] if clear_reference else [
             "--target-handle", _bind_business_object(
-                runtime, draft, object_id=target_id, role="reference_target",
+                runtime, draft, object_id=target_id,
             ),
         ]
     elif operation == "object.setLinked":
@@ -3059,12 +3059,24 @@ def test_rtpc_empty_create_update_delete_recreate_across_selected_version(
             assert rtpc_rows[0]["@Curve"]["points"][1]["y"] == float(middle_y)
             if mode == "add-or-update":
                 assert rtpc_id == original_rtpc_id, "update must preserve RTPC identity"
-                _delete_if_present_via_transaction(runtime, rtpc_id)
+                delete = _start_business_draft(runtime, "object.delete")
+                _bind_business_object(runtime, delete, object_id=rtpc_id, role="object")
+                _update_business_draft(runtime, delete, "draft-declare-object-change", live=False)
+                code, rejected = runtime.raw_gateway([
+                    "draft-check", delete.draft_id, "--task-authority", delete.task_authority,
+                    "--expected-revision", str(delete.revision),
+                ])
+                assert code != 0 and rejected["error_code"] == "EMBEDDED_OBJECT_DELETE_BOUNDARY", rejected
+                # Delete/recreate the disposable owner, not an unsupported
+                # RTPC deletion. This is fixture lifecycle, never a fallback.
+                _delete_if_present_via_transaction(runtime, sound_id)
+                sound_id = None
+                sound_id = _create_object(runtime, parent=CONTAINERS_PARENT if runtime.version == "2025.1" else ACTOR_MIXER_PARENT, object_type="Sound", name=f"RTPC_Empty_{suffix}")
             elif original_rtpc_id is None:
                 original_rtpc_id = rtpc_id
             else:
                 assert rtpc_id != original_rtpc_id, "recreate must follow a proven empty list"
-        runtime.category_results.append({"category": "rtpc-list-lifecycle", "status": "PASS", "verifier_strength": "empty_create_in_place_update_delete_recreate"})
+        runtime.category_results.append({"category": "rtpc-list-lifecycle", "status": "PASS", "verifier_strength": "empty_create_update_rtpc_delete_boundary_owner_delete_recreate"})
         for index in range(2):
             plugin = _start_business_draft(runtime, "object.createPlugin")
             owner = _bind_business_object(runtime, plugin, object_id=sound_id)
