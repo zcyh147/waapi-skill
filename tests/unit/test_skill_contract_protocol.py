@@ -1243,7 +1243,7 @@ def test_one_time_onboarding_is_global_natural_and_does_not_add_a_gateway_call()
         "Skill loaded",
         "WAAPI address",
         "in the user's language, in two short paragraphs",
-        "adapter version; then current policy and modes",
+        "Wwise 适配版本 (localize); then policy and modes",
         "configured, not connected unless proved live",
         "Closing questions are free prose, in a new paragraph",
         "Never announce before Gateway, split facts, use memory",
