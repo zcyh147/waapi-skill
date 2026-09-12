@@ -2328,27 +2328,31 @@ def _complete_object_metadata_business_transaction(
     platform: str | None = None,
     linked: bool | None = None,
 ) -> dict[str, Mapping[str, Any]]:
-    preview = create_object_metadata_business_preview(
-        lambda command: runtime.gateway(
-            command,
-            live=command[0]
-            in {
-                "draft-bind-object",
-                "draft-discover-fields",
-                "draft-check",
-                "preview-from-draft",
-            },
-        ),
-        version=runtime.version,
-        operation=operation,
-        object_id=object_id,
-        field_name=field_name,
-        value=value,
-        target_id=target_id,
-        clear_reference=clear_reference,
-        platform=platform,
-        linked=linked,
+    draft = _start_business_draft(runtime, operation)
+    owner = _bind_business_object(runtime, draft, object_id=object_id)
+    discovered = _update_business_draft(
+        runtime, draft, "draft-discover-fields",
+        ["--object-handle", owner, "--meaning", field_name,
+         *([] if platform is None else ["--platform", platform])], live=True,
     )
+    candidates = discovered["field_candidates"]
+    assert len(candidates) == 1, discovered
+    field = candidates[0]["handle"]
+    if operation == "object.setReference":
+        outcome = ["--clear-reference"] if clear_reference else [
+            "--target-handle", _bind_business_object(
+                runtime, draft, object_id=target_id, role="reference_target",
+            ),
+        ]
+    elif operation == "object.setLinked":
+        outcome = ["--link-state", "linked" if linked else "unlinked"]
+    else:
+        outcome = ["--business-value", json.dumps(value)]
+    _update_business_draft(runtime, draft, "draft-declare-field-change", [
+        "--object-handle", owner, "--field-handle", field, *outcome,
+    ], live=False)
+    _update_business_draft(runtime, draft, "draft-check", live=True)
+    preview = _update_business_draft(runtime, draft, "preview-from-draft", live=True)
     transaction_id = preview["transaction_id"]
     shown = runtime.gateway(
         ["transaction-show", transaction_id, "--summary-only"],
@@ -3043,7 +3047,12 @@ def test_rtpc_empty_create_update_delete_recreate_across_selected_version(
                 "--point", "100", "0", "Linear",
             ], live=False)
             result = _complete_business_draft(runtime, draft)
-            readbacks = result["verify"]["verification"]["readbacks"]
+            transaction_id = str(result["preview"]["transaction_id"])
+            events = TransactionStore(runtime.state_dir).read_events(transaction_id)
+            verifications = [event["details"]["verification"] for event in events if event.get("event_type") == "verification_recorded"]
+            assert len(verifications) == 1
+            assert waapi_gateway.canonical_sha256(verifications[0]) == result["verify"]["stdout_projection"]["verification_canonical_sha256"]
+            readbacks = verifications[0]["readbacks"]
             rtpc_rows = [row for entry in readbacks for row in entry.get("result", {}).get("return", []) if row.get("type") == "RTPC"]
             assert len(rtpc_rows) == 1, readbacks
             rtpc_id = str(rtpc_rows[0]["id"])
