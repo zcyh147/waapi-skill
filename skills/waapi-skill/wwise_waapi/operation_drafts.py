@@ -1543,8 +1543,31 @@ class OperationDraftStore:
                 )
             if not _lexists(entry):
                 continue
+            stage = "file_safety"
             try:
                 record_read = self._read_record_snapshot(entry)
+                stage = "storage_envelope"
+                envelope = json.loads(record_read.data.decode("utf-8"))
+                _validate_record_envelope(envelope, expected_draft_id=match.group(1))
+                if not hmac.compare_digest(
+                    record_read.data, canonical_json_bytes(envelope)
+                ):
+                    raise ValueError("draft record bytes are not canonical")
+                terminal_at = _parse_timestamp(
+                    envelope["terminal_at"] or envelope["expires_at"]
+                )
+                if current >= terminal_at + timedelta(
+                    seconds=DEFAULT_OPERATION_DRAFT_TERMINAL_RETENTION_SECONDS
+                ):
+                    stage = "retention_cleanup"
+                    self._unlink_managed_file(
+                        entry,
+                        label="Operation Draft record",
+                        expected_metadata=record_read.metadata,
+                        expected_bytes=record_read.data,
+                    )
+                    continue
+                stage = "business_content"
                 record = _parse_canonical_record_bytes(
                     record_read.data,
                     expected_draft_id=match.group(1),
@@ -1554,6 +1577,22 @@ class OperationDraftStore:
                     durable_bytes=record_read.data,
                     metadata=record_read.metadata,
                 )
+                if record.state in {
+                    OperationDraftState.EDITABLE,
+                    OperationDraftState.SEAL_RESERVED,
+                }:
+                    if current < _parse_timestamp(record.expires_at):
+                        active += 1
+                    else:
+                        stage = "expiry_transition"
+                        self._replace_record(
+                            entry,
+                            self._expired_record(record).as_durable_dict(),
+                            expected_previous=loaded,
+                        )
+            except OperationDraftStorageCorruption as exc:
+                exc.details.update({"draft_id": match.group(1), "stage": stage})
+                raise
             except (
                 OSError,
                 RecursionError,
@@ -1561,43 +1600,12 @@ class OperationDraftStore:
                 UnicodeError,
                 ValueError,
                 json.JSONDecodeError,
+                OperationComposerError,
             ) as exc:
                 raise OperationDraftStorageCorruption(
-                    "Operation Draft record cannot be validated during cleanup."
+                    "Operation Draft record cannot be validated during cleanup.",
+                    details={"draft_id": match.group(1), "stage": stage},
                 ) from exc
-            if record.state in {
-                OperationDraftState.EDITABLE,
-                OperationDraftState.SEAL_RESERVED,
-            }:
-                expiry = _parse_timestamp(record.expires_at)
-                if current < expiry:
-                    active += 1
-                    continue
-                terminal_at = expiry
-                if current < terminal_at + timedelta(
-                    seconds=DEFAULT_OPERATION_DRAFT_TERMINAL_RETENTION_SECONDS
-                ):
-                    self._replace_record(
-                        entry,
-                        self._expired_record(record).as_durable_dict(),
-                        expected_previous=loaded,
-                    )
-                    continue
-            else:
-                if record.terminal_at is None:
-                    raise OperationDraftStorageCorruption(
-                        "Terminal Operation Draft is missing terminal_at."
-                    )
-                terminal_at = _parse_timestamp(record.terminal_at)
-            if current >= terminal_at + timedelta(
-                seconds=DEFAULT_OPERATION_DRAFT_TERMINAL_RETENTION_SECONDS
-            ):
-                self._unlink_managed_file(
-                    entry,
-                    label="Operation Draft record",
-                    expected_metadata=loaded.metadata,
-                    expected_bytes=loaded.durable_bytes,
-                )
         self._require_managed_entry_capacity(additional_entries=1)
         return active
 
@@ -2572,13 +2580,12 @@ def load_operation_draft_archive_records(
     return records
 
 
-def _record_from_mapping(
+def _validate_record_envelope(
     payload: Any,
     *,
     expected_draft_id: str,
-    allow_cleaned_file_evidence: bool = False,
-    allow_retired_audio_import_composition: bool = False,
-) -> OperationDraftRecord:
+) -> tuple[Mapping[str, Any], ...]:
+    """Validate storage integrity/lifetime without interpreting business content."""
     if not isinstance(payload, Mapping):
         raise TypeError("draft record must be an object")
     schema_version = payload.get("schema_version")
@@ -2688,6 +2695,36 @@ def _record_from_mapping(
             or not _SHA256_PATTERN.fullmatch(composer_digest)
         ):
             raise ValueError("composer digest is invalid")
+        if not isinstance(payload["composition"], Mapping):
+            raise ValueError("draft composition must be an object")
+        for field in ("check", "seal"):
+            if payload[field] is not None and not isinstance(payload[field], Mapping):
+                raise ValueError(f"draft {field} must be an object or null")
+    return _validate_audit(
+        payload["audit"],
+        draft_id=draft_id,
+        revision=revision,
+        state=state,
+        created_at=created_at,
+        updated_at=updated_at,
+        schema_version=schema_version,
+    )
+
+
+def _record_from_mapping(
+    payload: Any,
+    *,
+    expected_draft_id: str,
+    allow_cleaned_file_evidence: bool = False,
+    allow_retired_audio_import_composition: bool = False,
+) -> OperationDraftRecord:
+    audit = _validate_record_envelope(payload, expected_draft_id=expected_draft_id)
+    schema_version = payload["schema_version"]
+    state = OperationDraftState(payload["state"])
+    revision = payload["revision"]
+    schema_digest = payload["schema_digest"]
+    if schema_version == OPERATION_DRAFT_SCHEMA_VERSION:
+        composer_digest = payload["composer_digest"]
         cleaned_file_replay = (
             allow_cleaned_file_evidence and state is OperationDraftState.SEALED
         )
@@ -2743,27 +2780,18 @@ def _record_from_mapping(
         composition = None
         check = None
         seal = None
-    audit = _validate_audit(
-        payload["audit"],
-        draft_id=draft_id,
-        revision=revision,
-        state=state,
-        created_at=created_at,
-        updated_at=updated_at,
-        schema_version=schema_version,
-    )
     return OperationDraftRecord(
-        draft_id=draft_id,
+        draft_id=payload["draft_id"],
         state=state,
         revision=revision,
         operation=payload["operation"],
         version=payload["version"],
         schema_digest=schema_digest,
-        authority_digest=authority_digest,
+        authority_digest=payload["authority_digest"],
         created_at=payload["created_at"],
         updated_at=payload["updated_at"],
         expires_at=payload["expires_at"],
-        terminal_at=terminal_at,
+        terminal_at=payload["terminal_at"],
         audit=audit,
         limits_digest=OPERATION_DRAFT_LIMITS_DIGEST,
         schema_version=schema_version,
