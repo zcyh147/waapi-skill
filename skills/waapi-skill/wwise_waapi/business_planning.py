@@ -34,6 +34,7 @@ from .platform_commands import (
     WINDOWS_POWERSHELL_ENCODED_FAMILY,
     decode_windows_model_argv,
     decode_windows_powershell_argv,
+    encode_posix_gateway_argv,
 )
 
 
@@ -733,7 +734,10 @@ def _validate_continuation(value: Any) -> dict[str, Any]:
     shell_family = continuation.get("shell_family")
     shell_command = continuation["shell_command"]
     if shell_family == "posix-sh":
-        if shlex.join(full_argv) != shell_command:
+        if shell_command not in (
+            shlex.join(full_argv),
+            encode_posix_gateway_argv(full_argv),
+        ):
             raise ValueError("POSIX continuation does not encode full_argv exactly")
     elif shell_family == WINDOWS_POWERSHELL_ENCODED_FAMILY:
         if decode_windows_powershell_argv(shell_command) != tuple(full_argv):

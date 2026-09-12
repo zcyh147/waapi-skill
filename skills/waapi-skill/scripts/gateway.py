@@ -94,6 +94,7 @@ from wwise_waapi.platform_commands import (  # noqa: E402  # pyright: ignore[rep
     PlatformCommandError,
     WINDOWS_MODEL_COMMAND_FAMILY,
     WINDOWS_POWERSHELL_ENCODED_FAMILY,
+    encode_posix_gateway_argv,
     encode_windows_model_argv,
     encode_windows_powershell_argv,
 )
@@ -410,6 +411,7 @@ from wwise_waapi.business_declarations import (  # noqa: E402  # pyright: ignore
     bind_live_field,
     business_repair,
     normalize_live_object_identity,
+    repair_at_draft_revision,
     revalidate_live_field,
     revalidate_live_objects,
     revalidate_live_types,
@@ -15026,10 +15028,17 @@ def dispatch_operation_draft_check(
                 state_dir=args.state_dir,
             )
 
-        compiled_business = adapter.compile_preview(
-            business_session,
-            build_continuation=build_business_continuation,
-        )
+        try:
+            compiled_business = adapter.compile_preview(
+                business_session,
+                build_continuation=build_business_continuation,
+            )
+        except BusinessDeclarationError as exc:
+            # Internal declaration revisions count rows, not public Draft
+            # updates. Report the revision the caller actually supplied.
+            raise repair_at_draft_revision(
+                exc, draft_revision=materialized.record.revision
+            ) from exc
         if compiled_business is not None:
             if (
                 compiled_business.request != materialized.request
@@ -23470,24 +23479,7 @@ def transaction_next_command(
             model_command = None
     else:
         payload["shell_family"] = "posix-sh"
-        copy_argv = full_argv
-        try:
-            relative_runner = Path(str(GATEWAY_RUNNER_PATH)).resolve(
-                strict=False
-            ).relative_to(Path.cwd().resolve(strict=False))
-        except (OSError, ValueError):
-            relative_runner = None
-        if (
-            relative_runner is not None
-            and relative_runner.as_posix()
-            == ".agents/skills/waapi-skill/scripts/run.py"
-        ):
-            copy_argv = [
-                full_argv[0],
-                relative_runner.as_posix(),
-                *full_argv[2:],
-            ]
-        shell_command = shlex.join(copy_argv)
+        shell_command = encode_posix_gateway_argv(full_argv)
     if model_command is not None:
         payload["shell_command"] = shell_command
         payload["model_shell_family"] = WINDOWS_MODEL_COMMAND_FAMILY

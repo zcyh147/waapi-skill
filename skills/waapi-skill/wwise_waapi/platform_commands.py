@@ -13,7 +13,9 @@ from __future__ import annotations
 
 import base64
 import binascii
+import shlex
 from collections.abc import Sequence
+from pathlib import Path
 
 
 WINDOWS_POWERSHELL_ENCODED_FAMILY = "windows-powershell-encoded"
@@ -43,6 +45,31 @@ _POWERSHELL_SMART_QUOTES = frozenset(chr(value) for value in range(0x2018, 0x202
 
 class PlatformCommandError(ValueError):
     """A platform continuation command is malformed or non-canonical."""
+
+
+def encode_posix_gateway_argv(argv: Sequence[str]) -> str:
+    """Encode exact argv, shortening only the current task's fixed runner.
+
+    Generation and validation share this rule. This is not general path
+    equivalence: the interpreter, Gateway marker and every later token remain
+    untouched, and another working directory cannot authorize the short form.
+    """
+
+    normalized = _validated_argv(argv)
+    task_runner = ".agents/skills/waapi-skill/scripts/run.py"
+    if (
+        len(normalized) >= 3
+        and normalized[0] == "python"
+        and normalized[2] == "gateway.py"
+        and Path(normalized[1]).is_absolute()
+    ):
+        try:
+            relative = Path(normalized[1]).resolve().relative_to(Path.cwd().resolve())
+        except (OSError, ValueError):
+            relative = None
+        if relative is not None and relative.as_posix() == task_runner:
+            normalized = (normalized[0], task_runner, *normalized[2:])
+    return shlex.join(normalized)
 
 
 def encode_windows_powershell_argv(argv: Sequence[str]) -> str:

@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import sys
+import pytest
 from collections import deque
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -1305,9 +1306,15 @@ def test_audio_import_switch_value_is_a_first_class_business_argument(
     assert record_path.read_bytes() == before_ambiguous_attempt
 
 
+@pytest.mark.parametrize("continuation_mode", ("absolute", "task-local", "invalid"))
 def test_structure_declaration_reaches_live_check_and_persists_readable_preview(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    continuation_mode: str,
 ) -> None:
+    if continuation_mode == "task-local":
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(waapi_gateway, "GATEWAY_RUNNER_PATH", tmp_path / ".agents/skills/waapi-skill/scripts/run.py")
     code, started = _offline(tmp_path, "draft-start", "audio.import")
     assert code == 0, started
     draft_id = started["draft"]["draft_id"]
@@ -1375,6 +1382,18 @@ def test_structure_declaration_reaches_live_check_and_persists_readable_preview(
     assert declare_code == 0, declared
     check_client = BusinessCheckClient(tmp_path)
 
+    record_path = tmp_path / "state/operation-drafts-v1/records" / f"{draft_id}.json"
+    before_check = record_path.read_bytes()
+    if continuation_mode == "invalid":
+        original_next_command = waapi_gateway.transaction_next_command
+
+        def invalid_next_command(*args, **kwargs):
+            result = original_next_command(*args, **kwargs)
+            result["shell_command"] = "python wrong.py"
+            return result
+
+        monkeypatch.setattr(waapi_gateway, "transaction_next_command", invalid_next_command)
+
     check_code, checked = waapi_gateway.execute_gateway(
         [
             "--state-dir",
@@ -1389,6 +1408,13 @@ def test_structure_declaration_reaches_live_check_and_persists_readable_preview(
         env=_env(tmp_path),
         client_factory=lambda _url: check_client,
     )
+
+    if continuation_mode == "invalid":
+        assert check_code == 2
+        assert checked["error_code"] == "BUSINESS_CONTINUATION_INVALID"
+        assert checked["details"]["repair"]["draft_revision"] == 3
+        assert record_path.read_bytes() == before_check
+        return
 
     assert check_code == 0, json.dumps(checked, indent=2)
     assert checked["draft"]["revision"] == 4
