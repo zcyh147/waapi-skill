@@ -890,6 +890,31 @@ no behavior credit.
 
 ## CI-safe focused checks
 
+### Bare Skill first use
+
+The matrix-only `first_use_2` regression runs two offline, memory-off Terra
+tasks: exactly `/waapi-skill`, and exactly a Markdown Skill link. Neither
+prompt asks for an introduction. Each must read the Skill, execute one
+production `config-show`, and introduce all Gateway-owned session facts
+without claiming a live connection. A second user turn asks it to wait; that
+same thread must not repeat the welcome or issue another command. This is
+first-use behavior evidence, not Wwise/API coverage. No live fixture, Wwise
+process, mutation, or legacy suite is involved.
+
+```bash
+skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_matrix.py \
+  --profile first_use_2 --offline-only \
+  --iteration-root skills/waapi-skill-workspace/first-use-new-candidate-r1
+```
+
+Use the existing one-shot desktop launcher and a clean frozen candidate.
+The matrix retains both prompts, raw turns, isolation audits, Broker records,
+per-fact checks, and a SHA-256 evidence manifest. It rejects existing roots and
+filters; this small profile has no campaign resume/replay route. Keep a failed
+root as evidence and use a new root after any repair.
+
+### Deterministic checks
+
 These checks validate the suite, isolation harness, broker, grader, fixtures,
 and documentation without starting Codex CLI or Wwise:
 

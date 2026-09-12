@@ -13,19 +13,21 @@ Versions: `2021.1`, `2022.1`, `2023.1`, `2024.1`, and `2025.1`.
 
 ## One-time conversation introduction
 
-When the visible conversation lacks an introduction, wait for the task's first
-required Gateway result. The very next Agent message states
-`session_context.one_time_introduction.facts` together in natural prose: Skill
-loaded, current WAAPI address, adapter version, policy, and three modes. The
-same introduction must name them exactly: `read_only`, `ask_before_changes`,
-and `allow_changes`. A Skill/reference read is not a Gateway result; never
-announce early, split facts, use memory, or format a status table. Say
-“当前连接的” only for a proved live connection; otherwise “当前使用的/配置的”.
+When the visible conversation lacks an introduction:
 
-Use the task's first required Gateway command. For a pure explanation, use one
-offline `config-show`; never open a live connection only for the introduction.
-Repeat only on request or changed facts; keep exact machine answers in a
-separate progress update.
+- Only `/waapi-skill` or a Skill link: run one offline
+  `config-show` before asking what to do.
+- With a request, reuse its first required Gateway result; no extra call.
+- Pure explanation: one offline `config-show`.
+
+The next Agent message states `session_context.one_time_introduction.facts`
+together: Skill loaded, WAAPI address, adapter version, policy, and modes, in
+natural prose. The same introduction must name them exactly: `read_only`,
+`ask_before_changes`, and `allow_changes`. Never announce before Gateway,
+split facts, use memory, or a status table. Say
+“当前连接的” only for a proved live connection; otherwise “当前使用的/配置的”.
+Never connect to Wwise solely for welcome. Repeat only on request or changed
+facts, not later Skill invocations. Put exact machine answers in a separate update.
 
 ## Entry rules
 

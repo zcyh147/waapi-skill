@@ -1235,22 +1235,22 @@ def test_one_time_onboarding_is_global_natural_and_does_not_add_a_gateway_call()
     skill_compact = " ".join(SKILL.split())
     for phrase in (
         "When the visible conversation lacks an introduction",
-        "wait for the task's first required Gateway result",
+        "Only `/waapi-skill` or a Skill link: run one offline `config-show`",
         "Read the injected `SKILL.md` exactly once",
         "A successful read is complete; a second `SKILL.md` read is forbidden",
-        "The very next Agent message",
+        "The next Agent message",
         "`session_context.one_time_introduction.facts` together",
         "Skill loaded",
-        "current WAAPI address",
-        "adapter version, policy, and three modes",
-        "A Skill/reference read is not a Gateway result",
-        "never announce early, split facts, use memory",
+        "WAAPI address",
+        "adapter version, policy, and modes",
+        "Never announce before Gateway, split facts, use memory",
         "status table",
-        "Use the task's first required Gateway command",
-        "For a pure explanation, use one offline `config-show`",
-        "never open a live connection only for the introduction",
+        "With a request, reuse its first required Gateway result; no extra call",
+        "Pure explanation: one offline `config-show`",
+        "Never connect to Wwise solely for welcome",
         "Repeat only on request or changed facts",
-        "separate progress update",
+        "not later Skill invocations",
+        "separate update",
     ):
         assert phrase in skill_compact
     assert "The entry file owns the one-time conversation introduction for every lane" in SETUP
