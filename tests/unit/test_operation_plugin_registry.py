@@ -696,6 +696,33 @@ def test_effect_verifier_resolves_effect_slot_to_effect_guid_before_plugin_read(
     }
 
 
+@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("proof", ({}, {"return": None}, {"return": {}}, {"return": [None]}, {"return": [{"id": SLOT_ID}]}, {"return": []}))
+def test_effect_prepare_requires_independent_empty_list_proof(
+    version: str, proof: Mapping[str, Any],
+) -> None:
+    reader = ScriptedReader({
+        "ak.wwise.core.object.get": [
+            {"return": [target_row(object_type="ActorMixer")]},
+            {"return": [{"id": TARGET_ID}]},
+            proof,
+        ],
+    })
+    parsed = parse_operation_request(request(version=version, kind="effect"))
+    if proof == {"return": []}:
+        prepared = prepare_operation(parsed, read_call=reader).as_dict()
+        assert prepared["dispatch"]["args"]["objects"][0]["listMode"] == "append"
+        assert prepared["preflight_reads"][-1]["result"] == proof
+    else:
+        with pytest.raises(OperationContractError, match="independently empty"):
+            prepare_operation(parsed, read_call=reader)
+    assert reader.calls[-1] == (
+        "ak.wwise.core.object.get",
+        {"waql": f'from object "{TARGET_ID}" select @Effects take 1'},
+        {"return": ["id"]},
+    )
+
+
 def test_2023_effect_verifier_fails_closed_when_slot_has_no_effect_reference() -> None:
     prepared = prepare_operation(
         parse_operation_request(request(version="2023.1", kind="effect")),

@@ -359,7 +359,6 @@ RTPC_SNAPSHOT_FIELDS = (
     "@Curve",
 )
 RTPC_MAX_LIST_ROWS = 128
-RTPC_EMPTY_OWNER_FIELD_OMISSION_VERSIONS = frozenset({"2022.1", "2025.1"})
 RTPC_CONTROL_INPUT_TYPE_TOKENS = frozenset(
     {
         "gameparameter",
@@ -6468,10 +6467,10 @@ def _read_rtpc_rows_with_evidence(
     owner_row = owner_rows[0]
     compatibility_normalization: dict[str, Any] | None = None
     if "@RTPC" not in owner_row:
-        if (
-            version in RTPC_EMPTY_OWNER_FIELD_OMISSION_VERSIONS
-            and set(owner_row) == {"id"}
-        ):
+        if set(owner_row) == {"id"}:
+            emptiness_readback = _prove_omitted_object_list_empty(
+                object_id, "RTPC", read=read,
+            )
             raw_references: Any = []
             compatibility_normalization = {
                 "kind": "missing-empty-object-list",
@@ -6479,6 +6478,7 @@ def _read_rtpc_rows_with_evidence(
                 "field": "@RTPC",
                 "observed_row_keys": ["id"],
                 "normalized_value": [],
+                "emptiness_readback": emptiness_readback,
             }
         else:
             raise OperationContractError(
@@ -7608,6 +7608,46 @@ def _bounded_multi_identity_read(
     }
 
 
+def _prove_omitted_object_list_empty(
+    object_id: Any,
+    list_name: str,
+    *,
+    read: ReadCall,
+    platform: str | None = None,
+) -> dict[str, Any]:
+    """Prove absence independently of a missing owner return projection.
+
+    Only fixed operation-owned lists enter this compatibility path. WAQL list
+    selection is distinct from the legacy transform.select relationship enum.
+    One returned member is sufficient to disprove emptiness; never enumerate
+    an unbounded list or treat a failed/malformed query as an empty result.
+    """
+    if (
+        list_name not in {"RTPC", "Effects"}
+        or not isinstance(object_id, str)
+        or not _PLUGIN_GUID.fullmatch(object_id)
+    ):
+        raise OperationContractError(
+            "INVALID_READBACK", "Empty-list proof requires a fixed list and canonical owner GUID.",
+        )
+    args = {"waql": f'from object "{object_id}" select @{list_name} take 1'}
+    options = _import_object_get_options(("id",), platform=platform)
+    result = read(OBJECT_GET_URI, args, options)
+    evidence = {
+        "uri": OBJECT_GET_URI,
+        "args": args,
+        "options": options,
+        "result": dict(result) if isinstance(result, Mapping) else result,
+    }
+    if not isinstance(result, Mapping) or result.get("return") != []:
+        raise OperationContractError(
+            "INVALID_READBACK",
+            "An omitted object-list field requires an independently empty list readback.",
+            details={"object_id": object_id, "field": f"@{list_name}", "emptiness_readback": evidence},
+        )
+    return evidence
+
+
 def _read_object_list_rows_with_evidence(
     object_id: Any,
     list_name: str,
@@ -7664,12 +7704,16 @@ def _read_object_list_rows_with_evidence(
     compatibility_normalization: dict[str, Any] | None = None
     if list_field not in owner_row:
         if allow_missing_empty and set(owner_row) == {"id"}:
+            emptiness_readback = _prove_omitted_object_list_empty(
+                object_id, canonical_name, read=read, platform=platform,
+            )
             raw_references: Any = []
             compatibility_normalization = {
                 "kind": "missing-empty-object-list",
                 "field": list_field,
                 "observed_row_keys": ["id"],
                 "normalized_value": [],
+                "emptiness_readback": emptiness_readback,
             }
         else:
             raise OperationContractError(

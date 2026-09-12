@@ -632,7 +632,23 @@ def test_gateway_closes_merge_configuration_before_root_declaration(
     assert "existing_same_name_root_merge" not in next_action
 
 
-def test_gateway_builds_rtpc_curve_from_bound_business_facts(tmp_path: Path) -> None:
+@pytest.mark.parametrize("version", ("2022.1", "2023.1", "2024.1", "2025.1"))
+def test_gateway_builds_rtpc_curve_from_bound_business_facts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, version: str,
+) -> None:
+    original_env, original_info = _env, _info
+
+    def version_env(path: Path) -> dict[str, str]:
+        return {**original_env(path), "WWISE_VERSION": version}
+
+    def version_info() -> dict[str, Any]:
+        value = original_info()
+        value["version"]["year"] = int(version[:4])
+        value["version"]["displayName"] = f"v{version}.0.1"
+        return value
+
+    monkeypatch.setattr(sys.modules[__name__], "_env", version_env)
+    monkeypatch.setattr(sys.modules[__name__], "_info", version_info)
     start_code, started = _offline(tmp_path, "draft-start", "object.setRTPC")
     assert start_code == 0, started
     draft_id = started["draft"]["draft_id"]
@@ -804,10 +820,10 @@ def test_gateway_builds_rtpc_curve_from_bound_business_facts(tmp_path: Path) -> 
         task_authority=authority,
         expected_revision=5,
         schema_digest=gateway.operation_draft_schema_digest(
-            "object.setRTPC", "2025.1"
+            "object.setRTPC", version
         ),
         composer_digest=operation_composer_digest(
-            "object.setRTPC", "2025.1"
+            "object.setRTPC", version
         ),
     )
     assert materialized.request["arguments"]["property"] == "Volume"
@@ -815,6 +831,46 @@ def test_gateway_builds_rtpc_curve_from_bound_business_facts(tmp_path: Path) -> 
         {"x": 0, "y": -12, "shape": "SCurve"},
         {"x": 100, "y": 0, "shape": "Linear"},
     ]
+
+    identities = {
+        PARENT_ID: {"id": PARENT_ID, "name": "Rain", "type": "Sound", "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Rain"},
+        CONTROL_ID: {"id": CONTROL_ID, "name": "Weather Intensity", "type": "GameParameter", "path": r"\Game Parameters\Default Work Unit\Weather Intensity"},
+    }
+
+    class CheckClient:
+        def call(self, uri: str, args: Any = None, options: Any = None) -> Any:
+            if uri == "ak.wwise.core.object.getPropertyAndReferenceNames":
+                return {"return": ["Volume"]}
+            if uri == "ak.wwise.core.getInfo":
+                return _info()
+            if uri == "ak.wwise.core.getProjectInfo":
+                return _project(tmp_path)
+            if uri == "ak.wwise.core.object.getPropertyInfo":
+                assert args["property"] == "Volume"
+                return volume_metadata
+            if uri == "ak.wwise.core.object.get":
+                if args == {"waql": f'from object "{PARENT_ID}" select @RTPC take 1'}:
+                    assert options == {"return": ["id"]}
+                    return {"return": []}
+                ids = args.get("from", {}).get("id")
+                if ids == [PARENT_ID] and options == {"return": ["id", "@RTPC"]}:
+                    return {"return": [{"id": PARENT_ID}]}
+                if ids and all(item in identities for item in ids):
+                    return {"return": [identities[item] for item in ids]}
+            raise AssertionError(f"Unexpected WAAPI call: {uri} {args!r} {options!r}")
+
+        def disconnect(self) -> None:
+            pass
+
+    for command, revision in (("draft-check", 5), ("preview-from-draft", 6)):
+        code, payload = gateway.execute_gateway(
+            ["--state-dir", str(tmp_path / "state"), command, draft_id,
+             "--task-authority", authority, "--expected-revision", str(revision)],
+            env=_env(tmp_path), client_factory=lambda _url: CheckClient(),
+        )
+        assert code == 0, json.dumps(payload, ensure_ascii=False)
+        assert payload["ok"] is True
+    assert payload["transaction_id"]
 
 
 def test_gateway_compiles_object_create_settings_and_stable_fields(

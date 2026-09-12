@@ -12,6 +12,7 @@ from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImp
     OperationContractError,
     _is_rtpc_control_input,
     _read_rtpc_rows_with_evidence,
+    _read_object_list_rows_with_evidence,
     parse_operation_request,
     prepare_operation,
     validate_prepared_roles,
@@ -395,8 +396,8 @@ def test_rtpc_add_materializes_only_the_closed_append_shape_and_verifies_full_li
     ]
 
 
-@pytest.mark.parametrize("version", ("2022.1", "2025.1"))
-def test_version_proven_missing_empty_rtpc_field_is_normalized_through_prepare_guard_and_verify(
+@pytest.mark.parametrize("version", ("2022.1", "2023.1", "2024.1", "2025.1"))
+def test_live_proven_missing_empty_rtpc_field_is_normalized_through_prepare_guard_and_verify(
     version: str,
 ) -> None:
     parsed = parse_operation_request(
@@ -427,6 +428,7 @@ def test_version_proven_missing_empty_rtpc_field_is_normalized_through_prepare_g
                         ]
                     },
                     _missing_rtpc_owner_result(),
+                    {"return": []},
                 ],
                 "ak.wwise.core.object.getPropertyInfo": [
                     {
@@ -449,12 +451,19 @@ def test_version_proven_missing_empty_rtpc_field_is_normalized_through_prepare_g
         "field": "@RTPC",
         "observed_row_keys": ["id"],
         "normalized_value": [],
+        "emptiness_readback": {
+            "uri": "ak.wwise.core.object.get",
+            "args": {"waql": f'from object "{OBJECT_ID}" select @RTPC take 1'},
+            "options": {"return": ["id"]},
+            "result": {"return": []},
+        },
     }
     assert prepared["pre_state"]["rtpc_snapshot"]["rows"] == []
     assert prepared["pre_state"]["rtpc_snapshot"]["readback_compatibility"] == [
         normalization
     ]
-    assert prepared["preflight_reads"][-1]["result"] == _missing_rtpc_owner_result()
+    assert prepared["preflight_reads"][-2]["result"] == _missing_rtpc_owner_result()
+    assert prepared["preflight_reads"][-1]["result"] == {"return": []}
 
     guard = validate_prepared_roles(
         prepared,
@@ -472,6 +481,7 @@ def test_version_proven_missing_empty_rtpc_field_is_normalized_through_prepare_g
                         ]
                     },
                     _missing_rtpc_owner_result(),
+                    {"return": []},
                 ]
             }
         ),
@@ -487,7 +497,7 @@ def test_version_proven_missing_empty_rtpc_field_is_normalized_through_prepare_g
         prepared,
         execution_result={"result": {}},
         read_call=ScriptedReader(
-            {"ak.wwise.core.object.get": [_missing_rtpc_owner_result()]}
+            {"ak.wwise.core.object.get": [_missing_rtpc_owner_result(), {"return": []}]}
         ),
     )
     assert verified.ok is False
@@ -496,12 +506,13 @@ def test_version_proven_missing_empty_rtpc_field_is_normalized_through_prepare_g
     assert verified.readbacks[0]["compatibility_normalization"] == normalization
 
 
-@pytest.mark.parametrize("version", ("2023.1", "2024.1"))
-def test_missing_rtpc_owner_field_remains_invalid_without_live_version_evidence(
-    version: str,
+@pytest.mark.parametrize("version", ("2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("proof", ({}, {"return": None}, {"return": {}}, {"return": [None]}, {"return": [{"id": RTPC_ID}]}))
+def test_missing_rtpc_owner_field_remains_invalid_without_live_empty_proof(
+    version: str, proof: Mapping[str, Any],
 ) -> None:
     reader = ScriptedReader(
-        {"ak.wwise.core.object.get": [_missing_rtpc_owner_result()]}
+        {"ak.wwise.core.object.get": [_missing_rtpc_owner_result(), proof]}
     )
 
     with pytest.raises(OperationContractError) as exc_info:
@@ -538,7 +549,7 @@ def test_explicit_empty_rtpc_owner_array_remains_valid(version: str) -> None:
     ]
 
 
-@pytest.mark.parametrize("version", ("2022.1", "2025.1"))
+@pytest.mark.parametrize("version", ("2022.1", "2023.1", "2024.1", "2025.1"))
 @pytest.mark.parametrize(
     "owner_result",
     (
@@ -566,7 +577,7 @@ def test_compatibility_version_still_requires_one_canonical_owner_row(
     assert exc_info.value.error_code == "INVALID_READBACK"
 
 
-@pytest.mark.parametrize("version", ("2022.1", "2025.1"))
+@pytest.mark.parametrize("version", ("2022.1", "2023.1", "2024.1", "2025.1"))
 def test_compatibility_version_missing_rtpc_field_with_an_extra_key_remains_invalid(
     version: str,
 ) -> None:
@@ -588,7 +599,7 @@ def test_compatibility_version_missing_rtpc_field_with_an_extra_key_remains_inva
     assert exc_info.value.error_code == "INVALID_READBACK"
 
 
-@pytest.mark.parametrize("version", ("2022.1", "2025.1"))
+@pytest.mark.parametrize("version", ("2022.1", "2023.1", "2024.1", "2025.1"))
 @pytest.mark.parametrize("malformed", (None, {}, "not-a-list", 0))
 def test_present_rtpc_owner_field_must_remain_an_array_in_compatibility_versions(
     version: str,
@@ -610,6 +621,42 @@ def test_present_rtpc_owner_field_must_remain_an_array_in_compatibility_versions
         )
 
     assert exc_info.value.error_code == "INVALID_READBACK"
+
+
+@pytest.mark.parametrize("proof", ({}, {"return": None}, {"return": {}}, {"return": [None]}, {"return": [{"id": RTPC_ID}]}, {"return": []}))
+def test_effects_omitted_list_requires_independent_empty_proof(proof: Mapping[str, Any]) -> None:
+    reader = ScriptedReader({"ak.wwise.core.object.get": [_missing_rtpc_owner_result(), proof]})
+    kwargs = dict(fields=("id",), read=reader, platform=CONTROL_ID, context="plugin-effect-slots", allow_missing_empty=True)
+    if proof == {"return": []}:
+        rows, evidence = _read_object_list_rows_with_evidence(OBJECT_ID, "Effects", **kwargs)
+        assert rows == []
+        probe = evidence[0]["compatibility_normalization"]["emptiness_readback"]
+        assert probe["result"] == proof
+    else:
+        with pytest.raises(OperationContractError, match="independently empty"):
+            _read_object_list_rows_with_evidence(OBJECT_ID, "Effects", **kwargs)
+    assert reader.calls[-1] == (
+        "ak.wwise.core.object.get",
+        {"waql": f'from object "{OBJECT_ID}" select @Effects take 1'},
+        {"return": ["id"], "platform": CONTROL_ID},
+    )
+
+
+def test_arbitrary_object_list_omission_remains_strict() -> None:
+    reader = ScriptedReader({"ak.wwise.core.object.get": [_missing_rtpc_owner_result()]})
+    with pytest.raises(OperationContractError, match="must contain"):
+        _read_object_list_rows_with_evidence(OBJECT_ID, "Markers", fields=("id",), read=reader, context="object-list")
+    assert len(reader.calls) == 1
+
+
+def test_rtpc_empty_proof_transport_failure_is_not_swallowed() -> None:
+    def read(uri: str, args: Mapping[str, Any], options: Mapping[str, Any]) -> Mapping[str, Any]:
+        if "waql" in args:
+            raise TimeoutError("empty-list proof timed out")
+        return _missing_rtpc_owner_result()
+
+    with pytest.raises(TimeoutError, match="empty-list proof timed out"):
+        _read_rtpc_rows_with_evidence(OBJECT_ID, version="2024.1", read=read)
 
 
 def test_rtpc_update_targets_existing_rtpc_without_replace_all() -> None:
