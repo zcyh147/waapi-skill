@@ -73,6 +73,16 @@ def common_checks(result: Any) -> dict[str, bool]:
     }
 
 
+def save_turn(directory: Path, result: Any) -> None:
+    """CodexCliTask returns evidence in memory; the matrix owns persistence."""
+    from tests.semantic import run_codex_skill_matrix as matrix
+
+    matrix.write_text(directory / "events.jsonl", result.stdout)
+    matrix.write_text(directory / "stderr.txt", result.stderr)
+    matrix.write_text(directory / "final-response.txt", result.final_response)
+    matrix.write_json(directory / "codex-result.json", result.facts_dict())
+
+
 def run_first_use_matrix(options: Any) -> int:
     # Reuse matrix installation, environment sanitization, argv extraction and
     # evidence serialization; no alternate agent runtime or direct WAAPI client.
@@ -102,6 +112,7 @@ def run_first_use_matrix(options: Any) -> int:
         policy = "ask_before_changes" if case_id == "bare-slash" else "allow_changes"
         matrix.write_json(case_root / "prompts.json", {"turns": [prompt, FOLLOWUP]})
         outcome: dict[str, Any] = {"case_id": case_id, "status": "BLOCKED"}
+        turn_directory = case_root / "turn-1"
         try:
             with CodexGatewayBroker(
                 skill_source=options.skill_source, invocation_skill_source=installed,
@@ -120,7 +131,8 @@ def run_first_use_matrix(options: Any) -> int:
                     windows_powershell_core_host=options.windows_powershell_core_host,
                 )
                 with CodexCliTask(config, extra_env=broker.model_environment_overrides()) as task:
-                    first = task.run_initial(prompt, output_dir=case_root / "turn-1")
+                    first = task.run_initial(prompt, output_dir=turn_directory)
+                    save_turn(turn_directory, first)
                     argv = matrix.gateway_candidate_argvs(first, skill_source=installed,
                         alternate_skill_sources=(options.skill_source,), expected_wwise_version="2024.1")
                     evidence = broker.evidence()
@@ -139,13 +151,17 @@ def run_first_use_matrix(options: Any) -> int:
                     checks.update(introduction_checks(intro, facts))
                     outcome.update(thread_id=task.thread_id, first_turn_checks=checks)
                     if all(checks.values()):
-                        later = task.run_followup(FOLLOWUP, output_dir=case_root / "turn-2")
+                        turn_directory = case_root / "turn-2"
+                        later = task.run_followup(FOLLOWUP, output_dir=turn_directory)
+                        save_turn(turn_directory, later)
                         later_checks = followup_checks(later, first.thread_id, facts)
                         outcome["followup_checks"] = later_checks
                         checks = {**checks, **{f"followup_{k}": v for k, v in later_checks.items()}}
                     matrix.write_json(case_root / "broker-evidence.json", asdict(broker.evidence()))
                     outcome["status"] = "PASS" if all(checks.values()) else "FAIL"
         except Exception as exc:
+            if getattr(exc, "result", None) is not None:
+                save_turn(turn_directory, exc.result)
             outcome["error"] = f"{type(exc).__name__}: {exc}"
         outcomes.append(outcome)
         matrix.write_json(case_root / "outcome.json", outcome)

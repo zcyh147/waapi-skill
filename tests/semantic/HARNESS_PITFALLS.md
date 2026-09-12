@@ -17,6 +17,18 @@ prevention checks that are expensive to rediscover.
 
 ## Incident ledger
 
+### A matrix caller must persist the returned Codex turn
+
+- The first `first_use_2` run passed both behavior checks, but its new matrix
+  caller saved only outcomes and Broker records. `CodexCliTask` returns raw
+  events and isolation audits in memory; creating its output directory does
+  not archive those fields automatically. That root is diagnostic only.
+- Persist each returned turn's raw events, stderr, final reply, and complete
+  `facts_dict()` before grading or starting a follow-up. Include those files
+  in the evidence manifest and test their contents before another Fresh run.
+  Preserve a returned infrastructure-error result too. Do not promote a root
+  lacking original turn evidence merely because its Boolean checks passed.
+
 ### Windows Session 0 process initialization
 
 - Symptom: standalone Codex or `pwsh` exits with `0xC0000142` when a formal

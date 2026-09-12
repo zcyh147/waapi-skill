@@ -52,6 +52,17 @@ def test_first_use_matrix_routes_without_loading_a_legacy_suite(monkeypatch) -> 
     assert matrix.main([]) == 0
 
 
+def test_turn_archive_retains_raw_events_and_independent_audits(tmp_path) -> None:
+    result = SimpleNamespace(
+        stdout='{"type":"turn.completed"}\n', stderr="", final_response=INTRO,
+        facts_dict=lambda: {"thread_id": "fresh-thread", "prompt_audit": {"passed": True}},
+    )
+    welcome.save_turn(tmp_path, result)
+    assert (tmp_path / "events.jsonl").read_text() == result.stdout
+    assert (tmp_path / "final-response.txt").read_text() == INTRO
+    assert json.loads((tmp_path / "codex-result.json").read_text())["thread_id"] == "fresh-thread"
+
+
 def test_followup_rejects_repeated_welcome_or_a_new_thread(monkeypatch) -> None:
     monkeypatch.setattr(welcome, "common_checks", lambda result: {"completed": True})
     def result(text, thread_id="same", commands=()):
