@@ -4,9 +4,13 @@ import importlib.util
 import json
 import re
 import sys
-from datetime import datetime, timezone
+from dataclasses import replace
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+
+import pytest
+from wwise_waapi.canonical import canonical_json_bytes
 
 from wwise_waapi.operation_drafts import (  # pyright: ignore[reportMissingImports]
     OperationDraftStore,
@@ -68,6 +72,42 @@ def execute(
         env=gateway_env(tmp_path),
         client_factory=fail_if_connected,
     )
+
+
+@pytest.mark.parametrize("age_days", [0, 3])
+def test_gateway_new_draft_checks_retention_before_historical_business_content(
+    tmp_path: Path, age_days: int,
+) -> None:
+    store = OperationDraftStore(tmp_path / "state")
+    old = store.start(
+        operation="object.create", version="2025.1",
+        schema_digest="a" * 64, composer_digest="b" * 64,
+        now=datetime.now(timezone.utc) - timedelta(days=age_days),
+    )
+    # Historical pre-business object.create, with intact storage digests/audit.
+    record = replace(old.record, composition={
+        "contract": "waapi-skill.operation-composition/v1",
+        "typed_request_schema_digest": "c" * 64,
+        "facts": [],
+    })
+    old_path = store.records_dir / f"{old.draft_id}.json"
+    before = canonical_json_bytes(record.as_durable_dict())
+    old_path.write_bytes(before)
+
+    code, result = execute(tmp_path, "draft-start", "object.set")
+
+    if age_days == 3:
+        assert code == 0, result
+        assert result["draft"]["binding"]["operation"] == "object.set"
+        assert result["draft"]["binding"]["version"] == "2022.1"
+        assert not old_path.exists()
+    else:
+        assert code == 2, result
+        assert result["error_code"] == "OPERATION_DRAFT_STORAGE_CORRUPTION"
+        assert result["details"]["draft_id"] == old.draft_id
+        assert result["details"]["stage"] == "business_content"
+        assert old_path.read_bytes() == before
+    assert not (tmp_path / "state" / "transactions").exists()
 
 
 def test_public_business_draft_lifecycle_is_offline_task_bound_and_cross_invocation(
