@@ -464,13 +464,14 @@ def test_source_verifier_rejects_tampered_property_validation_before_reads() -> 
     assert reader.calls == []
 
 
-def test_2022_effect_prepare_uses_complete_fixed_slot_snapshot_and_verifies_plugin() -> None:
+@pytest.mark.parametrize("empty", (None, "{00000000-0000-0000-0000-000000000000}", {"id": "{00000000-0000-0000-0000-000000000000}", "name": ""}))
+def test_2022_effect_prepare_uses_complete_fixed_slot_snapshot_and_verifies_plugin(empty: Any) -> None:
     fixed_snapshot = {
         "id": TARGET_ID,
         "@Effect0": {"id": OLD_PLUGIN_ID},
-        "@Effect1": None,
-        "@Effect2": None,
-        "@Effect3": None,
+        "@Effect1": empty,
+        "@Effect2": empty,
+        "@Effect3": empty,
     }
     prepared = prepare_operation(
         parse_operation_request(request(version="2022.1", kind="effect")),
@@ -512,8 +513,8 @@ def test_2022_effect_prepare_uses_complete_fixed_slot_snapshot_and_verifies_plug
         "id": TARGET_ID,
         "@Effect0": {"id": OLD_PLUGIN_ID},
         "@Effect1": {"id": PLUGIN_ID},
-        "@Effect2": None,
-        "@Effect3": None,
+        "@Effect2": empty,
+        "@Effect3": empty,
     }
     verifier_reader = ScriptedReader(
         {

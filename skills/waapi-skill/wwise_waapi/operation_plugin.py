@@ -1326,6 +1326,8 @@ def _closed_object_reference_id(
                     f"{field}.{optional_field} must be a string.",
                 )
         value = value.get("id")
+    if allow_none and value == "{00000000-0000-0000-0000-000000000000}":
+        return None
     return _require_guid(value, field=field)
 
 

@@ -1781,6 +1781,11 @@ class VerificationResult:
     verification_strength: str = "operation_specific_readback"
     business_state_verified: bool = True
 
+    def __post_init__(self) -> None:
+        # Verifier strength is not a claim that a failed check verified state.
+        if self.status != "verified":
+            object.__setattr__(self, "business_state_verified", False)
+
     @property
     def ok(self) -> bool:
         return self.status in {"verified", "result_schema_checked"}
@@ -4888,9 +4893,13 @@ def _raise_plugin_operation_error(exc: PluginOperationContractError) -> NoReturn
 
 
 def _plugin_guid(value: Any, *, field: str, allow_none: bool = False) -> str | None:
-    if isinstance(value, Mapping):
-        value = value.get("id")
     if value is None and allow_none:
+        return None
+    if isinstance(value, Mapping):
+        if "id" not in value or not isinstance(value["id"], str):
+            raise OperationContractError("INVALID_READBACK", f"{field} must expose a canonical reference id.")
+        value = value.get("id")
+    if value == "{00000000-0000-0000-0000-000000000000}" and allow_none:
         return None
     if not isinstance(value, str) or not _PLUGIN_GUID.fullmatch(value):
         raise OperationContractError(
@@ -8694,10 +8703,14 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
             },
         )
         field_before_rows = _rows(field_before_result)
-        if len(field_before_rows) != 1:
+        if (
+            len(field_before_rows) != 1
+            or not _same_identity(field_before_rows[0].get("id"), source.object)
+            or not _has_field(field_before_rows[0], field_value)
+        ):
             raise OperationContractError(
                 "INVALID_READBACK",
-                "Property/reference pre-state must resolve to exactly one source row.",
+                "Property/reference pre-state must return the exact source and requested field.",
                 details={"field": field_value, "rows": field_before_rows},
             )
         metadata["field_before"] = {
@@ -13165,7 +13178,7 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
             assertions.append(
                 {
                     "name": f"object.{field_name} pre-state unchanged",
-                    "passed": len(rows) == 1 and actual == field_before.get("value"),
+                    "passed": len(rows) == 1 and _same_identity(rows[0].get("id"), object_id) and _has_field(rows[0], field_name) and actual == field_before.get("value"),
                     "evidence": {"expected": field_before.get("value"), "actual": actual, "rows": rows},
                 }
             )
@@ -16870,7 +16883,9 @@ def verify_prepared_operation(
             expected = plan.get("expected_value")
             check(
                 "property value matches metadata type",
-                _typed_value_equal(actual, expected, str(plan.get("metadata_type", ""))),
+                _same_identity(rows[0].get("id"), plan.get("object_id"))
+                and _has_field(rows[0], field_name)
+                and _typed_value_equal(actual, expected, str(plan.get("metadata_type", ""))),
                 {"actual": actual, "expected": expected, "metadata_type": plan.get("metadata_type")},
             )
     elif kind == "same-guid-reference":
@@ -16884,13 +16899,17 @@ def verify_prepared_operation(
         check("reference source resolves exactly once", len(rows) == 1, rows)
         if len(rows) == 1:
             raw_actual = _field_value(rows[0], field_name)
+            projection_matches = (
+                _same_identity(rows[0].get("id"), plan.get("object_id"))
+                and _has_field(rows[0], field_name)
+            )
             actual = _reference_identity(raw_actual)
             expected = plan.get("expected_target_id")
             expected_clear = plan.get("expected_clear") is True
             if expected_clear:
                 check(
                     "reference is cleared",
-                    _reference_value_is_null(raw_actual),
+                    projection_matches and _reference_value_is_null(raw_actual),
                     {"actual": raw_actual, "expected": None},
                 )
             elif actual is None:
@@ -16904,7 +16923,7 @@ def verify_prepared_operation(
             else:
                 check(
                     "reference target matches",
-                    _same_identity(actual, expected),
+                    projection_matches and _same_identity(actual, expected),
                     {"actual": actual, "expected": expected},
                 )
     elif kind == "ui-capture-screen-result":
@@ -20631,6 +20650,10 @@ def _direct_child_parent_relationship_matches(
         if relative != child_path:
             return bool(relative) and "\\" not in relative
     return None
+
+
+def _has_field(row: Mapping[str, Any], field_name: str) -> bool:
+    return any(key in row for key in (field_name, f"@{field_name}", f"@@{field_name}"))
 
 
 def _field_value(row: Mapping[str, Any], field_name: str) -> Any:
