@@ -697,8 +697,9 @@ def verify_created_plugin_row(
     )
     expected_fields = plugin_verification_fields(descriptor)
     actual_fields = tuple(row)
+    effect_owner_only = descriptor.kind == "effect" and "parent" not in row
     allowed_missing_fields = (
-        {"owner"} if descriptor.kind == "source" else set()
+        {"owner"} if descriptor.kind == "source" else {"parent"}
     )
     if (
         set(actual_fields) - set(expected_fields)
@@ -717,7 +718,7 @@ def verify_created_plugin_row(
 
     plugin_id = _require_guid(row.get("id"), field="plugin.id")
     parent_id = _closed_object_reference_id(
-        row.get("parent"),
+        row.get("owner") if effect_owner_only else row.get("parent"),
         field="plugin.parent",
     )
     owner_id = _closed_object_reference_id(
@@ -752,12 +753,20 @@ def verify_created_plugin_row(
         expected_owner_id=expected_owner_id,
         placement_evidence=placement_evidence,
     )
+    # Effects can be embedded values with an immediate owner, not hierarchy
+    # children. Placement above independently proves slot -> target (or the
+    # 2022 fixed target reference); the effect must point back to that slot.
+    expected_plugin_owner = (
+        expected_parent_id if effect_owner_only else expected_owner_id
+    )
+    if effect_owner_only:
+        placement["ownership_readback"] = "immediate_owner_without_hierarchy_parent"
     expected = {
         "name": descriptor.name,
         "type": descriptor.object_type,
         "classId": descriptor.class_id,
         "parent": expected_parent_id,
-        "owner": expected_owner_id,
+        "owner": expected_plugin_owner,
     }
     native_type = row.get("type")
     normalized_type = (
@@ -779,7 +788,7 @@ def verify_created_plugin_row(
         and type(actual["classId"]) is int
         and actual["classId"] == expected["classId"]
         and _same_guid(parent_id, expected_parent_id)
-        and _same_guid(owner_id, expected_owner_id)
+        and _same_guid(owner_id, expected_plugin_owner)
     )
     if not matches:
         raise PluginOperationContractError(
@@ -1132,7 +1141,7 @@ def _verify_appended_effect_slot_placement(
         )
     _require_exact_mapping_fields(
         slot,
-        frozenset(PLUGIN_EFFECT_SLOT_READBACK_FIELDS),
+        frozenset(PLUGIN_EFFECT_SLOT_READBACK_FIELDS) - ({"parent"} if "parent" not in slot else set()),
         field="placement_evidence.created_effect_slot",
     )
     slot_id = _require_guid(
@@ -1146,7 +1155,7 @@ def _verify_appended_effect_slot_placement(
             details={"effect_slot_id": slot_id},
         )
     slot_parent = _closed_object_reference_id(
-        slot.get("parent"),
+        slot.get("parent", slot.get("owner")),
         field="placement_evidence.created_effect_slot.parent",
     )
     slot_owner = _closed_object_reference_id(

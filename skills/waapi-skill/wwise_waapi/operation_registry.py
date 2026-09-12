@@ -5154,7 +5154,7 @@ def _read_plugin_prestate(
             )
         slot_id = _plugin_guid(row.get("id"), field=f"effect_slots[{index}].id")
         parent_id = _plugin_guid(
-            row.get("parent"),
+            row.get("parent", row.get("owner")),
             field=f"effect_slots[{index}].parent",
         )
         owner_id = _plugin_guid(

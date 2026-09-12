@@ -723,6 +723,35 @@ def test_effect_prepare_requires_independent_empty_list_proof(
     )
 
 
+@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("owner_matches", (True, False))
+def test_effect_verifies_owner_chain_without_hierarchy_parent(
+    version: str, owner_matches: bool,
+) -> None:
+    prepared = prepare_operation(
+        parse_operation_request(request(version=version, kind="effect")),
+        read_call=ScriptedReader({"ak.wwise.core.object.get": [
+            {"return": [target_row(object_type="ActorMixer")]},
+            {"return": [{"id": TARGET_ID, "@Effects": []}]},
+        ]}),
+    ).as_dict()
+    slot = effect_slot_row()
+    slot.pop("parent")
+    effect = effect_row(parent_id=SLOT_ID)
+    effect.pop("parent")
+    effect["owner"] = {"id": SLOT_ID if owner_matches else OLD_SLOT_ID}
+    verified = verify_prepared_operation(
+        prepared,
+        execution_result={"result": {"objects": [{"id": TARGET_ID, "@Effects": [
+            {"id": SLOT_ID, "@Effect": {"id": PLUGIN_ID}},
+        ]}]}},
+        read_call=ScriptedReader({"ak.wwise.core.object.get": [
+            {"return": [slot]}, {"return": [effect]},
+        ]}),
+    )
+    assert verified.ok is owner_matches
+
+
 def test_2023_effect_verifier_fails_closed_when_slot_has_no_effect_reference() -> None:
     prepared = prepare_operation(
         parse_operation_request(request(version="2023.1", kind="effect")),
