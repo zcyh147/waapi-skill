@@ -12,6 +12,7 @@ import sys
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Mapping
+from urllib.parse import urlsplit
 
 from tests.semantic.support.codex_gateway_broker import CodexGatewayBroker, ExpectedGatewayStep
 from tests.semantic.support.codex_harness import (
@@ -38,9 +39,13 @@ def introduction_checks(text: str, facts: Mapping[str, Any]) -> dict[str, bool]:
     """Check facts, not a prescribed sentence or presentation order."""
     folded = text.casefold()
     product = re.sub(r"[\s_-]+", "", folded)
+    try:
+        port = urlsplit(str(facts.get("endpoint_url") or "")).port
+    except ValueError:
+        port = None
     return {
         "skill_named": "waapiskill" in product,
-        "endpoint": bool(facts.get("endpoint_url")) and str(facts["endpoint_url"]).casefold() in folded,
+        "endpoint": port is not None and bool(re.search(rf"(?<!\d){port}(?!\d)", text)),
         "adapter_version": bool(facts.get("adapter_version")) and str(facts["adapter_version"]) in text,
         "policy": bool(facts.get("project_modification_policy")) and str(facts["project_modification_policy"]) in text,
         "all_modes": all(mode in text for mode in ("read_only", "ask_before_changes", "allow_changes")),
