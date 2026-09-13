@@ -10275,20 +10275,31 @@ def _prepare_import_dynamic_fields(
     return targets, trusted_dispatch, roles
 
 
+def _import_requires_explicit_source(target: Mapping[str, Any]) -> bool:
+    return target.get("media_expected") is True and (
+        bool(target.get("validated_properties") or target.get("validated_references"))
+        or (
+            _object_type_token(target.get("metadata_object_type")) == "musictrack"
+            and isinstance(target.get("expected_audio_file_source_result_path"), str)
+        )
+    )
+
+
 def _materialize_audio_import_dynamic_rows(
     *,
     dispatch_args: Mapping[str, Any],
     targets: Sequence[Mapping[str, Any]],
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    """Materialize validated dynamic Sound fields onto their native owner.
+    """Materialize Sound/MusicTrack fields onto their native owner.
 
     A native import row whose final object is an implicitly created
     ``AudioFileSource`` applies ``@Property`` and ``@Reference`` fields to that
-    source, not to the requested Sound.  The public contract remains one
-    logical row per Sound.  Internally, a media row with dynamic Sound fields
+    source, not to the requested Sound/Track. The public contract remains one
+    logical row per target. Internally, a media row with dynamic object fields
     is therefore expanded into an ordered structure row followed by an
     explicit ``AudioFileSource`` media row, while the WAAPI call count remains
-    exactly one.
+    exactly one. MusicTrack media always uses an explicit source: importing
+    onto an already-created Track path alone can silently create no media.
     """
 
     raw_rows = dispatch_args.get("imports")
@@ -10367,7 +10378,7 @@ def _materialize_audio_import_dynamic_rows(
                 "An audio.import target lacks its explicit media expectation.",
                 details={"index": index},
             )
-        if not dynamic_fields or not media_expected:
+        if not _import_requires_explicit_source(target):
             row.update(dynamic_fields)
             native_index = len(native_rows)
             native_rows.append(row)
@@ -10389,10 +10400,10 @@ def _materialize_audio_import_dynamic_rows(
         expected_source_path = target.get(
             "expected_audio_file_source_result_path"
         )
-        if _object_type_token(metadata_type) != "sound":
+        if _object_type_token(metadata_type) not in {"sound", "musictrack"}:
             raise OperationContractError(
                 "IMPORT_DYNAMIC_MEDIA_TOPOLOGY_UNSUPPORTED",
-                "Dynamic fields with media are currently materialized only for a live-validated Sound target.",
+                "Media fields require a live-validated Sound or MusicTrack target.",
                 details={
                     "index": index,
                     "metadata_object_type": metadata_type,
@@ -10401,7 +10412,7 @@ def _materialize_audio_import_dynamic_rows(
         if not isinstance(expected_source_path, str):
             raise OperationContractError(
                 "IMPORT_DYNAMIC_MEDIA_TOPOLOGY_UNSUPPORTED",
-                "This media type has no sealed AudioFileSource topology for dynamic Sound fields.",
+                "This media type has no sealed AudioFileSource topology for object fields.",
                 details={"index": index, "target": target.get("canonical_target_path")},
             )
         source_key = expected_source_path.casefold()
@@ -10505,7 +10516,11 @@ def _materialize_audio_import_dynamic_rows(
                 "native_rows": [
                     {
                         "native_index": structure_index,
-                        "kind": "sound_structure",
+                        "kind": (
+                            "music_track_structure"
+                            if _object_type_token(metadata_type) == "musictrack"
+                            else "sound_structure"
+                        ),
                         "object_path": structure_row["objectPath"],
                     },
                     {
@@ -11013,20 +11028,16 @@ def _prepare_closed_import_plan(
         seen_explicit_source_paths: set[str] = set()
         for index, raw_target in enumerate(targets):
             target = dict(raw_target)
-            dynamic_fields_present = bool(
-                target.get("validated_properties")
-                or target.get("validated_references")
-            )
-            if not dynamic_fields_present or target.get("media_expected") is not True:
+            if not _import_requires_explicit_source(target):
                 continue
             metadata_type = target.get("metadata_object_type")
             expected_source_path = target.get(
                 "expected_audio_file_source_result_path"
             )
-            if _object_type_token(metadata_type) != "sound":
+            if _object_type_token(metadata_type) not in {"sound", "musictrack"}:
                 raise OperationContractError(
                     "IMPORT_DYNAMIC_MEDIA_TOPOLOGY_UNSUPPORTED",
-                    "Dynamic fields with media require a live-validated Sound target.",
+                    "Media fields require a live-validated Sound or MusicTrack target.",
                     details={
                         "index": index,
                         "metadata_object_type": metadata_type,
@@ -11035,7 +11046,7 @@ def _prepare_closed_import_plan(
             if not isinstance(expected_source_path, str):
                 raise OperationContractError(
                     "IMPORT_DYNAMIC_MEDIA_TOPOLOGY_UNSUPPORTED",
-                    "This media type has no sealed AudioFileSource topology for dynamic Sound fields.",
+                    "This media type has no sealed AudioFileSource topology for object fields.",
                     details={
                         "index": index,
                         "target_path": target.get("canonical_target_path"),
@@ -11574,6 +11585,11 @@ def _import_target_return_fields(
             )
         )
     )
+    if (
+        _object_type_token(target.get("requested_object_type")) == "musictrack"
+        and target.get("media_expected") is True
+    ):
+        fields.append("@Sequences")
     for key in ("validated_properties", "validated_references"):
         descriptors = target.get(key)
         if not isinstance(descriptors, list):
@@ -14572,6 +14588,53 @@ def _extract_plugin_result_binding(
     }
 
 
+def _music_import_clip_media_evidence(
+    track: Mapping[str, Any], *, copied_path: Any, version: str, read: ReadCall,
+) -> dict[str, Any]:
+    """Prove a Clip owned by this Track uses the imported media, not a source GUID link."""
+    readbacks: list[dict[str, Any]] = []
+
+    def references(value: Any) -> list[str]:
+        if not isinstance(value, list) or len(value) > MULTI_IDENTITY_READ_MAX_IDS:
+            raise OperationContractError("INVALID_READBACK", "Music list must be a bounded reference array.")
+        ids = [row.get("id") if isinstance(row, Mapping) else None for row in value]
+        if not all(_valid_object_id(item) for item in ids) or len(set(ids)) != len(ids):
+            raise OperationContractError("INVALID_READBACK", "Music list has malformed or duplicate identities.")
+        return ids
+
+    def batch(ids: list[str], fields: list[str], expected_types: set[str]) -> list[dict[str, Any]]:
+        if not ids:
+            return []
+        if len(ids) > MULTI_IDENTITY_READ_MAX_IDS or len(set(ids)) != len(ids):
+            raise OperationContractError("INVALID_READBACK", "Music list read exceeds its unique identity bound.")
+        args, options = {"from": {"id": ids}}, {"return": fields}
+        result = read(OBJECT_GET_URI, args, options)
+        if not isinstance(result, Mapping):
+            raise OperationContractError("INVALID_READBACK", "Music list readback must be an object.")
+        readbacks.append({"uri": OBJECT_GET_URI, "args": args, "options": options, "result": dict(result)})
+        rows = _rows(result)
+        actual = [row.get("id") for row in rows]
+        if (len(actual) != len(ids) or not all(_valid_object_id(value) for value in actual)
+                or set(actual) != set(ids)
+                or any(_object_type_token(row.get("type")) not in expected_types for row in rows)):
+            raise OperationContractError("INVALID_READBACK", "Music list readback changed identity or type.")
+        return rows
+
+    sequence_ids = references(track.get("@Sequences"))
+    sequences = batch(sequence_ids, ["id", "type", "@Clips"], {"musictracksequence"})
+    clip_ids = [clip for row in sequences for clip in references(row.get("@Clips", []))]
+    field = "originalWavFilePath" if version == "2021.1" else "originalFilePath"
+    # A Track may also contain MIDI/event clips. Read their exact type first;
+    # only MusicClip can establish this WAV/AMB import's media postcondition.
+    clips = batch(clip_ids, ["id", "type", field], {"musicclip", "musicclipmidi", "musiceventcue"})
+    expected_key = _import_file_path_key(copied_path)
+    matched = [row["id"] for row in clips
+               if _object_type_token(row.get("type")) == "musicclip" and expected_key is not None
+               and _import_file_path_key(row.get(field)) == expected_key]
+    return {"ok": bool(matched), "matching_clip_ids": matched,
+            "scope": "same_track_clip_media_path_not_source_guid_reference", "readbacks": readbacks}
+
+
 def verify_prepared_operation(
     prepared: Mapping[str, Any],
     *,
@@ -17421,11 +17484,7 @@ def verify_prepared_operation(
             )
             requires_explicit_source_pre_state = (
                 source_operation == "audio.import"
-                and media_expected
-                and bool(
-                    target.get("validated_properties")
-                    or target.get("validated_references")
-                )
+                and _import_requires_explicit_source({**target, "media_expected": media_expected})
             )
             if requires_explicit_source_pre_state != (
                 explicit_source_pre_state is not None
@@ -17883,10 +17942,14 @@ def verify_prepared_operation(
                         {"expected": before_notes, "actual": live_row.get("notes")},
                     )
 
+                music_media = (
+                    _object_type_token(expected_type) == "musictrack"
+                    and media_expected and isinstance(expected_source_path, str)
+                )
                 active_source_id = _reference_identity(
                     _field_value(live_row, "activeSource")
                 )
-                if version == "2021.1" and active_source_id is None:
+                if music_media or (version == "2021.1" and active_source_id is None):
                     active_source_id = returned_source_id
                 if len(returned_source_matches) == 1:
                     returned_source = returned_source_matches[0]
@@ -17902,23 +17965,36 @@ def verify_prepared_operation(
                             "parent": returned_source.get("parent"),
                         },
                     )
-                    check(
-                        f"{label} returned AudioFileSource is the active source",
-                        _same_identity(returned_source_id, active_source_id),
-                        {
-                            "result": returned_source_id,
-                            "activeSource": active_source_id,
-                        },
-                    )
+                    if not music_media:
+                        check(
+                            f"{label} returned AudioFileSource is the active source",
+                            _same_identity(returned_source_id, active_source_id),
+                            {
+                                "result": returned_source_id,
+                                "activeSource": active_source_id,
+                            },
+                        )
                 if active_source_id is not None:
+                    source_fields = _import_audio_source_return_fields(version=version)
+                    if music_media:
+                        source_fields.append("parent")
+                        if version == "2021.1":
+                            source_fields.append("originalWavFilePath")
                     source_rows = read_object(
                         object_id=active_source_id,
-                        fields=_import_audio_source_return_fields(version=version),
+                        fields=source_fields,
                         language=read_language,
                     )
                     check(f"{label} active Audio Source resolves once", len(source_rows) == 1, source_rows)
                     if len(source_rows) == 1:
                         audio_source_row = source_rows[0]
+                        if music_media:
+                            check(
+                                f"{label} live music source belongs to the Track",
+                                _object_type_token(audio_source_row.get("type")) == "audiofilesource"
+                                and _same_identity(_reference_identity(audio_source_row.get("parent")), live_id),
+                                audio_source_row,
+                            )
                         check(
                             f"{label} active Audio Source GUID is stable",
                             _same_identity(audio_source_row.get("id"), active_source_id),
@@ -18039,6 +18115,18 @@ def verify_prepared_operation(
 
                 if media_expected:
                     copied_path = _field_value(source_state, "originalFilePath")
+                    if music_media and version == "2021.1":
+                        copied_path = _field_value(source_state, "originalWavFilePath")
+                    if music_media:
+                        try:
+                            music_evidence = _music_import_clip_media_evidence(
+                                live_row, copied_path=copied_path, version=version, read=read_call,
+                            )
+                        except OperationContractError as exc:
+                            check(f"{label} Track Clip uses the imported media", False, exc.as_dict())
+                        else:
+                            readbacks.extend(music_evidence.pop("readbacks"))
+                            check(f"{label} Track Clip uses the imported media", music_evidence["ok"], music_evidence)
                     if copied_path is None and source_state is not live_row:
                         copied_path = _field_value(live_row, "originalFilePath")
                     if copied_path is None:

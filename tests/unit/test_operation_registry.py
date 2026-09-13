@@ -4372,16 +4372,19 @@ def test_audio_import_closes_nested_fields_files_targets_defaults_and_verificati
     assert any(item["name"] == "file_proofs[0] unchanged since preview" and not item["passed"] for item in guard["assertions"])
 
 
+@pytest.mark.parametrize("object_type,class_id", [("Sound", 65552), ("MusicTrack", 1835024)])
 def test_audio_import_materializes_defaults_base64_properties_references_and_row_location(
-    tmp_path: Path,
+    tmp_path: Path, object_type: str, class_id: int,
 ) -> None:
     project_info = project_info_row(tmp_path / "SampleProject")
-    import_path = r"\Actor-Mixer Hierarchy\Default Work Unit\Imports"
+    import_path = (r"\Interactive Music Hierarchy\Default Work Unit\Imports"
+                   if object_type == "MusicTrack"
+                   else r"\Actor-Mixer Hierarchy\Default Work Unit\Imports")
     target_path = import_path + r"\Inline"
     import_parent = object_row(
         object_id=PARENT_GUID,
         name="Imports",
-        object_type="ActorMixer",
+        object_type="MusicSegment" if object_type == "MusicTrack" else "ActorMixer",
         path=import_path,
         parent="{actor-root}",
     )
@@ -4418,7 +4421,7 @@ def test_audio_import_materializes_defaults_base64_properties_references_and_row
                     },
                 },
             ],
-            "ak.wwise.core.object.getTypes": [SOUND_TYPE_RESULT],
+            "ak.wwise.core.object.getTypes": [{"return": [{"classId": class_id, "name": object_type, "type": "WObject"}]}],
             "ak.wwise.core.getProjectInfo": [project_info],
         }
     )
@@ -4429,7 +4432,7 @@ def test_audio_import_materializes_defaults_base64_properties_references_and_row
                 "audio.import",
                 {
                     "defaults": {
-                        "object_type": "Sound",
+                        "object_type": object_type,
                         "properties": [{"name": "Volume", "value": -12.0}],
                         "references": [
                             {
@@ -4440,7 +4443,7 @@ def test_audio_import_materializes_defaults_base64_properties_references_and_row
                     },
                     "imports": [
                         {
-                            "object_path": r"<Sound>Inline",
+                            "object_path": f"<{object_type}>Inline",
                             "import_location": {
                                 "kind": "path",
                                 "value": import_path,
@@ -4462,14 +4465,14 @@ def test_audio_import_materializes_defaults_base64_properties_references_and_row
     assert dispatch["args"]["autoAddToSourceControl"] is True
     assert dispatch["args"]["imports"] == [
         {
-            "objectPath": r"<Sound>Inline",
+            "objectPath": f"<{object_type}>Inline",
             "importLocation": import_path,
-            "objectType": "Sound",
+            "objectType": object_type,
             "@Volume": -6.0,
             "@OutputBus": TARGET_GUID,
         },
         {
-            "objectPath": r"<Sound>Inline\<AudioFileSource>inline",
+            "objectPath": f"<{object_type}>Inline" + r"\<AudioFileSource>inline",
             "importLocation": import_path,
             "audioFileBase64": (
                 "SFX\\inline.wav|" + base64.b64encode(inline_wav).decode("ascii")
@@ -4483,8 +4486,8 @@ def test_audio_import_materializes_defaults_base64_properties_references_and_row
     assert "@OutputBus" in dispatch["options"]["return"]
     target = prepared["verification_plan"]["targets"][0]
     assert target["canonical_target_path"] == target_path
-    assert target["metadata_object_type"] == "Sound"
-    assert target["metadata_class_id"] == 65552
+    assert target["metadata_object_type"] == object_type
+    assert target["metadata_class_id"] == class_id
     assert target["explicit_audio_file_source_pre_state_rows"] == []
     assert target["validated_properties"] == [
         {
@@ -4515,8 +4518,8 @@ def test_audio_import_materializes_defaults_base64_properties_references_and_row
         if uri == "ak.wwise.core.object.getPropertyInfo"
     ]
     assert metadata_calls == [
-        ({"property": "Volume", "classId": 65552}, {}),
-        ({"property": "OutputBus", "classId": 65552}, {}),
+        ({"property": "Volume", "classId": class_id}, {}),
+        ({"property": "OutputBus", "classId": class_id}, {}),
     ]
     assert [
         (args, options)
@@ -4711,7 +4714,8 @@ def test_audio_import_native_materializer_keeps_structure_only_dynamic_row_singl
 @pytest.mark.parametrize(
     ("metadata_type", "source_path"),
     [
-        ("MusicTrack", r"\Interactive Music Hierarchy\Default Work Unit\Track\clip"),
+        ("MusicSegment", r"\Interactive Music Hierarchy\Default Work Unit\Track\clip"),
+        ("MusicTrack", None),
         ("Sound", None),
     ],
 )
