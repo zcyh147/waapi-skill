@@ -108,8 +108,17 @@ OBJECT_CREATE_WRITABLE_PARENT_TYPES = frozenset(
     }
 )
 OBJECT_CREATE_SPECIALIZED_CHILD_TYPES_BY_PARENT = {
+    "Bus": frozenset({"Bus", "AuxBus"}),
+    "AuxBus": frozenset({"Bus", "AuxBus"}),
     "StateGroup": frozenset({"State"}),
     "SwitchGroup": frozenset({"Switch"}),
+}
+# A parent's child allowlist is not the inverse of a child's required parent:
+# Bus/AuxBus may also be created under a WorkUnit. Only these game-sync children
+# require their dedicated group; preserve that restriction independently.
+_OBJECT_CREATE_REQUIRED_PARENT_TYPES_BY_CHILD = {
+    "State": frozenset({"StateGroup"}),
+    "Switch": frozenset({"SwitchGroup"}),
 }
 OBJECT_CREATE_REFLECTED_PARENT_TYPES_BY_VERSION = {
     "2025.1": frozenset({"PropertyContainer"}),
@@ -172,22 +181,9 @@ def object_child_capability(
         sorted(
             (
                 child,
-                tuple(
-                    sorted(
-                        parent
-                        for parent, children in (
-                            OBJECT_CREATE_SPECIALIZED_CHILD_TYPES_BY_PARENT.items()
-                        )
-                        if _object_type_token(child)
-                        in {_object_type_token(item) for item in children}
-                    )
-                ),
+                tuple(sorted(parents)),
             )
-            for child in {
-                item
-                for children in OBJECT_CREATE_SPECIALIZED_CHILD_TYPES_BY_PARENT.values()
-                for item in children
-            }
+            for child, parents in _OBJECT_CREATE_REQUIRED_PARENT_TYPES_BY_CHILD.items()
         )
     )
     invalid: set[str] = set()

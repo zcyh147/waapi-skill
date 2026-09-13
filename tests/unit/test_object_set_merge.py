@@ -757,9 +757,11 @@ def test_set_rejects_unreviewed_game_sync_children(
     assert rejected.value.details["allowed_child_types"] == [allowed_child_type]
 
 
-def test_object_set_schema_discloses_closed_game_sync_child_pairs() -> None:
+def test_object_set_schema_discloses_closed_bus_and_game_sync_child_pairs() -> None:
     spec = {item.name: item.as_dict() for item in list_operation_specs()}["object.set"]
     assert spec["parent_child_contract"] == {
+        "AuxBus": ["AuxBus", "Bus"],
+        "Bus": ["AuxBus", "Bus"],
         "StateGroup": ["State"],
         "SwitchGroup": ["Switch"],
     }

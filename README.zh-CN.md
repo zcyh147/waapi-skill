@@ -1,10 +1,10 @@
 [English](./README.md) · [简体中文](./README.zh-CN.md)
 
-# Wwise WAAPI Skill
+# WAAPI Skill
 
 用自然语言操作 Wwise Authoring，不再让 AI Agent 手写 WAAPI 参数和 JSON。
 
-Wwise WAAPI Skill 是一个本地 Agent Skill，内置版本感知的 Gateway。你只需
+WAAPI Skill 是一个本地 Agent Skill，内置版本感知的 Gateway。你只需
 描述想要的结果；Agent 负责选择合适的操作并提供少量业务参数，Gateway 则负责
 生成精确的 WAAPI 请求、预览修改并验证结果。
 

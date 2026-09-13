@@ -330,10 +330,10 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     }
 
     assert len(non_object_set_digests) == 149
-    # The five object.delete lanes now disclose the embedded-RTPC deletion
-    # boundary; no operation/route was added or removed in this inventory.
+    # Reviewed delta: Bus/AuxBus child pairs in object.create and the versioned
+    # localized Voice import constraint. No operation/route was added or removed.
     assert canonical_sha256(non_object_set_digests) == (
-        "06ad422f857f018f61596346b50e2e760473a52b24b44752b2bde5e0914ebb21"
+        "f15b651a7ec059d1c9604fe138901ab88c258751d1657e245fcdf5fed41b888f"
     )
     assert {
         version: operation_input_mode("object.set", version)

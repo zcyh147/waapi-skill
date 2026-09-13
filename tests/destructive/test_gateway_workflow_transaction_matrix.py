@@ -599,6 +599,78 @@ def test_closed_music_import_media_and_track_volume(
 
 @pytest.mark.live
 @pytest.mark.destructive
+@pytest.mark.parametrize("workflow_sandbox_runtime", [("Japanese",)], indirect=True)
+def test_voice_languages_reimport_preserves_other_language_and_sound_identity(
+    workflow_sandbox_runtime: _WorkflowSandboxRuntime,
+) -> None:
+    """Two real voice languages share a Sound, not each other's media slot."""
+    runtime = workflow_sandbox_runtime
+    name = "Voice_Localized_" + uuid.uuid4().hex[:10]
+    media_name = name + "_Media"
+    root = "Containers" if runtime.version == "2025.1" else "Actor-Mixer Hierarchy"
+    media_root = runtime.sandbox.sandbox_path / "GatewayVoiceAudio"
+    voice_id: str | None = None
+    snapshots: list[dict[str, Mapping[str, Any]]] = []
+    for index, language in enumerate(("English(US)", "Japanese", "English(US)", "Japanese")):
+        media = _write_fixture_wav(media_root / str(index), media_name, frequency=330 + index * 110)
+        if runtime.version == "2021.1":
+            _save_sandbox_project(runtime)
+        draft = _start_business_draft(runtime, "audio.import")
+        target = _bind_business_object(
+            runtime, draft, **({"object_id": voice_id} if voice_id else {
+                "path_segments": (root, "Default Work Unit"),
+            }),
+        )
+        row = (["--existing-row", "line", target] if voice_id else
+               ["--new-row", "line", target, name, "sound-voice"])
+        _update_business_draft(runtime, draft, "draft-declare-import-batch", [
+            "--row-order", "line", *row,
+            "--media-directory", str(media.parent), "--media-file", "line", media.name,
+            "--field", "line", "language", language,
+        ], live=False)
+        result = _complete_business_draft(runtime, draft)
+        voice = runtime.gateway([
+            "query-object", "--path-segment", root, "--path-segment", "Default Work Unit",
+            "--path-segment", name,
+        ], live=True)
+        assert voice["count"] == 1, voice
+        current_id = voice["objects"][0]["id"]
+        assert voice_id is None or current_id == voice_id
+        voice_id = current_id
+        sources = runtime.gateway([
+            "query-object", "--exact-id", voice_id, "--relationship", "children",
+            "--include", "source-language", "--max-results", "4",
+        ], live=True)
+        rows = sources["objects"]
+        assert all(row["type"] == "AudioFileSource" for row in rows), rows
+        assert all(isinstance(row["source_language"], Mapping) for row in rows), rows
+        by_language = {row["source_language"]["name"]: row for row in rows}
+        assert len(by_language) == len(rows), rows
+        assert set(by_language) == ({"English(US)"} if index == 0 else {"English(US)", "Japanese"})
+        snapshots.append(by_language)
+        runtime.category_results.append({
+            "category": "voice-language-reimport", "status": "PASS",
+            "language": language, "step": index,
+            "transaction_id": result["verify"]["transaction_id"],
+            "verifier_strength": "voice_language_media_hash_and_source_identity",
+        })
+    assert snapshots[0]["English(US)"]["id"] == snapshots[2]["English(US)"]["id"]
+    assert snapshots[1]["Japanese"] == snapshots[2]["Japanese"]
+    assert snapshots[1]["Japanese"]["id"] == snapshots[3]["Japanese"]["id"]
+    assert snapshots[2]["English(US)"] == snapshots[3]["English(US)"]
+    # Independent byte checks on the test-owned Originals prove that the second
+    # language was not replaced by the final English re-import.
+    originals = runtime.sandbox.sandbox_path / "Originals" / "Voices"
+    for language, source_index in (("English(US)", 2), ("Japanese", 3)):
+        matches = list((originals / language).rglob(media_name + ".wav"))
+        assert len(matches) == 1, matches
+        assert hashlib.sha256(matches[0].read_bytes()).digest() == hashlib.sha256(
+            (media_root / str(source_index) / (media_name + ".wav")).read_bytes()
+        ).digest()
+
+
+@pytest.mark.live
+@pytest.mark.destructive
 def test_music_playlist_canonical_query_create_and_import_parent(
     workflow_sandbox_runtime: _WorkflowSandboxRuntime,
 ) -> None:
@@ -687,6 +759,21 @@ def workflow_sandbox_runtime(
         source_tree_before = _source_tree_inventory(sandbox.source_root)
         source_mtime_before_ns = sandbox.source_project.stat().st_mtime_ns
         assert source_hash_before[1] > 0, "immutable SampleProject source has no .wproj/.wwu files to hash"
+        extra_languages = getattr(request, "param", ())
+        if extra_languages:
+            # Fixture setup only, before Wwise starts, on the disposable copy.
+            # No user/source project or live WAAPI operation uses this path.
+            assert path_is_under(sandbox.sandbox_project, case_sandbox_root)
+            tree = ET.parse(sandbox.sandbox_project)
+            languages = tree.find(".//LanguageList")
+            assert languages is not None
+            for language in extra_languages:
+                assert language == "Japanese"
+                assert not any(row.get("Name") == language for row in languages)
+                ET.SubElement(languages, "Language", {
+                    "Name": language, "ID": "{" + str(uuid.uuid4()).upper() + "}",
+                })
+            tree.write(sandbox.sandbox_project, encoding="utf-8", xml_declaration=True)
         if version in {"2022.1", "2025.1"}:
             prelaunch_io_root = case_sandbox_root / "prelaunch-io"
             prelaunch_io_root.mkdir(parents=True, exist_ok=False)
@@ -800,7 +887,7 @@ def workflow_sandbox_runtime(
                 candidate=candidate,
                 version=version,
                 request=request,
-                module_file=Path(__file__),
+                module_file=Path(request.module.__file__),
                 started_at_unix_ns=started_at_unix_ns,
                 active_error=active_error,
                 deferred_error=deferred_error,
@@ -3461,7 +3548,7 @@ def _write_external_sources_document(
     return path.resolve(strict=True)
 
 
-def _write_fixture_wav(root: Path, name: str) -> Path:
+def _write_fixture_wav(root: Path, name: str, *, frequency: int = 440) -> Path:
     root.mkdir(parents=True, exist_ok=True)
     path = root / f"{name}.wav"
     sample_rate = 8000
@@ -3473,7 +3560,7 @@ def _write_fixture_wav(root: Path, name: str) -> Path:
         wav_file.setframerate(sample_rate)
         frames = bytearray()
         for index in range(frame_count):
-            value = int(amplitude * math.sin(2 * math.pi * 440 * index / sample_rate))
+            value = int(amplitude * math.sin(2 * math.pi * frequency * index / sample_rate))
             frames.extend(value.to_bytes(2, byteorder="little", signed=True))
         wav_file.writeframes(bytes(frames))
     assert path.is_file() and not path.is_symlink()

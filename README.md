@@ -1,11 +1,11 @@
 [English](./README.md) · [简体中文](./README.zh-CN.md)
 
-# Wwise WAAPI Skill
+# WAAPI Skill
 
 Control Wwise Authoring with natural language—without asking an AI agent to
 write WAAPI payloads by hand.
 
-Wwise WAAPI Skill is a local Agent Skill with a packaged, version-aware
+WAAPI Skill is a local Agent Skill with a packaged, version-aware
 Gateway. You describe the result you want; the Agent selects the right
 operation and supplies a small set of business values, while the Gateway builds
 the exact WAAPI request, previews changes, and verifies the result.
