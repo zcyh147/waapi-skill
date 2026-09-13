@@ -53,6 +53,71 @@ pass. Two additional Sound/MusicTrack import controls passed (38 focused
 checks). Final wider program results are appended after completion. No live
 mutation or Fresh Agent campaign is part of this guard repair.
 
+At exact repair candidate `6d3ce68dd6f442ad307172e6caa5fc095d7cd2dd`, the
+four focused Registry/import test files passed **651 tests**; the fixed Program
+gate passed **5302 tests, 2 Windows-only skips**, exit 0, 260.89 seconds.
+HEAD and source status remained unchanged through the gate, and no scoped
+test process remained. No full Non-live rerun was needed for three guard
+entries; the preceding broad-run accounting remains preserved separately.
+
+### Installed WObjects.xml cross-check
+
+The user supplied the Windows source location
+`C:\Audiokinetic\Wwise2021.1.14.8108\Authoring\Data\WObjects\WObjects.xml`.
+On this Mac the corresponding installation payload is under
+`/Library/Application Support/Audiokinetic/Wwise <build>/Authoring/Data/WObjects/WObjects.xml`,
+not directly inside the app executable bundle. The Wine Program Files entries
+point to this location. Read only `WwiseObject Name` as a concrete class, not
+the shared `ObjectBase` definition names.
+
+All five installed builds list MusicStinger, MusicTrackSequence, MusicClipMidi
+and MusicPlaylistContainer under those exact names. In order, the physical XML
+lines are:
+
+| Build | Stinger | Track Sequence | MIDI Clip | Playlist Container |
+| --- | --- | --- | --- | --- |
+| 2021.1.14.8108 | 2790 | 6201 | 3653 | 6110 |
+| 2022.1.19.8584 | 2810 | 6286 | 3673 | 6195 |
+| 2023.1.19.8928 | 2747 | 6152 | 3616 | 6053 |
+| 2024.1.13.9056 | 2715 | 6168 | 3610 | 6051 |
+| 2025.1.7.9143 | 2791 | 6544 | 3686 | 6420 |
+
+The XML is an offline type-definition baseline, not proof that every class is
+publicly creatable or that every API uses an identical wire token.
+
+## Three parallel visible-task smoke checks
+
+The user requested three quick parallel conversations in `waapi_skill_test`.
+They used Sol / High, the demonstration Skill copy with the guard fix, and the
+already-running Authoring 2025.1. Scope was explicitly read-only discovery and
+Preview only: no confirmation, execute, playback, project/config/code changes
+or fixture creation. These are visible app tasks, not the formal Fresh CLI
+campaign; no formal memory-isolation credit is claimed.
+
+| Task | Final observed result after at most one guided correction |
+| --- | --- |
+| Playlist `01a09c0c-e56f-7ed3-aef8-9f507c9acce9` | Existing Segments and their MusicPlaylistContainer parent were found and exactly re-read. `draft-discover-fields` failed with `OBJECT_TYPE_NOT_UNIQUE`: requested MusicRanSeqCntr, zero matches. No Preview. |
+| Transition `01a09c0c-de84-79c1-a6d8-7eb4b6c135d8` | Closed `music-playlist-container` query compiled MusicRanSeqCntr; Wwise rejected it with `WaapiRequestFailed` / `ak.wwise.query.invalid_query`, Unknown object type. Did not reach transition authoring. No Preview. |
+| Stinger `01a09c0c-e923-7e70-a6ca-8aa81766ce4e` | Existing Stingers, Triggers and Segments were found. Binding an existing MusicStinger with a live empty name failed `BUSINESS_OBJECT_BINDING_MISMATCH`. Did not reach changing Trigger or prove the new-Stinger boundary. No Preview. |
+
+The first Playlist/Stinger attempts stopped on tool-output truncation after a
+91-Segment query. One guided retry reduced the result bound to two. The first
+Transition attempt incorrectly jumped to advanced WAQL and invented a brace
+syntax; the one guided retry used the closed query layer and exposed the
+different, deterministic type-mapping error. Preserve these first failures;
+the guided turns are not first-attempt PASS evidence. None of the three checks
+is music workflow acceptance, and no user-project mutation occurred.
+
+Read-only triage identified `business_declarations.py`'s shared
+music-playlist-container definition mapping both native and metadata types to
+MusicRanSeqCntr. Query compilation and field discovery consume those fields;
+the five packaged catalogs and installed XML instead name MusicPlaylistContainer.
+The import metadata alias in `operation_registry.py` also deserves examination.
+Native creation/import tokens must be independently verified rather than
+blindly globally replaced. The Stinger empty-name binding failure is a separate
+identity-handling issue. Neither newly discovered issue was patched as part
+of the three-entry creation-guard repair.
+
 ## Evidence and scope limits
 
 - All SDK paths above are relative to `/Users/xiye/Documents/NotebookLM_Sources/Wwise/Docs/`. Page numbers are one-based physical pages within each PDF part. Text was extracted read-only with PyMuPDF.
