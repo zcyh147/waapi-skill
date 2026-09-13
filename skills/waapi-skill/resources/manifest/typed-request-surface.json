@@ -1,7 +1,7 @@
 {
   "contract": "waapi-skill.typed-request-surface/v1",
   "intentionally_blocked_field_occurrences": 79,
-  "inventory_sha256": "15fdfba40a37f38bbf963e02a1114f1452fc609aae3c92cb7e916119d33e3773",
+  "inventory_sha256": "cbdccf1679c6f534b501cf3f67b503c376fa6a155d0cf8f085306ad86c0a031c",
   "lanes": [
     {
       "construction_shape": "inline",
@@ -25703,6 +25703,185 @@
     },
     {
       "construction_shape": "inline",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "548a0bdcce2b8b91975a046080f96d38b0d7d9b9799c04e9ea6457efe8fcdb7a",
+      "execution_policy": {
+        "accepted_authorization_modes": [
+          "explicit_confirmation",
+          "policy_authorization"
+        ],
+        "companion_uris": [
+          "ak.wwise.core.remote.disconnect"
+        ],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "runtime_mutation",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "request-schema"
+        ],
+        "item_type": "function",
+        "lifecycle_strategy": "paired_follow_up_required",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "managed_transaction-result-schema",
+        "project_guard_mode": "invariant",
+        "requires_authorization": true,
+        "result_limit_bytes": 1048576,
+        "route": "managed_transaction",
+        "timeout_seconds": 30.0,
+        "uri": "ak.wwise.core.remote.connect",
+        "verification_strategy": "result_schema",
+        "version": "2024.1"
+      },
+      "execution_policy_sha256": "4001893ce442f294fbf7f6cee832be548c4fdf00ddb0270ab409025f47987320",
+      "intentionally_blocked_fields": [],
+      "item_type": "function",
+      "reference_count": 2,
+      "schema_keywords": [
+        "$ref",
+        "additionalProperties",
+        "description",
+        "properties",
+        "required",
+        "type"
+      ],
+      "schema_sha256": "27858b8550dca6e3a65197e8a8eca66685581756dd4a7f32d78c85cecd5235ee",
+      "uri": "ak.wwise.core.remote.connect",
+      "version": "2024.1"
+    },
+    {
+      "construction_shape": "zero",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "548a0bdcce2b8b91975a046080f96d38b0d7d9b9799c04e9ea6457efe8fcdb7a",
+      "execution_policy": {
+        "accepted_authorization_modes": [
+          "explicit_confirmation",
+          "policy_authorization"
+        ],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "runtime_mutation",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "request-schema"
+        ],
+        "item_type": "function",
+        "lifecycle_strategy": "session_close",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "managed_transaction-result-schema",
+        "project_guard_mode": "invariant",
+        "requires_authorization": true,
+        "result_limit_bytes": 1048576,
+        "route": "managed_transaction",
+        "timeout_seconds": 30.0,
+        "uri": "ak.wwise.core.remote.disconnect",
+        "verification_strategy": "result_schema",
+        "version": "2024.1"
+      },
+      "execution_policy_sha256": "34e23a22d3743913b88b20000feb5d29f22ee8daf20afe12d2f52cbc97586d69",
+      "intentionally_blocked_fields": [],
+      "item_type": "function",
+      "reference_count": 0,
+      "schema_keywords": [
+        "additionalProperties",
+        "properties",
+        "type"
+      ],
+      "schema_sha256": "501092d65eaca87fd765dd9a611edb57115ac057165b30ba21b3800591713f58",
+      "uri": "ak.wwise.core.remote.disconnect",
+      "version": "2024.1"
+    },
+    {
+      "construction_shape": "zero",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "548a0bdcce2b8b91975a046080f96d38b0d7d9b9799c04e9ea6457efe8fcdb7a",
+      "execution_policy": {
+        "accepted_authorization_modes": [
+          "explicit_confirmation"
+        ],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "read",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "request-schema"
+        ],
+        "item_type": "function",
+        "lifecycle_strategy": "single_guarded_runtime_call",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "managed_transaction-result-schema",
+        "project_guard_mode": "invariant",
+        "requires_authorization": true,
+        "result_limit_bytes": 1048576,
+        "route": "managed_transaction",
+        "timeout_seconds": 30.0,
+        "uri": "ak.wwise.core.remote.getAvailableConsoles",
+        "verification_strategy": "result_schema",
+        "version": "2024.1"
+      },
+      "execution_policy_sha256": "d92bd4fb6568992b093ba2b03632658510158b875dec92e6649e6c7443949dab",
+      "intentionally_blocked_fields": [],
+      "item_type": "function",
+      "reference_count": 1,
+      "schema_keywords": [
+        "$ref",
+        "additionalProperties",
+        "description",
+        "items",
+        "properties",
+        "required",
+        "type"
+      ],
+      "schema_sha256": "81f10872a956d016c49c9a3e1876f5d3d53db1bb445f496911de4a89050ecae2",
+      "uri": "ak.wwise.core.remote.getAvailableConsoles",
+      "version": "2024.1"
+    },
+    {
+      "construction_shape": "zero",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "548a0bdcce2b8b91975a046080f96d38b0d7d9b9799c04e9ea6457efe8fcdb7a",
+      "execution_policy": {
+        "accepted_authorization_modes": [],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "read",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "request-schema"
+        ],
+        "item_type": "function",
+        "lifecycle_strategy": "none",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "call-result-schema",
+        "project_guard_mode": "invariant",
+        "requires_authorization": false,
+        "result_limit_bytes": 262144,
+        "route": "bounded_call",
+        "timeout_seconds": 10.0,
+        "uri": "ak.wwise.core.remote.getConnectionStatus",
+        "verification_strategy": "result_schema",
+        "version": "2024.1"
+      },
+      "execution_policy_sha256": "cc0a3da6983cbb399d030866a04b51d839f0a245e4b0fc42e59dc14a7dd09853",
+      "intentionally_blocked_fields": [],
+      "item_type": "function",
+      "reference_count": 0,
+      "schema_keywords": [
+        "additionalProperties",
+        "description",
+        "properties",
+        "required",
+        "type"
+      ],
+      "schema_sha256": "e7b701858534023631a9b0ef4eb266355b3528acc1ca19dbe0dd652855746e18",
+      "uri": "ak.wwise.core.remote.getConnectionStatus",
+      "version": "2024.1"
+    },
+    {
+      "construction_shape": "inline",
       "correct_host": "wwise-console",
       "definition_graph_sha256": "548a0bdcce2b8b91975a046080f96d38b0d7d9b9799c04e9ea6457efe8fcdb7a",
       "execution_policy": {
@@ -27431,6 +27610,49 @@
       "version": "2024.1"
     },
     {
+      "construction_shape": "zero",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "548a0bdcce2b8b91975a046080f96d38b0d7d9b9799c04e9ea6457efe8fcdb7a",
+      "execution_policy": {
+        "accepted_authorization_modes": [
+          "explicit_confirmation",
+          "policy_authorization"
+        ],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "runtime_mutation",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "request-schema"
+        ],
+        "item_type": "function",
+        "lifecycle_strategy": "single_guarded_runtime_call",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "managed_transaction-result-schema",
+        "project_guard_mode": "invariant",
+        "requires_authorization": true,
+        "result_limit_bytes": 1048576,
+        "route": "managed_transaction",
+        "timeout_seconds": 30.0,
+        "uri": "ak.wwise.ui.bringToForeground",
+        "verification_strategy": "result_schema",
+        "version": "2024.1"
+      },
+      "execution_policy_sha256": "915dbad1e9199634b8e9742db874ac8cfd734f6d9c92a0e87d493f3d3deb88d9",
+      "intentionally_blocked_fields": [],
+      "item_type": "function",
+      "reference_count": 0,
+      "schema_keywords": [
+        "additionalProperties",
+        "properties",
+        "type"
+      ],
+      "schema_sha256": "d755bef4780d0fa914d0f69acb9d1cc2cef768f2cf74f3538c9aedf698314483",
+      "uri": "ak.wwise.ui.bringToForeground",
+      "version": "2024.1"
+    },
+    {
       "construction_shape": "draft",
       "correct_host": "wwise-console",
       "definition_graph_sha256": "548a0bdcce2b8b91975a046080f96d38b0d7d9b9799c04e9ea6457efe8fcdb7a",
@@ -27656,6 +27878,188 @@
       ],
       "schema_sha256": "402e31d1e80c43d7a6f763d79790a66dc9d8bf14923f67b35dd2c8cd445e0153",
       "uri": "ak.wwise.ui.commands.unregister",
+      "version": "2024.1"
+    },
+    {
+      "construction_shape": "inline",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "548a0bdcce2b8b91975a046080f96d38b0d7d9b9799c04e9ea6457efe8fcdb7a",
+      "execution_policy": {
+        "accepted_authorization_modes": [],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "read",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "selected"
+        ],
+        "item_type": "function",
+        "lifecycle_strategy": "none",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "fixed-command-dispatch",
+        "project_guard_mode": "invariant",
+        "requires_authorization": false,
+        "result_limit_bytes": 262144,
+        "route": "fixed_command",
+        "timeout_seconds": 10.0,
+        "uri": "ak.wwise.ui.getSelectedObjects",
+        "verification_strategy": "fixed_result_contract",
+        "version": "2024.1"
+      },
+      "execution_policy_sha256": "8ee4f8778e38c913807757753c14603704b357975d4651655575b20ff975d20c",
+      "intentionally_blocked_fields": [],
+      "item_type": "function",
+      "reference_count": 2,
+      "schema_keywords": [
+        "$ref",
+        "additionalProperties",
+        "description",
+        "items",
+        "properties",
+        "required",
+        "type"
+      ],
+      "schema_sha256": "ea3b718b94930a3272715f4238f19cc2d3388cd5240e3440f5e9511816f49b09",
+      "uri": "ak.wwise.ui.getSelectedObjects",
+      "version": "2024.1"
+    },
+    {
+      "construction_shape": "inline",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "548a0bdcce2b8b91975a046080f96d38b0d7d9b9799c04e9ea6457efe8fcdb7a",
+      "execution_policy": {
+        "accepted_authorization_modes": [
+          "explicit_confirmation",
+          "policy_authorization"
+        ],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "runtime_mutation",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "request-schema"
+        ],
+        "item_type": "function",
+        "lifecycle_strategy": "single_guarded_runtime_call",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "managed_transaction-result-schema",
+        "project_guard_mode": "transition_to_none",
+        "requires_authorization": true,
+        "result_limit_bytes": 1048576,
+        "route": "managed_transaction",
+        "timeout_seconds": 30.0,
+        "uri": "ak.wwise.ui.project.close",
+        "verification_strategy": "result_schema_and_project_transition",
+        "version": "2024.1"
+      },
+      "execution_policy_sha256": "8490bd6a2ebec7e574ad39914f0ca6b48655a3343dd35a418d096b492a30897c",
+      "intentionally_blocked_fields": [],
+      "item_type": "function",
+      "reference_count": 0,
+      "schema_keywords": [
+        "additionalProperties",
+        "description",
+        "properties",
+        "type"
+      ],
+      "schema_sha256": "4974f237669499e3aff3ee937d697e3b44cc21f6bd234ca54be082626256c4f0",
+      "uri": "ak.wwise.ui.project.close",
+      "version": "2024.1"
+    },
+    {
+      "construction_shape": "draft",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "548a0bdcce2b8b91975a046080f96d38b0d7d9b9799c04e9ea6457efe8fcdb7a",
+      "execution_policy": {
+        "accepted_authorization_modes": [
+          "explicit_confirmation",
+          "policy_authorization"
+        ],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "external",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "request-schema"
+        ],
+        "item_type": "function",
+        "lifecycle_strategy": "none",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "isolated_transaction-result-schema",
+        "project_guard_mode": "transition_to_path",
+        "requires_authorization": true,
+        "result_limit_bytes": 1048576,
+        "route": "isolated_transaction",
+        "timeout_seconds": 120.0,
+        "uri": "ak.wwise.ui.project.create",
+        "verification_strategy": "result_schema_and_project_transition",
+        "version": "2024.1"
+      },
+      "execution_policy_sha256": "8abfd6a1a9eed563a4d6815d99e0e04a31d07e38cc0e63bb14d1bbe3a0a6b651",
+      "intentionally_blocked_fields": [],
+      "item_type": "function",
+      "reference_count": 2,
+      "schema_keywords": [
+        "$ref",
+        "additionalProperties",
+        "description",
+        "pattern",
+        "properties",
+        "required",
+        "type"
+      ],
+      "schema_sha256": "979bc82e084ca60202e4e6c499d6b14d4f286c4acc0d744d8374166e5202f71f",
+      "uri": "ak.wwise.ui.project.create",
+      "version": "2024.1"
+    },
+    {
+      "construction_shape": "inline",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "548a0bdcce2b8b91975a046080f96d38b0d7d9b9799c04e9ea6457efe8fcdb7a",
+      "execution_policy": {
+        "accepted_authorization_modes": [
+          "explicit_confirmation",
+          "policy_authorization"
+        ],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "external",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "request-schema"
+        ],
+        "item_type": "function",
+        "lifecycle_strategy": "none",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "isolated_transaction-result-schema",
+        "project_guard_mode": "transition_to_path",
+        "requires_authorization": true,
+        "result_limit_bytes": 1048576,
+        "route": "isolated_transaction",
+        "timeout_seconds": 120.0,
+        "uri": "ak.wwise.ui.project.open",
+        "verification_strategy": "result_schema_and_project_transition",
+        "version": "2024.1"
+      },
+      "execution_policy_sha256": "c7a0e2a73ba4c24aee25eec43936197666ed0b0960790793f9f9561b402e1fc9",
+      "intentionally_blocked_fields": [],
+      "item_type": "function",
+      "reference_count": 0,
+      "schema_keywords": [
+        "additionalProperties",
+        "description",
+        "enum",
+        "pattern",
+        "properties",
+        "required",
+        "type"
+      ],
+      "schema_sha256": "cb7b4a2e71ecfabdb6bfda333ebc0cd6a778e315cbc311d1c52bf531e041da01",
+      "uri": "ak.wwise.ui.project.open",
       "version": "2024.1"
     },
     {
@@ -34470,6 +34874,185 @@
     },
     {
       "construction_shape": "inline",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "61e9c4ca7756b827e65389fd0ecbe0d6a75a90ab93a280be7d6963f52ef15ccf",
+      "execution_policy": {
+        "accepted_authorization_modes": [
+          "explicit_confirmation",
+          "policy_authorization"
+        ],
+        "companion_uris": [
+          "ak.wwise.core.remote.disconnect"
+        ],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "runtime_mutation",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "request-schema"
+        ],
+        "item_type": "function",
+        "lifecycle_strategy": "paired_follow_up_required",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "managed_transaction-result-schema",
+        "project_guard_mode": "invariant",
+        "requires_authorization": true,
+        "result_limit_bytes": 1048576,
+        "route": "managed_transaction",
+        "timeout_seconds": 30.0,
+        "uri": "ak.wwise.core.remote.connect",
+        "verification_strategy": "result_schema",
+        "version": "2025.1"
+      },
+      "execution_policy_sha256": "6423a209b4a057804cbc8ec020a1f3e508d04eaacb393a9029955cfde1d51b80",
+      "intentionally_blocked_fields": [],
+      "item_type": "function",
+      "reference_count": 2,
+      "schema_keywords": [
+        "$ref",
+        "additionalProperties",
+        "description",
+        "properties",
+        "required",
+        "type"
+      ],
+      "schema_sha256": "27858b8550dca6e3a65197e8a8eca66685581756dd4a7f32d78c85cecd5235ee",
+      "uri": "ak.wwise.core.remote.connect",
+      "version": "2025.1"
+    },
+    {
+      "construction_shape": "zero",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "61e9c4ca7756b827e65389fd0ecbe0d6a75a90ab93a280be7d6963f52ef15ccf",
+      "execution_policy": {
+        "accepted_authorization_modes": [
+          "explicit_confirmation",
+          "policy_authorization"
+        ],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "runtime_mutation",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "request-schema"
+        ],
+        "item_type": "function",
+        "lifecycle_strategy": "session_close",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "managed_transaction-result-schema",
+        "project_guard_mode": "invariant",
+        "requires_authorization": true,
+        "result_limit_bytes": 1048576,
+        "route": "managed_transaction",
+        "timeout_seconds": 30.0,
+        "uri": "ak.wwise.core.remote.disconnect",
+        "verification_strategy": "result_schema",
+        "version": "2025.1"
+      },
+      "execution_policy_sha256": "a2fc50652990f8b0cdbfc74262f3c11da59b280ebc985bd7890dc44c972e2c8e",
+      "intentionally_blocked_fields": [],
+      "item_type": "function",
+      "reference_count": 0,
+      "schema_keywords": [
+        "additionalProperties",
+        "properties",
+        "type"
+      ],
+      "schema_sha256": "501092d65eaca87fd765dd9a611edb57115ac057165b30ba21b3800591713f58",
+      "uri": "ak.wwise.core.remote.disconnect",
+      "version": "2025.1"
+    },
+    {
+      "construction_shape": "zero",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "61e9c4ca7756b827e65389fd0ecbe0d6a75a90ab93a280be7d6963f52ef15ccf",
+      "execution_policy": {
+        "accepted_authorization_modes": [
+          "explicit_confirmation"
+        ],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "read",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "request-schema"
+        ],
+        "item_type": "function",
+        "lifecycle_strategy": "single_guarded_runtime_call",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "managed_transaction-result-schema",
+        "project_guard_mode": "invariant",
+        "requires_authorization": true,
+        "result_limit_bytes": 1048576,
+        "route": "managed_transaction",
+        "timeout_seconds": 30.0,
+        "uri": "ak.wwise.core.remote.getAvailableConsoles",
+        "verification_strategy": "result_schema",
+        "version": "2025.1"
+      },
+      "execution_policy_sha256": "2a35f29e5778fcb76f42935550195dcf81770078e89c3a4c9e0cdfc4452f8337",
+      "intentionally_blocked_fields": [],
+      "item_type": "function",
+      "reference_count": 1,
+      "schema_keywords": [
+        "$ref",
+        "additionalProperties",
+        "description",
+        "items",
+        "properties",
+        "required",
+        "type"
+      ],
+      "schema_sha256": "fbdc754ae39b62e571de59fb1b086680dd9eb5f3bcc3de344756549a513e3d37",
+      "uri": "ak.wwise.core.remote.getAvailableConsoles",
+      "version": "2025.1"
+    },
+    {
+      "construction_shape": "zero",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "61e9c4ca7756b827e65389fd0ecbe0d6a75a90ab93a280be7d6963f52ef15ccf",
+      "execution_policy": {
+        "accepted_authorization_modes": [],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "read",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "request-schema"
+        ],
+        "item_type": "function",
+        "lifecycle_strategy": "none",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "call-result-schema",
+        "project_guard_mode": "invariant",
+        "requires_authorization": false,
+        "result_limit_bytes": 262144,
+        "route": "bounded_call",
+        "timeout_seconds": 10.0,
+        "uri": "ak.wwise.core.remote.getConnectionStatus",
+        "verification_strategy": "result_schema",
+        "version": "2025.1"
+      },
+      "execution_policy_sha256": "0a668582b69cf0288e40d4b673906a4336c29c55778412012e32a8758f35426b",
+      "intentionally_blocked_fields": [],
+      "item_type": "function",
+      "reference_count": 0,
+      "schema_keywords": [
+        "additionalProperties",
+        "description",
+        "properties",
+        "required",
+        "type"
+      ],
+      "schema_sha256": "e7b701858534023631a9b0ef4eb266355b3528acc1ca19dbe0dd652855746e18",
+      "uri": "ak.wwise.core.remote.getConnectionStatus",
+      "version": "2025.1"
+    },
+    {
+      "construction_shape": "inline",
       "correct_host": "wwise-console",
       "definition_graph_sha256": "61e9c4ca7756b827e65389fd0ecbe0d6a75a90ab93a280be7d6963f52ef15ccf",
       "execution_policy": {
@@ -36293,6 +36876,49 @@
       "version": "2025.1"
     },
     {
+      "construction_shape": "zero",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "61e9c4ca7756b827e65389fd0ecbe0d6a75a90ab93a280be7d6963f52ef15ccf",
+      "execution_policy": {
+        "accepted_authorization_modes": [
+          "explicit_confirmation",
+          "policy_authorization"
+        ],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "runtime_mutation",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "request-schema"
+        ],
+        "item_type": "function",
+        "lifecycle_strategy": "single_guarded_runtime_call",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "managed_transaction-result-schema",
+        "project_guard_mode": "invariant",
+        "requires_authorization": true,
+        "result_limit_bytes": 1048576,
+        "route": "managed_transaction",
+        "timeout_seconds": 30.0,
+        "uri": "ak.wwise.ui.bringToForeground",
+        "verification_strategy": "result_schema",
+        "version": "2025.1"
+      },
+      "execution_policy_sha256": "20645089997230856018cc71c1075a20b481f14b2036e79035231528cec1393e",
+      "intentionally_blocked_fields": [],
+      "item_type": "function",
+      "reference_count": 0,
+      "schema_keywords": [
+        "additionalProperties",
+        "properties",
+        "type"
+      ],
+      "schema_sha256": "2b4839cfdfae63f22f9c5c6fb0666f1f6840b5f8d651f355a73a5e3b96c98d7e",
+      "uri": "ak.wwise.ui.bringToForeground",
+      "version": "2025.1"
+    },
+    {
       "construction_shape": "draft",
       "correct_host": "wwise-console",
       "definition_graph_sha256": "61e9c4ca7756b827e65389fd0ecbe0d6a75a90ab93a280be7d6963f52ef15ccf",
@@ -36518,6 +37144,231 @@
       ],
       "schema_sha256": "402e31d1e80c43d7a6f763d79790a66dc9d8bf14923f67b35dd2c8cd445e0153",
       "uri": "ak.wwise.ui.commands.unregister",
+      "version": "2025.1"
+    },
+    {
+      "construction_shape": "zero",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "61e9c4ca7756b827e65389fd0ecbe0d6a75a90ab93a280be7d6963f52ef15ccf",
+      "execution_policy": {
+        "accepted_authorization_modes": [],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "read",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "request-schema"
+        ],
+        "item_type": "function",
+        "lifecycle_strategy": "none",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "call-result-schema",
+        "project_guard_mode": "invariant",
+        "requires_authorization": false,
+        "result_limit_bytes": 262144,
+        "route": "bounded_call",
+        "timeout_seconds": 10.0,
+        "uri": "ak.wwise.ui.getSelectedFiles",
+        "verification_strategy": "result_schema",
+        "version": "2025.1"
+      },
+      "execution_policy_sha256": "9c9ecf5760095871a73dbae3198ff510466088aa7935108f85d00904fa123892",
+      "intentionally_blocked_fields": [],
+      "item_type": "function",
+      "reference_count": 0,
+      "schema_keywords": [
+        "additionalProperties",
+        "description",
+        "items",
+        "properties",
+        "required",
+        "type"
+      ],
+      "schema_sha256": "89e23a667eea6384b7e454c4662493d14037daeb63e373560132654e5cd8dc16",
+      "uri": "ak.wwise.ui.getSelectedFiles",
+      "version": "2025.1"
+    },
+    {
+      "construction_shape": "inline",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "61e9c4ca7756b827e65389fd0ecbe0d6a75a90ab93a280be7d6963f52ef15ccf",
+      "execution_policy": {
+        "accepted_authorization_modes": [],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "read",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "selected"
+        ],
+        "item_type": "function",
+        "lifecycle_strategy": "none",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "fixed-command-dispatch",
+        "project_guard_mode": "invariant",
+        "requires_authorization": false,
+        "result_limit_bytes": 262144,
+        "route": "fixed_command",
+        "timeout_seconds": 10.0,
+        "uri": "ak.wwise.ui.getSelectedObjects",
+        "verification_strategy": "fixed_result_contract",
+        "version": "2025.1"
+      },
+      "execution_policy_sha256": "dc0081d95062474efc78e321ccdfcd34094441d97df918138d4993c31058fee8",
+      "intentionally_blocked_fields": [],
+      "item_type": "function",
+      "reference_count": 2,
+      "schema_keywords": [
+        "$ref",
+        "additionalProperties",
+        "description",
+        "items",
+        "properties",
+        "required",
+        "type"
+      ],
+      "schema_sha256": "edccc10e505815494cd15e8603276d872f84ad63f04a179a11a2acd91aac247d",
+      "uri": "ak.wwise.ui.getSelectedObjects",
+      "version": "2025.1"
+    },
+    {
+      "construction_shape": "inline",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "61e9c4ca7756b827e65389fd0ecbe0d6a75a90ab93a280be7d6963f52ef15ccf",
+      "execution_policy": {
+        "accepted_authorization_modes": [
+          "explicit_confirmation",
+          "policy_authorization"
+        ],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "runtime_mutation",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "request-schema"
+        ],
+        "item_type": "function",
+        "lifecycle_strategy": "single_guarded_runtime_call",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "managed_transaction-result-schema",
+        "project_guard_mode": "transition_to_none",
+        "requires_authorization": true,
+        "result_limit_bytes": 1048576,
+        "route": "managed_transaction",
+        "timeout_seconds": 30.0,
+        "uri": "ak.wwise.ui.project.close",
+        "verification_strategy": "result_schema_and_project_transition",
+        "version": "2025.1"
+      },
+      "execution_policy_sha256": "2944e200bc19e47ddd064966d2380ad18c97c47f8da613fb1340e668eaf23d21",
+      "intentionally_blocked_fields": [],
+      "item_type": "function",
+      "reference_count": 0,
+      "schema_keywords": [
+        "additionalProperties",
+        "description",
+        "properties",
+        "type"
+      ],
+      "schema_sha256": "4974f237669499e3aff3ee937d697e3b44cc21f6bd234ca54be082626256c4f0",
+      "uri": "ak.wwise.ui.project.close",
+      "version": "2025.1"
+    },
+    {
+      "construction_shape": "draft",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "61e9c4ca7756b827e65389fd0ecbe0d6a75a90ab93a280be7d6963f52ef15ccf",
+      "execution_policy": {
+        "accepted_authorization_modes": [
+          "explicit_confirmation",
+          "policy_authorization"
+        ],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "external",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "request-schema"
+        ],
+        "item_type": "function",
+        "lifecycle_strategy": "none",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "isolated_transaction-result-schema",
+        "project_guard_mode": "transition_to_path",
+        "requires_authorization": true,
+        "result_limit_bytes": 1048576,
+        "route": "isolated_transaction",
+        "timeout_seconds": 120.0,
+        "uri": "ak.wwise.ui.project.create",
+        "verification_strategy": "result_schema_and_project_transition",
+        "version": "2025.1"
+      },
+      "execution_policy_sha256": "343b8c6ed095b8345d34d1fe5b2271fcfab29b800183325e36ee1c8ebf163ff0",
+      "intentionally_blocked_fields": [],
+      "item_type": "function",
+      "reference_count": 2,
+      "schema_keywords": [
+        "$ref",
+        "additionalProperties",
+        "description",
+        "pattern",
+        "properties",
+        "required",
+        "type"
+      ],
+      "schema_sha256": "e04f937cad6b96572cbb0c4a7e67124b46b2402ba7de808c528eeec9490ede89",
+      "uri": "ak.wwise.ui.project.create",
+      "version": "2025.1"
+    },
+    {
+      "construction_shape": "inline",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "61e9c4ca7756b827e65389fd0ecbe0d6a75a90ab93a280be7d6963f52ef15ccf",
+      "execution_policy": {
+        "accepted_authorization_modes": [
+          "explicit_confirmation",
+          "policy_authorization"
+        ],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "external",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "request-schema"
+        ],
+        "item_type": "function",
+        "lifecycle_strategy": "none",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "isolated_transaction-result-schema",
+        "project_guard_mode": "transition_to_path",
+        "requires_authorization": true,
+        "result_limit_bytes": 1048576,
+        "route": "isolated_transaction",
+        "timeout_seconds": 120.0,
+        "uri": "ak.wwise.ui.project.open",
+        "verification_strategy": "result_schema_and_project_transition",
+        "version": "2025.1"
+      },
+      "execution_policy_sha256": "507949e2459007ea842c789a746f80ca0bcf3aab77fc38a848c0a8eb60ad4130",
+      "intentionally_blocked_fields": [],
+      "item_type": "function",
+      "reference_count": 0,
+      "schema_keywords": [
+        "additionalProperties",
+        "description",
+        "enum",
+        "pattern",
+        "properties",
+        "required",
+        "type"
+      ],
+      "schema_sha256": "01bea7f358acbc3a453f8df6bc08570aa5db9fc4e266e75b46f15a5f44e50993",
+      "uri": "ak.wwise.ui.project.open",
       "version": "2025.1"
     },
     {
@@ -38194,10 +39045,10 @@
     }
   ],
   "totals": {
-    "function_lanes": 670,
+    "function_lanes": 689,
     "topic_lanes": 160,
-    "total_lanes": 830,
-    "unique_function_uris": 167,
+    "total_lanes": 849,
+    "unique_function_uris": 168,
     "unique_topic_uris": 35
   },
   "unknown_schema_keywords": [],

@@ -37,6 +37,8 @@ from wwise_waapi.authoring_ui_commands_manifest import (  # noqa: E402  # pyrigh
     AUTHORING_UI_COMMAND_URIS,
 )
 from wwise_waapi.authoring_ui_topics_manifest import AUTHORING_UI_OBSERVATION_TOPICS  # noqa: E402
+from wwise_waapi.authoring_core_manifest import COMMON_URIS as AUTHORING_CORE_URIS  # noqa: E402
+from wwise_waapi.authoring_core_manifest import requires_core_supplement  # noqa: E402
 from wwise_waapi.canonical import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     canonical_json_bytes,
     canonical_sha256,
@@ -576,7 +578,7 @@ OFFLINE_COMMANDS = frozenset(
     }
 )
 GATEWAY_RESULT_CONTRACT = "waapi-skill.gateway-result/v1"
-AUTHORING_HOST_REQUIRED_URIS = AUTHORING_UI_COMMAND_URIS | AUTHORING_UI_OBSERVATION_TOPICS
+AUTHORING_HOST_REQUIRED_URIS = AUTHORING_UI_COMMAND_URIS | AUTHORING_UI_OBSERVATION_TOPICS | AUTHORING_CORE_URIS | {"ak.wwise.ui.getSelectedFiles"}
 TOPIC_STREAM_RECORD_CONTRACT = "waapi-skill.topic-stream/v1"
 GATEWAY_CONFIG_CONTRACT = "waapi-skill.config/v2"
 GATEWAY_SESSION_CONTEXT_CONTRACT = "waapi-skill.session-context/v2"
@@ -875,7 +877,7 @@ class AuthoringUiRuntimeManifestStore:
         self._base_store = base_store
 
     def load(self, version: str) -> dict[str, Any]:
-        return self._base_store.load_with_authoring_ui_commands(version)
+        return self._base_store.load_authoring_ui_profile(version)
 
 
 class GatewaySubscriptionCleanupError(RuntimeError):
@@ -4530,6 +4532,13 @@ def live_capability(
     return catalog.describe(version, api)
 
 
+def transaction_capability(version: str, api: str) -> CapabilityRecord:
+    """Resolve offline construction/guard facts, not permission to dispatch."""
+    catalog = CapabilityCatalog()
+    return (catalog.authoring_ui_describe(version, api)
+            if requires_core_supplement(version, api) else catalog.describe(version, api))
+
+
 def authoring_host_required_payload(
     *,
     api: str | None,
@@ -4679,11 +4688,10 @@ def live_authoring_transaction_boundary(
         if operation == "waapi.call" and isinstance(arguments, Mapping)
         else None
     )
-    if native_api in {
-        "ak.wwise.ui.project.close",
-        "ak.wwise.ui.project.create",
-        "ak.wwise.ui.project.open",
-    }:
+    if native_api in {"ak.wwise.ui.project.close", "ak.wwise.ui.project.create", "ak.wwise.ui.project.open"} or (
+        isinstance(native_api, str)
+        and requires_core_supplement(version_key_from_get_info(live_info), native_api)
+    ):
         if live_info.get("isCommandLine") is not False:
             return authoring_host_required_payload(
                 api=str(native_api),
@@ -10165,7 +10173,7 @@ def sealed_read_transaction_contract(
     if not isinstance(sealed_contract, Mapping):
         return None
     try:
-        capability = CapabilityCatalog().describe(version, api)
+        capability = transaction_capability(version, api)
     except (CapabilityNotFoundError, ValueError):
         return None
     current_contract = capability.execution_contract
@@ -13662,9 +13670,10 @@ def dispatch_command(
         return_fields = SELECTED_REQUIRED_RETURN_FIELDS
         request_validation = None
         try:
-            selected_capability = CapabilityCatalog().describe(
+            selected_capability = live_capability(
                 detected_version,
                 GET_SELECTED_URI,
+                live_info=live_info,
             )
         except CapabilityNotFoundError:
             # Preserve the existing explicit absent-from-manifest boundary and
@@ -14885,6 +14894,11 @@ def dispatch_operation_draft_check(
             },
         )
     request_payload = dict(materialized.request)
+    authoring_boundary = live_authoring_transaction_boundary(
+        request_payload, command="draft-check", live_info=live_info, common=common,
+    )
+    if authoring_boundary is not None:
+        return authoring_boundary
     if inspected.operation.startswith("ak."):
         capability = live_capability(
             detected_version,
@@ -14962,14 +14976,6 @@ def dispatch_operation_draft_check(
         request_payload,
         expected_version=detected_version,
     )
-    authoring_boundary = live_authoring_transaction_boundary(
-        request_payload,
-        command=args.command,
-        live_info=live_info,
-        common=common,
-    )
-    if authoring_boundary is not None:
-        return authoring_boundary
     locality_boundary = local_filesystem_transaction_boundary(
         request_payload,
         command=args.command,
@@ -28663,7 +28669,7 @@ def transaction_project_guard_spec(
     api = arguments.get("api")
     if not isinstance(api, str):
         return PROJECT_GUARD_INVARIANT, None
-    capability = CapabilityCatalog().describe(version, api)
+    capability = transaction_capability(version, api)
     mode = capability.execution_contract.get("project_guard_mode", PROJECT_GUARD_INVARIANT)
     if not isinstance(mode, str) or mode not in PROJECT_GUARD_MODES:
         raise GatewayInputError(
@@ -28725,7 +28731,7 @@ def transaction_post_execution_project_guard_policy(
             f"Execution contract for {api!r} has unsupported "
             f"post_execution_project_guard_policy {policy!r}"
         )
-    current_contract = CapabilityCatalog().describe(version, api).execution_contract
+    current_contract = transaction_capability(version, api).execution_contract
     current_policy = current_contract.get("post_execution_project_guard_policy")
     if not isinstance(current_policy, str) or current_policy not in POST_EXECUTION_PROJECT_GUARD_POLICIES:
         raise GatewayInputError(

@@ -58,16 +58,16 @@ def test_schema_inventory_resources_have_deterministic_bytes() -> None:
         assert path.read_text(encoding="utf-8") == writer.dumps(payload)
 
 
-def test_packaged_surface_closes_all_830_exact_lanes() -> None:
+def test_packaged_surface_closes_all_849_exact_lanes() -> None:
     result = validate_packaged_typed_request_surface(root=RESOURCE_ROOT)
 
     assert result["contract"] == TYPED_REQUEST_SURFACE_CONTRACT
     assert result["versions"] == list(SUPPORTED_WWISE_VERSION_KEYS)
     assert result["totals"] == {
-        "function_lanes": 670,
+        "function_lanes": 689,
         "topic_lanes": 160,
-        "total_lanes": 830,
-        "unique_function_uris": 167,
+        "total_lanes": 849,
+        "unique_function_uris": 168,
         "unique_topic_uris": 35,
     }
     assert result["unresolved_references"] == []
@@ -83,17 +83,17 @@ def test_packaged_surface_closes_all_830_exact_lanes() -> None:
         row["construction_shape"] == "zero"
         for row in result["lanes"]
         if row["item_type"] == "function"
-    ) == 93
+    ) == 102
     assert sum(
         row["construction_shape"] == "inline"
         for row in result["lanes"]
         if row["item_type"] == "function"
-    ) == 463
+    ) == 471
     assert sum(
         row["construction_shape"] == "draft"
         for row in result["lanes"]
         if row["item_type"] == "function"
-    ) == 114
+    ) == 116
     assert sum(
         row["execution_policy"]["route"] == "compound_transaction_member"
         for row in result["lanes"]
@@ -153,7 +153,7 @@ def test_every_generated_zero_function_lane_has_no_typed_facts() -> None:
         if row["item_type"] == "function"
         and row["construction_shape"] == "zero"
     ]
-    assert len(zero_rows) == 93
+    assert len(zero_rows) == 102
     for row in zero_rows:
         try:
             catalog = CapabilityCatalog(manifest_root=RESOURCE_ROOT)
@@ -191,12 +191,12 @@ def test_every_generated_inline_lane_is_either_generic_or_exactly_isolated() -> 
             assert contract.as_gateway_payload()["input_shape"] == "inline"
             generic.append((row["version"], row["uri"]))
 
-    assert len(inline_rows) == 463
+    assert len(inline_rows) == 471
     # Isolated typed routes joined the same schema compiler in #44; only
     # dedicated exact-operation lanes remain intentionally unavailable through
     # generic request-schema.
-    assert len(generic) == 364
-    assert len(isolated) == 99
+    assert len(generic) == 370
+    assert len(isolated) == 101
     assert ("2025.1", "ak.wwise.core.object.setName") in isolated
     assert ("2025.1", "ak.wwise.core.log.get") in generic
 

@@ -4,6 +4,19 @@ This inventory is grouped for human review. The latest completed passing non-liv
 
 ## Runner modes and strict real behavior
 
+### 2026-09-13 approved Authoring core additions
+
+Nineteen version/function rows (nine in 2024.1, ten in 2025.1) reuse the
+existing closed Gateway routes; Console inventory remains unchanged. Final
+macOS Program: **5061 passed, 2 skipped**. Focused Non-live (CI driver, new core
+Gateway regressions, and host/project Adapter): **151 passed, 11 skipped**.
+Both sets of skips require native Windows and receive no passing credit.
+Real Windows Authoring, called from the macOS Gateway, returned valid empty
+selection results for `selected` on both versions and `getSelectedFiles` on
+2025.1. No real mutation, native-Windows Python gate, Fresh Agent, full Non-live
+or live matrix was run. See [scope and evidence](../docs/research/authoring-core-scope-2026-09-13.md)
+for exact exclusions, historical failures, and validation limits.
+
 ### 2026-09-13 CRUD field Interface repair
 
 The field-selection cutover adds 53 public Gateway regressions in

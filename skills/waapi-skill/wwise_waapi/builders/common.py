@@ -239,6 +239,12 @@ class ManifestSchemaLoader:
 
     def schema_for(self, uri: str, version: str = DEFAULT_WWISE_VERSION) -> Mapping[str, Any]:
         manifest = self.load_manifest(version)
+        from ..authoring_core_manifest import requires_core_supplement
+
+        if requires_core_supplement(version, uri):
+            # Schema availability is not host authorization. Live Gateway routes
+            # separately require an attested Authoring process before dispatch.
+            manifest = self.load_authoring_ui_manifest(version)
         for entry in manifest.get("schemas", []):
             if not isinstance(entry, Mapping) or entry.get("uri") != uri:
                 continue

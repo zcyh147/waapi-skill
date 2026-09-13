@@ -11,9 +11,9 @@ ALL_VERSIONS = ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
 HOST_UI_DEBUG_BUSINESS_LANES: dict[str, tuple[str, ...]] = {
     "ak.wwise.waapi.getSchema": ALL_VERSIONS,
     "ak.wwise.debug.generateToneWAV": ("2023.1", "2024.1", "2025.1"),
-    "ak.wwise.ui.project.open": ("2021.1", "2022.1", "2023.1"),
-    "ak.wwise.ui.project.close": ("2021.1", "2022.1", "2023.1"),
-    "ak.wwise.ui.project.create": ("2023.1",),
+    "ak.wwise.ui.project.open": ALL_VERSIONS,
+    "ak.wwise.ui.project.close": ALL_VERSIONS,
+    "ak.wwise.ui.project.create": ("2023.1", "2024.1", "2025.1"),
 }
 HOST_UI_DEBUG_BUSINESS_OPERATIONS = tuple(sorted(HOST_UI_DEBUG_BUSINESS_LANES))
 HOST_UI_DEBUG_DRAFT_OPERATIONS = tuple(
@@ -208,7 +208,7 @@ def _fields(
         }
     if operation == "ak.wwise.ui.project.open":
         optional = ["discard_unsaved_current_project", "upgrade_policy"]
-        if version == "2023.1":
+        if version in {"2023.1", "2024.1", "2025.1"}:
             optional.extend(["migration_policy", "auto_checkout"])
         return ["project_file"], optional, {
             "project_file": "exact_project_file",

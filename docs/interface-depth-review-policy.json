@@ -18,8 +18,8 @@
   "source_contracts": {
     "gateway_parser_sha256": "41e31e13abb6f5e907296ad877755879d61afbf0114c6d49f80d84c358b1583e",
     "operation_contract_sha256": "28e594931b21d500b0802f8bd916a90e9515cbc3ca4f186f740b1effc16230a7",
-    "public_continuation_sha256": "99ecaea3fe1c268ee7609b211553b90c2c6cb0b6b3713056a84820d0f3783de0",
-    "typed_request_surface_sha256": "15fdfba40a37f38bbf963e02a1114f1452fc609aae3c92cb7e916119d33e3773"
+    "public_continuation_sha256": "01337ddb92c29de552181ae702a1ed30ab6e26fae935ea5da49cec6f963fa2cb",
+    "typed_request_surface_sha256": "cbdccf1679c6f534b501cf3f67b503c376fa6a155d0cf8f085306ad86c0a031c"
   },
   "ownership_classes": {
     "stable_business_declaration": "A prompt-derived business value remains visible in the public request.",
@@ -205,7 +205,7 @@
       "owner_issue": null,
       "match": {"uri_prefixes": ["ak.wwise.debug.", "ak.wwise.ui.", "ak.wwise.waapi."]},
       "leaked_mechanics": [],
-      "audit_evidence": "The public host-ui-debug-business/v1 Adapter and bounded waapi-schema read cover all 15 exact host, Authoring project, Tone WAV, and WAAPI schema lanes. Callers provide stable waveform, duration, level, channel, project-policy, include-examples, and exact target artifact intent; the Gateway owns versioned native field names, waveform masks, marker shape, project open/create flags, host requirements, isolated I/O roots, POSIX-to-Wine path translation, immutable Preview, execute-once, project-transition settling, and verification. Normal typed-call, typed containers, raw native args/options, and shallow Draft construction are blocked. #90 retains five-version deterministic and hostile-value coverage, dual-host real schema/Tone and Authoring close/open evidence, and final Terra Fresh Agent host-plan PASS plus identical verify-only on both hosts."
+      "audit_evidence": "The public host-ui-debug-business/v1 Adapter and bounded waapi-schema read cover 21 exact host, Authoring project, Tone WAV, and WAAPI schema lanes. Callers provide stable waveform, duration, level, channel, project-policy, include-examples, and exact target artifact intent; the Gateway owns versioned native field names, waveform masks, marker shape, project open/create flags, host requirements, isolated I/O roots, POSIX-to-Wine path translation, immutable Preview, execute-once, project-transition settling, and verification. Normal typed-call, typed containers, raw native args/options, and shallow Draft construction are blocked. #90 retains five-version deterministic and hostile-value coverage, dual-host real schema/Tone and Authoring close/open evidence, and final Terra Fresh Agent host-plan PASS plus identical verify-only on both hosts. The 2026-09-13 Authoring core additions reuse these contracts and have separately recorded scoped evidence; historical issue acceptance does not grant new-version live or Fresh Agent credit."
     },
     {
       "id": "generic-core-project-object",
@@ -221,7 +221,7 @@
       "owner_issue": null,
       "match": {"uri_prefixes": ["ak.wwise.core.log.", "ak.wwise.core.profiler.", "ak.wwise.core.remote.", "ak.wwise.core.transport."]},
       "leaked_mechanics": [],
-      "audit_evidence": "The public runtime-inspection-business/v1 direct-read contracts and runtime-control-business/v1 Draft declarations cover all 94 exact log, Profiler, Remote, and Transport lanes. Callers supply bounded capture/filter/time intent, stable control outcomes, exact target names, and opaque Gateway-issued handles. The Gateway owns native data-type and action tokens, projections, handle encoding and validation, request arrays and fragments, host requirements, dependency order, immutable Preview, authorization, verification, and the sole continuation. Direct reads expose only core-call; runtime controls expose only the closed Draft declaration path; typed-call, typed-zero-call, raw request fragments, and weaker generic bypass are blocked before dispatch."
+      "audit_evidence": "The public runtime-inspection-business/v1 direct-read contracts and runtime-control-business/v1 Draft declarations cover all 94 exact log, Profiler, Remote, and Transport lanes. Callers supply bounded capture/filter/time intent, stable control outcomes, exact target names, and opaque Gateway-issued handles. The Gateway owns native data-type and action tokens, projections, handle encoding and validation, request arrays and fragments, host requirements, dependency order, immutable Preview, authorization, verification, and the sole continuation. Direct reads expose only core-call; runtime controls expose only the closed Draft declaration path; typed-call, typed-zero-call, raw request fragments, and weaker generic bypass are blocked before dispatch. The 2026-09-13 Authoring core additions reuse these contracts and have separately recorded scoped evidence; historical issue acceptance does not grant new-version live or Fresh Agent credit."
     },
     {
       "id": "generic-core-remaining",
@@ -251,8 +251,8 @@
     },
     "generic-core-runtime-inspection": {
       "github_issue": 87,
-      "row_count": 94,
-      "rows_sha256": "b66b1f4d66d8d77b456b98041c7e14fa2d383e02bae02b4a17fabfb85261d593"
+      "row_count": 96,
+      "rows_sha256": "44fc01c03475484a8a6cf302e2563f08d07338c0a27d807d741ee6bd56f83e7c"
     },
     "generic-soundengine-runtime": {
       "github_issue": 88,
@@ -266,8 +266,8 @@
     },
     "generic-host-ui-debug-waapi": {
       "github_issue": 90,
-      "row_count": 15,
-      "rows_sha256": "8d701d66442416c74f627e468842139fa8971b441b9b813be95cd9e7d3712ee0"
+      "row_count": 21,
+      "rows_sha256": "e110f4e782ca79f3eaf281d69b63aebab9faf688ec6b59214cc06993df03845e"
     },
     "generic-topics": {
       "github_issue": 91,
