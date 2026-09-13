@@ -193,6 +193,71 @@ def test_sound_sfx_kind_derives_the_only_valid_import_language(
 
 
 @pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
+@pytest.mark.parametrize("existing", (False, True))
+@pytest.mark.parametrize("language", (None, "SFX", "English(US)", "", "   "))
+def test_music_track_import_language_default_preserves_explicit_values(
+    version: str, existing: bool, language: str | None, tmp_path: Path,
+) -> None:
+    media = tmp_path / "music.wav"
+    media.write_bytes(b"RIFF-test")
+    session = BusinessDeclarationSession.create(_context(version))
+    root = "Containers" if version == "2025.1" else "Interactive Music Hierarchy"
+    parent = session.handles.bind_object(
+        object_id=PARENT_ID, name="Intro", object_type="MusicSegment",
+        path=rf"\{root}\Default Work Unit\Intro",
+    )
+    fields = {"media_file": str(media), "volume_db": -6}
+    if language is not None:
+        fields["language"] = language
+    if existing:
+        track = session.handles.bind_object(
+            object_id=SOUND_ID, name="Music", object_type="MusicTrack",
+            path=parent.path + r"\Music",
+        )
+        session = session.with_existing_declaration(
+            declaration_id="track", target=ExistingObjectTarget(track.handle), fields=fields,
+        )
+    else:
+        session = session.with_new_declaration(
+            declaration_id="track", target=NewDescendantTarget(parent.handle, "Music", "music-track"),
+            fields=fields,
+        )
+    if language in {"", "   "}:
+        with pytest.raises(BusinessDeclarationError) as missing:
+            materialize_audio_import_business_request(session)
+        assert missing.value.repair["field"] == "language"
+        return
+    request = materialize_audio_import_business_request(session)
+    row = request["arguments"]["imports"][0]
+    assert row["import_language"] == ("SFX" if language is None else language)
+    assert row["object_type"] == "MusicTrack"
+    assert row["properties"] == [{"name": "Volume", "value": -6}]
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
+@pytest.mark.parametrize("row_language", (None, "English(US)"))
+def test_music_track_inline_media_respects_default_and_row_language(
+    version: str, row_language: str | None,
+) -> None:
+    session = BusinessDeclarationSession.create(_context(version))
+    parent = session.handles.bind_object(
+        object_id=PARENT_ID, name="Intro", object_type="MusicSegment",
+        path=r"\Containers\Default Work Unit\Intro",
+    )
+    payload = base64.b64encode(b"RIFF" + (4).to_bytes(4, "little") + b"WAVEdata").decode("ascii")
+    fields = {"inline_wav": f"music.wav|{payload}"}
+    if row_language is not None:
+        fields["language"] = row_language
+    session = session.with_settings({"defaults": {"language": "Japanese"}}).with_new_declaration(
+        declaration_id="track", target=NewDescendantTarget(parent.handle, "Music", "music-track"),
+        fields=fields,
+    )
+    row = materialize_audio_import_business_request(session)["arguments"]["imports"][0]
+    assert row["import_language"] == (row_language or "Japanese")
+    assert row["audio_file_base64"].startswith("music.wav|")
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
 def test_sound_voice_still_requires_an_exact_project_language(
     version: str,
     tmp_path: Path,

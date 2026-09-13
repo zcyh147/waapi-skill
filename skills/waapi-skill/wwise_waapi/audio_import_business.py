@@ -419,7 +419,10 @@ def _compile_declaration(
     has_media = media_file is not None or inline_wav is not None
     language = fields.get("language")
     if has_media:
-        if language is None and semantic_kind_name == "sound-sfx":
+        if language is None and (
+            semantic_kind_name == "sound-sfx"
+            or _type_token(object_type) == "musictrack"
+        ):
             language = "SFX"
         if not isinstance(language, str) or not language.strip():
             raise _repair(
