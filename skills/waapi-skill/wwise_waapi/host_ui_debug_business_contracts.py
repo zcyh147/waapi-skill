@@ -143,6 +143,22 @@ def host_ui_debug_business_contract_data(
                 "ak.wwise.ui.project.open",
             },
             "native_request_fields": "gateway_owned",
+            **(
+                {
+                    "discard_unsaved_default": False,
+                    "discard_requires_explicit_user_intent": True,
+                    "save_prompt": "human_owned_when_required_by_authoring",
+                    "incomplete_transition": (
+                        "do_not_repeat_execute_or_claim_success; resolve any "
+                        "save prompt with the user, then follow the returned "
+                        "verification or indeterminate boundary"
+                    ),
+                }
+                if operation in {
+                    "ak.wwise.ui.project.open", "ak.wwise.ui.project.close",
+                }
+                else {}
+            ),
         },
     }
 

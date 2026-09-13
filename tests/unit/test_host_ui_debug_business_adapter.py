@@ -302,6 +302,27 @@ def test_tone_schema_owns_version_deltas_and_closed_choices() -> None:
     ]
 
 
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("action", ("open", "close"))
+@pytest.mark.parametrize("discard", (None, False, True))
+def test_project_switch_preserves_save_prompt_unless_discard_is_explicit(
+    tmp_path: Path, version: str, action: str, discard: bool | None,
+) -> None:
+    plan: dict[str, object] = {}
+    if action == "open":
+        plan["project_file"] = str((tmp_path / "Target.wproj").resolve())
+    if discard is not None:
+        field = (
+            "discard_unsaved_current_project" if action == "open"
+            else "discard_unsaved_changes"
+        )
+        plan[field] = discard
+    request = materialize_host_ui_debug_business_request(
+        f"ak.wwise.ui.project.{action}", _session(version, plan),
+    )
+    assert request["arguments"]["args"]["bypassSave"] is (discard is True)
+
+
 @pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
 def test_authoring_project_plans_compile_without_native_field_authorship(
     tmp_path: Path, version: str,

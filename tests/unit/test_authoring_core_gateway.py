@@ -19,6 +19,49 @@ LANES = [(v, u) for v in ("2024.1", "2025.1") for u in sorted(COMMON_URIS)] + [
 
 
 @pytest.mark.parametrize("version", ("2024.1", "2025.1"))
+def test_compact_catalog_reaches_all_approved_authoring_entries_offline(tmp_path, version):
+    env = gateway_env(tmp_path)
+    env["WWISE_VERSION"] = version
+    def no_client(_):
+        pytest.fail("catalog and request schema must stay offline")
+    code, catalog = gateway.execute_gateway(["operations"], env=env, client_factory=no_client)
+    assert code == 0, catalog
+    rows = {r["api"]: r for r in catalog["request_schema_routes"]}
+    for lane, uri in LANES:
+        if lane != version:
+            continue
+        row = rows[uri]
+        assert row["host_surface"] == "wwise-authoring"
+        code, schema = gateway.execute_gateway(row["next_command"], env=env, client_factory=no_client)
+        assert code == 0, schema
+        assert schema["version"] == version
+    assert ("ak.wwise.ui.getSelectedFiles" in rows) is (version == "2025.1")
+    assert not any(uri.startswith(("ak.wwise.ui.layout.", "ak.wwise.ui.model.")) for uri in rows)
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_every_catalog_schema_link_resolves_or_discloses_a_reviewed_boundary(tmp_path, version):
+    env = gateway_env(tmp_path)
+    env["WWISE_VERSION"] = version
+    def no_client(_):
+        pytest.fail("schema discovery must not connect")
+    code, catalog = gateway.execute_gateway(["operations"], env=env, client_factory=no_client)
+    assert code == 0, catalog
+    assert gateway.gateway_json_document_size(catalog) < 48 * 1024
+    for row in catalog["request_schema_routes"]:
+        assert row["supported_versions"] == [version]
+        if row["next_command"] == ["status"]:
+            assert row["api"] == "ak.wwise.core.getInfo"
+            continue
+        code, result = gateway.execute_gateway(row["next_command"], env=env, client_factory=no_client)
+        if row["api"] == "ak.wwise.core.sourceControl.setProvider":
+            assert code != 0
+        else:
+            assert code == 0, (row["api"], result)
+            assert result["version"] == version
+
+
+@pytest.mark.parametrize("version", ("2024.1", "2025.1"))
 @pytest.mark.parametrize("suffix", (
     "layout.getLayoutNames", "layout.setLayout", "layout.resetLayouts",
     "model.createHandle", "model.registerWafm", "window.create",

@@ -112,7 +112,7 @@ def test_operations_catalog_lists_all_soundengine_business_routes(
         "request-schema",
         "<api>",
     ]
-    assert all("next_command" not in row for row in rows.values())
+    assert all(row["next_command"] for row in rows.values())
 
 
 def test_event_draft_exposes_one_copy_ready_exact_name_binding(

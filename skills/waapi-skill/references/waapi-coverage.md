@@ -24,30 +24,35 @@ routes retained in each 2021.1–2023.1 Console-reflected manifest still require
 a live Authoring host and return `AUTHORING_HOST_REQUIRED` before business
 dispatch on WwiseConsole.
 
-The separate `wwise-authoring-ui` profile is the Console manifest plus only
-the five fixed `ak.wwise.ui.commands.*` URIs reflected from a real Authoring
-process:
+The separate `wwise-authoring-ui` profile is the Console manifest plus reviewed
+Authoring UI-command, UI-topic, and core/UI supplements:
 
 | Wwise | Packaged overlay rows | Packaged route rows | Functions | Topics | Registry exclusions |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | 2021.1 | 126 | 126 | 99 | 27 | 0 |
 | 2022.1 | 144 | 144 | 112 | 32 | 0 |
 | 2023.1 | 181 | 181 | 149 | 32 | 0 |
-| 2024.1 | 183 | 183 | 152 | 31 | 0 |
-| 2025.1 | 190 | 190 | 158 | 32 | 0 |
-| Total version/API rows | 824 | 824 | 670 | 154 | 0 |
+| 2024.1 | 195 | 195 | 161 | 34 | 0 |
+| 2025.1 | 203 | 203 | 168 | 35 | 0 |
+| Total version/API rows | 849 | 849 | 689 | 160 | 0 |
 
-Those rows represent 200 unique routed URIs; on a matching Authoring host, all
-824 rows have a public route. This is not a complete Authoring manifest
+Those rows represent 203 unique packaged URI contracts, not 849 calls proven
+executable on Authoring. This union retains Console-only rows; 16 inherited
+functions were absent from each 2024/2025 live Authoring inventory in the
+2026-09-13 audit. This is not a complete Authoring manifest
 reflection: runtime metadata deliberately reports
 `full_authoring_inventory_reflected: false`. The live gateway selects this
 profile only when `ak.wwise.core.getInfo` reports
 `isCommandLine: false`; UI-command requests sent to WwiseConsole fail with an
 Authoring-host boundary before the target API is dispatched.
-Only the five fixed UI-command schemas were reflected from Authoring:
-the overlay reopens or replaces those existing rows in 2021.1–2023.1 and adds
-the rows missing from the 2024.1–2025.1 Console manifests. Every other row is
-inherited from the canonical Console manifest.
+The supplements include the five UI-command schemas, reviewed UI topics,
+nine remote/selection/foreground/project functions in 2024.1 and 2025.1,
+and `ui.getSelectedFiles` in 2025.1 only. Other rows come from Console.
+The user-approved product exclusions remain outside the packaged union:
+the observed `ui.layout.*`, `ui.model.*`, `ui.window.*`, `ui.signal.emit`,
+`ui.cli.executeLuaScript`, and `ui.cli.launch` delta (27 unique functions,
+52 version rows). They remain part of any full live Authoring denominator;
+they are not evidence of missing Wwise functionality.
 
 ## Route meanings
 
@@ -150,14 +155,16 @@ evidence.
 
 ## Inspect aggregate counts and exact packaged route lists
 
-For aggregate counts across all five supported versions, use exactly this
-unfiltered offline summary:
+For aggregate counts across all five supported versions, choose the requested
+scope. These are unfiltered offline summaries, not live reflection:
 
 ```bash
 python /absolute/path/to/waapi-skill/scripts/run.py gateway.py capabilities --all-versions --summary-only
+python /absolute/path/to/waapi-skill/scripts/run.py gateway.py capabilities --all-versions --summary-only --profile wwise-authoring-ui
 ```
 
-That summary already contains each version's `total` and every
+The first is the Console baseline; the second is the packaged union with the
+reviewed Authoring supplements. Each summary contains each version's `total` and every
 `preferred_routes` count, including `transaction_operation` and
 `unsupported_boundary`; zero-valued route counts remain explicit. Do not combine `--summary-only` with row filters.
 
@@ -182,16 +189,14 @@ inventory digest. A URI addition, removal, or same-count substitution fails
 closed until the packaged contract is reviewed and updated.
 
 The deterministic [full-surface release report](../../../docs/full-surface-release-report.json)
-binds the exact 824-lane inventory digest to its zero/inline/draft/Topic
+binds the exact 849-lane inventory digest to its zero/inline/draft/Topic
 construction totals, host overlays, execution routes, public continuations,
 blocked fields, duplicate-lane audit, schema keywords, and references. It is a
 code-only construction report, not real-host or Fresh Agent evidence.
 
 ## Verification scope
 
-The focused Program gate currently contains 4743 passing tests with two
-platform-specific skips on macOS and 4720 passing tests with 25
-platform-specific skips on native Windows. It exercises
+The Program gate exercises
 all 808 packaged route-contract version/API rows with
 in-process fake clients. It validates exact URI dispatch, reflected request and
 result/event schemas, timeout/result ceilings, all three modification-policy
@@ -202,8 +207,11 @@ continuous `stream-topic`. Separate negative tests cover exclusions,
 route bypass attempts, model-authored external command hooks, malformed nested
 payloads, and manifest drift. Reflected and isolated typed transactions also run
 through complete preview/confirm/execute/verify program chains. Dedicated tests
-separately validate the 824-row Authoring overlay and its UI-command routes;
-this is not a second 824-row per-API fake-dispatch matrix. The query tests cover
+separately validate the 849-row packaged union, its supplements, and scoped
+Authoring transaction chains; this is not a second 849-row per-API fake-dispatch
+matrix. Exact completed run counts and candidate commits are recorded in the
+repository's `tests/TEST_INVENTORY.md`, not inferred from this coverage table.
+The query tests cover
 all five versions of the closed business compiler plus the advanced WAQL route's fixed
 read-only URI, UTF-8 byte limits, trimmed single-line framing (no comments,
 semicolons, or unclosed string/regex literals), Gateway-appended final `take`,
@@ -222,7 +230,7 @@ the later reflected-identical 2025.1 `audio.convert` mapping and the wider 808
 row interface remain “program-tested packaged coverage,” not individually
 live-semantic-verified.
 
-For the current modification-policy candidate, the sealed, memory-off
+For the historical modification-policy candidate, the sealed, memory-off
 `campaign-modification-policy-9-c7` Codex Terra campaign passed all nine
 Wwise 2022.1 tasks and all 15 user turns. It ran three isolated repetitions
 each of `read_only`, question-style `ask_before_changes`, and same-turn
@@ -233,9 +241,13 @@ assertions. All source-project hashes remained unchanged and all nine
 sandboxes were cleaned. This is focused policy behavior evidence, not
 per-API or cross-version semantic coverage.
 
-The five Authoring UI resources were collected from the matching installed
+The original five Authoring UI-command resources were collected from matching installed
 builds with exactly 35 read-only calls in total: per version, one `getInfo`,
 five fixed-URI `getSchema` calls, and one `getCommands`. No live
-`execute`, `register`, or `unregister` call was made. UI transaction behavior
-and the complete `object.createPlugin` verifier added in this candidate are
-program/fake-readback evidence, not new live business-mutation evidence.
+`execute`, `register`, or `unregister` call was made. Later reviewed Topic/core
+supplements have separate reflection evidence. The 2026-09-13 core addition
+collected 19 schemas and tested selected-object reads on 2024/2025 and an empty
+selected-file read on 2025. It did not execute remote/project/UI mutations.
+Schema collection, program tests, real read-only checks, and historical Fresh
+Agent scenarios are separate evidence; never combine them into a current
+all-API live pass.

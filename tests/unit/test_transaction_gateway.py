@@ -221,7 +221,7 @@ def assert_confirmation_binding(
 PROJECT_TRANSITION_ROWS = tuple(
     (entry.version, entry.uri, entry.project_guard_mode)
     for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
-    for entry in ExecutionContractRegistry().entries(version)
+    for entry in ExecutionContractRegistry().authoring_ui_entries(version)
     if entry.uri.startswith(("ak.wwise.ui.project.", "ak.wwise.console.project."))
 )
 
@@ -1592,15 +1592,15 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
         "operation-schema",
         "object.copy",
     ]
-    assert "request_schema_routes" not in catalog
+    assert catalog["request_schema_routes"]
     assert catalog["detail_available"] is True
     assert catalog["request_schema_command_template"] == [
         "request-schema",
         "<api>",
     ]
-    assert catalog["request_schema_route_count"] == 105
+    assert catalog["request_schema_route_count"] == len(catalog["request_schema_routes"])
     encoded_size = waapi_gateway.gateway_json_document_size(catalog)
-    assert encoded_size < 10 * 1024
+    assert encoded_size < 48 * 1024
     assert "\n" not in waapi_gateway.gateway_stdout_json_encoder(catalog).encode(catalog)
 
     exit_code, detail_catalog = execute(["operations", "--detail"], tmp_path=tmp_path)
@@ -1612,7 +1612,7 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
     }
     project_save = request_schema_routes["ak.wwise.core.project.save"]
     assert "save the current Wwise project" in project_save["intent"]
-    assert all("next_command" not in row for row in request_schema_routes.values())
+    assert all(row["next_command"] for row in request_schema_routes.values())
     assert detail_catalog["request_schema_route_count"] == len(request_schema_routes)
     assert "ak.wwise.cli.generateSoundbank" in request_schema_routes
     assert "ak.wwise.console.project.open" in request_schema_routes
@@ -7692,8 +7692,15 @@ def test_generate_soundbank_verify_rejects_runtime_drift_without_project_probe(
 
 
 @pytest.mark.parametrize(
-    ("version", "api", "guard_mode"),
-    PROJECT_TRANSITION_ROWS,
+    ("version", "api", "guard_mode", "outcome"),
+    [(*row, "completed") for row in PROJECT_TRANSITION_ROWS]
+    + [
+        (*row, outcome)
+        for row in PROJECT_TRANSITION_ROWS
+        if row[0] in {"2024.1", "2025.1"}
+        and row[1] in {"ak.wwise.ui.project.open", "ak.wwise.ui.project.close"}
+        for outcome in ("cancelled", "timeout")
+    ],
     ids=lambda value: str(value),
 )
 def test_every_project_transition_row_runs_one_complete_program_chain(
@@ -7701,6 +7708,7 @@ def test_every_project_transition_row_runs_one_complete_program_chain(
     version: str,
     api: str,
     guard_mode: str,
+    outcome: str,
 ) -> None:
     year = int(version.split(".", 1)[0])
     is_command_line = not api.startswith("ak.wwise.ui.")
@@ -7708,11 +7716,13 @@ def test_every_project_transition_row_runs_one_complete_program_chain(
     io_root = (tmp_path / "io-root").resolve()
     target_path = io_root / "TargetProject.wproj"
     current_path = (tmp_path / "current-project" / "CurrentProject.wproj").resolve()
-    contract = ExecutionContractRegistry().describe(version, api)
+    contract = ExecutionContractRegistry().authoring_ui_describe(version, api)
     call_args: dict[str, Any] = {}
     arguments: dict[str, Any] = {"api": api, "args": call_args, "options": {}}
     if guard_mode == PROJECT_GUARD_TRANSITION_TO_PATH:
         call_args["path"] = str(target_path)
+    if api in {"ak.wwise.ui.project.open", "ak.wwise.ui.project.close"}:
+        call_args["bypassSave"] = False
     if contract.route == "isolated_transaction":
         arguments["io_root"] = str(io_root)
     request = {
@@ -7752,7 +7762,11 @@ def test_every_project_transition_row_runs_one_complete_program_chain(
         state_dir=state_dir,
     )
 
-    result = {"hadProjectOpen": True} if api.endswith(".close") else {}
+    result = (
+        {"hadProjectOpen": True}
+        if api.endswith(".close") and version in {"2021.1", "2022.1", "2023.1"}
+        else {}
+    )
     execute_client = FakeClient(
         {
             "ak.wwise.core.getInfo": [
@@ -7760,7 +7774,8 @@ def test_every_project_transition_row_runs_one_complete_program_chain(
             ],
             "ak.wwise.core.object.get": [{"return": before_rows}],
             api: [result],
-        }
+        },
+        errors={api: [TimeoutError("save prompt still pending")]} if outcome == "timeout" else None,
     )
     execute_exit, execute_payload = execute(
         ["execute", transaction["transaction_id"]],
@@ -7769,6 +7784,21 @@ def test_every_project_transition_row_runs_one_complete_program_chain(
         client=execute_client,
         version=version,
     )
+    if outcome == "timeout":
+        assert execute_exit != 0, execute_payload
+        assert execute_payload["state"] == TransactionState.INDETERMINATE.value
+        replay_client = FakeClient({
+            "ak.wwise.core.getInfo": [live_info(year=year, is_command_line=is_command_line)],
+            "ak.wwise.core.object.get": [{"return": before_rows}],
+        })
+        replay_exit, _ = execute(
+            ["execute", transaction["transaction_id"]], tmp_path=tmp_path,
+            state_dir=state_dir, client=replay_client, version=version,
+        )
+        assert replay_exit != 0
+        assert all(call[0] != api for call in replay_client.calls)
+        assert [call[0] for call in execute_client.calls].count(api) == 1
+        return
     assert execute_exit == 0, execute_payload
     assert execute_payload["state"] == TransactionState.EXECUTED_UNVERIFIED.value
     assert [call[0] for call in execute_client.calls].count(api) == 1
@@ -7783,6 +7813,8 @@ def test_every_project_transition_row_runs_one_complete_program_chain(
         if guard_mode == PROJECT_GUARD_TRANSITION_TO_PATH
         else []
     )
+    if outcome == "cancelled":
+        after_rows = before_rows
     verify_client = FakeClient(
         {
             "ak.wwise.core.getInfo": [
@@ -7798,6 +7830,14 @@ def test_every_project_transition_row_runs_one_complete_program_chain(
         client=verify_client,
         version=version,
     )
+    if outcome == "cancelled":
+        assert verify_exit != 0, verify_payload
+        assert verify_payload["state"] == TransactionState.EXECUTED_UNVERIFIED.value
+        assert verify_payload.get("verified") is not True
+        assert verify_payload["ok"] is False
+        assert [call[0] for call in execute_client.calls].count(api) == 1
+        assert all(call[0] != api for call in verify_client.calls)
+        return
     assert verify_exit == 0, verify_payload
     assert verify_payload["state"] == TransactionState.VERIFIED.value
     assert verify_payload["verified"] is True
@@ -7886,10 +7926,11 @@ def test_project_transition_verify_waits_through_transient_authoring_lock(
     ) == 2
 
 
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
 def test_authoring_project_open_draft_allows_no_current_project(
     tmp_path: Path,
+    version: str,
 ) -> None:
-    version = "2022.1"
     operation = "ak.wwise.ui.project.open"
     state_dir = tmp_path / "state"
     target = (tmp_path / "target" / "TargetProject.wproj").resolve()
@@ -7908,7 +7949,7 @@ def test_authoring_project_open_draft_allows_no_current_project(
     def no_project_client() -> FakeClient:
         return FakeClient(
             {
-                "ak.wwise.core.getInfo": [live_info(is_command_line=False)],
+                "ak.wwise.core.getInfo": [live_info(year=int(version[:4]), is_command_line=False)],
                 "ak.wwise.core.object.get": [{"return": []}],
             },
             errors={
@@ -7932,9 +7973,6 @@ def test_authoring_project_open_draft_allows_no_current_project(
             "--value",
             "project_file",
             str(target),
-            "--toggle",
-            "discard_unsaved_current_project",
-            "disable",
             "--value",
             "upgrade_policy",
             "fail",
@@ -7977,9 +8015,11 @@ def test_authoring_project_open_draft_allows_no_current_project(
 
     assert code == 0, previewed
     assert previewed["state"] == TransactionState.AWAITING_CONFIRMATION.value
-    guard = TransactionStore(state_dir).load_preview(
+    artifact = TransactionStore(state_dir).load_preview(
         previewed["transaction_id"]
-    ).artifact["project_guard"]
+    ).artifact
+    assert artifact["request"]["arguments"]["args"]["bypassSave"] is False
+    guard = artifact["project_guard"]
     assert guard["project_guard_mode"] == PROJECT_GUARD_TRANSITION_TO_PATH
     assert guard["project"]["state"] == "none"
 

@@ -273,11 +273,9 @@ def _native_args(operation: str, plan: Mapping[str, Any]) -> dict[str, Any]:
             ]
         return result
     if operation == "ak.wwise.ui.project.close":
-        return (
-            {"bypassSave": plan["discard_unsaved_changes"]}
-            if "discard_unsaved_changes" in plan
-            else {}
-        )
+        # Wwise defaults to bypassing its save prompt. Omission is not consent
+        # to discard work, so the Gateway must override that native default.
+        return {"bypassSave": plan.get("discard_unsaved_changes", False)}
     result = {"path": plan["project_file"]}
     if operation == "ak.wwise.ui.project.create":
         if "languages" in plan:
@@ -288,8 +286,8 @@ def _native_args(operation: str, plan: Mapping[str, Any]) -> dict[str, Any]:
                 for base, name in plan["platforms"]
             ]
         return result
+    result["bypassSave"] = plan.get("discard_unsaved_current_project", False)
     mappings = {
-        "discard_unsaved_current_project": "bypassSave",
         "upgrade_policy": "onUpgrade",
         "migration_policy": "onMigrationRequired",
         "auto_checkout": "autoCheckOutToSourceControl",

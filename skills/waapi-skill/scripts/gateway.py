@@ -6775,6 +6775,55 @@ def operation_draft_schema_digest(operation: str, version: str) -> str:
     return operation_request_schema_digest(operation, version)
 
 
+def discover_business_routes(
+    business_rows: Sequence[Mapping[str, Any]], versions: Sequence[str],
+) -> list[dict[str, Any]]:
+    """Expose business adapters and closed fixed/zero-input routes, not wire schemas."""
+    catalog = CapabilityCatalog()
+    declared = {row["api"]: row for row in business_rows}
+    rows: dict[str, dict[str, Any]] = {}
+    for version in versions:
+        for entry in catalog.authoring_ui_entries(version):
+            if entry.item_type != "function" or entry.preferred_route == "unsupported_boundary":
+                continue
+            declaration = declared.get(entry.uri)
+            if declaration is not None:
+                if version not in declaration["supported_versions"]:
+                    continue
+                intent = declaration["intent"]
+            else:
+                # Named operations already have their own catalog section.
+                if any(name != "waapi.call" for name in entry.transaction_operations):
+                    continue
+                if entry.preferred_route != "fixed_command":
+                    if entry.preferred_route not in {"manifest_dispatch", "transaction_operation"}:
+                        continue
+                    if public_typed_contract(version, entry.uri).fields:
+                        continue
+                intent = entry.schema.get("description", entry.uri).split("\n", 1)[0]
+            if entry.uri not in rows:
+                rows[entry.uri] = {
+                    "api": entry.uri,
+                    "intent": intent,
+                    "supported_versions": [],
+                    "next_command": (
+                        ["status"] if entry.uri == "ak.wwise.core.getInfo"
+                        else ["request-schema", entry.uri]
+                    ),
+                    "host_surface_by_version": {},
+                }
+            rows[entry.uri]["supported_versions"].append(version)
+            rows[entry.uri]["host_surface_by_version"][version] = (
+                entry.host_surface or "live_host_checked"
+            )
+    for row in rows.values():
+        surfaces = set(row["host_surface_by_version"].values())
+        row["host_surface"] = next(iter(surfaces)) if len(surfaces) == 1 else "version_dependent"
+        if len(surfaces) == 1:
+            del row["host_surface_by_version"]
+    return [rows[uri] for uri in sorted(rows)]
+
+
 def public_typed_contract(version: str, api: str) -> Any:
     """Resolve one function or query construction contract by exact public key."""
 
@@ -9526,9 +9575,13 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             },
         }
     if args.command == "operations":
+        versions = (
+            tuple(SUPPORTED_WWISE_VERSION_KEYS)
+            if args.detail else resolve_catalog_versions(args, env=env)
+        )
         operations: list[dict[str, Any]] = []
         for spec in list_operation_specs():
-            if spec.name == "waapi.call":
+            if spec.name == "waapi.call" or not set(versions).intersection(spec.supported_versions):
                 continue
             modes = {
                 version: operation_input_mode(spec.name, version)
@@ -9584,12 +9637,18 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 *source_control_business_catalog_rows(),
             )
         )
+        request_schema_routes = discover_business_routes(request_schema_routes, versions)
         payload = {
             "contract": GATEWAY_RESULT_CONTRACT,
             "ok": True,
             "status": "ok",
             "command": "operations",
             "offline": True,
+            "versions": list(versions),
+            "host_scope": (
+                "packaged Console plus reviewed Authoring routes; offline discovery "
+                "does not prove live availability; live getInfo selects the host"
+            ),
             "routing_precedence": {
                 "primary_media_import": {
                     "match_terms": [
@@ -9673,10 +9732,11 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             "implemented_count": sum(
                 spec.implemented is True
                 for spec in list_operation_specs()
-                if spec.name != "waapi.call"
+                if spec.name != "waapi.call" and set(versions).intersection(spec.supported_versions)
             ),
             "operations": operations,
             "request_schema_route_count": len(request_schema_routes),
+            "request_schema_routes": request_schema_routes,
             "request_schema_command_template": ["request-schema", "<api>"],
             "detail_available": True,
             "selection_guidance": {
@@ -9736,8 +9796,6 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 },
             },
         }
-        if args.detail:
-            payload["request_schema_routes"] = request_schema_routes
         return payload
     if args.command == "operation-schema":
         if args.operation == "waapi.call":

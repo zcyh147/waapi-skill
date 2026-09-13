@@ -34,11 +34,11 @@ A new natural-language change starts with one compact `operations` lookup; only 
 
 | Request | First transaction-contract sequence |
 |---|---|
-| `object.create` | Preflight: explicit pre-Preview same-name-root type/path only; not parent/sibling or later verification. Then `operation-schema`; metadata. |
+| `object.create` | Preflight: explicit pre-Preview same-name-root type/path only; not parent/sibling or later verification. Then `operation-schema`, business Draft, returned binding/discovery. |
 | `object.set` | Named schema and `business_declaration`; bind roles, discover dynamic fields through returned Draft commands, and submit only disclosed high-level fields. |
 | `audio.import` | `operation-schema audio.import`, then returned `business_declaration`; bind live objects/custom fields and submit one complete import outcome. |
 | copy/delete/move/rename/notes | Named schema, returned business Draft, role bindings, one complete change. |
-| Any other operation with an explicitly requested unknown dynamic property/reference token | one metadata discovery first, then its named `operation-schema` |
+| Any other operation with a requested dynamic property/reference | its schema, then the returned discovery sequence; Business Drafts own field discovery |
 | A named operation using only closed schema fields and side effects | its named `operation-schema` directly |
 | An exact user-supplied native URI without a named route | `request-schema <uri>` and its sole continuation; never infer a URI from natural-language intent |
 
@@ -112,7 +112,7 @@ Omit every optional business field the user did not explicitly supply; defaults,
 - For an ordinary `audio.importTabDelimited` import, do not `cat` or otherwise read the caller's TSV; pass its absolute path through the typed continuation.
 - `SFX` is the built-in nonlocalized import token; never query language inventory for it.
 - Batch `mode` is `create`, `reimport`, or `replace`; omit unrequested source-control settings.
-- Bind the exact existing parent/target once. For import rows, copy every complete path segment literally, including `<Type>Name`; never remove or translate its angle-bracket type prefix. New objects declare parent handle, name, and semantic kind; existing objects declare their handle.
+- Bind the exact existing parent/target once. New objects declare parent handle, name, and semantic kind; existing objects declare their handle. Gateway constructs Wwise paths and type prefixes.
 - For new hierarchy, declare each requested container once as a structure-only descendant; children may use its planned handle.
 - Use `originals_subfolder` only when the user explicitly supplies it; never infer it.
 - `media_directory` and `audio_file` are opaque caller paths; never derive either from campaign/workspace cwd. `audio_file`: supplied absolute path only; no relative/traversal or relocation.
@@ -125,7 +125,13 @@ Only explicit WwiseConsole, CLI, command-line, or 命令行 wording selects `ak.
 
 Every reflected `ak.wwise.cli.*` route plus `ak.wwise.console.project.create` and `ak.wwise.console.project.open` starts from catalog/user-supplied `request-schema <exact-uri>`, then `draft-start` and one `draft-declare-cli-console-plan`. Use `--value` per scalar, `--item` per member, `--mapping` per platform/value pair, and `--toggle <field> enable|disable`. Never type native CLI option names. The Gateway owns versions, serialization, I/O, and ordering; model-supplied global/pre-build/post-build hooks are prohibited. Wwise 2022 external-source partial success: disconnect or continued reachability never authorizes replay; result-schema-only evidence is not a reopened-project business oracle.
 
-`ak.wwise.waapi.getSchema` continues directly through `waapi-schema`. `ak.wwise.debug.generateToneWAV` and `ak.wwise.ui.project.*` use one complete `draft-declare-host-plan`. Tone inputs use Hz/seconds/dB, returned layout, and zero-based `waveform_channels`; Gateway derives waveform spelling and the native channel bitmask. Every `ak.wwise.ui.project.*` phase requires Wwise Authoring.
+`ak.wwise.waapi.getSchema` uses `waapi-schema`. Test-tone and UI-project routes
+use the returned `draft-declare-host-plan` contract. Every UI-project phase
+requires Authoring.
+
+Project open/close preserves the save prompt by default. Discard requires
+explicit user intent. Let the user resolve save prompts; never repeat execution.
+Follow Gateway verification/status, not GUI assumptions. Timeout is indeterminate.
 
 ### Authoring audio conversion
 

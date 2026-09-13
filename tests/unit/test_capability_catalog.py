@@ -397,12 +397,20 @@ def test_public_manifest_dispatch_is_exactly_the_immutable_reviewed_call_allowli
             "ak.wwise.core.switchContainer.getAssignments",
             "ak.wwise.core.transport.getState",
             "ak.wwise.ui.commands.getCommands",
+            "ak.wwise.ui.getSelectedFiles",
             "ak.wwise.waapi.getFunctions",
             "ak.wwise.waapi.getSchema",
             "ak.wwise.waapi.getTopics",
         }
     )
-    assert public_calls == REVIEWED_PUBLIC_CALL_URIS
+    assert public_calls == REVIEWED_PUBLIC_CALL_URIS - {"ak.wwise.ui.getSelectedFiles"}
+    authoring_calls = {
+        entry.uri
+        for version in SUPPORTED_WWISE_VERSION_KEYS
+        for entry in catalog.authoring_ui_entries(version)
+        if entry.preferred_route == "manifest_dispatch"
+    }
+    assert authoring_calls == REVIEWED_PUBLIC_CALL_URIS
     assert public_fixed == REVIEWED_FIXED_FUNCTION_URIS
     assert public_topics == REVIEWED_TOPIC_URIS
     assert frozenset(FIXED_COMMANDS_BY_URI) == REVIEWED_FIXED_FUNCTION_URIS

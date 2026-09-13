@@ -271,8 +271,8 @@ def test_operate_identity_preflight_stays_in_the_operate_reference_lane() -> Non
     assert "preserved sibling" in operate_compact
     assert "post-execution verification does not" in operate_compact
     assert (
-        "After that preflight, `object.create` runs `operation-schema`, one "
-        "`metadata discover` for its 1–8 dynamic fields, then `draft-start`"
+        "Business declarations start the Draft first, bind the exact owner "
+        "or new-object kind, and use returned discovery commands"
     ) in operate_compact
     assert operate_compact.index(
         "Finish any user-requested exact path/type preflight"
@@ -755,7 +755,7 @@ def test_query_reference_has_a_deterministic_end_and_separate_alarm_hops() -> No
     assert "repeat `--meaning` for one to eight" in query_flat
     assert "Gateway owns detail level, search bounds, projection" in query_flat
     for phrase in (
-        "Exact standard bindings",
+        "Gateway owns native field bindings",
         "Success rows are objects in the array",
         "Complete `no_match` is a bounded miss",
         "Honor dependencies when authorized, otherwise clarify",
@@ -777,12 +777,12 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "| `audio.import` | `operation-schema audio.import`" in OPERATE
     assert "discover dynamic fields through returned Draft commands" in OPERATE
     assert "submit only disclosed high-level fields" in OPERATE
-    assert "Then `operation-schema`; metadata" in OPERATE
+    assert "Then `operation-schema`, business Draft, returned binding/discovery" in OPERATE
     assert "pre-Preview same-name-root type/path only" in OPERATE
     assert "not parent/sibling or later verification" in compact
     assert compact.index(
         "pre-Preview same-name-root type/path only"
-    ) < compact.index("Then `operation-schema`; metadata")
+    ) < compact.index("Then `operation-schema`, business Draft")
     assert "selected-subset identity gate" in OPERATE
     assert "exact-ID read back every selected" in OPERATE
     assert "These bounded read-only checks precede the transaction contract" in OPERATE
@@ -792,8 +792,9 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
         "lookup; only its returned route selects the first transaction contract"
         in compact
     )
-    assert "explicitly requested unknown dynamic property/reference token" in OPERATE
-    assert "one metadata discovery first, then its named `operation-schema`" in OPERATE
+    assert "Business Drafts own field discovery" in OPERATE
+    assert "one metadata discovery first, then its named `operation-schema`" not in OPERATE
+    assert "Import alone uses token custom-field binding" not in SKILL
     assert "A named operation using only closed schema fields and side effects" in OPERATE
     assert "its named `operation-schema` directly" in OPERATE
     assert "including both import operations" not in OPERATE
@@ -806,8 +807,8 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "Table imports start `operation-schema audio.importTabDelimited`" in OPERATE
     assert "dynamic columns stay metadata-first" in OPERATE
     skill_compact = " ".join(SKILL.split())
-    assert "`object.set` batches and revalidates its dynamic fields" in skill_compact
-    assert "only an explicit unknown dynamic property/reference token needs" in skill_compact
+    assert "dynamic fields use copied Field Handles" in skill_compact
+    assert "never infer a native token or scope" in skill_compact
     assert "An exact user-supplied native URI without a named route" in OPERATE
     assert "`request-schema <uri>`" in OPERATE
     assert "never infer a URI from natural-language intent" in OPERATE
@@ -1075,13 +1076,12 @@ def test_operate_host_schema_tone_and_project_routes_hide_native_mechanics() -> 
 
     for phrase in (
         "`ak.wwise.waapi.getSchema`",
-        "`ak.wwise.debug.generateToneWAV`",
-        "`ak.wwise.ui.project.*`",
-        "continues directly through `waapi-schema`",
-        "one complete `draft-declare-host-plan`",
-        "zero-based `waveform_channels`",
-        "derives waveform spelling and the native channel bitmask",
-        "Every `ak.wwise.ui.project.*` phase requires Wwise Authoring",
+        "uses `waapi-schema`",
+        "returned `draft-declare-host-plan` contract",
+        "Every UI-project phase requires Authoring",
+        "Project open/close preserves the save prompt by default",
+        "Discard requires explicit user intent",
+        "never repeat execution",
     ):
         assert phrase in compact
     assert "waveformChannelMask" not in OPERATE
@@ -1185,9 +1185,10 @@ def test_soundbank_topic_selection_distinguishes_per_result_from_cycle_notice() 
 def test_capability_summary_is_unfiltered_and_route_filters_are_row_only() -> None:
     summary_command = "capabilities --all-versions --summary-only"
 
-    assert f"run exactly `{summary_command}`" in SKILL
-    assert "For five-version totals, read coverage then run exactly" in SKILL
-    assert "it includes every route count" in SKILL
+    assert "For five-version totals, read coverage" in SKILL
+    assert "host-scoped summary command" in SKILL
+    assert "not a complete live Authoring inventory" in SKILL
+    assert "--summary-only --profile wwise-authoring-ui" in COVERAGE
     assert "Row filters omit `--summary-only`" in SKILL
     assert "read `references/waapi-coverage.md` once after `SKILL.md`" in SKILL
     assert "before the summary" in SKILL

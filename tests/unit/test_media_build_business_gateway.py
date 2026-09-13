@@ -712,4 +712,4 @@ def test_operations_catalog_lists_all_media_business_routes(tmp_path: Path) -> N
         "request-schema",
         "<api>",
     ]
-    assert all("next_command" not in row for row in rows.values())
+    assert all(row["next_command"] for row in rows.values())
