@@ -88,7 +88,7 @@ that supports local Skills and request installation of the `waapi-skill` Skill.
 Install the Skill directly with the Skills CLI:
 
 ```bash
-npx skills@latest add zcyh147/waapi-skill --skill waapi-skill
+npx skills add zcyh147/waapi-skill --skill waapi-skill
 ```
 
 ## Quick start

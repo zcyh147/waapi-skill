@@ -82,7 +82,7 @@ Skill 会在首次使用时自动创建并准备自己的 Python 环境。只有
 也可以使用 Skills CLI 直接安装：
 
 ```bash
-npx skills@latest add zcyh147/waapi-skill --skill waapi-skill
+npx skills add zcyh147/waapi-skill --skill waapi-skill
 ```
 
 ## 快速开始

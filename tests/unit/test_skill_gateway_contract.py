@@ -322,7 +322,7 @@ def test_public_readmes_keep_setup_and_usage_user_facing() -> None:
     for readme in readmes:
         assert "https://github.com/zcyh147/waapi-skill" in readme
         assert (
-            "npx skills@latest add zcyh147/waapi-skill --skill waapi-skill" in readme
+            "npx skills add zcyh147/waapi-skill --skill waapi-skill" in readme
         )
         assert "python skills/waapi-skill/scripts/run.py gateway.py config-set" in readme
         assert "python skills/waapi-skill/scripts/run.py gateway.py status" in readme
