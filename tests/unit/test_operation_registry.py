@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import copy
+import json
 from collections import defaultdict, deque
 from dataclasses import replace
 from pathlib import Path
@@ -2416,6 +2417,35 @@ def test_audio_convert_missing_languages_fails_reflected_required_field(
         match="missing required args: languages",
     ):
         parse_operation_request(payload, expected_version=version)
+
+
+@pytest.mark.parametrize("operation,version", [
+    (operation, version)
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
+    for operation in ("object.create", "object.set")
+    if operation != "object.set" or version != "2021.1"
+])
+@pytest.mark.parametrize("object_type", ("MusicStinger", "MusicTrackSequence", "MusicClipMidi", "MusicClip"))
+def test_music_internal_creation_rejects_real_reflected_type_names(
+    version: str, object_type: str, operation: str,
+) -> None:
+    resource = Path(__file__).resolve().parents[2] / "skills/waapi-skill/resources/metadata" / version / "object-types.json"
+    catalog = json.loads(resource.read_text(encoding="utf-8"))["types"]
+    reflected = [row for row in catalog if row["name"] == object_type]
+    assert len(reflected) == 1
+    parent = object_row(object_id=PARENT_GUID, name="Music", object_type="MusicSegment",
+                        path=r"\Interactive Music Hierarchy\Default Work Unit\Music")
+    node = {"type": object_type, "name": "InternalProbe"}
+    arguments = ({"parent": {"kind": "id", "value": PARENT_GUID}, **node}
+                 if operation == "object.create" else
+                 {"objects": [{"object": {"kind": "id", "value": PARENT_GUID}, "children": [node]}]})
+    reader = ScriptedReader({"ak.wwise.core.object.getTypes": [{"return": reflected}],
+                             "ak.wwise.core.object.get": [{"return": [parent]}, {"return": []}, {"return": []}]})
+    with pytest.raises(OperationContractError) as rejected:
+        prepare_operation(parse_operation_request(request(operation, arguments, version)), read_call=reader)
+    assert rejected.value.error_code == "UNSUPPORTED_OBJECT_TYPE"
+    assert rejected.value.details["resolved"]["name"] == object_type
+    assert all(uri in {"ak.wwise.core.object.get", "ak.wwise.core.object.getTypes"} for uri, _, _ in reader.calls)
 
 
 def test_create_preflight_canonicalizes_parent_and_fixes_cross_version_source_control_default() -> None:

@@ -6668,8 +6668,11 @@ def _resolve_object_type(
         "audiodevice",
         "metadata",
         "musicclip",
+        "musicclipmidi",
         "musicsequence",
+        "musictracksequence",
         "stinger",
+        "musicstinger",
     }
     if _object_type_token(row.type) in forbidden or _object_type_token(row.name) in forbidden:
         raise OperationContractError(
