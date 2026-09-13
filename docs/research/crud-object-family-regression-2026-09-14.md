@@ -125,7 +125,44 @@ The first full Program run at `b2c7afb` returned **5762 passed, 4 failed,
 child pairs in create/set and the versioned localized-Voice constraint.
 Removing exactly those reviewed additions from the in-memory contracts
 reproduced the old golden digests. Updated expectations then passed all four
-failed nodes, with no runtime change. Final Program and Non-live reruns are
-pending; the earlier failed run is retained rather than relabeled.
+failed nodes, with no runtime change. The earlier failed run is retained
+rather than relabeled.
+
+Final **Program at `e19fff1`: 5766 passed, 2 skipped**, exit zero (253.56 s).
+Both skips require native Windows. Its first full Non-live run returned
+**11346 passed, 1 failed, 116 skipped, 27 deselected**. The sole failure was
+the old Program manifest count (190 instead of 195). Updating that test and
+explicitly asserting inclusion of the four new cross-family files passed the
+whole CI-driver test file: **42 passed, 11 native-Windows-only skips**.
+
+Final **Non-live at `b10b95e`: 11347 passed, 116 skipped, 27 deselected**,
+exit zero (740.34 s). This is a complete, zero-failure rerun. The packaged
+Skill and real-test files are byte-identical between `b2c7afb`, `e19fff1`
+and `b10b95e`; only reviewed test expectations and this report changed.
+
+The real command selected the existing Voice node plus the three new modules:
+
+```bash
+for version in 2021.1 2022.1 2023.1 2024.1 2025.1; do
+  ci/test.sh --version "$version" --mode destructive -- \
+    tests/destructive/test_cross_family_lifecycle.py \
+    tests/destructive/test_cross_family_derived_identity.py \
+    tests/destructive/test_cross_family_effects.py \
+    -q -ra -k 'cross_family or test_voice_languages_reimport' --tb=short \
+    || exit $?
+done
+```
+
+The ordinary gates were `ci/test.sh --mode program -- -q -ra` and
+`ci/test.sh --mode nonlive -- -q -ra`. All gates were run directly with
+their actual exit statuses, without a status-masking pipeline. Independent
+read-only subagent checks found no blocking issue in the localized-source
+guard/verifier or the Bus/Game Sync relationship changes.
+
+After adding the dated inventory entry, its focused documentation gate first
+reported 22 passed / 1 failed because the entry did not use the required
+`Full Non-live:` label. Correcting that label (without changing counts or
+test expectations) produced **23 passed**. The evidence-only successor does
+not alter the tested runtime or test implementation.
 
 No native-Windows run or Fresh Agent campaign was performed for this repair.

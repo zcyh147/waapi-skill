@@ -7,6 +7,30 @@ are not live-Wwise or Fresh Agent evidence.
 
 ## Runner modes and strict real behavior
 
+### 2026-09-14 Cross-object-family CRUD regression and repair
+
+macOS WwiseConsole candidate `b2c7afb` passed **13 selected tests on each of
+2021.1–2025.1: 65/65**, using disposable copies and the public Gateway. These
+include explicit prohibited/unsupported boundaries, not 65 working mutation
+capabilities. The coverage adds multilingual Voice reimport, Bus/AuxBus,
+State/Switch, Attenuation, music-container hierarchy, derived object identity,
+versioned Stinger references and Effect-slot preservation. It does not prove
+Playlist/Transition authoring or audible playback.
+
+There were **149 business-verified transactions**, plus four 2021 fixture-save
+transactions with only result-schema verification. All source hashes, mtimes
+and tree metadata remained unchanged; passing sandboxes were deleted and
+scoped residual-process lists were empty. Generic owned-list clearing also has
+eight fake-WAAPI public-Gateway regressions, not additional live coverage.
+
+Final Program at `e19fff1`: **5766 passed, 2 skipped**.
+Full Non-live: **11347 passed, 116 skipped, 27 deselected**, zero failures at
+`b10b95e`. The
+packaged Skill and real-test files remained identical across these candidates;
+intervening changes corrected old schema/count test expectations. Earlier
+failed runs remain documented in the [repair record](../docs/research/crud-object-family-regression-2026-09-14.md).
+No Fresh Agent or native-Windows test was run for this change.
+
 ### 2026-09-14 Music Track import owner and verification repair
 
 Runtime candidate `af783b7` passed macOS Program: **5266 passed, 2 skipped**.
