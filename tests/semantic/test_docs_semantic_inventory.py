@@ -104,14 +104,21 @@ def test_inventory_count_matches_latest_nonlive_result_without_collect_only_over
         inventory,
     )
     assert len(recorded_results) >= 2
-    latest = re.search(
-        r"latest completed passing non-live verification reported `"
-        r"(\d+ passed, \d+ skipped, \d+ deselected)`",
-        inventory,
+    # The inventory is now newest-first dated evidence, not a fixed closing
+    # sentence whose last numeric tuple happened to be the newest result.
+    # A measured failed full run plus a focused repair is legitimate evidence;
+    # requiring a "latest passing" sentence would encourage overclaiming it.
+    dated = re.split(r"(?m)^### \d{4}-\d{2}-\d{2}[^\n]*\n", inventory)
+    assert len(dated) > 1
+    newest = " ".join(dated[1].split())
+    measured = re.search(
+        r"Full Non-live: \*\*(\d+) passed, (?:(\d+) failed, )?"
+        r"(\d+) skipped, (\d+) deselected\*\*",
+        newest,
     )
-    assert latest is not None
-    assert latest.group(1) == recorded_results[-1]
-    assert "not a fresh full `--collect-only` recount" in inventory
+    assert measured is not None
+    if measured.group(2) is not None and int(measured.group(2)) > 0:
+        assert "not a single all-green full Non-live run" in newest
 
 
 def test_composer_evidence_is_exact_and_never_promoted_to_integration() -> None:

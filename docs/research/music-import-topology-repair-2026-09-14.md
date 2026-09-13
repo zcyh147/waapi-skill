@@ -63,6 +63,34 @@ These initial runs were development worktree evidence, not an immutable Git
 candidate release result. Frozen-candidate final results are recorded below
 after completion.
 
+Runtime candidate `af783b7` passed the final Program gate: **5266 passed,
+2 skipped**, exit 0, 258.57 seconds. The skips require native Windows.
+The four targeted program files passed **615 tests**.
+
+The subsequent complete Non-live invocation returned **10840 passed, 2 failed,
+113 skipped, 27 deselected**, exit 1, 767.65 seconds. During that run,
+independent README/test commit `cbf60ee` changed the installation command;
+its already-loaded assertion disagreed with the then-current README. The
+packaged Skill tree did not change (`git diff af783b7..cbf60ee --
+skills/waapi-skill` is empty), but this is not an immutable all-green gate.
+The other failure required an obsolete fixed "latest passing" sentence in
+the inventory, despite its current newest-first dated full-run/follow-up
+format. The current README assertion passed unchanged; the inventory test
+now checks measured dated results and preserves the explicit distinction
+between a failed full run and successful focused follow-ups. Both complete
+affected test files passed **23 tests**. Do not describe this as a single
+all-green full Non-live run; no runtime fix followed Program.
+
+The visible Sol/High task also completed a new D Preview successfully through
+the synchronized music-only repair. Draft `od1-8f05a2736bf391069e42296fed5a046a`
+produced transaction `tx1-ssg68xy0xmwxzy9yenq1`, artifact hash
+`a7fce582da94c6a287183f040b96c1d9e958c7c36ac36218d1618485b991b901`.
+Its command history stops at `preview-from-draft`; no execute was issued.
+This is an existing visible application-task replay against Authoring 2025.1,
+not a fresh memory-isolated semantic campaign. The demonstration copy retains
+an unrelated older Authoring-core routing hunk; only this music patch and the
+previous MusicTrack language fix were synchronized, not the entire Skill.
+
 One early invocation mistakenly supplied a file without `-k` to `ci/test.sh`,
 which appends selected-version defaults rather than replacing them. It ran 28
 tests in 31 seconds: 10 passed and 18 unrelated legacy-helper failures (including
