@@ -339,7 +339,7 @@ def test_program_manifest_is_the_single_ordered_cross_platform_node_source() -> 
     lines = PROGRAM_TEST_MANIFEST.read_text(encoding="utf-8").splitlines()
     nodes = load_program_nodes(PROGRAM_TEST_MANIFEST)
 
-    assert len(nodes) == 182
+    assert len(nodes) == 188
     assert nodes[0] == "tests/unit/test_gateway_session_context.py"
     assert nodes[-1] == "tests/unit/test_single_typed_input_cutover.py"
     assert len(nodes) == len(set(nodes))
@@ -349,6 +349,11 @@ def test_program_manifest_is_the_single_ordered_cross_platform_node_source() -> 
         "tests/unit/test_script_helpers.py::test_run_bootstrap_repairs_existing_venv_without_ready_marker",
         "tests/unit/test_script_helpers.py::test_setup_environment_ensure_creates_venv_and_installs",
         "tests/unit/test_script_helpers.py::test_setup_environment_check_rejects_partial_existing_venv",
+        "tests/unit/test_waapi_gateway.py::test_stream_topic_idle_timeout_stops_incomplete_and_unsubscribes",
+        "tests/unit/test_waapi_gateway.py::test_selection_monitor_uses_authoring_schema_and_rejects_console",
+        "tests/unit/test_waapi_gateway.py::test_stream_topic_discloses_effective_idle_policy_without_shortening_user_duration",
+        "tests/unit/test_waapi_gateway.py::test_stream_topic_invalid_idle_timeout_rejected_before_connection",
+        "tests/unit/test_waapi_gateway.py::test_stream_topic_matching_events_restart_idle_clock",
     } <= set(nodes)
     for line in lines:
         if not line or line.startswith("#"):

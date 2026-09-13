@@ -52,7 +52,10 @@ def _topic_schema(version: str, topic: str) -> Mapping[str, Any]:
         try:
             capability = catalog.authoring_ui_describe(version, topic)
         except CapabilityNotFoundError as exc:
-            raise TypedTopicError(str(exc)) from exc
+            raise TypedTopicError(
+                f"The packaged Skill has no Topic schema for {topic!r} in Wwise {version}. "
+                "This is an interface coverage boundary, not proof that Wwise lacks the Topic."
+            ) from exc
     if capability.item_type != "topic":
         raise TypedTopicError(f"Typed Topic construction requires a Topic URI: {topic}")
     return capability.schema

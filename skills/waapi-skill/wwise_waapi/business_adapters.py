@@ -427,7 +427,6 @@ class BusinessAdapter:
     _preview_compiler: PreviewCompiler | None = None
     _completeness_check: CompletenessCheck | None = None
     requires_sound_subtype: bool = False
-    supports_field_binding: bool = False
     supports_field_discovery: bool = False
     supports_type_discovery: bool = False
     auto_apply_preview: bool = False
@@ -508,7 +507,7 @@ _AUDIO_IMPORT_DEFINITION = {
     ),
     "initial_projection_actions": (
         "bind-object",
-        "bind-field",
+        "discover-fields",
         "configure",
         "declare-new",
         "declare-existing",
@@ -518,7 +517,7 @@ _AUDIO_IMPORT_DEFINITION = {
     ),
     "active_projection_actions": (
         "bind-object",
-        "bind-field",
+        "discover-fields",
         "configure",
         "declare-new",
         "declare-existing",
@@ -531,7 +530,7 @@ _AUDIO_IMPORT_DEFINITION = {
     ),
     "preview_compiler": _compile_audio_import_preview,
     "requires_sound_subtype": True,
-    "supports_field_binding": True,
+    "supports_field_discovery": True,
     "auto_apply_preview": True,
     "records_business_preview": True,
     "requires_wwise_path_discipline": True,
@@ -551,7 +550,6 @@ _OBJECT_LIFECYCLE_DEFINITION = {
         "cancel",
     ),
     "requires_sound_subtype": False,
-    "supports_field_binding": False,
     "auto_apply_preview": True,
 }
 
@@ -570,7 +568,6 @@ _OBJECT_METADATA_DEFINITION = {
         "cancel",
     ),
     "requires_sound_subtype": False,
-    "supports_field_binding": False,
     "supports_field_discovery": True,
     "auto_apply_preview": True,
 }
@@ -607,7 +604,6 @@ _OBJECT_GRAPH_DEFINITION = {
         "cancel",
     ),
     "requires_sound_subtype": False,
-    "supports_field_binding": True,
     "supports_field_discovery": True,
     "supports_type_discovery": True,
     "auto_apply_preview": True,

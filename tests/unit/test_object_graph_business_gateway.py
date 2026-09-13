@@ -632,7 +632,23 @@ def test_gateway_closes_merge_configuration_before_root_declaration(
     assert "existing_same_name_root_merge" not in next_action
 
 
-def test_gateway_builds_rtpc_curve_from_bound_business_facts(tmp_path: Path) -> None:
+@pytest.mark.parametrize("version", ("2022.1", "2023.1", "2024.1", "2025.1"))
+def test_gateway_builds_rtpc_curve_from_bound_business_facts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, version: str,
+) -> None:
+    original_env, original_info = _env, _info
+
+    def version_env(path: Path) -> dict[str, str]:
+        return {**original_env(path), "WWISE_VERSION": version}
+
+    def version_info() -> dict[str, Any]:
+        value = original_info()
+        value["version"]["year"] = int(version[:4])
+        value["version"]["displayName"] = f"v{version}.0.1"
+        return value
+
+    monkeypatch.setattr(sys.modules[__name__], "_env", version_env)
+    monkeypatch.setattr(sys.modules[__name__], "_info", version_info)
     start_code, started = _offline(tmp_path, "draft-start", "object.setRTPC")
     assert start_code == 0, started
     draft_id = started["draft"]["draft_id"]
@@ -804,10 +820,10 @@ def test_gateway_builds_rtpc_curve_from_bound_business_facts(tmp_path: Path) -> 
         task_authority=authority,
         expected_revision=5,
         schema_digest=gateway.operation_draft_schema_digest(
-            "object.setRTPC", "2025.1"
+            "object.setRTPC", version
         ),
         composer_digest=operation_composer_digest(
-            "object.setRTPC", "2025.1"
+            "object.setRTPC", version
         ),
     )
     assert materialized.request["arguments"]["property"] == "Volume"
@@ -815,6 +831,46 @@ def test_gateway_builds_rtpc_curve_from_bound_business_facts(tmp_path: Path) -> 
         {"x": 0, "y": -12, "shape": "SCurve"},
         {"x": 100, "y": 0, "shape": "Linear"},
     ]
+
+    identities = {
+        PARENT_ID: {"id": PARENT_ID, "name": "Rain", "type": "Sound", "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Rain"},
+        CONTROL_ID: {"id": CONTROL_ID, "name": "Weather Intensity", "type": "GameParameter", "path": r"\Game Parameters\Default Work Unit\Weather Intensity"},
+    }
+
+    class CheckClient:
+        def call(self, uri: str, args: Any = None, options: Any = None) -> Any:
+            if uri == "ak.wwise.core.object.getPropertyAndReferenceNames":
+                return {"return": ["Volume"]}
+            if uri == "ak.wwise.core.getInfo":
+                return _info()
+            if uri == "ak.wwise.core.getProjectInfo":
+                return _project(tmp_path)
+            if uri == "ak.wwise.core.object.getPropertyInfo":
+                assert args["property"] == "Volume"
+                return volume_metadata
+            if uri == "ak.wwise.core.object.get":
+                if args == {"waql": f'from object "{PARENT_ID}" select @RTPC take 1'}:
+                    assert options == {"return": ["id"]}
+                    return {"return": []}
+                ids = args.get("from", {}).get("id")
+                if ids == [PARENT_ID] and options == {"return": ["id", "@RTPC"]}:
+                    return {"return": [{"id": PARENT_ID}]}
+                if ids and all(item in identities for item in ids):
+                    return {"return": [identities[item] for item in ids]}
+            raise AssertionError(f"Unexpected WAAPI call: {uri} {args!r} {options!r}")
+
+        def disconnect(self) -> None:
+            pass
+
+    for command, revision in (("draft-check", 5), ("preview-from-draft", 6)):
+        code, payload = gateway.execute_gateway(
+            ["--state-dir", str(tmp_path / "state"), command, draft_id,
+             "--task-authority", authority, "--expected-revision", str(revision)],
+            env=_env(tmp_path), client_factory=lambda _url: CheckClient(),
+        )
+        assert code == 0, json.dumps(payload, ensure_ascii=False)
+        assert payload["ok"] is True
+    assert payload["transaction_id"]
 
 
 def test_gateway_compiles_object_create_settings_and_stable_fields(
@@ -1320,6 +1376,7 @@ def test_object_set_discovers_two_business_field_meanings_in_one_revision(
         "required_next_phase",
         "field_discovery",
         "declare_existing",
+        "declare_existing_batch",
         "more_actions",
         "shell_tool_timeout_ms",
         "then_read_next_response",
@@ -1425,20 +1482,12 @@ def test_object_set_discovers_two_business_field_meanings_in_one_revision(
     assert len(unchanged.composition["business_session"]["declarations"]) == 1
 
 
+
+
 @pytest.mark.parametrize("swapped_row_values", (False, True))
-@pytest.mark.parametrize(
-    ("field_option", "fade_meaning", "delay_meaning"),
-    (
-        ("--field-meaning-value", "Fade Time", "Delay"),
-        ("--field", "fade_time", "delay"),
-    ),
-)
-def test_object_set_batch_declares_meanings_with_per_object_metadata_revalidation(
+def test_object_set_batch_declares_selected_fields_with_per_object_metadata_binding(
     tmp_path: Path,
     swapped_row_values: bool,
-    field_option: str,
-    fade_meaning: str,
-    delay_meaning: str,
 ) -> None:
     start_code, started = _offline(tmp_path, "draft-start", "object.set")
     assert start_code == 0, started
@@ -1487,7 +1536,7 @@ def test_object_set_batch_declares_meanings_with_per_object_metadata_revalidatio
         handles.append(bound["bound_object"]["handle"])
     continuation = bound["draft"]["next_action_binding"]
     assert "declare_existing_batch" in continuation
-    assert "field_discovery" not in continuation
+    assert "field_discovery" in continuation
     assert "declare_existing" not in continuation
     assert continuation["declare_existing_batch"]["row_value_orders"] == [
         "task_local_id_then_bound_object_handle",
@@ -1496,6 +1545,7 @@ def test_object_set_batch_declares_meanings_with_per_object_metadata_revalidatio
     assert continuation["declare_existing_batch"]["gateway_disambiguation"] == (
         "the_exact_boh1_object_handle_contract_identifies_the_handle"
     )
+    assert "field_selection_rule" in continuation["declare_existing_batch"]
 
     fade = {
         "name": "FadeTime",
@@ -1526,6 +1576,21 @@ def test_object_set_batch_declares_meanings_with_per_object_metadata_revalidatio
             "PauseDelayedResumeAction": delayed_resume,
         },
     )
+    selected = {}
+    for revision, (row_id, handle) in enumerate(zip(("rain", "wind", "thunder"), handles, strict=True), start=4):
+        client = MetadataFakeClient(
+            {"ak.wwise.core.getInfo": [_info()],
+             "ak.wwise.core.getProjectInfo": [_project(tmp_path)]},
+            {"FadeTime": fade, "Delay": delay, "PauseDelayedResumeAction": delayed_resume},
+        )
+        code, found = gateway.execute_gateway(
+            ["--state-dir", str(tmp_path / "state"), "draft-discover-fields", draft_id,
+             "--task-authority", authority, "--expected-revision", str(revision),
+             "--object-handle", handle, "--meaning", "Fade Time", "--meaning", "Delay"],
+            env=_env(tmp_path), client_factory=lambda _url: client,
+        )
+        assert code == 0, found
+        selected[row_id] = [result["candidates"][0]["handle"] for result in found["meaning_results"]]
     row_arguments = [
         value
         for declaration_id, handle in zip(
@@ -1546,7 +1611,7 @@ def test_object_set_batch_declares_meanings_with_per_object_metadata_revalidatio
             "--task-authority",
             authority,
             "--expected-revision",
-            "4",
+            "7",
             "--row-order",
             "rain",
             "--row-order",
@@ -1554,29 +1619,29 @@ def test_object_set_batch_declares_meanings_with_per_object_metadata_revalidatio
             "--row-order",
             "thunder",
             *row_arguments,
-            field_option,
+            "--field-value",
             "rain",
-            fade_meaning,
+            selected["rain"][0],
             "0.25 seconds",
-            field_option,
+            "--field-value",
             "rain",
-            delay_meaning,
+            selected["rain"][1],
             "0",
-            field_option,
+            "--field-value",
             "wind",
-            fade_meaning,
+            selected["wind"][0],
             "0.4",
-            field_option,
+            "--field-value",
             "wind",
-            delay_meaning,
+            selected["wind"][1],
             "0.1",
-            field_option,
+            "--field-value",
             "thunder",
-            fade_meaning,
+            selected["thunder"][0],
             "0.05",
-            field_option,
+            "--field-value",
             "thunder",
-            delay_meaning,
+            selected["thunder"][1],
             "0",
         ],
         env=_env(tmp_path),
@@ -1590,7 +1655,7 @@ def test_object_set_batch_declares_meanings_with_per_object_metadata_revalidatio
         "metadata_scope": "each_exact_bound_object",
         "applied_atomically": True,
     }
-    assert batch["draft"]["revision"] == 5
+    assert batch["draft"]["revision"] == 8
     assert len(json.dumps(batch, separators=(",", ":")).encode("utf-8")) < 7_000
     stored = OperationDraftStore(tmp_path / "state").inspect(
         draft_id,

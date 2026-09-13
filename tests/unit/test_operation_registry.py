@@ -2193,6 +2193,20 @@ def test_set_name_reports_the_non_intrinsic_name_boundary(object_type: str) -> N
     assert error.value.error_code == "DERIVED_OBJECT_NAME_BOUNDARY"
 
 
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_delete_rtpc_reports_embedded_list_boundary_before_dispatch(version: str) -> None:
+    parsed = parse_operation_request(request(
+        "object.delete", {"object": {"kind": "id", "value": GUID}}, version=version,
+    ))
+    with pytest.raises(OperationContractError) as error:
+        prepare_operation(parsed, read_call=ScriptedReader({
+            "ak.wwise.core.object.get": [{"return": [object_row(
+                name="", object_type="RTPC", path=r"\Fixture\[RTPC]",
+            )]}],
+        }))
+    assert error.value.error_code == "EMBEDDED_OBJECT_DELETE_BOUNDARY"
+
+
 @pytest.mark.parametrize(
     "object_type",
     (
@@ -2842,7 +2856,9 @@ def test_property_and_reference_metadata_are_live_runtime_inputs_not_request_fie
     assert prepared_reference["resolved_roles"]["target"]["object"] == TARGET_GUID
 
 
-def test_reference_can_be_explicitly_cleared_and_null_is_verified() -> None:
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("case, succeeds", (("null", True), ("zero-guid", True), ("missing", False), ("wrong-id", False), ("malformed", False), ("malformed-zero", False)))
+def test_reference_can_be_explicitly_cleared_and_null_is_verified(version: str, case: str, succeeds: bool) -> None:
     reader = ScriptedReader(
         {
             "ak.wwise.core.object.get": [
@@ -2879,6 +2895,7 @@ def test_reference_can_be_explicitly_cleared_and_null_is_verified() -> None:
                     "reference": "OutputBus",
                     "target": None,
                 },
+                version=version,
             )
         ),
         read_call=reader,
@@ -2887,27 +2904,61 @@ def test_reference_can_be_explicitly_cleared_and_null_is_verified() -> None:
     assert prepared["dispatch"]["args"] == {
         "object": GUID,
         "reference": "OutputBus",
-        "value": None,
+        "value": "{00000000-0000-0000-0000-000000000000}",
     }
     assert "target" not in prepared["resolved_roles"]
     assert prepared["verification_plan"]["expected_clear"] is True
     assert prepared["verification_plan"]["expected_target_id"] is None
 
+    result_row: dict[str, Any] = {"id": GUID, "OutputBus": None}
+    if case == "zero-guid":
+        result_row["OutputBus"] = {"id": "{00000000-0000-0000-0000-000000000000}"}
+    elif case == "missing":
+        result_row.pop("OutputBus")
+    elif case == "wrong-id":
+        result_row["id"] = TARGET_GUID
+    elif case == "malformed":
+        result_row["OutputBus"] = {}
+    elif case == "malformed-zero":
+        result_row["OutputBus"] = {"id": "{00000000-0000-0000-0000-000000000000}", "unexpected": True}
     verified = verify_prepared_operation(
         prepared,
         execution_result={},
         read_call=ScriptedReader(
             {
                 "ak.wwise.core.object.get": [
-                    {"return": [{"id": GUID, "OutputBus": None}]}
+                    {"return": [result_row]}
                 ]
             }
         ),
     )
-    assert verified.status == "verified"
+    assert verified.ok is succeeds
+    assert verified.business_state_verified is succeeds
     assert next(
         item for item in verified.assertions if item["name"] == "reference is cleared"
-    )["passed"] is True
+    )["passed"] is succeeds
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("operation, field, kind", (("object.setProperty", "Volume", "Real32"), ("object.setReference", "OutputBus", "Reference")))
+@pytest.mark.parametrize("case", ("missing-field", "wrong-id", "duplicate"))
+def test_field_edit_rejects_incomplete_or_wrong_source_prestate(
+    version: str, operation: str, field: str, kind: str, case: str,
+) -> None:
+    row = {"id": GUID, field: None if kind == "Reference" else 0}
+    if case == "missing-field":
+        row.pop(field)
+    elif case == "wrong-id":
+        row["id"] = TARGET_GUID
+    rows = [row, row] if case == "duplicate" else [row]
+    arguments = {"object": {"kind": "id", "value": GUID}}
+    arguments.update({"reference": field, "target": None} if kind == "Reference" else {"property": field, "value": -4})
+    with pytest.raises(OperationContractError) as error:
+        prepare_operation(parse_operation_request(request(operation, arguments, version=version)), read_call=ScriptedReader({
+            "ak.wwise.core.object.get": [{"return": [object_row()]}, {"return": rows}],
+            "ak.wwise.core.object.getPropertyInfo": [{"name": field, "type": kind}],
+        }))
+    assert error.value.error_code == "INVALID_READBACK"
 
 
 def test_reference_clear_rejects_live_not_null_restriction() -> None:

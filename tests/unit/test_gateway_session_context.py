@@ -389,19 +389,23 @@ def test_skill_contract_requests_one_natural_notice_without_an_extra_command() -
 
     for phrase in (
         "When the visible conversation lacks an introduction",
-        "wait for the task's first required Gateway result",
-        "The very next Agent message",
+        "Only `/waapi-skill` or a Skill link",
+        "run one offline `config-show` before asking what to do",
+        "With a request, reuse its first required Gateway result; no extra call",
+        "The next reply",
         "`session_context.one_time_introduction.facts` together",
         "Skill loaded",
-        "current WAAPI address",
-        "adapter version, policy, and three modes",
-        "A Skill/reference read is not a Gateway result",
-        "never announce early, split facts, use memory",
+        "WAAPI address",
+        "in the user's language, in two short paragraphs",
+        "Wwise 适配版本 (localize); then policy and modes",
+        "configured, not connected unless proved live",
+        "Closing questions are free prose, in a new paragraph",
+        "Never announce before Gateway, split facts, use memory",
         "status table",
-        "Use the task's first required Gateway command",
-        "For a pure explanation, use one offline `config-show`",
-        "never open a live connection only for the introduction",
+        "Pure explanation: one offline `config-show`",
+        "Never connect solely for welcome",
         "Repeat only on request or changed facts",
+        "not later Skill invocations",
     ):
         assert phrase in skill_compact
     assert "Do not add policy or implementation narration to a simple read-only result" not in setup

@@ -23,12 +23,14 @@ from wwise_waapi.execution_contracts import (  # noqa: E402
     AUTHORING_UI_EXECUTION_PROFILE,
 )
 from wwise_waapi.manifest import DeterministicJsonWriter  # noqa: E402
+from wwise_waapi.authoring_ui_topics_manifest import AUTHORING_UI_OBSERVATION_TOPICS  # noqa: E402
 from wwise_waapi.schema_inventory import (  # noqa: E402
     validate_packaged_typed_request_surface,
 )
 
 
 REPORT_CONTRACT = "waapi-skill.full-surface-release-report/v1"
+REVIEWED_AUTHORING_URIS = AUTHORING_UI_COMMAND_URIS | AUTHORING_UI_OBSERVATION_TOPICS
 REPORT_RELATIVE_PATH = Path("docs/full-surface-release-report.json")
 MANIFEST_RELATIVE_PATH = Path("skills/waapi-skill/resources/manifest")
 
@@ -105,7 +107,7 @@ def build_full_surface_release_report(*, repo_root: Path) -> dict[str, Any]:
         if (
             capability is None
             or capability.host_surface != host
-            or (host == "wwise-authoring" and uri not in AUTHORING_UI_COMMAND_URIS)
+            or (host == "wwise-authoring" and uri not in REVIEWED_AUTHORING_URIS)
         ):
             missing_host_overlays.append(
                 {"version": version, "item_type": item_type, "uri": uri}

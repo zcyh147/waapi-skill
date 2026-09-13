@@ -1,0 +1,112 @@
+{
+  "contract": "waapi-authoring-ui-topics-supplement/v1",
+  "version": "2024.1",
+  "wwise_build": "2024.1.13.9056",
+  "host": "wwise-authoring",
+  "collected_on": "2026-09-13",
+  "source": "live public Gateway waapi-schema",
+  "schemas": {
+    "ak.wwise.ui.selectionChanged": {
+      "optionsSchema": {
+        "description": "Specifies the return options for every returned object.",
+        "$ref": "waapi_definitions.json#/definitions/objectReturnOptions"
+      },
+      "publishSchema": {
+        "type": "object",
+        "properties": {
+          "objects": {
+            "type": "array",
+            "description": "The selected objects, in the format specified in the options. Can be empty if no object is selected.",
+            "items": {
+              "description": "The selected objects. You can use the options to specify which data to return. Default returns id and name.",
+              "$ref": "waapi_definitions.json#/definitions/objectReturn"
+            }
+          }
+        },
+        "required": [
+          "objects"
+        ],
+        "additionalProperties": false
+      },
+      "description": "Sent when the selection changes in the project."
+    },
+    "ak.wwise.ui.signal.click": {
+      "optionsSchema": {
+        "type": "object",
+        "properties": {
+          "handleID": {
+            "description": "The ID of the handle.",
+            "$ref": "common_definitions.json#/definitions/guid"
+          },
+          "widgetID": {
+            "type": "string",
+            "description": "The ID of the widget."
+          }
+        },
+        "required": [
+          "handleID",
+          "widgetID"
+        ],
+        "additionalProperties": false
+      },
+      "publishSchema": {
+        "type": "object",
+        "properties": {
+          "handleID": {
+            "description": "The ID of the handle.",
+            "$ref": "common_definitions.json#/definitions/guid"
+          },
+          "widgetID": {
+            "type": "string",
+            "description": "The ID of the widget."
+          }
+        },
+        "required": [
+          "handleID",
+          "widgetID"
+        ],
+        "additionalProperties": false
+      },
+      "description": "Emitted when a push button or a radio button gets clicked."
+    },
+    "ak.wwise.ui.signal.toggle": {
+      "optionsSchema": {
+        "type": "object",
+        "properties": {
+          "handleID": {
+            "description": "The ID of the handle.",
+            "$ref": "common_definitions.json#/definitions/guid"
+          },
+          "widgetID": {
+            "type": "string",
+            "description": "The ID of the widget."
+          }
+        },
+        "required": [
+          "handleID",
+          "widgetID"
+        ],
+        "additionalProperties": false
+      },
+      "publishSchema": {
+        "type": "object",
+        "properties": {
+          "handleID": {
+            "description": "The ID of the handle.",
+            "$ref": "common_definitions.json#/definitions/guid"
+          },
+          "widgetID": {
+            "type": "string",
+            "description": "The ID of the widget."
+          }
+        },
+        "required": [
+          "handleID",
+          "widgetID"
+        ],
+        "additionalProperties": false
+      },
+      "description": "Emitted when a toggle button or a checkbox gets toggled."
+    }
+  }
+}

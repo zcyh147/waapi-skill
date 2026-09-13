@@ -178,7 +178,9 @@ class PropertyReferenceBuilder:
         args: dict[str, Any] = {
             "object": source.object,
             "reference": reference,
-            "value": target_object.object if target_object is not None else None,
+            # objectArg is a GUID/name/path, not JSON null. A cleared native
+            # reference uses Wwise's null GUID; business input remains None.
+            "value": target_object.object if target_object is not None else "{00000000-0000-0000-0000-000000000000}",
         }
         if platform is not None:
             _require_object_arg("platform", platform)

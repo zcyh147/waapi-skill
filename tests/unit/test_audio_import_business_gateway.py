@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import sys
+import pytest
 from collections import deque
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -397,8 +398,8 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
         "bind_all_prompt_visible_handle_dependencies_before_any_import_chunk_"
         "then_append_bounded_complete_rows"
     )
-    for scope_name in ("object_scope", "class_scope"):
-        scope = bound_next["field_binding"][scope_name]
+    for scope_name in ("object_scope", "new_object_scope"):
+        scope = bound_next["field_discovery"][scope_name]
         assert scope["fixed_argv_prefix_copy_instruction"]["source_field"] == (
             "fixed_argv_prefix_copy"
         )
@@ -522,32 +523,32 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
             ],
             "ak.wwise.core.object.getTypes": [
                 {"return": [{"classId": 65552, "name": "Sound", "type": "Sound"}]}
-            ],
+            ] * 2,
             "ak.wwise.core.object.getPropertyAndReferenceNames": [
                 {"return": ["CustomGain"]}
-            ],
+            ] * 2,
             "ak.wwise.core.object.getPropertyInfo": [
                 {
                     "name": "CustomGain",
                     "type": "Real32",
                     "restriction": {"type": "range", "min": -12.0, "max": 12.0},
                 }
-            ],
+            ] * 2,
         }
     )
     field_code, field_bound = waapi_gateway.execute_gateway(
         [
             "--state-dir",
             str(tmp_path / "state"),
-            "draft-bind-field",
+            "draft-discover-fields",
             draft_id,
             "--task-authority",
             authority,
             "--expected-revision",
             "2",
-            "--class-name",
-            "Sound",
-            "--token",
+            "--semantic-kind",
+            "sound-sfx",
+            "--meaning",
             "CustomGain",
         ],
         env=_env(tmp_path),
@@ -556,8 +557,9 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
     assert field_code == 0, json.dumps(
         {"payload": field_bound, "calls": field_client.calls}, indent=2
     )
-    field_handle = field_bound["bound_field"]["handle"]
-    assert field_bound["bound_field"]["restrictions"] == {
+    selected_field = field_bound["meaning_results"][0]["candidates"][0]
+    field_handle = selected_field["handle"]
+    assert selected_field["restrictions"] == {
         "maximum": 12.0,
         "minimum": -12.0,
     }
@@ -1305,9 +1307,15 @@ def test_audio_import_switch_value_is_a_first_class_business_argument(
     assert record_path.read_bytes() == before_ambiguous_attempt
 
 
+@pytest.mark.parametrize("continuation_mode", ("absolute", "task-local", "invalid"))
 def test_structure_declaration_reaches_live_check_and_persists_readable_preview(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    continuation_mode: str,
 ) -> None:
+    if continuation_mode == "task-local":
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(waapi_gateway, "GATEWAY_RUNNER_PATH", tmp_path / ".agents/skills/waapi-skill/scripts/run.py")
     code, started = _offline(tmp_path, "draft-start", "audio.import")
     assert code == 0, started
     draft_id = started["draft"]["draft_id"]
@@ -1375,6 +1383,18 @@ def test_structure_declaration_reaches_live_check_and_persists_readable_preview(
     assert declare_code == 0, declared
     check_client = BusinessCheckClient(tmp_path)
 
+    record_path = tmp_path / "state/operation-drafts-v1/records" / f"{draft_id}.json"
+    before_check = record_path.read_bytes()
+    if continuation_mode == "invalid":
+        original_next_command = waapi_gateway.transaction_next_command
+
+        def invalid_next_command(*args, **kwargs):
+            result = original_next_command(*args, **kwargs)
+            result["shell_command"] = "python wrong.py"
+            return result
+
+        monkeypatch.setattr(waapi_gateway, "transaction_next_command", invalid_next_command)
+
     check_code, checked = waapi_gateway.execute_gateway(
         [
             "--state-dir",
@@ -1389,6 +1409,13 @@ def test_structure_declaration_reaches_live_check_and_persists_readable_preview(
         env=_env(tmp_path),
         client_factory=lambda _url: check_client,
     )
+
+    if continuation_mode == "invalid":
+        assert check_code == 2
+        assert checked["error_code"] == "BUSINESS_CONTINUATION_INVALID"
+        assert checked["details"]["repair"]["draft_revision"] == 3
+        assert record_path.read_bytes() == before_check
+        return
 
     assert check_code == 0, json.dumps(checked, indent=2)
     assert checked["draft"]["revision"] == 4

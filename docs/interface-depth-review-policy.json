@@ -16,10 +16,10 @@
     ]
   },
   "source_contracts": {
-    "gateway_parser_sha256": "38126ae5d3aa5d7bb67df5afb772c7cbabe33223fa6cbcca18e71abf32123578",
-    "operation_contract_sha256": "5740eb71829385a4072b776cad3052c5b1c43d76e95b2cfa60c9e4e79776ee8d",
-    "public_continuation_sha256": "c5dd9de956bf7b393c2c4b38c80561940d0873f6695acc2e5a635a7ad2bd8ee3",
-    "typed_request_surface_sha256": "7cbe0a9ba6d9756c94ecea58bb1b2ac56da242059f17c5cdfdaf768271d133a8"
+    "gateway_parser_sha256": "41e31e13abb6f5e907296ad877755879d61afbf0114c6d49f80d84c358b1583e",
+    "operation_contract_sha256": "28e594931b21d500b0802f8bd916a90e9515cbc3ca4f186f740b1effc16230a7",
+    "public_continuation_sha256": "99ecaea3fe1c268ee7609b211553b90c2c6cb0b6b3713056a84820d0f3783de0",
+    "typed_request_surface_sha256": "15fdfba40a37f38bbf963e02a1114f1452fc609aae3c92cb7e916119d33e3773"
   },
   "ownership_classes": {
     "stable_business_declaration": "A prompt-derived business value remains visible in the public request.",
@@ -141,7 +141,7 @@
       "owner_issue": null,
       "match": {"item_types": ["topic"]},
       "leaked_mechanics": [],
-      "audit_evidence": "The public waapi-skill.topic-business/v1 envelope covers all 154 exact five-version Topic lanes. Callers supply stable event meanings, business match values, and explicit wait or stream intent; ambiguous scalar meanings are selected only by contract-bound opaque tvc1 handles, so callers never author wire types. The Gateway derives versioned event-schema paths, native types, nested match structure, contract digest, the sole continuation, subscription ACK, projection, and cleanup. The SoundBank-generated lane additionally exposes closed object-identity, platform-name, and SoundBank-name business shortcuts; the Gateway expands them to the same typed contract and keeps the generic lossless path available. wait-topic owns finite timeout or explicitly bounded no-timeout behavior. stream-topic requires an event ceiling even with a finite duration, bounds every event and cumulative NDJSON bytes, emits ordered started/event/terminal records, and reports cancellation unsubscribe truth separately from transport cleanup. The 24-family 2022.1/2025.1 structural policy credits only fresh matching payloads from active safe publishers; prerequisite and prohibited families retain exact blockers and receive no real PASS credit."
+      "audit_evidence": "The public waapi-skill.topic-business/v1 envelope covers 160 exact five-version Topic lanes: the original 154-lane #91 baseline plus six Authoring-only rows added on 2026-09-13 from matching 2024.1/2025.1 live reflection. The historical baseline seal remains tested separately; the additions do not inherit historical event/Fresh Agent PASS credit. Callers supply stable event meanings, business match values, and explicit wait or stream intent; ambiguous scalar meanings are selected only by contract-bound opaque tvc1 handles, so callers never author wire types. The Gateway derives versioned event-schema paths, native types, nested match structure, contract digest, the sole continuation, subscription ACK, projection, and cleanup. The SoundBank-generated lane additionally exposes closed object-identity, platform-name, and SoundBank-name business shortcuts; the Gateway expands them to the same typed contract and keeps the generic lossless path available. wait-topic owns finite timeout or explicitly bounded no-timeout behavior. stream-topic requires an event ceiling even with a finite duration, bounds every event and cumulative NDJSON bytes, emits ordered started/event/terminal records, and reports cancellation unsubscribe truth separately from transport cleanup. The 24-family 2022.1/2025.1 structural policy credits only fresh matching payloads from active safe publishers; prerequisite and prohibited families retain exact blockers and receive no real PASS credit."
     },
     {
       "id": "generic-core-media-build",
@@ -271,8 +271,8 @@
     },
     "generic-topics": {
       "github_issue": 91,
-      "row_count": 154,
-      "rows_sha256": "48f62fffb957f2ed581bee75cb11ddd6624411b77fc307813d1984b5ce015982"
+      "row_count": 160,
+      "rows_sha256": "7446dd701ea343d3a089f452c82ad1ec40c3ca261764d78adfda4a147e31db18"
     }
   },
   "ticket_issue_numbers": {},

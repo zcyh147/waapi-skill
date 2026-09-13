@@ -428,3 +428,59 @@ def test_business_plan_rejects_inconsistent_continuation_envelope() -> None:
             file_evidence=(),
         )
     assert captured.value.repair["error_code"] == "BUSINESS_CONTINUATION_INVALID"
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
+@pytest.mark.parametrize("tamper", (None, "runner", "revision", "absolute-binding", "cwd", "shell-suffix"))
+def test_business_plan_accepts_only_exact_gateway_task_local_posix_continuation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, version: str, tamper: str | None,
+) -> None:
+    from tests.unit.test_transaction_gateway import waapi_gateway
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(waapi_gateway, "os", type("PosixOS", (), {"name": "posix"})())
+    runner = tmp_path / ".agents/skills/waapi-skill/scripts/run.py"
+    monkeypatch.setattr(waapi_gateway, "GATEWAY_RUNNER_PATH", runner)
+    session = _session(version)
+    effects = (
+        _effect("container"),
+        _effect("sound", depends_on=("container",)),
+        _effect("event", depends_on=("sound",), batch_key="event"),
+    )
+
+    def continuation(request, request_digest, deadline):
+        payload = waapi_gateway.transaction_next_command(
+            "preview-from-draft", ["preview-from-draft", "od1-test", "--expected-revision", "7"]
+        )
+        if tamper == "runner":
+            payload["shell_command"] = payload["shell_command"].replace("scripts/run.py", "scripts/other.py")
+        elif tamper == "revision":
+            payload["shell_command"] = payload["shell_command"].replace("--expected-revision 7", "--expected-revision 8")
+        elif tamper == "absolute-binding":
+            payload["full_argv"][1] = str(tmp_path / "elsewhere/scripts/run.py")
+        elif tamper == "cwd":
+            other = tmp_path / "other-workspace"
+            other.mkdir()
+            monkeypatch.chdir(other)
+        elif tamper == "shell-suffix":
+            payload["shell_command"] += " ; echo unsafe"
+        return payload
+
+    def compile_plan():
+        return compile_business_plan(
+            session, operation="audio.import", effects=effects,
+            materialize=lambda batches, deadline: _materialize_audio_import(version, batches, deadline),
+            build_continuation=continuation, file_evidence=(),
+        )
+
+    if tamper is not None:
+        with pytest.raises(BusinessDeclarationError) as caught:
+            compile_plan()
+        assert caught.value.repair["error_code"] == "BUSINESS_CONTINUATION_INVALID"
+        return
+    result = compile_plan().preview.detail["continuation"]
+    assert result["full_argv"][1] == str(runner)
+    assert result["shell_command"] == (
+        "python .agents/skills/waapi-skill/scripts/run.py gateway.py "
+        "preview-from-draft od1-test --expected-revision 7"
+    )

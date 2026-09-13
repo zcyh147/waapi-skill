@@ -233,7 +233,7 @@ def test_all_maximum_profile_topic_lanes_compile_exact_typed_contracts() -> None
             assert options.schema_digest != match.schema_digest
             lane_count += 1
 
-    assert lane_count == 154
+    assert lane_count == 160
 
 
 @pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
@@ -483,6 +483,19 @@ def test_topic_schema_leads_with_handle_free_business_input(tmp_path: Path) -> N
             "value_choice_handle": "copy_exactly_from_disclosure",
         }
     }
+
+
+@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+@pytest.mark.parametrize("topic", ["ak.wwise.ui.selectionChanged", "ak.wwise.ui.signal.click", "ak.wwise.ui.signal.toggle"])
+def test_selection_topic_schema_is_available_offline_for_authoring(version: str, topic: str, tmp_path: Path) -> None:
+    code, payload = gateway.execute_gateway(
+        ["topic-schema", topic],
+        env=_env(tmp_path, version),
+        client_factory=lambda _url: pytest.fail("offline schema must not connect"),
+    )
+    assert code == 0, payload
+    assert payload["topic"] == topic
+    assert payload["continuation"]["subcommands"] == ["wait-topic", "stream-topic"]
 
 
 def test_soundbank_topic_schema_exposes_closed_business_shortcuts(

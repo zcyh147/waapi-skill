@@ -29,7 +29,7 @@ def test_skill_entry_stays_within_one_complete_agent_tool_read() -> None:
 def test_first_gateway_backed_introduction_names_all_three_policy_modes() -> None:
     introduction = SKILL.split("## Setup", 1)[0]
 
-    assert "same introduction must name them exactly" in introduction
+    assert "Keep mode names exact" in introduction
     for policy in ("`read_only`", "`ask_before_changes`", "`allow_changes`"):
         assert policy in introduction
 
@@ -591,17 +591,17 @@ def test_mixed_parent_child_query_keeps_both_required_types_in_candidate_set() -
 
 def test_soundbank_generated_uses_an_explicit_skill_selected_timeout() -> None:
     assert "For `ak.wwise.core.soundbank.generated`" in QUERY
-    assert "Run `topic-schema`" in QUERY
+    assert "`topic-schema` shortcuts" in QUERY
     assert "--include-object-identity" in QUERY
     assert "--match-platform-name <exact-name>" in QUERY
     assert "--match-soundbank-name <exact-name>" in QUERY
     assert "--event-entry platform - name <platform-name>" not in QUERY
     assert "--timeout 10 wait-topic ak.wwise.core.soundbank.generated" not in QUERY
-    assert "gateway itself keeps the ordinary 10-second omitted-duration default" in QUERY
-    assert "explicitly pass gateway-global `--timeout 120`" in QUERY
-    assert "an explicit Skill-selected timeout, not a different gateway default" in QUERY
-    assert "tell the user that this subscription will use 120 seconds" in QUERY
-    assert "user-supplied positive finite duration or explicit no-time-limit bounded wait still takes precedence" in QUERY
+    assert "Gateway still\ndefaults to 10 seconds" in QUERY
+    assert "explicitly pass gateway-global `--timeout 120`" in " ".join(QUERY.split())
+    assert "This is Skill-selected" in QUERY
+    assert "announce 120 seconds" in QUERY
+    assert "Explicit user timing/count intent takes precedence" in QUERY
 
 
 def test_topic_wait_duration_policy_is_explicit_and_output_remains_bounded() -> None:
@@ -609,13 +609,13 @@ def test_topic_wait_duration_policy_is_explicit_and_output_remains_bounded() -> 
     query_flat = " ".join(QUERY.split())
 
     for phrase in (
-        "tell the user the effective policy naturally",
+        "Tell the user the effective policy naturally",
         "ordinary omitted-duration default is 10 seconds",
         "converting units to seconds without rounding",
-        "`--timeout <positive-finite-seconds>` position before `wait-topic`",
-        "`wait-topic` subcommand flag `--no-timeout`",
+        "global `--timeout` before `wait-topic`",
+        "request selects `--no-timeout`",
         "until 1–64 requested matches or cancellation",
-        "is not an unlimited output stream",
+        "not an unlimited output stream",
         "Never combine those flags",
         "`choice_on_disclosure`",
         "run `field_disclosure` first",
@@ -626,11 +626,11 @@ def test_topic_wait_duration_policy_is_explicit_and_output_remains_bounded() -> 
 
     for phrase in (
         "An ordinary omitted duration uses 10 seconds",
-        "convert its units to seconds without rounding",
-        "Do not silently clamp it",
-        "is its default or recommendation, not a maximum",
-        "add the subcommand flag `--no-timeout`",
-        "the command still returns one terminal JSON document",
+        "convert units to seconds without rounding",
+        "never clamp",
+        "Contract timeouts are defaults, not maxima",
+        "Explicit no-limit waits use `--no-timeout`",
+        "1–64 matching events, one terminal JSON document",
         "business match facts from `topic-schema` are applied per event",
         "Gateway derives publish-schema paths, nested containers, wire types",
         "after success, timeout, or user cancellation",
@@ -654,7 +654,10 @@ def test_explicit_persistent_topic_intent_uses_one_streaming_subscription() -> N
 
     for phrase in (
         "Route ordinary vague “subscribe”, “listen”, or “monitor” wording to `wait-topic`",
-        "Select `stream-topic` only for explicit persistent intent",
+        "Select `stream-topic` for a requested event count",
+        "do not add the vague-request 10-second total timeout",
+        "--idle-timeout <seconds>",
+        "explicit total durations have no implicit idle cutoff",
         "It keeps one subscription",
         "flushes matched events",
         "requires an `--event-count <1..64>` ceiling",
@@ -673,16 +676,7 @@ def test_explicit_persistent_topic_intent_uses_one_streaming_subscription() -> N
         "Every streamed event and the cumulative NDJSON bytes are bounded and validated",
     ):
         assert phrase in query_flat
-    for intent in (
-        "stream",
-        "continuous",
-        "persistent",
-        "实时逐条",
-        "流式",
-        "持续",
-        "一直监听",
-        "不要收到后退出",
-    ):
+    for intent in ("requested event count", "per-event/persistent"):
         assert intent in SKILL
         assert intent in QUERY
 
@@ -828,14 +822,13 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "For `business_declaration`, run `draft-start`" in OPERATE
     assert "Bind exact owners, parents, and references" in OPERATE
     assert "Supply stable facts such as `volume_db=-4`" in OPERATE
-    assert "The Gateway derives Wwise paths, types, metadata scopes" in OPERATE
+    assert "Gateway owns native construction" in OPERATE
     assert "Corrections reuse the draft" in OPERATE
     assert "preserving `--expected-revision` and `--apply`" in OPERATE
     assert "there is no `lua.executeFile` operation" in OPERATE
     assert "keep it as one `path` selector" in OPERATE
     assert "Preview change intent" in OPERATE
-    assert "configure a default only when the user requested it" in OPERATE
-    assert "Exact reflected URIs use `request-schema`" in OPERATE
+    assert "Configure defaults only when requested" in OPERATE
     assert "Follow the schema's sole `input_mode`" in OPERATE
     assert "Unknown fields fail" in OPERATE
     assert "there is no caller-authored request document" in OPERATE
@@ -1235,22 +1228,25 @@ def test_one_time_onboarding_is_global_natural_and_does_not_add_a_gateway_call()
     skill_compact = " ".join(SKILL.split())
     for phrase in (
         "When the visible conversation lacks an introduction",
-        "wait for the task's first required Gateway result",
+        "Only `/waapi-skill` or a Skill link: run one offline `config-show`",
         "Read the injected `SKILL.md` exactly once",
         "A successful read is complete; a second `SKILL.md` read is forbidden",
-        "The very next Agent message",
+        "The next reply",
         "`session_context.one_time_introduction.facts` together",
         "Skill loaded",
-        "current WAAPI address",
-        "adapter version, policy, and three modes",
-        "A Skill/reference read is not a Gateway result",
-        "never announce early, split facts, use memory",
+        "WAAPI address",
+        "in the user's language, in two short paragraphs",
+        "Wwise 适配版本 (localize); then policy and modes",
+        "configured, not connected unless proved live",
+        "Closing questions are free prose, in a new paragraph",
+        "Never announce before Gateway, split facts, use memory",
         "status table",
-        "Use the task's first required Gateway command",
-        "For a pure explanation, use one offline `config-show`",
-        "never open a live connection only for the introduction",
+        "With a request, reuse its first required Gateway result; no extra call",
+        "Pure explanation: one offline `config-show`",
+        "Never connect solely for welcome",
         "Repeat only on request or changed facts",
-        "separate progress update",
+        "not later Skill invocations",
+        "Send machine answers separately",
     ):
         assert phrase in skill_compact
     assert "The entry file owns the one-time conversation introduction for every lane" in SETUP

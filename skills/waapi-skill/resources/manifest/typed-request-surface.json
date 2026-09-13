@@ -1,7 +1,7 @@
 {
   "contract": "waapi-skill.typed-request-surface/v1",
   "intentionally_blocked_field_occurrences": 79,
-  "inventory_sha256": "7cbe0a9ba6d9756c94ecea58bb1b2ac56da242059f17c5cdfdaf768271d133a8",
+  "inventory_sha256": "15fdfba40a37f38bbf963e02a1114f1452fc609aae3c92cb7e916119d33e3773",
   "lanes": [
     {
       "construction_shape": "inline",
@@ -29151,6 +29151,139 @@
       "version": "2024.1"
     },
     {
+      "construction_shape": "topic",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "548a0bdcce2b8b91975a046080f96d38b0d7d9b9799c04e9ea6457efe8fcdb7a",
+      "execution_policy": {
+        "accepted_authorization_modes": [],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "observation",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "wait-topic",
+          "stream-topic"
+        ],
+        "item_type": "topic",
+        "lifecycle_strategy": "none",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "subscribe-event-unsubscribe",
+        "project_guard_mode": "invariant",
+        "requires_authorization": false,
+        "result_limit_bytes": 262144,
+        "route": "bounded_topic_wait",
+        "timeout_seconds": 10.0,
+        "uri": "ak.wwise.ui.selectionChanged",
+        "verification_strategy": "topic_event_schema",
+        "version": "2024.1"
+      },
+      "execution_policy_sha256": "5c0934787bdb6d422e28bf6f1476178d23bef0f76e3e141c0ea937dc190bc13d",
+      "intentionally_blocked_fields": [],
+      "item_type": "topic",
+      "reference_count": 2,
+      "schema_keywords": [
+        "$ref",
+        "additionalProperties",
+        "description",
+        "items",
+        "properties",
+        "required",
+        "type"
+      ],
+      "schema_sha256": "5d1ab633ab0533ca9ea6d06e334d80610df06df9856e8997145d5484c8539b05",
+      "uri": "ak.wwise.ui.selectionChanged",
+      "version": "2024.1"
+    },
+    {
+      "construction_shape": "topic",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "548a0bdcce2b8b91975a046080f96d38b0d7d9b9799c04e9ea6457efe8fcdb7a",
+      "execution_policy": {
+        "accepted_authorization_modes": [],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "observation",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "wait-topic",
+          "stream-topic"
+        ],
+        "item_type": "topic",
+        "lifecycle_strategy": "none",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "subscribe-event-unsubscribe",
+        "project_guard_mode": "invariant",
+        "requires_authorization": false,
+        "result_limit_bytes": 262144,
+        "route": "bounded_topic_wait",
+        "timeout_seconds": 10.0,
+        "uri": "ak.wwise.ui.signal.click",
+        "verification_strategy": "topic_event_schema",
+        "version": "2024.1"
+      },
+      "execution_policy_sha256": "c122e23f77ce5b1034be517b4010c87f2260c9c47262adbdd3fd5de509f02dec",
+      "intentionally_blocked_fields": [],
+      "item_type": "topic",
+      "reference_count": 2,
+      "schema_keywords": [
+        "$ref",
+        "additionalProperties",
+        "description",
+        "properties",
+        "required",
+        "type"
+      ],
+      "schema_sha256": "a4bff7f6e053c6ca617d15f42d7f6bee2a860f1766de3913df90627b10adabde",
+      "uri": "ak.wwise.ui.signal.click",
+      "version": "2024.1"
+    },
+    {
+      "construction_shape": "topic",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "548a0bdcce2b8b91975a046080f96d38b0d7d9b9799c04e9ea6457efe8fcdb7a",
+      "execution_policy": {
+        "accepted_authorization_modes": [],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "observation",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "wait-topic",
+          "stream-topic"
+        ],
+        "item_type": "topic",
+        "lifecycle_strategy": "none",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "subscribe-event-unsubscribe",
+        "project_guard_mode": "invariant",
+        "requires_authorization": false,
+        "result_limit_bytes": 262144,
+        "route": "bounded_topic_wait",
+        "timeout_seconds": 10.0,
+        "uri": "ak.wwise.ui.signal.toggle",
+        "verification_strategy": "topic_event_schema",
+        "version": "2024.1"
+      },
+      "execution_policy_sha256": "df95995c549f6302ffe510fb027e2d46376d483a9e0263ca1fe9c1017c822524",
+      "intentionally_blocked_fields": [],
+      "item_type": "topic",
+      "reference_count": 2,
+      "schema_keywords": [
+        "$ref",
+        "additionalProperties",
+        "description",
+        "properties",
+        "required",
+        "type"
+      ],
+      "schema_sha256": "f4bcfbcb1afe55a1e6662f528df7c1268b1058947b1e998e93cfb5f5206c079a",
+      "uri": "ak.wwise.ui.signal.toggle",
+      "version": "2024.1"
+    },
+    {
       "construction_shape": "inline",
       "correct_host": "wwise-console",
       "definition_graph_sha256": "61e9c4ca7756b827e65389fd0ecbe0d6a75a90ab93a280be7d6963f52ef15ccf",
@@ -37925,14 +38058,147 @@
       "schema_sha256": "acc65aca089b77666b74abaed2c1c01d0856eda5a587222ef0a8bc6724e3701d",
       "uri": "ak.wwise.ui.commands.executed",
       "version": "2025.1"
+    },
+    {
+      "construction_shape": "topic",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "61e9c4ca7756b827e65389fd0ecbe0d6a75a90ab93a280be7d6963f52ef15ccf",
+      "execution_policy": {
+        "accepted_authorization_modes": [],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "observation",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "wait-topic",
+          "stream-topic"
+        ],
+        "item_type": "topic",
+        "lifecycle_strategy": "none",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "subscribe-event-unsubscribe",
+        "project_guard_mode": "invariant",
+        "requires_authorization": false,
+        "result_limit_bytes": 262144,
+        "route": "bounded_topic_wait",
+        "timeout_seconds": 10.0,
+        "uri": "ak.wwise.ui.selectionChanged",
+        "verification_strategy": "topic_event_schema",
+        "version": "2025.1"
+      },
+      "execution_policy_sha256": "3b412b44d60605d7a870ff6e78edccea5796ae36180a85b2a44e164214a80392",
+      "intentionally_blocked_fields": [],
+      "item_type": "topic",
+      "reference_count": 2,
+      "schema_keywords": [
+        "$ref",
+        "additionalProperties",
+        "description",
+        "items",
+        "properties",
+        "required",
+        "type"
+      ],
+      "schema_sha256": "5d1ab633ab0533ca9ea6d06e334d80610df06df9856e8997145d5484c8539b05",
+      "uri": "ak.wwise.ui.selectionChanged",
+      "version": "2025.1"
+    },
+    {
+      "construction_shape": "topic",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "61e9c4ca7756b827e65389fd0ecbe0d6a75a90ab93a280be7d6963f52ef15ccf",
+      "execution_policy": {
+        "accepted_authorization_modes": [],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "observation",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "wait-topic",
+          "stream-topic"
+        ],
+        "item_type": "topic",
+        "lifecycle_strategy": "none",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "subscribe-event-unsubscribe",
+        "project_guard_mode": "invariant",
+        "requires_authorization": false,
+        "result_limit_bytes": 262144,
+        "route": "bounded_topic_wait",
+        "timeout_seconds": 10.0,
+        "uri": "ak.wwise.ui.signal.click",
+        "verification_strategy": "topic_event_schema",
+        "version": "2025.1"
+      },
+      "execution_policy_sha256": "4a0d2cf6153366772be6af99f471b108efb8ff9406ca77e09c1f9ebf42600443",
+      "intentionally_blocked_fields": [],
+      "item_type": "topic",
+      "reference_count": 2,
+      "schema_keywords": [
+        "$ref",
+        "additionalProperties",
+        "description",
+        "properties",
+        "required",
+        "type"
+      ],
+      "schema_sha256": "a4bff7f6e053c6ca617d15f42d7f6bee2a860f1766de3913df90627b10adabde",
+      "uri": "ak.wwise.ui.signal.click",
+      "version": "2025.1"
+    },
+    {
+      "construction_shape": "topic",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "61e9c4ca7756b827e65389fd0ecbe0d6a75a90ab93a280be7d6963f52ef15ccf",
+      "execution_policy": {
+        "accepted_authorization_modes": [],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "observation",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "wait-topic",
+          "stream-topic"
+        ],
+        "item_type": "topic",
+        "lifecycle_strategy": "none",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "subscribe-event-unsubscribe",
+        "project_guard_mode": "invariant",
+        "requires_authorization": false,
+        "result_limit_bytes": 262144,
+        "route": "bounded_topic_wait",
+        "timeout_seconds": 10.0,
+        "uri": "ak.wwise.ui.signal.toggle",
+        "verification_strategy": "topic_event_schema",
+        "version": "2025.1"
+      },
+      "execution_policy_sha256": "30d3eb555824c3310f0b984028b908f36412c657e85161509785552188e4c1bc",
+      "intentionally_blocked_fields": [],
+      "item_type": "topic",
+      "reference_count": 2,
+      "schema_keywords": [
+        "$ref",
+        "additionalProperties",
+        "description",
+        "properties",
+        "required",
+        "type"
+      ],
+      "schema_sha256": "f4bcfbcb1afe55a1e6662f528df7c1268b1058947b1e998e93cfb5f5206c079a",
+      "uri": "ak.wwise.ui.signal.toggle",
+      "version": "2025.1"
     }
   ],
   "totals": {
     "function_lanes": 670,
-    "topic_lanes": 154,
-    "total_lanes": 824,
+    "topic_lanes": 160,
+    "total_lanes": 830,
     "unique_function_uris": 167,
-    "unique_topic_uris": 33
+    "unique_topic_uris": 35
   },
   "unknown_schema_keywords": [],
   "unresolved_references": [],

@@ -17,7 +17,8 @@ for Wwise Authoring. Read this file before changing the Skill or running tests.
   identical across versions.
 - The canonical `wwise-console` execution profile is the five-version
   WwiseConsole reflection. The separate `wwise-authoring-ui` profile is only
-  that canonical surface plus the five fixed `ak.wwise.ui.commands.*` URIs;
+  that canonical surface plus the five fixed `ak.wwise.ui.commands.*` URIs
+  and separately pinned observation Topics for 2024.1/2025.1;
   it is not a complete Authoring reflection. Profile counts are packaged route
   contracts, not claims that every row dispatches on the named host: all five
   UI-command routes require Authoring, including rows retained in older Console
@@ -80,6 +81,9 @@ for Wwise Authoring. Read this file before changing the Skill or running tests.
   - reflected Console functions, topics, schemas, immutable inventory
     metadata, and the narrow `authoring-ui-commands-supplement.json` and
     `authoring-ui-command-inventory.json` resources.
+    `authoring-ui-topics-supplement.json` adds only `selectionChanged`,
+    `signal.click`, and `signal.toggle` where matching Authoring reflection
+    established their absence from Console. It does not expose other UI APIs.
 - `skills/waapi-skill/resources/deferred/<version>.json`
   - category and deferred-route classification.
 - `skills/waapi-skill/resources/metadata/<version>/object-types.json`
@@ -233,6 +237,12 @@ user's approval.
   only as an explicit event-count-bounded wait. Even without a time limit,
   event count, result size, terminal JSON output, cancellation cleanup, and
   Authoring-host boundaries remain enforced.
+  A requested event count or per-event output selects `stream-topic`, without
+  an implicit total timeout. Streams without explicit total duration default to
+  300 idle seconds; only matching events restart the clock. `--idle-timeout`
+  overrides it; `--no-idle-timeout` disables it. Explicit total duration has no
+  implicit idle cutoff. Idle termination is incomplete count monitoring, not
+  target completion. The 64-event cap is Skill-owned.
 - A new reflected API row needs an explicit public route or exclusion, versioned
   schema validation, safety classification, and program coverage. Same-count URI
   substitutions must fail the inventory digest checks.

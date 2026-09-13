@@ -331,7 +331,7 @@ def test_object_create_list_snapshot_fails_closed_on_inexact_membership(
     ("owner_row", "allow_missing_empty", "expected_error"),
     (
         ({"id": OWNER_ID, "@CustomList": []}, False, None),
-        ({"id": OWNER_ID}, True, None),
+        ({"id": OWNER_ID}, True, "INVALID_READBACK"),
         ({"id": OWNER_ID}, False, "INVALID_READBACK"),
         ({"id": OWNER_ID, "@CustomList": {}}, True, "INVALID_READBACK"),
     ),

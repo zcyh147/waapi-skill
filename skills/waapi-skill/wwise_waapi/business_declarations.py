@@ -1701,6 +1701,13 @@ def _restrictions_from_live_metadata(
                 "Enum restriction values must be a non-empty array of value rows.",
             )
         normalized["enum_choices"] = [row["value"] for row in raw_values]
+        labels = [
+            {"label": row["displayName"], "value": row["value"]}
+            for row in raw_values
+            if isinstance(row.get("displayName"), str) and row["displayName"].strip()
+        ]
+        if labels:
+            normalized["enum_labels"] = labels
     if field_kind == "reference":
         allowed = reference_allowed_types(restriction)
         if allowed:
@@ -2011,7 +2018,7 @@ def _normalize_restrictions(
 ) -> dict[str, Any]:
     if not isinstance(restrictions, Mapping):
         raise ValueError("restrictions must be an object")
-    allowed_keys = {"minimum", "maximum", "enum_choices", "allowed_target_types"}
+    allowed_keys = {"minimum", "maximum", "enum_choices", "enum_labels", "allowed_target_types"}
     if set(restrictions) - allowed_keys:
         raise ValueError("restrictions contain unsupported fields")
     normalized: dict[str, Any] = {}
@@ -2041,6 +2048,27 @@ def _normalize_restrictions(
             value_type=value_type,
         )
         normalized["enum_choices"] = list(choices)
+    if "enum_labels" in restrictions:
+        labels = restrictions["enum_labels"]
+        if (
+            "enum_choices" not in normalized
+            or not isinstance(labels, list)
+            or not 1 <= len(labels) <= MAX_FIELD_ENUM_CHOICES
+        ):
+            raise ValueError("enum labels require bounded live enum choices")
+        captured = []
+        for row in labels:
+            if (
+                not isinstance(row, Mapping) or set(row) != {"label", "value"}
+                or not isinstance(row["label"], str) or not row["label"].strip()
+                or len(row["label"].encode("utf-8")) > MAX_BUSINESS_REPAIR_TEXT_BYTES
+            ):
+                raise ValueError("enum labels require bounded nonempty labels and values")
+            value = _normalized_enum_choices([row["value"]], value_type=value_type)[0]
+            if value not in normalized["enum_choices"]:
+                raise ValueError("enum label value is not a live enum choice")
+            captured.append({"label": row["label"], "value": value})
+        normalized["enum_labels"] = captured
     if "allowed_target_types" in restrictions:
         target_types = _normalized_text_sequence(
             restrictions["allowed_target_types"],

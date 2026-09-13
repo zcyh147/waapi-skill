@@ -17,6 +17,18 @@ prevention checks that are expensive to rediscover.
 
 ## Incident ledger
 
+### A matrix caller must persist the returned Codex turn
+
+- The first `first_use_2` run passed both behavior checks, but its new matrix
+  caller saved only outcomes and Broker records. `CodexCliTask` returns raw
+  events and isolation audits in memory; creating its output directory does
+  not archive those fields automatically. That root is diagnostic only.
+- Persist each returned turn's raw events, stderr, final reply, and complete
+  `facts_dict()` before grading or starting a follow-up. Include those files
+  in the evidence manifest and test their contents before another Fresh run.
+  Preserve a returned infrastructure-error result too. Do not promote a root
+  lacking original turn evidence merely because its Boolean checks passed.
+
 ### Windows Session 0 process initialization
 
 - Symptom: standalone Codex or `pwsh` exits with `0xC0000142` when a formal
@@ -3319,6 +3331,46 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   `imac-int-0682c1a-r72-int22-weapons`, and both Weapons units subsequently
   passed inside the final Mac and Windows full roots. The frozen r71 status is
   not rewritten retroactively.
+
+## Real CRUD readbacks after endpoint-version screening
+
+- Trigger: an id-only RTPC owner row, an embedded Effect without `parent`, or
+  a null-GUID reference is rejected after tests concentrated on 2022/2025.
+  Inspect the matching version's actual projection and owner/list semantics;
+  use isolated Console CRUD checks before spending another Fresh turn. See
+  `docs/research/rtpc-crud-readback-audit-2026-09-13.md` for the reproduction,
+  related defects, repair boundaries and exact evidence.
+- Continue public Gateway tests through `draft-check` and immutable preview.
+  Declaration/materialization success alone does not exercise native reads.
+  Keep missing fields, explicit nulls, empty lists and malformed results as
+  separate fixtures. Include both first creation and an already-populated list.
+- Use the current business Draft commands in real fixtures. The old typed
+  metadata adapter may produce an unsupported `MetadataQueryArgument`; this is
+  a fixture failure, not Wwise or Agent failure. Read sealed verification events
+  and compare their published digest when successful stdout contains a compact
+  verification summary instead of raw readbacks.
+- `--mode destructive` already supplies its paths: select nodes with `-k`
+  rather than adding the same module path again (which collects it twice).
+  Preserve detailed evidence under a task-owned durable directory before later
+  pytest runs rotate their default temporary roots. A Console run is not a
+  Fresh Agent result; a successful preview is not an executed modification.
+
+## Console reflection is not the complete Authoring Topic inventory (2026-09-13)
+
+- The real 2021.1–2023.1 Authoring URI lists matched the packaged Console
+  lists; 2024.1/2025.1 did not. Their missing `ui.selectionChanged` and two
+  `ui.signal` Topics need the separately pinned Authoring Topic supplement.
+  A missing packaged schema is not proof that Wwise lacks the capability.
+- For a suspected host gap, read the running host's version and exact URI lists,
+  then collect matching schemas through the public Gateway. Never copy a prior
+  version's schema or turn an observed extra URI into automatic execution
+  permission. The fixed `ui.commands` supplement is not all Authoring UI APIs.
+- Keep schema discovery, event reception and Fresh Agent routing evidence
+  separate. A duration-limited stream with one of two requested events proves
+  reception/cleanup, not count completion. Preserve unresolved event `$ref`
+  markers as partial validation rather than silently upgrading the result.
+- See `docs/research/authoring-topic-monitoring-audit-2026-09-13.md` for the five
+  host inventories, retained raw evidence and scoped test results.
 
 ## New-root preflight
 

@@ -464,13 +464,14 @@ def test_source_verifier_rejects_tampered_property_validation_before_reads() -> 
     assert reader.calls == []
 
 
-def test_2022_effect_prepare_uses_complete_fixed_slot_snapshot_and_verifies_plugin() -> None:
+@pytest.mark.parametrize("empty", (None, "{00000000-0000-0000-0000-000000000000}", {"id": "{00000000-0000-0000-0000-000000000000}", "name": ""}))
+def test_2022_effect_prepare_uses_complete_fixed_slot_snapshot_and_verifies_plugin(empty: Any) -> None:
     fixed_snapshot = {
         "id": TARGET_ID,
         "@Effect0": {"id": OLD_PLUGIN_ID},
-        "@Effect1": None,
-        "@Effect2": None,
-        "@Effect3": None,
+        "@Effect1": empty,
+        "@Effect2": empty,
+        "@Effect3": empty,
     }
     prepared = prepare_operation(
         parse_operation_request(request(version="2022.1", kind="effect")),
@@ -512,8 +513,8 @@ def test_2022_effect_prepare_uses_complete_fixed_slot_snapshot_and_verifies_plug
         "id": TARGET_ID,
         "@Effect0": {"id": OLD_PLUGIN_ID},
         "@Effect1": {"id": PLUGIN_ID},
-        "@Effect2": None,
-        "@Effect3": None,
+        "@Effect2": empty,
+        "@Effect3": empty,
     }
     verifier_reader = ScriptedReader(
         {
@@ -694,6 +695,62 @@ def test_effect_verifier_resolves_effect_slot_to_effect_guid_before_plugin_read(
             "target_id": TARGET_ID,
         },
     }
+
+
+@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("proof", ({}, {"return": None}, {"return": {}}, {"return": [None]}, {"return": [{"id": SLOT_ID}]}, {"return": []}))
+def test_effect_prepare_requires_independent_empty_list_proof(
+    version: str, proof: Mapping[str, Any],
+) -> None:
+    reader = ScriptedReader({
+        "ak.wwise.core.object.get": [
+            {"return": [target_row(object_type="ActorMixer")]},
+            {"return": [{"id": TARGET_ID}]},
+            proof,
+        ],
+    })
+    parsed = parse_operation_request(request(version=version, kind="effect"))
+    if proof == {"return": []}:
+        prepared = prepare_operation(parsed, read_call=reader).as_dict()
+        assert prepared["dispatch"]["args"]["objects"][0]["listMode"] == "append"
+        assert prepared["preflight_reads"][-1]["result"] == proof
+    else:
+        with pytest.raises(OperationContractError, match="independently empty"):
+            prepare_operation(parsed, read_call=reader)
+    assert reader.calls[-1] == (
+        "ak.wwise.core.object.get",
+        {"waql": f'from object "{TARGET_ID}" select @Effects take 1'},
+        {"return": ["id"]},
+    )
+
+
+@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("owner_matches", (True, False))
+def test_effect_verifies_owner_chain_without_hierarchy_parent(
+    version: str, owner_matches: bool,
+) -> None:
+    prepared = prepare_operation(
+        parse_operation_request(request(version=version, kind="effect")),
+        read_call=ScriptedReader({"ak.wwise.core.object.get": [
+            {"return": [target_row(object_type="ActorMixer")]},
+            {"return": [{"id": TARGET_ID, "@Effects": []}]},
+        ]}),
+    ).as_dict()
+    slot = effect_slot_row()
+    slot.pop("parent")
+    effect = effect_row(parent_id=SLOT_ID)
+    effect.pop("parent")
+    effect["owner"] = {"id": SLOT_ID if owner_matches else OLD_SLOT_ID}
+    verified = verify_prepared_operation(
+        prepared,
+        execution_result={"result": {"objects": [{"id": TARGET_ID, "@Effects": [
+            {"id": SLOT_ID, "@Effect": {"id": PLUGIN_ID}},
+        ]}]}},
+        read_call=ScriptedReader({"ak.wwise.core.object.get": [
+            {"return": [slot]}, {"return": [effect]},
+        ]}),
+    )
+    assert verified.ok is owner_matches
 
 
 def test_2023_effect_verifier_fails_closed_when_slot_has_no_effect_reference() -> None:

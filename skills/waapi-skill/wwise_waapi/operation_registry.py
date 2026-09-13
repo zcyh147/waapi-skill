@@ -359,7 +359,6 @@ RTPC_SNAPSHOT_FIELDS = (
     "@Curve",
 )
 RTPC_MAX_LIST_ROWS = 128
-RTPC_EMPTY_OWNER_FIELD_OMISSION_VERSIONS = frozenset({"2022.1", "2025.1"})
 RTPC_CONTROL_INPUT_TYPE_TOKENS = frozenset(
     {
         "gameparameter",
@@ -1782,6 +1781,11 @@ class VerificationResult:
     verification_strength: str = "operation_specific_readback"
     business_state_verified: bool = True
 
+    def __post_init__(self) -> None:
+        # Verifier strength is not a claim that a failed check verified state.
+        if self.status != "verified":
+            object.__setattr__(self, "business_state_verified", False)
+
     @property
     def ok(self) -> bool:
         return self.status in {"verified", "result_schema_checked"}
@@ -2335,6 +2339,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         ),
         identity_arguments=("object",),
         constraints=(
+            "embedded RTPC entries reject direct deletion before preview; this operation never deletes their owner as a fallback",
             "auto_check_out_to_source_control defaults to false and is accepted only in Wwise 2023.1-2025.1; explicit use on 2021.1/2022.1 fails before connection",
         ),
         selection_guidance=_selection_guidance(
@@ -4888,9 +4893,13 @@ def _raise_plugin_operation_error(exc: PluginOperationContractError) -> NoReturn
 
 
 def _plugin_guid(value: Any, *, field: str, allow_none: bool = False) -> str | None:
-    if isinstance(value, Mapping):
-        value = value.get("id")
     if value is None and allow_none:
+        return None
+    if isinstance(value, Mapping):
+        if "id" not in value or not isinstance(value["id"], str):
+            raise OperationContractError("INVALID_READBACK", f"{field} must expose a canonical reference id.")
+        value = value.get("id")
+    if value == "{00000000-0000-0000-0000-000000000000}" and allow_none:
         return None
     if not isinstance(value, str) or not _PLUGIN_GUID.fullmatch(value):
         raise OperationContractError(
@@ -5154,7 +5163,7 @@ def _read_plugin_prestate(
             )
         slot_id = _plugin_guid(row.get("id"), field=f"effect_slots[{index}].id")
         parent_id = _plugin_guid(
-            row.get("parent"),
+            row.get("parent", row.get("owner")),
             field=f"effect_slots[{index}].parent",
         )
         owner_id = _plugin_guid(
@@ -6468,10 +6477,10 @@ def _read_rtpc_rows_with_evidence(
     owner_row = owner_rows[0]
     compatibility_normalization: dict[str, Any] | None = None
     if "@RTPC" not in owner_row:
-        if (
-            version in RTPC_EMPTY_OWNER_FIELD_OMISSION_VERSIONS
-            and set(owner_row) == {"id"}
-        ):
+        if set(owner_row) == {"id"}:
+            emptiness_readback = _prove_omitted_object_list_empty(
+                object_id, "RTPC", read=read,
+            )
             raw_references: Any = []
             compatibility_normalization = {
                 "kind": "missing-empty-object-list",
@@ -6479,6 +6488,7 @@ def _read_rtpc_rows_with_evidence(
                 "field": "@RTPC",
                 "observed_row_keys": ["id"],
                 "normalized_value": [],
+                "emptiness_readback": emptiness_readback,
             }
         else:
             raise OperationContractError(
@@ -7608,6 +7618,46 @@ def _bounded_multi_identity_read(
     }
 
 
+def _prove_omitted_object_list_empty(
+    object_id: Any,
+    list_name: str,
+    *,
+    read: ReadCall,
+    platform: str | None = None,
+) -> dict[str, Any]:
+    """Prove absence independently of a missing owner return projection.
+
+    Only fixed operation-owned lists enter this compatibility path. WAQL list
+    selection is distinct from the legacy transform.select relationship enum.
+    One returned member is sufficient to disprove emptiness; never enumerate
+    an unbounded list or treat a failed/malformed query as an empty result.
+    """
+    if (
+        list_name not in {"RTPC", "Effects"}
+        or not isinstance(object_id, str)
+        or not _PLUGIN_GUID.fullmatch(object_id)
+    ):
+        raise OperationContractError(
+            "INVALID_READBACK", "Empty-list proof requires a fixed list and canonical owner GUID.",
+        )
+    args = {"waql": f'from object "{object_id}" select @{list_name} take 1'}
+    options = _import_object_get_options(("id",), platform=platform)
+    result = read(OBJECT_GET_URI, args, options)
+    evidence = {
+        "uri": OBJECT_GET_URI,
+        "args": args,
+        "options": options,
+        "result": dict(result) if isinstance(result, Mapping) else result,
+    }
+    if not isinstance(result, Mapping) or result.get("return") != []:
+        raise OperationContractError(
+            "INVALID_READBACK",
+            "An omitted object-list field requires an independently empty list readback.",
+            details={"object_id": object_id, "field": f"@{list_name}", "emptiness_readback": evidence},
+        )
+    return evidence
+
+
 def _read_object_list_rows_with_evidence(
     object_id: Any,
     list_name: str,
@@ -7664,12 +7714,16 @@ def _read_object_list_rows_with_evidence(
     compatibility_normalization: dict[str, Any] | None = None
     if list_field not in owner_row:
         if allow_missing_empty and set(owner_row) == {"id"}:
+            emptiness_readback = _prove_omitted_object_list_empty(
+                object_id, canonical_name, read=read, platform=platform,
+            )
             raw_references: Any = []
             compatibility_normalization = {
                 "kind": "missing-empty-object-list",
                 "field": list_field,
                 "observed_row_keys": ["id"],
                 "normalized_value": [],
+                "emptiness_readback": emptiness_readback,
             }
         else:
             raise OperationContractError(
@@ -8465,6 +8519,17 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
     elif request.operation == "object.delete":
         target = _resolve_identity(arguments["object"], role="object", read=read)
         _reject_protected_delete(target)
+        if target.row.get("type") == "RTPC":
+            raise OperationContractError(
+                "EMBEDDED_OBJECT_DELETE_BOUNDARY",
+                "RTPC bindings are embedded list entries; Wwise does not support direct object.delete for them.",
+                details={
+                    "object_id": target.object,
+                    "object_type": "RTPC",
+                    "operation": "object.delete",
+                    "repair": "Remove this binding in Wwise Authoring; do not retry object.delete or delete the owning Sound as a workaround.",
+                },
+            )
         roles["object"] = target
         try:
             auto_check_out = normalize_auto_check_out_to_source_control(
@@ -8638,10 +8703,14 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
             },
         )
         field_before_rows = _rows(field_before_result)
-        if len(field_before_rows) != 1:
+        if (
+            len(field_before_rows) != 1
+            or not _same_identity(field_before_rows[0].get("id"), source.object)
+            or not _has_field(field_before_rows[0], field_value)
+        ):
             raise OperationContractError(
                 "INVALID_READBACK",
-                "Property/reference pre-state must resolve to exactly one source row.",
+                "Property/reference pre-state must return the exact source and requested field.",
                 details={"field": field_value, "rows": field_before_rows},
             )
         metadata["field_before"] = {
@@ -13109,7 +13178,7 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
             assertions.append(
                 {
                     "name": f"object.{field_name} pre-state unchanged",
-                    "passed": len(rows) == 1 and actual == field_before.get("value"),
+                    "passed": len(rows) == 1 and _same_identity(rows[0].get("id"), object_id) and _has_field(rows[0], field_name) and actual == field_before.get("value"),
                     "evidence": {"expected": field_before.get("value"), "actual": actual, "rows": rows},
                 }
             )
@@ -16814,7 +16883,9 @@ def verify_prepared_operation(
             expected = plan.get("expected_value")
             check(
                 "property value matches metadata type",
-                _typed_value_equal(actual, expected, str(plan.get("metadata_type", ""))),
+                _same_identity(rows[0].get("id"), plan.get("object_id"))
+                and _has_field(rows[0], field_name)
+                and _typed_value_equal(actual, expected, str(plan.get("metadata_type", ""))),
                 {"actual": actual, "expected": expected, "metadata_type": plan.get("metadata_type")},
             )
     elif kind == "same-guid-reference":
@@ -16828,13 +16899,17 @@ def verify_prepared_operation(
         check("reference source resolves exactly once", len(rows) == 1, rows)
         if len(rows) == 1:
             raw_actual = _field_value(rows[0], field_name)
+            projection_matches = (
+                _same_identity(rows[0].get("id"), plan.get("object_id"))
+                and _has_field(rows[0], field_name)
+            )
             actual = _reference_identity(raw_actual)
             expected = plan.get("expected_target_id")
             expected_clear = plan.get("expected_clear") is True
             if expected_clear:
                 check(
                     "reference is cleared",
-                    _reference_value_is_null(raw_actual),
+                    projection_matches and _reference_value_is_null(raw_actual),
                     {"actual": raw_actual, "expected": None},
                 )
             elif actual is None:
@@ -16848,7 +16923,7 @@ def verify_prepared_operation(
             else:
                 check(
                     "reference target matches",
-                    _same_identity(actual, expected),
+                    projection_matches and _same_identity(actual, expected),
                     {"actual": actual, "expected": expected},
                 )
     elif kind == "ui-capture-screen-result":
@@ -20577,6 +20652,10 @@ def _direct_child_parent_relationship_matches(
     return None
 
 
+def _has_field(row: Mapping[str, Any], field_name: str) -> bool:
+    return any(key in row for key in (field_name, f"@{field_name}", f"@@{field_name}"))
+
+
 def _field_value(row: Mapping[str, Any], field_name: str) -> Any:
     for key in (field_name, f"@{field_name}", f"@@{field_name}"):
         if key in row:
@@ -20595,7 +20674,14 @@ def _reference_identity(value: Any) -> Any:
 def _reference_value_is_null(value: Any) -> bool:
     if value is None:
         return True
-    identity = _reference_identity(value)
+    if isinstance(value, Mapping):
+        if "id" not in value or set(value) - {"id", "name", "type", "path"}:
+            return False
+        if any(key in value and not isinstance(value[key], str) for key in value):
+            return False
+        identity = value["id"]
+    else:
+        identity = value
     return (
         isinstance(identity, str)
         and identity.casefold()

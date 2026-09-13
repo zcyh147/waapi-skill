@@ -297,6 +297,14 @@ class ManifestStore:
             raise AuthoringUiCommandsSupplementMissingError(version, path)
         return merge_authoring_ui_commands_surface(console_manifest, supplement)
 
+    def load_authoring_ui_profile(self, version: str) -> dict[str, Any]:
+        """Compose the fixed UI commands and separately reviewed UI Topics."""
+        from .authoring_ui_topics_manifest import merge_authoring_ui_topics
+
+        return merge_authoring_ui_topics(
+            self.load_with_authoring_ui_commands(version), root=self.root, version=version,
+        )
+
     def load_authoring_ui_commands_supplement(
         self,
         version: str,

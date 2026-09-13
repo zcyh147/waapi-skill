@@ -2328,27 +2328,31 @@ def _complete_object_metadata_business_transaction(
     platform: str | None = None,
     linked: bool | None = None,
 ) -> dict[str, Mapping[str, Any]]:
-    preview = create_object_metadata_business_preview(
-        lambda command: runtime.gateway(
-            command,
-            live=command[0]
-            in {
-                "draft-bind-object",
-                "draft-discover-fields",
-                "draft-check",
-                "preview-from-draft",
-            },
-        ),
-        version=runtime.version,
-        operation=operation,
-        object_id=object_id,
-        field_name=field_name,
-        value=value,
-        target_id=target_id,
-        clear_reference=clear_reference,
-        platform=platform,
-        linked=linked,
+    draft = _start_business_draft(runtime, operation)
+    owner = _bind_business_object(runtime, draft, object_id=object_id)
+    discovered = _update_business_draft(
+        runtime, draft, "draft-discover-fields",
+        ["--object-handle", owner, "--meaning", field_name,
+         *([] if platform is None else ["--platform", platform])], live=True,
     )
+    candidates = discovered["field_candidates"]
+    assert len(candidates) == 1, discovered
+    field = candidates[0]["handle"]
+    if operation == "object.setReference":
+        outcome = ["--clear-reference"] if clear_reference else [
+            "--target-handle", _bind_business_object(
+                runtime, draft, object_id=target_id,
+            ),
+        ]
+    elif operation == "object.setLinked":
+        outcome = ["--link-state", "linked" if linked else "unlinked"]
+    else:
+        outcome = ["--business-value", json.dumps(value)]
+    _update_business_draft(runtime, draft, "draft-declare-field-change", [
+        "--object-handle", owner, "--field-handle", field, *outcome,
+    ], live=False)
+    _update_business_draft(runtime, draft, "draft-check", live=True)
+    preview = _update_business_draft(runtime, draft, "preview-from-draft", live=True)
     transaction_id = preview["transaction_id"]
     shown = runtime.gateway(
         ["transaction-show", transaction_id, "--summary-only"],
@@ -2604,8 +2608,6 @@ def test_object_metadata_business_draft_executes_field_verifiers(
     workflow_sandbox_runtime: _WorkflowSandboxRuntime,
 ) -> None:
     runtime = workflow_sandbox_runtime
-    if runtime.version not in {"2022.1", "2025.1"}:
-        pytest.skip("object metadata business evidence targets 2022.1 and 2025.1")
     suffix = uuid.uuid4().hex[:12]
     source_id: str | None = None
     target_bus_id: str | None = None
@@ -2637,7 +2639,15 @@ def test_object_metadata_business_draft_executes_field_verifiers(
             target_id=target_bus_id,
             platform="Windows",
         )
-        if runtime.version == "2025.1":
+        _complete_object_metadata_business_transaction(
+            runtime,
+            operation="object.setReference",
+            object_id=source_id,
+            field_name="Attenuation",
+            clear_reference=True,
+            platform="Windows",
+        )
+        if runtime.version in {"2023.1", "2024.1", "2025.1"}:
             _complete_object_metadata_business_transaction(
                 runtime,
                 operation="object.setLinked",
@@ -3010,6 +3020,91 @@ def test_object_graph_business_draft_executes_weather_graph_plugin_bulk_set_and_
     finally:
         if weather_id is not None:
             _delete_if_present_via_transaction(runtime, weather_id)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_rtpc_empty_create_update_delete_recreate_across_selected_version(
+    workflow_sandbox_runtime: _WorkflowSandboxRuntime,
+) -> None:
+    """Exercise the real list lifecycle, not a pre-populated Weather fixture."""
+    runtime = workflow_sandbox_runtime
+    if runtime.version == "2021.1":
+        code, payload = runtime.raw_gateway(["draft-start", "object.setRTPC"])
+        assert code != 0 and payload["ok"] is False
+        assert payload["error_code"] == "UNAVAILABLE_IN_VERSION"
+        runtime.category_results.append({"category": "rtpc-list-lifecycle", "status": "PASS", "verifier_strength": "explicit_2021_unsupported_boundary"})
+        return
+
+    suffix = uuid.uuid4().hex[:10]
+    sound_id: str | None = None
+    control_id: str | None = None
+    try:
+        sound_id = _create_object(runtime, parent=CONTAINERS_PARENT if runtime.version == "2025.1" else ACTOR_MIXER_PARENT, object_type="Sound", name=f"RTPC_Empty_{suffix}")
+        control_id = _create_object(runtime, parent=GAME_PARAMETERS_PARENT, object_type="GameParameter", name=f"RTPC_Input_{suffix}")
+        original_rtpc_id: str | None = None
+        for mode, middle_y in (("add-only", "-12"), ("add-or-update", "-6"), ("add-only", "-9")):
+            draft = _start_business_draft(runtime, "object.setRTPC")
+            owner = _bind_business_object(runtime, draft, object_id=sound_id)
+            field = _discover_business_field(runtime, draft, object_handle=owner, meaning="volume")
+            control = _bind_business_object(runtime, draft, object_id=control_id)
+            _update_business_draft(runtime, draft, "draft-declare-rtpc", [
+                "--object-handle", owner, "--field-handle", field,
+                "--control-input-handle", control, "--mode", mode,
+                "--point", "0", "-48", "Linear", "--point", "50", middle_y, "Linear",
+                "--point", "100", "0", "Linear",
+            ], live=False)
+            result = _complete_business_draft(runtime, draft)
+            transaction_id = str(result["preview"]["transaction_id"])
+            events = TransactionStore(runtime.state_dir).read_events(transaction_id)
+            verifications = [event["details"]["verification"] for event in events if event.get("event_type") == "verification_recorded"]
+            assert len(verifications) == 1
+            assert waapi_gateway.canonical_sha256(verifications[0]) == result["verify"]["stdout_projection"]["verification_canonical_sha256"]
+            readbacks = verifications[0]["readbacks"]
+            rtpc_rows = [row for entry in readbacks for row in entry.get("result", {}).get("return", []) if row.get("type") == "RTPC"]
+            assert len(rtpc_rows) == 1, readbacks
+            rtpc_id = str(rtpc_rows[0]["id"])
+            assert rtpc_rows[0]["@Curve"]["points"][1]["y"] == float(middle_y)
+            if mode == "add-or-update":
+                assert rtpc_id == original_rtpc_id, "update must preserve RTPC identity"
+                delete = _start_business_draft(runtime, "object.delete")
+                _bind_business_object(runtime, delete, object_id=rtpc_id, role="object")
+                _update_business_draft(runtime, delete, "draft-declare-object-change", live=False)
+                code, rejected = runtime.raw_gateway([
+                    "draft-check", delete.draft_id, "--task-authority", delete.task_authority,
+                    "--expected-revision", str(delete.revision),
+                ])
+                assert code != 0 and rejected["error_code"] == "EMBEDDED_OBJECT_DELETE_BOUNDARY", rejected
+                # Delete/recreate the disposable owner, not an unsupported
+                # RTPC deletion. This is fixture lifecycle, never a fallback.
+                _delete_if_present_via_transaction(runtime, sound_id)
+                sound_id = None
+                sound_id = _create_object(runtime, parent=CONTAINERS_PARENT if runtime.version == "2025.1" else ACTOR_MIXER_PARENT, object_type="Sound", name=f"RTPC_Empty_{suffix}")
+            elif original_rtpc_id is None:
+                original_rtpc_id = rtpc_id
+            else:
+                assert rtpc_id != original_rtpc_id, "recreate must follow a proven empty list"
+        runtime.category_results.append({"category": "rtpc-list-lifecycle", "status": "PASS", "verifier_strength": "empty_create_update_rtpc_delete_boundary_owner_delete_recreate"})
+        for index in range(2):
+            plugin = _start_business_draft(runtime, "object.createPlugin")
+            owner = _bind_business_object(runtime, plugin, object_id=sound_id)
+            plugin_type = _discover_business_type(
+                runtime, plugin, meaning="Wwise Gain", role="effect",
+                expected_label="Wwise Gain",
+            )
+            _update_business_draft(runtime, plugin, "draft-declare-existing", [
+                "--declaration-id", f"effect-{index}", "--object-handle", owner,
+                "--field", "plugin_role", "effect",
+                "--field", "plugin_name", f"Gain_{index}",
+                "--field", "plugin_type_handle", plugin_type,
+            ], live=False)
+            _complete_business_draft(runtime, plugin)
+        runtime.category_results.append({"category": "effect-list-lifecycle", "status": "PASS", "verifier_strength": "first_effect_create_and_append_preserves_existing"})
+    finally:
+        if sound_id is not None:
+            _delete_if_present_via_transaction(runtime, sound_id)
+        if control_id is not None:
+            _delete_if_present_via_transaction(runtime, control_id)
 
 
 def _save_sandbox_project(runtime: _WorkflowSandboxRuntime) -> None:

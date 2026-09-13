@@ -5222,6 +5222,121 @@ def test_stream_topic_emits_matching_events_immediately_from_one_subscription(
     assert client.disconnected is True
 
 
+@pytest.mark.parametrize("year", [2021, 2022, 2023, 2024, 2025])
+@pytest.mark.parametrize("authoring", [True, False])
+def test_selection_monitor_uses_authoring_schema_and_rejects_console(
+    tmp_path: Path, year: int, authoring: bool,
+) -> None:
+    version = f"{year}.1"
+    topic = "ak.wwise.ui.selectionChanged"
+    info = live_info(year=year)
+    info["isCommandLine"] = not authoring
+    client = FakeClient({"ak.wwise.core.getInfo": info}, subscription_events={
+        topic: [{"objects": []}, {"objects": [{"id": PROJECT_GUID, "name": "Rain"}]}]})
+    env = gateway_env(tmp_path)
+    env["WWISE_VERSION"] = version
+    records: list[Mapping[str, Any]] = []
+    code, terminal = waapi_gateway.execute_gateway(
+        ["stream-topic", topic, "--event-count", "2", *_typed_topic_bindings(topic, version)],
+        env=env, client_factory=lambda _url: client, stream_sink=records.append,
+    )
+    if authoring:
+        assert code == 0, terminal
+        assert terminal["completion_reason"] == "event_count_reached"
+        assert terminal["event_count"] == 2
+        assert len(client.handlers) == 1
+        assert client.handlers[0].unsubscribe_calls == 1
+        assert [r["sequence"] for r in records if r["record_type"] == "event"] == [1, 2]
+    else:
+        assert code != 0
+        assert terminal["error_code"] == "AUTHORING_HOST_REQUIRED"
+        assert client.handlers == []
+
+
+def test_stream_topic_idle_timeout_stops_incomplete_and_unsubscribes(tmp_path: Path) -> None:
+    topic = "ak.wwise.core.object.created"
+    client = FakeClient({"ak.wwise.core.getInfo": live_info()})
+    records: list[Mapping[str, Any]] = []
+    exit_code, terminal = waapi_gateway.execute_gateway(
+        ["stream-topic", topic, "--event-count", "10", "--idle-timeout", "0.01",
+         *_typed_topic_bindings(topic)],
+        env=gateway_env(tmp_path), client_factory=lambda _url: client,
+        stream_sink=records.append,
+    )
+    assert exit_code == 0, terminal
+    assert terminal["status"] == "stopped"
+    assert terminal["completion_reason"] == "idle_timeout"
+    assert terminal["event_count"] == 0
+    assert terminal["requested_event_count"] == 10
+    assert terminal["event_count_reached"] is False
+    assert terminal["idle_timeout"] == {"seconds": 0.01, "source": "explicit"}
+    assert terminal["cleanup"] == "unsubscribed"
+    assert client.handlers[0].unsubscribe_calls == 1
+    assert client.disconnected is True
+
+
+@pytest.mark.parametrize(
+    ("global_args", "idle_args", "seconds", "source"),
+    [([], [], 300.0, "default_count_monitor"),
+     ([], ["--idle-timeout", "1800"], 1800.0, "explicit"),
+     ([], ["--no-idle-timeout"], None, "explicit_disabled"),
+     (["--timeout", "1800"], [], None, "explicit_total_duration"),
+     (["--timeout", "3600"], ["--idle-timeout", "1800"], 1800.0, "explicit")],
+)
+def test_stream_topic_discloses_effective_idle_policy_without_shortening_user_duration(
+    tmp_path: Path, global_args: list[str], idle_args: list[str],
+    seconds: float | None, source: str,
+) -> None:
+    topic = "ak.wwise.core.object.created"
+    client = FakeClient({"ak.wwise.core.getInfo": live_info()},
+        subscription_events={topic: [{"object": {"id": "one", "name": "One"}}]})
+    records: list[Mapping[str, Any]] = []
+    code, terminal = waapi_gateway.execute_gateway(
+        [*global_args, "stream-topic", topic, "--event-count", "1", *idle_args,
+         *_typed_topic_bindings(topic)], env=gateway_env(tmp_path),
+        client_factory=lambda _url: client, stream_sink=records.append,
+    )
+    assert code == 0, terminal
+    assert records[0]["idle_timeout"] == {"seconds": seconds, "source": source}
+    assert terminal["idle_timeout"] == records[0]["idle_timeout"]
+    assert terminal["event_count_reached"] is True
+    assert terminal["completion_reason"] == "event_count_reached"
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "nan", "inf", "-inf"])
+def test_stream_topic_invalid_idle_timeout_rejected_before_connection(tmp_path: Path, value: str) -> None:
+    def forbidden_client(_url: str) -> FakeClient:
+        raise AssertionError("Invalid idle timeout must not connect")
+    code, terminal = waapi_gateway.execute_gateway(
+        ["stream-topic", "ak.wwise.core.object.created", "--event-count", "10",
+         f"--idle-timeout={value}"], env=gateway_env(tmp_path),
+        client_factory=forbidden_client, stream_sink=lambda _record: None,
+    )
+    assert code == 2
+    assert "idle-timeout must be finite and greater than zero" in terminal["message"]
+
+
+def test_stream_topic_matching_events_restart_idle_clock(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from types import SimpleNamespace
+    clock = [0.0]
+    monkeypatch.setattr(waapi_gateway, "time", SimpleNamespace(monotonic=lambda: clock[0]))
+    topic = "ak.wwise.core.object.created"
+    client = FakeClient({"ak.wwise.core.getInfo": live_info()}, subscription_events={
+        topic: [{"object": {"id": str(i), "name": "Sound"}} for i in range(3)]})
+    def sink(record: Mapping[str, Any]) -> None:
+        if record["record_type"] == "event":
+            clock[0] += 4.0
+    code, terminal = waapi_gateway.execute_gateway(
+        ["stream-topic", topic, "--event-count", "3", "--idle-timeout", "5",
+         *_typed_topic_bindings(topic)], env=gateway_env(tmp_path),
+        client_factory=lambda _url: client, stream_sink=sink,
+    )
+    assert code == 0, terminal
+    assert terminal["completion_reason"] == "event_count_reached"
+    assert terminal["elapsed_seconds"] == 12.0
+    assert client.handlers[0].unsubscribe_calls == 1
+
+
 def test_stream_topic_stops_at_its_explicit_event_count_bound(
     tmp_path: Path,
 ) -> None:

@@ -1688,6 +1688,10 @@ def _append_heavy_reason(current: str, extra: str) -> str:
 
 def main(argv: Sequence[str] | None = None) -> int:
     options = parse_args(argv)
+    if options.profile == "first_use_2":
+        from tests.semantic.support.codex_first_use import run_first_use_matrix
+
+        return run_first_use_matrix(options)
     if options.profile in EXECUTABLE_V3_PROFILE_IDS:
         return run_heavy_v3_matrix(options)
     suite = load_eval_suite(options.suite_path)
@@ -4050,8 +4054,8 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--profile",
-        type=parse_profile_id,
-        metavar="{" + ",".join(PUBLIC_PROFILE_HELP_IDS) + "}",
+        type=lambda value: value if value == "first_use_2" else parse_profile_id(value),
+        metavar="{" + ",".join((*PUBLIC_PROFILE_HELP_IDS, "first_use_2")) + "}",
         default="screening",
     )
     parser.add_argument("--suite")
@@ -4087,6 +4091,12 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
         help=argparse.SUPPRESS,
     )
     args = parser.parse_args(argv)
+    is_first_use = args.profile == "first_use_2"
+    if is_first_use and (
+        not args.offline_only or not args.iteration_root or args.overwrite
+        or args.suite or args.case_id or args.version or args.pair_id
+    ):
+        parser.error("first_use_2 requires --offline-only and a new --iteration-root; no filters, suite, or overwrite")
     is_executable_v3 = args.profile in EXECUTABLE_V3_PROFILE_IDS
     is_policy_v3 = args.profile == MODIFICATION_POLICY_V3_PROFILE_ID
     is_compound_v1 = args.profile == COMPOUND_HEAVY_V1_PROFILE_ID
@@ -4186,12 +4196,12 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
             "--version 2022.1 and 2025.1"
         )
     model = args.model or (
-        "gpt-5.6-terra" if is_terra_v3 else "gpt-5.6-sol"
+        "gpt-5.6-terra" if is_terra_v3 or is_first_use else "gpt-5.6-sol"
     )
     service_tier = args.service_tier or (
-        "default" if is_terra_v3 else "priority"
+        "default" if is_terra_v3 or is_first_use else "priority"
     )
-    if is_terra_v3 and (
+    if (is_terra_v3 or is_first_use) and (
         model != "gpt-5.6-terra"
         or args.reasoning_effort != "medium"
         or service_tier != "default"

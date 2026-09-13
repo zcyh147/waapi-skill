@@ -170,22 +170,21 @@ def test_topic_wait_policy_is_consistent_across_skill_and_query_reference() -> N
     query_flat = " ".join(query.split())
 
     assert "ordinary omitted-duration default is 10 seconds" in skill_flat
-    assert "tell the user the effective policy naturally" in skill_flat
+    assert "Tell the user the effective policy naturally" in skill_flat
     assert "positive finite duration" in skill_flat
     assert "explicit no-time-limit bounded-wait request selects" in skill_flat
     assert "not an unlimited output stream" in skill_flat
 
     assert "An ordinary omitted duration uses 10 seconds" in query_flat
-    assert "A user-supplied positive finite duration is authoritative" in query_flat
-    assert "Do not silently clamp it" in query_flat
-    assert "Do not combine the two flags" in query_flat
-    assert "collection still stops at 1–64 matching events" in query_flat
-    assert "the command still returns one terminal JSON document" in query_flat
-    assert "gateway itself keeps the ordinary 10-second omitted-duration default" in query_flat
+    assert "Explicit durations are authoritative" in query_flat
+    assert "never clamp" in query_flat
+    assert "`--no-timeout`, never combined with `--timeout`" in query_flat
+    assert "1–64 matching events, one terminal JSON document" in query_flat
+    assert "Gateway still defaults to 10 seconds" in query_flat
     assert "explicitly pass gateway-global `--timeout 120`" in query_flat
-    assert "tell the user that this subscription will use 120 seconds" in query_flat
+    assert "announce 120 seconds" in query_flat
     assert "ordinary vague requests to subscribe, listen, monitor" in query_flat
-    assert "only when the user explicitly asks for a stream" in query_flat
+    assert "a requested event count or per-event/persistent output selects `stream-topic`" in query_flat
     assert "one persistent subscription" in query_flat
     assert "one compact flushed NDJSON record" in query_flat
     assert "requires an explicit maximum `--event-count <1..64>`" in query_flat
@@ -195,16 +194,7 @@ def test_topic_wait_policy_is_consistent_across_skill_and_query_reference() -> N
     assert "always attempts to unsubscribe" in query_flat
     assert "one terminal NDJSON record" in query_flat
     assert "Every command except `stream-topic` prints one JSON document" in skill_flat
-    for intent in (
-        "stream",
-        "continuous",
-        "persistent",
-        "实时逐条",
-        "流式",
-        "持续",
-        "一直监听",
-        "不要收到后退出",
-    ):
+    for intent in ("requested event count", "per-event/persistent"):
         assert intent in query
 
 
@@ -276,7 +266,7 @@ def test_metadata_order_follows_the_disclosed_input_mode() -> None:
     assert "common outcomes such as volume, infinite looping, output bus" in operate
     assert "use stable business fields" in operate
     assert "Bind the exact existing owner or the disclosed new-object type first" in operate
-    assert "Submit only business values against those handles" in operate
+    assert "Submit business values against those handles" in operate
 
 
 def test_media_gate_routes_pure_sound_hierarchies_to_object_create() -> None:
@@ -298,8 +288,10 @@ def test_operate_lane_reuses_exact_diagnostics_and_preserves_media_paths() -> No
     assert "reuse its GUID; do not query it again" in operate
     assert "`media_directory` and `audio_file` are opaque caller paths" in operate
     assert "never derive either from campaign/workspace cwd" in operate
-    assert "Three or more existing targets: bind every target first" in operate
-    assert "then use `declare_existing_batch`; do not run field discovery" in operate
+    assert "For a batch, bind every target first" in operate
+    assert "discover other fields for each exact target" in operate
+    assert "copy the selected handles into `declare_existing_batch`" in operate
+    assert "do not run field discovery" not in operate
 
 
 def test_normal_change_prose_stays_business_facing() -> None:
