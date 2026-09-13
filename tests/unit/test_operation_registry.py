@@ -281,16 +281,16 @@ def test_operation_request_schema_digest_owns_only_versioned_machine_contract() 
     assert "selection_guidance" not in contract_2022
     assert "next_step" not in contract_2022
     assert operation_request_schema_digest("object.set", "2022.1") == (
-        "997c56c07d4f946579c9ec0ee96d9c05d4491105989010b003c7d7e1d02fa02b"
+        "5d1e91f2a3bcce5901c96d36d42794eb2b82913101fc58cade96160d222b1a33"
     )
     assert operation_request_schema_digest("object.set", "2025.1") != (
         operation_request_schema_digest("object.set", "2022.1")
     )
     assert operation_request_schema_digest("audio.import", "2022.1") == (
-        "b84f8a7a23a1b5944a45d4889eaf996b96beefa346671917550f71fdc90f8d8a"
+        "8b85af0f82f96125128856aa7d046e776925ce66ef4244dd87d8da0cab36ed68"
     )
     assert operation_request_schema_digest("audio.import", "2025.1") == (
-        "f1f5d15fb16db06a6a3d5bf1d3749a7f0cf7b8a0a3efcbfbbf09515b2b72967d"
+        "bfb354132b1a97ddc972b2e24c3f01c2efee78d0be2aac87f99a65390b99652e"
     )
     assert operation_request_schema_digest(
         "audio.importTabDelimited", "2022.1"

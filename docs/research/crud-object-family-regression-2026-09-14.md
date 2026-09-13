@@ -105,4 +105,27 @@ establish that behavior.
 
 ## Final validation
 
-Pending completion; development probes are not final-candidate gate evidence.
+Frozen candidate `b2c7afb` completed the selected public-Gateway Console tests
+on macOS, one version at a time: **13 passed / 31 deselected per version** on
+2021.1.14.8108, 2022.1.19.8584, 2023.1.19.8928, 2024.1.13.9056 and
+2025.1.7.9143. All five pytest processes exited zero: **65 selected nodes
+passed**, including explicit unsupported-version and prohibited-operation
+boundaries, not 65 successful mutation capabilities.
+
+The 20 final module evidence records in
+`.waapi-skill-state/evidence/full-typed-input/macos-category-evidence.jsonl`
+seal that candidate. Verified transaction counts are respectively
+**28 / 31 / 30 / 30 / 30**. Four additional 2021 fixture-save transactions are
+only `result_schema_checked`, not business verification. Every source full
+hash, project mtime and tree-metadata digest is unchanged; all 20 passing
+sandboxes were deleted and all scoped residual-process lists are empty.
+
+The first full Program run at `b2c7afb` returned **5762 passed, 4 failed,
+2 skipped**. The failures were old schema snapshots/digests: new Bus/AuxBus
+child pairs in create/set and the versioned localized-Voice constraint.
+Removing exactly those reviewed additions from the in-memory contracts
+reproduced the old golden digests. Updated expectations then passed all four
+failed nodes, with no runtime change. Final Program and Non-live reruns are
+pending; the earlier failed run is retained rather than relabeled.
+
+No native-Windows run or Fresh Agent campaign was performed for this repair.
