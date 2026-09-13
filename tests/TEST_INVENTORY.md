@@ -21,7 +21,7 @@ Five-version copied-project music import evidence and the separate Sol/High
 Authoring preview are detailed in [the repair record](../docs/research/music-import-topology-repair-2026-09-14.md).
 Exact candidate `9df82a77c3b31c1e943ebef278a6497f738f5668` passed both public
 Gateway music workflows on each version, **10/10** on macOS WwiseConsole.
-All transactions verified; source hashes/mtimes were unchanged, passing
+All ten music transactions verified; source hashes/mtimes were unchanged, passing
 sandboxes were deleted and scoped residual-process checks were empty.
 No native Windows or full Fresh Agent campaign was run for this repair.
 

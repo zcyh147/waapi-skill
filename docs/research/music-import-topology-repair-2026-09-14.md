@@ -96,6 +96,9 @@ Final exact-candidate real validation at
 workflows sequentially on all five installed versions: **10 passed** (two
 per version, every invocation exit 0). These are macOS real WwiseConsole
 transactions, not Fresh Agent tasks. All ten transactions ended `verified`.
+The two separate 2021 fixture-save transactions remain `result_schema_checked`
+and are excluded from those ten music transactions; they receive no music
+business acceptance credit.
 All five source full hashes, project mtimes and tree metadata remained
 unchanged; all passing sandboxes were deleted and scoped residual processes
 were empty. Evidence is retained in
