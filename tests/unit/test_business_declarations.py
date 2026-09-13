@@ -137,6 +137,16 @@ def test_semantic_kinds_are_closed_and_deterministic_for_every_version(
     assert again.binding_digest == actor_mixer.binding_digest
 
 
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
+@pytest.mark.parametrize("kind", SUPPORTED_BUSINESS_KINDS)
+def test_business_kind_metadata_matches_real_versioned_type_catalog(version: str, kind: str) -> None:
+    resource = Path(__file__).resolve().parents[2] / "skills/waapi-skill/resources/metadata" / version / "object-types.json"
+    names = {row["name"] for row in json.loads(resource.read_text(encoding="utf-8"))["types"]}
+    resolved = resolve_semantic_kind(kind, version=version)
+    assert resolved.metadata_object_type in names
+    assert resolved.metadata_object_type in resolved.verifier_object_types
+
+
 def test_semantic_kind_repair_discloses_only_closed_choices() -> None:
     with pytest.raises(BusinessDeclarationError) as captured:
         resolve_semantic_kind("SFX Sound", version="2022.1")

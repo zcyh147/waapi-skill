@@ -320,12 +320,13 @@ def test_public_readmes_keep_setup_and_usage_user_facing() -> None:
     readmes = (english, chinese)
 
     for readme in readmes:
-        assert "git clone https://github.com/zcyh147/waapi-skill.git" in readme
+        assert "https://github.com/zcyh147/waapi-skill" in readme
         assert (
-            "python skills/waapi-skill/scripts/run.py setup_environment.py" in readme
+            "npx skills add zcyh147/waapi-skill --skill waapi-skill" in readme
         )
         assert "python skills/waapi-skill/scripts/run.py gateway.py config-set" in readme
         assert "python skills/waapi-skill/scripts/run.py gateway.py status" in readme
+        assert "python skills/waapi-skill/scripts/run.py setup_environment.py" not in readme
         assert "read_only" in readme
         assert "ask_before_changes" in readme
         assert "allow_changes" in readme
@@ -348,8 +349,12 @@ def test_public_readmes_keep_setup_and_usage_user_facing() -> None:
             assert internal_detail not in readme
 
     assert "Control Wwise Authoring with natural language" in english
+    assert "Agent-assisted installation" in english
+    assert "Configure this Skill for Wwise 2025.1" in english
     assert "List the Events under the Default Work Unit" in english
     assert "用自然语言操作 Wwise Authoring" in chinese
+    assert "由 Agent 安装" in chinese
+    assert "为这个 Skill 配置 Wwise 2025.1" in chinese
     assert "列出 Default Work Unit 下的所有 Event" in chinese
 
 

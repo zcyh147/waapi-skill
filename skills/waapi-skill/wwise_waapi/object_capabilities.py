@@ -103,7 +103,7 @@ OBJECT_CREATE_WRITABLE_PARENT_TYPES = frozenset(
         "SwitchContainer",
         "BlendContainer",
         "MusicSwitchContainer",
-        "MusicRanSeqCntr",
+        "MusicPlaylistContainer",
         "MusicSegment",
     }
 )

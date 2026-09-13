@@ -1012,6 +1012,57 @@ def test_audio_import_batch_chunks_are_atomic_cumulative_and_compact(
     assert record_path.read_bytes() == before_ambiguous_directory
 
 
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_music_import_batch_accepts_omitted_language_without_native_dispatch(
+    tmp_path: Path, version: str,
+) -> None:
+    env = {**_env(tmp_path), "WWISE_VERSION": version}
+    state_args = ["--state-dir", str(tmp_path / "state")]
+    def offline(*argv):
+        return waapi_gateway.execute_gateway(
+            [*state_args, *argv], env=env,
+            client_factory=lambda _: pytest.fail("declaration must not connect"),
+        )
+    code, started = offline("draft-start", "audio.import")
+    assert code == 0, started
+    info = _info()
+    info["version"]["year"] = int(version[:4])
+    info["version"]["displayName"] = f"v{version}.0.1"
+    info["isCommandLine"] = False
+    client = FakeClient({
+        "ak.wwise.core.getInfo": [info],
+        "ak.wwise.core.getProjectInfo": [{
+            "id": PROJECT_ID, "name": "SampleProject", "path": str(_project_path(tmp_path)),
+        }],
+        "ak.wwise.core.object.get": ([{"return": [{
+            "id": PROJECT_ID, "name": "SampleProject", "type": "Project",
+            "path": str(_project_path(tmp_path)),
+        }]}] if version == "2021.1" else []) + [{"return": [{
+            "id": PARENT_ID, "name": "Default Work Unit", "type": "WorkUnit",
+            "path": r"\Containers\Default Work Unit",
+        }]}],
+    })
+    draft_id, authority = started["draft"]["draft_id"], started["task_authority"]
+    code, bound = waapi_gateway.execute_gateway([
+        *state_args, "draft-bind-object", draft_id, "--task-authority", authority,
+        "--expected-revision", "1", "--object-id", PARENT_ID,
+    ], env=env, client_factory=lambda _: client)
+    assert code == 0, bound
+    media = tmp_path / "music.wav"
+    media.write_bytes(b"RIFF-test")
+    code, declared = offline(
+        "draft-declare-import-batch", draft_id, "--task-authority", authority,
+        "--expected-revision", "2", "--row-order", "segment", "track",
+        "--new-row", "segment", bound["bound_object"]["handle"], "Intro", "music-segment",
+        "--new-row", "track", "segment", "Music", "music-track",
+        "--media-directory", str(tmp_path), "--media-file", "track", media.name,
+        "--field", "track", "volume_db", "-6",
+    )
+    assert code == 0, declared
+    assert declared["draft"]["revision"] > 2
+    assert not any(uri == "ak.wwise.core.audio.import" for uri, _, _ in client.calls)
+
+
 def test_audio_import_batch_count_mismatch_is_atomic(tmp_path: Path) -> None:
     code, started = _offline(tmp_path, "draft-start", "audio.import")
     assert code == 0, started

@@ -291,9 +291,9 @@ _BASE_KIND_ROWS: Mapping[str, tuple[str, str, str, tuple[str, ...]]] = {
     ),
     "music-playlist-container": (
         "Music Playlist Container",
-        "MusicRanSeqCntr",
-        "MusicRanSeqCntr",
-        ("MusicRanSeqCntr", "Music Playlist Container"),
+        "MusicPlaylistContainer",
+        "MusicPlaylistContainer",
+        ("MusicPlaylistContainer", "Music Playlist Container"),
     ),
     "music-segment": (
         "Music Segment",
@@ -2262,10 +2262,11 @@ def _bounded_object_name(value: Any, *, object_type: str) -> str:
 def normalize_live_object_identity(row: Any) -> LiveObjectIdentity:
     """Normalize the exact Wwise object identity shape once for every caller.
 
-    Wwise Authoring objects use canonical GUIDs and absolute object paths.
-    Most object types also own a non-empty name. The shared object-identity
-    capability table owns the reviewed derived, embedded-value, and
-    owned-collection exceptions.
+    Wwise Authoring objects use canonical GUIDs. Ordinary objects have absolute
+    hierarchy paths and non-empty names; reviewed non-intrinsic objects may
+    instead return a bracketed display identity, such as a MusicStinger's
+    ``[Stinger : Trigger,Segment]``. That display text is sealed for comparison,
+    never promoted into a selector: the exact GUID remains the authority.
     """
 
     if not isinstance(row, Mapping):
@@ -2283,9 +2284,20 @@ def normalize_live_object_identity(row: Any) -> LiveObjectIdentity:
         row.get("path"),
         field="path",
         maximum_bytes=MAX_BUSINESS_PATH_BYTES,
-    ).rstrip("\\")
-    if not path.startswith("\\"):
-        raise ValueError("path must be an absolute Wwise path")
+    )
+    if path.startswith("\\"):
+        path = path.rstrip("\\")
+    derived_display_path = (
+        not object_identity_semantics(object_type).mutable_intrinsic_name
+        and path.startswith("[")
+        and path.endswith("]")
+        and bool(path[1:-1].strip())
+        and not any(character in path for character in ("\x00", "\r", "\n"))
+    )
+    if not path.startswith("\\") and not derived_display_path:
+        raise ValueError(
+            "path must be an absolute Wwise path or a reviewed derived display identity"
+        )
     return LiveObjectIdentity(
         object_id=object_id.upper(),
         name=name,

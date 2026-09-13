@@ -67,37 +67,34 @@ WwiseConsole 中运行。
 - 本地 Wwise 工程可以使用 WAAPI
 - 支持加载本地 Skill 的 Agent 或工具运行器
 
+Skill 会在首次使用时自动创建并准备自己的 Python 环境。只有使用下方 Skills CLI
+安装方式时才需要 Node.js 和 npm。
+
 ## 安装
 
-克隆仓库并准备 Skill 自带的 Python 环境：
+### 由 Agent 安装
+
+将[本仓库](https://github.com/zcyh147/waapi-skill)提供给支持本地 Skill 的 Agent，
+并让它安装 `waapi-skill` Skill。
+
+### Skills CLI
+
+也可以使用 Skills CLI 直接安装：
 
 ```bash
-git clone https://github.com/zcyh147/waapi-skill.git
-cd waapi-skill
-python skills/waapi-skill/scripts/run.py setup_environment.py
+npx skills add zcyh147/waapi-skill --skill waapi-skill
 ```
-
-如果 Windows 中的 Python 命令是 `py`，将上面的 `python` 替换为 `py` 即可。
-
-然后把 `skills/waapi-skill` 作为 Skill 提供给你的 Agent。使用 Codex 时，可将该
-目录复制或链接到 `~/.agents/skills/waapi-skill`；其他客户端按自己的 Skill 安装
-方式加载同一个目录即可。
 
 ## 快速开始
 
-配置 Wwise 版本、WAAPI 地址和修改策略：
-
-```bash
-python skills/waapi-skill/scripts/run.py gateway.py config-set --wwise-version 2025.1 --waapi-host 127.0.0.1 --waapi-port 8080 --project-modification-policy ask_before_changes
-```
-
-检查连接：
-
-```bash
-python skills/waapi-skill/scripts/run.py gateway.py status
-```
+在 Wwise 中打开目标工程，进入 `Project > User Preferences`，启用
+`Wwise Authoring API (WAAPI)` 并确认 WAMP 端口。本地默认端口为 `8080`；如果工程
+使用其他端口，需要向 Skill 提供相同的值。
 
 安装 Skill 后，直接在 Agent 对话中描述任务：
+
+> 使用本地 WAAPI 地址和 8080 端口，为这个 Skill 配置 Wwise 2025.1，保持
+> `ask_before_changes` 修改策略，并检查当前连接。
 
 > 列出 Default Work Unit 下的所有 Event。
 
@@ -107,7 +104,7 @@ python skills/waapi-skill/scripts/run.py gateway.py status
 > 重新导入 Rifle Tail 的音频，不要改变这个 Sound 的其他设置。
 
 Agent 会跟随 Gateway 返回的唯一后续操作。用户不需要把这些需求翻译成 WAAPI
-Schema 或命令行参数。
+Schema、Python 命令或命令行参数。
 
 ## 修改策略
 
@@ -142,6 +139,19 @@ Wwise
 Gateway 内部没有 LLM。它是确定性的，使用按版本反射的资源，并且只在当前任务需要
 时加载详细说明。这样既保留了 Skill 的轻量使用方式，也提供了优秀 MCP 工具应有的
 稳定工具边界。
+
+## 直接使用 Gateway（可选）
+
+通常由 Agent 代替用户操作 Gateway。开发、诊断或外部自动化场景也可以在源码仓库中
+直接调用：
+
+```bash
+python skills/waapi-skill/scripts/run.py gateway.py config-set --wwise-version 2025.1 --waapi-host 127.0.0.1 --waapi-port 8080 --project-modification-policy ask_before_changes
+python skills/waapi-skill/scripts/run.py gateway.py status
+```
+
+首次调用会自动准备 Skill 自带的 Python 环境。如果 Windows 中的 Python 命令是
+`py`，将上面的 `python` 替换为 `py` 即可。
 
 ## 范围与验证
 

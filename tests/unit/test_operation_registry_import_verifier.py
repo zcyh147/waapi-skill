@@ -386,6 +386,46 @@ def test_closed_audio_import_enforces_each_reflected_version_shape(
     assert reflected["passed"] is True
 
 
+@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("fault", [None, "wrong_parent", "wrong_media", "missing_clip", "duplicate_sequences", "wrong_clip_type", "extra_clip_row", "oversized_sequences"])
+def test_music_import_verifies_source_and_clip_without_sound_active_source(
+    tmp_path: Path, version: str, fault: str | None,
+) -> None:
+    source = _media(tmp_path, "music.wav")
+    copied = _media(tmp_path, "Originals/SFX/music.wav")
+    root = NEW_ROOT if version == "2025.1" else r"\Interactive Music Hierarchy\Default Work Unit"
+    path = root + r"\Segment\Track"
+    sequence_id = "{77777777-7777-7777-7777-777777777777}"
+    clip_id = "{88888888-8888-8888-8888-888888888888}"
+    target = _target(source, path, requested_object_type="MusicTrack", metadata_object_type="MusicTrack",
+                     requested_language="SFX", media_expected=True,
+                     explicit_audio_file_source_pre_state_rows=[])
+    live = {"id": NEW_GUID, "name": "Track", "path": path, "type": "MusicTrack",
+            "parent": {"id": PARENT_GUID}, "notes": "", "@Sequences": [{"id": sequence_id}]}
+    media_field = "originalWavFilePath" if version == "2021.1" else "originalFilePath"
+    audio_source = {"id": SOURCE_GUID, "name": "music", "path": path + r"\music",
+                    "type": "AudioFileSource", "notes": "", "audioSource:language": "SFX",
+                    "parent": {"id": NEW_GUID if fault != "wrong_parent" else OLD_GUID},
+                    media_field: str(copied)}
+    sequence = {"id": sequence_id, "type": "MusicTrackSequence", "@Clips": [] if fault == "missing_clip" else [{"id": clip_id}]}
+    clip = {"id": clip_id, "type": "MusicClip", media_field: str(copied) if fault != "wrong_media" else str(tmp_path / "other.wav")}
+    if fault == "duplicate_sequences":
+        live["@Sequences"] *= 2
+    elif fault == "oversized_sequences":
+        live["@Sequences"] *= 1000
+    elif fault == "wrong_clip_type":
+        clip["type"] = "Sound"
+    responses = [{"return": [live]}, {"return": [audio_source]}, {"return": [sequence]}]
+    if fault != "missing_clip":
+        responses.append({"return": [clip, clip] if fault == "extra_clip_row" else [clip]})
+    verified = verify_prepared_operation(
+        _prepared(version=version, targets=[target]),
+        execution_result=_result(version, [live, audio_source], [copied]),
+        read_call=ScriptedReader(responses),
+    )
+    assert verified.status == ("verified" if fault is None else "verification_failed"), verified.as_dict()
+
+
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])
 def test_closed_audio_import_native_directive_boundary_is_weak_success(
     version: str,

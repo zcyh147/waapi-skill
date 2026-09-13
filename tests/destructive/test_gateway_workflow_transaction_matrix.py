@@ -509,6 +509,126 @@ def _query_exact_path_id(
     return _required_string(rows[0], "id")
 
 
+@pytest.mark.live
+@pytest.mark.destructive
+def test_music_import_structure_media_owner_probe(workflow_sandbox_runtime) -> None:
+    from wwise_waapi.headless import default_waapi_client_factory
+
+    runtime = workflow_sandbox_runtime
+    client = default_waapi_client_factory(runtime.lifecycle.waapi_url)
+    try:
+        name = "WAAPI_MUSIC_" + uuid.uuid4().hex[:12]
+        audio = _write_fixture_wav(runtime.sandbox.sandbox_path / "GatewayWorkflowAudio", name)
+        root = (r"\Containers\Default Work Unit" if runtime.version == "2025.1"
+                else r"\Interactive Music Hierarchy\Default Work Unit")
+        track = f"{root}\\<MusicSegment>{name}\\<MusicTrack>Music"
+        result = client.call(
+            "ak.wwise.core.audio.import",
+            {"importOperation": "useExisting", "imports": [
+                {"objectPath": track, "@Volume": -6.0},
+                {"objectPath": track + f"\\<AudioFileSource>{audio.stem}",
+                 "audioFile": str(audio), "importLanguage": "SFX"},
+            ]},
+            options={"return": ["id", "name", "type", "path", "parent"]},
+        )
+        rows = client.call(
+            "ak.wwise.core.object.get",
+            {"from": {"path": [f"{root}\\{name}\\Music"]}},
+            options={"return": ["id", "name", "type", "path", "@Volume", "@Sequences"]},
+        )
+        source_ids = [row["id"] for row in result["objects"] if row["type"] == "AudioFileSource"]
+        media_field = "originalWavFilePath" if runtime.version == "2021.1" else "originalFilePath"
+        sources = client.call(
+            "ak.wwise.core.object.get", {"from": {"id": source_ids}},
+            options={"return": ["id", "type", "path", "parent", media_field, "audioSource:language"]},
+        )
+        sequence_ids = [item["id"] for item in rows["return"][0].get("@Sequences", [])]
+        sequences = client.call(
+            "ak.wwise.core.object.get", {"from": {"id": sequence_ids}},
+            options={"return": ["id", "type", "@Clips"]},
+        )
+        clip_ids = [clip["id"] for seq in sequences["return"] for clip in seq.get("@Clips", [])]
+        clips = client.call(
+            "ak.wwise.core.object.get", {"from": {"id": clip_ids}},
+            options={"return": ["id", "type", media_field, "@Volume"]},
+        ) if clip_ids else {"return": []}
+        evidence = {"category": "music-import-topology-probe", "status": "FAIL",
+                    "verifier_strength": "native_diagnostic_not_gateway_acceptance", "result": result,
+                    "track": rows, "sources": sources, "sequences": sequences, "clips": clips}
+        runtime.category_results.append(evidence)
+        assert rows["return"][0]["@Volume"] == -6, evidence
+        assert len(sources["return"]) == 1, evidence
+        assert len(clips["return"]) == 1, evidence
+        assert clips["return"][0][media_field] == sources["return"][0][media_field], evidence
+        evidence["status"] = "PASS"
+    finally:
+        client.disconnect()
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+@pytest.mark.parametrize("set_volume", [False, True])
+def test_closed_music_import_media_and_track_volume(
+    workflow_sandbox_runtime: _WorkflowSandboxRuntime, set_volume: bool,
+) -> None:
+    """Public business declaration through Preview, execution and music verification."""
+    runtime = workflow_sandbox_runtime
+    name = "Music_Closed_" + uuid.uuid4().hex[:12]
+    audio = _write_fixture_wav(runtime.sandbox.sandbox_path / "GatewayWorkflowAudio", name)
+    if runtime.version == "2021.1":
+        _save_sandbox_project(runtime)
+    draft = _start_business_draft(runtime, "audio.import")
+    root = "Containers" if runtime.version == "2025.1" else "Interactive Music Hierarchy"
+    parent = _bind_business_object(runtime, draft, path_segments=(root, "Default Work Unit"))
+    arguments = [
+        "--row-order", "segment", "track",
+        "--new-row", "segment", parent, name, "music-segment",
+        "--new-row", "track", "segment", "Music", "music-track",
+        "--media-directory", str(audio.parent), "--media-file", "track", audio.name,
+    ]
+    if set_volume:
+        arguments.extend(["--field", "track", "volume_db", "-6"])
+    _update_business_draft(runtime, draft, "draft-declare-import-batch", arguments, live=False)
+    result = _complete_business_draft(runtime, draft)
+    runtime.category_results.append({
+        "category": "music-import-business-with-volume" if set_volume else "music-import-business-media-only",
+        "status": "PASS", "verifier_strength": "gateway_music_source_clip_media_and_track_property",
+        "transaction_id": result["verify"]["transaction_id"],
+    })
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_music_playlist_canonical_query_create_and_import_parent(
+    workflow_sandbox_runtime: _WorkflowSandboxRuntime,
+) -> None:
+    """Prove canonical type routing, not playlist order or playback behavior."""
+    runtime = workflow_sandbox_runtime
+    queried = runtime.gateway(["query-object", "--kind", "music-playlist-container", "--max-results", "2"], live=True)
+    assert queried["ok"] is True
+    root = "Containers" if runtime.version == "2025.1" else "Interactive Music Hierarchy"
+    draft = _start_business_draft(runtime, "object.create")
+    parent = _bind_business_object(runtime, draft, path_segments=(root, "Default Work Unit"))
+    name = "Playlist_Type_" + uuid.uuid4().hex[:12]
+    _update_business_draft(runtime, draft, "draft-declare-new", [
+        "--declaration-id", "playlist", "--parent-handle", parent,
+        "--name", name, "--kind", "music-playlist-container",
+    ], live=False)
+    created = _complete_business_draft(runtime, draft)
+    playlist_id = _created_object_id(created["execute"])
+    draft = _start_business_draft(runtime, "audio.import")
+    parent = _bind_business_object(runtime, draft, object_id=playlist_id)
+    _update_business_draft(runtime, draft, "draft-declare-import-batch", [
+        "--row-order", "segment", "--new-row", "segment", parent, "Segment", "music-segment",
+    ], live=False)
+    imported = _complete_business_draft(runtime, draft)
+    runtime.category_results.append({
+        "category": "music-playlist-canonical-type", "status": "PASS",
+        "verifier_strength": "closed_query_create_and_import_parent_not_playlist_playback",
+        "transaction_ids": [created["verify"]["transaction_id"], imported["verify"]["transaction_id"]],
+    })
+
+
 def _restart_workflow_host_after_transport_loss(
     runtime: _WorkflowSandboxRuntime,
 ) -> None:

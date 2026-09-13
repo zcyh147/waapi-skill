@@ -72,37 +72,36 @@ do not pretend to work through WwiseConsole.
 - a local Wwise project with WAAPI available
 - an agent or tool runner that supports local Skills
 
+The Skill creates and prepares its own Python environment automatically on
+first use. Node.js and npm are required only for the Skills CLI installation
+method below.
+
 ## Install
 
-Clone the repository and prepare the Skill-local Python environment:
+### Agent-assisted installation
+
+Provide [this repository](https://github.com/zcyh147/waapi-skill) to an Agent
+that supports local Skills and request installation of the `waapi-skill` Skill.
+
+### Skills CLI
+
+Install the Skill directly with the Skills CLI:
 
 ```bash
-git clone https://github.com/zcyh147/waapi-skill.git
-cd waapi-skill
-python skills/waapi-skill/scripts/run.py setup_environment.py
+npx skills add zcyh147/waapi-skill --skill waapi-skill
 ```
-
-If Windows exposes Python as `py`, use that command instead of `python`.
-
-Then make `skills/waapi-skill` available to your agent as a Skill. For Codex,
-copy or link it into `~/.agents/skills/waapi-skill`; other clients can use the
-same directory through their normal Skill installation flow.
 
 ## Quick start
 
-Configure the Wwise release, WAAPI endpoint, and modification policy:
+Open the target project in Wwise. Under `Project > User Preferences`, enable
+`Wwise Authoring API (WAAPI)` and confirm the WAMP port. The default local port
+is `8080`; if your project uses another port, provide the same value to the
+Skill.
 
-```bash
-python skills/waapi-skill/scripts/run.py gateway.py config-set --wwise-version 2025.1 --waapi-host 127.0.0.1 --waapi-port 8080 --project-modification-policy ask_before_changes
-```
+Once the Skill is installed, use normal language in your Agent conversation:
 
-Check the connection:
-
-```bash
-python skills/waapi-skill/scripts/run.py gateway.py status
-```
-
-Once the Skill is installed, use normal language in your agent conversation:
+> Configure this Skill for Wwise 2025.1 using the local WAAPI endpoint on port
+> 8080, keep the `ask_before_changes` policy, and verify the connection.
 
 > List the Events under the Default Work Unit.
 
@@ -112,7 +111,8 @@ Once the Skill is installed, use normal language in your agent conversation:
 > Reimport the rifle tail audio without changing the Sound's other settings.
 
 The Agent follows the Skill's Gateway-generated continuation. You do not need
-to translate these requests into WAAPI schemas or command-line arguments.
+to translate these requests into WAAPI schemas, Python commands, or command-line
+arguments.
 
 ## Change policies
 
@@ -152,6 +152,20 @@ There is no LLM inside the Gateway. It is deterministic, uses versioned
 reflected resources, and loads detailed guidance only when the current task
 needs it. This keeps the experience Skill-like while giving it the stable tool
 boundary normally expected from a well-designed MCP integration.
+
+## Direct Gateway access (optional)
+
+The Agent normally operates the Gateway on your behalf. For development,
+diagnostics, or external automation, it can also be invoked directly from a
+source checkout:
+
+```bash
+python skills/waapi-skill/scripts/run.py gateway.py config-set --wwise-version 2025.1 --waapi-host 127.0.0.1 --waapi-port 8080 --project-modification-policy ask_before_changes
+python skills/waapi-skill/scripts/run.py gateway.py status
+```
+
+The first invocation automatically prepares the Skill-local Python environment.
+If Windows exposes Python as `py`, use that command instead of `python`.
 
 ## Scope and validation
 
