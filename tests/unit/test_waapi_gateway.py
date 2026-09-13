@@ -3670,6 +3670,7 @@ def test_query_object_rejects_root_marker_on_first_business_segment(
     ("kind", "expected_waql"),
     (
         ("actor-mixer", "from type ActorMixer take 2"),
+        ("music-playlist-container", "from type MusicPlaylistContainer take 2"),
         ("sound-sfx", "from type Sound where @IsVoice = false take 2"),
         ("sound-voice", "from type Sound where @IsVoice = true take 2"),
     ),

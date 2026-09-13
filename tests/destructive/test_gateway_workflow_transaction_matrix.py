@@ -597,6 +597,38 @@ def test_closed_music_import_media_and_track_volume(
     })
 
 
+@pytest.mark.live
+@pytest.mark.destructive
+def test_music_playlist_canonical_query_create_and_import_parent(
+    workflow_sandbox_runtime: _WorkflowSandboxRuntime,
+) -> None:
+    """Prove canonical type routing, not playlist order or playback behavior."""
+    runtime = workflow_sandbox_runtime
+    queried = runtime.gateway(["query-object", "--kind", "music-playlist-container", "--max-results", "2"], live=True)
+    assert queried["ok"] is True
+    root = "Containers" if runtime.version == "2025.1" else "Interactive Music Hierarchy"
+    draft = _start_business_draft(runtime, "object.create")
+    parent = _bind_business_object(runtime, draft, path_segments=(root, "Default Work Unit"))
+    name = "Playlist_Type_" + uuid.uuid4().hex[:12]
+    _update_business_draft(runtime, draft, "draft-declare-new", [
+        "--declaration-id", "playlist", "--parent-handle", parent,
+        "--name", name, "--kind", "music-playlist-container",
+    ], live=False)
+    created = _complete_business_draft(runtime, draft)
+    playlist_id = _created_object_id(created["execute"])
+    draft = _start_business_draft(runtime, "audio.import")
+    parent = _bind_business_object(runtime, draft, object_id=playlist_id)
+    _update_business_draft(runtime, draft, "draft-declare-import-batch", [
+        "--row-order", "segment", "--new-row", "segment", parent, "Segment", "music-segment",
+    ], live=False)
+    imported = _complete_business_draft(runtime, draft)
+    runtime.category_results.append({
+        "category": "music-playlist-canonical-type", "status": "PASS",
+        "verifier_strength": "closed_query_create_and_import_parent_not_playlist_playback",
+        "transaction_ids": [created["verify"]["transaction_id"], imported["verify"]["transaction_id"]],
+    })
+
+
 def _restart_workflow_host_after_transport_loss(
     runtime: _WorkflowSandboxRuntime,
 ) -> None:

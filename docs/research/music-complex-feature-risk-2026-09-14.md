@@ -118,6 +118,33 @@ blindly globally replaced. The Stinger empty-name binding failure is a separate
 identity-handling issue. Neither newly discovered issue was patched as part
 of the three-entry creation-guard repair.
 
+## Follow-up: shared type and identity fixes
+
+The subsequent repair separates three concrete defects from the complex-feature
+support boundary:
+
+- The closed Playlist kind, create/import parent guards, and import metadata
+  resolver now use the reflected `MusicPlaylistContainer`. Native import syntax
+  aliases are retained only in their own resolver, not substituted globally.
+- Import metadata for `PropertyContainer` now resolves to `PropertyContainer`
+  in 2025.1 and `ActorMixer` in older lanes, rather than incorrectly using
+  `Folder`. A five-version audit of all twelve semantic kinds found no other
+  missing metadata type names.
+- The Stinger binding failure was not caused by its empty name, which was
+  already supported. Its live path was the derived display identity
+  `[Stinger : Bonus,Stinger Bonus - Fight]`. Reviewed non-intrinsic types can
+  now preserve a bounded bracketed display identity while continuing to bind
+  and revalidate by exact GUID. Display text is never a query selector;
+  malformed identities and changes between preparation phases still fail.
+
+Development regression evidence: the type-mapping tests reproduced 12 failures
+before the fix and then passed 83 selected checks. The derived-identity file
+passed 119 checks; the four-file identity/business regression passed 393 checks.
+A new sandbox test passed on 2025.1, proving closed Playlist query, creation,
+and use as the parent of a structure-only MusicSegment import. This does not
+prove PlaylistRoot entries/order, transition behavior, or playback. Frozen
+candidate gates and the visible-task follow-up are recorded separately below.
+
 ## Evidence and scope limits
 
 - All SDK paths above are relative to `/Users/xiye/Documents/NotebookLM_Sources/Wwise/Docs/`. Page numbers are one-based physical pages within each PDF part. Text was extracted read-only with PyMuPDF.

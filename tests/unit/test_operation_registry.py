@@ -5590,7 +5590,8 @@ def test_audio_import_old_versions_reject_property_container_path_anchor(
     ]
 
 
-def test_audio_import_2025_resolves_actor_mixer_metadata_through_property_container() -> None:
+@pytest.mark.parametrize("native_type", ["ActorMixer", "Property Container", "PropertyContainer"])
+def test_audio_import_2025_resolves_actor_mixer_metadata_through_property_container(native_type: str) -> None:
     parent_path = r"\Containers\Default Work Unit"
     target_path = parent_path + r"\Weather_Interactive"
     parent_row = object_row(
@@ -5628,7 +5629,7 @@ def test_audio_import_2025_resolves_actor_mixer_metadata_through_property_contai
                     "imports": [
                         {
                             "object_path": target_path,
-                            "object_type": "ActorMixer",
+                            "object_type": native_type,
                         }
                     ]
                 },
@@ -5641,11 +5642,11 @@ def test_audio_import_2025_resolves_actor_mixer_metadata_through_property_contai
     assert prepared["dispatch"]["args"]["imports"] == [
         {
             "objectPath": target_path,
-            "objectType": "ActorMixer",
+            "objectType": native_type,
         }
     ]
     target = prepared["verification_plan"]["targets"][0]
-    assert target["requested_object_type"] == "ActorMixer"
+    assert target["requested_object_type"] == native_type
     assert target["metadata_object_type"] == "PropertyContainer"
     assert target["metadata_class_id"] == 1
     assert reader.calls[0] == (

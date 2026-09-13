@@ -46,6 +46,7 @@ tests/unit/test_audio_import_business_adapter.py
 tests/unit/test_audio_import_business_gateway.py
 tests/unit/test_audio_import_business_migration.py
 tests/unit/test_business_declarations.py
+tests/unit/test_non_intrinsic_identity_gateway.py
 tests/unit/test_business_declaration_state.py
 tests/unit/test_business_planning.py
 tests/unit/test_core_business_adapter.py

@@ -386,7 +386,7 @@ IMPORT_WRITABLE_PARENT_TYPES = frozenset(
         "SwitchContainer",
         "BlendContainer",
         "MusicSwitchContainer",
-        "MusicRanSeqCntr",
+        "MusicPlaylistContainer",
         "MusicSegment",
     }
 )
@@ -10558,10 +10558,10 @@ def _metadata_is_reference(info: PropertyInfoMetadataRecord) -> bool:
 
 def _import_metadata_object_type(value: str, *, version: str) -> str:
     token = _object_type_token(value)
-    if version == "2025.1" and token == "actormixer":
+    if token in {"actormixer", "propertycontainer"}:
         # Wwise 2025.1 reflects Actor Mixers as PropertyContainer metadata,
         # while audio.import still accepts the stable native ActorMixer token.
-        return "PropertyContainer"
+        return "PropertyContainer" if version == "2025.1" else "ActorMixer"
     aliases = {
         "soundsfx": "Sound",
         "soundvoice": "Sound",
@@ -10571,12 +10571,12 @@ def _import_metadata_object_type(value: str, *, version: str) -> str:
         "actormixer": "ActorMixer",
         "blendcontainer": "BlendContainer",
         "switchcontainer": "SwitchContainer",
-        "musicplaylistcontainer": "MusicRanSeqCntr",
+        "musicplaylistcontainer": "MusicPlaylistContainer",
+        "musicranseqcntr": "MusicPlaylistContainer",
         "musicswitchcontainer": "MusicSwitchContainer",
         "musicsegment": "MusicSegment",
         "musictrack": "MusicTrack",
         "virtualfolder": "Folder",
-        "propertycontainer": "Folder",
     }
     return aliases.get(token, value)
 
