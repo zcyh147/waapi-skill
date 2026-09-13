@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from .business_declarations import SUPPORTED_BUSINESS_KINDS, SUPPORTED_WWISE_VERSIONS
+from .business_fields import ACTION_DURATION_FIELDS, OBJECT_BUSINESS_FIELD_TYPES
 
 
 AUDIO_IMPORT_BUSINESS_CONTRACT = "waapi-skill.audio-import-business/v1"
@@ -16,19 +17,15 @@ AUDIO_IMPORT_BUSINESS_SETTING_FIELDS = (
     "mode",
 )
 AUDIO_IMPORT_BUSINESS_VALUE_TYPES = {
+    **{name: kind for name, kind in OBJECT_BUSINESS_FIELD_TYPES.items()
+       if name not in ACTION_DURATION_FIELDS},
     "audio_source_notes": "string",
     "dialogue_event_directive": "string",
     "inline_wav": "string",
     "language": "string",
-    "loop": "string",
-    "max_instances": "integer",
     "media_file": "string",
-    "notes": "string",
     "originals_subfolder": "string",
-    "output_bus": "reference",
-    "ignore_parent_instance_limit": "boolean",
     "switch_value": "string",
-    "volume_db": "number",
 }
 AUDIO_IMPORT_BUSINESS_DECLARATION_FIELDS = (
     *tuple(AUDIO_IMPORT_BUSINESS_VALUE_TYPES),
@@ -43,7 +40,7 @@ AUDIO_IMPORT_BUSINESS_MODES = {
 AUDIO_IMPORT_EVENT_ACTIONS = ("Break", "Pause", "Play", "Resume", "Seek", "Stop")
 AUDIO_IMPORT_BUSINESS_COMMANDS = (
     "draft-bind-object",
-    "draft-bind-field",
+    "draft-discover-fields",
     "draft-business-configure",
     "draft-declare-import-batch",
     "draft-declare-new",

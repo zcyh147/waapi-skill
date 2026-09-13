@@ -78,7 +78,7 @@ def test_business_adapter_registry_selects_one_family_at_one_seam() -> None:
         "object-metadata-fields"
     )
     assert business_adapter("object.setProperty").supports_field_discovery is True
-    assert business_adapter("object.setProperty").supports_field_binding is False
+    assert business_adapter("object.setProperty").supports_field_discovery is True
 
 
 def test_every_business_input_lane_has_exactly_one_registered_adapter() -> None:

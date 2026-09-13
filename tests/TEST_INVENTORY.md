@@ -4,6 +4,20 @@ This inventory is grouped for human review. The latest completed passing non-liv
 
 ## Runner modes and strict real behavior
 
+### 2026-09-13 CRUD field Interface repair
+
+The field-selection cutover adds 53 public Gateway regressions in
+`tests/unit/test_field_interface_closure_gateway.py` and includes that file in
+the fixed Program manifest. Final macOS Program: **5011 passed, 2 skipped**.
+The full Non-live invocation reported **10598 passed, 2 failed, 113 skipped,
+27 deselected**; both failures were obsolete operate-reference assertions and
+passed after correction in a 146-test focused selection. Preserve the original
+full-run failure classification. No Fresh Agent or actual Wwise was started.
+See [repair evidence](../docs/research/crud-field-interface-repair-2026-09-13.md)
+for the precise candidate/run scope and subsequent focused validation.
+
+### Mode definitions
+
 | Scope | Type | Files / Nodes | What it verifies | Real Wwise required |
 | --- | --- | --- | --- | --- |
 | Focused pure-program gate | Unit, contract, and fake gateway | `ci/test.sh --mode program` | Runs the five-version public-route coverage contract, all 808 default-profile version/API program cases, the deterministic 824-row full-surface release report, the separate Authoring-overlay/resource contracts, negative gateway contracts, isolated-I/O confinement tests, named object/plug-in/import/SoundBank/debug/Lua/UI-command operation contracts and verifiers, RTPC capacity boundaries, the optional registry-integrity file when present, and the selected complete fake preview/confirm/execute/verify chains | No |

@@ -398,8 +398,8 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
         "bind_all_prompt_visible_handle_dependencies_before_any_import_chunk_"
         "then_append_bounded_complete_rows"
     )
-    for scope_name in ("object_scope", "class_scope"):
-        scope = bound_next["field_binding"][scope_name]
+    for scope_name in ("object_scope", "new_object_scope"):
+        scope = bound_next["field_discovery"][scope_name]
         assert scope["fixed_argv_prefix_copy_instruction"]["source_field"] == (
             "fixed_argv_prefix_copy"
         )
@@ -523,32 +523,32 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
             ],
             "ak.wwise.core.object.getTypes": [
                 {"return": [{"classId": 65552, "name": "Sound", "type": "Sound"}]}
-            ],
+            ] * 2,
             "ak.wwise.core.object.getPropertyAndReferenceNames": [
                 {"return": ["CustomGain"]}
-            ],
+            ] * 2,
             "ak.wwise.core.object.getPropertyInfo": [
                 {
                     "name": "CustomGain",
                     "type": "Real32",
                     "restriction": {"type": "range", "min": -12.0, "max": 12.0},
                 }
-            ],
+            ] * 2,
         }
     )
     field_code, field_bound = waapi_gateway.execute_gateway(
         [
             "--state-dir",
             str(tmp_path / "state"),
-            "draft-bind-field",
+            "draft-discover-fields",
             draft_id,
             "--task-authority",
             authority,
             "--expected-revision",
             "2",
-            "--class-name",
-            "Sound",
-            "--token",
+            "--semantic-kind",
+            "sound-sfx",
+            "--meaning",
             "CustomGain",
         ],
         env=_env(tmp_path),
@@ -557,8 +557,9 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
     assert field_code == 0, json.dumps(
         {"payload": field_bound, "calls": field_client.calls}, indent=2
     )
-    field_handle = field_bound["bound_field"]["handle"]
-    assert field_bound["bound_field"]["restrictions"] == {
+    selected_field = field_bound["meaning_results"][0]["candidates"][0]
+    field_handle = selected_field["handle"]
+    assert selected_field["restrictions"] == {
         "maximum": 12.0,
         "minimum": -12.0,
     }

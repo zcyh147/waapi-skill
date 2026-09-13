@@ -822,14 +822,13 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "For `business_declaration`, run `draft-start`" in OPERATE
     assert "Bind exact owners, parents, and references" in OPERATE
     assert "Supply stable facts such as `volume_db=-4`" in OPERATE
-    assert "The Gateway derives Wwise paths, types, metadata scopes" in OPERATE
+    assert "Gateway owns native construction" in OPERATE
     assert "Corrections reuse the draft" in OPERATE
     assert "preserving `--expected-revision` and `--apply`" in OPERATE
     assert "there is no `lua.executeFile` operation" in OPERATE
     assert "keep it as one `path` selector" in OPERATE
     assert "Preview change intent" in OPERATE
-    assert "configure a default only when the user requested it" in OPERATE
-    assert "Exact reflected URIs use `request-schema`" in OPERATE
+    assert "Configure defaults only when requested" in OPERATE
     assert "Follow the schema's sole `input_mode`" in OPERATE
     assert "Unknown fields fail" in OPERATE
     assert "there is no caller-authored request document" in OPERATE

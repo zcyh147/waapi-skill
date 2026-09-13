@@ -524,7 +524,7 @@ DEFAULT_TIMEOUT = 10.0
 DEFAULT_METADATA_DISCOVERY_TIMEOUT = 30.0
 DEFAULT_TRANSACTION_TIMEOUT = 150.0
 DRAFT_METADATA_DISCOVERY_COMMANDS = frozenset(
-    {"draft-bind-field", "draft-discover-fields", "draft-discover-types"}
+    {"draft-discover-fields", "draft-discover-types"}
 )
 PROJECT_TRANSITION_SETTLE_POLL_SECONDS = 0.1
 TRANSPORT_CLEANUP_GRACE_SECONDS = 0.05
@@ -823,6 +823,27 @@ MAX_REFLECTION_URI_BYTES = 512
 
 class GatewayInputError(ValueError):
     """Raised for invalid gateway input before a WAAPI call is attempted."""
+
+
+class BusinessFieldInputError(GatewayInputError):
+    """Bounded diagnostics for field discovery, selection and declaration."""
+
+    error_code = "GatewayInputError"
+
+    def __init__(self, message: str, *, details: Mapping[str, Any],
+                 error_code: str = "GatewayInputError") -> None:
+        super().__init__(message)
+        self.error_code = error_code
+        self.details = dict(details)
+
+    def as_dict(self) -> dict[str, Any]:
+        return {"error_code": self.error_code, "message": str(self), "details": self.details}
+
+
+OBJECT_SET_BATCH_FIELD_SELECTION_RULE = (
+    "Use a disclosed fixed business field or copy a selected field handle discovered "
+    "for this exact row object. Meanings are discovery inputs, not mutation fields."
+)
 
 
 class GatewayResultShapeError(ValueError):
@@ -2932,7 +2953,7 @@ def build_parser() -> argparse.ArgumentParser:
         "draft-declare-existing-batch",
         help=(
             "Atomically declare bounded changes to several exact existing "
-            "objects while the Gateway resolves and revalidates each field meaning"
+            "objects using fixed business fields or selected scoped field handles"
         ),
     )
     _add_business_draft_binding_arguments(draft_declare_existing_batch)
@@ -2954,11 +2975,11 @@ def build_parser() -> argparse.ArgumentParser:
         metavar=("DECLARATION_ID", "STABLE_FIELD", "VALUE"),
     )
     draft_declare_existing_batch.add_argument(
-        "--field-meaning-value",
+        "--field-value",
         action="append",
         nargs=3,
         default=[],
-        metavar=("DECLARATION_ID", "FIELD_MEANING", "VALUE"),
+        metavar=("DECLARATION_ID", "FIELD_HANDLE", "VALUE"),
     )
 
     draft_add_media = subparsers.add_parser(
@@ -3029,17 +3050,6 @@ def build_parser() -> argparse.ArgumentParser:
     parent_selector.add_argument("--parent-id")
     parent_selector.add_argument("--parent-path-segment", action="append")
     draft_bind_object.add_argument("--role")
-
-    draft_bind_field = subparsers.add_parser(
-        "draft-bind-field",
-        help="Bind one exact live property or reference into an opaque typed handle",
-    )
-    _add_business_draft_binding_arguments(draft_bind_field)
-    field_scope = draft_bind_field.add_mutually_exclusive_group(required=True)
-    field_scope.add_argument("--object-handle")
-    field_scope.add_argument("--class-name")
-    draft_bind_field.add_argument("--token", required=True)
-    draft_bind_field.add_argument("--platform")
 
     draft_discover_fields = subparsers.add_parser(
         "draft-discover-fields",
@@ -12890,16 +12900,6 @@ def dispatch_command(
             dispatcher=dispatcher,
             common=common,
         )
-    if args.command == "draft-bind-field":
-        return dispatch_business_field_binding(
-            args,
-            env=env,
-            connection=connection,
-            detected_version=detected_version,
-            live_info=live_info,
-            dispatcher=dispatcher,
-            common=common,
-        )
     if args.command == "draft-discover-fields":
         return dispatch_business_field_discovery(
             args,
@@ -15038,7 +15038,7 @@ def dispatch_operation_draft_check(
             bound_objects,
             read_call=read_call,
         )
-        if adapter.supports_field_binding or adapter.supports_field_discovery:
+        if adapter.supports_field_discovery:
             for row in business_session.handles.as_dict()["fields"]:
                 bound_field = business_session.handles.bound_field(row["handle"])
                 revalidate_live_field(
@@ -15208,10 +15208,46 @@ def _parse_bound_field_business_value(
     raw: str,
     *,
     field: str,
+    session: BusinessDeclarationSession,
 ) -> Any:
     """Parse one live field value, retaining only reviewed business units."""
 
-    if bound.value_type == "number" and bound.token in {"FadeTime", "Delay"}:
+    choices = bound.restrictions.get("enum_choices")
+    if choices is not None and raw.startswith("choice:"):
+        index = raw.removeprefix("choice:")
+        if not re.fullmatch(r"0|[1-9][0-9]?", index) or int(index) >= len(choices):
+            raise BusinessFieldInputError(
+                "Copy one choice input returned for this field.",
+                error_code="FIELD_CHOICE_UNAVAILABLE",
+                details={"field": field, "choice_count": len(choices)},
+            )
+        return choices[int(index)]
+    matches = [
+        row["value"] for row in bound.restrictions.get("enum_labels", [])
+        if row["label"] == raw
+    ]
+    literal = None
+    if matches:
+        try:
+            literal = _parse_business_value(bound.value_type, raw, field=field)
+        except GatewayInputError:
+            pass
+    candidate_values = set(matches)
+    if matches and literal in (choices or []):
+        candidate_values.add(literal)
+    if len(candidate_values) > 1:
+        raise BusinessFieldInputError(
+            "This text identifies conflicting enum choices; copy the selected choice input.",
+            error_code="FIELD_CHOICE_AMBIGUOUS",
+            details={"field": field, "label": raw, "candidate_count": len(candidate_values),
+                     "choices": bound.restrictions["enum_labels"],
+                     "recovery": "copy value_input.choices[].input from field discovery"},
+        )
+    if matches:
+        return matches[0]
+    from wwise_waapi.business_fields import field_is_action_duration
+
+    if field_is_action_duration(session, bound):
         matched = re.fullmatch(
             r"([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)\s*"
             r"(ms|millisecond|milliseconds|s|sec|secs|second|seconds|秒)",
@@ -15282,10 +15318,11 @@ def _parse_audio_import_business_fields(
             if handle in dynamic:
                 raise GatewayInputError("One Field Handle was supplied twice")
             bound = session.handles.bound_field(handle)
-            dynamic[handle] = _parse_business_value(
-                bound.value_type,
+            dynamic[handle] = _parse_bound_field_business_value(
+                bound,
                 raw,
                 field=bound.token,
+                session=session,
             )
         fields["field_values"] = dynamic
     event_parts = (event_parent_handle, event_name, event_action)
@@ -15339,10 +15376,11 @@ def _parse_object_graph_business_fields(
             if handle in dynamic:
                 raise GatewayInputError("One Field Handle was supplied twice")
             bound = session.handles.bound_field(handle)
-            dynamic[handle] = _parse_business_value(
-                bound.value_type,
+            dynamic[handle] = _parse_bound_field_business_value(
+                bound,
                 raw,
                 field="bound business field",
+                session=session,
             )
         fields["field_values"] = dynamic
     return fields
@@ -15724,10 +15762,11 @@ def dispatch_offline_business_draft_update(
         bound_field = session.handles.bound_field(args.field_handle)
         fields: dict[str, Any] = {"field_handle": args.field_handle}
         if args.business_value is not None:
-            fields["business_value"] = _parse_business_value(
-                bound_field.value_type,
+            fields["business_value"] = _parse_bound_field_business_value(
+                bound_field,
                 args.business_value,
                 field="business_value",
+                session=session,
             )
         elif args.target_handle is not None:
             fields["reference_outcome"] = args.target_handle
@@ -17465,116 +17504,6 @@ def dispatch_business_object_binding(
     return payload
 
 
-def dispatch_business_field_binding(
-    args: argparse.Namespace,
-    *,
-    env: Mapping[str, str],
-    connection: GatewayConnection,
-    detected_version: str,
-    live_info: Mapping[str, Any],
-    dispatcher: WwiseDispatcher,
-    common: Mapping[str, Any],
-) -> dict[str, Any]:
-    binding = _open_business_binding(
-        args,
-        env=env,
-        connection=connection,
-        detected_version=detected_version,
-        live_info=live_info,
-        dispatcher=dispatcher,
-    )
-    adapter = business_adapter(binding.record.operation)
-    if not adapter.supports_field_binding:
-        raise GatewayInputError(
-            f"Custom field binding is unavailable for {binding.record.operation}"
-        )
-    raw_session = (
-        binding.record.composition.get("business_session")
-        if binding.record.composition is not None
-        else None
-    )
-    if raw_session is None:
-        raise GatewayInputError("Bind one exact object before binding custom fields")
-    session = BusinessDeclarationSession.from_dict(raw_session)
-    if binding.context != session.context:
-        raise OperationDraftBindingDrift(
-            "Live project or Wwise build differs from the business declaration binding."
-        )
-    if args.object_handle is not None:
-        scope_kind = "object"
-        scope_value: str | int = session.handles.resolve_object(
-            args.object_handle
-        ).object_id
-    else:
-        scope_kind = "class"
-        scope_value = args.class_name
-    read_call = metadata_cached_read_call(
-        binding.read_call,
-        connection=connection,
-        version=detected_version,
-        live_info=live_info,
-        project=binding.project,
-        state_dir=binding.state_dir,
-    )
-    captured: list[Any] = []
-
-    def bind(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
-        handles = BusinessHandleRegistry.from_dict(current.handles.as_dict())
-        bound = bind_live_field(
-            handles,
-            read_call=read_call,
-            scope_kind=scope_kind,
-            scope_value=scope_value,
-            token=args.token,
-            platform=args.platform,
-        )
-        captured.append(bound)
-        return current.with_handle_registry(handles)
-
-    schema_digest = operation_draft_schema_digest(
-        binding.record.operation,
-        detected_version,
-    )
-    composer_digest = operation_composer_digest(
-        binding.record.operation,
-        detected_version,
-    )
-    record = binding.store.apply_business_update(
-        args.draft_id,
-        task_authority=args.task_authority,
-        expected_revision=args.expected_revision,
-        schema_digest=schema_digest,
-        composer_digest=composer_digest,
-        context=binding.context,
-        update=bind,
-        event_type="handles.bound",
-    )
-    bound = captured[0]
-    payload = operation_draft_payload(
-        args.command,
-        record,
-        offline=False,
-        state_dir=args.state_dir,
-        task_authority=args.task_authority,
-    )
-    payload.update(
-        {
-            "endpoint": dict(common["endpoint"]),
-            "detected_version": detected_version,
-            "project_call": dispatch_call_summary(binding.project_call),
-            "bound_field": {
-                "handle": bound.handle,
-                "token": bound.token,
-                "field_kind": bound.field_kind,
-                "value_type": bound.value_type,
-                "platform": bound.platform,
-                "restrictions": dict(bound.restrictions),
-            },
-        }
-    )
-    return payload
-
-
 def _normalized_business_field_meaning(value: str) -> str:
     return "".join(
         character for character in value.casefold() if character.isalnum()
@@ -17733,7 +17662,7 @@ def dispatch_business_field_discovery(
                 and value_type in {"number", "integer"}
                 and rtpc not in {None, False, "", "None", "none"}
             )
-        elif binding.record.operation == "object.set":
+        elif binding.record.operation in {"object.set", "audio.import"}:
             accepted = (
                 (kind == "property" and value_type is not None)
                 or kind == "reference"
@@ -17768,10 +17697,6 @@ def dispatch_business_field_discovery(
             )
         if accepted:
             eligible.append(candidate)
-    if not eligible:
-        raise GatewayInputError(
-            "Live field discovery found no candidate compatible with this operation"
-        )
     missing_meanings = [
         meaning
         for meaning in meanings
@@ -17786,8 +17711,19 @@ def dispatch_business_field_discovery(
         )
     ]
     if missing_meanings:
-        raise GatewayInputError(
-            "Live field discovery found no compatible candidate for every requested meaning"
+        raise BusinessFieldInputError(
+            "Live field discovery found no compatible candidate for every requested meaning",
+            details={
+                "stage": "field_discovery", "object_handle": args.object_handle,
+                "scope_kind": scope_kind, "draft_changed": False,
+                "meaning_results": [
+                    {"meaning": meaning, "candidate_count": 0, "match_status": "no_matches"}
+                    for meaning in missing_meanings
+                ],
+                "candidate_count_scope": "returned_compatible_live_fields",
+                "fallback_detail_scan": dict(discovery.fallback_detail_scan),
+                "recovery": "Refine the missing discovery meaning for this bound object; no declaration was changed.",
+            },
         )
     narrowed: list[Mapping[str, Any]] = []
     for meaning in meanings:
@@ -17874,6 +17810,8 @@ def dispatch_business_field_discovery(
         str(candidate["name"]): candidate
         for candidate in eligible
     }
+    from wwise_waapi.business_fields import field_value_input
+
     field_candidates: list[dict[str, Any]] = []
     for bound in captured:
         candidate = metadata_by_name[bound.token]
@@ -17894,6 +17832,7 @@ def dispatch_business_field_discovery(
                 "value_type": bound.value_type,
                 "platform": bound.platform,
                 "restrictions": dict(bound.restrictions),
+                "value_input": field_value_input(session, bound),
                 "matched_meanings": list(candidate.get("matched_queries", [])),
             }
         )
@@ -17969,7 +17908,7 @@ def dispatch_business_existing_batch(
     dispatcher: WwiseDispatcher,
     common: Mapping[str, Any],
 ) -> dict[str, Any]:
-    """Declare a bounded object.set batch from meanings, with exact-scope checks."""
+    """Declare one atomic batch from fixed fields or selected scoped handles."""
 
     binding = _open_business_binding(
         args,
@@ -18034,136 +17973,44 @@ def dispatch_business_existing_batch(
         )
 
     stable_by_id: dict[str, list[tuple[str, str]]] = {}
-    meanings_by_id: dict[str, list[tuple[str, str]]] = {}
+    dynamic_by_id: dict[str, list[tuple[str, str]]] = {}
     for declaration_id, field_name, value in args.field:
-        target = (
-            stable_by_id if field_name in stable_field_names else meanings_by_id
-        )
-        target.setdefault(declaration_id, []).append((field_name, value))
-    for declaration_id, meaning, value in args.field_meaning_value:
-        meanings_by_id.setdefault(declaration_id, []).append((meaning, value))
-    if (set(stable_by_id) | set(meanings_by_id)) - set(rows):
+        if field_name not in stable_field_names:
+            raise BusinessFieldInputError(
+                "Unknown fixed business field; choose a disclosed field or discover a field handle.",
+                error_code="UNKNOWN_BUSINESS_FIELD",
+                details={"declaration_id": declaration_id, "field": field_name,
+                         "choices": sorted(stable_field_names), "draft_changed": False},
+            )
+        stable_by_id.setdefault(declaration_id, []).append((field_name, value))
+    for declaration_id, handle, value in args.field_value:
+        dynamic_by_id.setdefault(declaration_id, []).append((handle, value))
+    if (set(stable_by_id) | set(dynamic_by_id)) - set(rows):
         raise GatewayInputError(
             "Object-set batch fields reference an unknown declaration id"
         )
     if any(
-        declaration_id not in stable_by_id and declaration_id not in meanings_by_id
+        declaration_id not in stable_by_id and declaration_id not in dynamic_by_id
         for declaration_id in row_order
     ):
         raise GatewayInputError("Every object-set batch row requires one business outcome")
-    for declaration_id, pairs in meanings_by_id.items():
-        meanings = [meaning for meaning, _value in pairs]
-        normalized = [" ".join(meaning.split()).casefold() for meaning in meanings]
-        if (
-            not 1 <= len(meanings) <= MAX_METADATA_DISCOVERY_QUERIES
-            or any(
-                not meaning.strip()
-                or meaning != meaning.strip()
-                or len(meaning) > MAX_METADATA_DISCOVERY_QUERY_CHARS
-                for meaning in meanings
-            )
-            or len(normalized) != len(set(normalized))
-            or sum(len(meaning) for meaning in meanings)
-            > MAX_METADATA_DISCOVERY_TOTAL_QUERY_CHARS
-        ):
-            raise GatewayInputError(
-                f"Object-set batch row {declaration_id!r} requires 1..8 distinct bounded field meanings"
-            )
-
-    read_call = metadata_cached_read_call(
-        binding.read_call,
-        connection=connection,
-        version=detected_version,
-        live_info=live_info,
-        project=binding.project,
-        state_dir=binding.state_dir,
+    field_count = sum(len(pairs) for pairs in stable_by_id.values()) + sum(
+        len(pairs) for pairs in dynamic_by_id.values()
     )
-    meaning_field_count = sum(len(pairs) for pairs in meanings_by_id.values())
-    field_count = sum(len(pairs) for pairs in stable_by_id.values()) + meaning_field_count
     adapter = business_adapter(binding.record.operation)
 
     def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
-        handles = BusinessHandleRegistry.from_dict(current.handles.as_dict())
-        dynamic_by_id: dict[str, dict[str, Any]] = {}
+        candidate_session = current
         for declaration_id in row_order:
-            object_handle = rows[declaration_id]
-            source = handles.resolve_object(object_handle)
-            meaning_pairs = meanings_by_id.get(declaration_id, [])
-            dynamic: dict[str, Any] = {}
-            if meaning_pairs:
-                discovery = discover_metadata(
-                    read_call=read_call,
-                    queries=[meaning for meaning, _value in meaning_pairs],
-                    object=source.object_id,
-                    limit=MAX_METADATA_DISCOVERY_LIMIT,
-                )
-                for meaning, raw_value in meaning_pairs:
-                    normalized_meaning = " ".join(meaning.split()).casefold()
-                    matches: list[Mapping[str, Any]] = []
-                    for discovered in discovery.candidates:
-                        metadata = discovered.get("metadata")
-                        kind = discovered.get("kind")
-                        value_type = (
-                            metadata_typed_value_type(str(metadata.get("type", "")))
-                            if isinstance(metadata, Mapping)
-                            else None
-                        )
-                        matched_queries = discovered.get("matched_queries", [])
-                        if (
-                            ((kind == "property" and value_type is not None) or kind == "reference")
-                            and any(
-                                isinstance(item, str)
-                                and " ".join(item.split()).casefold()
-                                == normalized_meaning
-                                for item in matched_queries
-                            )
-                        ):
-                            matches.append(discovered)
-                    exact_matches = _unique_exact_business_field_candidates(
-                        matches,
-                        meaning,
-                    )
-                    if exact_matches:
-                        matches = exact_matches
-                    if len(matches) != 1:
-                        raise GatewayInputError(
-                            "Each object-set batch field meaning must resolve to exactly one compatible live field"
-                        )
-                    bound = bind_live_field(
-                        handles,
-                        read_call=read_call,
-                        scope_kind="object",
-                        scope_value=source.object_id,
-                        token=str(matches[0]["name"]),
-                    )
-                    if bound.handle in dynamic:
-                        raise GatewayInputError(
-                            "Distinct object-set batch meanings cannot select the same live field"
-                        )
-                    dynamic[bound.handle] = _parse_bound_field_business_value(
-                        bound,
-                        raw_value,
-                        field=meaning,
-                    )
-            dynamic_by_id[declaration_id] = dynamic
-        candidate_session = (
-            current.with_handle_registry(handles)
-            if meaning_field_count
-            else current
-        )
-        for declaration_id in row_order:
-            object_handle = rows[declaration_id]
             fields = _parse_object_graph_business_fields(
                 candidate_session,
                 binding.record.operation,
                 stable_by_id.get(declaration_id, []),
+                field_value_pairs=dynamic_by_id.get(declaration_id, []),
             )
-            dynamic = dynamic_by_id[declaration_id]
-            if dynamic:
-                fields["field_values"] = dynamic
             candidate_session = candidate_session.with_existing_declaration(
                 declaration_id=declaration_id,
-                target=ExistingObjectTarget(object_handle),
+                target=ExistingObjectTarget(rows[declaration_id]),
                 fields=fields,
             )
         adapter.materialize(candidate_session)
@@ -23765,6 +23612,7 @@ def _compact_object_set_update_continuation(
         "draft-discover-fields": [
             "field_discovery",
             "declare_existing",
+            "declare_existing_batch",
         ],
         "draft-declare-existing": [
             "completion_candidate",
@@ -23795,6 +23643,7 @@ def _compact_object_set_update_continuation(
                         "row_value_orders",
                         "gateway_disambiguation",
                         "precondition",
+                        "field_selection_rule",
                     )
                     if name in action
                 }
@@ -24009,7 +23858,6 @@ def _business_next_action_binding(
             "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
         }
     object_bind_prefix = [*base, "draft-bind-object", *binding]
-    field_bind_prefix = [*base, "draft-bind-field", *binding]
     field_discover_prefix = [*base, "draft-discover-fields", *binding]
     configure_prefix = [*base, "draft-business-configure", *binding]
     declare_new_prefix = [*base, "draft-declare-new", *binding]
@@ -24253,7 +24101,7 @@ def _business_next_action_binding(
         record.operation,
         record.version,
     )
-    if not (adapter.supports_field_binding or adapter.supports_field_discovery):
+    if not adapter.supports_field_discovery:
         object_binding = {
             **object_binding,
             "use_only_for": business_contract["binding"]["roles"],
@@ -25895,9 +25743,9 @@ def _business_next_action_binding(
                             "<business-value>",
                         ],
                         "dynamic_field": [
-                            "--field-meaning-value",
+                            "--field-value",
                             "<same-task-local-id>",
-                            "<user-facing-field-meaning>",
+                            "<selected-object-scoped-field-handle>",
                             "<business-value>",
                         ],
                     },
@@ -25909,12 +25757,13 @@ def _business_next_action_binding(
                         "the_exact_boh1_object_handle_contract_identifies_the_handle"
                     ),
                     "field_resolution": (
-                        "--field_uses_a_disclosed_stable_field_when_exactly_matched_"
-                        "otherwise_it_is_a_live_user_facing_field_meaning"
+                        "fixed_fields_are_strict;_dynamic_fields_require_selected_"
+                        "exact_object_scoped_handles_from_field_discovery"
                     ),
+                    "field_selection_rule": OBJECT_SET_BATCH_FIELD_SELECTION_RULE,
                     "maximum_rows": OBJECT_SET_BUSINESS_BATCH_MAX_ROWS,
                     "gateway_owned_behavior": (
-                        "resolve_and_revalidate_each_field_for_each_exact_object_"
+                        "validate_selected_fields_for_each_exact_object_"
                         "then_apply_one_atomic_draft_revision"
                     ),
                     "precondition": (
@@ -26018,7 +25867,6 @@ def _business_next_action_binding(
                     "bind_remaining_targets_or_declare_all_ready_existing_"
                     "targets_as_one_batch"
                 )
-                result.pop("field_discovery", None)
                 result.pop("declare_existing", None)
             elif session.declarations:
                 result.pop("declare_existing_batch", None)
@@ -26166,7 +26014,7 @@ def _business_next_action_binding(
                 "is_next_command_when_condition_true": bool(session.declarations),
             },
         }
-    if not (adapter.supports_field_binding or adapter.supports_field_discovery):
+    if not adapter.supports_field_discovery:
         if session.declarations:
             return {
                 "contract": "waapi-skill.business-draft-next-action/v1",
@@ -26207,7 +26055,7 @@ def _business_next_action_binding(
             "then_read_next_response": True,
             "precompute_or_increment_revision": False,
         }
-    if adapter.supports_field_discovery:
+    if adapter.supports_field_discovery and adapter.family != "audio-import":
         if record.operation == "object.setRTPC":
             handle_state = session.handles.as_dict()
             bound_objects = handle_state["objects"]
@@ -26453,23 +26301,23 @@ def _business_next_action_binding(
                 "chunk_then_append_bounded_complete_rows"
             ),
             "object_binding": audio_object_binding,
-            "field_binding": {
+            "field_discovery": {
                 "object_scope": {
-                    **operation_draft_prefix_copy_binding(field_bind_prefix),
+                    **operation_draft_prefix_copy_binding(field_discover_prefix),
                     "append": [
                         "--object-handle",
                         "<bound-object-handle>",
-                        "--token",
-                        "<exact-live-field-token>",
+                        "--meaning",
+                        "<user-facing-field-meaning>",
                     ],
                 },
-                "class_scope": {
-                    **operation_draft_prefix_copy_binding(field_bind_prefix),
+                "new_object_scope": {
+                    **operation_draft_prefix_copy_binding(field_discover_prefix),
                     "append": [
-                        "--class-name",
-                        "<exact-live-class-name>",
-                        "--token",
-                        "<exact-live-field-token>",
+                        "--semantic-kind",
+                        "<declared-semantic-kind>",
+                        "--meaning",
+                        "<user-facing-field-meaning>",
                     ],
                 },
                 "use_only_for": "custom_property_or_reference_field_values",
@@ -26625,26 +26473,26 @@ def _business_next_action_binding(
         },
         "business_contract": business_contract,
         "object_binding": object_binding,
-        "field_binding": {
+        "field_discovery": {
             "object_scope": {
-                **operation_draft_prefix_copy_binding(field_bind_prefix),
+                **operation_draft_prefix_copy_binding(field_discover_prefix),
                 "append": [
                     "--object-handle",
                     "<bound-object-handle>",
-                    "--token",
-                    "<exact-live-field-token>",
+                    "--meaning",
+                    "<user-facing-field-meaning>",
                 ],
             },
-            "class_scope": {
-                **operation_draft_prefix_copy_binding(field_bind_prefix),
+            "new_object_scope": {
+                **operation_draft_prefix_copy_binding(field_discover_prefix),
                 "append": [
-                    "--class-name",
-                    "<exact-live-class-name>",
-                    "--token",
-                    "<exact-live-field-token>",
+                    "--semantic-kind",
+                    "<declared-semantic-kind>",
+                    "--meaning",
+                    "<user-facing-field-meaning>",
                 ],
             },
-            "result": "copy_the_returned_bound_field.handle_and_restrictions",
+            "result": "choose_one_returned_candidate_handle_and_business_value",
             "use_only_for": "custom_property_or_reference_field_values",
         },
         "binding_decision": {
@@ -27498,7 +27346,6 @@ def operation_draft_payload(
                 command
                 in {
                     "draft-bind-object",
-                    "draft-bind-field",
                     "draft-discover-fields",
                     "draft-discover-types",
                 }

@@ -654,10 +654,10 @@ def test_draft_field_discovery_uses_the_live_metadata_deadline(
     "command_args",
     (
         (
-            "draft-bind-field",
-            "--class-name",
-            "Sound",
-            "--token",
+            "draft-discover-fields",
+            "--semantic-kind",
+            "sound-sfx",
+            "--meaning",
             "Volume",
         ),
         (

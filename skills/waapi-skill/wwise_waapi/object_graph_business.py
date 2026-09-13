@@ -17,6 +17,7 @@ from .business_declarations import (
     resolve_semantic_kind,
 )
 from .object_graph_business_contracts import object_graph_business_contract_data
+from .business_fields import ACTION_DURATION_FIELDS, OBJECT_BUSINESS_FIELD_TYPES
 from .operation_object import (
     DEFAULT_MAX_CHILDREN_PER_NODE,
     DEFAULT_MAX_DEPTH,
@@ -39,13 +40,8 @@ from .operation_registry import parse_operation_request
 
 _CREATE_FIELDS = frozenset(
     {
+        *OBJECT_BUSINESS_FIELD_TYPES,
         "field_values",
-        "loop",
-        "max_instances",
-        "notes",
-        "output_bus",
-        "ignore_parent_instance_limit",
-        "volume_db",
     }
 )
 _CREATE_SETTINGS = frozenset(
@@ -489,6 +485,24 @@ def _compile_create_fields(
         compiled["notes"] = notes
     properties: list[dict[str, Any]] = []
     references: list[dict[str, Any]] = []
+    for field_name, token in ACTION_DURATION_FIELDS.items():
+        if field_name not in fields:
+            continue
+        target = declaration.target
+        object_type = (
+            session.handles.resolve_object(target.object_handle).object_type
+            if isinstance(target, ExistingObjectTarget)
+            else _resolve_native_object_type(session, target.kind)
+        )
+        if object_type != "Action":
+            raise _repair(session, "BUSINESS_FIELD_SCOPE_MISMATCH", field=field_name,
+                          action="use Action duration fields only on Action objects")
+        value = fields[field_name]
+        if (isinstance(value, bool) or not isinstance(value, (int, float))
+                or not math.isfinite(value) or value < 0):
+            raise _repair(session, "FIELD_VALUE_OUT_OF_RANGE", field=field_name,
+                          action="provide a finite nonnegative duration in milliseconds")
+        properties.append({"name": token, "value": float(value) / 1000.0})
     if "loop" in fields:
         if fields["loop"] != "infinite":
             raise _repair(

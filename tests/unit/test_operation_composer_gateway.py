@@ -2012,7 +2012,7 @@ def test_audio_import_schema_requires_one_complete_metadata_query_batch(
     )
     assert payload["business_adapter"]["commands"][:2] == [
         "draft-bind-object",
-        "draft-bind-field",
+        "draft-discover-fields",
     ]
     assert payload["business_adapter"]["legacy_shallow_composer_public"] is False
 

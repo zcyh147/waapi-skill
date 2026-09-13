@@ -266,7 +266,7 @@ def test_metadata_order_follows_the_disclosed_input_mode() -> None:
     assert "common outcomes such as volume, infinite looping, output bus" in operate
     assert "use stable business fields" in operate
     assert "Bind the exact existing owner or the disclosed new-object type first" in operate
-    assert "Submit only business values against those handles" in operate
+    assert "Submit business values against those handles" in operate
 
 
 def test_media_gate_routes_pure_sound_hierarchies_to_object_create() -> None:
@@ -288,8 +288,10 @@ def test_operate_lane_reuses_exact_diagnostics_and_preserves_media_paths() -> No
     assert "reuse its GUID; do not query it again" in operate
     assert "`media_directory` and `audio_file` are opaque caller paths" in operate
     assert "never derive either from campaign/workspace cwd" in operate
-    assert "Three or more existing targets: bind every target first" in operate
-    assert "then use `declare_existing_batch`; do not run field discovery" in operate
+    assert "For a batch, bind every target first" in operate
+    assert "discover other fields for each exact target" in operate
+    assert "copy the selected handles into `declare_existing_batch`" in operate
+    assert "do not run field discovery" not in operate
 
 
 def test_normal_change_prose_stays_business_facing() -> None:

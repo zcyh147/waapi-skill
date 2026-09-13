@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from .business_declarations import SUPPORTED_BUSINESS_KINDS, SUPPORTED_WWISE_VERSIONS
+from .business_fields import ACTION_DURATION_SEMANTICS, OBJECT_BUSINESS_FIELD_TYPES
 
 
 OBJECT_GRAPH_BUSINESS_CONTRACT = "waapi-skill.object-graph-business/v1"
@@ -15,14 +16,7 @@ OBJECT_GRAPH_BUSINESS_OPERATIONS = (
     "object.setRTPC",
 )
 
-OBJECT_CREATE_BUSINESS_VALUE_TYPES = {
-    "loop": "string",
-    "max_instances": "integer",
-    "notes": "string",
-    "output_bus": "reference",
-    "ignore_parent_instance_limit": "boolean",
-    "volume_db": "number",
-}
+OBJECT_CREATE_BUSINESS_VALUE_TYPES = OBJECT_BUSINESS_FIELD_TYPES
 
 _SUPPORTED_VERSIONS = {
     "object.create": SUPPORTED_WWISE_VERSIONS,
@@ -205,7 +199,7 @@ def object_graph_business_contract_data(
                 ],
                 "existing_batch": {
                     "maximum_rows": 8,
-                    "field_input": "user_facing_meaning_and_business_value",
+                    "field_input": "fixed_business_fields_or_selected_scoped_field_handles",
                     "business_quantities": {
                         "action_time": {
                             "accepted_units": ["seconds", "milliseconds"],
@@ -231,6 +225,8 @@ def object_graph_business_contract_data(
                     "ignore_parent_instance_limit",
                     "platform",
                     "volume_db",
+                    "fade_time_ms",
+                    "delay_ms",
                 ],
                 "field_value_types": {
                     **OBJECT_CREATE_BUSINESS_VALUE_TYPES,
@@ -240,6 +236,7 @@ def object_graph_business_contract_data(
                     "object_list": "string",
                     "platform": "string",
                 },
+                "field_semantics": ACTION_DURATION_SEMANTICS,
             },
             "object_list_declaration": {
                 "member_fields": {
@@ -311,6 +308,7 @@ def object_graph_business_contract_data(
             "subcommand": "draft-declare-new",
             "target_fields": ["parent_handle", "name", "kind"],
             "stable_fields": dict(OBJECT_CREATE_BUSINESS_VALUE_TYPES),
+            "field_semantics": ACTION_DURATION_SEMANTICS,
             "field_value_types": dict(OBJECT_CREATE_BUSINESS_VALUE_TYPES),
             "bound_field_handle_container": "field_values",
             "semantic_kinds": list(SUPPORTED_BUSINESS_KINDS),
