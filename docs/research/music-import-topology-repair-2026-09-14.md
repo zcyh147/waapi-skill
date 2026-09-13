@@ -91,6 +91,18 @@ not a fresh memory-isolated semantic campaign. The demonstration copy retains
 an unrelated older Authoring-core routing hunk; only this music patch and the
 previous MusicTrack language fix were synchronized, not the entire Skill.
 
+Final exact-candidate real validation at
+`9df82a77c3b31c1e943ebef278a6497f738f5668` repeated the two public music
+workflows sequentially on all five installed versions: **10 passed** (two
+per version, every invocation exit 0). These are macOS real WwiseConsole
+transactions, not Fresh Agent tasks. All ten transactions ended `verified`.
+All five source full hashes, project mtimes and tree metadata remained
+unchanged; all passing sandboxes were deleted and scoped residual processes
+were empty. Evidence is retained in
+`.waapi-skill-state/evidence/full-typed-input/macos-category-evidence.jsonl`,
+filtered by this exact candidate and `invocation.phase == "final"`.
+The packaged Skill tree is unchanged from Program candidate `af783b7`.
+
 One early invocation mistakenly supplied a file without `-k` to `ci/test.sh`,
 which appends selected-version defaults rather than replacing them. It ran 28
 tests in 31 seconds: 10 passed and 18 unrelated legacy-helper failures (including
