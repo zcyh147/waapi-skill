@@ -44,6 +44,14 @@ def test_intro_uses_gateway_facts_without_exact_sentence_matching() -> None:
     assert not all(welcome.introduction_checks(INTRO, {}).values())
 
 
+@pytest.mark.parametrize("display", ["WAAPI 端口为 18765", "WAAPI port: 18765"])
+def test_intro_accepts_localized_port_without_requiring_the_full_url(display) -> None:
+    text = INTRO.replace("ws://127.0.0.1:18765/waapi", display)
+    assert all(welcome.introduction_checks(text, FACTS).values())
+    for wrong in ("8080", "118765", "187650"):
+        assert not welcome.introduction_checks(text.replace("18765", wrong), FACTS)["endpoint"]
+
+
 def test_first_use_matrix_routes_without_loading_a_legacy_suite(monkeypatch) -> None:
     options = SimpleNamespace(profile="first_use_2")
     monkeypatch.setattr(matrix, "parse_args", lambda argv: options)

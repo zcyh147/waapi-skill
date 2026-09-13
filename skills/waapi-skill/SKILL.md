@@ -21,7 +21,7 @@ When the visible conversation lacks an introduction:
 - Pure explanation: one offline `config-show`.
 
 The next reply states `session_context.one_time_introduction.facts` together
-in the user's language, in two short paragraphs: Skill loaded, WAAPI address,
+in the user's language, in two short paragraphs: Skill loaded, WAAPI port (not URL),
 Wwise 适配版本 (localize); then policy and modes. Keep mode names exact: `read_only`,
 `ask_before_changes`, and `allow_changes`. Never announce before Gateway,
 split facts, use memory, or a status table. Say

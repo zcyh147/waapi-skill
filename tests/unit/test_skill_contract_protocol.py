@@ -1234,7 +1234,7 @@ def test_one_time_onboarding_is_global_natural_and_does_not_add_a_gateway_call()
         "The next reply",
         "`session_context.one_time_introduction.facts` together",
         "Skill loaded",
-        "WAAPI address",
+        "WAAPI port",
         "in the user's language, in two short paragraphs",
         "Wwise 适配版本 (localize); then policy and modes",
         "configured, not connected unless proved live",
