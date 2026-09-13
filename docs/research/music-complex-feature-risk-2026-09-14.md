@@ -145,6 +145,55 @@ and use as the parent of a structure-only MusicSegment import. This does not
 prove PlaylistRoot entries/order, transition behavior, or playback. Frozen
 candidate gates and the visible-task follow-up are recorded separately below.
 
+### Final checks at abbface
+
+Candidate `abbface670c4a6832c42b07d8d85226db15e0fc9` passed the fixed
+five-version Program gate: **5483 passed, 2 skipped**, exit 0, 258.75 seconds.
+The skips require native Windows (shell and NTFS-junction proof). HEAD/status
+were unchanged and no scoped test process remained. This does not add Windows
+or full Non-live evidence.
+
+The one focused real sandbox test
+`test_music_playlist_canonical_query_create_and_import_parent` passed once on
+each of 2021.1, 2022.1, 2023.1, 2024.1 and 2025.1, sequentially on macOS.
+Each invocation completed two verified transactions, for ten verified
+transactions across five passing test invocations. The exact candidate,
+transaction IDs and final records are retained in
+`.waapi-skill-state/evidence/full-typed-input/macos-category-evidence.jsonl`.
+All five final records report unchanged source hash, project mtime and tree
+metadata, deleted test sandboxes, and no residual processes. The module's
+Authoring-UI category remains explicitly blocked on Console; it grants no UI
+or complex-music playback coverage.
+
+The three earlier app tasks then retried against the demonstration copy with
+only these scoped runtime patches synchronized (not a claim that the entire
+demo tree equals the repository candidate):
+
+- **Stinger:** immutable Preview succeeded for existing MusicStinger
+  `{39E1F08E-464A-4039-A6C6-5D75B6E3F43E}`, changing only `Trigger` to
+  `{FB63DE7B-12AF-4A12-A836-FFAE0B4DD858}`. Transaction
+  `tx1-z4b4yz3nphfnecsxt28v` reports `executed: false`. The existing demo
+  `allow_changes` configuration produced `policy_authorized` during Preview;
+  the task issued no confirm, authorize or execute command. This proves the
+  repaired binding and preview path, not live mutation or verification.
+- **Playlist:** type discovery and `Playlist Root` field discovery now work.
+  Creating the complete A-then-B playlist still stopped at discovery of a
+  compatible new `Music Playlist Item` role. No empty-container substitution
+  was counted as success, and no Preview or mutation occurred.
+- **Transition:** the first retry stopped prematurely after discovering
+  `Transition Root` on the container. A bounded four-call read-only follow-up
+  successfully followed that reference to the existing MusicTransition root
+  and its one existing rule. Field queries returned `needs_clarification`
+  with multiple live candidates. Thus existing-rule discovery is available;
+  complete requested scheduling/fade editing remains unproven, not
+  categorically unsupported. No Preview or mutation occurred.
+
+These are guided Sol / High app smoke checks, not a three-case PASS, formal
+Fresh Agent acceptance, or audible validation. All tasks stopped. The
+remaining playlist construction and transition-intent questions are feature
+boundaries to evaluate separately, not grounds to bypass current safeguards
+or expand this publication-stage defect repair into a new music subsystem.
+
 ## Evidence and scope limits
 
 - All SDK paths above are relative to `/Users/xiye/Documents/NotebookLM_Sources/Wwise/Docs/`. Page numbers are one-based physical pages within each PDF part. Text was extracted read-only with PyMuPDF.
