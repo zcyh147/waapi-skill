@@ -6,8 +6,9 @@ Use this for read-only Wwise queries and bounded Topic waits/streams. Require th
 
 - Use only the packaged Gateway. There is no raw-client fallback and do not write Python.
 - Use fixed routes directly: object reads use the business declaration from `query-schema`; Topic facts use `topic-schema`; non-fixed reflected functions use `request-schema <uri>` and its sole continuation. Topic observation never authorizes its publisher.
-- Broad catalog: `capabilities --all-versions --summary-only`, then narrow with filters. It returns at most 50 compact rows by default. Use `--limit 0` only when every row is explicitly needed and `--detail` only for audits.
-- Known URI: `describe <uri>`. Add `--full-schema` only when the complete reflected schema is required.
+- For an ordinary read without a fixed command or exact URI, run `operations` and copy its returned route. This includes business reads and zero-input reads for the configured version.
+- Broad catalog: use the coverage reference's host-scoped summary, then narrow with filters. `capabilities`/`describe` default to Console; Authoring inspection adds offline `--profile wwise-authoring-ui`. Neither proves live availability. Use `--limit 0` only when every row is explicitly needed and `--detail` only for audits.
+- Known function URI: `request-schema <uri>` and its sole continuation. `describe` is for an explicit capability/schema audit, with the requested offline host profile.
 - `API_NOT_FOUND`, `MANIFEST_NOT_FOUND`, `FIXED_COMMAND_REQUIRED`, `QUERY_OBJECT_REQUIRED`, `WAIT_TOPIC_REQUIRED`, `TRANSACTION_REQUIRED`, and `UNSUPPORTED_BY_SKILL_INTERFACE` (`unsupported_by_skill_interface`) are boundaries; connection errors, invalid responses, and rejected continuations also stop the workflow.
 - The configured exact Wwise version selects every schema. Live work never copies an example `--version`; use it only for a requested offline inspection.
 
@@ -15,11 +16,15 @@ Use this for read-only Wwise queries and bounded Topic waits/streams. Require th
 
 `ak.wwise.core.mediaPool.getFields` and `.get` are one closed two-call read. Use `request-schema` for each URI and follow only its typed continuation. Run `request-schema ak.wwise.core.mediaPool.getFields` before `request-schema ak.wwise.core.mediaPool.get`; Do not request the `.get` schema first.
 
-Exact standard bindings are name/file -> `Filename`, duration -> `WAV/Duration`, sample rate -> `WAV/Sample Rate`, bit depth -> `WAV/Bit Depth`, and channels -> `WAV/Channels`. `Filename` omits extension; use `Path` when it matters. Bind custom fields only from the live field result and stop on missing/ambiguous binding.
-
-Args contain only `databases`, `filters`, and `maxResults`. Preserve database and predicate order. Each filter is `{"type":"field","field":<bound field>,"operator":<operator>,"value":<value>}`. `contains` takes literal text, never regex syntax or inline modifiers. Convert Between/from A to B into two ordered bounds. Use the user's maximum, else 100; range is 1–200. For a case-sensitive requirement, use the `result_filter` fields disclosed by `request-schema`; the Gateway returns `MEDIA_POOL_POST_FILTER_INCOMPLETE` when a saturated candidate set cannot prove completeness.
-
-The return list starts with `Path`, `FileId`, `Db`, `Filename`, `WAV/Duration`, `WAV/Sample Rate`, `WAV/Bit Depth`, `WAV/Channels`; append only explicitly needed live fields, without duplicates. Preserve returned `Db` and complete `Path`; never run the old unfiltered 1000-row AudioFileSource projection and never perform this join in model-authored code.
+Follow the returned business declaration for database selection, field meanings,
+text/number conditions, requested outputs, and result limit. Gateway owns native
+field bindings, filter objects, and the return projection; the Agent supplies
+only disclosed business values. Missing or ambiguous live fields stop the read.
+For case-sensitive matching use the disclosed post-filter; a saturated candidate
+set that cannot prove completeness returns `MEDIA_POOL_POST_FILTER_INCOMPLETE`.
+Preserve returned `Db` and complete `Path` for a later original-file reference
+check; never perform this join in model-authored code.
+`contains` takes literal text, never regex syntax or inline modifiers.
 
 ### Closed original-file reference classification
 
@@ -192,6 +197,10 @@ UI-command reads require the auto-detected Authoring profile and fresh `getComma
 ## Selection and result boundary
 
 For current selection use live `selected`; report rows or explicit empty. The Gateway deduplicates and bounds it. Preserve terminal `agent_result` exactly. Malformed responses never become empty objects/Buses/projects/selections.
+
+Selected files: Wwise 2025.1 Authoring only. Find `getSelectedFiles` through
+`operations` and follow its zero-input continuation. File and object selections
+are distinct; an empty file list says nothing about object selection.
 
 There is no raw-client fallback for an ordinary user query. If the packaged Gateway cannot perform it, report the interface boundary. Only an explicit Skill-development task may change the implementation.
 

@@ -49,7 +49,7 @@ def test_skill_declares_fixed_gateway_before_discovery_and_no_code_fallback() ->
     assert "814" in coverage
     assert "808 packaged route rows" in coverage
     assert "require a live Authoring host" in coverage
-    assert "824" in coverage
+    assert "849" in coverage
     assert "Mutations always require immutable Preview plus confirmation or policy authorization" in skill
     assert "Closed transaction operations include `waapi.undoGroup`" in skill
     assert "FIXED_COMMAND_REQUIRED" in skill
@@ -57,8 +57,8 @@ def test_skill_declares_fixed_gateway_before_discovery_and_no_code_fallback() ->
     assert "describe <uri> --full-schema" in skill
     assert "The list defaults to at most 50 compact rows" in skill
     assert "operations --detail" in skill
-    assert "never synthesize one" in skill
-    assert "run one `operations` lookup and copy its route" in skill
+    assert "never synthesize a route" in skill
+    assert "run one `operations` lookup and copy its `next_command`" in skill
     assert "do not read the query reference before or after it" in skill
     assert "do not retry a rejected or failed gateway invocation" in skill
     assert "Do not run `describe` or `capabilities` first" in skill
@@ -150,8 +150,8 @@ def test_query_reference_has_no_raw_client_fallback() -> None:
     assert "`QUERY_OBJECT_REQUIRED`" in query_reference
     assert "gateway.py --version <supported-version> query-schema" in query_reference
     assert "business declaration" in query_reference
-    assert "Add `--full-schema` only when" in query_reference
-    assert "at most 50 compact rows by default" in query_reference
+    assert "`describe` is for an explicit capability/schema audit" in query_reference
+    assert "offline `--profile wwise-authoring-ui`" in query_reference
     assert "Use `--limit 0` only when" in query_reference
     assert "--path-segment 'Events' --path-segment 'Default Work Unit'" in query_reference
     assert "--search-text 'ExactName' --predicate name-is ExactName --max-results 1" in query_reference
@@ -216,7 +216,7 @@ def test_query_reference_exposes_only_the_closed_original_file_match_surface() -
     assert "candidate-limit boundary" in query_flat
     assert "do not silently truncate" in query_flat
     assert "Do not add predicates, relationships, or extra business outputs" in query_flat
-    assert "never run the old unfiltered 1000-row AudioFileSource projection" in query_flat
+    assert "The fixed `id,path,originalFilePath` projection performs the complete join" in query_flat
     assert "--return-field originalFilePath" not in query_reference
     assert "A 1000-row scan returns `ORIGINAL_FILE_REFERENCE_SCAN_INCOMPLETE`" in query_flat
     assert "with no `agent_result`" in query_flat
@@ -369,5 +369,5 @@ def test_public_readmes_link_exact_coverage_instead_of_inlining_it() -> None:
         assert "4743" not in readme
         assert "4720" not in readme
 
-    assert "currently contains 4743 passing tests" in coverage_contract
-    assert "4720 passing tests with 25" in coverage_contract
+    assert "Exact completed run counts and candidate commits" in coverage_contract
+    assert "tests/TEST_INVENTORY.md" in coverage_contract

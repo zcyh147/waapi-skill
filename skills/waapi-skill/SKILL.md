@@ -103,7 +103,7 @@ terminal record includes the completion and unsubscribe result.
 
 For `ak.wwise.waapi.getFunctions`/`getTopics`, run `request-schema` and follow its sole typed continuation. Do not run `describe` or `capabilities` first.
 
-For five-version totals, read coverage then run exactly `capabilities --all-versions --summary-only`; it includes every route count. Row filters omit `--summary-only`. The list defaults to at most 50 compact rows; `--limit 0` requests all and `--detail` is diagnostic. A user-literal URI uses `request-schema`. For another natural-language change/Preview without an exact Gateway operation or URI, run one `operations` lookup and copy its route/guidance; never synthesize one or choose from memory/examples. Then use `operation-schema` for a name or `request-schema` for a URI. Use `operations --detail` only for an explicit full-catalog audit.
+For five-version totals, read coverage then use its host-scoped summary command. The default capability profile is Console; `--profile wwise-authoring-ui` inspects the packaged Console-plus-Authoring union, not a complete live Authoring inventory. Row filters omit `--summary-only`. The list defaults to at most 50 compact rows; `--limit 0` requests all and `--detail` is diagnostic. A user-literal function URI uses `request-schema`. For another natural-language request not covered by a fixed route, run one `operations` lookup and copy its `next_command`/guidance; never synthesize a route or choose from memory/examples. This offline directory includes named operations, business reads, and zero-input routes for the configured version. Live host checks still apply. Use `operations --detail` only for an explicit all-version catalog audit.
 
 For totals, coverage, exclusions, or matrix proof, read `references/waapi-coverage.md` once after `SKILL.md` and before the summary. Program tests are not live-Wwise verification.
 
@@ -150,10 +150,7 @@ Conditional read for a query not fully covered by the fixed commands, exact-iden
 Use operate for project-changing work: create, move, copy, delete, property/reference edits, imports, soundbanks, switch assignments, and design previews. An exact path/GUID identity preflight inside a change request is part of the operate lane; read only `references/waapi-operate.md` for that task.
 
 Finish any required selected-subset exact-ID readback first. Finish any user-requested exact path/type preflight before `operation-schema object.create`. Only an explicit before-preview type/path check of the same-name request root triggers it; a parent path, preserved sibling, or post-execution verification does not.
-After that preflight, `object.create` runs `operation-schema`, one `metadata discover` for its 1–8 dynamic fields, then `draft-start`. `object.set` batches and revalidates its dynamic fields. Import, lifecycle, scalar property/reference, and platform-link operations use `business_declaration`. For the last three, bind the target, pass its English field meaning and optional platform to `draft-discover-fields`, and copy one handle—never a token. Import alone uses token custom-field binding. For other
-operations, only an explicit unknown dynamic property/reference token needs
-metadata in the operate-reference order; never infer a token or scope.
-For `object.create`, finish every prompt-present metadata-disclosed field before `children`.
+After that preflight, use `operation-schema` and its sole continuation. Business declarations start the Draft first, bind the exact owner or new-object kind, and use returned discovery commands for requested dynamic fields. Common fields use disclosed business parameters; dynamic fields use copied Field Handles. The operate reference owns this sequence for creation, edits, and imports; never infer a native token or scope.
 
 Apply the latest `session_context` policy and copy the returned Preview exactly. For Business Drafts, copy the returned `preview-from-draft` continuation exactly; it is executable without the flag. Never append `--apply` to `preview-from-draft`.
 

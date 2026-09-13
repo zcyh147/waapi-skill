@@ -48,7 +48,7 @@ PACKAGED_INVENTORY_SHA256 = "4644c792fdf55fe498e7dd9fc7de1475831801d1b363be8488f
 CONSOLE_EXECUTION_PROFILE = "wwise-console"
 AUTHORING_UI_EXECUTION_PROFILE = "wwise-authoring-ui"
 PACKAGED_AUTHORING_UI_INVENTORY_SHA256 = (
-    "dc607bd8fe1528a1754ebd1d2294b26d3878d85329f2389a9c0ca7db36040483"
+    "8d25abc4519331083d9db8b0dd8783fde9f5521128c9ace9b6c12df6e29491b2"
 )
 
 EXPECTED_VERSION_COUNTS: Mapping[str, Mapping[str, int]] = MappingProxyType(
@@ -119,35 +119,35 @@ EXPECTED_AUTHORING_UI_VERSION_COUNTS: Mapping[
         ),
         "2024.1": MappingProxyType(
             {
-                "functions": 152,
+                "functions": 161,
                 "topics": 34,
-                "public_functions": 152,
+                "public_functions": 161,
                 "public_topics": 34,
-                "public_total": 186,
+                "public_total": 195,
             }
         ),
         "2025.1": MappingProxyType(
             {
-                "functions": 158,
+                "functions": 168,
                 "topics": 35,
-                "public_functions": 158,
+                "public_functions": 168,
                 "public_topics": 35,
-                "public_total": 193,
+                "public_total": 203,
             }
         ),
     }
 )
-EXPECTED_AUTHORING_UI_MANIFEST_VERSION_ROWS = 830
-EXPECTED_AUTHORING_UI_PUBLIC_VERSION_ROWS = 830
-EXPECTED_AUTHORING_UI_PUBLIC_UNIQUE_URIS = 202
+EXPECTED_AUTHORING_UI_MANIFEST_VERSION_ROWS = 849
+EXPECTED_AUTHORING_UI_PUBLIC_VERSION_ROWS = 849
+EXPECTED_AUTHORING_UI_PUBLIC_UNIQUE_URIS = 203
 EXPECTED_AUTHORING_UI_VERSION_INVENTORY_SHA256: Mapping[str, str] = (
     MappingProxyType(
         {
             "2021.1": "80caea46b0613135df09ea9b74ba55d261061b7b7e6f0cc54a93793bccc60e43",
             "2022.1": "3c7ee729d0e50453bb7b1b04c955f3a94562a9b3e5abcbde8f53f8ab902145df",
             "2023.1": "cb513e3584a00f40fd0998d7a73c4a46ecd2528a1351c6ee4f6c26e88734af33",
-            "2024.1": "1d09f7a3b2f54fcda1aedb03fc15e247533adee6209bbecb9ad90e8ca58f49d5",
-            "2025.1": "e5d7a7692accbeb52bed47766381e5f834eaad4c494cd815cfc291a84b01c887",
+            "2024.1": "507ac5837fed7c1fd92f203c35e0eb638ca0f7b02236b35e3145fa890f7cb6a8",
+            "2025.1": "0b38412a85ac82e7005e1f6729b3abdbdd908946038e520fdee2ceadba7715ae",
         }
     )
 )
@@ -234,6 +234,7 @@ BOUNDED_DIRECT_CALL_URIS = frozenset(
         "ak.wwise.core.remote.getConnectionStatus",
         "ak.wwise.core.transport.getState",
         "ak.wwise.ui.commands.getCommands",
+        "ak.wwise.ui.getSelectedFiles",
         "ak.wwise.waapi.getFunctions",
         "ak.wwise.waapi.getSchema",
         "ak.wwise.waapi.getTopics",

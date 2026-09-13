@@ -192,7 +192,7 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
         },
     },
     REMOTE_CONNECT_URI: {
-        "versions": ("2021.1", "2022.1", "2023.1"),
+        "versions": _ALL_VERSIONS,
         "execution_shape": "draft_mutation",
         "required_fields": ("remote_host",),
         "optional_fields": ("application_name", "command_port"),

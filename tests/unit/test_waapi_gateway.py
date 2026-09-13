@@ -769,7 +769,7 @@ def test_selected_accepts_only_an_explicit_empty_objects_array(tmp_path: Path) -
     assert payload["objects"] == []
 
 
-@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1"))
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
 def test_selected_derives_one_fixed_identity_projection(
     tmp_path: Path,
     version: str,

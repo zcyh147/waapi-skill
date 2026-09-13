@@ -10,37 +10,37 @@
     "unresolved_references": []
   },
   "construction_shapes": {
-    "draft": 114,
-    "inline": 463,
+    "draft": 116,
+    "inline": 471,
     "topic": 160,
-    "zero": 93
+    "zero": 102
   },
   "contract": "waapi-skill.full-surface-release-report/v1",
   "coverage": {
-    "construction_covered_lanes": 830,
-    "function_lanes": 670,
+    "construction_covered_lanes": 849,
+    "function_lanes": 689,
     "topic_lanes": 160,
-    "total_lanes": 830,
-    "unique_function_uris": 167,
+    "total_lanes": 849,
+    "unique_function_uris": 168,
     "unique_topic_uris": 35
   },
   "execution_routes": {
-    "bounded_call": 113,
+    "bounded_call": 116,
     "bounded_topic_wait": 160,
     "compound_transaction_member": 15,
-    "fixed_command": 56,
-    "isolated_transaction": 141,
-    "managed_transaction": 232,
+    "fixed_command": 58,
+    "isolated_transaction": 145,
+    "managed_transaction": 242,
     "transaction": 113
   },
   "host_lanes": {
-    "wwise-authoring": 31,
+    "wwise-authoring": 50,
     "wwise-console": 799
   },
   "intentionally_blocked_field_occurrences": 79,
   "source_inventory": {
     "contract": "waapi-skill.typed-request-surface/v1",
-    "inventory_sha256": "15fdfba40a37f38bbf963e02a1114f1452fc609aae3c92cb7e916119d33e3773",
+    "inventory_sha256": "cbdccf1679c6f534b501cf3f67b503c376fa6a155d0cf8f085306ad86c0a031c",
     "versions": [
       "2021.1",
       "2022.1",

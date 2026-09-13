@@ -49,9 +49,9 @@ LANES = {
         "2025.1",
     ),
     "ak.wwise.debug.generateToneWAV": ("2023.1", "2024.1", "2025.1"),
-    "ak.wwise.ui.project.open": ("2021.1", "2022.1", "2023.1"),
-    "ak.wwise.ui.project.close": ("2021.1", "2022.1", "2023.1"),
-    "ak.wwise.ui.project.create": ("2023.1",),
+    "ak.wwise.ui.project.open": ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"),
+    "ak.wwise.ui.project.close": ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"),
+    "ak.wwise.ui.project.create": ("2023.1", "2024.1", "2025.1"),
 }
 
 
@@ -139,7 +139,7 @@ class _HostClient:
         raise AssertionError(f"unexpected call {uri} {args} {options}")
 
 
-def test_host_ui_debug_inventory_is_the_exact_15_row_issue_90_family() -> None:
+def test_host_ui_debug_inventory_retains_issue_90_and_adds_six_authoring_rows() -> None:
     rows = sorted(
         f"{version}|function|{operation}"
         for operation, versions in LANES.items()
@@ -147,8 +147,12 @@ def test_host_ui_debug_inventory_is_the_exact_15_row_issue_90_family() -> None:
     )
 
     assert set(HOST_UI_DEBUG_BUSINESS_OPERATIONS) == set(LANES)
-    assert len(rows) == 15
-    assert canonical_sha256(rows) == (
+    assert len(rows) == 21
+    historical = [row for row in rows if not (
+        row.startswith(("2024.1|", "2025.1|")) and "|ak.wwise.ui.project." in row
+    )]
+    assert len(historical) == 15
+    assert canonical_sha256(historical) == (
         "8d701d66442416c74f627e468842139fa8971b441b9b813be95cd9e7d3712ee0"
     )
 
@@ -298,8 +302,30 @@ def test_tone_schema_owns_version_deltas_and_closed_choices() -> None:
     ]
 
 
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("action", ("open", "close"))
+@pytest.mark.parametrize("discard", (None, False, True))
+def test_project_switch_preserves_save_prompt_unless_discard_is_explicit(
+    tmp_path: Path, version: str, action: str, discard: bool | None,
+) -> None:
+    plan: dict[str, object] = {}
+    if action == "open":
+        plan["project_file"] = str((tmp_path / "Target.wproj").resolve())
+    if discard is not None:
+        field = (
+            "discard_unsaved_current_project" if action == "open"
+            else "discard_unsaved_changes"
+        )
+        plan[field] = discard
+    request = materialize_host_ui_debug_business_request(
+        f"ak.wwise.ui.project.{action}", _session(version, plan),
+    )
+    assert request["arguments"]["args"]["bypassSave"] is (discard is True)
+
+
+@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
 def test_authoring_project_plans_compile_without_native_field_authorship(
-    tmp_path: Path,
+    tmp_path: Path, version: str,
 ) -> None:
     project = (tmp_path / "New Project.wproj").resolve()
     old_open = materialize_host_ui_debug_business_request(
@@ -322,7 +348,7 @@ def test_authoring_project_plans_compile_without_native_field_authorship(
     current_open = materialize_host_ui_debug_business_request(
         "ak.wwise.ui.project.open",
         _session(
-            "2023.1",
+            version,
             {
                 "project_file": str(project),
                 "discard_unsaved_current_project": False,
@@ -342,14 +368,14 @@ def test_authoring_project_plans_compile_without_native_field_authorship(
 
     closed = materialize_host_ui_debug_business_request(
         "ak.wwise.ui.project.close",
-        _session("2023.1", {"discard_unsaved_changes": True}),
+        _session(version, {"discard_unsaved_changes": True}),
     )
     assert closed["arguments"]["args"] == {"bypassSave": True}
 
     created = materialize_host_ui_debug_business_request(
         "ak.wwise.ui.project.create",
         _session(
-            "2023.1",
+            version,
             {
                 "project_file": str(project),
                 "languages": ["English(US)", "Japanese"],
@@ -613,16 +639,17 @@ def test_host_plan_draft_records_only_business_fields(tmp_path: Path) -> None:
     ]
 
 
+@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
 def test_authoring_project_plan_rejects_console_before_project_probe(
-    tmp_path: Path,
+    tmp_path: Path, version: str,
 ) -> None:
     operation = "ak.wwise.ui.project.open"
     state_dir = tmp_path / "state"
-    env = _env(tmp_path, "2023.1")
+    env = _env(tmp_path, version)
     code, started = gateway.execute_gateway(
         [
             "--version",
-            "2023.1",
+            version,
             "--state-dir",
             str(state_dir),
             "draft-start",
@@ -632,12 +659,12 @@ def test_authoring_project_plan_rejects_console_before_project_probe(
         client_factory=lambda url: pytest.fail(f"offline start connected to {url}"),
     )
     assert code == 0, started
-    client = _HostClient(tmp_path, "2023.1", is_command_line=True)
+    client = _HostClient(tmp_path, version, is_command_line=True)
 
     code, rejected = gateway.execute_gateway(
         [
             "--version",
-            "2023.1",
+            version,
             "--state-dir",
             str(state_dir),
             "draft-declare-host-plan",
@@ -655,19 +682,20 @@ def test_authoring_project_plan_rejects_console_before_project_probe(
     )
 
     assert code == 2
-    assert rejected["status"] == "authoring_host_required"
+    assert rejected["status"] == "authoring_host_required", json.dumps(rejected)
     assert [call[0] for call in client.calls] == ["ak.wwise.core.getInfo"]
 
 
-def test_authoring_project_draft_rejects_console_during_check(tmp_path: Path) -> None:
+@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+def test_authoring_project_draft_rejects_console_during_check(tmp_path: Path, version: str) -> None:
     operation = "ak.wwise.ui.project.open"
     state_dir = tmp_path / "state"
-    env = _env(tmp_path, "2023.1")
-    authoring = _HostClient(tmp_path, "2023.1", is_command_line=False)
+    env = _env(tmp_path, version)
+    authoring = _HostClient(tmp_path, version, is_command_line=False)
     code, started = gateway.execute_gateway(
         [
             "--version",
-            "2023.1",
+            version,
             "--state-dir",
             str(state_dir),
             "draft-start",
@@ -680,7 +708,7 @@ def test_authoring_project_draft_rejects_console_during_check(tmp_path: Path) ->
     code, declared = gateway.execute_gateway(
         [
             "--version",
-            "2023.1",
+            version,
             "--state-dir",
             str(state_dir),
             "draft-declare-host-plan",
@@ -698,11 +726,11 @@ def test_authoring_project_draft_rejects_console_during_check(tmp_path: Path) ->
     )
     assert code == 0, declared
 
-    console = _HostClient(tmp_path, "2023.1", is_command_line=True)
+    console = _HostClient(tmp_path, version, is_command_line=True)
     code, rejected = gateway.execute_gateway(
         [
             "--version",
-            "2023.1",
+            version,
             "--state-dir",
             str(state_dir),
             "draft-check",
@@ -717,7 +745,7 @@ def test_authoring_project_draft_rejects_console_during_check(tmp_path: Path) ->
     )
 
     assert code == 2
-    assert rejected["status"] == "authoring_host_required"
+    assert rejected["status"] == "authoring_host_required", json.dumps(rejected)
     assert [call[0] for call in console.calls] == ["ak.wwise.core.getInfo"]
 
 

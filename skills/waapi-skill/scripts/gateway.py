@@ -37,6 +37,8 @@ from wwise_waapi.authoring_ui_commands_manifest import (  # noqa: E402  # pyrigh
     AUTHORING_UI_COMMAND_URIS,
 )
 from wwise_waapi.authoring_ui_topics_manifest import AUTHORING_UI_OBSERVATION_TOPICS  # noqa: E402
+from wwise_waapi.authoring_core_manifest import COMMON_URIS as AUTHORING_CORE_URIS  # noqa: E402
+from wwise_waapi.authoring_core_manifest import requires_core_supplement  # noqa: E402
 from wwise_waapi.canonical import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     canonical_json_bytes,
     canonical_sha256,
@@ -576,7 +578,7 @@ OFFLINE_COMMANDS = frozenset(
     }
 )
 GATEWAY_RESULT_CONTRACT = "waapi-skill.gateway-result/v1"
-AUTHORING_HOST_REQUIRED_URIS = AUTHORING_UI_COMMAND_URIS | AUTHORING_UI_OBSERVATION_TOPICS
+AUTHORING_HOST_REQUIRED_URIS = AUTHORING_UI_COMMAND_URIS | AUTHORING_UI_OBSERVATION_TOPICS | AUTHORING_CORE_URIS | {"ak.wwise.ui.getSelectedFiles"}
 TOPIC_STREAM_RECORD_CONTRACT = "waapi-skill.topic-stream/v1"
 GATEWAY_CONFIG_CONTRACT = "waapi-skill.config/v2"
 GATEWAY_SESSION_CONTEXT_CONTRACT = "waapi-skill.session-context/v2"
@@ -875,7 +877,7 @@ class AuthoringUiRuntimeManifestStore:
         self._base_store = base_store
 
     def load(self, version: str) -> dict[str, Any]:
-        return self._base_store.load_with_authoring_ui_commands(version)
+        return self._base_store.load_authoring_ui_profile(version)
 
 
 class GatewaySubscriptionCleanupError(RuntimeError):
@@ -4530,6 +4532,13 @@ def live_capability(
     return catalog.describe(version, api)
 
 
+def transaction_capability(version: str, api: str) -> CapabilityRecord:
+    """Resolve offline construction/guard facts, not permission to dispatch."""
+    catalog = CapabilityCatalog()
+    return (catalog.authoring_ui_describe(version, api)
+            if requires_core_supplement(version, api) else catalog.describe(version, api))
+
+
 def authoring_host_required_payload(
     *,
     api: str | None,
@@ -4679,11 +4688,10 @@ def live_authoring_transaction_boundary(
         if operation == "waapi.call" and isinstance(arguments, Mapping)
         else None
     )
-    if native_api in {
-        "ak.wwise.ui.project.close",
-        "ak.wwise.ui.project.create",
-        "ak.wwise.ui.project.open",
-    }:
+    if native_api in {"ak.wwise.ui.project.close", "ak.wwise.ui.project.create", "ak.wwise.ui.project.open"} or (
+        isinstance(native_api, str)
+        and requires_core_supplement(version_key_from_get_info(live_info), native_api)
+    ):
         if live_info.get("isCommandLine") is not False:
             return authoring_host_required_payload(
                 api=str(native_api),
@@ -6765,6 +6773,55 @@ def operation_draft_schema_digest(operation: str, version: str) -> str:
     if operation in DRAFT_TYPED_OPERATIONS:
         return draft_operation_request_contract(operation, version).schema_digest
     return operation_request_schema_digest(operation, version)
+
+
+def discover_business_routes(
+    business_rows: Sequence[Mapping[str, Any]], versions: Sequence[str],
+) -> list[dict[str, Any]]:
+    """Expose business adapters and closed fixed/zero-input routes, not wire schemas."""
+    catalog = CapabilityCatalog()
+    declared = {row["api"]: row for row in business_rows}
+    rows: dict[str, dict[str, Any]] = {}
+    for version in versions:
+        for entry in catalog.authoring_ui_entries(version):
+            if entry.item_type != "function" or entry.preferred_route == "unsupported_boundary":
+                continue
+            declaration = declared.get(entry.uri)
+            if declaration is not None:
+                if version not in declaration["supported_versions"]:
+                    continue
+                intent = declaration["intent"]
+            else:
+                # Named operations already have their own catalog section.
+                if any(name != "waapi.call" for name in entry.transaction_operations):
+                    continue
+                if entry.preferred_route != "fixed_command":
+                    if entry.preferred_route not in {"manifest_dispatch", "transaction_operation"}:
+                        continue
+                    if public_typed_contract(version, entry.uri).fields:
+                        continue
+                intent = entry.schema.get("description", entry.uri).split("\n", 1)[0]
+            if entry.uri not in rows:
+                rows[entry.uri] = {
+                    "api": entry.uri,
+                    "intent": intent,
+                    "supported_versions": [],
+                    "next_command": (
+                        ["status"] if entry.uri == "ak.wwise.core.getInfo"
+                        else ["request-schema", entry.uri]
+                    ),
+                    "host_surface_by_version": {},
+                }
+            rows[entry.uri]["supported_versions"].append(version)
+            rows[entry.uri]["host_surface_by_version"][version] = (
+                entry.host_surface or "live_host_checked"
+            )
+    for row in rows.values():
+        surfaces = set(row["host_surface_by_version"].values())
+        row["host_surface"] = next(iter(surfaces)) if len(surfaces) == 1 else "version_dependent"
+        if len(surfaces) == 1:
+            del row["host_surface_by_version"]
+    return [rows[uri] for uri in sorted(rows)]
 
 
 def public_typed_contract(version: str, api: str) -> Any:
@@ -9518,9 +9575,13 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             },
         }
     if args.command == "operations":
+        versions = (
+            tuple(SUPPORTED_WWISE_VERSION_KEYS)
+            if args.detail else resolve_catalog_versions(args, env=env)
+        )
         operations: list[dict[str, Any]] = []
         for spec in list_operation_specs():
-            if spec.name == "waapi.call":
+            if spec.name == "waapi.call" or not set(versions).intersection(spec.supported_versions):
                 continue
             modes = {
                 version: operation_input_mode(spec.name, version)
@@ -9576,12 +9637,18 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 *source_control_business_catalog_rows(),
             )
         )
+        request_schema_routes = discover_business_routes(request_schema_routes, versions)
         payload = {
             "contract": GATEWAY_RESULT_CONTRACT,
             "ok": True,
             "status": "ok",
             "command": "operations",
             "offline": True,
+            "versions": list(versions),
+            "host_scope": (
+                "packaged Console plus reviewed Authoring routes; offline discovery "
+                "does not prove live availability; live getInfo selects the host"
+            ),
             "routing_precedence": {
                 "primary_media_import": {
                     "match_terms": [
@@ -9665,10 +9732,11 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             "implemented_count": sum(
                 spec.implemented is True
                 for spec in list_operation_specs()
-                if spec.name != "waapi.call"
+                if spec.name != "waapi.call" and set(versions).intersection(spec.supported_versions)
             ),
             "operations": operations,
             "request_schema_route_count": len(request_schema_routes),
+            "request_schema_routes": request_schema_routes,
             "request_schema_command_template": ["request-schema", "<api>"],
             "detail_available": True,
             "selection_guidance": {
@@ -9728,8 +9796,6 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 },
             },
         }
-        if args.detail:
-            payload["request_schema_routes"] = request_schema_routes
         return payload
     if args.command == "operation-schema":
         if args.operation == "waapi.call":
@@ -10165,7 +10231,7 @@ def sealed_read_transaction_contract(
     if not isinstance(sealed_contract, Mapping):
         return None
     try:
-        capability = CapabilityCatalog().describe(version, api)
+        capability = transaction_capability(version, api)
     except (CapabilityNotFoundError, ValueError):
         return None
     current_contract = capability.execution_contract
@@ -13662,9 +13728,10 @@ def dispatch_command(
         return_fields = SELECTED_REQUIRED_RETURN_FIELDS
         request_validation = None
         try:
-            selected_capability = CapabilityCatalog().describe(
+            selected_capability = live_capability(
                 detected_version,
                 GET_SELECTED_URI,
+                live_info=live_info,
             )
         except CapabilityNotFoundError:
             # Preserve the existing explicit absent-from-manifest boundary and
@@ -14885,6 +14952,11 @@ def dispatch_operation_draft_check(
             },
         )
     request_payload = dict(materialized.request)
+    authoring_boundary = live_authoring_transaction_boundary(
+        request_payload, command="draft-check", live_info=live_info, common=common,
+    )
+    if authoring_boundary is not None:
+        return authoring_boundary
     if inspected.operation.startswith("ak."):
         capability = live_capability(
             detected_version,
@@ -14962,14 +15034,6 @@ def dispatch_operation_draft_check(
         request_payload,
         expected_version=detected_version,
     )
-    authoring_boundary = live_authoring_transaction_boundary(
-        request_payload,
-        command=args.command,
-        live_info=live_info,
-        common=common,
-    )
-    if authoring_boundary is not None:
-        return authoring_boundary
     locality_boundary = local_filesystem_transaction_boundary(
         request_payload,
         command=args.command,
@@ -28663,7 +28727,7 @@ def transaction_project_guard_spec(
     api = arguments.get("api")
     if not isinstance(api, str):
         return PROJECT_GUARD_INVARIANT, None
-    capability = CapabilityCatalog().describe(version, api)
+    capability = transaction_capability(version, api)
     mode = capability.execution_contract.get("project_guard_mode", PROJECT_GUARD_INVARIANT)
     if not isinstance(mode, str) or mode not in PROJECT_GUARD_MODES:
         raise GatewayInputError(
@@ -28725,7 +28789,7 @@ def transaction_post_execution_project_guard_policy(
             f"Execution contract for {api!r} has unsupported "
             f"post_execution_project_guard_policy {policy!r}"
         )
-    current_contract = CapabilityCatalog().describe(version, api).execution_contract
+    current_contract = transaction_capability(version, api).execution_contract
     current_policy = current_contract.get("post_execution_project_guard_policy")
     if not isinstance(current_policy, str) or current_policy not in POST_EXECUTION_PROJECT_GUARD_POLICIES:
         raise GatewayInputError(

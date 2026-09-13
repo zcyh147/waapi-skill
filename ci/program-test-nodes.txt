@@ -189,3 +189,5 @@ tests/unit/test_compound_undo_business_adapter.py
 tests/unit/test_compound_undo_business_gateway.py
 tests/unit/test_typed_authoring_ui_input.py
 tests/unit/test_single_typed_input_cutover.py
+tests/unit/test_authoring_core_gateway.py
+tests/unit/test_host_ui_debug_business_adapter.py

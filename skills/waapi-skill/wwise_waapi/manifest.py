@@ -298,11 +298,14 @@ class ManifestStore:
         return merge_authoring_ui_commands_surface(console_manifest, supplement)
 
     def load_authoring_ui_profile(self, version: str) -> dict[str, Any]:
-        """Compose the fixed UI commands and separately reviewed UI Topics."""
+        """Compose only the separately reviewed Authoring supplements."""
         from .authoring_ui_topics_manifest import merge_authoring_ui_topics
+        from .authoring_core_manifest import merge_authoring_core
 
-        return merge_authoring_ui_topics(
-            self.load_with_authoring_ui_commands(version), root=self.root, version=version,
+        return merge_authoring_core(
+            merge_authoring_ui_topics(
+                self.load_with_authoring_ui_commands(version), root=self.root, version=version,
+            ), root=self.root, version=version,
         )
 
     def load_authoring_ui_commands_supplement(

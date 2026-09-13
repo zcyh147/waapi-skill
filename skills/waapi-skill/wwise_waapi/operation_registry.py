@@ -4082,7 +4082,11 @@ def _public_call_arguments(
     if not isinstance(raw_args, Mapping) or not isinstance(raw_options, Mapping):
         raise OperationContractError("INVALID_ARGUMENT", "waapi.call args and options must be JSON objects.")
     try:
-        contract = ExecutionContractRegistry().describe(version, api)
+        from .authoring_core_manifest import requires_core_supplement
+
+        registry = ExecutionContractRegistry()
+        contract = (registry.authoring_ui_describe(version, api)
+                    if requires_core_supplement(version, api) else registry.describe(version, api))
     except ExecutionContractError as exc:
         raise OperationContractError(
             "UNAVAILABLE_IN_VERSION",

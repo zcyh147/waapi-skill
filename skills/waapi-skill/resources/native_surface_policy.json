@@ -19,11 +19,11 @@
         "special_unique_uris": 51
       },
       "wwise-authoring-ui": {
-        "function_rows": 670,
-        "unique_function_uris": 167,
-        "generic_reflected_rows": 442,
-        "generic_reflected_unique_uris": 116,
-        "special_rows": 228,
+        "function_rows": 689,
+        "unique_function_uris": 168,
+        "generic_reflected_rows": 459,
+        "generic_reflected_unique_uris": 117,
+        "special_rows": 230,
         "special_unique_uris": 51
       }
     },

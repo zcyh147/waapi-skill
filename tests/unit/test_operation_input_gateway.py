@@ -864,10 +864,13 @@ def test_operation_inventory_does_not_republish_native_fields_for_business_lanes
         "object.setProperty",
         "object.setReference",
     ):
-        compact_row = compact_rows[operation]
-        assert set(compact_row) == {"name", "summary", "next_command"}
-        assert compact_row["next_command"] == ["operation-schema", operation]
         row = rows[operation]
+        if set(compact["versions"]).intersection(row["supported_versions"]):
+            compact_row = compact_rows[operation]
+            assert set(compact_row) == {"name", "summary", "next_command"}
+            assert compact_row["next_command"] == ["operation-schema", operation]
+        else:
+            assert operation not in compact_rows
         assert set(row["input_modes_by_version"].values()) == {
             BUSINESS_DECLARATION_INPUT_MODE
         }

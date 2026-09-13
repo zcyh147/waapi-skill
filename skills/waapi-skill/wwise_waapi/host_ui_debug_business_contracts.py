@@ -11,9 +11,9 @@ ALL_VERSIONS = ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
 HOST_UI_DEBUG_BUSINESS_LANES: dict[str, tuple[str, ...]] = {
     "ak.wwise.waapi.getSchema": ALL_VERSIONS,
     "ak.wwise.debug.generateToneWAV": ("2023.1", "2024.1", "2025.1"),
-    "ak.wwise.ui.project.open": ("2021.1", "2022.1", "2023.1"),
-    "ak.wwise.ui.project.close": ("2021.1", "2022.1", "2023.1"),
-    "ak.wwise.ui.project.create": ("2023.1",),
+    "ak.wwise.ui.project.open": ALL_VERSIONS,
+    "ak.wwise.ui.project.close": ALL_VERSIONS,
+    "ak.wwise.ui.project.create": ("2023.1", "2024.1", "2025.1"),
 }
 HOST_UI_DEBUG_BUSINESS_OPERATIONS = tuple(sorted(HOST_UI_DEBUG_BUSINESS_LANES))
 HOST_UI_DEBUG_DRAFT_OPERATIONS = tuple(
@@ -143,6 +143,22 @@ def host_ui_debug_business_contract_data(
                 "ak.wwise.ui.project.open",
             },
             "native_request_fields": "gateway_owned",
+            **(
+                {
+                    "discard_unsaved_default": False,
+                    "discard_requires_explicit_user_intent": True,
+                    "save_prompt": "human_owned_when_required_by_authoring",
+                    "incomplete_transition": (
+                        "do_not_repeat_execute_or_claim_success; resolve any "
+                        "save prompt with the user, then follow the returned "
+                        "verification or indeterminate boundary"
+                    ),
+                }
+                if operation in {
+                    "ak.wwise.ui.project.open", "ak.wwise.ui.project.close",
+                }
+                else {}
+            ),
         },
     }
 
@@ -208,7 +224,7 @@ def _fields(
         }
     if operation == "ak.wwise.ui.project.open":
         optional = ["discard_unsaved_current_project", "upgrade_policy"]
-        if version == "2023.1":
+        if version in {"2023.1", "2024.1", "2025.1"}:
             optional.extend(["migration_policy", "auto_checkout"])
         return ["project_file"], optional, {
             "project_file": "exact_project_file",

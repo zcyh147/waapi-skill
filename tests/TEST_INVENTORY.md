@@ -1,8 +1,41 @@
 # Test inventory
 
-This inventory is grouped for human review. The latest completed passing non-live verification reported `10325 passed, 113 skipped, 27 deselected`; broad unit coverage is summarized by file or module instead of listing every item instance. This count is a non-live run result, not a fresh full `--collect-only` recount.
+This inventory is grouped for human review. The dated entries below distinguish
+complete runs from focused follow-ups; broad coverage is summarized by file or
+module instead of listing every item instance. Program and Non-live results
+are not live-Wwise or Fresh Agent evidence.
 
 ## Runner modes and strict real behavior
+
+### 2026-09-13 Authoring entry and safe-switch repair
+
+Code candidate `249fc75` aligns compact version-aware business discovery,
+Skill/lane guidance and project open/close defaults. Omitted discard now keeps
+the Wwise save prompt enabled. The five-version regressions cover omitted and
+explicit choices; the project-transition matrix includes all six new 2024/2025
+rows plus cancellation/timeout boundaries. No real Wwise or Fresh Agent ran.
+
+Final macOS Program: **5159 passed, 2 skipped** (native Windows-only skips).
+Full Non-live: **10725 passed, 10 failed, 113 skipped, 27 deselected**. All ten
+failures were old test expectations for removed native-input documentation,
+historical counts, or the pre-addition call allowlist. Following test-only
+corrections, all three affected test files passed **91 tests**. Runtime and
+Skill files did not change after Program. This is a complete Non-live run plus
+focused follow-up, **not a single all-green full Non-live run**.
+See [audit and repair evidence](../docs/research/skill-to-dispatch-audit-2026-09-13.md).
+
+### 2026-09-13 approved Authoring core additions
+
+Nineteen version/function rows (nine in 2024.1, ten in 2025.1) reuse the
+existing closed Gateway routes; Console inventory remains unchanged. Final
+macOS Program: **5061 passed, 2 skipped**. Focused Non-live (CI driver, new core
+Gateway regressions, and host/project Adapter): **151 passed, 11 skipped**.
+Both sets of skips require native Windows and receive no passing credit.
+Real Windows Authoring, called from the macOS Gateway, returned valid empty
+selection results for `selected` on both versions and `getSelectedFiles` on
+2025.1. No real mutation, native-Windows Python gate, Fresh Agent, full Non-live
+or live matrix was run. See [scope and evidence](../docs/research/authoring-core-scope-2026-09-13.md)
+for exact exclusions, historical failures, and validation limits.
 
 ### 2026-09-13 CRUD field Interface repair
 

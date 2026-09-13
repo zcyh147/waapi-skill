@@ -73,10 +73,10 @@ def test_authoring_profile_has_fixed_five_version_counts_and_digests() -> None:
     assert summary == {
         "contract": "waapi-skill.public-execution-contract/v2",
         "execution_profile": AUTHORING_UI_EXECUTION_PROFILE,
-        "manifest_rows": 830,
-        "executable_rows": 830,
+        "manifest_rows": 849,
+        "executable_rows": 849,
         "excluded_rows": 0,
-        "unique_public_uris": 202,
+        "unique_public_uris": 203,
         "inventory_sha256": PACKAGED_AUTHORING_UI_INVENTORY_SHA256,
         "by_version": {
             version: {

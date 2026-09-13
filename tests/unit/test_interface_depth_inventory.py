@@ -47,8 +47,8 @@ def test_generated_inventory_is_current_and_exactly_covers_both_surfaces() -> No
     assert inventory == build_interface_depth_inventory()
     native = inventory["native_lanes"]
     operations = inventory["operation_lanes"]
-    assert len(native) == 830
-    assert len({(row["version"], row["item_type"], row["uri"]) for row in native}) == 830
+    assert len(native) == 849
+    assert len({(row["version"], row["item_type"], row["uri"]) for row in native}) == 849
     expected_operations = {
         (name, version)
         for name, spec in OPERATION_SPECS.items()
@@ -418,8 +418,14 @@ def test_completed_runtime_inspection_family_retains_issue_87_row_seal() -> None
     runtime = completed["generic-core-runtime-inspection"]
 
     assert runtime["github_issue"] == 87
-    assert runtime["row_count"] == len(runtime["rows"]) == 94
-    assert runtime["rows_sha256"] == (
+    assert runtime["row_count"] == len(runtime["rows"]) == 96
+    assert runtime["rows_sha256"] == "44fc01c03475484a8a6cf302e2563f08d07338c0a27d807d741ee6bd56f83e7c"
+    baseline = [row for row in runtime["rows"] if row not in {
+        "2024.1|function|ak.wwise.core.remote.connect",
+        "2025.1|function|ak.wwise.core.remote.connect",
+    }]
+    assert len(baseline) == 94
+    assert canonical_sha256(baseline) == (
         "b66b1f4d66d8d77b456b98041c7e14fa"
         "2d383e02bae02b4a17fabfb85261d593"
     )
@@ -549,7 +555,7 @@ def test_fixed_commands_are_audited_from_their_actual_public_parameters() -> Non
     issue_96_rows = [
         row for row in inventory["native_lanes"] if row["uri"] in issue_96_apis
     ]
-    assert len(issue_96_rows) == 47
+    assert len(issue_96_rows) == 49
     assert all(
         row["disposition"] == "already_deep" and row["owner_issue"] is None
         for row in issue_96_rows
@@ -599,7 +605,7 @@ def test_historical_construction_baseline_is_preserved_without_depth_claim() -> 
     baseline = _inventory()["historical_baseline"]
     assert baseline == {
         "contract": "waapi-skill.typed-request-surface/v1",
-        "total_lanes": 830,
+        "total_lanes": 849,
         "construction_coverage_is_depth_evidence": False,
     }
     assert set(SUPPORTED_WWISE_VERSION_KEYS) == {

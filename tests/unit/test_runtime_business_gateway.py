@@ -68,7 +68,7 @@ EXPECTED_CONTROL_ROWS = {
     "ak.wwise.core.profiler.enableProfilerData": (
         "2021.1", "2022.1", "2023.1", "2024.1", "2025.1"
     ),
-    "ak.wwise.core.remote.connect": ("2021.1", "2022.1", "2023.1"),
+    "ak.wwise.core.remote.connect": ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"),
     "ak.wwise.core.transport.create": (
         "2021.1", "2022.1", "2023.1", "2024.1", "2025.1"
     ),
@@ -152,13 +152,13 @@ def test_runtime_business_direct_read_inventory_is_exactly_49_rows() -> None:
     assert sum(len(versions) for versions in EXPECTED_DIRECT_READ_ROWS.values()) == 49
 
 
-def test_runtime_business_control_inventory_is_exactly_45_rows() -> None:
+def test_runtime_business_control_inventory_adds_two_authoring_rows() -> None:
     assert runtime_control_business_operations() == frozenset(EXPECTED_CONTROL_ROWS)
     assert {
         operation: runtime_inspection_business_versions(operation)
         for operation in EXPECTED_CONTROL_ROWS
     } == EXPECTED_CONTROL_ROWS
-    assert sum(len(versions) for versions in EXPECTED_CONTROL_ROWS.values()) == 45
+    assert sum(len(versions) for versions in EXPECTED_CONTROL_ROWS.values()) == 47
 
 
 @pytest.mark.parametrize(

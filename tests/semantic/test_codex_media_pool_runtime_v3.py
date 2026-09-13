@@ -162,14 +162,14 @@ def _assert_public_media_mapping_is_documented() -> None:
     text = " ".join(QUERY_REFERENCE.read_text(encoding="utf-8").split())
     for required in (
         "Use `request-schema` for each URI and follow only its typed continuation",
-        '`{"type":"field","field":<bound field>,"operator":<operator>,"value":<value>}`',
-        "Preserve database and predicate order",
-        "use the `result_filter` fields disclosed by `request-schema`",
-        "Between/from A to B",
-        "Path`, `FileId`, `Db`, `Filename`, `WAV/Duration`, `WAV/Sample Rate`, `WAV/Bit Depth`, `WAV/Channels",
-        "never run the old unfiltered 1000-row AudioFileSource projection",
+        "Follow the returned business declaration",
+        "Gateway owns native field bindings, filter objects, and the return projection",
+        "Agent supplies only disclosed business values",
+        "For case-sensitive matching use the disclosed post-filter",
+        "never perform this join in model-authored code",
     ):
         assert required in text
+    assert 'Each filter is `{"type":"field"' not in text
 
 
 def _guid(namespace: str, key: str) -> str:
