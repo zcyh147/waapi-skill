@@ -259,7 +259,7 @@ class ManifestSchemaLoader:
         """Load the explicit Console-plus-UI-command schema profile."""
 
         try:
-            manifest = self.manifest_store.load_with_authoring_ui_commands(
+            manifest = self.manifest_store.load_authoring_ui_profile(
                 version
             )
         except ManifestResourceMissingError as exc:

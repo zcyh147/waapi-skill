@@ -271,7 +271,7 @@ class CapabilityCatalog:
             manifest = manifest_store.load(version)
         else:
             try:
-                manifest = manifest_store.load_with_authoring_ui_commands(
+                manifest = manifest_store.load_authoring_ui_profile(
                     version
                 )
             except (
@@ -417,7 +417,9 @@ class CapabilityCatalog:
                             else CONSOLE_EXECUTION_PROFILE
                         ),
                         authoring_ui_profile=(
-                            "fixed-five-uri-reflection-supplement"
+                            ("fixed-ui-commands-and-observation-topics"
+                             if manifest.get("metadata", {}).get("authoring_ui_topics_evidence")
+                             else "fixed-five-uri-reflection-supplement")
                             if authoring_profile
                             else "not_reflected_separately"
                         ),
@@ -615,6 +617,14 @@ def _safety_for_profile(
     *,
     profile: str,
 ) -> ApiSafety:
+    from .authoring_ui_topics_manifest import AUTHORING_UI_OBSERVATION_TOPICS
+
+    if profile == AUTHORING_UI_EXECUTION_PROFILE and uri in AUTHORING_UI_OBSERVATION_TOPICS and item_type == "topic":
+        return ApiSafety(
+            read_only=True, requires_destructive_gate=False,
+            accepted_authorization_modes=(), interface_status="available",
+            reason="Reviewed Authoring observation Topic; bounded subscription and cleanup required.",
+        )
     if (
         profile != AUTHORING_UI_EXECUTION_PROFILE
         or uri not in AUTHORING_UI_COMMAND_URIS

@@ -12,21 +12,21 @@
   "construction_shapes": {
     "draft": 114,
     "inline": 463,
-    "topic": 154,
+    "topic": 160,
     "zero": 93
   },
   "contract": "waapi-skill.full-surface-release-report/v1",
   "coverage": {
-    "construction_covered_lanes": 824,
+    "construction_covered_lanes": 830,
     "function_lanes": 670,
-    "topic_lanes": 154,
-    "total_lanes": 824,
+    "topic_lanes": 160,
+    "total_lanes": 830,
     "unique_function_uris": 167,
-    "unique_topic_uris": 33
+    "unique_topic_uris": 35
   },
   "execution_routes": {
     "bounded_call": 113,
-    "bounded_topic_wait": 154,
+    "bounded_topic_wait": 160,
     "compound_transaction_member": 15,
     "fixed_command": 56,
     "isolated_transaction": 141,
@@ -34,13 +34,13 @@
     "transaction": 113
   },
   "host_lanes": {
-    "wwise-authoring": 25,
+    "wwise-authoring": 31,
     "wwise-console": 799
   },
   "intentionally_blocked_field_occurrences": 79,
   "source_inventory": {
     "contract": "waapi-skill.typed-request-surface/v1",
-    "inventory_sha256": "7cbe0a9ba6d9756c94ecea58bb1b2ac56da242059f17c5cdfdaf768271d133a8",
+    "inventory_sha256": "15fdfba40a37f38bbf963e02a1114f1452fc609aae3c92cb7e916119d33e3773",
     "versions": [
       "2021.1",
       "2022.1",

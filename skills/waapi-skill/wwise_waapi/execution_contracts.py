@@ -48,7 +48,7 @@ PACKAGED_INVENTORY_SHA256 = "4644c792fdf55fe498e7dd9fc7de1475831801d1b363be8488f
 CONSOLE_EXECUTION_PROFILE = "wwise-console"
 AUTHORING_UI_EXECUTION_PROFILE = "wwise-authoring-ui"
 PACKAGED_AUTHORING_UI_INVENTORY_SHA256 = (
-    "caa57fd7c0879a7b264d63b7a095c27893a9d2380f4f4d2cacf9a8be9c5c6cea"
+    "dc607bd8fe1528a1754ebd1d2294b26d3878d85329f2389a9c0ca7db36040483"
 )
 
 EXPECTED_VERSION_COUNTS: Mapping[str, Mapping[str, int]] = MappingProxyType(
@@ -120,34 +120,34 @@ EXPECTED_AUTHORING_UI_VERSION_COUNTS: Mapping[
         "2024.1": MappingProxyType(
             {
                 "functions": 152,
-                "topics": 31,
+                "topics": 34,
                 "public_functions": 152,
-                "public_topics": 31,
-                "public_total": 183,
+                "public_topics": 34,
+                "public_total": 186,
             }
         ),
         "2025.1": MappingProxyType(
             {
                 "functions": 158,
-                "topics": 32,
+                "topics": 35,
                 "public_functions": 158,
-                "public_topics": 32,
-                "public_total": 190,
+                "public_topics": 35,
+                "public_total": 193,
             }
         ),
     }
 )
-EXPECTED_AUTHORING_UI_MANIFEST_VERSION_ROWS = 824
-EXPECTED_AUTHORING_UI_PUBLIC_VERSION_ROWS = 824
-EXPECTED_AUTHORING_UI_PUBLIC_UNIQUE_URIS = 200
+EXPECTED_AUTHORING_UI_MANIFEST_VERSION_ROWS = 830
+EXPECTED_AUTHORING_UI_PUBLIC_VERSION_ROWS = 830
+EXPECTED_AUTHORING_UI_PUBLIC_UNIQUE_URIS = 202
 EXPECTED_AUTHORING_UI_VERSION_INVENTORY_SHA256: Mapping[str, str] = (
     MappingProxyType(
         {
             "2021.1": "80caea46b0613135df09ea9b74ba55d261061b7b7e6f0cc54a93793bccc60e43",
             "2022.1": "3c7ee729d0e50453bb7b1b04c955f3a94562a9b3e5abcbde8f53f8ab902145df",
             "2023.1": "cb513e3584a00f40fd0998d7a73c4a46ecd2528a1351c6ee4f6c26e88734af33",
-            "2024.1": "c63b44b050ffa4c04d2ed8b845157e95c72342bc862589621b2324919fa7f0db",
-            "2025.1": "1187491924ac220713ec094984b7aa5463293df4c7db6c0566013d1884172f4e",
+            "2024.1": "1d09f7a3b2f54fcda1aedb03fc15e247533adee6209bbecb9ad90e8ca58f49d5",
+            "2025.1": "e5d7a7692accbeb52bed47766381e5f834eaad4c494cd815cfc291a84b01c887",
         }
     )
 )
@@ -486,7 +486,7 @@ class ExecutionContractRegistry:
 
         _require_supported_version(version)
         try:
-            manifest = self.manifest_store.load_with_authoring_ui_commands(
+            manifest = self.manifest_store.load_authoring_ui_profile(
                 version
             )
         except (

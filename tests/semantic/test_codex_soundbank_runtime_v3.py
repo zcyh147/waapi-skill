@@ -2339,14 +2339,14 @@ def test_each_generated_topic_prompt_reaches_a_name_only_request_and_hidden_guid
 
 def test_generated_topic_reference_closes_model_owned_request_fields() -> None:
     reference = " ".join(QUERY_REFERENCE.read_text(encoding="utf-8").split())
-    assert "Run `topic-schema`" in reference
+    assert "Before every wait/stream, run `topic-schema`" in reference
     assert "--include-object-identity" in reference
     assert "--match-platform-name <exact-name>" in reference
-    assert "without a handle" in reference
+    assert "bind names without handles" in reference
     assert "`id,name,type,path`" in reference
     assert "--match-soundbank-name <exact-name>" in reference
-    assert "Omit a match the user did not request" in reference
-    assert "never inject a GUID" in reference
+    assert "Omit unrequested matches" in reference
+    assert "never substitute GUIDs" in reference
 
 
 def test_all_25_cases_emit_registry_valid_closed_operation_requests(

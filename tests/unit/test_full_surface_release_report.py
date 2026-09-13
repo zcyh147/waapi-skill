@@ -20,17 +20,17 @@ def test_committed_full_surface_release_report_matches_packaged_truth() -> None:
 
     assert report["contract"] == "waapi-skill.full-surface-release-report/v1"
     assert report["coverage"] == {
-        "construction_covered_lanes": 824,
+        "construction_covered_lanes": 830,
         "function_lanes": 670,
-        "topic_lanes": 154,
-        "total_lanes": 824,
+        "topic_lanes": 160,
+        "total_lanes": 830,
         "unique_function_uris": 167,
-        "unique_topic_uris": 33,
+        "unique_topic_uris": 35,
     }
     assert report["construction_shapes"] == {
         "draft": 114,
         "inline": 463,
-        "topic": 154,
+        "topic": 160,
         "zero": 93,
     }
     assert report["audit"] == {
@@ -91,5 +91,5 @@ def test_release_report_rejects_invented_continuation_or_semantic_binding(
 
     assert len(report["audit"][expected_audit]) == 1
     assert report["coverage"]["construction_covered_lanes"] == (
-        823 if expected_audit == "missing_continuations" else 824
+        829 if expected_audit == "missing_continuations" else 830
     )

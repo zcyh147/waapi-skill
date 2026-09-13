@@ -591,17 +591,17 @@ def test_mixed_parent_child_query_keeps_both_required_types_in_candidate_set() -
 
 def test_soundbank_generated_uses_an_explicit_skill_selected_timeout() -> None:
     assert "For `ak.wwise.core.soundbank.generated`" in QUERY
-    assert "Run `topic-schema`" in QUERY
+    assert "`topic-schema` shortcuts" in QUERY
     assert "--include-object-identity" in QUERY
     assert "--match-platform-name <exact-name>" in QUERY
     assert "--match-soundbank-name <exact-name>" in QUERY
     assert "--event-entry platform - name <platform-name>" not in QUERY
     assert "--timeout 10 wait-topic ak.wwise.core.soundbank.generated" not in QUERY
-    assert "gateway itself keeps the ordinary 10-second omitted-duration default" in QUERY
-    assert "explicitly pass gateway-global `--timeout 120`" in QUERY
-    assert "an explicit Skill-selected timeout, not a different gateway default" in QUERY
-    assert "tell the user that this subscription will use 120 seconds" in QUERY
-    assert "user-supplied positive finite duration or explicit no-time-limit bounded wait still takes precedence" in QUERY
+    assert "Gateway still\ndefaults to 10 seconds" in QUERY
+    assert "explicitly pass gateway-global `--timeout 120`" in " ".join(QUERY.split())
+    assert "This is Skill-selected" in QUERY
+    assert "announce 120 seconds" in QUERY
+    assert "Explicit user timing/count intent takes precedence" in QUERY
 
 
 def test_topic_wait_duration_policy_is_explicit_and_output_remains_bounded() -> None:
@@ -609,13 +609,13 @@ def test_topic_wait_duration_policy_is_explicit_and_output_remains_bounded() -> 
     query_flat = " ".join(QUERY.split())
 
     for phrase in (
-        "tell the user the effective policy naturally",
+        "Tell the user the effective policy naturally",
         "ordinary omitted-duration default is 10 seconds",
         "converting units to seconds without rounding",
-        "`--timeout <positive-finite-seconds>` position before `wait-topic`",
-        "`wait-topic` subcommand flag `--no-timeout`",
+        "global `--timeout` before `wait-topic`",
+        "request selects `--no-timeout`",
         "until 1–64 requested matches or cancellation",
-        "is not an unlimited output stream",
+        "not an unlimited output stream",
         "Never combine those flags",
         "`choice_on_disclosure`",
         "run `field_disclosure` first",
@@ -626,11 +626,11 @@ def test_topic_wait_duration_policy_is_explicit_and_output_remains_bounded() -> 
 
     for phrase in (
         "An ordinary omitted duration uses 10 seconds",
-        "convert its units to seconds without rounding",
-        "Do not silently clamp it",
-        "is its default or recommendation, not a maximum",
-        "add the subcommand flag `--no-timeout`",
-        "the command still returns one terminal JSON document",
+        "convert units to seconds without rounding",
+        "never clamp",
+        "Contract timeouts are defaults, not maxima",
+        "Explicit no-limit waits use `--no-timeout`",
+        "1–64 matching events, one terminal JSON document",
         "business match facts from `topic-schema` are applied per event",
         "Gateway derives publish-schema paths, nested containers, wire types",
         "after success, timeout, or user cancellation",
@@ -654,7 +654,10 @@ def test_explicit_persistent_topic_intent_uses_one_streaming_subscription() -> N
 
     for phrase in (
         "Route ordinary vague “subscribe”, “listen”, or “monitor” wording to `wait-topic`",
-        "Select `stream-topic` only for explicit persistent intent",
+        "Select `stream-topic` for a requested event count",
+        "do not add the vague-request 10-second total timeout",
+        "--idle-timeout <seconds>",
+        "explicit total durations have no implicit idle cutoff",
         "It keeps one subscription",
         "flushes matched events",
         "requires an `--event-count <1..64>` ceiling",
@@ -673,16 +676,7 @@ def test_explicit_persistent_topic_intent_uses_one_streaming_subscription() -> N
         "Every streamed event and the cumulative NDJSON bytes are bounded and validated",
     ):
         assert phrase in query_flat
-    for intent in (
-        "stream",
-        "continuous",
-        "persistent",
-        "实时逐条",
-        "流式",
-        "持续",
-        "一直监听",
-        "不要收到后退出",
-    ):
+    for intent in ("requested event count", "per-event/persistent"):
         assert intent in SKILL
         assert intent in QUERY
 

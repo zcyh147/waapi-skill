@@ -3355,6 +3355,23 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   pytest runs rotate their default temporary roots. A Console run is not a
   Fresh Agent result; a successful preview is not an executed modification.
 
+## Console reflection is not the complete Authoring Topic inventory (2026-09-13)
+
+- The real 2021.1–2023.1 Authoring URI lists matched the packaged Console
+  lists; 2024.1/2025.1 did not. Their missing `ui.selectionChanged` and two
+  `ui.signal` Topics need the separately pinned Authoring Topic supplement.
+  A missing packaged schema is not proof that Wwise lacks the capability.
+- For a suspected host gap, read the running host's version and exact URI lists,
+  then collect matching schemas through the public Gateway. Never copy a prior
+  version's schema or turn an observed extra URI into automatic execution
+  permission. The fixed `ui.commands` supplement is not all Authoring UI APIs.
+- Keep schema discovery, event reception and Fresh Agent routing evidence
+  separate. A duration-limited stream with one of two requested events proves
+  reception/cleanup, not count completion. Preserve unresolved event `$ref`
+  markers as partial validation rather than silently upgrading the result.
+- See `docs/research/authoring-topic-monitoring-audit-2026-09-13.md` for the five
+  host inventories, retained raw evidence and scoped test results.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:

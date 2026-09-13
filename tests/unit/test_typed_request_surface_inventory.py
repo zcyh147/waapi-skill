@@ -58,17 +58,17 @@ def test_schema_inventory_resources_have_deterministic_bytes() -> None:
         assert path.read_text(encoding="utf-8") == writer.dumps(payload)
 
 
-def test_packaged_surface_closes_all_824_exact_lanes() -> None:
+def test_packaged_surface_closes_all_830_exact_lanes() -> None:
     result = validate_packaged_typed_request_surface(root=RESOURCE_ROOT)
 
     assert result["contract"] == TYPED_REQUEST_SURFACE_CONTRACT
     assert result["versions"] == list(SUPPORTED_WWISE_VERSION_KEYS)
     assert result["totals"] == {
         "function_lanes": 670,
-        "topic_lanes": 154,
-        "total_lanes": 824,
+        "topic_lanes": 160,
+        "total_lanes": 830,
         "unique_function_uris": 167,
-        "unique_topic_uris": 33,
+        "unique_topic_uris": 35,
     }
     assert result["unresolved_references"] == []
     assert result["unknown_schema_keywords"] == []

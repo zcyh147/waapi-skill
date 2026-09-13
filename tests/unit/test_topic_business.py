@@ -25,7 +25,7 @@ from wwise_waapi.versions import SUPPORTED_WWISE_VERSION_KEYS
 PROJECT_GUID = "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"
 
 
-def test_all_154_topic_lanes_compile_one_handle_free_business_contract() -> None:
+def test_all_160_topic_lanes_compile_one_handle_free_business_contract() -> None:
     lane_count = 0
 
     for version in SUPPORTED_WWISE_VERSION_KEYS:
@@ -55,7 +55,7 @@ def test_all_154_topic_lanes_compile_one_handle_free_business_contract() -> None
             assert all(row.fields for row in contract.row_fields)
             lane_count += 1
 
-    assert lane_count == 154
+    assert lane_count == 160
 
 
 def test_object_created_business_values_compile_exact_options_and_match() -> None:

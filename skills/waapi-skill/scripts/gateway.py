@@ -36,6 +36,7 @@ from wwise_waapi.capabilities import (  # noqa: E402  # pyright: ignore[reportMi
 from wwise_waapi.authoring_ui_commands_manifest import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     AUTHORING_UI_COMMAND_URIS,
 )
+from wwise_waapi.authoring_ui_topics_manifest import AUTHORING_UI_OBSERVATION_TOPICS  # noqa: E402
 from wwise_waapi.canonical import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     canonical_json_bytes,
     canonical_sha256,
@@ -575,6 +576,7 @@ OFFLINE_COMMANDS = frozenset(
     }
 )
 GATEWAY_RESULT_CONTRACT = "waapi-skill.gateway-result/v1"
+AUTHORING_HOST_REQUIRED_URIS = AUTHORING_UI_COMMAND_URIS | AUTHORING_UI_OBSERVATION_TOPICS
 TOPIC_STREAM_RECORD_CONTRACT = "waapi-skill.topic-stream/v1"
 GATEWAY_CONFIG_CONTRACT = "waapi-skill.config/v2"
 GATEWAY_SESSION_CONTEXT_CONTRACT = "waapi-skill.session-context/v2"
@@ -608,6 +610,7 @@ TOPIC_STREAM_TOTAL_OUTPUT_LIMIT_BYTES = (
 )
 TOPIC_STREAM_POLL_SECONDS = 0.05
 TOPIC_STREAM_HEALTH_INTERVAL_SECONDS = 5.0
+TOPIC_STREAM_DEFAULT_IDLE_SECONDS = 300.0
 MAX_GATEWAY_JSON_INPUT_BYTES = 256 * 1024
 MAX_GATEWAY_JSON_DEPTH = 32
 MAX_GATEWAY_JSON_NODES = 10_000
@@ -2092,6 +2095,15 @@ def build_parser() -> argparse.ArgumentParser:
             "Explicit maximum matching-event count before unsubscribe; required "
             f"for finite and no-time-limit streams and capped at {MAX_WAIT_EVENT_COUNT}"
         ),
+    )
+    stream_idle = stream_topic.add_mutually_exclusive_group()
+    stream_idle.add_argument(
+        "--idle-timeout", type=float,
+        help="Stop after this many positive finite seconds without a matching event; defaults to 300 only when no total --timeout is supplied",
+    )
+    stream_idle.add_argument(
+        "--no-idle-timeout", action="store_true",
+        help="Explicitly wait for the bounded event count without an idle cutoff",
     )
 
     topic_schema = subparsers.add_parser(
@@ -4631,7 +4643,7 @@ def live_authoring_api_boundary(
     live_info: Mapping[str, Any],
     common: Mapping[str, Any],
 ) -> dict[str, Any] | None:
-    if api not in AUTHORING_UI_COMMAND_URIS:
+    if api not in AUTHORING_HOST_REQUIRED_URIS:
         return None
     if live_info.get("isCommandLine") is False:
         return None
@@ -4785,7 +4797,7 @@ def preflight_public_route(
             catalog = CapabilityCatalog()
             capability = (
                 catalog.authoring_ui_describe(str(version), api)
-                if api in AUTHORING_UI_COMMAND_URIS
+                if api in AUTHORING_HOST_REQUIRED_URIS
                 else catalog.describe(str(version), api)
             )
         except CapabilityNotFoundError:
@@ -5965,6 +5977,9 @@ def preflight_json_inputs(args: argparse.Namespace) -> None:
     """Validate the remaining typed command-line documents before WAAPI."""
 
     if args.command in {"wait-topic", "stream-topic"}:
+        if args.command == "stream-topic" and args.idle_timeout is not None:
+            if not math.isfinite(args.idle_timeout) or args.idle_timeout <= 0:
+                raise GatewayInputError("idle-timeout must be finite and greater than zero")
         if (
             args.command == "wait-topic"
             and args.no_timeout
@@ -8285,6 +8300,13 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             "bounds": {
                 "stdout_utf8_bytes": MAX_TOPIC_SCHEMA_GATEWAY_RESULT_BYTES,
             },
+            "monitoring_policy": {
+                "skill_event_limit": MAX_WAIT_EVENT_COUNT,
+                "idle_default_seconds": TOPIC_STREAM_DEFAULT_IDLE_SECONDS,
+                "idle_override": "--idle-timeout",
+                "idle_disable": "--no-idle-timeout",
+                "default_idle_applies": "without_total_timeout",
+            },
             "continuation": {
                 "subcommands": ["wait-topic", "stream-topic"],
                 "default_input": "business",
@@ -8462,7 +8484,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 catalog = CapabilityCatalog()
                 capability = (
                     catalog.authoring_ui_describe(versions[0], args.api)
-                    if args.api in AUTHORING_UI_COMMAND_URIS
+                    if args.api in AUTHORING_HOST_REQUIRED_URIS
                     else catalog.describe(versions[0], args.api)
                 )
             except CapabilityNotFoundError:
@@ -14293,6 +14315,21 @@ def dispatch_topic_stream(
         max_event_bytes=result_limit_bytes,
     )
     stream_started_at = time.monotonic()
+    idle_seconds = (
+        None if args.no_idle_timeout
+        else args.idle_timeout if args.idle_timeout is not None
+        else TOPIC_STREAM_DEFAULT_IDLE_SECONDS if args.timeout is None
+        else None
+    )
+    idle_policy = {
+        "seconds": idle_seconds,
+        "source": (
+            "explicit_disabled" if args.no_idle_timeout
+            else "explicit" if args.idle_timeout is not None
+            else "default_count_monitor" if args.timeout is None
+            else "explicit_total_duration"
+        ),
+    }
     unbounded_timeout = math.isinf(connection.timeout)
     timeout_policy = {
         "mode": "unbounded" if unbounded_timeout else "finite",
@@ -14311,6 +14348,7 @@ def dispatch_topic_stream(
         "topic_contract_digest": args.topic_contract_digest,
         "match": match or None,
         "subscription_timeout": timeout_policy,
+        "idle_timeout": idle_policy,
     }
     started_record = attach_gateway_session_context(
         {
@@ -14336,6 +14374,7 @@ def dispatch_topic_stream(
     cleanup_status = "unknown"
     cleanup_failure: dict[str, Any] | None = None
     streamed_output_bytes = 0
+    completion_reason = "duration_elapsed"
     try:
         streamed_output_bytes += emit_topic_stream_record(
             started_record,
@@ -14357,10 +14396,17 @@ def dispatch_topic_stream(
         next_health_at = (
             time.monotonic() + TOPIC_STREAM_HEALTH_INTERVAL_SECONDS
         )
+        idle_expires_at = (
+            math.inf if idle_seconds is None else time.monotonic() + idle_seconds
+        )
         while True:
             now = time.monotonic()
             remaining = collection_expires_at - now
             if remaining <= 0:
+                break
+            idle_remaining = idle_expires_at - now
+            if idle_remaining <= 0:
+                completion_reason = "idle_timeout"
                 break
             if now >= next_health_at:
                 require_topic_stream_health(
@@ -14376,6 +14422,7 @@ def dispatch_topic_stream(
                     TOPIC_STREAM_POLL_SECONDS,
                     max(0.0, next_health_at - now),
                     remaining,
+                    idle_remaining,
                 )
             )
             if event is None:
@@ -14406,6 +14453,8 @@ def dispatch_topic_stream(
                 version=detected_version,
                 authoring_ui_profile=live_info.get("isCommandLine") is False,
             )
+            if idle_seconds is not None:
+                idle_expires_at = time.monotonic() + idle_seconds
             sequence = event_count + 1
             streamed_output_bytes += emit_topic_stream_record(
                 {
@@ -14428,6 +14477,7 @@ def dispatch_topic_stream(
                 agent_events.append(dict(event.payload))
             event_count = sequence
             if event_count >= args.event_count:
+                completion_reason = "event_count_reached"
                 break
     except KeyboardInterrupt as cancellation:
         try:
@@ -14478,6 +14528,8 @@ def dispatch_topic_stream(
         **stream_common,
         "record_type": "terminal",
         "event_count": event_count,
+        "requested_event_count": args.event_count,
+        "event_count_reached": event_count >= args.event_count,
         "elapsed_seconds": max(0.0, time.monotonic() - stream_started_at),
         "cleanup": cleanup_status,
     }
@@ -14515,12 +14567,8 @@ def dispatch_topic_stream(
     terminal.update(
         {
             "ok": True,
-            "status": "completed",
-            "completion_reason": (
-                "event_count_reached"
-                if event_count >= args.event_count
-                else "duration_elapsed"
-            ),
+            "status": "stopped" if completion_reason == "idle_timeout" else "completed",
+            "completion_reason": completion_reason,
         }
     )
     if args.api == SOUNDBANK_GENERATED_TOPIC_URI and args.include_object_identity:

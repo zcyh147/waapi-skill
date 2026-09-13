@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from copy import deepcopy
 from pathlib import Path
 
@@ -42,6 +43,29 @@ MANIFEST_ROOT = (
 )
 
 
+@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+def test_authoring_topic_resource_accepts_crlf_but_rejects_changed_schema(version: str, tmp_path: Path) -> None:
+    from wwise_waapi.authoring_ui_topics_manifest import FILENAME, merge_authoring_ui_topics
+    from wwise_waapi.authoring_ui_commands_manifest import AuthoringUiCommandsSupplementError
+
+    original = (MANIFEST_ROOT / version / FILENAME).read_text(encoding="utf-8")
+    target = tmp_path / version / FILENAME
+    target.parent.mkdir()
+    target.write_bytes(original.replace("\n", "\r\n").encode("utf-8"))
+    base = ManifestStore(root=MANIFEST_ROOT).load_with_authoring_ui_commands(version)
+    composed = merge_authoring_ui_topics(base, root=tmp_path, version=version)
+    assert len(composed["topics"]) == len(base["topics"]) + 3
+    assert "ak.wwise.ui.selectionChanged" not in {row["uri"] for row in base["topics"]}
+    damaged = json.loads(original)
+    damaged["schemas"]["ak.wwise.ui.selectionChanged"]["publishSchema"]["required"] = []
+    target.write_text(json.dumps(damaged), encoding="utf-8")
+    with pytest.raises(AuthoringUiCommandsSupplementError, match="digest mismatch"):
+        merge_authoring_ui_topics(base, root=tmp_path, version=version)
+    target.unlink()
+    with pytest.raises(AuthoringUiCommandsSupplementError, match="Missing Authoring Topic evidence"):
+        merge_authoring_ui_topics(base, root=tmp_path, version=version)
+
+
 def test_authoring_profile_has_fixed_five_version_counts_and_digests() -> None:
     registry = ExecutionContractRegistry()
     summary = validate_packaged_authoring_ui_execution_contracts(registry)
@@ -49,10 +73,10 @@ def test_authoring_profile_has_fixed_five_version_counts_and_digests() -> None:
     assert summary == {
         "contract": "waapi-skill.public-execution-contract/v2",
         "execution_profile": AUTHORING_UI_EXECUTION_PROFILE,
-        "manifest_rows": 824,
-        "executable_rows": 824,
+        "manifest_rows": 830,
+        "executable_rows": 830,
         "excluded_rows": 0,
-        "unique_public_uris": 200,
+        "unique_public_uris": 202,
         "inventory_sha256": PACKAGED_AUTHORING_UI_INVENTORY_SHA256,
         "by_version": {
             version: {
@@ -214,11 +238,13 @@ def test_authoring_capabilities_expose_correct_safety_route_and_evidence(
         assert record.full_authoring_inventory_reflected is False
         assert (
             record.manifest_runtime_profile
-            == "console-with-authoring-ui-commands"
+            == ("console-with-authoring-ui-commands-and-topics" if version in {"2024.1", "2025.1"}
+                else "console-with-authoring-ui-commands")
         )
         assert (
             record.authoring_ui_profile
-            == "fixed-five-uri-reflection-supplement"
+            == ("fixed-ui-commands-and-observation-topics" if version in {"2024.1", "2025.1"}
+                else "fixed-five-uri-reflection-supplement")
         )
         assert (
             record.authoring_ui_commands_supplement_evidence[

@@ -47,8 +47,8 @@ def test_generated_inventory_is_current_and_exactly_covers_both_surfaces() -> No
     assert inventory == build_interface_depth_inventory()
     native = inventory["native_lanes"]
     operations = inventory["operation_lanes"]
-    assert len(native) == 824
-    assert len({(row["version"], row["item_type"], row["uri"]) for row in native}) == 824
+    assert len(native) == 830
+    assert len({(row["version"], row["item_type"], row["uri"]) for row in native}) == 830
     expected_operations = {
         (name, version)
         for name, spec in OPERATION_SPECS.items()
@@ -314,7 +314,7 @@ def test_continuation_and_shell_mechanics_are_detected_per_exact_lane() -> None:
         row for row in inventory["native_lanes"]
         if row["item_type"] == "topic"
     ]
-    assert len(topics) == 154
+    assert len(topics) == 160
     assert all(
         row["mechanic_states"]["ambiguous_continuation_selection"]
         == "gateway_owned"
@@ -439,7 +439,7 @@ def test_completed_runtime_inspection_family_retains_issue_87_row_seal() -> None
     )
 
 
-def test_completed_topic_family_retains_issue_91_row_seal() -> None:
+def test_completed_topic_family_preserves_issue_91_baseline_with_authoring_additions() -> None:
     inventory = _inventory()
     completed = {
         family["id"]: family
@@ -448,8 +448,16 @@ def test_completed_topic_family_retains_issue_91_row_seal() -> None:
     topics = completed["generic-topics"]
 
     assert topics["github_issue"] == 91
-    assert topics["row_count"] == len(topics["rows"]) == 154
-    assert topics["rows_sha256"] == (
+    assert topics["row_count"] == len(topics["rows"]) == 160
+    added = {
+        f"{version}|topic|{uri}"
+        for version in ("2024.1", "2025.1")
+        for uri in ("ak.wwise.ui.selectionChanged", "ak.wwise.ui.signal.click", "ak.wwise.ui.signal.toggle")
+    }
+    assert added <= set(topics["rows"])
+    baseline = sorted(set(topics["rows"]) - added)
+    assert len(baseline) == 154
+    assert canonical_sha256(baseline) == (
         "48f62fffb957f2ed581bee75cb11ddd6"
         "624411b77fc307813d1984b5ce015982"
     )
@@ -591,7 +599,7 @@ def test_historical_construction_baseline_is_preserved_without_depth_claim() -> 
     baseline = _inventory()["historical_baseline"]
     assert baseline == {
         "contract": "waapi-skill.typed-request-surface/v1",
-        "total_lanes": 824,
+        "total_lanes": 830,
         "construction_coverage_is_depth_evidence": False,
     }
     assert set(SUPPORTED_WWISE_VERSION_KEYS) == {

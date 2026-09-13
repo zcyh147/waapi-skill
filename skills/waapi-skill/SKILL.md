@@ -82,20 +82,20 @@ Register a runtime Game Object with `request-schema ak.soundengine.registerGameO
 Every command except `stream-topic` prints one JSON document; streaming emits bounded NDJSON plus one terminal record.
 
 Route ordinary vague “subscribe”, “listen”, or “monitor” wording to `wait-topic`.
-Before invoking it, tell the user the effective policy naturally. Its ordinary
-omitted-duration default is 10 seconds; SoundBank-generated explicitly uses and
-reports `--timeout 120`. Preserve a user-supplied positive finite duration
-exactly (converting units to seconds without rounding) in the gateway-global
-`--timeout <positive-finite-seconds>` position before `wait-topic`. Only an
-explicit no-time-limit bounded-wait request selects the `wait-topic` subcommand
-flag `--no-timeout`; it waits until 1–64 requested matches or cancellation and
-is not an unlimited output stream. Never combine those flags. By
-default say “这次使用默认的 10 秒等待时间”.
+Tell the user the effective policy naturally: ordinary omitted-duration default
+is 10 seconds; SoundBank-generated uses `--timeout 120`. Preserve a positive finite
+duration, converting units to seconds without rounding, in global `--timeout`
+before `wait-topic`. An explicit no-time-limit bounded-wait request selects
+`--no-timeout`: until 1–64 requested matches or cancellation, not an unlimited
+output stream. Never combine those flags. Default: “这次使用默认的 10 秒等待时间”.
 
-Select `stream-topic` only for explicit persistent intent: stream, continuous,
-persistent, 实时逐条, 流式, 持续, 一直监听, or 不要收到后退出. It keeps one
-subscription, flushes matched events, requires an `--event-count <1..64>` ceiling, and
-may have a gateway-global timeout. Before every wait/stream,
+Select `stream-topic` for a requested event count (such as “监控十次”) or
+per-event/persistent output; do not add the vague-request 10-second total timeout.
+It keeps one subscription, flushes matched events, and requires an
+`--event-count <1..64>` ceiling. Announce `topic-schema.monitoring_policy`:
+default idle cutoff is 300 seconds; explicit total durations have no implicit
+idle cutoff. User overrides: `--idle-timeout <seconds>` / `--no-idle-timeout`.
+Before every wait/stream,
 run `topic-schema` and copy its digest and opaque `tvc1-*` handles. For
 `choice_on_disclosure`, run `field_disclosure` first and use only typed `*-as`;
 never guess untyped. Event size, count, cumulative bytes, and buffering are bounded; the

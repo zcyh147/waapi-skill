@@ -327,9 +327,9 @@ def test_offline_capability_profile_is_explicit_and_defaults_to_console(
     }
     assert authoring_payload["profile"] == "wwise-authoring-ui"
     assert authoring_payload["summary"]["profile"] == "wwise-authoring-ui"
-    assert authoring_payload["summary"]["totals"]["total"] == 824
+    assert authoring_payload["summary"]["totals"]["total"] == 830
     assert authoring_payload["summary"]["totals"]["interface_status"] == {
-        "available": 323,
+        "available": 329,
         "available_via_transaction": 501,
     }
     assert authoring_payload["filters"]["profile"] == "wwise-authoring-ui"
@@ -366,7 +366,7 @@ def test_offline_describe_can_inspect_authoring_only_supplement(
     capability = authoring_payload["availability"]["2024.1"]["capability"]
     assert (
         capability["interface"]["manifest_runtime_profile"]
-        == "console-with-authoring-ui-commands"
+        == "console-with-authoring-ui-commands-and-topics"
     )
     assert capability["interface"]["preferred_route"] == "transaction_operation"
     assert capability["interface"]["transaction_operations"] == [

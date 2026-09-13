@@ -150,15 +150,40 @@ comparison Bus path or id. Never omit it from the comparison Bus.
 
 ## Topics and Authoring-only reads
 
-`wait-topic` accepts one reviewed URI and 1–64 matches. An ordinary omitted duration uses 10 seconds; tell the user. A user-supplied positive finite duration is authoritative: convert its units to seconds without rounding and place global `--timeout` before the command. Do not silently clamp it. A Topic contract timeout is its default or recommendation, not a maximum. Explicit no-limit bounded wait must add the subcommand flag `--no-timeout`; Do not combine the two flags. Even then collection still stops at 1–64 matching events and the command still returns one terminal JSON document.
+`wait-topic`: one reviewed URI, 1–64 matching events, one terminal JSON document.
+An ordinary omitted duration uses 10 seconds. Explicit durations are authoritative:
+convert units to seconds without rounding into global `--timeout`, never clamp.
+Contract timeouts are defaults, not maxima. Explicit no-limit waits use
+`--no-timeout`, never combined with `--timeout`. Announce the effective policy.
 
 Before every wait/stream, run `topic-schema`, copy its complete contract digest and opaque value handles, and stop on missing/stale data. Recursive business match facts from `topic-schema` are applied per event; the Gateway derives publish-schema paths, nested containers, wire types, and matching structure. It unsubscribes after success, timeout, or user cancellation. The complete dispatcher collection still shares the topic execution contract's 256 KiB JSON result ceiling.
 
 For `ak.wwise.core.soundbank.generated`, the default `topic-schema` is the compact shortcut view. It omits the long-tail row and exact-entry catalogs; request those only when the shortcut fields cannot express the user's need, using `topic-schema <topic-uri> --catalog` before the relevant field disclosure. After a successful stream, terminal `agent_result` is the sole event-result authority for both natural-language and machine-readable answers. Report its exact events, and never report no events when its `event_count` is positive.
 
-Route ordinary vague requests to subscribe, listen, monitor through `wait-topic`. Select `stream-topic` only when the user explicitly asks for a stream, continuous, persistent, event-by-event, 实时逐条, 流式, 持续, 一直监听, or 不要收到后退出 intent. It keeps one persistent subscription, emits one compact flushed NDJSON record per match, and requires an explicit maximum `--event-count <1..64>`. It ends at the count, timeout, user cancellation, or a bounded low-frequency health check detects host loss. Every streamed event and the cumulative NDJSON bytes are bounded and validated; overflow fails closed instead of silently dropping an event. Every exit always attempts to unsubscribe and emits one terminal NDJSON record.
+Route ordinary vague requests to subscribe, listen, monitor through `wait-topic`;
+a requested event count or per-event/persistent output selects `stream-topic`.
+It emits one compact flushed NDJSON record per match from one persistent subscription and
+requires an explicit maximum `--event-count <1..64>` (a Skill limit, not WAAPI).
+Total: global `--timeout`; idle: `--idle-timeout` after `stream-topic`.
+Announce both and the count. Without a
+total duration, Gateway defaults to 300 idle seconds, reset only by matching
+events. Explicit total duration disables that default; explicit idle duration
+overrides it (30 minutes = 1800 seconds); `--no-idle-timeout` disables it.
+Clarify ambiguous timeout wording. Options are start-time, not live-adjustable.
+The stream ends at count/time limits, user cancellation, or a bounded low-frequency
+health check detects host loss. Every streamed event and the cumulative NDJSON
+bytes are bounded and validated; overflow fails closed instead of silently
+dropping an event. Every exit always attempts to unsubscribe and emits one
+terminal NDJSON record. For `idle_timeout`, report observed/target counts and
+the stop reason, not completion; do not automatically restart.
 
-For `ak.wwise.core.soundbank.generated`, the gateway itself keeps the ordinary 10-second omitted-duration default. The Skill must explicitly pass gateway-global `--timeout 120` and tell the user that this subscription will use 120 seconds. This is an explicit Skill-selected timeout, not a different gateway default; a user-supplied positive finite duration or explicit no-time-limit bounded wait still takes precedence. Run `topic-schema` and prefer its closed business shortcuts: `--include-object-identity` returns `id,name,type,path`; `--match-platform-name <exact-name>` binds the nested platform name without a handle; `--match-soundbank-name <exact-name>` binds a named Bank. Omit a match the user did not request and never inject a GUID in its place. The generic disclosed Topic facts remain available for other fields and topics.
+For a vague `ak.wwise.core.soundbank.generated` wait, explicitly pass gateway-global
+`--timeout 120` and announce 120 seconds. This is Skill-selected; Gateway still
+defaults to 10 seconds. Explicit user timing/count intent takes precedence.
+Prefer its `topic-schema` shortcuts: `--include-object-identity` returns
+`id,name,type,path`; `--match-platform-name <exact-name>` and
+`--match-soundbank-name <exact-name>` bind names without handles. Omit unrequested
+matches; never substitute GUIDs. Disclosed Topic facts cover other fields.
 
 Use `ak.wwise.core.soundbank.generated` for per-Bank × platform × language result events. Use `ak.wwise.core.soundbank.generationDone` only for the overall generation-cycle notice; `generationDone` is not proof that every Bank succeeded, so use the generating operation's terminal verification. `interface.selection_guidance` repeats this distinction.
 
