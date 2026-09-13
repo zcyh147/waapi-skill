@@ -87,8 +87,13 @@ establish that behavior.
 
 - Exact identity tests cover existing Action, MusicStinger, MusicPlaylistItem
   and RTPC, not every possible Wwise class or plugin.
-- Stinger Trigger mutation checks that Segment is preserved; no new Stinger
-  creation or playback claim follows.
+- Stinger Trigger mutation on 2023–2025 checks that Segment is preserved;
+  2021/2022 live metadata does not expose these references, so those lanes
+  check explicit zero-match refusal and unchanged identity without a mutation.
+  No new Stinger creation or playback claim follows. The initial `6af6c90`
+  2021 run retained 12 PASS / 1 FAIL because the test incorrectly assumed the
+  newer reference surface. The correction changes only the test and keeps the
+  Gateway's existing fail-closed discovery behavior.
 - Effect tests compare old slot GUIDs and effect references after append.
   They do not infer audible processing order from an arbitrary query order.
 - Generic list clearing is a fake-WAAPI full Gateway regression. A returned

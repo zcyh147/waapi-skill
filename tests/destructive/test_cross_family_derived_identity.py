@@ -132,11 +132,52 @@ def _stinger_state(runtime) -> Mapping[str, Any]:
 
 @pytest.mark.live
 @pytest.mark.destructive
-def test_cross_family_existing_stinger_trigger_change_preserves_segment(
+def test_cross_family_existing_stinger_versioned_reference_boundary_and_change(
     workflow_sandbox_runtime,
 ) -> None:
-    """Change only a real existing Stinger reference in the disposable copy."""
+    """2021/22 do not expose these references; 2023–25 allow the scoped edit.
+
+    Matching installed WObjects.xml MusicStinger definitions omit both
+    references in 2021.1.14 (line 2790) and 2022.1.19 (line 2810), but include
+    Trigger/Segment in 2023.1.19 (2792/2799), 2024.1.13 (2760/2767), and
+    2025.1.7 (2836/2843). Live metadata, not that offline list, is asserted here.
+    """
     runtime = workflow_sandbox_runtime
+    if runtime.version in {"2021.1", "2022.1"}:
+        before = _exact_identity(runtime, STINGER)
+        queried = runtime.gateway([
+            "query-object", "--exact-id", STINGER,
+            "--include-field", "Trigger", "--include-field", "Segment",
+        ], live=True)
+        unavailable = queried["agent_result"]
+        assert isinstance(unavailable, Mapping), queried
+        unresolved = {row["meaning"]: row["candidate_names"] for row in unavailable["unresolved"]}
+        assert unresolved["Trigger"] == [], queried
+        assert "Segment" in unresolved and "Segment" not in unresolved["Segment"], queried
+        draft = _start_business_draft(runtime, "object.setReference")
+        owner = _bind_business_object(runtime, draft, object_id=STINGER)
+        code, discovered = runtime.raw_gateway([
+            "draft-discover-fields", draft.draft_id,
+            "--task-authority", draft.task_authority,
+            "--expected-revision", str(draft.revision),
+            "--object-handle", owner, "--meaning", "Trigger",
+        ])
+        assert code == 2 and discovered["error_code"] == "GatewayInputError", discovered
+        assert discovered["details"]["stage"] == "field_discovery", discovered
+        assert discovered["details"]["draft_changed"] is False, discovered
+        assert discovered["details"]["meaning_results"] == [{
+            "meaning": "Trigger", "candidate_count": 0, "match_status": "no_matches",
+        }], discovered
+        assert _exact_identity(runtime, STINGER) == before
+        runtime.category_results.append({
+            "category": "cross-family-existing-stinger-trigger",
+            "status": "PASS",
+            "verifier_strength": "live_unexposed_reference_boundary_no_edit_or_playback",
+            "reference_scope": "Trigger_zero_candidates_Segment_not_an_exact_reference",
+            "object_id": STINGER,
+            "transaction_ids": [],
+        })
+        return
     before = _stinger_state(runtime)
     assert before["type"] == "MusicStinger", before
     assert before["references"]["Trigger"]["id"] == BONUS_TRIGGER, before
