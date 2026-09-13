@@ -612,23 +612,23 @@ def test_object_graph_field_limit_counts_compiled_properties_and_references() ->
 
 
 @pytest.mark.parametrize(
-    ("parent_type", "child_kind", "expected_list"),
+    ("parent_type", "child_kind", "hierarchy"),
     (
         ("StateGroup", "state", "States"),
         ("SwitchGroup", "switch", "Switches"),
     ),
 )
-def test_object_create_derives_game_sync_list_from_bound_parent(
+def test_object_create_keeps_game_sync_value_as_a_normal_child(
     parent_type: str,
     child_kind: str,
-    expected_list: str,
+    hierarchy: str,
 ) -> None:
     session, _parent_handle = _session("2025.1")
     parent = session.handles.bind_object(
         object_id="{99999999-9999-9999-9999-999999999999}",
         name="Weather Mode",
         object_type=parent_type,
-        path=rf"\Game Parameters\Default Work Unit\Weather Mode",
+        path=rf"\{hierarchy}\Default Work Unit\Weather Mode",
     )
     child_type = session.handles.bind_type(
         class_id=77 if child_kind == "state" else 88,
@@ -648,7 +648,11 @@ def test_object_create_derives_game_sync_list_from_bound_parent(
 
     request = business_adapter("object.create").materialize(session)
 
-    assert request["arguments"]["list"] == expected_list
+    assert request["arguments"] == {
+        "parent": {"kind": "id", "value": parent.object_id},
+        "type": child_kind.title(),
+        "name": "Storm",
+    }
 
 
 def test_object_set_compiles_voice_language_platform_and_subordinate_media() -> None:

@@ -2079,7 +2079,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "dynamic @ fields are produced only after live object-type and getPropertyInfo validation",
             "each row accepts one regular audio_file, one bounded RIFF/WAVE audio_file_base64, or a typed structure-only import",
             "useExisting preserves an existing target GUID; replaceExisting requires the old GUID to disappear",
-            "a live non-SFX localized useExisting row dispatches only audioFile/objectPath/importLanguage; objectType is consumed by live type preflight and other requested row fields are rejected",
+            "a live non-SFX localized useExisting row uses a Gateway-owned versioned source binding: audioFile/objectPath/importLanguage, plus an exact discovered source GUID importLocation for 2025 reimport; objectType is consumed by live type preflight and other requested row fields are rejected",
             "replaceExisting is irreversible and must be exercised only in a disposable project copy during tests",
             "auto_add_to_source_control is explicit and defaults to false",
             "auto_check_out_to_source_control defaults to false and is accepted only in Wwise 2023.1-2025.1; explicit use on 2021.1/2022.1 fails before connection",
@@ -8574,6 +8574,29 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 "INVALID_ARGUMENT",
                 "object and parent must identify different live objects.",
             )
+        # Matching Console probes accept this move in 2021/22 but reject it
+        # natively in 2023–25. Creation ownership does not imply reparenting
+        # capability. Keep copy and same-group behavior separate.
+        if (
+            request.operation == "object.move"
+            and request.version in {"2023.1", "2024.1", "2025.1"}
+            and source.row.get("type") in {"State", "Switch"}
+            and not _same_identity(_parent_value(source.row.get("parent")), parent.object)
+        ):
+            raise OperationContractError(
+                "GAME_SYNC_REPARENT_UNSUPPORTED",
+                "This Wwise version does not support moving an existing State or Switch to another group.",
+                details={
+                    "operation": request.operation,
+                    "version": request.version,
+                    "object_id": source.object,
+                    "object_type": source.row.get("type"),
+                    "source_parent_id": _parent_value(source.row.get("parent")),
+                    "destination_parent_id": parent.object,
+                    "destination_parent_type": parent.row.get("type"),
+                    "repair": "Keep the value in its current group; do not retry this move or replace it with automatic copy/delete/recreation.",
+                },
+            )
         _reject_protected_delete(source)
         roles.update({"object": source, "parent": parent})
         conflict = str(arguments.get("on_name_conflict", "fail"))
@@ -10278,6 +10301,39 @@ def _prepare_import_dynamic_fields(
     return targets, trusted_dispatch, roles
 
 
+def _localized_source_snapshot(owner_id: str, *, read: ReadCall) -> dict[str, Any]:
+    """Bound language-specific source identity without language-ambiguous paths."""
+    if not isinstance(owner_id, str) or not _PLUGIN_GUID.fullmatch(owner_id):
+        raise OperationContractError("INVALID_READBACK", "Voice source owner must be a canonical GUID.")
+    rows = _rows(read(
+        OBJECT_GET_URI,
+        {"waql": f'from object "{owner_id}" select children take {OBJECT_LIST_MAX_SUBTREE_NODES + 1}'},
+        {"return": ["id", "name", "type", "path", "parent", "audioSource:language"]},
+    ))
+    if len(rows) > OBJECT_LIST_MAX_SUBTREE_NODES:
+        raise OperationContractError("LOCALIZED_SOURCE_LIMIT_EXCEEDED", "Voice source discovery exceeded its bounded child limit.")
+    seen: set[str] = set()
+    for row in rows:
+        object_id = row.get("id")
+        if (
+            not isinstance(object_id, str)
+            or not _PLUGIN_GUID.fullmatch(object_id)
+            or str(object_id).casefold() in seen
+            or not _same_identity(_reference_identity(row.get("parent")), owner_id)
+            or not isinstance(row.get("path"), str)
+            or not isinstance(row.get("name"), str)
+            or not isinstance(row.get("type"), str)
+            or not row["type"]
+        ):
+            raise OperationContractError("INVALID_READBACK", "Voice source discovery returned malformed or unrelated children.")
+        if _object_type_token(row.get("type")) == "audiofilesource":
+            language = row.get("audioSource:language")
+            if not isinstance(language, Mapping) or not isinstance(language.get("name"), str) or not language["name"]:
+                raise OperationContractError("INVALID_READBACK", "An AudioFileSource must disclose its exact language.")
+        seen.add(str(object_id).casefold())
+    return {"owner_id": owner_id, "rows": sorted(rows, key=lambda row: row["id"].casefold())}
+
+
 def _import_requires_explicit_source(target: Mapping[str, Any]) -> bool:
     return target.get("media_expected") is True and (
         bool(target.get("validated_properties") or target.get("validated_references"))
@@ -11012,7 +11068,7 @@ def _prepare_closed_import_plan(
             raise OperationContractError(
                 "LOCALIZED_EXISTING_IMPORT_FIELDS",
                 "A localized useExisting row that resolves to a live target may "
-                "dispatch only audioFile, objectPath, and importLanguage. Remove "
+                "accept only media and language inputs; the Gateway owns native source targeting. Remove "
                 "creation/placement fields or submit their semantics through a "
                 "separately previewed operation.",
                 details={
@@ -11214,18 +11270,48 @@ def _prepare_closed_import_plan(
                         "A localized existing audio.import row lacks its requested objectPath.",
                         details={"index": index, "objectPath": input_object_path},
                     )
-                wire_object_path = f"{canonical_parent}\\<Sound Voice>{leaf}"
+                snapshot = _localized_source_snapshot(str(target["preexisting_id"]), read=read)
+                matching_sources = [source for source in snapshot["rows"]
+                                    if source.get("path") == target.get("expected_audio_file_source_result_path")
+                                    and _object_type_token(source.get("type")) == "audiofilesource"
+                                    and source["audioSource:language"]["name"] == language]
+                if len(matching_sources) > 1:
+                    raise OperationContractError(
+                        "AMBIGUOUS_LOCALIZED_SOURCE", "More than one AudioFileSource matches this Voice filename and language.",
+                        details={"object_id": target["preexisting_id"], "language": language,
+                                 "source_path": target.get("expected_audio_file_source_result_path"),
+                                 "candidate_count": len(matching_sources)},
+                    )
+                localized_active_source = matching_sources[0]["id"] if matching_sources else None
+                target["localized_source_snapshot"] = snapshot
+                target["localized_audio_file_source_id"] = localized_active_source
+                # Console 2021/2022 reuse the language source through the typed
+                # Sound Voice path; source-GUID importLocation silently imports
+                # nothing there. Console 2025 instead needs that exact source
+                # location to avoid creating a duplicate same-language source.
+                # Keep the older wire shape outside the established 2025 lane.
+                localized_guid_location = (
+                    _valid_object_id(localized_active_source) and request.version == "2025.1"
+                )
+                wire_object_path = (
+                    "" if localized_guid_location
+                    else f"{canonical_parent}\\<Sound Voice>{leaf}"
+                )
                 row["objectPath"] = wire_object_path
+                if localized_guid_location:
+                    row["importLocation"] = localized_active_source
                 consumed: list[str] = []
                 if "objectType" in row:
                     row.pop("objectType")
                     consumed.append("object_type")
                 expected_wire_fields = {"audioFile", "objectPath", "importLanguage"}
+                if localized_guid_location:
+                    expected_wire_fields.add("importLocation")
                 if set(row) != expected_wire_fields:
                     raise OperationContractError(
                         "INVALID_PREVIEW",
                         "A localized existing audio.import row did not reduce to the "
-                        "closed three-field wire contract.",
+                        "closed versioned localized-source wire contract.",
                         details={
                             "index": index,
                             "target_path": target.get("canonical_target_path"),
@@ -11245,6 +11331,7 @@ def _prepare_closed_import_plan(
                             "preexisting_id": target.get("preexisting_id"),
                             "reflected_type": live_type,
                             "requested_language": language,
+                            "localized_source_id": localized_active_source,
                         },
                     }
                 )
@@ -11421,6 +11508,8 @@ def _prepare_closed_import_plan(
         "source_operation": source_operation,
         "file_proofs": file_proofs,
         "path_snapshots": path_snapshots,
+        "localized_source_snapshots": [target["localized_source_snapshot"] for target in targets
+                                       if "localized_source_snapshot" in target],
         "language_inventory": _json_mapping(language_inventory) if language_inventory is not None else None,
     }
     if wire_path_input_audit is not None:
@@ -13914,6 +14003,15 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                     "evidence": evidence,
                 }
             )
+        for snapshot in import_guard.get("localized_source_snapshots", []):
+            if not isinstance(snapshot, Mapping) or not isinstance(snapshot.get("rows"), list):
+                raise OperationContractError("INVALID_PREVIEW", "Localized source guard is malformed.")
+            actual = _localized_source_snapshot(snapshot.get("owner_id"), read=read_call)
+            assertions.append({
+                "name": "localized Voice source identities unchanged since preview",
+                "passed": actual == snapshot,
+                "evidence": {"expected": snapshot, "actual": actual},
+            })
         for index, snapshot in enumerate(import_guard.get("path_snapshots", [])):
             if not isinstance(snapshot, Mapping):
                 raise OperationContractError("INVALID_PREVIEW", "Import path snapshot is malformed.")
@@ -17821,16 +17919,28 @@ def verify_prepared_operation(
                 if isinstance(expected_source_path, str)
                 else []
             )
+            # A source-bound localized reimport can omit its unchanged source
+            # from the native result. Only that preview-bound GUID permits the
+            # exception, with exact live ownership/language/hash proof below.
+            # This does not relax ordinary SFX or MusicTrack result contracts.
+            omitted_sound_source = (
+                existing_use_existing
+                and isinstance(expected_source_path, str)
+                and not returned_source_matches
+                and _valid_object_id(target.get("localized_audio_file_source_id"))
+                and _object_type_token(target.get("requested_object_type", "Sound"))
+                in {"sound", "soundsfx", "soundvoice"}
+            )
             if isinstance(expected_source_path, str):
                 check(
                     (
                         f"{label} AudioFileSource is returned exactly once"
-                        if existing_use_existing
+                        if existing_use_existing and not omitted_sound_source
                         else f"{label} AudioFileSource result is optional but unique"
                     ),
                     (
                         len(returned_source_matches) == 1
-                        if existing_use_existing
+                        if existing_use_existing and not omitted_sound_source
                         else len(returned_source_matches) <= 1
                     ),
                     {
@@ -17953,7 +18063,13 @@ def verify_prepared_operation(
                     _field_value(live_row, "activeSource")
                 )
                 if music_media or (version == "2021.1" and active_source_id is None):
-                    active_source_id = returned_source_id
+                    active_source_id = returned_source_id or target.get("localized_audio_file_source_id")
+                if omitted_sound_source:
+                    check(
+                        f"{label} omitted source result has a canonical live active source",
+                        _valid_object_id(active_source_id),
+                        {"activeSource": _field_value(live_row, "activeSource")},
+                    )
                 if len(returned_source_matches) == 1:
                     returned_source = returned_source_matches[0]
                     returned_parent_id = _reference_identity(
@@ -17979,7 +18095,7 @@ def verify_prepared_operation(
                         )
                 if active_source_id is not None:
                     source_fields = _import_audio_source_return_fields(version=version)
-                    if music_media:
+                    if music_media or omitted_sound_source:
                         source_fields.append("parent")
                         if version == "2021.1":
                             source_fields.append("originalWavFilePath")
@@ -17991,6 +18107,19 @@ def verify_prepared_operation(
                     check(f"{label} active Audio Source resolves once", len(source_rows) == 1, source_rows)
                     if len(source_rows) == 1:
                         audio_source_row = source_rows[0]
+                        if target.get("localized_audio_file_source_id") is not None:
+                            check(
+                                f"{label} reimport preserves the bound localized source GUID",
+                                _same_identity(audio_source_row.get("id"), target["localized_audio_file_source_id"]),
+                                {"expected": target["localized_audio_file_source_id"], "actual": audio_source_row.get("id")},
+                            )
+                        if omitted_sound_source:
+                            check(
+                                f"{label} omitted source result is proven by exact live ownership",
+                                _object_type_token(audio_source_row.get("type")) == "audiofilesource"
+                                and _same_identity(_reference_identity(audio_source_row.get("parent")), live_id),
+                                audio_source_row,
+                            )
                         if music_media:
                             check(
                                 f"{label} live music source belongs to the Track",
@@ -18025,6 +18154,34 @@ def verify_prepared_operation(
                         False,
                         {"activeSource": _field_value(live_row, "activeSource")},
                     )
+
+                localized_snapshot = target.get("localized_source_snapshot")
+                if isinstance(localized_snapshot, Mapping):
+                    def read_localized_sources(uri, args, options):
+                        result = read_call(uri, args, options)
+                        readbacks.append({"uri": uri, "args": args, "options": options, "result": result})
+                        return result
+
+                    try:
+                        after_sources = _localized_source_snapshot(str(live_id), read=read_localized_sources)
+                    except OperationContractError as exc:
+                        check(f"{label} localized source collection remains valid", False, exc.as_dict())
+                    else:
+                        after_rows = after_sources["rows"]
+                        selected = [row for row in after_rows
+                                    if row.get("path") == expected_source_path
+                                    and _object_type_token(row.get("type")) == "audiofilesource"
+                                    and row["audioSource:language"]["name"] == target.get("requested_language")]
+                        check(f"{label} localized source is unique after import", len(selected) == 1, selected)
+                        before_by_id = {row["id"].casefold(): row for row in localized_snapshot["rows"]}
+                        after_by_id = {row["id"].casefold(): row for row in after_rows}
+                        expected_ids = set(before_by_id) | {row["id"].casefold() for row in selected}
+                        check(
+                            f"{label} localized import preserves existing source identities and other languages",
+                            set(after_by_id) == expected_ids
+                            and all(after_by_id.get(key) == row for key, row in before_by_id.items()),
+                            {"before": localized_snapshot["rows"], "after": after_rows},
+                        )
 
                 if explicit_source_preexisting_id is not None:
                     live_source_id = (

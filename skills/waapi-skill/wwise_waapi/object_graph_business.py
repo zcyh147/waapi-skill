@@ -175,21 +175,12 @@ def _object_type_token(value: Any) -> str:
     )
 
 
-def _derived_game_sync_list(parent_type: Any, child_type: Any) -> str | None:
-    pair = (_object_type_token(parent_type), _object_type_token(child_type))
-    return {
-        ("stategroup", "state"): "States",
-        ("switchgroup", "switch"): "Switches",
-    }.get(pair)
-
-
 def _validate_specialized_relationship(
     session: BusinessDeclarationSession,
     *,
     parent_type: Any,
     child_type: Any,
-) -> str | None:
-    derived = _derived_game_sync_list(parent_type, child_type)
+) -> None:
     capability = object_child_capability(
         version=session.context.wwise_version,
         parent_type=parent_type,
@@ -226,7 +217,6 @@ def _validate_specialized_relationship(
             allowed_parent_types=list(required_parents),
             action="bind the reviewed Wwise parent type for this child kind",
         )
-    return derived
 
 
 def _compile_object_set_import(
@@ -806,21 +796,11 @@ def _materialize_create(
         **root_node,
         **_compile_create_settings(session),
     }
-    game_sync_list = _validate_specialized_relationship(
+    _validate_specialized_relationship(
         session,
         parent_type=parent.object_type,
         child_type=root_node["type"],
     )
-    if game_sync_list is not None:
-        if arguments.get("on_name_conflict") == "replace":
-            raise _repair(
-                session,
-                "OBJECT_CREATE_LIST_REPLACE_UNAVAILABLE",
-                field="name_conflict",
-                choices=["fail", "rename", "merge"],
-                action="use object.set replace-all for destructive object-list replacement",
-            )
-        arguments["list"] = game_sync_list
     return parse_operation_request(
         {
             "contract": "waapi-skill.operation-request/v1",
@@ -1338,31 +1318,22 @@ def _materialize_set(
             declaration,
             allow_object_list=True,
         )
-        specialized = _validate_specialized_relationship(
+        _validate_specialized_relationship(
             session,
             parent_type=parent.object_type,
             child_type=node["type"],
         )
-        if specialized is not None and object_list not in {None, specialized}:
-            raise _repair(
-                session,
-                "OBJECT_GRAPH_RELATIONSHIP_INVALID",
-                field="object_list",
-                choices=[specialized],
-                action="use the canonical Wwise Game Sync list for this value kind",
-            )
-        effective_list = object_list or specialized
-        if effective_list is None:
+        if object_list is None:
             row.setdefault("children", []).append(node)
         else:
             _apply_row_list_behavior(session, row, list_behavior)
             lists = row.setdefault("lists", [])
             existing = next(
-                (item for item in lists if item["name"] == effective_list),
+                (item for item in lists if item["name"] == object_list),
                 None,
             )
             if existing is None:
-                existing = {"name": effective_list, "objects": []}
+                existing = {"name": object_list, "objects": []}
                 lists.append(existing)
             existing["objects"].append(node)
     for row in rows:

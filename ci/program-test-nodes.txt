@@ -47,6 +47,10 @@ tests/unit/test_audio_import_business_gateway.py
 tests/unit/test_audio_import_business_migration.py
 tests/unit/test_business_declarations.py
 tests/unit/test_non_intrinsic_identity_gateway.py
+tests/unit/test_cross_family_bus_gateway.py
+tests/unit/test_cross_family_collection_gateway.py
+tests/unit/test_cross_family_voice_import.py
+tests/unit/test_cross_family_game_sync_gateway.py
 tests/unit/test_business_declaration_state.py
 tests/unit/test_business_planning.py
 tests/unit/test_core_business_adapter.py

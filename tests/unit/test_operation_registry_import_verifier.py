@@ -77,8 +77,10 @@ class ScriptedReader:
         project_root: Path | None = None,
         originals_root: Path | None = None,
         legacy_project_file: Path | None = None,
+        source_children: list[Mapping[str, Any]] | None = None,
     ) -> None:
         self.responses = deque(responses)
+        self.source_children = source_children
         self.calls: list[tuple[str, Mapping[str, Any], Mapping[str, Any]]] = []
         self.project_languages = [
             dict(row)
@@ -106,6 +108,9 @@ class ScriptedReader:
 
     def __call__(self, uri: str, args: Mapping[str, Any], options: Mapping[str, Any]) -> Mapping[str, Any]:
         self.calls.append((uri, dict(args), dict(options)))
+        if (self.source_children is not None and uri == "ak.wwise.core.object.get"
+                and args.get("waql", "").endswith(" select children take 129")):
+            return {"return": self.source_children}
         if uri == "ak.wwise.core.object.getTypes":
             return LIVE_SOUND_TYPES
         if uri == "ak.wwise.core.getProjectInfo":
@@ -1161,6 +1166,7 @@ def test_use_existing_live_localized_row_has_exact_three_field_wire_shape(
     )
     reader = ScriptedReader(
         [{"return": [anchor]}, {"return": [existing]}],
+        source_children=[],
         project_languages=[
             {"id": "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}", "name": "Japanese", "shortId": 2}
         ],
@@ -1201,6 +1207,7 @@ def test_use_existing_live_localized_row_has_exact_three_field_wire_shape(
                 "preexisting_id": OLD_GUID,
                 "reflected_type": "Sound",
                 "requested_language": "Japanese",
+                "localized_source_id": None,
             },
         }
     ]
@@ -1233,6 +1240,7 @@ def test_use_existing_live_localized_row_has_exact_three_field_wire_shape(
             {"return": [anchor, existing]},
             {"return": [existing]},
         ],
+        source_children=[],
         project_languages=[
             {"id": "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}", "name": "Japanese", "shortId": 2}
         ],
@@ -1302,6 +1310,7 @@ def test_use_existing_live_localized_typed_input_normalizes_from_canonical_paren
     )
     reader = ScriptedReader(
         [{"return": [anchor]}, {"return": [existing]}],
+        source_children=[],
         project_languages=[
             {
                 "id": "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}",
@@ -2077,6 +2086,57 @@ def test_use_existing_verifies_guid_fields_audio_source_and_original_hash(tmp_pa
         "import target 0 Originals subfolder matches",
         "import target 0 copied original WAV hash matches the source",
     }
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("defect", (None, "wrong-parent", "wrong-type", "wrong-language", "missing-source",
+                                    "extra-source", "missing-other-language", "changed-other-language"))
+def test_reimport_may_omit_source_result_only_with_exact_live_source_proof(
+    tmp_path: Path, version: str, defect: str | None,
+) -> None:
+    source = _media(tmp_path, "Line.wav", b"RIFF-new-English-WAVE")
+    copied = _media(tmp_path, "Originals/Voices/English(US)/Line.wav", source.read_bytes())
+    path = (NEW_ROOT if version == "2025.1" else OLD_ROOT) + r"\Voice"
+    before = _object_row(path, copied, object_id=OLD_GUID)
+    target = _target(source, path, pre_state_rows=[before],
+                     requested_object_type="Sound Voice", requested_language="English(US)",
+                     localized_audio_file_source_id=SOURCE_GUID)
+    live = _object_row(path, copied, object_id=OLD_GUID, activeSource={"id": SOURCE_GUID})
+    audio = {"id": SOURCE_GUID, "name": "Line", "type": "AudioFileSource",
+             "path": path + r"\Line", "parent": {"id": OLD_GUID}, "notes": "",
+             "originalFilePath": str(copied), "originalWavFilePath": str(copied),
+             "audioSource:language": {"name": "English(US)"}}
+    identity_keys = ("id", "name", "type", "path", "parent", "audioSource:language")
+    english = {key: audio[key] for key in identity_keys}
+    japanese = {**english, "id": SECOND_GUID, "audioSource:language": {"name": "Japanese"}}
+    target["localized_source_snapshot"] = {"owner_id": OLD_GUID, "rows": [english, japanese]}
+    children = [english, japanese]
+    if defect == "wrong-parent":
+        audio["parent"] = {"id": SECOND_GUID}
+    elif defect == "wrong-type":
+        audio["type"] = "MusicTrack"
+    elif defect == "wrong-language":
+        audio["audioSource:language"] = {"name": "Japanese"}
+    elif defect == "extra-source":
+        children = [english, japanese, {**english, "id": EVENT_GUID}]
+    elif defect == "missing-other-language":
+        children = [english]
+    elif defect == "changed-other-language":
+        children = [english, {**japanese, "audioSource:language": {"name": "French"}}]
+
+    class SourceReader(ScriptedReader):
+        def __call__(self, uri, args, options):
+            if args.get("waql") == f'from object "{OLD_GUID}" select children take 129':
+                return {"return": children}
+            return super().__call__(uri, args, options)
+
+    reader = SourceReader([{"return": [live]}, {"return": [] if defect == "missing-source" else [audio]}])
+    verified = verify_prepared_operation(
+        _prepared(version=version, targets=[target], import_operation="useExisting",
+                  originals_root=tmp_path / "Originals"),
+        execution_result=_result(version, [], [copied]), read_call=reader,
+    )
+    assert verified.status == ("verified" if defect is None else "verification_failed"), verified
 
 
 def test_localized_verifier_scopes_sound_and_active_source_reads_to_row_language(
