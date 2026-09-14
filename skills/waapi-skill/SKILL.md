@@ -32,7 +32,7 @@ Read only the reference needed for the current task, once, completely and as
 UTF-8 text. Reuse complete instructions already visible in the conversation.
 Use the environment's file-reading tool or a compatible shell. Shell reads
 are standalone: POSIX may use `cat '<absolute-file>'`; native Windows uses
-PowerShell Core with `Get-Content -Raw -Encoding UTF8 '<absolute-file>'`.
+PowerShell Core, for example `Get-Content -Raw -Encoding UTF8 '<absolute-file>'`.
 Choose by the actual execution environment, not the connected Wwise version
 or the spelling of a path. A missing or truncated read stops the workflow.
 For query/operate references, the matching `WAAPI_QUERY_REFERENCE_END` or

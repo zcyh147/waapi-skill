@@ -53,6 +53,19 @@ def test_intro_uses_gateway_facts_without_exact_sentence_matching() -> None:
     assert not all(welcome.introduction_checks(INTRO, {}).values())
 
 
+@pytest.mark.parametrize("phrase", (
+    "尚未确认已连接", "还未验证是否已成功连接", "未确认已连接",
+))
+def test_offline_intro_accepts_unconfirmed_connection_but_rejects_a_separate_claim(phrase) -> None:
+    unconfirmed = INTRO + phrase + "。"
+
+    assert welcome.introduction_checks(unconfirmed, FACTS)["offline_wording"]
+    for affirmative in ("已连接 Wwise。", "已成功连接 Wwise。", "当前连接的 Wwise 已就绪。"):
+        assert not welcome.introduction_checks(
+            unconfirmed + affirmative, FACTS
+        )["offline_wording"]
+
+
 @pytest.mark.parametrize("display", ["WAAPI 端口为 18765", "WAAPI port: 18765"])
 def test_intro_accepts_localized_port_without_requiring_the_full_url(display) -> None:
     text = INTRO.replace("ws://127.0.0.1:18765/waapi", display)

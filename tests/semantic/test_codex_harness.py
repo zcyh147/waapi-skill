@@ -4860,19 +4860,11 @@ def test_posix_shell_wrapper_accepts_only_exact_executable_option_and_script(
     ("script", "output"),
     (
         (
-            r"Get-Content -Raw -Encoding UTF8 '.agents/skills/waapi-skill/SKILL.md'",
-            "# skill\n",
-        ),
-        (
             r"Get-Content -Raw -Encoding UTF8 '.agents\skills\waapi-skill\..\waapi-skill\SKILL.md'",
             "# skill\n",
         ),
         (
             r"Get-Content -Encoding UTF8 '.agents\skills\waapi-skill\SKILL.md'",
-            "# skill\n",
-        ),
-        (
-            r"Get-Content -Raw '.agents\skills\waapi-skill\SKILL.md'",
             "# skill\n",
         ),
         (
@@ -4946,6 +4938,123 @@ def test_windows_get_content_utf8_newline_contract(
     assert facts.skill_read is accepted
     assert facts.allowed_read_commands == ((command,) if accepted else ())
     assert facts.unexpected_commands == (() if accepted else (command,))
+
+
+@pytest.mark.parametrize("encoding", ("", " -Encoding UTF8"))
+@pytest.mark.parametrize("output", ("# skill\n声音\n", "# skill\r\n声音\r\n\r\n"))
+def test_attested_powershell_core_raw_read_proves_utf8_from_complete_content(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    encoding: str,
+    output: str,
+) -> None:
+    monkeypatch.setattr(
+        codex_harness_module, "split_native_command_line", portable_windows_outer_split
+    )
+    skill = tmp_path / "agent-workspace" / ".agents" / "skills" / "waapi-skill"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_bytes("# skill\r\n声音\r\n".encode("utf-8"))
+    command = windows_powershell_recording(
+        f"Get-Content -Raw{encoding} '.agents\\skills\\waapi-skill\\SKILL.md'"
+    )
+    record = completed_windows_record(command, output)
+
+    facts = classify_commands((record,), skill_source=skill)
+
+    assert facts.skill_read is True
+    assert facts.allowed_read_commands == (command,)
+    assert facts.unexpected_commands == ()
+
+
+@pytest.mark.parametrize("fault", ("corrupt", "truncated", "unattested", "no-raw", "wrong-encoding"))
+def test_default_encoding_skill_read_does_not_bypass_content_or_host_proof(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    fault: str,
+) -> None:
+    monkeypatch.setattr(
+        codex_harness_module, "split_native_command_line", portable_windows_outer_split
+    )
+    skill = tmp_path / "agent-workspace" / ".agents" / "skills" / "waapi-skill"
+    skill.mkdir(parents=True)
+    content = "# skill\n声音\n"
+    (skill / "SKILL.md").write_text(content, encoding="utf-8")
+    flags = "-Raw -Encoding Unicode" if fault == "wrong-encoding" else "-Raw"
+    if fault == "no-raw":
+        flags = ""
+    command = windows_powershell_recording(
+        f"Get-Content {flags} '.agents\\skills\\waapi-skill\\SKILL.md'"
+    )
+    output = "# skill\n??\n" if fault == "corrupt" else "# skill\n" if fault == "truncated" else content
+    record = completed_windows_record(command, output)
+    if fault == "unattested":
+        record = CodexCommandRecord(
+            command=record.command, exit_code=0, status="completed",
+            aggregated_output=content, argv=record.argv,
+            has_shell_operators=False, parser_kind="windows-native",
+        )
+
+    facts = classify_commands((record,), skill_source=skill)
+
+    assert facts.skill_read is False
+    assert facts.allowed_read_commands == ()
+    assert facts.unexpected_commands == (command,)
+
+
+@pytest.mark.parametrize("encoding", ("", " -Encoding UTF8"))
+@pytest.mark.parametrize("relative", ("SKILL.md", "references/waapi-operate.md"))
+def test_attested_powershell_read_accepts_canonical_forward_slash_skill_locator(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    encoding: str,
+    relative: str,
+) -> None:
+    monkeypatch.setattr(
+        codex_harness_module, "split_native_command_line", portable_windows_outer_split
+    )
+    skill = tmp_path / "agent-workspace" / ".agents" / "skills" / "waapi-skill"
+    source = skill.joinpath(*PurePosixPath(relative).parts)
+    source.parent.mkdir(parents=True)
+    content = "# 声音\nWAAPI_OPERATE_REFERENCE_END\n"
+    source.write_text(content, encoding="utf-8")
+    command = windows_powershell_recording(
+        f"Get-Content -Raw{encoding} '.agents/skills/waapi-skill/{relative}'"
+    )
+    record = completed_windows_record(command, content)
+
+    facts = classify_commands((record,), skill_source=skill)
+
+    assert facts.skill_read_files == (relative,)
+    assert facts.allowed_read_commands == (command,)
+    assert facts.unexpected_commands == ()
+
+
+@pytest.mark.parametrize("locator", (
+    r".agents/skills\waapi-skill\SKILL.md",
+    ".agents/skills/waapi-skill/../waapi-skill/SKILL.md",
+    ".agents/skills/other-skill/SKILL.md",
+    ".agents//skills/waapi-skill/SKILL.md",
+))
+def test_powershell_forward_slash_read_keeps_closed_locator_boundary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    locator: str,
+) -> None:
+    monkeypatch.setattr(
+        codex_harness_module, "split_native_command_line", portable_windows_outer_split
+    )
+    skill = tmp_path / "agent-workspace" / ".agents" / "skills" / "waapi-skill"
+    skill.mkdir(parents=True)
+    content = "# 声音\n"
+    (skill / "SKILL.md").write_text(content, encoding="utf-8")
+    command = windows_powershell_recording(f"Get-Content -Raw '{locator}'")
+    record = completed_windows_record(command, content)
+
+    facts = classify_commands((record,), skill_source=skill)
+
+    assert facts.skill_read_files == ()
+    assert facts.allowed_read_commands == ()
+    assert facts.unexpected_commands == (command,)
 
 
 def test_windows_get_content_accepts_repeated_safe_path_separators(
@@ -6355,6 +6464,67 @@ def test_validated_skill_read_normalizes_only_line_endings(tmp_path: Path) -> No
     )
 
 
+@pytest.mark.parametrize("expression", ("1,$p", "1,240p"))
+@pytest.mark.parametrize("workspace_relative", (False, True))
+@pytest.mark.parametrize("relative", (
+    "SKILL.md", "references/waapi-setup.md", "references/waapi-query.md",
+    "references/waapi-operate.md", "references/waapi-coverage.md",
+))
+def test_command_classifier_accepts_only_complete_sed_reads_from_approved_skill_files(
+    tmp_path: Path,
+    expression: str,
+    workspace_relative: bool,
+    relative: str,
+) -> None:
+    skill = tmp_path / "workspace 空格" / ".agents" / "skills" / "waapi-skill"
+    source = skill.joinpath(*PurePosixPath(relative).parts)
+    source.parent.mkdir(parents=True)
+    terminal = {
+        "references/waapi-query.md": "WAAPI_QUERY_REFERENCE_END",
+        "references/waapi-operate.md": "WAAPI_OPERATE_REFERENCE_END",
+    }.get(relative, "final line")
+    content = f"# 完整 UTF-8\nsecond line\n{terminal}\n"
+    source.write_text(content, encoding="utf-8")
+    locator = (
+        str(PurePosixPath(".agents/skills/waapi-skill") / relative)
+        if workspace_relative else str(source)
+    )
+    command = shlex.join(("sed", "-n", expression, locator))
+    record = completed_record(command, content)
+
+    facts = classify_commands((record,), skill_source=skill)
+
+    assert facts.skill_read_files == (relative,)
+    assert facts.allowed_read_commands == (command,)
+    assert facts.unexpected_commands == ()
+
+
+def test_command_classifier_rejects_incomplete_or_nonread_sed_expressions(tmp_path: Path) -> None:
+    skill = tmp_path / "waapi-skill"
+    skill.mkdir()
+    source = skill / "SKILL.md"
+    content = "first\nsecond\nthird\n"
+    source.write_text(content, encoding="utf-8")
+    stale = tmp_path / "stale-SKILL.md"
+    stale.write_text(content, encoding="utf-8")
+    cases = (
+        (("sed", "-n", "1,2p", str(source)), content),
+        (("sed", "-n", "1,240p", str(source)), "first\nsecond\n"),
+        (("sed", "-n", "2,240p", str(source)), content),
+        (("sed", "-n", "1,0p", str(source)), content),
+        (("sed", "-n", "1,240p;d", str(source)), content),
+        (("sed", "-n", "1,240p", "-e", "d", str(source)), content),
+        (("sed", "-n", "1,240p", str(stale)), content),
+        (("sed", "-n", "1,240p", str(source)), content + "[truncated]"),
+    )
+    for argv, output in cases:
+        record = completed_record(shlex.join(argv), output)
+        facts = classify_commands((record,), skill_source=skill)
+        assert facts.skill_read_files == ()
+        assert facts.allowed_read_commands == ()
+        assert facts.unexpected_commands == (record.command,)
+
+
 def test_command_classifier_accepts_codex_full_range_sed_only_for_exact_skill_read(
     tmp_path: Path,
 ) -> None:
@@ -6382,7 +6552,7 @@ def test_command_classifier_accepts_codex_full_range_sed_only_for_exact_skill_re
 
     partial = completed_record(command, "first\n")
     reference_command = f"sed -n '1,$p' {shell_reference}"
-    reference_read = completed_record(reference_command, content)
+    reference_read = completed_record(reference_command, "first\n")
     for rejected in (partial, reference_read):
         rejected_facts = classify_commands((rejected,), skill_source=skill)
         assert rejected_facts.allowed_read_commands == ()

@@ -4859,7 +4859,6 @@ def allowed_skill_read(
             skill_read_content_source=skill_read_content_source,
         )
     executable = Path(record.argv[0]).name.lower()
-    complete_skill_read = False
     if executable == "cat":
         if (
             record.parser_kind not in _POSIX_COMMAND_PARSER_KINDS
@@ -4873,22 +4872,30 @@ def allowed_skill_read(
             record.parser_kind not in _POSIX_COMMAND_PARSER_KINDS
             or len(record.argv) != 4
             or record.argv[1] != "-n"
-            or record.argv[2] != "1,$p"
         ):
             return None
-        complete_skill_read = True
         path_text = record.argv[3]
-        minimum_lines = None
+        if record.argv[2] == "1,$p":
+            minimum_lines = None
+        else:
+            numeric_range = re.fullmatch(r"1,([1-9][0-9]*)p", record.argv[2])
+            if numeric_range is None:
+                return None
+            try:
+                minimum_lines = int(numeric_range.group(1))
+            except ValueError:
+                return None
     elif executable == "get-content":
         if (
             record.parser_kind != _WINDOWS_POWERSHELL_CORE_PARSER_KIND
-            or len(record.argv) != 5
-            or record.argv[1] != "-Raw"
-            or record.argv[2] != "-Encoding"
-            or record.argv[3] != "UTF8"
+            or not (
+                len(record.argv) == 3 and record.argv[1] == "-Raw"
+                or len(record.argv) == 5
+                and record.argv[1:4] == ("-Raw", "-Encoding", "UTF8")
+            )
         ):
             return None
-        path_text = record.argv[4]
+        path_text = record.argv[-1]
         minimum_lines = None
     else:
         return None
@@ -4899,7 +4906,7 @@ def allowed_skill_read(
         skill_read_content_source=skill_read_content_source,
         exact_workspace_relative_syntax=(
             "posix"
-            if executable == "cat"
+            if executable in {"cat", "sed"}
             else "windows" if executable == "get-content" else None
         ),
         allow_one_terminal_newline=(executable == "get-content"),
@@ -4907,8 +4914,6 @@ def allowed_skill_read(
     if validated is None:
         return None
     relative, content = validated
-    if executable == "sed" and complete_skill_read and relative != "SKILL.md":
-        return None
     if minimum_lines is not None and minimum_lines < len(content.splitlines()):
         return None
     return relative
@@ -4983,12 +4988,19 @@ def validated_skill_read(
         and not windows_absolute
         and not host_absolute
     ):
-        if "/" in path_text or path_text.startswith("\\") or ":" in path_text:
-            return None
-        windows_parts = tuple(re.split(r"\\+", path_text))
-        if not windows_parts or any(part in {"", ".."} for part in windows_parts):
-            return None
-        workspace_path_text = "\\".join(windows_parts)
+        if "/" in path_text:
+            if "\\" in path_text:
+                return None
+            # PowerShell accepts this spelling too. Reuse the exact closed
+            # POSIX locator map, never normalize arbitrary or mixed paths.
+            exact_workspace_relative_syntax = "posix"
+        else:
+            if path_text.startswith("\\") or ":" in path_text:
+                return None
+            windows_parts = tuple(re.split(r"\\+", path_text))
+            if not windows_parts or any(part in {"", ".."} for part in windows_parts):
+                return None
+            workspace_path_text = "\\".join(windows_parts)
     candidate = Path(path_text)
     if ".." in candidate.parts:
         return None

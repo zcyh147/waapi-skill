@@ -41,6 +41,9 @@ def initial_prompt(case_id: str, installed_skill: Path) -> str:
 def introduction_checks(text: str, facts: Mapping[str, Any]) -> dict[str, bool]:
     """Check facts, not a prescribed sentence or presentation order."""
     folded = text.casefold()
+    connection_claims = re.sub(
+        r"(?:尚未|还未|未)(?:确认|验证)(?:是否)?已(?:成功)?连接", "", folded
+    )
     product = re.sub(r"[\s_-]+", "", folded)
     try:
         port = urlsplit(str(facts.get("endpoint_url") or "")).port
@@ -52,7 +55,7 @@ def introduction_checks(text: str, facts: Mapping[str, Any]) -> dict[str, bool]:
         "adapter_version": bool(facts.get("adapter_version")) and str(facts["adapter_version"]) in text,
         "policy": bool(facts.get("project_modification_policy")) and str(facts["project_modification_policy"]) in text,
         "all_modes": all(mode in text for mode in ("read_only", "ask_before_changes", "allow_changes")),
-        "offline_wording": not bool(re.search(r"当前连接的|已(?:成功)?连接|(?<!not )\bconnected to\b", folded)),
+        "offline_wording": not bool(re.search(r"当前连接的|已(?:成功)?连接|(?<!not )\bconnected to\b", connection_claims)),
     }
 
 

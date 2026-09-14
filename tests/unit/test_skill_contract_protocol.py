@@ -177,41 +177,32 @@ def test_media_pool_reference_classification_documents_terminal_result_and_bound
     assert "direct `WaapiClient`, inline Python, or a helper file" in section_flat
 
 
-def test_initial_skill_bootstrap_is_the_only_combined_read_exception() -> None:
-    frontmatter = SKILL.split("---", 2)[1]
-
-    assert "Read the injected `SKILL.md` exactly once as the sole first shell action" in SKILL
-    assert "Never combine it with `pwd`, `git`, `rg`, `ls`, `find`, `printf`" in SKILL
-    assert "Choose by command host, not Wwise/Codex version or path spelling" in frontmatter
-    assert "POSIX uses `cat '<literal-locator>'` or exact `sed -n '1,$p'" in frontmatter
-    assert "whitespace-free POSIX locator uses unquoted `cat <literal-locator>`" in frontmatter
-    assert (
-        "native Windows uses exact "
-        "`Get-Content -Raw -Encoding UTF8 '<literal-locator>'`" in frontmatter
-    )
-    assert "Never cross-use/wrap these forms" in frontmatter
-    assert "combine the read with unrelated action" in frontmatter
-    assert "Read each later named lane reference exactly once" in SKILL
-    assert "spans the visible task, not each turn" in SKILL
-    assert "never reread an already-visible file" in SKILL
-    assert "same literal file" in SKILL
-    assert "Only POSIX may bootstrap the initial complete `SKILL.md`" in SKILL
-    assert "this is the only combined read allowed" in SKILL
-    assert "Never combine any other command" in SKILL
+def test_portable_loading_reuses_complete_content_and_keeps_shell_calls_separate() -> None:
+    compact = " ".join(SKILL.split())
+    assert "complete Skill instructions supplied by the agent environment" in compact
+    assert "If they are not already loaded" in compact
+    assert "before running a Gateway command" in compact
+    assert "Reuse complete instructions already visible in the conversation" in compact
+    assert "Shell reads are standalone" in compact
+    assert "Keep Gateway calls separate" in compact
+    assert "A missing or truncated read stops the workflow" in compact
+    assert "actual execution environment, not the connected Wwise version" in compact
 
 
-def test_skill_frontmatter_uses_the_closed_plain_scalar_shape() -> None:
+def test_skill_frontmatter_has_a_bounded_plain_or_folded_description() -> None:
     frontmatter = SKILL.split("---", 2)[1].strip().splitlines()
 
-    assert len(frontmatter) == 2
     assert frontmatter[0] == "name: waapi-skill"
     assert frontmatter[1].startswith("description: ")
     description = frontmatter[1].removeprefix("description: ")
-    assert description
-    # This Skill deliberately uses one unquoted plain YAML scalar.  A colon
-    # followed by whitespace would start a nested mapping and make the Skill
-    # unloadable, so keep that syntax outside the value.
-    assert ": " not in description
+    if description in {">", ">-"}:
+        assert len(frontmatter) > 2
+        assert all(line.startswith("  ") for line in frontmatter[2:])
+        description = " ".join(line.strip() for line in frontmatter[2:])
+    else:
+        assert len(frontmatter) == 2
+        assert ": " not in description
+    assert 1 <= len(description) <= 1024
     assert "\t" not in description
 
 
@@ -729,7 +720,8 @@ def test_operate_reference_is_a_bounded_single_read_control_plane() -> None:
     assert OPERATE.count("WAAPI_OPERATE_REFERENCE_END") == 1
     assert OPERATE.rstrip().endswith(marker)
     assert marker not in OPERATE[: OPERATE.rfind(marker)]
-    assert "unique terminal sentinel required by `SKILL.md`" in OPERATE
+    assert "loading rules in `SKILL.md`" in OPERATE
+    assert "unique terminal sentinel is final" in OPERATE
     assert "no truncation or omission marker" in OPERATE
     assert "do not reread a range or invoke the Gateway" in OPERATE
 
@@ -745,8 +737,9 @@ def test_query_reference_has_a_deterministic_end_and_separate_alarm_hops() -> No
     assert "unique terminal sentinel required by `SKILL.md`" in query_flat
     assert "no truncation or omission marker" in query_flat
     assert "do not reread a range or invoke the Gateway" in query_flat
-    assert "`WAAPI_QUERY_REFERENCE_END` and `WAAPI_OPERATE_REFERENCE_END`" in SKILL
-    assert "matching sentinel is the final visible line" in SKILL
+    assert "`WAAPI_QUERY_REFERENCE_END`" in SKILL
+    assert "`WAAPI_OPERATE_REFERENCE_END`" in SKILL
+    assert "sentinel must be the final visible line" in " ".join(SKILL.split())
     assert "ends at `output_bus`" in query_flat
     assert "do not add `volume-db` to the Sound hop" in query_flat
     assert "request `volume-db` only on the exact Bus identities" in query_flat
@@ -1230,8 +1223,8 @@ def test_one_time_onboarding_is_global_natural_and_does_not_add_a_gateway_call()
     for phrase in (
         "When the visible conversation lacks an introduction",
         "Only `/waapi-skill` or a Skill link: run one offline `config-show`",
-        "Read the injected `SKILL.md` exactly once",
-        "A successful read is complete; a second `SKILL.md` read is forbidden",
+        "complete Skill instructions supplied by the agent environment",
+        "Reuse complete instructions already visible in the conversation",
         "The next reply",
         "`session_context.one_time_introduction.facts` together",
         "Skill loaded",
