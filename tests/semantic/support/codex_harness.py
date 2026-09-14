@@ -4888,14 +4888,38 @@ def allowed_skill_read(
     elif executable == "get-content":
         if (
             record.parser_kind != _WINDOWS_POWERSHELL_CORE_PARSER_KIND
-            or not (
-                len(record.argv) == 3 and record.argv[1] == "-Raw"
-                or len(record.argv) == 5
-                and record.argv[1:4] == ("-Raw", "-Encoding", "UTF8")
-            )
+            or not 3 <= len(record.argv) <= 6
         ):
             return None
-        path_text = record.argv[-1]
+        path_text = None
+        seen_options: set[str] = set()
+        index = 1
+        while index < len(record.argv):
+            token = record.argv[index]
+            option = token.casefold()
+            if option.startswith("-"):
+                if option not in {"-raw", "-encoding", "-literalpath"} or option in seen_options:
+                    return None
+                seen_options.add(option)
+                if option != "-raw":
+                    index += 1
+                    if index >= len(record.argv):
+                        return None
+                    value = record.argv[index]
+                    if option == "-encoding":
+                        if value.casefold() != "utf8":
+                            return None
+                    else:
+                        if path_text is not None or not value or value.startswith("-"):
+                            return None
+                        path_text = value
+            else:
+                if path_text is not None or not token:
+                    return None
+                path_text = token
+            index += 1
+        if "-raw" not in seen_options or path_text is None:
+            return None
         minimum_lines = None
     else:
         return None

@@ -4872,10 +4872,6 @@ def test_posix_shell_wrapper_accepts_only_exact_executable_option_and_script(
             "# skill\n",
         ),
         (
-            r"Get-Content -Encoding UTF8 -Raw '.agents\skills\waapi-skill\SKILL.md'",
-            "# skill\n",
-        ),
-        (
             r"Get-Content -Raw -Encoding UTF8 '.agents\skills\waapi-skill\SKILL.md'",
             "# partial",
         ),
@@ -4966,11 +4962,13 @@ def test_attested_powershell_core_raw_read_proves_utf8_from_complete_content(
     assert facts.unexpected_commands == ()
 
 
+@pytest.mark.parametrize("literal_path", (False, True))
 @pytest.mark.parametrize("fault", ("corrupt", "truncated", "unattested", "no-raw", "wrong-encoding"))
 def test_default_encoding_skill_read_does_not_bypass_content_or_host_proof(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     fault: str,
+    literal_path: bool,
 ) -> None:
     monkeypatch.setattr(
         codex_harness_module, "split_native_command_line", portable_windows_outer_split
@@ -4982,8 +4980,9 @@ def test_default_encoding_skill_read_does_not_bypass_content_or_host_proof(
     flags = "-Raw -Encoding Unicode" if fault == "wrong-encoding" else "-Raw"
     if fault == "no-raw":
         flags = ""
+    path_option = "-LiteralPath " if literal_path else ""
     command = windows_powershell_recording(
-        f"Get-Content {flags} '.agents\\skills\\waapi-skill\\SKILL.md'"
+        f"Get-Content {flags} {path_option}'.agents\\skills\\waapi-skill\\SKILL.md'"
     )
     output = "# skill\n??\n" if fault == "corrupt" else "# skill\n" if fault == "truncated" else content
     record = completed_windows_record(command, output)
@@ -4997,6 +4996,78 @@ def test_default_encoding_skill_read_does_not_bypass_content_or_host_proof(
     facts = classify_commands((record,), skill_source=skill)
 
     assert facts.skill_read is False
+    assert facts.allowed_read_commands == ()
+    assert facts.unexpected_commands == (command,)
+
+
+@pytest.mark.parametrize("relative", ("SKILL.md", "references/waapi-coverage.md"))
+@pytest.mark.parametrize("arguments", (
+    "-LiteralPath '{path}' -Raw",
+    "-LiteralPath '{path}' -Raw -Encoding UTF8",
+    "-Encoding UTF8 -Raw '{path}'",
+    "'{path}' -Raw -Encoding UTF8",
+    "-Raw -LiteralPath '{path}'",
+    "-eNcOdInG uTf8 -lItErAlPaTh '{path}' -rAw",
+))
+def test_attested_get_content_read_options_bind_one_exact_target_in_any_order(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    relative: str,
+    arguments: str,
+) -> None:
+    monkeypatch.setattr(
+        codex_harness_module, "split_native_command_line", portable_windows_outer_split
+    )
+    skill = tmp_path / "agent-workspace" / ".agents" / "skills" / "waapi-skill"
+    source = skill.joinpath(*PurePosixPath(relative).parts)
+    source.parent.mkdir(parents=True)
+    content = "# 完整 UTF-8\n最后一行\n"
+    source.write_text(content, encoding="utf-8")
+    path = f".agents/skills/waapi-skill/{relative}"
+    command = windows_powershell_recording("Get-Content " + arguments.format(path=path))
+    record = completed_windows_record(command, content + "\n")
+
+    facts = classify_commands((record,), skill_source=skill)
+
+    assert facts.skill_read_files == (relative,)
+    assert facts.allowed_read_commands == (command,)
+    assert facts.unexpected_commands == ()
+
+
+@pytest.mark.parametrize("arguments", (
+    "-Raw -rAw '{path}'",
+    "-Raw -Encoding UTF8 -Encoding UTF8 '{path}'",
+    "-Raw -LiteralPath '{path}' '{path}'",
+    "-Raw -LiteralPath '{path}' -LiteralPath '{path}'",
+    "-Raw '{path}' '{path}'",
+    "-Raw -Path '{path}'",
+    "-Raw -TotalCount 3 '{path}'",
+    "-Raw:$true '{path}'",
+    "-Raw '{path}' -Encoding",
+    "-Raw -LiteralPath",
+    "-Raw -LiteralPath -Encoding UTF8",
+    "-Raw -LiteralPath '.agents/skills/stale-skill/SKILL.md'",
+))
+def test_get_content_read_options_reject_duplicates_unknowns_and_unbound_targets(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    arguments: str,
+) -> None:
+    monkeypatch.setattr(
+        codex_harness_module, "split_native_command_line", portable_windows_outer_split
+    )
+    skill = tmp_path / "agent-workspace" / ".agents" / "skills" / "waapi-skill"
+    skill.mkdir(parents=True)
+    content = "# 完整 UTF-8\n最后一行\n"
+    (skill / "SKILL.md").write_text(content, encoding="utf-8")
+    command = windows_powershell_recording(
+        "Get-Content " + arguments.format(path=".agents/skills/waapi-skill/SKILL.md")
+    )
+    record = completed_windows_record(command, content)
+
+    facts = classify_commands((record,), skill_source=skill)
+
+    assert facts.skill_read_files == ()
     assert facts.allowed_read_commands == ()
     assert facts.unexpected_commands == (command,)
 

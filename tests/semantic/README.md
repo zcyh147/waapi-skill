@@ -783,6 +783,9 @@ from the sealed, profile-free PowerShell Core wrapper. The latter uses Core's
 UTF-8 default, not Windows PowerShell 5's legacy decoding. Both require the
 exact trusted file's complete UTF-8 text; parsing normalizes line endings and
 tolerates only the single terminal newline added to otherwise complete text.
+The same closed flags may use PowerShell's case-insensitive option order and
+an explicit `-LiteralPath` target. Duplicate, missing, unknown, or additional
+arguments remain rejected.
 Windows file-read locators may use canonical forward or backslashes, but must
 resolve to the exact supplied Skill root. This does not change Gateway
 continuation-copy requirements. POSIX `sed -n '1,Np'` is a complete-file read

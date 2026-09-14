@@ -3372,6 +3372,31 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
 - See `docs/research/authoring-topic-monitoring-audit-2026-09-13.md` for the five
   host inventories, retained raw evidence and scoped test results.
 
+## Portable file reads are not one fixed shell spelling (2026-09-14)
+
+- A capability-only Skill description no longer dictates how the initial file
+  is loaded. Both hosts first produced correct complete Skill text and an
+  offline welcome, while older graders rejected valid command spellings.
+- Credit only an approved exact source with complete matching UTF-8 content,
+  the attested parser/host and no extra commands. Full-range numeric `sed`,
+  PowerShell Core's UTF-8 default, canonical read separators and `-LiteralPath`
+  do not justify accepting partial, stale, corrupt or unaudited reads. File-read
+  equivalence never permits rewriting a Gateway continuation or using a
+  relative runner where the Broker requires its absolute identity.
+- Negated connection statements such as “尚未确认已连接” are not affirmative
+  claims. Keep the negation recognizer bounded and test a separate affirmative
+  statement in the same answer so negation cannot mask a real false claim.
+- A bare Markdown link containing spaces must use an angle-bracket destination.
+  Keep the user prompt bare; do not add an introduction or read-command hint.
+- The current C1 campaign wrapper has a separate offline preflight mismatch:
+  it first requires a live-config fingerprint, then rejects that fingerprint
+  because offline config must be marked unused. Both failures occur before an
+  Agent starts. Preserve those logs; for this bounded offline probe use the
+  existing matrix entrypoint, not a new harness, live launch or failed-root
+  replay. A direct matrix PASS is not a campaign/replay PASS.
+- Full provenance and retained failures are in
+  `docs/research/portable-skill-entry-validation-2026-09-14.md`.
+
 ## New-root preflight
 
 Complete every item before spending a Fresh turn:

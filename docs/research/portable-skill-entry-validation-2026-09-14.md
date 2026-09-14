@@ -76,7 +76,41 @@ the old interface before the edit and passed afterward.
 
 ## Final validation
 
-Pending: new frozen candidate, both platforms' `first_use_2`, one unhinted
-offline C1 coverage-reference task per host, and final Program/Non-live gates.
-First-use has no replay path. C1 may receive its identical verify-only audit.
-No real Wwise process, full Fresh matrix or project mutation is in scope.
+Candidate `1e9ab36583841190f6aa18c7e47d03cbfd817ba2` passed both bare
+first-use tasks and both same-thread follow-ups on each host. All checks were
+true; each first turn issued one offline `config-show`, and each follow-up
+issued no command and no repeated welcome. Roots:
+
+- macOS: `/Users/xiye/.local/share/waapi-entry-1e9ab36/skills/waapi-skill-workspace/entry first use 1e9ab36 r2`;
+  521/521 manifest hashes matched, manifest SHA-256
+  `7d58c59270f48ec4acb29f2fffc0eddc171e6685592f711407a3c09e3ef4eecb`.
+- Windows: `C:\w\entry-1e9ab36\skills\waapi-skill-workspace\entry first use 1e9ab36 r2`;
+  521/521 manifest hashes matched, manifest SHA-256
+  `CFE0155FD7ADFFDC889A35537188CEA28C40EDAA2B0A475F81DEC3CBF655247E`.
+
+Mac C1 direct matrix root `entry coverage matrix 1e9ab36 r3` under the same
+workspace passed its one Fresh task (20.930 s), selecting and reading the
+coverage reference without a scripted read hint. Windows's corresponding
+root failed: valid complete `Get-Content -LiteralPath ... -Raw` reads were
+unrecognized, and a subsequent relative runner path was genuinely rejected
+by the Broker. The latter independently prevents PASS and is not relaxed.
+The read recognizer subsequently gained bounded, order/case-insensitive
+PowerShell arguments with one Raw flag, one source and optional UTF8 encoding;
+duplicates, unknown arguments and invalid content remain refused. Both owned
+harness/first-use test files then passed **383 tests, 9 native-Windows skips**.
+
+Earlier C1 campaign-wrapper launches failed before any Agent: missing ignored
+live config, then an offline fingerprint/unused-config contradiction. No
+semantic attempt ran. Those logs/roots remain; the supported direct matrix
+entrypoint was used instead. Its results are matrix-only evidence, with no
+campaign or verify-only claim.
+
+Program at `1e9ab36`: **5766 passed, 2 skipped**, exit zero (257.22 s).
+Its full Non-live run returned **11400 passed, 2 failed, 116 skipped,
+27 deselected** (736.92 s). The failures were two remaining old load/path
+wording assertions; the affected file passed **7 tests** after correction.
+Final Non-live and the Windows C1 follow-up remain pending.
+
+First-use has no replay path. No real Wwise process, full Fresh matrix or
+project mutation ran. Temporary launch resources were removed after exit and
+owned residual-process checks; passing/failing evidence remains distinct.
