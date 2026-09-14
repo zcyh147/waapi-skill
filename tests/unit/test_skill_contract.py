@@ -37,21 +37,21 @@ def test_skill_contract_documents_gateway_inputs_outputs_and_failure_boundary() 
 def test_skill_contract_prefers_fixed_live_query_before_discovery() -> None:
     text = doc_text("SKILL.md")
 
-    assert "run its absolute `scripts/run.py` before" in text
+    assert "run the absolute `scripts/run.py` before" in text
     assert "before `ls`, `find`, `rg`" in text
     assert "Never hand-edit config or scan unrelated ports/processes" in text
     assert "Do not search the repository to recover from a gateway error" in text
 
 
-def test_skill_contract_keeps_windows_reference_reads_on_the_short_task_locator() -> None:
+def test_skill_contract_resolves_references_from_the_supplied_installation() -> None:
     text = doc_text("SKILL.md")
 
-    assert (
-        "Native Windows always copies the short task-local form "
-        "`Get-Content -Raw -Encoding UTF8 "
-        "'.agents\\skills\\waapi-skill\\references\\<file>.md'` exactly"
-    ) in text
-    assert "reconstructing a scenario-root absolute path" in text
+    compact = " ".join(text.split())
+    assert "The Skill root is the directory containing that `SKILL.md`" in compact
+    assert "`references/` relative to this root, not the working directory" in compact
+    assert "Get-Content -Raw -Encoding UTF8 '<absolute-file>'" in text
+    assert ".agents\\skills\\waapi-skill\\references" not in text
+    assert "Use the absolute path to `scripts/run.py` for Gateway calls" in compact
 
 
 def test_skill_contract_requires_confirmation_before_retargeting_invalid_parent() -> None:

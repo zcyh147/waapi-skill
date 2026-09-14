@@ -420,9 +420,12 @@ and uses Broker-owned `python.ps1` / `python3.ps1` relays. Never restore the old
 files and can remove structural quotes from Gateway JSON before Broker
 authentication. Before PowerShell attestation or Codex launch, the native
 harness sets and reads back Console input and output code page 65001; a failure
-blocks before the Fresh turn. Skill reads use the exact literal form
-`Get-Content -Raw -Encoding UTF8 <path>` and receive credit only through the
-sealed PowerShell Core wrapper.
+blocks before the Fresh turn. Skill reads use complete UTF-8 text from the
+exact trusted file. `Get-Content -Raw -Encoding UTF8 <path>` and the equivalent
+`Get-Content -Raw <path>` UTF-8 default receive credit only through the sealed,
+profile-free PowerShell Core wrapper and complete-content comparison; legacy
+or unattested shells do not. This file-read equivalence never authorizes
+reconstructing a Gateway continuation.
 
 The official profiles are `screening` (40 sessions), `formal_98` (98), and
 `full_cross_version_168` (168). Run the latter two only when the user explicitly

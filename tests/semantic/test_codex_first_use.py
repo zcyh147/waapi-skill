@@ -35,6 +35,15 @@ def test_both_initial_prompts_are_bare_invocations() -> None:
         welcome.initial_prompt("unknown", skill)
 
 
+@pytest.mark.parametrize("folder", ["Skill root 声音", "Skill(root)"])
+def test_bare_link_keeps_a_special_install_path_in_one_markdown_destination(folder) -> None:
+    skill = Path("/demo") / folder / "waapi-skill"
+
+    assert welcome.initial_prompt("bare-link", skill) == (
+        f"[$waapi-skill](<{skill / 'SKILL.md'}>)"
+    )
+
+
 def test_intro_uses_gateway_facts_without_exact_sentence_matching() -> None:
     assert all(welcome.introduction_checks(INTRO, FACTS).values())
     assert all(welcome.introduction_checks(INTRO.replace("WAAPI Skill", "waapi-skill"), FACTS).values())
@@ -42,6 +51,19 @@ def test_intro_uses_gateway_facts_without_exact_sentence_matching() -> None:
     assert not all(welcome.introduction_checks(INTRO.replace("2024.1", "2025.1"), FACTS).values())
     assert not welcome.introduction_checks(INTRO.replace("当前配置的", "当前连接的"), FACTS)["offline_wording"]
     assert not all(welcome.introduction_checks(INTRO, {}).values())
+
+
+@pytest.mark.parametrize("phrase", (
+    "尚未确认已连接", "还未验证是否已成功连接", "未确认已连接",
+))
+def test_offline_intro_accepts_unconfirmed_connection_but_rejects_a_separate_claim(phrase) -> None:
+    unconfirmed = INTRO + phrase + "。"
+
+    assert welcome.introduction_checks(unconfirmed, FACTS)["offline_wording"]
+    for affirmative in ("已连接 Wwise。", "已成功连接 Wwise。", "当前连接的 Wwise 已就绪。"):
+        assert not welcome.introduction_checks(
+            unconfirmed + affirmative, FACTS
+        )["offline_wording"]
 
 
 @pytest.mark.parametrize("display", ["WAAPI 端口为 18765", "WAAPI port: 18765"])

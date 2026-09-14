@@ -1,6 +1,6 @@
 # WAAPI operate lane
 
-Read once with one standalone `cat`. It is complete only when the unique terminal sentinel required by `SKILL.md` is final and no truncation or omission marker appears; otherwise do not reread a range or invoke the Gateway.
+Read this reference using the loading rules in `SKILL.md`. It is complete only when the unique terminal sentinel is final and no truncation or omission marker appears; otherwise do not reread a range or invoke the Gateway.
 
 ## Core boundaries
 

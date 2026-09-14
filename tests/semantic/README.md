@@ -777,10 +777,21 @@ and revalidates that identity for resume and verify-only. Broker command
 resolution uses generated `python.ps1` / `python3.ps1` relays with `.PS1` first
 in the isolated `PATHEXT`; `.cmd` and `.bat` relays are forbidden because their
 legacy argument path corrupts structured Gateway JSON even under current
-PowerShell Core. The Skill requires exact
-`Get-Content -Raw -Encoding UTF8 <path>` reads. Evidence parsing accepts that
-form only from the sealed PowerShell Core wrapper, normalizes line endings, and
+PowerShell Core. The formal shell-read audit accepts
+`Get-Content -Raw -Encoding UTF8 <path>` or `Get-Content -Raw <path>` only
+from the sealed, profile-free PowerShell Core wrapper. The latter uses Core's
+UTF-8 default, not Windows PowerShell 5's legacy decoding. Both require the
+exact trusted file's complete UTF-8 text; parsing normalizes line endings and
 tolerates only the single terminal newline added to otherwise complete text.
+The same closed flags may use PowerShell's case-insensitive option order and
+an explicit `-LiteralPath` target. Duplicate, missing, unknown, or additional
+arguments remain rejected.
+Windows file-read locators may use canonical forward or backslashes, but must
+resolve to the exact supplied Skill root. This does not change Gateway
+continuation-copy requirements. POSIX `sed -n '1,Np'` is a complete-file read
+only when N covers the trusted file and the output matches its entire text;
+partial ranges, stale paths, extra expressions and shell operators remain
+rejected. An accepted command spelling without full content grants no credit.
 Before PowerShell attestation or Codex launch, the native harness also sets and
 reads back Console input and output code page 65001. This is distinct from
 PowerShell's `$OutputEncoding`: the latter does not prevent an attached CP936

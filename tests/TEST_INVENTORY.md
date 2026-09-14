@@ -7,6 +7,32 @@ are not live-Wwise or Fresh Agent evidence.
 
 ## Runner modes and strict real behavior
 
+### 2026-09-14 Portable Skill entry and scoped first-use validation
+
+The public description now uses query/edit/subscribe/monitor language and
+loads references from the supplied Skill root, without a hardcoded installation
+directory or agent-brand bootstrap. No WAAPI business runtime changed.
+Program at `1e9ab36`: **5766 passed, 2 skipped**.
+Full Non-live: **11430 passed, 116 skipped, 27 deselected**, exit zero at
+`519c47b` (767.49 s). Both owned read-audit/first-use regression files passed
+**383 tests, 9 native-Windows-only skips**.
+
+On both macOS and native Windows, `1e9ab36` passed the two bare first-use tasks
+(`/waapi-skill` and a Markdown Skill link) plus their two same-thread follow-up
+turns: one offline `config-show` and complete welcome facts initially, no
+command or repeated welcome afterward. The packaged Skill remained identical
+at `519c47b`. The existing offline C1 matrix also passed one Fresh task per
+host: macOS at `1e9ab36`, Windows at `519c47b`, proving coverage-reference
+selection and an absolute Gateway runner. All Fresh tasks used Terra, medium
+reasoning, default service tier, and isolated memory-off environments.
+
+These are scoped first-use and matrix results, not a full campaign/replay or
+real-Wwise acceptance. Earlier grader failures, the genuine Windows relative-
+runner failure, and pre-Agent campaign-wrapper blocks remain recorded in the
+[validation report](../docs/research/portable-skill-entry-validation-2026-09-14.md).
+No Wwise process or project mutation ran; temporary launch tasks/scripts were
+removed and owned residual checks were empty.
+
 ### 2026-09-14 Cross-object-family CRUD regression and repair
 
 macOS WwiseConsole candidate `b2c7afb` passed **13 selected tests on each of
