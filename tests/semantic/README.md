@@ -777,7 +777,7 @@ and revalidates that identity for resume and verify-only. Broker command
 resolution uses generated `python.ps1` / `python3.ps1` relays with `.PS1` first
 in the isolated `PATHEXT`; `.cmd` and `.bat` relays are forbidden because their
 legacy argument path corrupts structured Gateway JSON even under current
-PowerShell Core. The Skill requires exact
+PowerShell Core. The formal shell-read audit requires exact
 `Get-Content -Raw -Encoding UTF8 <path>` reads. Evidence parsing accepts that
 form only from the sealed PowerShell Core wrapper, normalizes line endings, and
 tolerates only the single terminal newline added to otherwise complete text.

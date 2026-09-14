@@ -31,7 +31,10 @@ def initial_prompt(case_id: str, installed_skill: Path) -> str:
     if case_id == "bare-slash":
         return "/waapi-skill"
     if case_id == "bare-link":
-        return f"[$waapi-skill]({installed_skill / 'SKILL.md'})"
+        destination = str(installed_skill / "SKILL.md")
+        if re.search(r"[\s()]", destination):
+            destination = f"<{destination}>"
+        return f"[$waapi-skill]({destination})"
     raise ValueError(f"unknown first-use case: {case_id}")
 
 

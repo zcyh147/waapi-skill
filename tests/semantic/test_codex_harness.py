@@ -3637,6 +3637,94 @@ def test_jsonl_parser_extracts_commands_final_message_and_usage() -> None:
     assert audit_session_events(events).passed is True
 
 
+@pytest.mark.parametrize("reader", ("posix", "powershell-core"))
+@pytest.mark.parametrize("relative", ("SKILL.md", "references/waapi-operate.md"))
+def test_complete_read_audit_uses_exact_nonstandard_skill_root_not_cwd(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    reader: str,
+    relative: str,
+) -> None:
+    if reader == "powershell-core":
+        monkeypatch.setattr(
+            codex_harness_module, "split_native_command_line", portable_windows_outer_split
+        )
+    skill = tmp_path / "packaged install 声音" / "waapi-skill"
+    source = skill.joinpath(*PurePosixPath(relative).parts)
+    source.parent.mkdir(parents=True)
+    content = "# 完整 UTF-8 文档\nfirst line\n最后一行\n"
+    source.write_text(content, encoding="utf-8")
+    unrelated = tmp_path / "unrelated current directory"
+    unrelated.mkdir()
+    monkeypatch.chdir(unrelated)
+    if reader == "posix":
+        record = completed_record(f"cat {shlex.quote(str(source))}", content)
+    else:
+        quoted = str(source).replace("'", "''")
+        record = completed_windows_record(
+            windows_powershell_recording(f"Get-Content -Raw -Encoding UTF8 '{quoted}'"),
+            content,
+        )
+
+    facts = classify_commands((record,), skill_source=skill)
+
+    assert facts.skill_read_files == (relative,)
+    assert facts.allowed_read_commands == (record.command,)
+    assert facts.unexpected_commands == ()
+
+
+@pytest.mark.parametrize("reader", ("posix", "powershell-core"))
+@pytest.mark.parametrize("fault", ("stale-relative", "stale-absolute", "truncated", "corrupt-utf8"))
+def test_nonstandard_skill_read_audit_rejects_stale_locator_or_incomplete_content(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    reader: str,
+    fault: str,
+) -> None:
+    if reader == "powershell-core":
+        monkeypatch.setattr(
+            codex_harness_module, "split_native_command_line", portable_windows_outer_split
+        )
+    skill = tmp_path / "packaged install 声音" / "waapi-skill"
+    source = skill / "references" / "waapi-operate.md"
+    source.parent.mkdir(parents=True)
+    content = "# 完整 UTF-8 文档\nfirst line\n最后一行\n"
+    source.write_text(content, encoding="utf-8")
+    unrelated = tmp_path / "unrelated current directory"
+    stale = unrelated / ".agents" / "skills" / "waapi-skill" / "references" / "waapi-operate.md"
+    stale.parent.mkdir(parents=True)
+    stale.write_text(content, encoding="utf-8")
+    monkeypatch.chdir(unrelated)
+    locator = str(source)
+    output = content
+    if fault == "stale-relative":
+        locator = (
+            ".agents/skills/waapi-skill/references/waapi-operate.md"
+            if reader == "posix"
+            else r".agents\skills\waapi-skill\references\waapi-operate.md"
+        )
+    elif fault == "stale-absolute":
+        locator = str(stale)
+    elif fault == "truncated":
+        output = "# 完整 UTF-8 文档\nfirst line\n"
+    else:
+        output = "# ?? UTF-8 ??\nfirst line\n????\n"
+    if reader == "posix":
+        record = completed_record(f"cat {shlex.quote(locator)}", output)
+    else:
+        quoted = locator.replace("'", "''")
+        record = completed_windows_record(
+            windows_powershell_recording(f"Get-Content -Raw -Encoding UTF8 '{quoted}'"),
+            output,
+        )
+
+    facts = classify_commands((record,), skill_source=skill)
+
+    assert facts.skill_read_files == ()
+    assert facts.allowed_read_commands == ()
+    assert facts.unexpected_commands == (record.command,)
+
+
 def test_windows_powershell_recording_unwraps_skill_coverage_and_gateway(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

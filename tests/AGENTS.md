@@ -375,11 +375,14 @@ formal semantic bootstrap requires every model shell call to omit an explicit
 `workdir`/`cwd` and inherit the exact task workspace; a model-reconstructed
 Windows campaign path can be drive-qualified yet still duplicate an older
 campaign root before process creation. The
-Skill permits exactly one identical replay of that complete shell command, and
-the harness credits it only through `recoverable_preprocess_attempt_indexes`;
-this is process-launch recovery inside one task, not a Gateway or campaign-root
-retry. A second 267, a changed command, or an Agent that stops instead freezes
-the root as infrastructure-blocked. Preserve the failed command index and exact
+historical Skill revisions permitted exactly one identical replay of that
+complete shell command. The harness retains that historical recognition only
+through `recoverable_preprocess_attempt_indexes`; this is process-launch
+recovery inside one task, not a Gateway or campaign-root retry. The current
+portable public Skill instead stops on shell failure and does not grant this
+launcher-specific retry permission. Do not inject a retry hint into bare
+first-use prompts. A second 267, a changed command, or an Agent that stops
+instead freezes the root as infrastructure-blocked. Preserve the failed command index and exact
 reported `cwd` in evidence; do not repair, resume, or rerun that failed root.
 If the Agent itself repeats the command, retain both attempts: the later command
 may reach the Broker successfully while the unit still fails its sealed command

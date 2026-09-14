@@ -7,6 +7,26 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SKILL_ROOT = REPO_ROOT / "skills" / "waapi-skill"
 
 
+def test_description_exposes_user_tasks_without_host_loading_instructions() -> None:
+    frontmatter = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8").split("---", 2)[1]
+    description = frontmatter.split("description:", 1)[1].strip()
+    for task in ("query", "edit", "monitor", "subscribe", "import", "soundbank"):
+        assert task in description.casefold()
+    for host_detail in ("codex", "claude", "powershell", "literal-locator", "Get-Content", "`cat"):
+        assert host_detail.casefold() not in description.casefold()
+
+
+def test_public_loading_contract_has_no_fixed_install_path_or_launcher_retry() -> None:
+    skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+    operate = (SKILL_ROOT / "references/waapi-operate.md").read_text(encoding="utf-8")
+    assert ".agents\\skills\\waapi-skill" not in skill
+    assert "CreateProcessAsUserW" not in skill
+    assert "standalone `cat`" not in operate
+    assert "UTF-8" in skill
+    assert "copy_instruction.source_field" in skill
+    assert "Mutations always require immutable Preview plus confirmation or policy authorization" in skill
+
+
 def test_skill_declares_fixed_gateway_before_discovery_and_no_code_fallback() -> None:
     skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
     coverage = (SKILL_ROOT / "references" / "waapi-coverage.md").read_text(
@@ -64,16 +84,10 @@ def test_skill_declares_fixed_gateway_before_discovery_and_no_code_fallback() ->
     assert "Do not run `describe` or `capabilities` first" in skill
     assert "run `request-schema` and follow its sole typed continuation" in skill
     assert "The configured exact Wwise version selects every schema" in (SKILL_ROOT / "references" / "waapi-query.md").read_text(encoding="utf-8")
-    assert "Read each later named lane reference exactly once in its own shell call" in skill
-    assert (
-        "Native Windows always copies the short task-local form "
-        "`Get-Content -Raw -Encoding UTF8 "
-        "'.agents\\skills\\waapi-skill\\references\\<file>.md'` exactly"
-        in skill
-    )
-    assert ".agents\\skills\\waapi-skill\\references\\<file>.md" in skill
-    assert "Do not probe with `wc -l`, `ls`, `rg`, `find`, `stat`, or `test`" in skill
-    assert "never split a reference" in skill
+    compact = " ".join(skill.split())
+    assert "Read only the reference needed for the current task, once, completely and as UTF-8 text" in compact
+    assert "A missing or truncated read stops the workflow" in compact
+    assert "sentinel must be the final visible line" in compact
     assert (
         "python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version "
         "2022.1 operation-schema object.copy"
@@ -82,32 +96,24 @@ def test_skill_declares_fixed_gateway_before_discovery_and_no_code_fallback() ->
     assert "do not run another command after receiving it" in skill
 
 
-def test_cli_bootstrap_uses_only_the_literal_injected_skill_locator() -> None:
+def test_loading_uses_supplied_skill_root_and_allows_complete_host_injection() -> None:
     skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
-    frontmatter = skill.split("---", 2)[1]
-
-    assert "Read only the injected SKILL.md locator first" in frontmatter
-    assert "never search for or infer it" in frontmatter
-    assert "Choose by command host, not Wwise/Codex version or path spelling" in frontmatter
-    assert "POSIX uses `cat '<literal-locator>'` or exact `sed -n '1,$p'" in frontmatter
-    assert "Get-Content -Raw -Encoding UTF8 '<literal-locator>'" in frontmatter
-    assert "Never cross-use/wrap these forms" in frontmatter
-    assert "combine the read with unrelated action" in frontmatter
-    assert "Bootstrap only from the injected `SKILL.md` locator" in skill
-    assert "Never guess a repository-relative `skills/waapi-skill` path" in skill
-    for forbidden_probe in ("`pwd`", "`git status`", "`ls`", "`find`", "`rg`"):
-        assert forbidden_probe in skill
+    compact = " ".join(skill.split())
+    assert "If they are not already loaded, read `SKILL.md` from the supplied location before running a Gateway command" in compact
+    assert "The Skill root is the directory containing that `SKILL.md`" in compact
+    assert "not the working directory or an assumed installation path" in compact
+    assert "stop instead of searching for another installation" in compact
+    assert "environment's file-reading tool or a compatible shell" in compact
+    assert "Get-Content -Raw -Encoding UTF8 '<absolute-file>'" in skill
+    assert "Reuse complete instructions already visible in the conversation" in compact
     assert "including for Wwise CLI and project-migration requests" in skill
 
 
-def test_skill_limits_windows_267_recovery_to_one_identical_shell_replay() -> None:
+def test_public_skill_stops_on_launch_failure_without_harness_retry_permission() -> None:
     skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
-
-    assert "CreateProcessAsUserW failed: 267" in skill
-    assert "before PowerShell starts" in skill
-    assert "repeat that identical complete shell command once" in skill
-    assert "This is process-launch recovery, not a Gateway retry" in skill
-    assert "A second 267 or any other shell failure stops" in skill
+    assert "A structured error or shell failure stops the workflow" in skill
+    assert "do not retry the Gateway command" in skill
+    assert "CreateProcessAsUserW" not in skill
 
 
 def test_runtime_game_object_registration_never_routes_to_object_create() -> None:

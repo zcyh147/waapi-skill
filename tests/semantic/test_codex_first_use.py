@@ -35,6 +35,15 @@ def test_both_initial_prompts_are_bare_invocations() -> None:
         welcome.initial_prompt("unknown", skill)
 
 
+@pytest.mark.parametrize("folder", ["Skill root 声音", "Skill(root)"])
+def test_bare_link_keeps_a_special_install_path_in_one_markdown_destination(folder) -> None:
+    skill = Path("/demo") / folder / "waapi-skill"
+
+    assert welcome.initial_prompt("bare-link", skill) == (
+        f"[$waapi-skill](<{skill / 'SKILL.md'}>)"
+    )
+
+
 def test_intro_uses_gateway_facts_without_exact_sentence_matching() -> None:
     assert all(welcome.introduction_checks(INTRO, FACTS).values())
     assert all(welcome.introduction_checks(INTRO.replace("WAAPI Skill", "waapi-skill"), FACTS).values())

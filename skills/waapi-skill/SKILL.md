@@ -1,15 +1,45 @@
 ---
 name: waapi-skill
-description: Use for every Wwise/WAAPI setup, read, topic, or change. Read only the injected SKILL.md locator first; never search for or infer it. Choose by command host, not Wwise/Codex version or path spelling. POSIX uses `cat '<literal-locator>'` or exact `sed -n '1,$p' '<literal-locator>'`; a whitespace-free POSIX locator uses unquoted `cat <literal-locator>`. native Windows uses exact `Get-Content -Raw -Encoding UTF8 '<literal-locator>'` in PowerShell Core. Never cross-use/wrap these forms or combine the read with unrelated action.
+description: >-
+  Query, edit, and monitor Wwise projects through a local, version-aware
+  WAAPI Gateway. Use to configure WAAPI connections and Wwise versions;
+  inspect, create, edit, copy, move, or delete objects; update properties
+  and references; import or reimport audio; generate SoundBanks; use
+  supported playback and UI controls; or subscribe to Wwise events
+  and monitor changes.
 ---
 
-# Wwise WAAPI Skill
+# WAAPI Skill
 
-Automate Wwise through the packaged gateway. Use no inline Python or direct `WaapiClient`.
-
-Read the injected `SKILL.md` exactly once as the sole first shell action in a fresh task. A successful read is complete; a second `SKILL.md` read is forbidden. Never combine it with `pwd`, `git`, `rg`, `ls`, `find`, `printf` or another action.
+Use the packaged Gateway to operate Wwise. The Agent selects the requested
+outcome and supplies business values; the Gateway owns version-specific
+parameters, validation, execution, and verification.
 
 Versions: `2021.1`, `2022.1`, `2023.1`, `2024.1`, and `2025.1`.
+
+## Loading and paths
+
+Use the complete Skill instructions supplied by the agent environment.
+If they are not already loaded, read `SKILL.md` from the supplied location
+before running a Gateway command. If that location or complete content is
+unavailable, stop instead of searching for another installation.
+
+The Skill root is the directory containing that `SKILL.md`. Resolve `scripts/`
+and `references/` relative to this root, not the working directory or an assumed
+installation path. Use the absolute path to `scripts/run.py` for Gateway calls.
+
+Read only the reference needed for the current task, once, completely and as
+UTF-8 text. Reuse complete instructions already visible in the conversation.
+Use the environment's file-reading tool or a compatible shell. Shell reads
+are standalone: POSIX may use `cat '<absolute-file>'`; native Windows uses
+PowerShell Core with `Get-Content -Raw -Encoding UTF8 '<absolute-file>'`.
+Choose by the actual execution environment, not the connected Wwise version
+or the spelling of a path. A missing or truncated read stops the workflow.
+For query/operate references, the matching `WAAPI_QUERY_REFERENCE_END` or
+`WAAPI_OPERATE_REFERENCE_END` sentinel must be the final visible line.
+
+Keep Gateway calls separate. Copy each returned continuation exactly as
+instructed; do not reconstruct its command or change its shell syntax.
 
 ## One-time conversation introduction
 
@@ -33,16 +63,15 @@ facts, not later Skill invocations. Send machine answers separately.
 ## Entry rules
 
 1. Route the user's request into **setup**, **query**, or **operate**.
-2. Bootstrap only from the injected `SKILL.md` locator. Never guess a repository-relative `skills/waapi-skill` path or probe with `pwd`, `git status`, `ls`, `find`, or `rg`, including for Wwise CLI and project-migration requests.
-3. For common reads below, resolve the locator to the absolute Skill directory without probing and run its absolute `scripts/run.py` before `ls`, `find`, `rg`, research, or implementation reads.
+2. Use the supplied Skill root and the loading rules above, including for Wwise CLI and project-migration requests. Do not probe the repository or working directory to locate the Skill.
+3. For common reads below, run the absolute `scripts/run.py` before `ls`, `find`, `rg`, research, or implementation reads.
 4. Connection precedence is explicit flags, `WWISE_WAAPI_HOST` / `WWISE_WAAPI_PORT` / `WWISE_VERSION`, then config. Put version after `gateway.py`: `python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version 2022.1 operation-schema object.copy`. `--wwise-version` is the compatibility/config field. Never hand-edit config or scan unrelated ports/processes.
-5. Treat gateway JSON as authoritative. Every gateway command must leave its complete JSON visible before the next command: never suppress or redirect its output, request a zero/short tool-output budget, or continue from the shell exit code alone. Copy returned `shell_tool_timeout_ms` to the outer shell tool call; never add it to the command argv. If no complete JSON is visible, stop. A structured error is final. On native Windows, only `CreateProcessAsUserW failed: 267` before PowerShell starts permits you to repeat that identical complete shell command once. This is process-launch recovery, not a Gateway retry. A second 267 or any other shell failure stops.
+5. Treat gateway JSON as authoritative. Every gateway command must leave its complete JSON visible before the next command: never suppress or redirect its output, request a zero/short tool-output budget, or continue from the shell exit code alone. Copy returned `shell_tool_timeout_ms` to the outer shell tool call; never add it to the command argv. If no complete JSON is visible, stop. A structured error or shell failure stops the workflow; do not retry the Gateway command.
 6. Read only the current-turn lane; never preload. Read-only work cannot read `waapi-operate.md` before a change request.
-7. Read each later named lane reference exactly once in its own shell call. POSIX uses `cat <absolute-reference>`. Native Windows always copies the short task-local form `Get-Content -Raw -Encoding UTF8 '.agents\skills\waapi-skill\references\<file>.md'` exactly instead of reconstructing a scenario-root absolute path. Exactly once spans the visible task, not each turn; never reread an already-visible file. Do not probe with `wc -l`, `ls`, `rg`, `find`, `stat`, or `test`, and never split a reference. For `WAAPI_QUERY_REFERENCE_END` and `WAAPI_OPERATE_REFERENCE_END`, proceed only when the matching sentinel is the final visible line. Each Gateway call is separate. Only POSIX may bootstrap the initial complete `SKILL.md` against the same literal file with exact `wc -l <SKILL.md> && sed -n '1,<enough-lines>p' <SKILL.md>`; this is the only combined read allowed. Never combine any other command.
 
 ## Fixed gateway commands
 
-Use the injected absolute `scripts/run.py`.
+Examples below are relative to the supplied Skill root; use its absolute `scripts/run.py` when executing them.
 
 ```bash
 python scripts/run.py gateway.py status
