@@ -109,7 +109,37 @@ Program at `1e9ab36`: **5766 passed, 2 skipped**, exit zero (257.22 s).
 Its full Non-live run returned **11400 passed, 2 failed, 116 skipped,
 27 deselected** (736.92 s). The failures were two remaining old load/path
 wording assertions; the affected file passed **7 tests** after correction.
-Final Non-live and the Windows C1 follow-up remain pending.
+Final Non-live at `519c47b9f159fd625904ec1bda9573a3a33684e2` passed
+**11430 passed, 116 skipped, 27 deselected**, exit zero (767.49 s).
+The worktree remained unchanged during the run and was clean afterward,
+apart from the three pre-existing untracked research documents. The packaged
+Skill is byte-identical to `1e9ab36`; subsequent changes affect only the
+test harness, assertions, and developer evidence.
+
+Windows C1 at `519c47b` passed **1/1**, all 12 hard gates true, exit/task
+result zero (26.613 s). Root:
+`C:\w\entry-519c47b\skills\waapi-skill-workspace\entry coverage matrix 519c47b r4`.
+It read the complete Skill, selected and read the coverage reference, then
+used the required absolute Gateway runner. The 12-artifact manual hash audit
+had zero mismatches; audit SHA-256
+`B5C6EAF6E79696E0228A30EF68CB55FF7A790EC3458EA1DCCB6E44DE299D05B7`.
+Fresh thread: `01a09dc9-0be5-7751-9986-48a969f782c5`.
+The InteractiveToken/Limited task and temporary execution scripts were
+removed, with zero owned residuals. Launch logs remain under
+`C:\w\entry-519c47b-launch-r5`.
+
+The passing Mac C1 summary SHA-256 is
+`2596ed30660bac0b78390066e59d1eadc9cee05a0e83c789a7bfd4ed176dd577`;
+its selected/executed/passed session counts are each one, with no failed or
+pending sessions and no run errors. C1 on either host proves offline coverage
+reference selection, not setup/operate behavior or arbitrary-client support.
+
+A separate read-only review of committed `1e54f8a..519c47b` found no blocking
+issue in the public entry, bounded read-audit equivalences, or their regression
+tests. Gateway absolute-runner and continuation checks were not relaxed;
+the older Windows relative-runner failure remains a failure.
+After recording the completed results and updating the release note, the four
+affected public-document/inventory contract files passed **99 tests**, exit zero.
 
 First-use has no replay path. No real Wwise process, full Fresh matrix or
 project mutation ran. Temporary launch resources were removed after exit and
