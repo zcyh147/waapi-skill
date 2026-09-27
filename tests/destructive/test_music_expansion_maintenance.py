@@ -27,12 +27,27 @@ def test_music_existing_scalar_maintenance(
     command = ["query-object", "--exact-id", object_id]
     for meaning in (field, *preserved):
         command.extend(("--include-field", meaning))
+    if token == "LoopCount":
+        command.extend(("--include-field", "IsLoopingInfinite"))
     before = runtime.gateway(command, live=True)
     assert before.get("status") == "ok" and before.get("count") == 1, before
     before_row = before["objects"][0]
     assert token in before_row.get("properties", {}), before
     assert before_row["properties"][token] != value, "fixture already has the requested value"
     evidence["before"] = before_row
+    expected_properties = {**before_row["properties"], token: value}
+    if token == "LoopCount":
+        infinite = before_row["properties"].get("IsLoopingInfinite")
+        assert type(infinite) is bool, before
+        if infinite:
+            # Wwise 2025 disables finite count while infinite looping is on.
+            # The discovered dependency is a separate approved transaction.
+            dependency = _complete_object_metadata_business_transaction(
+                runtime, operation="object.setProperty", object_id=object_id,
+                field_name="IsLoopingInfinite", value=False,
+            )
+            evidence["transaction_ids"].append(dependency["verify"]["transaction_id"])
+            expected_properties["IsLoopingInfinite"] = False
     result = _complete_object_metadata_business_transaction(
         runtime, operation="object.setProperty", object_id=object_id, field_name=field, value=value,
     )
@@ -40,7 +55,7 @@ def test_music_existing_scalar_maintenance(
     after = runtime.gateway(command, live=True)
     assert after.get("status") == "ok" and after.get("count") == 1, after
     after_row = after["objects"][0]
-    expected = {**before_row, "properties": {**before_row["properties"], token: value}}
+    expected = {**before_row, "properties": expected_properties}
     evidence["after"] = after_row
     assert after_row == expected, (before_row, after_row)
     evidence["status"] = "PASS"

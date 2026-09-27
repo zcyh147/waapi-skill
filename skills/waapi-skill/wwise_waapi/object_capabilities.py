@@ -18,6 +18,7 @@ class ObjectIdentitySemantics:
     empty_name_allowed: bool
     mutable_intrinsic_name: bool
     display_identity_source: str
+    relative_display_paths: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,6 +90,15 @@ _BY_OBJECT_TYPE = {
     "MusicPlaylistItem": _OWNED_COLLECTION_ENTRY,
     "MusicStinger": _OWNED_COLLECTION_ENTRY,
     "MusicTrackSequence": _OWNED_COLLECTION_ENTRY,
+    # Live exact-GUID reads on 2022.1/2025.1 return this internal display path.
+    # It is an identity comparison value, never a hierarchy selector.
+    "MusicTransition": ObjectIdentitySemantics(
+        name_mode="owned_collection_entry",
+        empty_name_allowed=True,
+        mutable_intrinsic_name=False,
+        display_identity_source="owner_and_collection_role",
+        relative_display_paths=(r"Root\Transition",),
+    ),
     "StateGroupInfo": _OWNED_COLLECTION_ENTRY,
 }
 

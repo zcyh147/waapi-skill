@@ -48,6 +48,7 @@ EXPECTED_NON_INTRINSIC_NAME_OBJECT_TYPES = {
     "MusicPlaylistItem",
     "MusicStinger",
     "MusicTrackSequence",
+    "MusicTransition",
     "Panner",
     "Position",
     "RTPC",
@@ -96,7 +97,9 @@ def test_reflected_sample_objects_with_empty_names_are_all_classified() -> None:
             row["name"] for row in catalog["types"] if row["type"] == "WObject"
         )
 
-    assert empty_name_tags & reflected_wobjects == NON_INTRINSIC_NAME_OBJECT_TYPES
+    # MusicTransition has an owned relative display identity with a nonempty
+    # built-in label in these fixtures; it is not an empty-name fixture row.
+    assert empty_name_tags & reflected_wobjects == NON_INTRINSIC_NAME_OBJECT_TYPES - {"MusicTransition"}
 
 
 def _context(**overrides: str) -> BusinessContext:

@@ -298,6 +298,50 @@ def test_set_schema_keeps_existing_action_duration_fields(
     assert declaration["field_semantics"]["fade_time_ms"]["unit"] == "milliseconds"
 
 
+@pytest.mark.parametrize("version", ("2022.1", "2025.1"))
+def test_music_transition_exact_guid_binding_accepts_observed_owned_display_path(
+    tmp_path: Path, version: str,
+) -> None:
+    task = FieldTask(tmp_path, version, "object.setProperty")
+    task.objects[FIRST] = {"id": FIRST, "name": "Transition", "type": "MusicTransition",
+                           "path": r"Root\Transition"}
+    handle = task.bind(FIRST)
+    code, inspected = task.run("draft-inspect", task.draft, "--task-authority", task.authority)
+    assert code == 0, inspected
+    assert handle.startswith("boh1-"), handle
+    assert all(uri in {"ak.wwise.core.getInfo", "ak.wwise.core.getProjectInfo", "ak.wwise.core.object.get"}
+               for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize("object_type,path", [
+    ("Sound", r"Root\Transition"),
+    ("MusicTransition", r"Other\Transition"),
+    ("MusicTransition", r"Root\Other"),
+    ("MusicTransition", r"..\Transition"),
+    ("MusicTransition", "Root/Transition"),
+])
+def test_transition_display_exception_does_not_relax_other_live_identities(
+    tmp_path: Path, object_type: str, path: str,
+) -> None:
+    task = FieldTask(tmp_path, "2025.1", "object.setProperty")
+    task.objects[FIRST] = {"id": FIRST, "name": "Transition", "type": object_type, "path": path}
+    code, rejected = task.step("draft-bind-object", "--object-id", FIRST)
+    assert code == 2, rejected
+    assert rejected["error_code"] == "BUSINESS_OBJECT_BINDING_MISMATCH"
+
+
+def test_owned_transition_name_cannot_be_rewritten_as_an_intrinsic_name(tmp_path: Path) -> None:
+    task = FieldTask(tmp_path, "2025.1", "object.setName")
+    task.objects[FIRST] = {"id": FIRST, "name": "Transition", "type": "MusicTransition",
+                           "path": r"Root\Transition"}
+    task.bind(FIRST)
+    code, declared = task.step("draft-declare-object-change", "--new-name", "Renamed")
+    assert code == 0, declared
+    code, rejected = task.step("draft-check")
+    assert code == 2, rejected
+    assert rejected["error_code"] == "DERIVED_OBJECT_NAME_BOUNDARY"
+
+
 @pytest.mark.parametrize("version", VERSIONS[1:])
 def test_unknown_batch_fixed_field_is_not_reinterpreted_as_search(
     tmp_path: Path, version: str,
