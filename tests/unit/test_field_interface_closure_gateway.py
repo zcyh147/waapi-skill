@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 import json
 from pathlib import Path
 from typing import Any
@@ -103,6 +104,166 @@ class FieldTask:
                                   "--meaning", meaning)
         assert code == 0, payload
         return payload["meaning_results"][0]["candidates"][0]["handle"]
+
+
+class CreateTask(FieldTask):
+    """Read-only Wwise boundary for public create declarations and previews."""
+
+    def __init__(self, path: Path, version: str) -> None:
+        super().__init__(path, version, "object.create")
+        parent_path = r"\Events\Default Work Unit\Owned"
+        self.objects = {
+            FIRST: {"id": FIRST, "name": "Owned", "type": "Folder",
+                    "path": parent_path, "parent": {"id": PROJECT}},
+            SECOND: {"id": SECOND, "name": "Play_Weather", "type": "Event",
+                     "path": parent_path + r"\Play_Weather", "parent": {"id": FIRST}},
+        }
+        self.types = [
+            {"classId": 1, "name": "Folder", "type": "WObject"},
+            {"classId": 2, "name": "Event", "type": "WObject"},
+            {"classId": 3, "name": "Action", "type": "WObject"},
+        ]
+        self.metadata["Delay"] = {
+            "name": "Delay", "type": "Real64",
+            "restriction": {"type": "range", "min": 0, "max": 60},
+        }
+
+    def call(self, uri: str, args: Any = None, options: Any = None) -> Any:
+        if uri == "ak.wwise.core.object.get" and "from" in args:
+            self.calls.append((uri, args, options))
+            source = args["from"]
+            if "id" in source:
+                rows = [self.objects[key] for key in source["id"] if key in self.objects]
+            else:
+                assert set(source) == {"path"}, args
+                rows = [row for row in self.objects.values() if row["path"] in source["path"]]
+            if "transform" in args:
+                assert len(rows) == 1, args
+                parent = rows[0]
+                if args["transform"] == [{"select": ["children"]}]:
+                    rows = [row for row in self.objects.values()
+                            if row["parent"]["id"] == parent["id"]]
+                else:
+                    assert args["transform"] == [{"select": ["descendants"]}], args
+                    rows = [row for row in self.objects.values()
+                            if row["path"].startswith(parent["path"] + "\\")]
+            return {"return": deepcopy(rows)}
+        return super().call(uri, args, options)
+
+    def discover_kind(self, meaning: str) -> str:
+        code, payload = self.step("draft-discover-types", "--role", "object",
+                                  "--meaning", meaning)
+        assert code == 0, payload
+        assert len(payload["type_candidates"]) == 1
+        return payload["type_candidates"][0]["handle"]
+
+    def preview_artifact(self) -> dict[str, Any]:
+        before = deepcopy(self.objects)
+        project_before = self.project_file.read_bytes()
+        code, checked = self.step("draft-check")
+        assert code == 0, checked
+        code, preview = self.step("preview-from-draft")
+        assert code == 0, preview
+        code, shown = self.run("transaction-show", preview["transaction_id"])
+        assert code == 0, shown
+        assert shown["state"] == "awaiting_confirmation"
+        assert self.objects == before
+        assert self.project_file.read_bytes() == project_before
+        assert all(uri in {
+            "ak.wwise.core.getInfo", "ak.wwise.core.getProjectInfo",
+            "ak.wwise.core.object.get", "ak.wwise.core.object.getTypes",
+            "ak.wwise.core.object.getPropertyAndReferenceNames",
+            "ak.wwise.core.object.getPropertyInfo",
+        } for uri, _, _ in self.calls)
+        return shown["artifact"]
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("conflict", ("rename", "replace"))
+def test_create_conflict_declaration_reaches_preview_without_writing(
+    tmp_path: Path, version: str, conflict: str,
+) -> None:
+    task = CreateTask(tmp_path, version)
+    parent = task.bind(FIRST)
+    kind = task.discover_kind("Event")
+    settings = ["--name-conflict", conflict]
+    if conflict == "replace":
+        settings.extend(["--replace-owner-handle", parent])
+    code, configured = task.step("draft-business-configure", *settings)
+    assert code == 0, configured
+    code, declared = task.step(
+        "draft-declare-new", "--declaration-id", "weather", "--parent-handle", parent,
+        "--name", "Play_Weather", "--kind", kind,
+    )
+    assert code == 0, declared
+    artifact = task.preview_artifact()
+    expected = {
+        "parent": {"kind": "id", "value": FIRST}, "type": "Event",
+        "name": "Play_Weather", "on_name_conflict": conflict,
+    }
+    if conflict == "replace":
+        expected["replace_owned_root"] = {"kind": "id", "value": FIRST}
+    assert artifact["request"]["arguments"] == expected
+    assert artifact["prepared_operation"]["dispatch"]["args"]["onNameConflict"] == conflict
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+def test_create_replace_without_owner_cannot_produce_a_preview(
+    tmp_path: Path, version: str,
+) -> None:
+    task = CreateTask(tmp_path, version)
+    parent = task.bind(FIRST)
+    kind = task.discover_kind("Event")
+    code, configured = task.step("draft-business-configure", "--name-conflict", "replace")
+    assert code == 0, configured
+    before = deepcopy(task.objects)
+    revision = task.revision
+    code, before_draft = task.run("draft-inspect", task.draft,
+                                  "--task-authority", task.authority)
+    assert code == 0, before_draft
+    task.calls.clear()
+    code, declared = task.step(
+        "draft-declare-new", "--declaration-id", "weather", "--parent-handle", parent,
+        "--name", "Play_Weather", "--kind", kind,
+    )
+    assert code == 2, declared
+    assert declared["error_code"] == "REPLACE_OWNERSHIP_REQUIRED"
+    assert declared["details"]["repair"]["draft_changed"] is False
+    assert task.revision == revision
+    assert task.objects == before
+    assert task.calls == []
+    code, after_draft = task.run("draft-inspect", task.draft,
+                                 "--task-authority", task.authority)
+    assert code == 0, after_draft
+    assert after_draft["draft"] == before_draft["draft"]
+    code, no_preview = task.step("preview-from-draft")
+    assert code == 2, no_preview
+    assert "transaction_id" not in no_preview
+    assert all(uri == "ak.wwise.core.getInfo" for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+def test_create_action_durations_report_event_parent_boundary_without_writing(
+    tmp_path: Path, version: str,
+) -> None:
+    task = CreateTask(tmp_path, version)
+    parent = task.bind(SECOND)
+    kind = task.discover_kind("Action")
+    before = deepcopy(task.objects)
+    task.calls.clear()
+    code, declared = task.step(
+        "draft-declare-new", "--declaration-id", "play", "--parent-handle", parent,
+        "--name", "Play", "--kind", kind,
+        "--field", "fade_time_ms", "250", "--field", "delay_ms", "80",
+    )
+    # This is boundary evidence, not positive Action-creation timing coverage.
+    # Event parenting and Action derived identity need a separate runtime repair.
+    assert code == 2, declared
+    assert declared["error_code"] == "INVALID_CREATE_PARENT_TYPE"
+    assert declared["details"]["repair"]["draft_changed"] is False
+    assert "transaction_id" not in declared
+    assert task.objects == before
+    assert task.calls == []
 
 
 @pytest.mark.parametrize("version", VERSIONS[1:])
