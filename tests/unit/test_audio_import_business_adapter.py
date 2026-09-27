@@ -135,6 +135,9 @@ def test_new_media_declaration_compiles_all_common_business_fields(
         {"name": "OutputBus", "target": {"kind": "id", "value": BUS_ID}}
     ]
     assert row["switch_assignment"] == "Rain"
+    assert row["notes"] == "steady rain bed"
+    assert row["audio_source_notes"] == "field recording"
+    assert row["originals_subfolder"] == r"Weather\Rain"
     assert compiled.preview.readable_lines[:3] == (
         "对象：Rain_Bed",
         "类型：Sound SFX",

@@ -440,7 +440,19 @@ def _resolve_native_object_type(
     kind_name: str,
 ) -> str:
     if kind_name.startswith("bth1-"):
-        return session.handles.resolve_type(kind_name).name
+        native_type = session.handles.resolve_type(kind_name).name
+        if native_type == "Action":
+            raise _repair(
+                session,
+                "ACTION_CREATION_UNAVAILABLE",
+                field="kind",
+                action=(
+                    "Action creation requires a dedicated Event-parent and derived-identity "
+                    "contract; existing Actions can still be edited through object.set "
+                    "or the metadata operations"
+                ),
+            )
+        return native_type
     version = session.context.wwise_version
     kind = resolve_semantic_kind(kind_name, version=version)
     if kind.name in {"sound-sfx", "sound-voice"}:

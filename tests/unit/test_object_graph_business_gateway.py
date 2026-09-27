@@ -71,7 +71,7 @@ class MetadataFakeClient(FakeClient):
         return super().call(uri, args, options)
 
 
-def _env(tmp_path: Path) -> dict[str, str]:
+def _env(tmp_path: Path, version: str = "2025.1") -> dict[str, str]:
     config = tmp_path / "config.json"
     config.write_text(
         json.dumps(
@@ -88,7 +88,7 @@ def _env(tmp_path: Path) -> dict[str, str]:
         "WAAPI_SKILL_CONFIG_PATH": str(config),
         "WWISE_WAAPI_HOST": "127.0.0.1",
         "WWISE_WAAPI_PORT": "31337",
-        "WWISE_VERSION": "2025.1",
+        "WWISE_VERSION": version,
     }
 
 
@@ -99,7 +99,7 @@ def _project(tmp_path: Path) -> dict[str, Any]:
     return {"id": PROJECT_ID, "name": "SampleProject", "path": str(path)}
 
 
-def _info() -> dict[str, Any]:
+def _info(version: str = "2025.1") -> dict[str, Any]:
     return {
         "displayName": "Wwise",
         "isCommandLine": True,
@@ -110,29 +110,33 @@ def _info() -> dict[str, Any]:
         "platform": "macosx",
         "configuration": "release",
         "version": {
-            "year": 2025,
+            "year": int(version.split(".")[0]),
             "major": 1,
             "minor": 0,
             "build": 1,
-            "displayName": "v2025.1.0.1",
+            "displayName": f"v{version}.0.1",
         },
     }
 
 
-def _offline(tmp_path: Path, *argv: str) -> tuple[int, dict[str, Any]]:
+def _offline(
+    tmp_path: Path, *argv: str, version: str | None = None,
+) -> tuple[int, dict[str, Any]]:
     return gateway.execute_gateway(
         ["--state-dir", str(tmp_path / "state"), *argv],
-        env=_env(tmp_path),
+        env=_env(tmp_path) if version is None else _env(tmp_path, version),
         client_factory=lambda url: (_ for _ in ()).throw(
             AssertionError(f"offline command connected to {url}")
         ),
     )
 
 
-def _live_client(tmp_path: Path, extra: Mapping[str, Sequence[Any]]) -> FakeClient:
+def _live_client(
+    tmp_path: Path, extra: Mapping[str, Sequence[Any]], *, version: str | None = None,
+) -> FakeClient:
     return FakeClient(
         {
-            "ak.wwise.core.getInfo": [_info()],
+            "ak.wwise.core.getInfo": [_info() if version is None else _info(version)],
             "ak.wwise.core.getProjectInfo": [_project(tmp_path)],
             **extra,
         }
@@ -1820,8 +1824,9 @@ def test_object_set_batch_keeps_disclosed_stable_fields_out_of_metadata(
     }
 
 
+@pytest.mark.parametrize("source_form", ("inline-wav", "media-file"))
 def test_gateway_adds_subordinate_media_without_model_authored_json(
-    tmp_path: Path,
+    tmp_path: Path, source_form: str,
 ) -> None:
     start_code, started = _offline(tmp_path, "draft-start", "object.set")
     assert start_code == 0, started
@@ -1919,6 +1924,13 @@ def test_gateway_adds_subordinate_media_without_model_authored_json(
     media_binding = declared["draft"]["next_action_binding"]["add_media"]
     assert media_binding["native_import_fragment_input"] == "forbidden"
 
+    media = tmp_path / "Storm Warning 现场.wav"
+    media.write_bytes(b"RIFF-fixture")
+    source_value = (
+        "StormWarning.wav|UklGRgAAAAAA"
+        if source_form == "inline-wav"
+        else str(media)
+    )
     media_code, added = _offline(
         tmp_path,
         "draft-add-media",
@@ -1929,8 +1941,8 @@ def test_gateway_adds_subordinate_media_without_model_authored_json(
         "3",
         "--declaration-id",
         "voice",
-        "--inline-wav",
-        "StormWarning.wav|UklGRgAAAAAA",
+        f"--{source_form}",
+        source_value,
         "--kind",
         "sound-voice",
         "--language",
@@ -1971,13 +1983,93 @@ def test_gateway_adds_subordinate_media_without_model_authored_json(
     assert child["import"] == {
         "files": [
             {
-                "audio_file_base64": "StormWarning.wav|UklGRgAAAAAA",
+                ("audio_file_base64" if source_form == "inline-wav" else "audio_file"): source_value,
                 "originals_subfolder": "Weather/Warnings",
                 "language": "English(US)",
                 "object_type": "Sound",
             }
         ]
     }
+
+
+@pytest.mark.parametrize("version", ("2022.1", "2025.1"))
+@pytest.mark.parametrize("configured", (False, True), ids=("defaults", "explicit-global"))
+def test_object_set_global_settings_materialize_at_request_scope(
+    tmp_path: Path, version: str, configured: bool,
+) -> None:
+    code, started = _offline(tmp_path, "draft-start", "object.set", version=version)
+    assert code == 0, started
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    root = "Containers" if version == "2025.1" else "Actor-Mixer Hierarchy"
+    client = _live_client(tmp_path, {
+        "ak.wwise.core.object.get": [{"return": [{
+            "id": PARENT_ID,
+            "name": "Default Work Unit",
+            "type": "WorkUnit",
+            "path": rf"\{root}\Default Work Unit",
+        }]}],
+    }, version=version)
+    code, bound = gateway.execute_gateway(
+        ["--state-dir", str(tmp_path / "state"), "draft-bind-object", draft_id,
+         "--task-authority", authority, "--expected-revision", "1",
+         "--object-id", PARENT_ID],
+        env=_env(tmp_path, version), client_factory=lambda _url: client,
+    )
+    assert code == 0, bound
+    code, declared = _offline(
+        tmp_path, "draft-declare-new", draft_id, "--task-authority", authority,
+        "--expected-revision", "2", "--declaration-id", "member",
+        "--parent-handle", bound["bound_object"]["handle"],
+        "--name", "Rain Layer", "--kind", "sound-sfx",
+        "--field", "object_list", "CustomList", version=version,
+    )
+    assert code == 0, declared
+    revision = declared["draft"]["revision"]
+    if configured:
+        code, configured_result = _offline(
+            tmp_path, "draft-business-configure", draft_id,
+            "--task-authority", authority, "--expected-revision", str(revision),
+            "--name-conflict", "merge", "--list-behavior", "replace-all",
+            "--add-to-source-control", version=version,
+        )
+        assert code == 0, configured_result
+        revision = configured_result["draft"]["revision"]
+
+    store = OperationDraftStore(tmp_path / "state")
+    materialized = store.materialize_request(
+        draft_id, task_authority=authority, expected_revision=revision,
+        schema_digest=gateway.operation_draft_schema_digest("object.set", version),
+        composer_digest=operation_composer_digest("object.set", version),
+    )
+    expected_arguments: dict[str, Any] = {
+        "objects": [{
+            "object": {"kind": "id", "value": PARENT_ID},
+            "lists": [{"name": "CustomList", "objects": [
+                {"type": "Sound", "name": "Rain Layer"},
+            ]}],
+        }],
+    }
+    if configured:
+        expected_arguments.update({
+            "on_name_conflict": "merge",
+            "list_mode": "replaceAll",
+            "auto_add_to_source_control": True,
+        })
+    assert materialized.request["arguments"] == expected_arguments
+
+    # object.create's replace choice must not enter object.set or change its draft.
+    before = store.inspect(draft_id, task_authority=authority).composition
+    code, rejected = _offline(
+        tmp_path, "draft-business-configure", draft_id,
+        "--task-authority", authority, "--expected-revision", str(revision),
+        "--name-conflict", "replace", version=version,
+    )
+    assert code == 2, rejected
+    assert rejected["error_code"] == "FIELD_VALUE_UNAVAILABLE"
+    after = store.inspect(draft_id, task_authority=authority)
+    assert after.revision == revision
+    assert after.composition == before
 
 
 def test_gateway_declares_named_object_list_without_native_row_json(

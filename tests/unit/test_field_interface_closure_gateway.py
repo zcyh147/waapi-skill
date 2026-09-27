@@ -109,8 +109,8 @@ class FieldTask:
 class CreateTask(FieldTask):
     """Read-only Wwise boundary for public create declarations and previews."""
 
-    def __init__(self, path: Path, version: str) -> None:
-        super().__init__(path, version, "object.create")
+    def __init__(self, path: Path, version: str, operation: str = "object.create") -> None:
+        super().__init__(path, version, operation)
         parent_path = r"\Events\Default Work Unit\Owned"
         self.objects = {
             FIRST: {"id": FIRST, "name": "Owned", "type": "Folder",
@@ -242,11 +242,14 @@ def test_create_replace_without_owner_cannot_produce_a_preview(
     assert all(uri == "ak.wwise.core.getInfo" for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize("version", VERSIONS)
-def test_create_action_durations_report_event_parent_boundary_without_writing(
-    tmp_path: Path, version: str,
+@pytest.mark.parametrize("version,operation", [
+    *((version, "object.create") for version in VERSIONS),
+    *((version, "object.set") for version in VERSIONS[1:]),
+])
+def test_action_creation_has_explicit_boundary_without_writing(
+    tmp_path: Path, version: str, operation: str,
 ) -> None:
-    task = CreateTask(tmp_path, version)
+    task = CreateTask(tmp_path, version, operation)
     parent = task.bind(SECOND)
     kind = task.discover_kind("Action")
     before = deepcopy(task.objects)
@@ -254,16 +257,45 @@ def test_create_action_durations_report_event_parent_boundary_without_writing(
     code, declared = task.step(
         "draft-declare-new", "--declaration-id", "play", "--parent-handle", parent,
         "--name", "Play", "--kind", kind,
-        "--field", "fade_time_ms", "250", "--field", "delay_ms", "80",
     )
     # This is boundary evidence, not positive Action-creation timing coverage.
     # Event parenting and Action derived identity need a separate runtime repair.
     assert code == 2, declared
-    assert declared["error_code"] == "INVALID_CREATE_PARENT_TYPE"
+    assert declared["error_code"] == "ACTION_CREATION_UNAVAILABLE"
     assert declared["details"]["repair"]["draft_changed"] is False
     assert "transaction_id" not in declared
     assert task.objects == before
     assert task.calls == []
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+def test_create_schema_does_not_advertise_unavailable_action_durations(
+    tmp_path: Path, version: str,
+) -> None:
+    task = CreateTask(tmp_path, version)
+    code, schema = task.run("operation-schema", "object.create")
+    assert code == 0, schema
+    declaration = schema["business_adapter"]["declaration"]
+    for key in ("stable_fields", "field_value_types", "field_semantics"):
+        assert not {"fade_time_ms", "delay_ms"}.intersection(declaration.get(key, {}))
+    assert schema["business_adapter"]["creation_boundaries"]["Action"] == {
+        "status": "unsupported_by_skill_interface",
+        "reason": "event_parent_and_derived_action_identity_require_a_dedicated_creation_contract",
+        "existing_object_edits": "supported_through_object_set_or_metadata_operations",
+    }
+
+
+@pytest.mark.parametrize("version", VERSIONS[1:])
+def test_set_schema_keeps_existing_action_duration_fields(
+    tmp_path: Path, version: str,
+) -> None:
+    task = FieldTask(tmp_path, version, "object.set")
+    code, schema = task.run("operation-schema", "object.set")
+    assert code == 0, schema
+    declaration = schema["business_adapter"]["declaration"]
+    assert declaration["field_value_types"]["fade_time_ms"] == "number"
+    assert declaration["field_value_types"]["delay_ms"] == "number"
+    assert declaration["field_semantics"]["fade_time_ms"]["unit"] == "milliseconds"
 
 
 @pytest.mark.parametrize("version", VERSIONS[1:])

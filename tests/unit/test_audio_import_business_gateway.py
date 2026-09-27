@@ -608,14 +608,22 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
         "--field",
         "loop",
         "infinite",
+        "--field",
+        "audio_source_notes",
+        "现场录音 · take 2",
+        "--field",
+        "originals_subfolder",
+        "Weather/Rain",
     )
     assert declare_code == 0, declared
     assert declared["draft"]["revision"] == 5
     assert "declarations" not in declared["draft"]
     assert declared["draft"]["declaration_receipt"]["fields"] == {
+        "audio_source_notes": "现场录音 · take 2",
         "language": "SFX",
         "loop": "infinite",
         "media_file": str(media),
+        "originals_subfolder": "Weather/Rain",
         "volume_db": -4.0,
     }
     assert declared["draft"]["declarations_summary"]["count"] == 1
@@ -669,11 +677,13 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
     )
     assert materialized.request["arguments"]["imports"][0] == {
         "audio_file": str(media),
+        "audio_source_notes": "现场录音 · take 2",
         "import_language": "SFX",
         "object_path": (
             r"\Actor-Mixer Hierarchy\Default Work Unit\Weather\<Sound SFX>Rain_Bed"
         ),
         "object_type": "Sound SFX",
+        "originals_subfolder": r"Weather\Rain",
         "properties": [
             {"name": "IsLoopingEnabled", "value": True},
             {"name": "IsLoopingInfinite", "value": True},
