@@ -1,4 +1,8 @@
-"""Narrow existing-object music edits; no claim of Playlist authoring/playback."""
+"""Explicit developer probes for existing music edits, including capability gaps.
+
+Not automatically collected: these investigations retain unsupported attempts
+as failures, rather than blessing them as business acceptance.
+"""
 
 import pytest
 

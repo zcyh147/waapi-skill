@@ -1992,7 +1992,7 @@ def test_gateway_adds_subordinate_media_without_model_authored_json(
     }
 
 
-@pytest.mark.parametrize("version", ("2022.1", "2025.1"))
+@pytest.mark.parametrize("version", ("2022.1", "2023.1", "2024.1", "2025.1"))
 @pytest.mark.parametrize("configured", (False, True), ids=("defaults", "explicit-global"))
 def test_object_set_global_settings_materialize_at_request_scope(
     tmp_path: Path, version: str, configured: bool,

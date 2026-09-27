@@ -1,7 +1,9 @@
 """Read-only public contract probes on lifecycle-owned SampleProject copies.
 
-These probes establish independent oracle feasibility, not music playback or
-business mutation acceptance. A rejected read remains failed probe evidence.
+These explicitly selected developer probes establish oracle feasibility, not
+music playback or business mutation acceptance. They intentionally expose
+unsupported reads as failures and are excluded from automatic test collection.
+A rejected read remains failed probe evidence.
 """
 
 from __future__ import annotations
