@@ -1,8 +1,25 @@
 [English](./README.md) · [简体中文](./README.zh-CN.md)
 
+<div align="center">
+
 # WAAPI Skill
 
-用自然语言操作 Wwise Authoring，不再让 AI Agent 手写 WAAPI 参数和 JSON。
+**用自然语言操作 Wwise Authoring。**
+
+不再让 AI Agent 手写 WAAPI 参数和 JSON。
+
+[![平台](https://img.shields.io/badge/Platforms-macOS%20%7C%20Windows-0078D4?style=flat-square)](#使用要求)
+[![Wwise](https://img.shields.io/badge/Wwise-2021.1–2025.1-5965E0?style=flat-square)](#支持版本)
+[![Python](https://img.shields.io/badge/Python-3.11–3.13-00897B?style=flat-square)](#使用要求)
+[![MIT](https://img.shields.io/badge/License-MIT-64748B?style=flat-square)](./LICENSE)
+
+### [下载最新版](https://github.com/zcyh147/waapi-skill/releases/latest)
+
+[安装](#安装) · [快速开始](#快速开始) · [覆盖范围](./skills/waapi-skill/references/waapi-coverage.md) · [反馈问题](https://github.com/zcyh147/waapi-skill/issues)
+
+</div>
+
+---
 
 WAAPI Skill 是一个本地 Agent Skill，内置版本感知的 Gateway。你只需
 描述想要的结果；Agent 负责选择合适的操作并提供少量业务参数，Gateway 则负责
@@ -15,8 +32,6 @@ WAAPI Skill 是一个本地 Agent Skill，内置版本感知的 Gateway。你只
 
 - **自然语言操作 Wwise**：关注想得到什么，不必理解 API 名称、对象类型、GUID、
   完整路径或 JSON payload。
-- **覆盖常用 Authoring 工作流**：查询与修改对象、导入或重新导入音频、维护 Event
-  和 Switch 分配、生成 SoundBank、使用 Profiler/运行时操作、订阅事件等。
 - **支持五个 Wwise 版本系列**：为 `2021.1`、`2022.1`、`2023.1`、`2024.1` 和
   `2025.1` 提供独立的版本合同。
 - **更安全的工程修改**：所有修改都经过不可变 Preview、明确授权、单次执行和结果
@@ -52,13 +67,9 @@ WAAPI Skill 是一个本地 Agent Skill，内置版本感知的 Gateway。你只
 | `2024.1` | 支持 |
 | `2025.1` | 支持 |
 
-提供两种宿主 Profile：
-
-- **WwiseConsole**：覆盖反射得到的命令行接口
-- **Wwise Authoring UI**：在相同核心接口上增加受支持的 UI Command
-
-Gateway 会自动识别当前连接的宿主。仅限 Authoring 的命令不会假装能在
-WwiseConsole 中运行。
+支持连接 **Wwise Authoring** 和 **WwiseConsole**，Gateway 会自动识别宿主。
+读取当前选中对象、控制界面和监控 UI 事件等能力需要 Authoring；具体可用操作取决于
+当前连接的宿主和 Wwise 版本。
 
 ## 使用要求
 
@@ -140,7 +151,8 @@ Gateway 内部没有 LLM。它是确定性的，使用按版本反射的资源�
 时加载详细说明。这样既保留了 Skill 的轻量使用方式，也提供了优秀 MCP 工具应有的
 稳定工具边界。
 
-## 直接使用 Gateway（可选）
+<details>
+<summary>开发与诊断：直接使用 Gateway</summary>
 
 通常由 Agent 代替用户操作 Gateway。开发、诊断或外部自动化场景也可以在源码仓库中
 直接调用：
@@ -152,6 +164,8 @@ python skills/waapi-skill/scripts/run.py gateway.py status
 
 首次调用会自动准备 Skill 自带的 Python 环境。如果 Windows 中的 Python 命令是
 `py`，将上面的 `python` 替换为 `py` 即可。
+
+</details>
 
 ## 范围与验证
 
@@ -171,3 +185,13 @@ Fresh Agent 语义测试。精确路由数量、版本边界和完整证据放�
 如果你需要本地、版本感知、不依赖常驻 Server，并且行为边界已经打包好的 Agent
 Skill，就使用这个项目。如果客户端明确要求 MCP 原生互操作，或你希望使用持久化的
 服务边界，则更适合选择 Wwise MCP Server。
+
+## 问题反馈
+
+遇到问题欢迎[提交 Issue](https://github.com/zcyh147/waapi-skill/issues)，请附上
+Wwise 版本、操作系统、Agent 客户端、复现步骤及报错。分享日志或对话片段前，
+请隐去工程敏感信息。
+
+## 许可证
+
+[MIT](./LICENSE)
