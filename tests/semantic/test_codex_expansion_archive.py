@@ -691,3 +691,52 @@ def test_canonical_command_binding_keeps_exact_arguments_and_multiplicity(tmp_pa
         _write(directory / 'codex-facts.json', facts)
     with pytest.raises(ExpansionArchiveError):
         _verify(tmp_path)
+
+
+def _swap_raw_command_blocks(root, first_id, second_id):
+    directory = root / 'turns/turn-01'
+    events = [json.loads(line) for line in (directory / 'events.jsonl').read_text().splitlines()]
+    first = [index for index, event in enumerate(events) if event.get('item', {}).get('id') == first_id]
+    second = [index for index, event in enumerate(events) if event.get('item', {}).get('id') == second_id]
+    assert len(first) == len(second) == 2
+    assert [events[index]['type'] for index in first] == ['item.started', 'item.completed']
+    assert [events[index]['type'] for index in second] == ['item.started', 'item.completed']
+    for left, right in zip(first, second):
+        events[left], events[right] = events[right], events[left]
+    (directory / 'events.jsonl').write_text(''.join(json.dumps(event) + '\n' for event in events))
+    facts = json.loads((directory / 'codex-facts.json').read_text())
+    facts['command_facts']['command_records'] = [asdict(row) for row in completed_command_records(events, platform_name='posix')]
+    _write(directory / 'codex-facts.json', facts)
+
+
+def test_terminal_rejected_read_cannot_precede_accepted_query_in_raw_events(tmp_path):
+    _sealed_read_rejection(tmp_path)
+    _swap_raw_command_blocks(tmp_path, 'cmd-1', 'cmd-2')
+    with pytest.raises(ExpansionArchiveError, match='order'):
+        _verify(tmp_path)
+
+
+def test_preview_execute_verify_receipts_require_same_raw_dependency_order(tmp_path):
+    _sealed_c08(tmp_path)
+    _realistic_command_paths(tmp_path)
+    # The unchanged Preview and notice precede both commands. Only execution
+    # and its verification are reversed, leaving every receipt and fact valid.
+    _swap_raw_command_blocks(tmp_path, 'cmd-3', 'cmd-4')
+    with pytest.raises(ExpansionArchiveError, match='order'):
+        _verify(tmp_path)
+
+
+def test_completed_rejected_read_turn_cannot_omit_terminal_receipt(tmp_path):
+    _sealed_read_rejection(tmp_path)
+    directory = tmp_path / 'turns/turn-01'
+    events = [json.loads(line) for line in (directory / 'events.jsonl').read_text().splitlines()]
+    events = [event for event in events if event.get('item', {}).get('id') != 'cmd-2']
+    (directory / 'events.jsonl').write_text(''.join(json.dumps(event) + '\n' for event in events))
+    facts = json.loads((directory / 'codex-facts.json').read_text())
+    facts['command_facts']['command_records'] = [asdict(row) for row in completed_command_records(events, platform_name='posix')]
+    _write(directory / 'codex-facts.json', facts)
+    grade = json.loads((directory / 'turn-grade.json').read_text())
+    grade['broker_prefix_count'] = 1
+    _write(directory / 'turn-grade.json', grade)
+    with pytest.raises(ExpansionArchiveError, match='omitted.*receipt'):
+        _verify(tmp_path)

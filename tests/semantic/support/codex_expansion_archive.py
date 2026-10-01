@@ -333,14 +333,14 @@ def _turns(root: Path, plan: Mapping[str, Any], result: Mapping[str, Any],
             except ValueError:
                 continue  # Skill reads are classified separately below.
             resolved_commands.append((command, resolved))
-        for record in records[prefix:count]:
-            matching = next((position for position, (command, resolved) in enumerate(resolved_commands)
-                if list(resolved.normalized_model_argv) == record["normalized_model_argv"]
+        turn_records = records[prefix:count]
+        _require(len(resolved_commands) == len(turn_records),
+                 "raw Codex Gateway command count differs from Broker receipts")
+        for (command, resolved), record in zip(resolved_commands, turn_records):
+            _require(list(resolved.normalized_model_argv) == record["normalized_model_argv"]
                 and list(resolved.gateway_arguments) == record["gateway_arguments"]
-                and command.exit_code == record["exit_code"]), None)
-            _require(matching is not None, "Broker receipt has no matching raw Codex command")
-            resolved_commands.pop(matching)
-        _require(not resolved_commands, "raw Codex Gateway command has no Broker receipt")
+                and command.exit_code == record["exit_code"],
+                "Broker receipt order differs from raw Codex Gateway commands")
         rejected_read = any(record.get("accepted") is False for record in records)
         if result["passed"] or rejected_read:
             classified = classify_task_commands(commands, workspace=root / "agent-workspace",
@@ -387,6 +387,8 @@ def _turns(root: Path, plan: Mapping[str, Any], result: Mapping[str, Any],
         and result.get("agent_seconds") == budget["elapsed_seconds"]
         and budget.get("slow") is (elapsed >= 420) and result.get("slow") is budget["slow"]
         and result.get("turns") == turns, "cumulative Agent budget mismatch")
+    if any(record.get("accepted") is False for record in records):
+        _require(prefix == len(records), "completed rejected-read turn omitted a Broker receipt")
     if result["passed"]:
         _require(elapsed <= 600 and len(turns) == len(plan["prompts"]) and prefix == len(records),
                  "passing task exhausted budget or omitted a turn")
