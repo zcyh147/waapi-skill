@@ -199,6 +199,8 @@ def _base_env(tmp_path: Path, *, fail_on: str | None = None) -> tuple[dict[str, 
     sandbox_root = tmp_path / "sandbox"
 
     env = os.environ.copy()
+    # This fixture routes through fake Poetry, independently of the host gate.
+    env.pop("WAAPI_TEST_PYTHON", None)
     env.update(
         {
             "PATH": f"{bin_dir}{os.pathsep}{env.get('PATH', '')}",
@@ -213,6 +215,13 @@ def _base_env(tmp_path: Path, *, fail_on: str | None = None) -> tuple[dict[str, 
 
 def _load_calls(log_path: Path) -> list[dict[str, object]]:
     return [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
+
+
+def test_fake_ci_environment_ignores_outer_interpreter_override(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("WAAPI_TEST_PYTHON", str(tmp_path / "unrelated-interpreter"))
+    environment, _ = _base_env(tmp_path)
+    assert environment.get("WAAPI_TEST_PYTHON") is None
+    assert "WAAPI_TEST_PYTHON" in os.environ
 
 
 def _payload_argv(call: dict[str, object]) -> list[str]:

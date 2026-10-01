@@ -517,7 +517,12 @@ def _write_fake_python(bin_dir: Path, fail_on_nonlive: bool = False) -> Path:
 
 def _run_ci_test(env: dict[str, str], *args: str) -> subprocess.CompletedProcess[str]:
     command = ["cmd.exe", "/d", "/c", str(CI_TEST_BAT), *args] if os.name == "nt" else ["bash", str(CI_TEST_SH), *args]
-    return subprocess.run(command, cwd=REPO_ROOT, env=env, capture_output=True, text=True, check=False)
+    child_environment = dict(env)
+    if "CI_TEST_LOG" in child_environment:
+        # Fake Poetry owns the child runner; never inherit the outer gate's
+        # pinned interpreter and recursively launch a real pytest process.
+        child_environment.pop("WAAPI_TEST_PYTHON", None)
+    return subprocess.run(command, cwd=REPO_ROOT, env=child_environment, capture_output=True, text=True, check=False)
 
 
 def _pytest_argv(argv: list[str]) -> list[str]:
@@ -528,6 +533,22 @@ def _pytest_argv(argv: list[str]) -> list[str]:
     if argv and os.path.normcase(argv[0]) == os.path.normcase(sys.executable):
         return argv[1:]
     return argv
+
+
+def test_ci_fixture_ignores_inherited_interpreter_override(tmp_path: Path, monkeypatch) -> None:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    _write_fake_python(bin_dir)
+    log_path = tmp_path / "python.log"
+    monkeypatch.setenv("WAAPI_TEST_PYTHON", str(tmp_path / "unrelated-interpreter"))
+    env = {**os.environ, "CI_TEST_LOG": str(log_path),
+           "PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+    result = _run_ci_test(env, "--mode", "nonlive", "--", "-q")
+    assert result.returncode == 0, result.stderr
+    calls = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
+    assert len(calls) == 1
+    assert _pytest_argv(calls[0]) == ["-m", "pytest", "-m", "not live and not destructive", "-q"]
+    assert "WAAPI_TEST_PYTHON" in env  # The caller's environment is untouched.
 
 
 def test_ci_test_help_mentions_all_mode() -> None:

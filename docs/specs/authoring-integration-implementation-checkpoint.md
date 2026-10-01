@@ -83,6 +83,14 @@ pilot, and acceptance may proceed after their prerequisite gates.
   prefix before any pending suffix can resume. The combined focused gate
   passed **515 tests** after these repairs. Partial archives and unproved
   cleanup remain systemic stops; ordinary isolated negative results continue.
+- The first final Non-live attempt at `1e0783d` was interrupted and receives no
+  PASS credit: CI-wrapper tests inherited the outer `WAAPI_TEST_PYTHON`, bypassed
+  fake Poetry, and recursively started a real pytest run. Owned group 10379 and
+  its seven processes were terminated; no owned test process or tracked source
+  change remained. Its log and `abort.json` stay in
+  `expansion-nonlive-20261001-final-r1`. Fake CI environments now exclude that
+  host override; the two affected files passed 67 / skipped 11 with an explicit
+  pinned interpreter. A new full gate root is required.
 
 The remaining sections retain the earlier pause checkpoint as historical context.
 The two review defects listed below are repaired by the resume update; the
