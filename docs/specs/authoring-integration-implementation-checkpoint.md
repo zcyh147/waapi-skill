@@ -42,6 +42,18 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- Consolidated notice-evidence candidate `977e71e` passed **344 focused tests**
+  and Non-live **12360 / skipped 118 / deselected 27**, exit zero. Its public Skill
+  and Program inputs remain byte-identical to `cf94158`; no new Program rerun is
+  claimed. Fresh failed-only C06 passed for both Luna high and Sol medium, each
+  followed by identical verify-only with no extra Fresh task or turn. Independent
+  audit rehashed **190** artifacts and twelve metadata seals; all seven business
+  assertions passed per unit, each executed once, sources unchanged, PASS copies
+  deleted, and all four jobs unloaded. Exact proof and usage are in
+  `../research/integration-expansion-consolidated-notice-proof-2026-10-02.json`.
+  The complete matched six-task selection is now running on frozen `977e71e`;
+  model selection and final acceptance remain pending. Original FAILs remain frozen.
+
 - The complete matched `86e23cd` pilot finished **six tasks / eight turns**:
   each model passed C01/M01 and retained a C06 notice FAIL, for **4 PASS / 2 FAIL**.
   All six independent business oracles passed. Both C06 notices were precise and
