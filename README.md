@@ -190,6 +190,10 @@ The repository includes program tests, live read-only tests, destructive
 sandbox tests, and fresh-agent semantic tests on macOS and Windows. Exact route
 counts, version boundaries, and evidence are kept outside this user overview:
 
+The October integration expansion has completed its macOS program and non-live
+gates, copied-project preparation, and scoped music/RTPC Gateway checks. Its
+new-model Fresh Agent pilot and final integration acceptance remain pending.
+
 - [Detailed coverage](./skills/waapi-skill/references/waapi-coverage.md)
 - [Test inventory and evidence](./tests/TEST_INVENTORY.md)
 - [Skill contract](./skills/waapi-skill/SKILL.md)

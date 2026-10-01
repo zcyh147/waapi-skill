@@ -7,6 +7,33 @@ are not live-Wwise or Fresh Agent evidence.
 
 ## Runner modes and strict real behavior
 
+### 2026-10-01 Outcome-based integration expansion: development gates
+
+Frozen macOS candidate `9256ae8` passed the fixed five-version Program gate:
+**5886 passed, 2 skipped** (275.05 s), and full Non-live:
+**11954 passed, 118 skipped, 27 deselected** (809.03 s), both exit zero.
+The two Program skips require native Windows. Earlier interrupted/failed gate
+roots remain retained; failed-only fixture reruns preceded this complete pass.
+The final tests correct fake-CI interpreter isolation, local LFS hydration,
+host-dependent Wine mapping expectations, per-field evidence bounds, and
+compact verification proof; these are not additional live API coverage.
+
+Real copied-project preparation passed 13 baselines plus the separate
+M05/2022 capability boundary. Developer-owned M01 music import and C06 existing
+RTPC updates passed on 2022.1/2025.1 with approved immutable Previews, single
+execution, Gateway verification, and independent outcome checks. Source full
+hashes/mtimes/tree metadata and scoped cleanup were proven. This is **not Agent
+semantic acceptance**. The matching 2025.1.7 Console smoke passed, with 4.41 s
+readiness and cleaned/deleted test copy.
+
+The six-task Luna-high / GPT-6.1-Sol-medium pilot remains pending: its first
+one-shot launcher blocked in file-open before creating a campaign root while
+the Mac was locked. No Agent or Wwise case started; the job was unloaded and
+the diagnostic retained. No new Windows or playback evidence is claimed.
+See [development gate records](../docs/research/integration-expansion-development-gates-2026-10-01.json),
+[native follow-ups](../docs/research/integration-expansion-native-followups-2026-10-01.json),
+and [music investigation dispositions](../docs/research/music-expansion-dispositions-2026-10-01.md).
+
 ### 2026-09-14 Portable Skill entry and scoped first-use validation
 
 The public description now uses query/edit/subscribe/monitor language and

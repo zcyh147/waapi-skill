@@ -101,6 +101,21 @@ pilot, and acceptance may proceed after their prerequisite gates.
   verification and its compact-output digest, and Harbor checks its actual
   per-field path ceiling with explicit short/long roots. The combined targeted
   rerun passed 17 tests. A new complete Non-live run remains required.
+- Frozen `9256ae8` subsequently passed complete Non-live: **11954 passed,
+  118 skipped, 27 deselected**, exit zero (809.03 s); fixed five-version
+  Program: **5886 passed, 2 skipped**, exit zero (275.05 s). The two Program
+  skips need native Windows. A rejected attempt to add `--basetemp` to the
+  closed Program option surface ran no pytest; the next root used its canonical
+  `-q -ra` options. Both completed gates left the frozen source clean and no
+  owned test process. Wwise 2025.1.7 smoke passed with 4.41 s readiness and
+  complete cleanup. Exact logs/digests are in the development-gate summary.
+- The first prepared Luna-high pilot launcher ran once but blocked in native
+  file-open before creating its campaign root. Computer-use inventory reported
+  the Mac locked and unable to unlock automatically. No Agent or Wwise case
+  started. The job was unloaded, PID 56126 exited, and its stack/diagnostic
+  files remain under `expansion-pilot-launchers-9256ae8-r1`. The user has been
+  asked to unlock; use a new launcher/root once startup prerequisites are
+  resolved. This is not a model failure or semantic attempt.
 
 The remaining sections retain the earlier pause checkpoint as historical context.
 The two review defects listed below are repaired by the resume update; the
