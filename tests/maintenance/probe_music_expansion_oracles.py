@@ -20,7 +20,9 @@ def test_music_complete_oracle_public_read_investigation(expansion_runtime, fami
                 else Path("Containers") / "Music" / "Music.wwu")
     owned = runtime.sandbox.sandbox_path / relative
     owned.resolve(strict=True).relative_to(runtime.sandbox.sandbox_path.resolve(strict=True))
-    witness = xml_music_witness(owned, runtime.version)
+    project = runtime.sandbox.sandbox_path / "SampleProject.wproj"
+    project.resolve(strict=True).relative_to(runtime.sandbox.sandbox_path.resolve(strict=True))
+    witness = xml_music_witness(owned, runtime.version, project_path=project)
     report = {"category": "music-complete-oracle-read-" + family, "status": "FAIL",
         "verifier_strength": "bounded_public_read_findings_not_music_configuration_acceptance",
         "version": runtime.version, "xml_witness": witness, "transaction_ids": [],
@@ -37,6 +39,6 @@ def test_music_complete_oracle_public_read_investigation(expansion_runtime, fami
         return code, payload
     report.update(run_music_read_plan(plan, gateway))
     report["baseline_comparisons"] = compare_music_read_receipts(witness, report["receipts"])
-    assert xml_music_witness(owned, runtime.version) == witness, "read-only probe changed its owned WWU"
+    assert xml_music_witness(owned, runtime.version, project_path=project) == witness, "read-only probe changed its owned WWU"
     report["status"] = "PASS"  # the bounded investigation ran; its findings retain failed reads
     report["scope"] = "read_transport_and_retained_findings_only_not_complete_oracle_or_mutation_pass"

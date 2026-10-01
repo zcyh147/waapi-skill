@@ -1,0 +1,24 @@
+{
+  "candidate": "cc8707a",
+  "exit_code": 0,
+  "stats": {
+    "tests": 12162,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 118
+  },
+  "passed": 12044,
+  "deselected": 27,
+  "summary": "12044 passed, 118 skipped, 27 deselected in 777.20s (0:12:57)",
+  "artifacts": [
+    {
+      "name": "run.log",
+      "sha256": "921daadf1ff05a6f7745bc08454ec3b6b40c5f2e8a8726d5bb120ca6c7de580d"
+    },
+    {
+      "name": "junit.xml",
+      "sha256": "db01aa6d8b4368383a17b06ba82ac8b760a7cc05d63df0882c7cde3284a8d668"
+    }
+  ],
+  "evidence_root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-nonlive-20261001-pristine-draft-r1"
+}

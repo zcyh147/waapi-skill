@@ -7,6 +7,26 @@ are not live-Wwise or Fresh Agent evidence.
 
 ## Runner modes and strict real behavior
 
+### 2026-10-01 Pristine-Draft regression and music read investigations
+
+Frozen macOS candidate `cc8707a` passed Full Non-live:
+**12044 passed, 118 skipped, 27 deselected** (777.20 s), exit zero.
+Logs/JUnit digests are in [the completed gate record](../docs/research/integration-expansion-pristine-draft-gates-2026-10-01.json).
+
+Six copied-project public read investigations completed: three on 2025.1
+(3 passed / 32 deselected, 11.45 s) and three on 2022.1 (3 passed / 32
+ deselected, 15.40 s). Every source full hash, mtime, tree metadata and scoped
+cleanup check passed; investigation copies were deleted. These are completed
+bounded investigations, **not complete music authoring or Agent acceptance**.
+Read failures, clarification, unavailable representations and unproven order
+remain findings. The omitted property-state platform was a probe input error,
+not an upstream boundary. See [music read findings](../docs/research/integration-expansion-music-read-findings-2026-10-01.json).
+
+The narrow platform correction passed 35 focused fake-client tests. The new
+existing-2025-reference goal passed 23 focused tests after independent order
+and evidence-bound review repairs; it has not run live yet. Neither adds
+Agent credit or silently changes the formal seven-case selection.
+
 ### 2026-10-01 Expansion receipt binding and completed regression
 
 Frozen macOS candidate `dd1ad71` (harness implementation `7c81406`) passed

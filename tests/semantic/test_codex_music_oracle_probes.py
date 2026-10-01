@@ -2,9 +2,10 @@ from pathlib import Path
 
 import pytest
 
+from tests.semantic.support.codex_filesystem_security import CodexFileSecurityError
 from tests.semantic.support.codex_music_oracle_probes import (
     FADE, MAX_CALLS, MusicOracleProbeError, compare_music_read_receipts,
-    music_read_plan, run_music_read_plan, xml_music_witness,
+    music_read_plan, run_music_read_plan, xml_music_witness, xml_project_platform,
 )
 
 
@@ -22,6 +23,8 @@ def test_real_committed_xml_witness_retains_complete_mapping_and_existing_fade(v
     assert len(witness["transition"]["rules"]) == 15
     assert len(witness["playlist"]["items"]) == 3
     assert witness["saved_order_is_live_order_proof"] is False
+    assert witness["project_platform"]["name"] == "Mac"
+    assert len(witness["project_platform"]["project_sha256"]) == 64
     for family in ("playlist", "transition", "music-switch"):
         plan = music_read_plan(family, witness, version)
         assert len(plan) <= MAX_CALLS
@@ -165,3 +168,57 @@ def test_probe_accepts_actual_public_gateway_bound_projection(tmp_path, route, e
         assert preview.envelope.metadata["query_bound"] == {"mode": "exact-object", "value": 1}
     result = run_music_read_plan([argv], lambda _: (code, payload))
     assert result["receipts"][0]["finding"] == "read_returned"
+
+
+@pytest.mark.parametrize('version', ('2022.1', '2025.1'))
+@pytest.mark.parametrize('field', ('FadeTime', 'FadeOffset'))
+@pytest.mark.parametrize('ambiguous', (False, True))
+def test_transition_property_state_plan_passes_public_preflight_and_live_metadata(tmp_path, version, field, ambiguous):
+    from tests.unit.test_metadata_discovery_gateway import (
+        FakeClient, _gateway_env, _metadata_responses, waapi_gateway, IS_PROPERTY_ENABLED_URI,
+    )
+    relative = (Path('Interactive Music Hierarchy/Music.wwu') if version == '2022.1'
+        else Path('Containers/Music/Music.wwu'))
+    witness = xml_music_witness(ROOT / 'tests/_org' / version / relative, version)
+    commands = [argv for argv in music_read_plan('transition', witness, version)
+        if argv[:2] == ('metadata', 'property-state')]
+    command = commands[('FadeTime', 'FadeOffset').index(field)]
+    responses = _metadata_responses(tmp_path, version=version, names=('FadeTime', 'FadeOffset') if ambiguous else (field,))
+    responses[IS_PROPERTY_ENABLED_URI] = {'return': True}
+    client = FakeClient(responses)
+    code, payload = waapi_gateway.execute_gateway(list(command), env=_gateway_env(tmp_path, version=version),
+        client_factory=lambda _url: client)
+    assert code == 0, payload
+    assert command == ('metadata', 'property-state', '--exact-id', FADE, '--meaning', field, '--platform', 'Mac')
+    assert client.calls  # Actual public preflight reached only the injected fake.
+    if ambiguous:
+        assert payload['status'] == 'needs_clarification'
+        assert payload['agent_result']['meaning'] == field
+        assert payload['agent_result']['candidate_count'] == 2
+        assert {row['field'] for row in payload['agent_result']['candidates']} == {'FadeTime', 'FadeOffset'}
+        assert IS_PROPERTY_ENABLED_URI not in [call[0] for call in client.calls]
+        result = run_music_read_plan([command], lambda _: (code, payload))
+        assert result['receipts'][0]['finding'] == 'needs_clarification'
+    else:
+        assert payload['agent_result'] == {'meaning': field, 'platform': 'Mac', 'enabled': True}
+        assert client.calls[-1] == (IS_PROPERTY_ENABLED_URI, {'object': FADE, 'platform': 'Mac', 'property': field}, {})
+
+
+@pytest.mark.parametrize('damage', ('missing', 'duplicate', 'entity', 'oversized', 'too_many'))
+def test_project_platform_binding_rejects_unproven_or_unbounded_xml(tmp_path, damage):
+    project = tmp_path / 'SampleProject.wproj'
+    platform = '<Platform Name="Mac" ID="{9C6217D5-DD11-4795-87C1-6CE02853C541}"/>'
+    if damage == 'missing':
+        platform = platform.replace('Name="Mac"', 'Name="Windows"')
+    elif damage == 'duplicate':
+        platform += platform
+    elif damage == 'too_many':
+        platform += ''.join(f'<Platform Name="Other{index}" ID="other"/>' for index in range(32))
+    text = '<WwiseDocument><ProjectInfo><Project><Platforms>' + platform + '</Platforms></Project></ProjectInfo></WwiseDocument>'
+    if damage == 'entity':
+        text = '<!DOCTYPE WwiseDocument [<!ENTITY external SYSTEM "file:///forbidden">]>' + text
+    elif damage == 'oversized':
+        text += ' ' * 1_048_576
+    project.write_text(text)
+    with pytest.raises((ValueError, CodexFileSecurityError)):
+        xml_project_platform(project)

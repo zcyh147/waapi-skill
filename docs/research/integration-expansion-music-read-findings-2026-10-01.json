@@ -1,0 +1,901 @@
+{
+  "candidate": "cc8707a",
+  "scope": "six developer-owned bounded public read investigations; no Agent or complete music-workflow acceptance",
+  "records": [
+    {
+      "candidate": "cc8707a",
+      "version": "2025.1",
+      "exit_code": 0,
+      "pytest": "3 passed, 32 deselected in 11.45s",
+      "records": [
+        {
+          "family": "music-complete-oracle-read-playlist",
+          "invocation_status": "PASS",
+          "agent_credit": false,
+          "music_business_credit": false,
+          "read_findings": {
+            "read_returned": 11
+          },
+          "baseline_comparisons": [
+            {
+              "checks": {
+                "PlaylistRoot": true
+              },
+              "finding": "read_returned",
+              "id": "{492A2BCA-08ED-4ED9-BDA3-B4D876D2D830}"
+            },
+            {
+              "checks": {
+                "member_set_matches": true,
+                "observed_order_matches_saved_xml": true,
+                "order_is_authoritative": false
+              },
+              "finding": "read_returned",
+              "id": "{15F37D81-B510-4B20-8B71-CDAADA2820BE}"
+            },
+            {
+              "checks": {
+                "returned_parent_matches_saved_xml_owner": false
+              },
+              "finding": "read_returned",
+              "id": "{15F37D81-B510-4B20-8B71-CDAADA2820BE}"
+            },
+            {
+              "checks": {
+                "Segment": true
+              },
+              "finding": "read_returned",
+              "id": "{DE090E27-2F5C-436F-A239-D02F8D5016B2}"
+            },
+            {
+              "checks": {
+                "Segment": true
+              },
+              "finding": "read_returned",
+              "id": "{074B5844-847D-44B6-84AC-5F9C4D178899}"
+            },
+            {
+              "checks": {
+                "Segment": true
+              },
+              "finding": "read_returned",
+              "id": "{898C3D43-E6A9-4327-8029-61E657048399}"
+            }
+          ],
+          "source_full_hash_mtime_tree_unchanged": true,
+          "process_cleanup_proven": true,
+          "sandbox_deleted": true,
+          "record_sha256": "18c95a3a4702bc9f61e508659db84eaf9c179f4b6caa6088cd94a546045a598e",
+          "record_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/music-oracle-probes-cc8707a-r2/2025-final-record-1.json"
+        },
+        {
+          "family": "music-complete-oracle-read-transition",
+          "invocation_status": "PASS",
+          "agent_credit": false,
+          "music_business_credit": false,
+          "read_findings": {
+            "read_returned": 39,
+            "gateway_rejected": 2
+          },
+          "baseline_comparisons": [
+            {
+              "checks": {
+                "member_set_matches": true,
+                "observed_order_matches_saved_xml": true,
+                "order_is_authoritative": false
+              },
+              "finding": "read_returned",
+              "id": "{8A6F5BFD-8784-474D-8BDE-6460595AA1FC}"
+            },
+            {
+              "checks": {
+                "returned_parent_matches_saved_xml_owner": true
+              },
+              "finding": "read_returned",
+              "id": "{E49EF1AA-29FB-40F1-B343-523AF28244AE}"
+            },
+            {
+              "checks": {
+                "returned_parent_matches_saved_xml_owner": false
+              },
+              "finding": "read_returned",
+              "id": "{0FC1E836-74BB-43AB-B417-6C9D16AE5636}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{E49EF1AA-29FB-40F1-B343-523AF28244AE}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{E49EF1AA-29FB-40F1-B343-523AF28244AE}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{1071725D-F3B3-403E-BFB7-A8F55D8F70C5}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{1071725D-F3B3-403E-BFB7-A8F55D8F70C5}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{3ADBBB01-3C00-48E9-8B98-48EB1D8888D6}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{3ADBBB01-3C00-48E9-8B98-48EB1D8888D6}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{1D05C665-49A1-4FF6-BB62-90CECE479B96}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{1D05C665-49A1-4FF6-BB62-90CECE479B96}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{234C3AE1-5CA6-44BF-B40F-1D7D970A4E4A}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{234C3AE1-5CA6-44BF-B40F-1D7D970A4E4A}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{918A0CC3-7E52-47B9-A641-1ED9C40CACA3}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{918A0CC3-7E52-47B9-A641-1ED9C40CACA3}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{B5832EB2-BACE-4088-AB24-CFDA16884DC8}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{B5832EB2-BACE-4088-AB24-CFDA16884DC8}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{316B82BA-298C-4194-A58D-A2563C39C3AA}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{316B82BA-298C-4194-A58D-A2563C39C3AA}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{30D287DE-8BC3-486B-9100-661B7A568EDB}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{30D287DE-8BC3-486B-9100-661B7A568EDB}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{841109D9-8052-41F7-B5FF-837E1F62459E}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{841109D9-8052-41F7-B5FF-837E1F62459E}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{9A8C59CF-4F03-4D76-9BBB-0540E7A8AB97}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{9A8C59CF-4F03-4D76-9BBB-0540E7A8AB97}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{F6203BF7-5059-44B7-867F-B98C372FC64F}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{F6203BF7-5059-44B7-867F-B98C372FC64F}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{BE1D5071-F444-40F1-9499-9327F5B8BC0C}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{BE1D5071-F444-40F1-9499-9327F5B8BC0C}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{11E1CBC0-C4A6-4F1A-880E-256861D9F477}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{11E1CBC0-C4A6-4F1A-880E-256861D9F477}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{6F215F6B-324E-49F1-924F-055237372C7C}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{6F215F6B-324E-49F1-924F-055237372C7C}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{0FC1E836-74BB-43AB-B417-6C9D16AE5636}"
+            }
+          ],
+          "source_full_hash_mtime_tree_unchanged": true,
+          "process_cleanup_proven": true,
+          "sandbox_deleted": true,
+          "record_sha256": "da8821e475ac00cfa338aa92c7488db337304b1d0cee411a872533f2decc1fb9",
+          "record_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/music-oracle-probes-cc8707a-r2/2025-final-record-2.json"
+        },
+        {
+          "family": "music-complete-oracle-read-music-switch",
+          "invocation_status": "PASS",
+          "agent_credit": false,
+          "music_business_credit": false,
+          "read_findings": {
+            "read_returned": 45
+          },
+          "baseline_comparisons": [
+            {
+              "checks": {
+                "member_set_matches": true,
+                "observed_order_matches_saved_xml": true,
+                "order_is_authoritative": false
+              },
+              "expression": "from object \"{A9D070F3-3BD9-49EB-9D8B-5D3312173FB4}\" select @Arguments",
+              "finding": "read_returned"
+            },
+            {
+              "checks": {
+                "member_set_matches": true,
+                "observed_order_matches_saved_xml": true,
+                "order_is_authoritative": false
+              },
+              "expression": "from object \"{A9D070F3-3BD9-49EB-9D8B-5D3312173FB4}\" select @Entries",
+              "finding": "read_returned"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{6BC46605-3653-483C-AE48-FC0ACD9A2951}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{AF599241-DE64-4286-BB8B-B0260EE20B80}"
+            },
+            {
+              "checks": {
+                "Argument": true
+              },
+              "finding": "read_returned",
+              "id": "{147D74E6-BCCD-4F41-80F9-EAE3ABF79D0A}"
+            },
+            {
+              "checks": {
+                "Argument": true
+              },
+              "finding": "read_returned",
+              "id": "{56D7643F-6929-4007-9F41-7AB76D9EAB44}"
+            },
+            {
+              "checks": {
+                "AudioNode": true
+              },
+              "finding": "read_returned",
+              "id": "{BB6519A2-1173-4569-B1F6-57305FEBB759}"
+            },
+            {
+              "checks": {
+                "member_set_matches": true,
+                "observed_order_matches_saved_xml": true,
+                "order_is_authoritative": false
+              },
+              "expression": "from object \"{BB6519A2-1173-4569-B1F6-57305FEBB759}\" select @EntryPath",
+              "finding": "read_returned"
+            },
+            {
+              "checks": {
+                "EntryPathObject": true
+              },
+              "finding": "read_returned",
+              "id": "{689F1644-6813-44ED-8DCA-F2A068057A59}"
+            },
+            {
+              "checks": {
+                "EntryPathObject": true
+              },
+              "finding": "read_returned",
+              "id": "{4ACFB80A-D33E-4A67-8538-34B8ED3BA04C}"
+            },
+            {
+              "checks": {
+                "AudioNode": true
+              },
+              "finding": "read_returned",
+              "id": "{903A30EC-F1F4-49FF-9CBC-99B89539598B}"
+            },
+            {
+              "checks": {
+                "member_set_matches": true,
+                "observed_order_matches_saved_xml": true,
+                "order_is_authoritative": false
+              },
+              "expression": "from object \"{903A30EC-F1F4-49FF-9CBC-99B89539598B}\" select @EntryPath",
+              "finding": "read_returned"
+            },
+            {
+              "checks": {
+                "EntryPathObject": true
+              },
+              "finding": "read_returned",
+              "id": "{248252BE-ACBD-44B7-B53E-0C4F64185B8C}"
+            },
+            {
+              "checks": {
+                "EntryPathObject": true
+              },
+              "finding": "read_returned",
+              "id": "{A5968004-9453-467D-8E30-F3A37456B17D}"
+            },
+            {
+              "checks": {
+                "AudioNode": true
+              },
+              "finding": "read_returned",
+              "id": "{7AE5D86A-30A6-4AC9-A909-C57953EE03BE}"
+            },
+            {
+              "checks": {
+                "member_set_matches": true,
+                "observed_order_matches_saved_xml": true,
+                "order_is_authoritative": false
+              },
+              "expression": "from object \"{7AE5D86A-30A6-4AC9-A909-C57953EE03BE}\" select @EntryPath",
+              "finding": "read_returned"
+            },
+            {
+              "checks": {
+                "EntryPathObject": true
+              },
+              "finding": "read_returned",
+              "id": "{4BD69BB5-AB87-4107-850B-557C35B60FF8}"
+            },
+            {
+              "checks": {
+                "EntryPathObject": true
+              },
+              "finding": "read_returned",
+              "id": "{6AF88A29-0333-4641-9860-6DD3502A202E}"
+            },
+            {
+              "checks": {
+                "AudioNode": true
+              },
+              "finding": "read_returned",
+              "id": "{4F98CAE7-F96A-4C18-8733-15A31CF40AC1}"
+            },
+            {
+              "checks": {
+                "member_set_matches": true,
+                "observed_order_matches_saved_xml": true,
+                "order_is_authoritative": false
+              },
+              "expression": "from object \"{4F98CAE7-F96A-4C18-8733-15A31CF40AC1}\" select @EntryPath",
+              "finding": "read_returned"
+            },
+            {
+              "checks": {
+                "EntryPathObject": true
+              },
+              "finding": "read_returned",
+              "id": "{1B1145C4-E0D9-4A7B-98D0-1CA7CC6B91AF}"
+            },
+            {
+              "checks": {
+                "EntryPathObject": true
+              },
+              "finding": "read_returned",
+              "id": "{E5A227CF-5D71-4851-93C3-B04052B96915}"
+            },
+            {
+              "checks": {
+                "AudioNode": true
+              },
+              "finding": "read_returned",
+              "id": "{8158C5B6-73BB-4B5D-B02D-C7FD6A642A49}"
+            },
+            {
+              "checks": {
+                "member_set_matches": true,
+                "observed_order_matches_saved_xml": true,
+                "order_is_authoritative": false
+              },
+              "expression": "from object \"{8158C5B6-73BB-4B5D-B02D-C7FD6A642A49}\" select @EntryPath",
+              "finding": "read_returned"
+            },
+            {
+              "checks": {
+                "EntryPathObject": true
+              },
+              "finding": "read_returned",
+              "id": "{E3F94263-12D1-4BF4-8796-1ACA46A1E391}"
+            },
+            {
+              "checks": {
+                "EntryPathObject": true
+              },
+              "finding": "read_returned",
+              "id": "{45DCA63B-32B0-48E7-A3C9-068526605547}"
+            },
+            {
+              "checks": {
+                "AudioNode": true
+              },
+              "finding": "read_returned",
+              "id": "{8CA7ACF4-E9F8-4F67-9FCE-FC12E323BEAC}"
+            },
+            {
+              "checks": {
+                "member_set_matches": true,
+                "observed_order_matches_saved_xml": true,
+                "order_is_authoritative": false
+              },
+              "expression": "from object \"{8CA7ACF4-E9F8-4F67-9FCE-FC12E323BEAC}\" select @EntryPath",
+              "finding": "read_returned"
+            },
+            {
+              "checks": {
+                "EntryPathObject": true
+              },
+              "finding": "read_returned",
+              "id": "{65A8468A-348F-40C7-90A1-0617420007DA}"
+            },
+            {
+              "checks": {
+                "EntryPathObject": true
+              },
+              "finding": "read_returned",
+              "id": "{5B539F01-8A59-4FC4-B314-501F853C7A78}"
+            },
+            {
+              "checks": {
+                "AudioNode": true
+              },
+              "finding": "read_returned",
+              "id": "{C8085861-F375-48ED-94FB-AA4B39DB8B64}"
+            },
+            {
+              "checks": {
+                "member_set_matches": true,
+                "observed_order_matches_saved_xml": true,
+                "order_is_authoritative": false
+              },
+              "expression": "from object \"{C8085861-F375-48ED-94FB-AA4B39DB8B64}\" select @EntryPath",
+              "finding": "read_returned"
+            },
+            {
+              "checks": {
+                "EntryPathObject": true
+              },
+              "finding": "read_returned",
+              "id": "{9EC6227B-CC5F-4057-9380-2D5BF6E6F598}"
+            },
+            {
+              "checks": {
+                "EntryPathObject": true
+              },
+              "finding": "read_returned",
+              "id": "{C0381501-04E9-4B75-99AF-5667D938F6BF}"
+            },
+            {
+              "checks": {
+                "AudioNode": true
+              },
+              "finding": "read_returned",
+              "id": "{F66C5F2D-E01E-43CD-BE5A-16F5F20E97A6}"
+            },
+            {
+              "checks": {
+                "member_set_matches": true,
+                "observed_order_matches_saved_xml": true,
+                "order_is_authoritative": false
+              },
+              "expression": "from object \"{F66C5F2D-E01E-43CD-BE5A-16F5F20E97A6}\" select @EntryPath",
+              "finding": "read_returned"
+            },
+            {
+              "checks": {
+                "EntryPathObject": true
+              },
+              "finding": "read_returned",
+              "id": "{7CA7CB4E-042E-4624-8352-4AA60D1D78E1}"
+            },
+            {
+              "checks": {
+                "EntryPathObject": true
+              },
+              "finding": "read_returned",
+              "id": "{31AF0C4C-4C05-49CD-9105-BEF802436FCA}"
+            },
+            {
+              "checks": {
+                "AudioNode": true
+              },
+              "finding": "read_returned",
+              "id": "{1F7BC8C1-AEC9-40B7-BBA2-1FE12C4B346F}"
+            },
+            {
+              "checks": {
+                "member_set_matches": true,
+                "observed_order_matches_saved_xml": true,
+                "order_is_authoritative": false
+              },
+              "expression": "from object \"{1F7BC8C1-AEC9-40B7-BBA2-1FE12C4B346F}\" select @EntryPath",
+              "finding": "read_returned"
+            },
+            {
+              "checks": {
+                "EntryPathObject": true
+              },
+              "finding": "read_returned",
+              "id": "{62491AE5-B74F-4894-AB13-B8DD40FF4F99}"
+            },
+            {
+              "checks": {
+                "EntryPathObject": true
+              },
+              "finding": "read_returned",
+              "id": "{A3D67A6B-6B63-4E02-81AF-CF3685ECAF68}"
+            }
+          ],
+          "source_full_hash_mtime_tree_unchanged": true,
+          "process_cleanup_proven": true,
+          "sandbox_deleted": true,
+          "record_sha256": "68eb99814843807e0f015cd279774bb6134e612160e586423022372dd7ccd124",
+          "record_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/music-oracle-probes-cc8707a-r2/2025-final-record-3.json"
+        }
+      ]
+    },
+    {
+      "candidate": "cc8707a",
+      "version": "2022.1",
+      "exit_code": 0,
+      "pytest": "3 passed, 32 deselected in 15.40s",
+      "records": [
+        {
+          "family": "music-complete-oracle-read-playlist",
+          "invocation_status": "PASS",
+          "agent_credit": false,
+          "music_business_credit": false,
+          "read_findings": {
+            "read_returned": 7,
+            "needs_clarification": 1,
+            "gateway_rejected": 3
+          },
+          "baseline_comparisons": [
+            {
+              "checks": {},
+              "finding": "needs_clarification",
+              "id": "{492A2BCA-08ED-4ED9-BDA3-B4D876D2D830}"
+            },
+            {
+              "checks": {
+                "member_set_matches": true,
+                "observed_order_matches_saved_xml": true,
+                "order_is_authoritative": false
+              },
+              "finding": "read_returned",
+              "id": "{15F37D81-B510-4B20-8B71-CDAADA2820BE}"
+            },
+            {
+              "checks": {
+                "returned_parent_matches_saved_xml_owner": false
+              },
+              "finding": "read_returned",
+              "id": "{15F37D81-B510-4B20-8B71-CDAADA2820BE}"
+            },
+            {
+              "checks": {},
+              "finding": "gateway_rejected",
+              "id": "{DE090E27-2F5C-436F-A239-D02F8D5016B2}"
+            },
+            {
+              "checks": {},
+              "finding": "gateway_rejected",
+              "id": "{074B5844-847D-44B6-84AC-5F9C4D178899}"
+            },
+            {
+              "checks": {},
+              "finding": "gateway_rejected",
+              "id": "{898C3D43-E6A9-4327-8029-61E657048399}"
+            }
+          ],
+          "source_full_hash_mtime_tree_unchanged": true,
+          "process_cleanup_proven": true,
+          "sandbox_deleted": true,
+          "record_sha256": "81f945e1031aa0095e302c127f120d00d543216c0430565a71163f96ff80099b",
+          "record_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/music-oracle-probes-cc8707a-r2/2022-final-record-1.json"
+        },
+        {
+          "family": "music-complete-oracle-read-transition",
+          "invocation_status": "PASS",
+          "agent_credit": false,
+          "music_business_credit": false,
+          "read_findings": {
+            "read_returned": 39,
+            "gateway_rejected": 2
+          },
+          "baseline_comparisons": [
+            {
+              "checks": {
+                "member_set_matches": true,
+                "observed_order_matches_saved_xml": true,
+                "order_is_authoritative": false
+              },
+              "finding": "read_returned",
+              "id": "{8A6F5BFD-8784-474D-8BDE-6460595AA1FC}"
+            },
+            {
+              "checks": {
+                "returned_parent_matches_saved_xml_owner": true
+              },
+              "finding": "read_returned",
+              "id": "{E49EF1AA-29FB-40F1-B343-523AF28244AE}"
+            },
+            {
+              "checks": {
+                "returned_parent_matches_saved_xml_owner": false
+              },
+              "finding": "read_returned",
+              "id": "{0FC1E836-74BB-43AB-B417-6C9D16AE5636}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{E49EF1AA-29FB-40F1-B343-523AF28244AE}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{E49EF1AA-29FB-40F1-B343-523AF28244AE}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{1071725D-F3B3-403E-BFB7-A8F55D8F70C5}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{1071725D-F3B3-403E-BFB7-A8F55D8F70C5}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{3ADBBB01-3C00-48E9-8B98-48EB1D8888D6}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{3ADBBB01-3C00-48E9-8B98-48EB1D8888D6}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{1D05C665-49A1-4FF6-BB62-90CECE479B96}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{1D05C665-49A1-4FF6-BB62-90CECE479B96}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{234C3AE1-5CA6-44BF-B40F-1D7D970A4E4A}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{234C3AE1-5CA6-44BF-B40F-1D7D970A4E4A}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{918A0CC3-7E52-47B9-A641-1ED9C40CACA3}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{918A0CC3-7E52-47B9-A641-1ED9C40CACA3}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{B5832EB2-BACE-4088-AB24-CFDA16884DC8}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{B5832EB2-BACE-4088-AB24-CFDA16884DC8}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{316B82BA-298C-4194-A58D-A2563C39C3AA}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{316B82BA-298C-4194-A58D-A2563C39C3AA}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{30D287DE-8BC3-486B-9100-661B7A568EDB}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{30D287DE-8BC3-486B-9100-661B7A568EDB}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{841109D9-8052-41F7-B5FF-837E1F62459E}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{841109D9-8052-41F7-B5FF-837E1F62459E}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{9A8C59CF-4F03-4D76-9BBB-0540E7A8AB97}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{9A8C59CF-4F03-4D76-9BBB-0540E7A8AB97}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{F6203BF7-5059-44B7-867F-B98C372FC64F}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{F6203BF7-5059-44B7-867F-B98C372FC64F}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{BE1D5071-F444-40F1-9499-9327F5B8BC0C}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{BE1D5071-F444-40F1-9499-9327F5B8BC0C}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{11E1CBC0-C4A6-4F1A-880E-256861D9F477}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{11E1CBC0-C4A6-4F1A-880E-256861D9F477}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{6F215F6B-324E-49F1-924F-055237372C7C}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{6F215F6B-324E-49F1-924F-055237372C7C}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{0FC1E836-74BB-43AB-B417-6C9D16AE5636}"
+            }
+          ],
+          "source_full_hash_mtime_tree_unchanged": true,
+          "process_cleanup_proven": true,
+          "sandbox_deleted": true,
+          "record_sha256": "3f73c7b6f385a55948f6476d451506f73fcc2513b923caf17cd7a0be4b6e3b74",
+          "record_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/music-oracle-probes-cc8707a-r2/2022-final-record-2.json"
+        },
+        {
+          "family": "music-complete-oracle-read-music-switch",
+          "invocation_status": "PASS",
+          "agent_credit": false,
+          "music_business_credit": false,
+          "read_findings": {
+            "read_returned": 5,
+            "gateway_rejected": 2
+          },
+          "baseline_comparisons": [
+            {
+              "checks": {},
+              "expression": "from object \"{A9D070F3-3BD9-49EB-9D8B-5D3312173FB4}\" select @Arguments",
+              "finding": "expected_representation_unavailable",
+              "gateway_finding": "gateway_rejected"
+            },
+            {
+              "checks": {},
+              "expression": "from object \"{A9D070F3-3BD9-49EB-9D8B-5D3312173FB4}\" select @Entries",
+              "finding": "expected_representation_unavailable",
+              "gateway_finding": "gateway_rejected"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{6BC46605-3653-483C-AE48-FC0ACD9A2951}"
+            },
+            {
+              "checks": {},
+              "finding": "read_returned",
+              "id": "{AF599241-DE64-4286-BB8B-B0260EE20B80}"
+            }
+          ],
+          "source_full_hash_mtime_tree_unchanged": true,
+          "process_cleanup_proven": true,
+          "sandbox_deleted": true,
+          "record_sha256": "aa0c11e81dfa40b33001aa583e4a6ce9ab5d2ae3ba1a2cba2670283081670453",
+          "record_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/music-oracle-probes-cc8707a-r2/2022-final-record-3.json"
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "property-state failures omitted required platform and occurred before dispatch; not native capability boundaries",
+    "2025 memberships/condition references/targets returned and matched XML; observed order is not authoritative",
+    "2022 MusicSwitch Arguments/Entries unknown-property failures prove only those accessor boundaries",
+    "reference-owned Playlist/fade ownership is not proven by a parent hierarchy query",
+    "native fade units and full authoring/preservation remain unproven"
+  ],
+  "followups": "Reviewed main-only platform fix35 focused pass and existing2025reference goal23 focused pass; no new live execution yet"
+}

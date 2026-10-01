@@ -40,6 +40,34 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ## Resume update — 2026-10-01
 
+### Completed pristine-Draft gate, native reads, and model prerequisites
+
+- `cc8707a` completed Full Non-live: **12044 passed, 118 skipped,
+  27 deselected**, exit zero (777.20 s). Source was clean and no owned test
+  process remained. Exact digests are in the pristine-Draft gate record.
+- Six music read investigations completed with source full hash/mtime/tree and
+  scoped cleanup proven. The 2025 nine-tuple references were readable; 2022's
+  two unknown-property getters remain accessor boundaries. Missing-platform
+  property-state requests were input errors; the main-only correction passed
+  35 focused tests. Native units and authoritative ordering remain unproven.
+- A separate existing-2025-reference goal uses the current closed setter and
+  exact immutable Preview. Independent review repaired incidental Entry-order
+  rejection and oversized failed evidence. Its 23 focused tests passed; real
+  execution and complete workflow evidence are still pending.
+- Delivery tickets #111 (M01) and #113 (C06) closed from their earlier two-version
+  public Gateway goal evidence and current regression. This is not Agent credit;
+  the other business/model/final-acceptance tickets remain open.
+- On CLI 0.157.1, Luna high finished all three tasks as ordinary FAIL before
+  Preview, each stopping at the approximately 44 KiB operations response.
+  All failed copies/source guards were retained. Sol's three units were blocked
+  before Agent action: that CLI rejected `gpt-6.1-sol` for ChatGPT auth.
+- Official 0.159.2 was installed only in the managed ignored tooling directory,
+  verified against its published archive hash. A disposable read-only no-tool
+  availability probe returned READY on 6.1 Sol medium; it grants no semantic
+  credit. Both pilot halves now require fresh roots with that same CLI.
+  The managed formal candidate remains `cc8707a` while main-only follow-ups are
+  reviewed; no old FAIL/BLOCKED root is resumed or regraded.
+
 ### Pristine rejected-Draft archive review
 
 - The invalid-GUID terminal rejection now retains original FAIL/unprepared and

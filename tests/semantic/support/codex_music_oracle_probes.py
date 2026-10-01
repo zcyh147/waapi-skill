@@ -39,7 +39,22 @@ def _references(nodes: Sequence[ET.Element]) -> list[str]:
     return values
 
 
-def xml_music_witness(path: Path, version: str) -> Mapping[str, Any]:
+def xml_project_platform(path: Path) -> Mapping[str, str]:
+    """Bind the investigation's preferred Mac platform to owned project XML."""
+    raw = read_bounded_exclusive_regular_file(
+        path, max_bytes=1_048_576, require_private_posix_mode=False,
+    ).raw
+    if b"<!DOCTYPE" in raw.upper() or b"<!ENTITY" in raw.upper():
+        raise MusicOracleProbeError("project must not contain external/entity declarations")
+    root = ET.fromstring(raw)
+    platforms = root.findall("./ProjectInfo/Project/Platforms/Platform")
+    matching = [node for node in platforms if node.get("Name") == "Mac"]
+    if len(platforms) > 32 or len(matching) != 1 or not matching[0].get("ID"):
+        raise MusicOracleProbeError("project must declare exactly one preferred Mac platform")
+    return {"name": "Mac", "id": matching[0].get("ID"), "project_sha256": hashlib.sha256(raw).hexdigest()}
+
+
+def xml_music_witness(path: Path, version: str, *, project_path: Path | None = None) -> Mapping[str, Any]:
     """Read one owned WWU; saved order is evidence, never a live-order claim."""
     if version not in {"2022.1", "2025.1"}:
         raise MusicOracleProbeError("unsupported music investigation version")
@@ -91,7 +106,11 @@ def xml_music_witness(path: Path, version: str) -> Mapping[str, Any]:
     fade = target_rule.find("./TransitionInfo/SourceFadeOut/MusicFade")
     if len(rules) != 15 or fade is None or fade.get("ID") != FADE:
         raise MusicOracleProbeError("fixture has no complete fifteen-rule existing-fade baseline")
+    if project_path is None:
+        project_path = path.parents[1 if version == "2022.1" else 2] / "SampleProject.wproj"
+    platform = xml_project_platform(project_path)
     return {
+        "project_platform": platform,
         "wwu_sha256": hashlib.sha256(raw).hexdigest(),
         "playlist": {"owner": PLAYLIST, "root": playlist_root.get("ID"), "items": playlist_rows},
         "music_switch": {"owner": SWITCH, "groups": groups, "mappings": mappings,
@@ -138,8 +157,12 @@ def music_read_plan(family: str, witness: Mapping[str, Any], version: str) -> tu
         exact(data["fade"], "Fade Time", "Fade Offset", "Fade Curve", "Fade Type")
         commands.append(("metadata", "discover", "--exact-id", data["fade"],
                          "--meaning", "Fade Time", "--meaning", "Fade Offset", "--meaning", "Fade Curve"))
-        for field in ("Fade Time", "Fade Offset"):
-            commands.append(("metadata", "property-state", "--exact-id", data["fade"], "--meaning", field))
+        platform = witness["project_platform"]["name"]
+        if platform != "Mac":
+            raise MusicOracleProbeError("transition investigation has no declared Mac platform")
+        for field in ("FadeTime", "FadeOffset"):
+            commands.append(("metadata", "property-state", "--exact-id", data["fade"],
+                             "--meaning", field, "--platform", platform))
     else:
         data = witness["music_switch"]
         commands.append(("query-schema", "--advanced"))
