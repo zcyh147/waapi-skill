@@ -42,6 +42,18 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- Consolidated #134/#135 passed **709 focused tests / 9 native Windows-only
+  skips** in 3.79 seconds, exit zero. Each seam passed independent Spec and
+  Standards review after fixing preservation/shape-negation findings.
+  Unique existing RTPC context can support an accurate point delta or an
+  attested relationship GUID; numeric parsing recognizes U+2212 without
+  changing signed-value checks. Wrong identity, ambiguous context, wrong
+  points/shape and affirmative protected changes remain rejected.
+  Expansion-only authenticated read interleaving retains the latest exact
+  Draft binding; strict historical defaults, positional receipts and stale/
+  changed continuation controls remain unchanged. The new candidate still
+  requires broad gates, failed-case reruns and the full selection afterward.
+
 - Frozen `0997d20` completed Program **5888 passed / 2 skipped** and
   Non-live **12197 passed / 118 skipped / 27 deselected**, both exit zero;
   matching 2025 smoke was ready in **3.3797 seconds** and cleaned its sandbox.

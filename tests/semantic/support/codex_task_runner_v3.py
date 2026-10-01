@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import re
 import shutil
@@ -176,6 +177,8 @@ def _expansion_effect_groups(artifact: Mapping[str, Any], before: Mapping[str, A
     prose or native API requests. Unknown/missing effect data fails closed.
     """
     request = artifact.get("request", {})
+    if not isinstance(request, Mapping):
+        return ()
     arguments = request.get("arguments", {})
     operation = request.get("operation")
     if not isinstance(arguments, Mapping):
@@ -247,6 +250,151 @@ def _expansion_effect_groups(artifact: Mapping[str, Any], before: Mapping[str, A
     return tuple(groups) if groups and all(all(term for term in group) for group in groups) else ()
 
 
+def _rtpc_notice_context(artifact: Mapping[str, Any], before: Mapping[str, Any]) -> Mapping[str, Any] | None:
+    """Attest one existing Volume association before inheriting its identity.
+
+    The immutable request, prepared snapshot/verification plan and independent
+    baseline must agree. No identity is inferred from free-form tool prose.
+    """
+    request = artifact.get("request", {})
+    prepared = artifact.get("prepared_operation", {})
+    if not isinstance(request, Mapping) or not isinstance(prepared, Mapping):
+        return None
+    args = request.get("arguments", {})
+    plan = prepared.get("verification_plan", {})
+    state = prepared.get("pre_state", {})
+    if not all(isinstance(value, Mapping) for value in (request, prepared, args, plan, state)):
+        return None
+    def guid(value: Any) -> bool:
+        return isinstance(value, str) and re.fullmatch(r"\{[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}\}", value) is not None
+    owner, control, association = (plan.get(key) for key in ("object_id", "control_input_id", "existing_rtpc_id"))
+    if (not all(guid(value) for value in (owner, control, association))
+            or request.get("operation") != prepared.get("operation") or prepared.get("operation") != "object.setRTPC"
+            or request.get("version") not in {"2021.1", "2022.1", "2023.1", "2024.1", "2025.1"}
+            or request.get("version") != prepared.get("version") or plan.get("version") != request.get("version")
+            or plan.get("kind") != "object-rtpc-state" or plan.get("action") != "update"
+            or args.get("object") != {"kind": "id", "value": owner}
+            or args.get("control_input") != {"kind": "id", "value": control}
+            or args.get("property") != "Volume" or plan.get("property") != "Volume"
+            or args.get("mode") != "add_or_replace" or "notes" in args
+            or plan.get("notes_supplied") is not False or plan.get("expected_notes") is not None):
+        return None
+    old_owner, controls, rtpcs = before.get("owner"), before.get("controls"), before.get("rtpcs")
+    snapshot = state.get("rtpc_snapshot", {})
+    if (not isinstance(old_owner, Mapping) or old_owner.get("id") != owner
+            or not isinstance(controls, list) or not isinstance(rtpcs, Mapping)
+            or not isinstance(snapshot, Mapping) or snapshot.get("object_id") != owner):
+        return None
+    matched = [row for row in controls if isinstance(row, Mapping) and row.get("id") == control]
+    if len(matched) != 1:
+        return None
+    for baseline, row in ((old_owner, state.get("object")), (matched[0], state.get("control_input"))):
+        if not isinstance(row, Mapping) or any(row.get(key) != baseline.get(key) for key in ("id", "name", "type", "path")):
+            return None
+    rows = snapshot.get("rows")
+    plan_rows = plan.get("before_rows")
+    if (not isinstance(plan_rows, list) or any(not isinstance(row, Mapping) or not guid(row.get("id")) for row in plan_rows)
+            or len({row["id"] for row in plan_rows}) != len(plan_rows)):
+        return None
+    if (not isinstance(rows, list) or any(not isinstance(row, Mapping) or not guid(row.get("id")) for row in rows)
+            or len({row["id"] for row in rows}) != len(rows)
+            or {row["id"]: row for row in rows} != dict(rtpcs)
+            or {row["id"]: row for row in plan_rows} != dict(rtpcs)):
+        return None
+    volume = [row for row in rows if row.get("@PropertyName") == "Volume"]
+    if (len(volume) != 1 or volume[0].get("id") != association
+            or not isinstance(volume[0].get("@ControlInput"), Mapping)
+            or volume[0]["@ControlInput"].get("id") != control):
+        return None
+    def points(value: Any) -> list[tuple[float, float]] | None:
+        if not isinstance(value, list) or not value:
+            return None
+        result = []
+        for point in value:
+            if (not isinstance(point, Mapping) or set(point) != {"x", "y", "shape"}
+                    or point["shape"] != "Linear" or any(type(point[key]) not in {int, float}
+                    or not math.isfinite(point[key]) for key in ("x", "y"))):
+                return None
+            result.append((point["x"], point["y"]))
+        return result if all(a[0] < b[0] for a, b in zip(result, result[1:])) else None
+    curve = volume[0].get("@Curve", {})
+    old = points(curve.get("points")) if isinstance(curve, Mapping) else None
+    new = points(args.get("points"))
+    if old is None or new is None or plan.get("points") != args.get("points") or old == new:
+        return None
+    delta = [point for point in new if point not in old]
+    return {"ids": (owner, control, association), "old": old, "new": new, "delta": delta,
+            "same_domain": [p[0] for p in old] == [p[0] for p in new]}
+
+
+def _affirmative_linear_interpolation(effect_clause: str) -> bool:
+    """Require the requested shape, with polarity scoped to this effect."""
+    mentions = tuple(re.finditer(r"线性|(?<![a-z])linear(?![a-z])", effect_clause))
+    for mention in mentions:
+        # A qualifier may contain an intervening predicate ("不保持线性",
+        # "not keep linear"). Any negator in that local qualifier makes the
+        # requested affirmative shape unclear; do not guess its scope.
+        qualifier = re.split(r"[，,。；;\n]", effect_clause[:mention.start()])[-1]
+        if re.search(r"不|未|非|(?<![a-z])(?:not|never|without|non)(?![a-z])|n't", qualifier):
+            return False
+    return bool(mentions)
+
+
+def _rtpc_notice_effect(text: str, context: Mapping[str, Any], *, earlier_points: bool) -> tuple[bool, bool]:
+    """Recognize a full curve or accurate point delta in the attested context."""
+    numeric = text.replace("\u2212", "-")
+    ids = re.findall(r"\{[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\}", text)
+    if any(value not in {key.casefold() for key in context["ids"]} for value in ids):
+        return False, False
+    # A negated change preserves the field. Polarity is local to a clause;
+    # an English coordinated verb may share it, but a later clause cannot.
+    protected = r"(?:备注|身份|其他控制曲线|notes|identity|pitch|time)"
+    changes = re.compile(rf"(?:修改|更新|删除|改变|\b(?:change|update|delete|remove)\b)\s*(?:这条关系的)?{protected}|{protected}\s*(?:改为|改成|更新为|修改为)")
+    for clause in re.split(r"[。；;,，.\n]|\bbut\b|但", text):
+        previous_end = 0
+        negated = False
+        for change in changes.finditer(clause):
+            prefix = clause[:change.start()]
+            local_negation = re.search(r"(?:不(?:会|再|要)?|\b(?:not|never)|n't)\s*$", prefix) is not None
+            shared_negation = (negated and previous_end > 0
+                               and re.fullmatch(r"\s*(?:and|or)\s*", clause[previous_end:change.start()]) is not None)
+            negated = local_negation or shared_negation
+            if not negated:
+                return False, False
+            previous_end = change.end()
+    number = r"[+-]?\d+(?:\.\d+)?"
+    def pairs(part: str) -> list[tuple[float, float]]:
+        return [(float(x), float(y)) for x, y in re.findall(
+            rf"[（(]\s*({number})\s*[,，]\s*({number})\s*[)）]", part)]
+    full = False
+    effect = False
+    for clause in re.split(r"[。；;\n]", numeric):
+        if not any(term in clause for term in ("volume", "音量", "增益")) or not any(term in clause for term in ("curve", "曲线", "rtpc")):
+            continue
+        if any(term in clause for term in ("现有", "当前", "现状", "existing", "current")):
+            # Historical points may be a subset (e.g. the former midpoint).
+            previous = pairs(re.split(r"改为|改成|更新为|修改为|设为|设置为|update|replace|change|set", clause)[0])
+            if any(point not in context["old"] for point in previous):
+                return False, False
+        for action in re.finditer(r"更新为|替换为|修改为|改为|改成|设为|设置为|update|replace|change|set", clause):
+            following = clause[action.end():]
+            stated = pairs(following)
+            if stated == context["new"] and _affirmative_linear_interpolation(following):
+                full = effect = True
+            elif (stated == context["delta"] and stated and context["same_domain"]
+                  and any(term in following for term in ("两端", "其余点", "endpoints", "other points"))
+                  and any(term in following for term in ("保持", "不变", "unchanged"))
+                  and _affirmative_linear_interpolation(following)):
+                effect = True
+            elif (not stated and earlier_points and any(term in following for term in (
+                    "指定", "上述", "前述", "requested", "specified", "above"))
+                  and _affirmative_linear_interpolation(following)):
+                effect = True
+            elif stated:
+                return False, False
+    return effect, full
+
+
 def expansion_preview_notice(result: Any, command_records: Sequence[Any], *,
                              version: str, execute_expected: bool,
                              preview_artifact: Mapping[str, Any],
@@ -260,6 +408,12 @@ def expansion_preview_notice(result: Any, command_records: Sequence[Any], *,
     groups = _expansion_effect_groups(preview_artifact, before_snapshot)
     if not groups:
         return False
+    prepared_rtpc = (preview_artifact.get("request", {}).get("operation") == "object.setRTPC"
+                     and "prepared_operation" in preview_artifact)
+    rtpc_context = _rtpc_notice_context(preview_artifact, before_snapshot) if prepared_rtpc else None
+    if prepared_rtpc and rtpc_context is None:
+        return False
+    earlier_points = False
     commands = {}
     for record in command_records:
         argv = normalized_gateway_command_argv(record.argv, expected_wwise_version=version)
@@ -284,10 +438,13 @@ def expansion_preview_notice(result: Any, command_records: Sequence[Any], *,
             def mentions(term: str) -> bool:
                 if re.fullmatch(r"-?\d+(?:\.\d+)?", term):
                     return any(float(value) == float(term) for value in
-                               re.findall(r"(?<![\w.\-])-?\d+(?:\.\d+)?(?![\d.])", text))
+                               re.findall(r"(?<![\w.\-])-?\d+(?:\.\d+)?(?![\d.])", text.replace("\u2212", "-")))
                 return term.casefold() in text
             effect = all(any(mentions(term) for term in group) for group in groups)
-            reference = earlier_effect and any(term in text for term in (
+            if rtpc_context is not None:
+                effect, full_points = _rtpc_notice_effect(text, rtpc_context, earlier_points=earlier_points)
+                earlier_points = earlier_points or full_points
+            reference = rtpc_context is None and earlier_effect and any(term in text for term in (
                 "expected result above", "expected changes above", "changes described above",
                 "result just described", "plan above", "上述预期", "上面的预期", "刚才说明的", "上述变更", "按以上方案"))
             if preview_seen and (effect or reference):
@@ -418,6 +575,7 @@ def run_expansion_codex_task(
                         reconciliation, command_records=cumulative_command_records,
                         broker_evidence=broker.evidence(),
                         windows_powershell_core_host=task.windows_powershell_core_host,
+                        allow_expansion_read_interleaving=True,
                     )
                     gates = {
                         "memory_isolated": result.isolation_audit.passed and not result.prompt_audit.has_memory,
@@ -1710,6 +1868,7 @@ def _bind_gateway_prefix_reconciliation(
     prefix_errors: Sequence[str] = (),
     windows_powershell_core_host: WindowsPowerShellCoreHost | None = None,
     platform_name: str | None = None,
+    allow_expansion_read_interleaving: bool = False,
 ) -> GatewayBrokerReconciliation:
     """Add exact response-derived command binding to argv reconciliation."""
 
@@ -1718,6 +1877,7 @@ def _bind_gateway_prefix_reconciliation(
         broker_evidence.accepted_records,
         platform_name=platform_name,
         windows_powershell_core_host=windows_powershell_core_host,
+        allow_expansion_read_interleaving=allow_expansion_read_interleaving and raw_reconciliation.passed,
     )
     return GatewayBrokerReconciliation(
         passed=(

@@ -3656,6 +3656,7 @@ def gateway_continuation_binding_errors(
     platform_name: str | None = None,
     windows_powershell_core_host: WindowsPowerShellCoreHost | None = None,
     allow_compound_checked_child_handoff: bool = False,
+    allow_expansion_read_interleaving: bool = False,
 ) -> tuple[str, ...]:
     """Bind every response-derived continuation to its exact selected bytes.
 
@@ -3674,6 +3675,9 @@ def gateway_continuation_binding_errors(
 
     active_platform = os.name if platform_name is None else platform_name
     errors: list[str] = []
+    pending_business_index: int | None = None
+    if allow_expansion_read_interleaving and len(command_records) != len(broker_records):
+        return ("expansion continuation command/receipt count mismatch",)
     compound_parent_candidates: tuple[tuple[str, str], ...] = ()
     compound_child_bindings: set[tuple[str, str]] = set()
     if allow_compound_checked_child_handoff:
@@ -3713,6 +3717,32 @@ def gateway_continuation_binding_errors(
     for index in range(1, len(broker_records)):
         prior_broker = broker_records[index - 1]
         prior_payload = _record_field(prior_broker, "payload")
+        prior_index = index - 1
+        if allow_expansion_read_interleaving:
+            # Only the expansion caller enables this after positional Broker
+            # reconciliation. Accepted reads have passed its bounded public
+            # admission policy; they do not consume or replace a Draft copy.
+            if isinstance(prior_payload, Mapping):
+                is_business, _ = _business_draft_continuation_candidates(prior_payload, platform_name=active_platform)
+                if is_business and "next_command" not in prior_payload:
+                    pending_business_index = prior_index
+            if pending_business_index is not None:
+                current = broker_records[index]
+                arguments = _record_field(current, "gateway_arguments", ())
+                if arguments and arguments[0] in {"status", "operations", "query-schema", "operation-schema",
+                                                   "request-schema", "query-object", "metadata"}:
+                    payload = _record_field(current, "payload")
+                    if (all(_record_field(current, key) is True for key in ("authenticated", "accepted", "succeeded"))
+                            and _record_field(current, "exit_code") == _record_field(current, "runner_exit_code") == 0
+                            and isinstance(payload, Mapping) and payload.get("command") == arguments[0]
+                            and _command_output_matches_payload(command_records[index], payload)):
+                        continue
+                    errors.append(f"command {index + 1}: interleaved read lacks authenticated successful evidence")
+                    continue
+                prior_index = pending_business_index
+                prior_broker = broker_records[prior_index]
+                prior_payload = _record_field(prior_broker, "payload")
+                pending_business_index = None
         if not isinstance(prior_payload, Mapping):
             continue
         business_contract, business_candidates = (
@@ -3729,7 +3759,7 @@ def gateway_continuation_binding_errors(
                 f"command {command_number}: Gateway continuation raw evidence is missing"
             )
             continue
-        prior_command = command_records[index - 1]
+        prior_command = command_records[prior_index]
         current_command = command_records[index]
         if not _command_output_matches_payload(prior_command, prior_payload):
             errors.append(

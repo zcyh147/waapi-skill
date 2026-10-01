@@ -19,9 +19,159 @@ def test_actual_archived_preview_notice_wording_and_order(unit, expected):
         before=case["before_snapshot"], execute_expected=case["execute_expected"]) is expected
 
 
+def _current_notice_case(model="sol-medium", unit="EXP25-C06"):
+    fixture = json.loads((Path(__file__).parents[1] / "fixtures/semantic/expansion-preview-notice-0997d20.json").read_text())
+    return next(case for case in fixture["cases"] if case["model"] == model and case["unit"] == unit)
+
+
+@pytest.mark.parametrize("model,unit", [("luna-high", "EXP25-C06"), ("sol-medium", "EXP25-C06"),
+    ("luna-high", "EXP25-M01")])
+def test_current_archived_notice_accepts_specific_effect_in_bound_context(model, unit):
+    case = _current_notice_case(model, unit)
+    assert _notice(case["events"], artifact=case["preview_artifact"], before=case["before_snapshot"])
+
+
+@pytest.mark.parametrize("text", [
+    "即将执行预览。",
+    "将音量曲线的中间点改为 (50,-60)，两端和线性插值保持不变。",
+    "将音量曲线的中间点改为 (50,6)，两端和线性插值保持不变。",
+    "将音量曲线的中间点改为 (50,-6)，两端改为 (0,-20)、(100,2)，各段线性。",
+    "将音量曲线改为 (0,-48)、(50,-6)、(100,0)，各段线性；备注改为新的备注。",
+    "现有音量曲线为 (0,-48)、(50,-24)、(100,0)。将音量曲线的中间点改为 (50,-6)，两端和线性插值保持不变。",
+    "将音量曲线改为 (0,-48)、(50,-6)、(100,0)，各段线性，目标是 {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}。",
+])
+def test_contextual_rtpc_notice_rejects_wrong_effect_and_preservation(text):
+    case = _current_notice_case()
+    assert not _notice([PREVIEW, _message(text), EXECUTE],
+        artifact=case["preview_artifact"], before=case["before_snapshot"])
+
+
+@pytest.mark.parametrize("preservation,expected", [
+    ("不修改备注，也不修改其他控制曲线。", True),
+    ("do not change pitch; do not update notes.", True),
+    ("do not change pitch or update notes.", True),
+    ("修改备注。", False),
+    ("change pitch.", False),
+    ("不修改备注，但修改其他控制曲线。", False),
+    ("do not change pitch, but update notes.", False),
+    ("不修改备注，并更新身份。", False),
+])
+def test_rtpc_preservation_uses_clause_polarity(preservation, expected):
+    case = _current_notice_case()
+    text = "将音量曲线改为 (0,-48)、(50,-6)、(100,0)，各段线性；" + preservation
+    assert _notice([PREVIEW, _message(text), EXECUTE],
+        artifact=case["preview_artifact"], before=case["before_snapshot"]) is expected
+
+
+@pytest.mark.parametrize("interpolation,expected", [
+    ("线性", True), ("linear", True), ("非线性", False), ("不使用线性", False),
+    ("保持线性", True), ("使用线性", True), ("不保持线性", False), ("不用线性", False),
+    ("nonlinear", False), ("non-linear", False), ("not linear", False),
+])
+@pytest.mark.parametrize("form", ["full", "delta"])
+def test_rtpc_notice_requires_affirmative_requested_interpolation(form, interpolation, expected):
+    case = _current_notice_case()
+    if form == "full":
+        text = f"将音量曲线改为 (0,-48)、(50,-6)、(100,0)，各段{interpolation}。"
+    else:
+        text = f"将音量曲线的中间点改为 (50,-6)，两端和{interpolation}插值保持不变。"
+    assert _notice([PREVIEW, _message(text), EXECUTE],
+        artifact=case["preview_artifact"], before=case["before_snapshot"]) is expected
+
+
+def test_rtpc_interpolation_check_does_not_blacklist_unrelated_preservation_clause():
+    case = _current_notice_case()
+    text = "将音量曲线改为 (0,-48)、(50,-6)、(100,0)，各段线性；其他曲线的非线性插值不变。"
+    assert _notice([PREVIEW, _message(text), EXECUTE],
+        artifact=case["preview_artifact"], before=case["before_snapshot"])
+
+
+@pytest.mark.parametrize("defect", ["owner", "control", "association", "plan_points", "snapshot",
+    "duplicate_volume", "duplicate_control", "version", "missing_versions", "nonfinite", "boolean_point", "shape", "notes", "malformed_prepared", "malformed_plan", "duplicate_plan_row"])
+def test_rtpc_context_requires_unique_immutable_and_baseline_agreement(defect):
+    case = _current_notice_case()
+    artifact, before = case["preview_artifact"], case["before_snapshot"]
+    args = artifact["request"]["arguments"]
+    prepared = artifact["prepared_operation"]
+    plan = prepared["verification_plan"]
+    foreign = "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"
+    if defect in {"owner", "control", "association"}:
+        plan[{"owner": "object_id", "control": "control_input_id", "association": "existing_rtpc_id"}[defect]] = foreign
+    elif defect == "plan_points":
+        plan["points"][1]["y"] = -60
+    elif defect == "snapshot":
+        prepared["pre_state"]["rtpc_snapshot"]["rows"][0]["notes"] = "changed"
+    elif defect == "duplicate_volume":
+        from copy import deepcopy
+        row = deepcopy(next(row for row in before["rtpcs"].values() if row["@PropertyName"] == "Volume"))
+        row["id"] = foreign
+        before["rtpcs"][foreign] = row
+        prepared["pre_state"]["rtpc_snapshot"]["rows"].append(row)
+        plan["before_rows"].append(row)
+    elif defect == "duplicate_control":
+        before["controls"].append(dict(before["controls"][0]))
+    elif defect == "version":
+        plan.pop("version")
+    elif defect == "missing_versions":
+        artifact["request"].pop("version")
+        prepared.pop("version")
+        plan.pop("version")
+    elif defect == "malformed_prepared":
+        artifact["prepared_operation"] = []
+    elif defect == "malformed_plan":
+        prepared["verification_plan"] = []
+    elif defect == "duplicate_plan_row":
+        plan["before_rows"].append(dict(plan["before_rows"][0]))
+    elif defect in {"nonfinite", "boolean_point", "shape"}:
+        args["points"][1]["shape" if defect == "shape" else "y"] = {
+            "nonfinite": float("nan"), "boolean_point": True, "shape": "Logarithmic"}[defect]
+    elif defect == "notes":
+        args["notes"] = "overwrite"
+    assert not _notice(case["events"], artifact=artifact, before=before)
+
+
+def test_rtpc_context_accepts_independent_snapshot_row_permutations():
+    case = _current_notice_case()
+    case["preview_artifact"]["prepared_operation"]["verification_plan"]["before_rows"].reverse()
+    assert _notice(case["events"], artifact=case["preview_artifact"], before=case["before_snapshot"])
+
+
+def test_rtpc_reference_requires_previously_stated_correct_points():
+    case = _current_notice_case("luna-high")
+    post = next(event for event in case["events"] if event.get("original_index") == 27)
+    assert not _notice([PREVIEW, post, EXECUTE], artifact=case["preview_artifact"], before=case["before_snapshot"])
+
+
+@pytest.mark.parametrize("text", [
+    "按上述预期执行，关系是 {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}。",
+    "将音量曲线改为上述指定线性点，关系是 {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}。",
+])
+def test_rtpc_reference_cannot_override_foreign_identity(text):
+    case = _current_notice_case()
+    earlier = _message("将音量曲线设为 (0,-48)、(50,-6)、(100,0)，各段线性。")
+    assert not _notice([earlier, PREVIEW, _message(text), EXECUTE],
+        artifact=case["preview_artifact"], before=case["before_snapshot"])
+
+
+@pytest.mark.parametrize("events", ["before", "after", "tool"])
+def test_contextual_rtpc_keeps_advance_visible_message_boundary(events):
+    case = _current_notice_case()
+    message = next(event for event in case["events"] if event.get("original_index") == 25)
+    sequence = {"before": [message, PREVIEW, EXECUTE], "after": [PREVIEW, EXECUTE, message],
+        "tool": [PREVIEW, {"type": "item.completed", "item": {"type": "command_execution",
+            "aggregated_output": message["item"]["text"]}}, EXECUTE]}[events]
+    assert not _notice(sequence, artifact=case["preview_artifact"], before=case["before_snapshot"])
+
+
 @pytest.mark.parametrize("text", ["将更新 Quiet 的轨道音量为 -6 dB。", "I will update Quiet with volume at -6 dB."])
 def test_import_notice_accepts_equivalent_update_wording(text):
     assert _notice([PREVIEW, _message(text), EXECUTE])
+
+
+@pytest.mark.parametrize("value,expected", [("−6", True), ("−6.0", True), ("+6", False),
+    ("6", False), ("−60", False), ("−6.5", False)])
+def test_numeric_notice_preserves_sign_and_exact_value(value, expected):
+    assert _notice([PREVIEW, _message(f"将导入 Quiet，音量为 {value} dB。"), EXECUTE]) is expected
 
 
 @pytest.mark.parametrize("text", ["正在更新进度。", "将更新 Full 的音量为 -6 dB。", "将更新 Quiet 的音量为 -60 dB。"])

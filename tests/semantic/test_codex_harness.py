@@ -547,6 +547,100 @@ def test_business_draft_prefix_continuation_binds_exact_copied_bytes() -> None:
     ) == ()
 
 
+def _expansion_interleaved_read_projection():
+    fixture = json.loads((Path(__file__).parents[1] / "fixtures/semantic/expansion-interleaved-reads-0997d20.json").read_text())
+    rows = fixture["records"]
+    commands = tuple(completed_record(row["command"], row["payload"]) for row in rows)
+    receipts = tuple({**row["receipt"], "payload": row["payload"]} for row in rows)
+    return commands, receipts
+
+
+def test_expansion_actual_thirteen_receipts_allow_authenticated_read_interleaving():
+    commands, receipts = _expansion_interleaved_read_projection()
+    assert len(receipts) == 13
+    assert gateway_continuation_binding_errors(commands, receipts, platform_name="posix")
+    assert gateway_continuation_binding_errors(commands, receipts, platform_name="posix",
+        allow_expansion_read_interleaving=True) == ()
+
+
+@pytest.mark.parametrize("damage", ["unrecorded", "rejected", "unauthenticated", "read_output", "mutation",
+    "prefix", "authority", "revision", "stale_binding"])
+def test_expansion_read_interleaving_preserves_pending_exact_copy_and_receipt_proof(damage):
+    from copy import deepcopy
+    commands, receipts = _expansion_interleaved_read_projection()
+    commands, receipts = list(commands), deepcopy(list(receipts))
+    if damage == "unrecorded":
+        commands.insert(5, completed_record("python .agents/skills/waapi-skill/scripts/run.py gateway.py query-schema", {}))
+    elif damage in {"rejected", "unauthenticated"}:
+        receipts[4]["accepted" if damage == "rejected" else "authenticated"] = False
+    elif damage == "read_output":
+        commands[4] = completed_record(commands[4].command, {"command": "query-schema", "forged": True})
+    elif damage == "mutation":
+        receipts[4]["gateway_arguments"] = ["execute", "tx1-other"]
+        commands[4] = completed_record("python .agents/skills/waapi-skill/scripts/run.py gateway.py execute tx1-other", {})
+    else:
+        command = commands[10].command
+        if damage == "prefix":
+            command = command.replace("python .agents/skills/waapi-skill/scripts/run.py", "python './.agents/skills/waapi-skill/scripts/run.py'")
+        elif damage == "authority":
+            command = command.replace("da1-f3dabcae8519e0e03783277fb39d9fa48ecfd585", "da1-" + "0" * 40)
+        elif damage == "revision":
+            command = command.replace("--expected-revision 2", "--expected-revision 1")
+        else:
+            # A later accepted Draft response replaces the old revision;
+            # reads cannot resurrect the earlier declaration prefix.
+            receipts[9]["payload"] = deepcopy(receipts[3]["payload"])
+            def advance(value):
+                if isinstance(value, dict):
+                    for key, child in value.items():
+                        if isinstance(child, str): value[key] = child.replace("--expected-revision 2", "--expected-revision 3")
+                        else: advance(child)
+            advance(receipts[9]["payload"])
+            binding = receipts[3]["payload"]["draft"]["next_action_binding"]["object_binding"]["by_id"]["fixed_argv_prefix_copy"]
+            inner = binding + " --object-id '{60650DE4-F870-43C4-923A-D601D67B6497}'"
+            commands[9] = completed_record(shlex.join(("/bin/bash", "-lc", inner)), receipts[9]["payload"])
+            receipts[9]["gateway_arguments"] = list(commands[9].argv[3:])
+        commands[10] = completed_record(command, receipts[10]["payload"])
+    assert gateway_continuation_binding_errors(commands, receipts, platform_name="posix",
+        allow_expansion_read_interleaving=True)
+
+
+@pytest.mark.parametrize("damage", [None, "facts", "unrecorded", "rejected", "receipt_order"])
+def test_expansion_copy_interleaving_requires_real_positional_argv_reconciliation(damage):
+    from tests.semantic.support.codex_gateway_broker import reconcile_gateway_commands, resolve_gateway_invocation
+    from tests.semantic.support.codex_task_runner_v3 import _bind_gateway_prefix_reconciliation
+    path = Path(__file__).parents[1] / "fixtures/semantic/expansion-interleaved-reads-0997d20.json"
+    text = path.read_text()
+    original = json.loads(text)
+    original_runner = completed_record(original["records"][3]["command"]).argv[1]
+    skill = Path(__file__).parents[2] / "skills/waapi-skill"
+    runner = str(skill / "scripts/run.py")
+    rows = json.loads(text.replace(original_runner, runner).replace(".agents/skills/waapi-skill/scripts/run.py", runner))["records"]
+    commands = [completed_record(row["command"], row["payload"]) for row in rows]
+    accepted = []
+    for row, command in zip(rows, commands):
+        resolved = resolve_gateway_invocation(command.argv, skill_source=skill)
+        accepted.append(SimpleNamespace(**row["receipt"], payload=row["payload"],
+            normalized_model_argv=resolved.normalized_model_argv, argv_sha256=resolved.argv_sha256))
+    rejected = ()
+    if damage == "facts":
+        commands[10] = completed_record(commands[10].command.replace("Japanese", "English"), rows[10]["payload"])
+    elif damage == "unrecorded":
+        commands.insert(5, commands[4])
+    elif damage == "rejected":
+        rejected = (accepted.pop(4),)
+    elif damage == "receipt_order":
+        accepted[4], accepted[5] = accepted[5], accepted[4]
+    evidence = SimpleNamespace(accepted_records=tuple(accepted), rejected_records=rejected,
+        complete=True, passed=True, terminal_state="RUNNING")
+    raw = reconcile_gateway_commands(tuple(command.argv for command in commands), evidence, skill_source=skill)
+    bound = _bind_gateway_prefix_reconciliation(raw, command_records=commands, broker_evidence=evidence,
+        platform_name="posix", allow_expansion_read_interleaving=True)
+    assert bound.passed is (damage is None)
+    if damage is not None:
+        assert not raw.passed and raw.errors
+
+
 def test_business_draft_accepts_its_nested_closed_standard_continuation() -> None:
     business_prefix = (
         "python '/tmp/Task Skill/scripts/run.py' gateway.py draft-check "

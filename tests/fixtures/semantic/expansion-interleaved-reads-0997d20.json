@@ -1,0 +1,669 @@
+{
+  "source_candidate": "0997d20",
+  "projection": "Actual thirteen command strings, receipt order and complete copy-contract fields; unrelated output fields omitted. Synthetic test stdout encodes this declared projection, not original full replies.",
+  "records": [
+    {
+      "command": "/bin/bash -lc 'python .agents/skills/waapi-skill/scripts/run.py gateway.py operations'",
+      "receipt": {
+        "sequence": 1,
+        "authenticated": true,
+        "accepted": true,
+        "succeeded": true,
+        "exit_code": 0,
+        "runner_exit_code": 0,
+        "gateway_arguments": [
+          "operations"
+        ]
+      },
+      "payload": {
+        "command": "operations"
+      }
+    },
+    {
+      "command": "/bin/bash -lc 'python .agents/skills/waapi-skill/scripts/run.py gateway.py operation-schema audio.import'",
+      "receipt": {
+        "sequence": 2,
+        "authenticated": true,
+        "accepted": true,
+        "succeeded": true,
+        "exit_code": 0,
+        "runner_exit_code": 0,
+        "gateway_arguments": [
+          "operation-schema",
+          "audio.import"
+        ]
+      },
+      "payload": {
+        "command": "operation-schema"
+      }
+    },
+    {
+      "command": "/bin/bash -lc 'python /Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-0997d20-sol-medium-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C01/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py gateway.py draft-start audio.import'",
+      "receipt": {
+        "sequence": 3,
+        "authenticated": true,
+        "accepted": true,
+        "succeeded": true,
+        "exit_code": 0,
+        "runner_exit_code": 0,
+        "gateway_arguments": [
+          "draft-start",
+          "audio.import"
+        ]
+      },
+      "payload": {
+        "command": "draft-start",
+        "draft": {
+          "contract": "waapi-skill.operation-draft/v1",
+          "next_action_binding": {
+            "contract": "waapi-skill.business-draft-next-action/v1",
+            "business_contract": {
+              "contract": "waapi-skill.audio-import-business/v1",
+              "start": {
+                "copy_exactly": true
+              }
+            },
+            "object_binding": {
+              "by_id": {
+                "fixed_argv_prefix_copy": "python /Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-0997d20-sol-medium-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C01/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py gateway.py draft-bind-object od1-4377db8ac2e2f659ceef79e094c3f9bf --task-authority da1-f3dabcae8519e0e03783277fb39d9fa48ecfd585 --expected-revision 1",
+                "fixed_argv_prefix_copy_instruction": {
+                  "action": "copy_verbatim_then_append_complete_typed_action_groups",
+                  "contract": "waapi-skill.operation-draft-command-copy-instruction/v1",
+                  "forbidden_transformations": [
+                    "reconstruct",
+                    "shorten",
+                    "normalize",
+                    "substitute_path_segments",
+                    "select_another_field"
+                  ],
+                  "opaque_token_guard": {
+                    "task_authority": {
+                      "hex_characters_after_prefix": 40,
+                      "prefix": "da1-",
+                      "truncate_to_32_hex_characters": "invalid"
+                    }
+                  },
+                  "source_field": "fixed_argv_prefix_copy"
+                }
+              },
+              "by_path_segments": {
+                "fixed_argv_prefix_copy": "python /Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-0997d20-sol-medium-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C01/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py gateway.py draft-bind-object od1-4377db8ac2e2f659ceef79e094c3f9bf --task-authority da1-f3dabcae8519e0e03783277fb39d9fa48ecfd585 --expected-revision 1",
+                "fixed_argv_prefix_copy_instruction": {
+                  "action": "copy_verbatim_then_append_complete_typed_action_groups",
+                  "contract": "waapi-skill.operation-draft-command-copy-instruction/v1",
+                  "forbidden_transformations": [
+                    "reconstruct",
+                    "shorten",
+                    "normalize",
+                    "substitute_path_segments",
+                    "select_another_field"
+                  ],
+                  "opaque_token_guard": {
+                    "task_authority": {
+                      "hex_characters_after_prefix": 40,
+                      "prefix": "da1-",
+                      "truncate_to_32_hex_characters": "invalid"
+                    }
+                  },
+                  "source_field": "fixed_argv_prefix_copy"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "command": "/bin/bash -lc \"python /Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-0997d20-sol-medium-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C01/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py gateway.py draft-bind-object od1-4377db8ac2e2f659ceef79e094c3f9bf --task-authority da1-f3dabcae8519e0e03783277fb39d9fa48ecfd585 --expected-revision 1 --object-id '{60650DE4-F870-43C4-923A-D601D67B6497}'\"",
+      "receipt": {
+        "sequence": 4,
+        "authenticated": true,
+        "accepted": true,
+        "succeeded": true,
+        "exit_code": 0,
+        "runner_exit_code": 0,
+        "gateway_arguments": [
+          "draft-bind-object",
+          "od1-4377db8ac2e2f659ceef79e094c3f9bf",
+          "--task-authority",
+          "da1-f3dabcae8519e0e03783277fb39d9fa48ecfd585",
+          "--expected-revision",
+          "1",
+          "--object-id",
+          "{60650DE4-F870-43C4-923A-D601D67B6497}"
+        ]
+      },
+      "payload": {
+        "command": "draft-bind-object",
+        "draft": {
+          "contract": "waapi-skill.operation-draft/v1",
+          "next_action_binding": {
+            "contract": "waapi-skill.business-draft-next-action/v1",
+            "declare_import_batch": {
+              "fixed_argv_prefix_copy": "python .agents/skills/waapi-skill/scripts/run.py gateway.py draft-declare-import-batch od1-4377db8ac2e2f659ceef79e094c3f9bf --task-authority da1-f3dabcae8519e0e03783277fb39d9fa48ecfd585 --expected-revision 2",
+              "fixed_argv_prefix_copy_instruction": {
+                "action": "copy_verbatim_then_append_complete_typed_action_groups",
+                "contract": "waapi-skill.operation-draft-command-copy-instruction/v1",
+                "forbidden_transformations": [
+                  "reconstruct",
+                  "shorten",
+                  "normalize",
+                  "substitute_path_segments",
+                  "select_another_field"
+                ],
+                "opaque_token_guard": {
+                  "task_authority": {
+                    "hex_characters_after_prefix": 40,
+                    "prefix": "da1-",
+                    "truncate_to_32_hex_characters": "invalid"
+                  }
+                },
+                "source_field": "fixed_argv_prefix_copy"
+              }
+            },
+            "explicit_batch_overrides": {
+              "fixed_argv_prefix_copy": "python .agents/skills/waapi-skill/scripts/run.py gateway.py draft-business-configure od1-4377db8ac2e2f659ceef79e094c3f9bf --task-authority da1-f3dabcae8519e0e03783277fb39d9fa48ecfd585 --expected-revision 2",
+              "fixed_argv_prefix_copy_instruction": {
+                "action": "copy_verbatim_then_append_complete_typed_action_groups",
+                "contract": "waapi-skill.operation-draft-command-copy-instruction/v1",
+                "forbidden_transformations": [
+                  "reconstruct",
+                  "shorten",
+                  "normalize",
+                  "substitute_path_segments",
+                  "select_another_field"
+                ],
+                "opaque_token_guard": {
+                  "task_authority": {
+                    "hex_characters_after_prefix": 40,
+                    "prefix": "da1-",
+                    "truncate_to_32_hex_characters": "invalid"
+                  }
+                },
+                "source_field": "fixed_argv_prefix_copy"
+              }
+            },
+            "field_discovery": {
+              "new_object_scope": {
+                "fixed_argv_prefix_copy": "python .agents/skills/waapi-skill/scripts/run.py gateway.py draft-discover-fields od1-4377db8ac2e2f659ceef79e094c3f9bf --task-authority da1-f3dabcae8519e0e03783277fb39d9fa48ecfd585 --expected-revision 2",
+                "fixed_argv_prefix_copy_instruction": {
+                  "action": "copy_verbatim_then_append_complete_typed_action_groups",
+                  "contract": "waapi-skill.operation-draft-command-copy-instruction/v1",
+                  "forbidden_transformations": [
+                    "reconstruct",
+                    "shorten",
+                    "normalize",
+                    "substitute_path_segments",
+                    "select_another_field"
+                  ],
+                  "opaque_token_guard": {
+                    "task_authority": {
+                      "hex_characters_after_prefix": 40,
+                      "prefix": "da1-",
+                      "truncate_to_32_hex_characters": "invalid"
+                    }
+                  },
+                  "source_field": "fixed_argv_prefix_copy"
+                }
+              },
+              "object_scope": {
+                "fixed_argv_prefix_copy": "python .agents/skills/waapi-skill/scripts/run.py gateway.py draft-discover-fields od1-4377db8ac2e2f659ceef79e094c3f9bf --task-authority da1-f3dabcae8519e0e03783277fb39d9fa48ecfd585 --expected-revision 2",
+                "fixed_argv_prefix_copy_instruction": {
+                  "action": "copy_verbatim_then_append_complete_typed_action_groups",
+                  "contract": "waapi-skill.operation-draft-command-copy-instruction/v1",
+                  "forbidden_transformations": [
+                    "reconstruct",
+                    "shorten",
+                    "normalize",
+                    "substitute_path_segments",
+                    "select_another_field"
+                  ],
+                  "opaque_token_guard": {
+                    "task_authority": {
+                      "hex_characters_after_prefix": 40,
+                      "prefix": "da1-",
+                      "truncate_to_32_hex_characters": "invalid"
+                    }
+                  },
+                  "source_field": "fixed_argv_prefix_copy"
+                }
+              }
+            },
+            "object_binding": {
+              "by_id": {
+                "fixed_argv_prefix_copy": "python .agents/skills/waapi-skill/scripts/run.py gateway.py draft-bind-object od1-4377db8ac2e2f659ceef79e094c3f9bf --task-authority da1-f3dabcae8519e0e03783277fb39d9fa48ecfd585 --expected-revision 2",
+                "fixed_argv_prefix_copy_instruction": {
+                  "action": "copy_verbatim_then_append_complete_typed_action_groups",
+                  "contract": "waapi-skill.operation-draft-command-copy-instruction/v1",
+                  "forbidden_transformations": [
+                    "reconstruct",
+                    "shorten",
+                    "normalize",
+                    "substitute_path_segments",
+                    "select_another_field"
+                  ],
+                  "opaque_token_guard": {
+                    "task_authority": {
+                      "hex_characters_after_prefix": 40,
+                      "prefix": "da1-",
+                      "truncate_to_32_hex_characters": "invalid"
+                    }
+                  },
+                  "source_field": "fixed_argv_prefix_copy"
+                }
+              },
+              "by_path_segments": {
+                "fixed_argv_prefix_copy": "python .agents/skills/waapi-skill/scripts/run.py gateway.py draft-bind-object od1-4377db8ac2e2f659ceef79e094c3f9bf --task-authority da1-f3dabcae8519e0e03783277fb39d9fa48ecfd585 --expected-revision 2",
+                "fixed_argv_prefix_copy_instruction": {
+                  "action": "copy_verbatim_then_append_complete_typed_action_groups",
+                  "contract": "waapi-skill.operation-draft-command-copy-instruction/v1",
+                  "forbidden_transformations": [
+                    "reconstruct",
+                    "shorten",
+                    "normalize",
+                    "substitute_path_segments",
+                    "select_another_field"
+                  ],
+                  "opaque_token_guard": {
+                    "task_authority": {
+                      "hex_characters_after_prefix": 40,
+                      "prefix": "da1-",
+                      "truncate_to_32_hex_characters": "invalid"
+                    }
+                  },
+                  "source_field": "fixed_argv_prefix_copy"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "command": "/bin/bash -lc 'python .agents/skills/waapi-skill/scripts/run.py gateway.py query-schema'",
+      "receipt": {
+        "sequence": 5,
+        "authenticated": true,
+        "accepted": true,
+        "succeeded": true,
+        "exit_code": 0,
+        "runner_exit_code": 0,
+        "gateway_arguments": [
+          "query-schema"
+        ]
+      },
+      "payload": {
+        "command": "query-schema"
+      }
+    },
+    {
+      "command": "/bin/bash -lc \"python .agents/skills/waapi-skill/scripts/run.py gateway.py query-object --exact-id '{60650DE4-F870-43C4-923A-D601D67B6497}' --include volume-db --include output-bus --include active-source\"",
+      "receipt": {
+        "sequence": 6,
+        "authenticated": true,
+        "accepted": true,
+        "succeeded": true,
+        "exit_code": 0,
+        "runner_exit_code": 0,
+        "gateway_arguments": [
+          "query-object",
+          "--exact-id",
+          "{60650DE4-F870-43C4-923A-D601D67B6497}",
+          "--include",
+          "volume-db",
+          "--include",
+          "output-bus",
+          "--include",
+          "active-source"
+        ]
+      },
+      "payload": {
+        "command": "query-object"
+      }
+    },
+    {
+      "command": "/bin/bash -lc \"python .agents/skills/waapi-skill/scripts/run.py gateway.py query-object --exact-id '{60650DE4-F870-43C4-923A-D601D67B6497}' --relationship children --include source-language --include original-file-path --include file-path --max-results 100\"",
+      "receipt": {
+        "sequence": 7,
+        "authenticated": true,
+        "accepted": true,
+        "succeeded": true,
+        "exit_code": 0,
+        "runner_exit_code": 0,
+        "gateway_arguments": [
+          "query-object",
+          "--exact-id",
+          "{60650DE4-F870-43C4-923A-D601D67B6497}",
+          "--relationship",
+          "children",
+          "--include",
+          "source-language",
+          "--include",
+          "original-file-path",
+          "--include",
+          "file-path",
+          "--max-results",
+          "100"
+        ]
+      },
+      "payload": {
+        "command": "query-object"
+      }
+    },
+    {
+      "command": "/bin/bash -lc \"python .agents/skills/waapi-skill/scripts/run.py gateway.py query-object --exact-id '{ACB5EC71-5F1A-44A0-BC68-BC748906F11F}' --relationship event-actions\"",
+      "receipt": {
+        "sequence": 8,
+        "authenticated": true,
+        "accepted": true,
+        "succeeded": true,
+        "exit_code": 0,
+        "runner_exit_code": 0,
+        "gateway_arguments": [
+          "query-object",
+          "--exact-id",
+          "{ACB5EC71-5F1A-44A0-BC68-BC748906F11F}",
+          "--relationship",
+          "event-actions"
+        ]
+      },
+      "payload": {
+        "command": "query-object"
+      }
+    },
+    {
+      "command": "/bin/bash -lc \"python /Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-0997d20-sol-medium-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C01/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py gateway.py query-object --exact-id '{60650DE4-F870-43C4-923A-D601D67B6497}' --view sound-routing-diagnostics\"",
+      "receipt": {
+        "sequence": 9,
+        "authenticated": true,
+        "accepted": true,
+        "succeeded": true,
+        "exit_code": 0,
+        "runner_exit_code": 0,
+        "gateway_arguments": [
+          "query-object",
+          "--exact-id",
+          "{60650DE4-F870-43C4-923A-D601D67B6497}",
+          "--view",
+          "sound-routing-diagnostics"
+        ]
+      },
+      "payload": {
+        "command": "query-object"
+      }
+    },
+    {
+      "command": "/bin/bash -lc \"python .agents/skills/waapi-skill/scripts/run.py gateway.py query-object --exact-id '{F44828DF-4752-4E58-A8D1-D42FD2BD193F}' --include volume-db --include output-bus\"",
+      "receipt": {
+        "sequence": 10,
+        "authenticated": true,
+        "accepted": true,
+        "succeeded": true,
+        "exit_code": 0,
+        "runner_exit_code": 0,
+        "gateway_arguments": [
+          "query-object",
+          "--exact-id",
+          "{F44828DF-4752-4E58-A8D1-D42FD2BD193F}",
+          "--include",
+          "volume-db",
+          "--include",
+          "output-bus"
+        ]
+      },
+      "payload": {
+        "command": "query-object"
+      }
+    },
+    {
+      "command": "/bin/bash -lc \"python .agents/skills/waapi-skill/scripts/run.py gateway.py draft-declare-import-batch od1-4377db8ac2e2f659ceef79e094c3f9bf --task-authority da1-f3dabcae8519e0e03783277fb39d9fa48ecfd585 --expected-revision 2 --row-order japanese --existing-row japanese boh1-a44d49d6272c3ad62050b739abc3a9de --field japanese language 'Japanese' --field japanese media_file '/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-0997d20-sol-medium-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C01/owned/assets/replacement/C01_line.wav'\"",
+      "receipt": {
+        "sequence": 11,
+        "authenticated": true,
+        "accepted": true,
+        "succeeded": true,
+        "exit_code": 0,
+        "runner_exit_code": 0,
+        "gateway_arguments": [
+          "draft-declare-import-batch",
+          "od1-4377db8ac2e2f659ceef79e094c3f9bf",
+          "--task-authority",
+          "da1-f3dabcae8519e0e03783277fb39d9fa48ecfd585",
+          "--expected-revision",
+          "2",
+          "--row-order",
+          "japanese",
+          "--existing-row",
+          "japanese",
+          "boh1-a44d49d6272c3ad62050b739abc3a9de",
+          "--field",
+          "japanese",
+          "language",
+          "Japanese",
+          "--field",
+          "japanese",
+          "media_file",
+          "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-0997d20-sol-medium-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C01/owned/assets/replacement/C01_line.wav"
+        ]
+      },
+      "payload": {
+        "command": "draft-declare-import-batch",
+        "draft": {
+          "contract": "waapi-skill.operation-draft/v1",
+          "next_command": {
+            "command": "draft-check",
+            "contract": "waapi-skill.gateway-next-command/v2",
+            "copy_exactly": true,
+            "copy_instruction": {
+              "action": "execute_verbatim_as_one_shell_tool_call",
+              "contract": "waapi-skill.gateway-command-copy-instruction/v2",
+              "forbidden_transformations": [
+                "reconstruct",
+                "shorten",
+                "normalize",
+                "substitute_path_segments",
+                "select_another_field"
+              ],
+              "source_field": "shell_command"
+            },
+            "full_argv": [
+              "python",
+              "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-0997d20-sol-medium-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C01/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py",
+              "gateway.py",
+              "draft-check",
+              "od1-4377db8ac2e2f659ceef79e094c3f9bf",
+              "--task-authority",
+              "da1-f3dabcae8519e0e03783277fb39d9fa48ecfd585",
+              "--expected-revision",
+              "3"
+            ],
+            "gateway_argv": [
+              "draft-check",
+              "od1-4377db8ac2e2f659ceef79e094c3f9bf",
+              "--task-authority",
+              "da1-f3dabcae8519e0e03783277fb39d9fa48ecfd585",
+              "--expected-revision",
+              "3"
+            ],
+            "shell_command": "python /Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-0997d20-sol-medium-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C01/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py gateway.py draft-check od1-4377db8ac2e2f659ceef79e094c3f9bf --task-authority da1-f3dabcae8519e0e03783277fb39d9fa48ecfd585 --expected-revision 3",
+            "shell_family": "posix-sh",
+            "shell_tool_timeout_ms": 30000
+          },
+          "batch_receipt": {
+            "contract": "waapi-skill.business-declaration-batch-receipt/v1"
+          },
+          "next_action_binding": {
+            "contract": "waapi-skill.business-draft-next-action/v1",
+            "append_import_chunk": {
+              "fixed_argv_prefix_copy": "python .agents/skills/waapi-skill/scripts/run.py gateway.py draft-declare-import-batch od1-4377db8ac2e2f659ceef79e094c3f9bf --task-authority da1-f3dabcae8519e0e03783277fb39d9fa48ecfd585 --expected-revision 3",
+              "fixed_argv_prefix_copy_instruction": {
+                "action": "copy_verbatim_then_append_complete_typed_action_groups",
+                "contract": "waapi-skill.operation-draft-command-copy-instruction/v1",
+                "forbidden_transformations": [
+                  "reconstruct",
+                  "shorten",
+                  "normalize",
+                  "substitute_path_segments",
+                  "select_another_field"
+                ],
+                "opaque_token_guard": {
+                  "task_authority": {
+                    "hex_characters_after_prefix": 40,
+                    "prefix": "da1-",
+                    "truncate_to_32_hex_characters": "invalid"
+                  }
+                },
+                "source_field": "fixed_argv_prefix_copy"
+              }
+            },
+            "bind_additional_object_by_path_segments": {
+              "fixed_argv_prefix_copy": "python .agents/skills/waapi-skill/scripts/run.py gateway.py draft-bind-object od1-4377db8ac2e2f659ceef79e094c3f9bf --task-authority da1-f3dabcae8519e0e03783277fb39d9fa48ecfd585 --expected-revision 3",
+              "fixed_argv_prefix_copy_instruction": {
+                "action": "copy_verbatim_then_append_complete_typed_action_groups",
+                "contract": "waapi-skill.operation-draft-command-copy-instruction/v1",
+                "forbidden_transformations": [
+                  "reconstruct",
+                  "shorten",
+                  "normalize",
+                  "substitute_path_segments",
+                  "select_another_field"
+                ],
+                "opaque_token_guard": {
+                  "task_authority": {
+                    "hex_characters_after_prefix": 40,
+                    "prefix": "da1-",
+                    "truncate_to_32_hex_characters": "invalid"
+                  }
+                },
+                "source_field": "fixed_argv_prefix_copy"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "command": "/bin/bash -lc 'python /Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-0997d20-sol-medium-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C01/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py gateway.py draft-check od1-4377db8ac2e2f659ceef79e094c3f9bf --task-authority da1-f3dabcae8519e0e03783277fb39d9fa48ecfd585 --expected-revision 3'",
+      "receipt": {
+        "sequence": 12,
+        "authenticated": true,
+        "accepted": true,
+        "succeeded": true,
+        "exit_code": 0,
+        "runner_exit_code": 0,
+        "gateway_arguments": [
+          "draft-check",
+          "od1-4377db8ac2e2f659ceef79e094c3f9bf",
+          "--task-authority",
+          "da1-f3dabcae8519e0e03783277fb39d9fa48ecfd585",
+          "--expected-revision",
+          "3"
+        ]
+      },
+      "payload": {
+        "command": "draft-check",
+        "draft": {
+          "contract": "waapi-skill.operation-draft/v1",
+          "preview": {
+            "contract": "waapi-skill.business-preview/v1"
+          }
+        },
+        "next_command": {
+          "command": "preview-from-draft",
+          "contract": "waapi-skill.gateway-next-command/v2",
+          "copy_exactly": true,
+          "copy_instruction": {
+            "action": "execute_verbatim_as_one_shell_tool_call",
+            "contract": "waapi-skill.gateway-command-copy-instruction/v2",
+            "forbidden_transformations": [
+              "reconstruct",
+              "shorten",
+              "normalize",
+              "substitute_path_segments",
+              "select_another_field"
+            ],
+            "source_field": "shell_command"
+          },
+          "full_argv": [
+            "python",
+            "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-0997d20-sol-medium-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C01/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py",
+            "gateway.py",
+            "preview-from-draft",
+            "od1-4377db8ac2e2f659ceef79e094c3f9bf",
+            "--task-authority",
+            "da1-f3dabcae8519e0e03783277fb39d9fa48ecfd585",
+            "--expected-revision",
+            "4"
+          ],
+          "gateway_argv": [
+            "preview-from-draft",
+            "od1-4377db8ac2e2f659ceef79e094c3f9bf",
+            "--task-authority",
+            "da1-f3dabcae8519e0e03783277fb39d9fa48ecfd585",
+            "--expected-revision",
+            "4"
+          ],
+          "shell_command": "python /Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-0997d20-sol-medium-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C01/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py gateway.py preview-from-draft od1-4377db8ac2e2f659ceef79e094c3f9bf --task-authority da1-f3dabcae8519e0e03783277fb39d9fa48ecfd585 --expected-revision 4",
+          "shell_family": "posix-sh",
+          "shell_tool_timeout_ms": 30000
+        }
+      }
+    },
+    {
+      "command": "/bin/bash -lc 'python /Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-0997d20-sol-medium-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C01/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py gateway.py preview-from-draft od1-4377db8ac2e2f659ceef79e094c3f9bf --task-authority da1-f3dabcae8519e0e03783277fb39d9fa48ecfd585 --expected-revision 4'",
+      "receipt": {
+        "sequence": 13,
+        "authenticated": true,
+        "accepted": true,
+        "succeeded": true,
+        "exit_code": 0,
+        "runner_exit_code": 0,
+        "gateway_arguments": [
+          "preview-from-draft",
+          "od1-4377db8ac2e2f659ceef79e094c3f9bf",
+          "--task-authority",
+          "da1-f3dabcae8519e0e03783277fb39d9fa48ecfd585",
+          "--expected-revision",
+          "4"
+        ]
+      },
+      "payload": {
+        "command": "preview-from-draft",
+        "next_command": {
+          "command": "transaction-show",
+          "contract": "waapi-skill.gateway-next-command/v2",
+          "copy_exactly": true,
+          "copy_instruction": {
+            "action": "execute_verbatim_as_one_shell_tool_call",
+            "contract": "waapi-skill.gateway-command-copy-instruction/v2",
+            "forbidden_transformations": [
+              "reconstruct",
+              "shorten",
+              "normalize",
+              "substitute_path_segments",
+              "select_another_field"
+            ],
+            "source_field": "shell_command"
+          },
+          "full_argv": [
+            "python",
+            "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-0997d20-sol-medium-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C01/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py",
+            "gateway.py",
+            "transaction-show",
+            "tx1-at5skbhhwas18z1638y3",
+            "--summary-only"
+          ],
+          "gateway_argv": [
+            "transaction-show",
+            "tx1-at5skbhhwas18z1638y3",
+            "--summary-only"
+          ],
+          "requires_later_user_message": true,
+          "shell_command": "python /Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-0997d20-sol-medium-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C01/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py gateway.py transaction-show tx1-at5skbhhwas18z1638y3 --summary-only",
+          "shell_family": "posix-sh",
+          "shell_tool_timeout_ms": 30000
+        }
+      }
+    }
+  ]
+}
