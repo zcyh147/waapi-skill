@@ -42,6 +42,15 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- Frozen `122eb09` completed Program **5888 passed / 2 skipped** and
+  Non-live **12156 passed / 118 skipped / 27 deselected**, both exit zero.
+  The matching 2025 smoke reached readiness in **4.1306 seconds** and removed
+  its clean sandbox. Exact completed reports and digests are in
+  `../research/integration-expansion-archive-seal-gates-2026-10-02.json`.
+  New matched-model roots use the same candidate and pinned CLI 0.159.2;
+  the Luna-high group is running first. These gates alone provide no Fresh
+  business acceptance or model-selection credit.
+
 - Native follow-up candidate `78c3587` passed all nine selected nodes with
   final full-source-content protection and cleanup evidence. The independently
   checked evidence summary is `../research/music-native-maintenance-evidence-2026-10-02.md`;
