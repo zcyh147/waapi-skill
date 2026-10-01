@@ -20,6 +20,7 @@ from tests.semantic.support.codex_transaction_seal import (
     serialize_preview_seal,
     validate_transaction_show_confirmation_against_store,
     verify_preview_seal,
+    _validate_artifact,
 )
 from wwise_waapi.canonical import canonical_sha256
 from wwise_waapi.operation_registry import OPERATION_REQUEST_CONTRACT
@@ -27,11 +28,68 @@ from wwise_waapi.transaction_runtime import (
     PROJECT_GUARD_CONTRACT,
     RUNTIME_GUARD_CONTRACT,
     TRANSACTION_PREVIEW_CONTRACT,
+    build_project_guard,
 )
 from wwise_waapi.transactions import TransactionState, TransactionStore
 
 
 GUID = "{11111111-1111-1111-1111-111111111111}"
+
+
+def _current_archived_artifact():
+    fixture = json.loads((Path(__file__).parents[1] / "fixtures/semantic/expansion-current-project-guard.json").read_text())
+    artifact = _artifact()
+    artifact["project_guard"] = fixture["project_guard"]
+    version = artifact["project_guard"]["version"]
+    artifact["request"]["version"] = version
+    artifact["runtime_guard"]["version"] = version
+    artifact["runtime_guard"]["fingerprint"] = canonical_sha256({
+        key: artifact["runtime_guard"][key] for key in ("version", "files")})
+    return artifact
+
+
+def test_current_archived_project_guard_matches_authoritative_producer():
+    artifact = _current_archived_artifact()
+    guard = artifact["project_guard"]
+    assert build_project_guard(endpoint=guard["endpoint"], version=guard["version"],
+        live_info=guard["wwise"], project=guard["project"]) == guard
+    assert _validate_artifact(artifact)[0] == guard["fingerprint"]
+
+
+@pytest.mark.parametrize("mode", ("invariant", "transition_to_none", "transition_to_path"))
+def test_current_project_guard_supports_only_authoritative_producer_modes(mode):
+    artifact = _current_archived_artifact()
+    guard = artifact["project_guard"]
+    artifact["project_guard"] = build_project_guard(
+        endpoint=guard["endpoint"], version=guard["version"],
+        live_info=guard["wwise"], project=guard["project"], project_guard_mode=mode,
+        target_project_path="/test/SampleProject.wproj" if mode == "transition_to_path" else None,
+    )
+    assert _validate_artifact(artifact)[0] == artifact["project_guard"]["fingerprint"]
+
+
+@pytest.mark.parametrize("fault", ("missing_context", "context_tamper", "unknown_mode", "wrong_postcondition", "extra_field", "bad_project"))
+def test_current_project_guard_rejects_malformed_or_tampered_contract(fault):
+    artifact = _current_archived_artifact()
+    guard = artifact["project_guard"]
+    if fault == "missing_context":
+        del guard["context_fingerprint"]
+    elif fault == "context_tamper":
+        guard["context_fingerprint"] = "0" * 64
+    elif fault == "unknown_mode":
+        guard["project_guard_mode"] = "unreviewed"
+    elif fault == "wrong_postcondition":
+        guard["postcondition"] = {"state": "none"}
+    elif fault == "extra_field":
+        guard["unreviewed"] = True
+    else:
+        guard["project"] = {"state": "none", "id": GUID}
+    # Preserve a self-consistent main body digest: independent context/semantics
+    # must still reject the altered guard, not merely detect stale outer hashing.
+    guard["fingerprint"] = canonical_sha256({key: guard[key] for key in (
+        "endpoint", "version", "wwise", "project_guard_mode", "project", "postcondition")})
+    with pytest.raises(TransactionSealError):
+        _validate_artifact(artifact)
 CREATED_AT = "2026-07-14T06:00:00.000000Z"
 EXPIRES_AT = "2026-07-14T06:30:00.000000Z"
 

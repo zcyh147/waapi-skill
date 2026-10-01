@@ -1,0 +1,88 @@
+{
+  "source_candidate": "78c3587",
+  "source_unit": "EXP25-C01",
+  "matrix_case_sha256": "7ceb0bead4d91b46512528b13db265572c6fa68b510d49f35e1b2f8ceee3a7d2",
+  "project_guard": {
+    "context_fingerprint": "4a670b2a8025a8a8a9b764a820d7310ccc3e387f4e19c137c16c0299e1807657",
+    "contract": "waapi-skill.project-guard/v1",
+    "endpoint": {
+      "host": "127.0.0.1",
+      "port": 30043,
+      "url": "ws://127.0.0.1:30043/waapi"
+    },
+    "fingerprint": "25f2f78ed7b0be430c21f74340a3023b056081b8028382b1547cbbb4ceb89644",
+    "postcondition": {
+      "state": "same_project"
+    },
+    "project": {
+      "id": "{16164796-C6E6-491A-8799-C42A33110A84}",
+      "name": "SampleProject",
+      "path": "Y:\\.codex\\worktrees\\music-capability-probes\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-pilot-78c3587-luna-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\001-EXP25-C01\\owned\\sandbox-root\\sample-project-9a5073a0a5a44209873c7553b4a685d8\\SampleProject.wproj",
+      "state": "open"
+    },
+    "project_guard_mode": "invariant",
+    "version": "2025.1",
+    "wwise": {
+      "apiVersion": 1,
+      "configuration": "release",
+      "displayName": "WwiseConsole",
+      "isCommandLine": true,
+      "platform": "x64",
+      "processId": 176,
+      "processPath": "c:\\Program Files\\Audiokinetic\\Wwise 2025.1.7.9143\\Authoring\\x64\\Release\\bin\\WwiseConsole.exe",
+      "sessionId": "{7CF3B439-6C24-4EC8-9481-813A79160DD2}",
+      "version": {
+        "build": 9143,
+        "displayName": "v2025.1.7",
+        "major": 1,
+        "minor": 7,
+        "nickname": "",
+        "schema": 133,
+        "year": 2025
+      }
+    }
+  },
+  "isolation_record": {
+    "scenario_id": "EXP25-C01",
+    "version": "2025.1",
+    "status": "PASS",
+    "runner_outcome": {
+      "checks": {
+        "trusted_oracle_closed": true
+      },
+      "inputs_sha256": "a8a7f7b6de9bff1b111154473f2064e0fef9644e9bfc394f7279a822887d5411",
+      "lifecycle": {
+        "contract": "waapi-skill.codex-semantic-scenario-lifecycle/v3",
+        "errors": [],
+        "final_status": "PASS",
+        "quarantine_path": null,
+        "requested_status": "PASS",
+        "sandbox_retained": false,
+        "scenario_id": "EXP25-C01",
+        "source_hash_after": {
+          "algorithm": "sha256",
+          "bytes_hashed": 3943065,
+          "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+          "file_count": 83,
+          "strategy": "full"
+        },
+        "source_hash_before": {
+          "algorithm": "sha256",
+          "bytes_hashed": 3943065,
+          "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+          "file_count": 83,
+          "strategy": "full"
+        },
+        "source_mtime_after_ns": 1790531309503233691,
+        "source_mtime_before_ns": 1790531309503233691,
+        "version": "2025.1"
+      }
+    }
+  },
+  "expected_archive_replay": {
+    "archive_valid": true,
+    "original_status": "PASS",
+    "business_pass": true,
+    "reconciliation": null
+  }
+}

@@ -42,6 +42,22 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- Native follow-up candidate `78c3587` passed all nine selected nodes with
+  final full-source-content protection and cleanup evidence. The independently
+  checked evidence summary is `../research/music-native-maintenance-evidence-2026-10-02.md`;
+  #129 is closed. This remains native maintenance/investigation evidence.
+- Its new Luna-high Fresh root completed C01's two-turn business workflow in
+  **163.208 Agent seconds**, but the mandatory archive isolation check stopped
+  the matrix. The consolidated result remains C01 BLOCKED, C06/M01 PENDING;
+  the original root receives no formal campaign PASS credit and was unloaded.
+  Repair #130 corrects the harness-only transaction seal reader's legacy
+  six-field project guard expectation to the current exact nine-field producer
+  contract, including both fingerprints and closed mode/postcondition checks.
+  The old contract remains strict. TDD reproduced two failures before repair;
+  focused seal/CLI/archive regression then passed **173 tests** in 2.35 s.
+  Original evidence is frozen; a new candidate/root and matched model pilot
+  are required. No packaged Skill or matrix isolation check is bypassed.
+
 - Candidate `b23011f` completed Program **5888 passed / 2 skipped** and
   Non-live **12126 passed / 118 skipped / 27 deselected**, both exit zero.
   Exact logs and digests are recorded in

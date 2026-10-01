@@ -46,6 +46,8 @@ from wwise_waapi.transaction_runtime import (
     PROJECT_GUARD_CONTRACT,
     RUNTIME_GUARD_CONTRACT,
     TRANSACTION_PREVIEW_CONTRACT,
+    TransactionGuardError,
+    canonical_project_path,
 )
 from wwise_waapi.transactions import (
     ALLOWED_TRANSITIONS,
@@ -104,6 +106,9 @@ _ARTIFACT_FIELDS = frozenset(
 )
 _PROJECT_GUARD_FIELDS = frozenset(
     {"contract", "endpoint", "version", "wwise", "project", "fingerprint"}
+)
+_CURRENT_PROJECT_GUARD_FIELDS = _PROJECT_GUARD_FIELDS | frozenset(
+    {"project_guard_mode", "postcondition", "context_fingerprint"}
 )
 _RUNTIME_GUARD_FIELDS = frozenset({"contract", "version", "files", "fingerprint"})
 _EXECUTION_POLICY = {
@@ -544,13 +549,7 @@ def _validate_artifact(artifact: Mapping[str, Any]) -> tuple[str, str, str, str,
     if not isinstance(project_guard, Mapping) or not isinstance(runtime_guard, Mapping):
         raise TransactionSealError("Transaction preview project/runtime guards must be objects")
 
-    project_fingerprint = _validate_guard(
-        project_guard,
-        contract=PROJECT_GUARD_CONTRACT,
-        fields=_PROJECT_GUARD_FIELDS,
-        body_fields=("endpoint", "version", "wwise", "project"),
-        context="project_guard",
-    )
+    project_fingerprint = _validate_project_guard(project_guard)
     runtime_fingerprint = _validate_guard(
         runtime_guard,
         contract=RUNTIME_GUARD_CONTRACT,
@@ -577,6 +576,56 @@ def _validate_artifact(artifact: Mapping[str, Any]) -> tuple[str, str, str, str,
         created_at,
         expires_at,
     )
+
+
+def _validate_project_guard(guard: Mapping[str, Any]) -> str:
+    """Validate exact legacy/current producer contracts without dropping fields."""
+
+    if set(guard) == _PROJECT_GUARD_FIELDS:
+        return _validate_guard(
+            guard, contract=PROJECT_GUARD_CONTRACT, fields=_PROJECT_GUARD_FIELDS,
+            body_fields=("endpoint", "version", "wwise", "project"),
+            context="project_guard",
+        )
+    fingerprint = _validate_guard(
+        guard, contract=PROJECT_GUARD_CONTRACT, fields=_CURRENT_PROJECT_GUARD_FIELDS,
+        body_fields=("endpoint", "version", "wwise", "project_guard_mode", "project", "postcondition"),
+        context="project_guard",
+    )
+    context = {key: guard[key] for key in ("endpoint", "version", "wwise")}
+    _require_sha256(guard["context_fingerprint"], field="project_guard.context_fingerprint")
+    if guard["context_fingerprint"] != canonical_sha256(context):
+        raise TransactionSealError("project_guard context fingerprint does not match its context")
+    mode, postcondition = guard["project_guard_mode"], guard["postcondition"]
+    if mode == "invariant":
+        valid = postcondition == {"state": "same_project"}
+    elif mode == "transition_to_none":
+        valid = postcondition == {"state": "none"}
+    elif mode == "transition_to_path":
+        valid = (isinstance(postcondition, Mapping)
+                 and set(postcondition) == {"state", "canonical_path"}
+                 and postcondition["state"] == "open"
+                 and isinstance(postcondition["canonical_path"], str))
+        if valid:
+            try:
+                canonical = postcondition["canonical_path"]
+                # The producer stores a flavor-prefixed canonical key, not the
+                # original path argument accepted by canonical_project_path.
+                valid = canonical_project_path(canonical.partition(":")[2]) == canonical
+            except TransactionGuardError:
+                valid = False
+    else:
+        raise TransactionSealError("project_guard has an unsupported project_guard_mode")
+    if not valid:
+        raise TransactionSealError("project_guard postcondition does not match its mode")
+    project = guard["project"]
+    if (not isinstance(project, Mapping)
+            or project.get("state") not in {"open", "none"}
+            or (project["state"] == "none" and set(project) != {"state"})
+            or not set(project).issubset({"state", "id", "name", "path", "projectPath", "filePath"})
+            or (mode == "invariant" and project["state"] != "open")):
+        raise TransactionSealError("project_guard project snapshot is invalid for its mode")
+    return fingerprint
 
 
 def _validate_guard(

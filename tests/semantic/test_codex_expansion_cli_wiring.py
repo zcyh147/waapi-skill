@@ -14,6 +14,42 @@ from tests.semantic import run_codex_skill_matrix as matrix
 PROFILE = "integration_expansion_v1"
 
 
+@pytest.mark.parametrize("fault", (None, "source", "mtime", "close", "context"))
+def test_archived_success_isolation_requires_valid_current_guard(tmp_path, monkeypatch, fault):
+    from tests.semantic.support import codex_expansion_archive as archive
+    from tests.semantic.test_codex_transaction_seal import _current_archived_artifact
+    from tests.semantic.support.codex_transaction_seal import _validate_artifact
+    fixture = json.loads((Path(__file__).parents[1] / "fixtures/semantic/expansion-current-project-guard.json").read_text())
+    record = fixture["isolation_record"]
+    record["scenario_root"] = str(tmp_path)
+    task_root = tmp_path / "task"
+    task_root.mkdir()
+    record["runner_outcome"]["task_root"] = str(task_root)
+    artifact = _current_archived_artifact()
+    if fault == "source":
+        record["runner_outcome"]["lifecycle"]["source_hash_after"]["digest"] = "0" * 64
+    elif fault == "mtime":
+        record["runner_outcome"]["lifecycle"]["source_mtime_after_ns"] += 1
+    elif fault == "close":
+        record["runner_outcome"]["checks"]["trusted_oracle_closed"] = False
+    elif fault == "context":
+        artifact["project_guard"]["context_fingerprint"] = "0" * 64
+
+    def verify(root, **expected):
+        assert root == task_root
+        assert expected == {"expected_unit_id": record["scenario_id"],
+            "expected_version": record["version"],
+            "expected_inputs_sha256": record["runner_outcome"]["inputs_sha256"]}
+        try:
+            _validate_artifact(artifact)
+        except Exception as exc:
+            raise archive.ExpansionArchiveError(str(exc)) from exc
+        return fixture["expected_archive_replay"]
+
+    monkeypatch.setattr(archive, "verify_expansion_task_archive", verify)
+    assert matrix.expansion_case_isolated(record) is (fault is None)
+
+
 def _options(tmp_path, monkeypatch, surface="matrix", *extra):
     tmp_path.mkdir(parents=True, exist_ok=True)
     for name in ("codex", "auth.json", "live.json"):
