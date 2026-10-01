@@ -221,6 +221,11 @@ POWERSHELL_CORE_NATIVE_ARGUMENT_MODES = frozenset({"Standard", "Windows"})
 WORKSPACE_SKILL_EXCLUDED_NAMES = frozenset(
     {".venv", "__pycache__", ".pytest_cache", ".DS_Store", ".coverage"}
 )
+_WORKSPACE_GIT_HEAD = b"ref: refs/heads/main\n"
+_WORKSPACE_GIT_CONFIG = (
+    b"[core]\n\trepositoryformatversion = 0\n\tbare = false\n"
+)
+_WORKSPACE_GIT_DIRECTORIES = ("objects", "refs")
 MEMORY_MARKERS = (
     "MEMORY_SUMMARY",
     "## Memory",
@@ -1336,7 +1341,7 @@ def workspace_skill_install_path(workspace: Path) -> Path:
 
 
 def _prepare_workspace_repository_boundary(workspace: Path) -> None:
-    """Stop Codex from inheriting skills and instructions from an outer repo."""
+    """Create a minimal valid Git worktree boundary without invoking Git."""
 
     workspace.mkdir(parents=True, exist_ok=True)
     existing = tuple(workspace.iterdir())
@@ -1344,7 +1349,12 @@ def _prepare_workspace_repository_boundary(workspace: Path) -> None:
         raise CodexHarnessError(
             "Agent workspace must be empty before its repository boundary is prepared"
         )
-    (workspace / ".git").mkdir()
+    boundary = workspace / ".git"
+    boundary.mkdir()
+    (boundary / "HEAD").write_bytes(_WORKSPACE_GIT_HEAD)
+    (boundary / "config").write_bytes(_WORKSPACE_GIT_CONFIG)
+    for name in _WORKSPACE_GIT_DIRECTORIES:
+        (boundary / name).mkdir()
 
 
 def _verify_workspace_repository_boundary(workspace: Path) -> None:
@@ -1359,8 +1369,55 @@ def _verify_workspace_repository_boundary(workspace: Path) -> None:
     boundary = workspace / ".git"
     if is_link_or_junction(boundary) or not boundary.is_dir():
         raise CodexHarnessError("Agent workspace repository boundary is not a real directory")
-    if tuple(boundary.iterdir()):
-        raise CodexHarnessError("Agent workspace repository boundary must remain empty")
+    expected_entries = ("HEAD", "config", *_WORKSPACE_GIT_DIRECTORIES)
+    if tuple(sorted(path.name for path in boundary.iterdir())) != tuple(
+        sorted(expected_entries)
+    ):
+        raise CodexHarnessError(
+            "Agent workspace repository boundary has unexpected Git metadata"
+        )
+    expected_files = {"HEAD": _WORKSPACE_GIT_HEAD, "config": _WORKSPACE_GIT_CONFIG}
+    for name, expected_bytes in expected_files.items():
+        path = boundary / name
+        if is_link_or_junction(path):
+            raise CodexHarnessError(
+                f"Agent workspace repository boundary metadata is linked: {name}"
+            )
+        try:
+            info = path.stat()
+        except OSError as exc:
+            raise CodexHarnessError(
+                f"Agent workspace repository boundary metadata is unavailable: {name}"
+            ) from exc
+        if (
+            not stat.S_ISREG(info.st_mode)
+            or info.st_nlink != 1
+            or info.st_size != len(expected_bytes)
+        ):
+            raise CodexHarnessError(
+                f"Agent workspace repository boundary metadata shape changed: {name}"
+            )
+        try:
+            with path.open("rb") as metadata_file:
+                content = metadata_file.read(len(expected_bytes) + 1)
+        except OSError as exc:
+            raise CodexHarnessError(
+                f"Agent workspace repository boundary metadata is unreadable: {name}"
+            ) from exc
+        if content != expected_bytes:
+            raise CodexHarnessError(
+                f"Agent workspace repository boundary metadata changed: {name}"
+            )
+    for name in _WORKSPACE_GIT_DIRECTORIES:
+        path = boundary / name
+        if is_link_or_junction(path) or not path.is_dir():
+            raise CodexHarnessError(
+                f"Agent workspace repository boundary directory is invalid: {name}"
+            )
+        if tuple(path.iterdir()):
+            raise CodexHarnessError(
+                f"Agent workspace repository boundary directory is not empty: {name}"
+            )
 
 
 def prepare_workspace_skill_install(

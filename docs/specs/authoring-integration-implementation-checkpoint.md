@@ -5,6 +5,35 @@ The user requested a quota pause on 2026-09-28 and explicitly resumed implementa
 on 2026-10-01. The implementation Goal is active; approved real preflight, model
 pilot, and acceptance may proceed after their prerequisite gates.
 
+## Startup diagnosis after unlocking — 2026-10-01
+
+- Unlocking restored desktop inspection, but did not resolve the background
+  file-open stall. A bounded probe isolated the portable live-config read under
+  `Documents`; a byte-identical managed-local copy resolved that first stall
+  without changing the resolved SampleProject or sandbox paths or OS permissions.
+- Frozen `9256ae8` Luna-high root `expansion-pilot-9256ae8-luna-high-r3`
+  retains three FAILs. Every case stopped at the prompt-input audit before a
+  Codex exec turn: no model-comparison or business acceptance credit is available.
+  Each source full hash and project mtime remained unchanged; the failed copies
+  remain quarantined and the one-shot launcher was unloaded.
+- CLI-only native LaunchAgent probes held arguments, Skill bytes, disposable
+  authentication state, and memory isolation constant. The nested empty-`.git`
+  workspace timed out at 30.02 seconds; an independent directory completed in
+  3.26 seconds. A new nested workspace with minimal valid Git metadata completed
+  in 3.12 seconds, passed the unchanged prompt audit, and changed no workspace
+  files. These are startup diagnostics, not Agent or Wwise PASS evidence.
+- The existing harness now creates and strictly verifies that minimal valid
+  repository, without a Git CLI dependency. The empty-marker regression failed
+  before the repair on both platform contracts; the repaired workspace selection
+  passed 18 tests and the full harness test file passed 381 / skipped 9 native
+  Windows checks. Broad Non-live and fresh model pilots remain pending.
+  The exact blocked Git/config filename remains
+  unproven; the location-dependent stall and successful boundary replacement are
+  established. New candidate gates and new pilot roots are required afterward.
+  Original failed records must not be rewritten or verify-only replayed as PASS.
+  Sanitized results and raw-record digests are in
+  `../research/integration-expansion-startup-diagnostics-2026-10-01.json`.
+
 ## Resume update — 2026-10-01
 
 - Root coordinator: GPT-6.1 Sol high. New implementation/review subagents:

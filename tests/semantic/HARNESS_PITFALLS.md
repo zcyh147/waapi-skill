@@ -251,6 +251,22 @@ prevention checks that are expensive to rediscover.
   while one of its Fresh or verify-only runs is active, and retain the worktree
   for as long as its sealed evidence is needed.
 
+### An empty Git marker can fail to bound Codex startup discovery
+
+- Evidence: Codex CLI 0.157.1 prompt-input audits under the managed macOS
+  worktree stalled in native file opens. The same isolated command completed in
+  3.26 seconds outside that Git ancestry. Replacing the nested workspace's empty
+  `.git` marker with minimal valid Git metadata completed in 3.12 seconds, passed
+  the unchanged isolation audit, and changed no workspace files. These probes
+  started no Agent or Wwise task. Unlocking alone did not resolve the stall;
+  the exact blocked Git/config filename was not established.
+- Prevention: the harness creates fixed `HEAD` and local core config bytes with
+  empty `objects` and `refs` directories. Verify the closed layout, file type,
+  link count, size, and bounded content before and after use; reject drift,
+  external links, hooks, and extra metadata. Do not require a Git executable or
+  widen macOS permissions. Keep portable live configuration inside the managed
+  worktree as well; a byte-identical copy preserves repository-relative inputs.
+
 ### A macOS verify-only replay can discover a different Codex binary
 
 - Symptom: a passing LaunchAgent root immediately rejects a foreground

@@ -2784,19 +2784,27 @@ def test_workspace_skill_copy_is_filtered_detached_and_attested(
         )
 
 
+@pytest.mark.parametrize("platform_name", ("posix", "nt"))
 def test_workspace_skill_install_creates_closed_repository_boundary(
     tmp_path: Path,
+    platform_name: str,
 ) -> None:
     source = tmp_path / "waapi-skill"
     source.mkdir()
     (source / "SKILL.md").write_text("skill\n", encoding="utf-8")
     workspace = tmp_path / "workspace"
 
-    prepare_workspace_skill_install(workspace, source, platform_name="posix")
+    prepare_workspace_skill_install(workspace, source, platform_name=platform_name)
 
     boundary = workspace / ".git"
     assert boundary.is_dir() and not boundary.is_symlink()
-    assert tuple(boundary.iterdir()) == ()
+    assert (boundary / "HEAD").read_bytes() == b"ref: refs/heads/main\n"
+    assert (boundary / "config").read_bytes() == (
+        b"[core]\n\trepositoryformatversion = 0\n\tbare = false\n"
+    )
+    for directory in ("objects", "refs"):
+        assert (boundary / directory).is_dir()
+        assert tuple((boundary / directory).iterdir()) == ()
     assert tuple(sorted(path.name for path in workspace.iterdir())) == (
         ".agents",
         ".git",
@@ -2804,16 +2812,165 @@ def test_workspace_skill_install_creates_closed_repository_boundary(
     assert verify_workspace_skill_install(
         workspace,
         source,
-        platform_name="posix",
+        platform_name=platform_name,
     ) == workspace_skill_install_path(workspace)
 
     (boundary / "unexpected").write_text("drift\n", encoding="utf-8")
     with pytest.raises(CodexHarnessError, match="repository boundary"):
-        verify_workspace_skill_install(
-            workspace,
-            source,
-            platform_name="posix",
-        )
+        verify_workspace_skill_install(workspace, source, platform_name=platform_name)
+
+
+@pytest.mark.parametrize("platform_name", ("posix", "nt"))
+def test_empty_git_marker_is_not_a_workspace_repository_boundary(
+    tmp_path: Path,
+    platform_name: str,
+) -> None:
+    source = tmp_path / "waapi-skill"
+    source.mkdir()
+    (source / "SKILL.md").write_text("skill\n", encoding="utf-8")
+    workspace = tmp_path / "workspace"
+    install = workspace_skill_install_path(workspace)
+    install.mkdir(parents=True)
+    (install / "SKILL.md").write_text("skill\n", encoding="utf-8")
+    (workspace / ".git").mkdir()
+
+    with pytest.raises(CodexHarnessError, match="repository boundary"):
+        verify_workspace_skill_install(workspace, source, platform_name=platform_name)
+
+
+@pytest.mark.parametrize(
+    "damage",
+    (
+        "missing_head",
+        "malformed_head",
+        "config_drift",
+        "hardlinked_config",
+        "missing_directory",
+        "extra_hook",
+    ),
+)
+def test_workspace_repository_boundary_rejects_metadata_drift(
+    tmp_path: Path,
+    damage: str,
+) -> None:
+    source = tmp_path / "waapi-skill"
+    source.mkdir()
+    (source / "SKILL.md").write_text("skill\n", encoding="utf-8")
+    workspace = tmp_path / "workspace"
+    prepare_workspace_skill_install(workspace, source)
+    boundary = workspace / ".git"
+
+    if damage == "missing_head":
+        (boundary / "HEAD").unlink()
+    elif damage == "malformed_head":
+        (boundary / "HEAD").write_text("ref: refs/heads/other\n", encoding="utf-8")
+    elif damage == "config_drift":
+        with (boundary / "config").open("ab") as config:
+            config.write(b"\n[include]\n\tpath = /outside/config\n")
+    elif damage == "hardlinked_config":
+        external_config = tmp_path / "external-git-config"
+        external_config.write_bytes((boundary / "config").read_bytes())
+        (boundary / "config").unlink()
+        os.link(external_config, boundary / "config")
+    elif damage == "missing_directory":
+        (boundary / "objects").rmdir()
+    else:
+        hooks = boundary / "hooks"
+        hooks.mkdir()
+        (hooks / "post-checkout").write_text("unexpected\n", encoding="utf-8")
+
+    with pytest.raises(CodexHarnessError, match="repository boundary"):
+        verify_workspace_skill_install(workspace, source)
+
+
+@pytest.mark.parametrize("entry", ("HEAD", "objects"))
+def test_workspace_repository_boundary_rejects_symlinked_metadata(
+    tmp_path: Path,
+    entry: str,
+) -> None:
+    source = tmp_path / "waapi-skill"
+    source.mkdir()
+    (source / "SKILL.md").write_text("skill\n", encoding="utf-8")
+    workspace = tmp_path / "workspace"
+    prepare_workspace_skill_install(workspace, source)
+    boundary = workspace / ".git"
+    if entry == "HEAD":
+        target = tmp_path / "external-head"
+        target.write_bytes(b"ref: refs/heads/main\n")
+        (boundary / entry).unlink()
+        create_symlink_or_skip(boundary / entry, target)
+    else:
+        target = tmp_path / "external-objects"
+        target.mkdir()
+        (boundary / entry).rmdir()
+        create_symlink_or_skip(boundary / entry, target, target_is_directory=True)
+
+    with pytest.raises(CodexHarnessError, match="repository boundary"):
+        verify_workspace_skill_install(workspace, source)
+
+
+@pytest.mark.parametrize("metadata_kind", ("directory", "oversized"))
+def test_repository_metadata_shape_is_rejected_before_file_open(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    metadata_kind: str,
+) -> None:
+    source = tmp_path / "waapi-skill"
+    source.mkdir()
+    (source / "SKILL.md").write_text("skill\n", encoding="utf-8")
+    workspace = tmp_path / "workspace"
+    prepare_workspace_skill_install(workspace, source)
+    metadata = workspace / ".git" / "HEAD"
+    metadata.unlink()
+    if metadata_kind == "directory":
+        metadata.mkdir()
+    else:
+        metadata.write_bytes(b"x" * 1_048_576)
+
+    original_open = Path.open
+
+    def reject_open(path: Path, *args: Any, **kwargs: Any):
+        if path == metadata:
+            pytest.fail("invalid repository metadata was opened")
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", reject_open)
+    with pytest.raises(CodexHarnessError, match="repository boundary"):
+        verify_workspace_skill_install(workspace, source)
+
+
+def test_repository_metadata_read_remains_bounded_after_size_check(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = tmp_path / "waapi-skill"
+    source.mkdir()
+    (source / "SKILL.md").write_text("skill\n", encoding="utf-8")
+    workspace = tmp_path / "workspace"
+    prepare_workspace_skill_install(workspace, source)
+    head = workspace / ".git" / "HEAD"
+    expected = b"ref: refs/heads/main\n"
+    original_open = Path.open
+    read_limits: list[int] = []
+
+    class GrewAfterStat:
+        def __enter__(self):
+            return self
+        def __exit__(self, *_args):
+            return False
+        def read(self, size: int = -1) -> bytes:
+            read_limits.append(size)
+            return expected + b"x"
+
+    def grow_during_read(path: Path, *args: Any, **kwargs: Any):
+        if path == head:
+            return GrewAfterStat()
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", grow_during_read)
+    with pytest.raises(CodexHarnessError, match="repository boundary metadata changed"):
+        verify_workspace_skill_install(workspace, source)
+    assert read_limits == [len(expected) + 1]
 
 
 def test_windows_workspace_skill_copy_rejects_hardlink_alias(tmp_path: Path) -> None:
@@ -2821,9 +2978,9 @@ def test_windows_workspace_skill_copy_rejects_hardlink_alias(tmp_path: Path) -> 
     source.mkdir()
     (source / "SKILL.md").write_text("skill\n", encoding="utf-8")
     workspace = tmp_path / "workspace"
-    (workspace / ".git").mkdir(parents=True)
+    prepare_workspace_skill_install(workspace, source, platform_name="nt")
     install = workspace_skill_install_path(workspace)
-    install.mkdir(parents=True)
+    (install / "SKILL.md").unlink()
     os.link(source / "SKILL.md", install / "SKILL.md")
 
     with pytest.raises(CodexHarnessError, match="hardlink aliases"):
