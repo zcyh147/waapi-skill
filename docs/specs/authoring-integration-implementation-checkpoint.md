@@ -42,6 +42,19 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- Coherent RTPC notice-context repair `86e23cd` passed **321 focused tests** and
+  Non-live **12337 / skipped 118 / deselected 27**, exit zero. The packaged Skill,
+  CI, unit tests, and maintenance tree are unchanged from `cf94158`, whose Program
+  result remains component evidence rather than a new-candidate rerun claim.
+  Fresh Luna C06 passed in **112.12 Agent seconds**, then identical verify-only
+  passed without another Fresh task or turn. Independent audit rehashed **95**
+  artifacts and six metadata seals; seven business assertions passed, the notice
+  preceded the sole execution, source full hash/mtime stayed unchanged, and the
+  PASS copy was deleted. Both jobs were unloaded. Exact proof and usage are in
+  `../research/integration-expansion-context-repair-proof-2026-10-02.json`.
+  The complete matched six-task model pilot is now running on frozen `86e23cd`;
+  no model selection or final acceptance is claimed yet. Original FAILs remain frozen.
+
 - Reviewed notice/disclosure candidate `cf94158` passed Program **5888 / skipped 2**
   and Non-live **12309 / skipped 118 / deselected 27**, both exit zero, then
   2025 smoke in **4.2055 seconds** with unchanged source and clean deletion.
