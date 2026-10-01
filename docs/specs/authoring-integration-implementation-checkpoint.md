@@ -42,6 +42,24 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- Reviewed notice/disclosure candidate `cf94158` passed Program **5888 / skipped 2**
+  and Non-live **12309 / skipped 118 / deselected 27**, both exit zero, then
+  2025 smoke in **4.2055 seconds** with unchanged source and clean deletion.
+  Its predecessor `d8bcb43` failed one Program inventory-seal check; the existing
+  generator and independent review proved only the five `audio.import` contract
+  hashes and aggregate/inventory seals changed. The failed gate remains recorded.
+  Exact reports are in `../research/integration-expansion-notice-disclosure-gates-2026-10-02.json`.
+- Fresh Luna failed-only rerun completed **1 PASS / 1 FAIL**. M01 passed using
+  the existing structure-only import declaration; C06 still failed visible-notice
+  grading despite its precise advance midpoint update and seven true independent
+  business assertions. Its identity, effect, preservation, and shape evidence
+  span notice clauses and an earlier visible plan, which the current matcher
+  does not accept. All **304** sealed artifacts were rehashed; sources unchanged,
+  PASS copy deleted, FAIL copy retained, job unloaded and scoped processes empty.
+  The mixed root was frozen without verify-only. #134 context repair, the complete
+  matched model pilot, and final acceptance remain pending; no model is selected.
+  Exact evidence is in `../research/integration-expansion-failed-rerun-cf94158-2026-10-02.json`.
+
 - Frozen `919043f` passed Program **5888 / skipped 2** and Non-live
   **12282 / skipped 118 / deselected 27**, both exit zero, then matching
   2025 smoke in **4.3971 seconds** with clean sandbox deletion. Exact reports

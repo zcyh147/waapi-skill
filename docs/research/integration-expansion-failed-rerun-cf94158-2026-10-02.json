@@ -1,0 +1,63 @@
+{
+  "contract": "waapi-skill.integration-expansion-failed-rerun/v1",
+  "candidate": "cf94158c5cf3e4e4e480bc6ef65bcad80370f077",
+  "cli_version": "0.159.2",
+  "service_tier": "default",
+  "selected_tasks": 2,
+  "completed_tasks": 2,
+  "model_selected": null,
+  "passing_units": 1,
+  "all_selected_passed": false,
+  "campaigns": [
+    {
+      "model": "gpt-6-luna",
+      "reasoning_effort": "high",
+      "campaign_root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-cf94158-luna-high-r1-retry2-cli1592",
+      "attempt_manifest_sha256": "29e130cab9f6df5afa9822094ec9ef036e94979d457295d821400076760902b6",
+      "sealed_artifacts_rehashed": 304,
+      "consolidated": {
+        "passed_unit_ids": [
+          "EXP25-M01"
+        ],
+        "failed_unit_ids": [
+          "EXP25-C06"
+        ],
+        "blocked_unit_ids": [],
+        "pending_unit_ids": []
+      },
+      "units": [
+        {
+          "unit_id": "EXP25-C06",
+          "runner_status": "FAIL",
+          "reason": "V3TaskRunnerError: expansion turn failed: visible_preview_notice",
+          "agent_elapsed_seconds": 134.3287625000812,
+          "source_full_hash_unchanged": true,
+          "source_mtime_unchanged": true,
+          "sandbox_retained": true,
+          "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-cf94158-luna-high-r1-retry2-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C06/evidence/quarantine.json"
+        },
+        {
+          "unit_id": "EXP25-M01",
+          "runner_status": "PASS",
+          "reason": "",
+          "agent_elapsed_seconds": 111.60474754218012,
+          "source_full_hash_unchanged": true,
+          "source_mtime_unchanged": true,
+          "sandbox_retained": false,
+          "quarantine_path": null
+        }
+      ],
+      "job_unloaded": true,
+      "scoped_processes_remaining": false,
+      "verify_only_performed": false
+    }
+  ],
+  "derived_diagnoses": {
+    "Luna_C06": "Exact relationship/Volume/control and old-to-new midpoint were announced before execution; retained endpoints and shape are expressed across notice clauses and earlier visible plan. Current same-clause/repeated-label matcher rejects it; seven independent business assertions passed. Frozen FAIL retained.",
+    "Luna_M01": "Fresh PASS after public disclosure of existing structure-only rows and earlier-parent references; no new creation lane."
+  },
+  "remaining_repairs": [
+    134
+  ],
+  "next": "Repair the attested RTPC notice-context seam and review. New frozen failed-only run, then complete matched six-task model pilot and final acceptance. No promotion of original FAILs."
+}

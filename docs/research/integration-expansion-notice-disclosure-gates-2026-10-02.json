@@ -1,0 +1,85 @@
+{
+  "contract": "waapi-skill.integration-expansion-gates/v1",
+  "candidate": "cf94158c5cf3e4e4e480bc6ef65bcad80370f077",
+  "focused_combined": {
+    "passed": 274,
+    "exit_code": 0,
+    "duration_seconds": 1.51
+  },
+  "seal_focused": {
+    "passed": 32,
+    "exit_code": 0,
+    "duration_seconds": 18.96
+  },
+  "program": {
+    "candidate": "cf94158c5cf3e4e4e480bc6ef65bcad80370f077",
+    "mode": "program",
+    "exit_code": 0,
+    "passed": 5888,
+    "skipped": 2,
+    "duration_seconds": 262.3,
+    "log_sha256": "ed64be74b55cf9cd08067bcf42c9daf87174512be6b14356b165b8420c7a8349",
+    "live_or_agent_credit": false
+  },
+  "nonlive": {
+    "candidate": "cf94158c5cf3e4e4e480bc6ef65bcad80370f077",
+    "mode": "nonlive",
+    "exit_code": 0,
+    "passed": 12309,
+    "skipped": 118,
+    "deselected": 27,
+    "duration_seconds": 808.09,
+    "junit_counts": {
+      "tests": 12427,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 118
+    },
+    "log_sha256": "d5bd586d611dcd5c26833425954fe6c3930cc26350f3bcd378c84f93f6f0882f",
+    "junit_sha256": "bc0a476270365b6425352a785284716cc098f1725569bc4ac6d815a5745d9020",
+    "source_tracked_clean": true,
+    "live_or_agent_credit": false
+  },
+  "smoke": {
+    "exit_code": 0,
+    "log_sha256": "3664f4ad02db4f0f3cac344a23dc1de99ac2a5b47e060978a18c4917fc8ea9bf",
+    "result": {
+      "argv": [
+        "/Applications/Audiokinetic/Wwise2025.1.7.9143/Wwise.app/Contents/Tools/WwiseConsole.sh",
+        "waapi-server",
+        "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/runtime/wwise-waapi-sandboxes/2025.1/sample-project-4601da197b3a42cea8d8e9dbc209748e/SampleProject.wproj",
+        "--wamp-port",
+        "30194",
+        "--http-port",
+        "0"
+      ],
+      "build": "2025.1.7.9143",
+      "cleanup": "cleaned",
+      "contract": "waapi-skill.real-smoke/v1",
+      "display_name": "WwiseConsole",
+      "isCommandLine": true,
+      "pid": 441,
+      "port": 30194,
+      "ready_duration_seconds": 4.205502624856308,
+      "sandbox_deleted": true,
+      "sandbox_project": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/runtime/wwise-waapi-sandboxes/2025.1/sample-project-4601da197b3a42cea8d8e9dbc209748e/SampleProject.wproj",
+      "source_mtime_ns": 1790531309503233691,
+      "source_sha256": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+      "version": "2025.1"
+    }
+  },
+  "prior_candidate_program_failure": {
+    "candidate": "d8bcb4370942325a8539d4c75b3d2d0dcea89eac",
+    "mode": "program",
+    "exit_code": 1,
+    "passed": 5887,
+    "failed": 1,
+    "skipped": 2,
+    "duration_seconds": 274.76,
+    "log_sha256": "f2ab5550eb94b67f41080e203dcd4bc14264c216dd982fdf2b21bf23f051b0a3",
+    "failure": "test_generated_inventory_is_current_and_exactly_covers_both_surfaces: operation_contract_sha256 seal differs after reviewed #136 public disclosure",
+    "live_or_agent_credit": false
+  },
+  "evidence_root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-cf94158-gates",
+  "live_or_agent_credit_from_program_gates": false
+}
