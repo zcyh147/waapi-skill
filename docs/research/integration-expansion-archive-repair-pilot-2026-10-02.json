@@ -102,5 +102,20 @@
       "verify_only_performed": false
     }
   ],
-  "next": "Consolidate notice failures and Sol read-policy/archive isolation blocker; preserve original roots and use new candidate/root for affected reruns."
+  "next": "Consolidate131notice,132historical FAIL replay and133owned-read budget alignment; preserve original roots and use one new frozen candidate/root for affected/model reruns.",
+  "rejection_visibility_audit": {
+    "frozen_statuses_unchanged": true,
+    "initial_agent_cap_violation_attribution_retracted": true,
+    "business_prompt_characters": 706,
+    "business_prompt_discloses_64_row_cap": false,
+    "actual_query_schema_characters": 4796,
+    "actual_query_schema_contains_64": false,
+    "actual_query_schema_result_bound": "--max-results <1..1000>",
+    "actual_event_actions_fixed_max_results": 100,
+    "formal_developer_guidance": "Rows obey returned max",
+    "agent_visible_ordinary_skill_example_max_results": 100,
+    "runner_owned_sealed_max_rows": 64,
+    "conclusion": "Benchmark admission/visibility mismatch; requested100 was within the disclosed public query bound. Retained runner FAIL/consolidated BLOCKED are historical classifications, not fair evidence of an Agent cap error.",
+    "repair_issue": 133
+  }
 }

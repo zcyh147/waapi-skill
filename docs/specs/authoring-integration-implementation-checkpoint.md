@@ -50,12 +50,16 @@ pilot, and acceptance may proceed after their prerequisite gates.
   natural-wording false positive and clarifies the formal task instruction's
   required Preview/Execute notice, without weakening authorization or oracles.
 - Sol-medium C01 obeyed a terminal rejection before Preview: requested
-  `--max-results 100` exceeded the disclosed 64-row limit. The actual Agent
-  result is FAIL. Unsupported archive replay of the authenticated rejected
+  `--max-results 100` exceeded the runner-owned 64-row limit. The frozen runner
+  result is FAIL. Subsequent inspection established that this 64-row limit was
+  not visible to the Agent; its public query schema instead allowed 1–1000,
+  and the Skill included a normal 100-row example. This is a benchmark admission
+  mismatch, addressed separately by #133, rather than fair evidence of an Agent
+  cap violation. Unsupported archive replay of the authenticated rejected
   owned-project read after an accepted exact Draft binding caused a systemic
   stop and consolidated BLOCKED, leaving Sol C06/M01 unattempted. Repair #132
-  adds this safely isolated FAIL shape; it does not increase the row cap or
-  promote the cap violation. Both jobs were unloaded, no scoped process remained,
+  adds this safely isolated historical FAIL shape; it does not increase old
+  sealed budgets or reinterpret the original result. Both jobs were unloaded, no scoped process remained,
   sources were unchanged and failed copies remain quarantined. All **790**
   sealed artifact contents were independently rehashed. Exact original results
   are in `../research/integration-expansion-archive-repair-pilot-2026-10-02.json`.
