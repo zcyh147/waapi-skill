@@ -40,6 +40,31 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ## Resume update — 2026-10-01
 
+### Subsequent real pilot and receipt repairs
+
+- `c566e85` Luna-high C01 entered a real isolated Codex task and consumed
+  83.92 case-budget seconds. It stopped before Preview after the harness rejected
+  the public `event-actions` preset's Gateway-owned 100-row bound. The source
+  full hash and project mtime were unchanged; the failed copy remains quarantined.
+  C06 and M01 were not started, so this is not a completed model comparison.
+- `ad8a87c` accepts that sealed exact-Event read and validates its effective bound
+  while keeping the 64-row case proof ceiling. Archive binding uses the existing
+  closed runner resolver instead of literal shim paths. Original failed gates
+  remain FAIL; accepted writes and uncertain outcomes retain their existing rules.
+- Independent review found two proof gaps. `7c81406` binds commands and receipts
+  positionally and requires completed rejected-read turns to cover every receipt.
+  Three red tamper regressions preceded the repair; archive/CLI/task-runner
+  validation passed 133 tests. Both review axes confirmed their findings resolved.
+  The earlier combined expansion selection passed 425 tests. New broad regression
+  and new frozen pilot roots remain required; original failures are not regraded.
+- Sanitized pilot usage, failure attribution, and artifact digests are in
+  `../research/integration-expansion-pilot-observations-2026-10-01.json`.
+- `../research/music-expansion-oracle-gaps-2026-10-01.md` now records all nine
+  saved Music Switch mappings and an existing-fade Transition with fourteen
+  siblings. The original boolean target has neither a saved fade nor sibling
+  rules. Official Help establishes UI seconds; native conversion and full live
+  readback remain unproven. Research creates no additional execution credit.
+
 - Root coordinator: GPT-6.1 Sol high. New implementation/review subagents:
   GPT-6 Luna max or GPT-6.1 Sol medium.
 - The unexecuted pilot's Sol comparator is now GPT-6.1 Sol medium. Historical

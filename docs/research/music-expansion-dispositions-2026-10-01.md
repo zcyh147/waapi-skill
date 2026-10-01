@@ -50,17 +50,19 @@ Proposed prompt:
 
 ### #120 / M04: existing Transition configuration
 
-Use existing rule `{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}`. The proposed fixture must first seal source/destination context choices and exact Segment GUIDs, then expose those choices to the Agent. The requested source/destination are the first two Playlist Segments, not inferred display labels. Exit at source end and synchronize to destination entry; source post-exit false, destination pre-entry true; source fade-out 0.5 seconds, zero offset, linear curve. Those are intended configuration meanings, not guessed native enum/unit values.
+Use existing rule `{E49EF1AA-29FB-40F1-B343-523AF28244AE}` under the `02_In-Game Music` Transition root `{8A6F5BFD-8784-474D-8BDE-6460595AA1FC}`. It already owns source fade `{0FC1E836-74BB-43AB-B417-6C9D16AE5636}` and has fourteen sibling rules in both saved fixtures. The historical boolean probe's `{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}` has neither a saved fade nor sibling rules; retain its narrow PASS without using it as this maintenance baseline. The proposed fixture must seal actual context labels and the existing Stealth `{20FA9A69-7ECC-4B05-BD6B-2C9527CD88C2}` and Fight `{1D0ECA1F-2749-4DBB-B92C-0DBDFDA7A825}` music targets, then expose those exact choices to the Agent. Exit at source end and synchronize to destination entry; source post-exit false, destination pre-entry true; source fade-out 0.5 seconds, zero offset, linear curve. Official Help establishes UI seconds; native field units/conversion and live enabled-state must still be attested before mutation. See [complete fixture extraction and remaining proof](music-expansion-oracle-gaps-2026-10-01.md).
 
 Oracle: exact rule and owner identity; source/destination context kinds and GUIDs; exit/synchronization/cue settings; pre/post flags; each fade's role, GUID/ownership, enable state, time with attested units, offset, and curve; preserved destination fade and other fade roles; unchanged sibling rule contents **and order**; unchanged owner/root references and Segments. The existing boolean PASS covers none of the new timing/fade obligations. A dependency that requires several transactions needs an explicit ordered multi-Preview case, rather than an assumed atomic batch.
 
 Proposed prompt:
 
-> 请直接修改已指定的现有 Stealth Transition 规则：来源指定为 Stealth_Seg_01，目标指定为 Stealth_Seg_02；在来源音乐段结束时离开，与目标入口同步；关闭来源的 post-exit 播放，保留目标的 pre-entry 播放。启用来源淡出，时间为 0.5 秒、偏移为 0、曲线为线性。目标淡入及其他淡变设置、其他规则及其顺序、音乐段本身保持不变。展示预期变更后执行并核验完整规则配置，无需播放或试听。
+> 请直接修改已指定的 02_In-Game Music 现有 Transition 规则：来源指定为已指定的 Stealth 音乐对象，目标指定为已指定的 Fight 音乐对象；在来源音乐段结束时离开，与目标入口同步；关闭来源的 post-exit 播放，保留目标的 pre-entry 播放。保留现有来源淡出对象，将淡出时间改为 0.5 秒、偏移为 0、曲线为线性。目标淡入及其他淡变设置、其余十四条规则及顺序、音乐对象本身保持不变。展示预期变更后执行并核验完整规则配置，无需播放或试听。
 
 ### #121 / M06: preserve a complete two-condition mapping
 
 Use `02_In-Game Music` `{A9D070F3-3BD9-49EB-9D8B-5D3312173FB4}`. Preserve argument order Music_Global then Music_inGame. Retarget only tuple `(InGame, None)` to the existing Fight `{1D0ECA1F-2749-4DBB-B92C-0DBDFDA7A825}`; preserve all other specific and group-valued routes. The 2025 existing tuple entry is `{903A30EC-F1F4-49FF-9CBC-99B89539598B}`; do not reuse that identity as a 2022 entry GUID.
+
+The [complete nine-route baseline](music-expansion-oracle-gaps-2026-10-01.md) now seals both versions' saved mappings, distinguishes the two groups' None states, and lists every 2025 EntryPath slot. Live complete-tuple readback and maintenance remain unproven; XML extraction is expected-state evidence, not execution credit.
 
 Oracle: ordered argument-group GUIDs; complete tuple→AudioNode mapping; tuple width; each value's membership in the corresponding group; stable entry/slot identities where available; exact preservation of all unselected routes, group-valued routes, weights/probabilities, container references, and target objects. Reject duplicate tuples, missing/extra routes, dimension swaps, or a set of values without tuple association. Entry ordering is preserved where versioned evidence establishes it as meaningful; wildcard/priority behavior is not inferred from group-valued XML references or display names.
 
