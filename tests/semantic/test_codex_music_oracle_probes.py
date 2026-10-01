@@ -183,24 +183,28 @@ def test_transition_property_state_plan_passes_public_preflight_and_live_metadat
     commands = [argv for argv in music_read_plan('transition', witness, version)
         if argv[:2] == ('metadata', 'property-state')]
     command = commands[('FadeTime', 'FadeOffset').index(field)]
-    responses = _metadata_responses(tmp_path, version=version, names=('FadeTime', 'FadeOffset') if ambiguous else (field,))
+    meaning = 'time' if field == 'FadeTime' else 'offset'
+    assert command == ('metadata', 'property-state', '--exact-id', FADE, '--meaning', meaning, '--platform', 'Mac')
+    if ambiguous:
+        # Keep the original broad request as a truthful ambiguity control.
+        command = (*command[:5], field, *command[6:])
+    responses = _metadata_responses(tmp_path, version=version, names=('FadeTime', 'FadeOffset', 'FadeCurve', 'FadeType'))
     responses[IS_PROPERTY_ENABLED_URI] = {'return': True}
     client = FakeClient(responses)
     code, payload = waapi_gateway.execute_gateway(list(command), env=_gateway_env(tmp_path, version=version),
         client_factory=lambda _url: client)
     assert code == 0, payload
-    assert command == ('metadata', 'property-state', '--exact-id', FADE, '--meaning', field, '--platform', 'Mac')
     assert client.calls  # Actual public preflight reached only the injected fake.
     if ambiguous:
         assert payload['status'] == 'needs_clarification'
         assert payload['agent_result']['meaning'] == field
-        assert payload['agent_result']['candidate_count'] == 2
-        assert {row['field'] for row in payload['agent_result']['candidates']} == {'FadeTime', 'FadeOffset'}
+        assert payload['agent_result']['candidate_count'] == 4
+        assert {row['field'] for row in payload['agent_result']['candidates']} == {'FadeTime', 'FadeOffset', 'FadeCurve', 'FadeType'}
         assert IS_PROPERTY_ENABLED_URI not in [call[0] for call in client.calls]
         result = run_music_read_plan([command], lambda _: (code, payload))
         assert result['receipts'][0]['finding'] == 'needs_clarification'
     else:
-        assert payload['agent_result'] == {'meaning': field, 'platform': 'Mac', 'enabled': True}
+        assert payload['agent_result'] == {'meaning': meaning, 'platform': 'Mac', 'enabled': True}
         assert client.calls[-1] == (IS_PROPERTY_ENABLED_URI, {'object': FADE, 'platform': 'Mac', 'property': field}, {})
 
 

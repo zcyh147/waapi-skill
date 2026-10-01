@@ -9592,7 +9592,6 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     {
                         "name": spec.name,
                         "summary": spec.summary,
-                        "next_command": ["operation-schema", spec.name],
                     }
                 )
                 continue
@@ -9796,6 +9795,39 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 },
             },
         }
+        if not args.detail:
+            route_defaults = {
+                "supported_versions": list(versions),
+                "host_surface": "wwise-console",
+            }
+            payload["request_schema_routes"] = [
+                {
+                    key: value
+                    for key, value in row.items()
+                    if not (
+                        (key in route_defaults and value == route_defaults[key])
+                        or (
+                            key == "next_command"
+                            and value == ["request-schema", row["api"]]
+                        )
+                    )
+                }
+                for row in request_schema_routes
+            ]
+            payload["operation_schema_command_template"] = [
+                "operation-schema", "<name>",
+            ]
+            payload["request_schema_route_defaults"] = route_defaults
+            payload["directory_reading"] = (
+                "Request rows inherit omitted supported_versions and host_surface "
+                "from request_schema_route_defaults; explicit row fields override. "
+                "For schema discovery only, use a row's next_command if present; "
+                "otherwise instantiate the static schema-command templates: "
+                "operation_schema_command_template replaces only <name> with the "
+                "selected name; request_schema_command_template replaces only <api> "
+                "with the selected api. These directory templates are not typed "
+                "continuations: copy typed continuations exactly as instructed."
+            )
         return payload
     if args.command == "operation-schema":
         if args.operation == "waapi.call":

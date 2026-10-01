@@ -1584,6 +1584,88 @@ def execute_migrate_successfully(
     return transaction, request, preview_client, execute_client
 
 
+@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+def test_compact_operations_reconstructs_detailed_directory_without_loss(
+    tmp_path: Path,
+    version: str,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    full_directories = []
+    discover = waapi_gateway.discover_business_routes
+
+    def capture_full_directory(*args):
+        rows = discover(*args)
+        full_directories.append(json.loads(json.dumps(rows)))
+        return rows
+
+    monkeypatch.setattr(waapi_gateway, "discover_business_routes", capture_full_directory)
+    code, compact = execute(["operations"], tmp_path=tmp_path, version=version)
+    detail_code, detail = execute(
+        ["operations", "--detail"], tmp_path=tmp_path, version=version,
+    )
+    assert code == detail_code == 0
+    assert compact["versions"] == [version]
+    assert compact["routing_precedence"] == detail["routing_precedence"]
+    assert compact["selection_guidance"] == detail["selection_guidance"]
+    assert compact["session_context"] == detail["session_context"]
+    named = {row["name"]: row for row in compact["operations"]}
+    expected_named = {
+        row["name"]: row for row in detail["operations"]
+        if version in row["supported_versions"]
+    }
+    assert len(named) == compact["count"] == compact["implemented_count"]
+    assert set(named) == set(expected_named)
+    for name, row in named.items():
+        assert row["summary"] == expected_named[name]["summary"]
+        assert [
+            part.replace("<name>", name)
+            for part in compact["operation_schema_command_template"]
+        ] == ["operation-schema", name]
+    defaults = compact["request_schema_route_defaults"]
+    reconstructed = {}
+    for row in compact["request_schema_routes"]:
+        full = {**defaults, **row}
+        full.setdefault("next_command", [
+            part.replace("<api>", row["api"])
+            for part in compact["request_schema_command_template"]
+        ])
+        reconstructed[row["api"]] = full
+    expected_routes = {row["api"]: row for row in full_directories[0]}
+    assert reconstructed == expected_routes
+    # Detail intentionally takes descriptions from the first reflected lane;
+    # the compact lane must retain its own full version-specific descriptions.
+    assert set(reconstructed) == {
+        row["api"] for row in detail["request_schema_routes"]
+        if version in row["supported_versions"]
+    }
+    assert detail["request_schema_routes"] == full_directories[1]
+    assert len(reconstructed) == compact["request_schema_route_count"]
+    assert sum(len(row) for row in compact["request_schema_routes"]) < sum(
+        len(row) for row in reconstructed.values()
+    )
+    for host in ("wwise-console", "wwise-authoring"):
+        observed = {
+            api for api, row in reconstructed.items() if row["host_surface"] == host
+        }
+        expected = {
+            api for api, row in expected_routes.items() if row["host_surface"] == host
+        }
+        assert observed == expected
+        assert expected
+    assert reconstructed["ak.wwise.core.getInfo"]["next_command"] == ["status"]
+    assert "static schema-command templates" in compact["directory_reading"]
+    assert "typed continuations" in compact["directory_reading"]
+    assert waapi_gateway.gateway_json_document_size(compact) < 26 * 1024
+    # Exercise the terminal CLI serializer, not only the execute_gateway result.
+    monkeypatch.setattr(waapi_gateway, "execute_gateway", lambda argv: (code, compact))
+    assert waapi_gateway.main(["operations"]) == 0
+    stdout = capsys.readouterr().out
+    assert json.loads(stdout) == compact
+    assert len(stdout.encode("utf-8")) < 26 * 1024
+    assert "WAAPI_TYPED_CONTAINER_RESPONSE_END" not in stdout
+
+
 def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: Path) -> None:
     exit_code, catalog = execute(["operations"], tmp_path=tmp_path)
 
@@ -1591,14 +1673,9 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
     assert catalog["ok"] is True
     assert catalog["offline"] is True
     operations = {item["name"]: item for item in catalog["operations"]}
-    assert set(operations["object.create"]) == {"name", "summary", "next_command"}
-    assert operations["object.create"]["next_command"] == [
-        "operation-schema",
-        "object.create",
-    ]
-    assert operations["object.copy"]["next_command"] == [
-        "operation-schema",
-        "object.copy",
+    assert set(operations["object.create"]) == {"name", "summary"}
+    assert catalog["operation_schema_command_template"] == [
+        "operation-schema", "<name>",
     ]
     assert catalog["request_schema_routes"]
     assert catalog["detail_available"] is True
@@ -1608,7 +1685,7 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
     ]
     assert catalog["request_schema_route_count"] == len(catalog["request_schema_routes"])
     encoded_size = waapi_gateway.gateway_json_document_size(catalog)
-    assert encoded_size < 48 * 1024
+    assert encoded_size < 26 * 1024
     assert "\n" not in waapi_gateway.gateway_stdout_json_encoder(catalog).encode(catalog)
 
     exit_code, detail_catalog = execute(["operations", "--detail"], tmp_path=tmp_path)

@@ -1,0 +1,234 @@
+{
+  "contract": "waapi-skill.integration-expansion-model-pilot-observations/v1",
+  "candidate": "4d74ebb432fc7c309e74e88b4b9501590ab7e82c",
+  "instruction_repair_ticket": 127,
+  "followup_repair_ticket": 128,
+  "same_cli_six_tasks_completed": true,
+  "semantic_pass_credit": 0,
+  "model_selection": "unresolved_shared_catalog_stop",
+  "attribution": "Corrected footer instructions did not remove operations-output stops. Actual model-facing truncation/budget remains unproven; compact ordinary directory is next scoped repair. No original FAIL is regraded.",
+  "models": [
+    {
+      "root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-4d74ebb-luna-high-r1-cli1592",
+      "model": "gpt-6-luna",
+      "reasoning_effort": "high",
+      "service_tier": "default",
+      "codex": {
+        "path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/tooling/codex-0.159.2/package/bin/codex",
+        "version": "codex-cli 0.159.2",
+        "sha256": "16593cc2f422d5f398a8e40f550ebbaf1245392528957be342c295920a300704"
+      },
+      "skill_tree_sha256": "6adfe0ba91bd1d4414fc440900996bf3e34001e7f3a75068362731192adb1c53",
+      "selected": 3,
+      "passed": 0,
+      "failed": 3,
+      "verified_artifacts": 459,
+      "attempt_manifest_sha256": "e7a24bbdfe20dc7fd975d551939ca1b4159799a53a23144ba4d078907e5a4f7a",
+      "formal_verify_only_performed": false,
+      "cases": [
+        {
+          "unit_id": "EXP25-C01",
+          "status": "FAIL",
+          "terminal_state": "unprepared",
+          "agent_seconds": 52.419664915883914,
+          "cli_seconds": 41.5727,
+          "usage": {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 68608,
+            "input_tokens": 91940,
+            "output_tokens": 1228,
+            "reasoning_output_tokens": 831
+          },
+          "gateway_subcommands": [
+            "operations"
+          ],
+          "archived_operations_bytes": 44214,
+          "archived_operations_sha256": "9c4f8fe39c174a15a8fe1932e0299bffe3f2506fade25607d4746967363ef8d7",
+          "archived_operations_complete_json": true,
+          "model_visible_output_or_budget_proven": false,
+          "model_claimed_truncation": true,
+          "preview_or_execution": false,
+          "source_hash_unchanged": true,
+          "source_mtime_unchanged": true,
+          "failed_copy_retained": true,
+          "never_reuse": true,
+          "trusted_oracle_closed": true,
+          "fact_sha256": "0e911549e28a9d331637ed3c79597899863c63f9c5d0abf6ca31234ee6be41f7",
+          "outcome_sha256": "b8035b92894b98310ae9cfd008bab824da13f094e548b84bc57e3383d2108d7e"
+        },
+        {
+          "unit_id": "EXP25-C06",
+          "status": "FAIL",
+          "terminal_state": "unprepared",
+          "agent_seconds": 38.82009504199959,
+          "cli_seconds": 35.52497,
+          "usage": {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 67584,
+            "input_tokens": 91132,
+            "output_tokens": 956,
+            "reasoning_output_tokens": 620
+          },
+          "gateway_subcommands": [
+            "operations"
+          ],
+          "archived_operations_bytes": 44204,
+          "archived_operations_sha256": "534977162fd1b1683feb8f0e350ce2cfce0f6081b52ecb0e349039fe3eaf7968",
+          "archived_operations_complete_json": true,
+          "model_visible_output_or_budget_proven": false,
+          "model_claimed_truncation": true,
+          "preview_or_execution": false,
+          "source_hash_unchanged": true,
+          "source_mtime_unchanged": true,
+          "failed_copy_retained": true,
+          "never_reuse": true,
+          "trusted_oracle_closed": true,
+          "fact_sha256": "94fecd45739d630a41ba4986114737a99e8e8baa9f0fc3417beb5b8f4090e6c7",
+          "outcome_sha256": "408c55c0742059d015cf2d86fc9e62d6523b5ccdb418371617be2dee92cd69fe"
+        },
+        {
+          "unit_id": "EXP25-M01",
+          "status": "FAIL",
+          "terminal_state": "unprepared",
+          "agent_seconds": 64.1464649590198,
+          "cli_seconds": 60.841905,
+          "usage": {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 68608,
+            "input_tokens": 92227,
+            "output_tokens": 1344,
+            "reasoning_output_tokens": 953
+          },
+          "gateway_subcommands": [
+            "operations"
+          ],
+          "archived_operations_bytes": 44204,
+          "archived_operations_sha256": "d73138333bf60ed0baec43e6b4dae551f01406a9fd678bf10901756a43ea5817",
+          "archived_operations_complete_json": true,
+          "model_visible_output_or_budget_proven": false,
+          "model_claimed_truncation": true,
+          "preview_or_execution": false,
+          "source_hash_unchanged": true,
+          "source_mtime_unchanged": true,
+          "failed_copy_retained": true,
+          "never_reuse": true,
+          "trusted_oracle_closed": true,
+          "fact_sha256": "0fe707814869a7fa82fee00cbde8773a64f9c952b9d1563a9fb28372a2c736fb",
+          "outcome_sha256": "b91232fcf82f87f08f132921d9c31118356f55ff8085af4eff2a2e96924e4af9"
+        }
+      ]
+    },
+    {
+      "root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-4d74ebb-sol-medium-r1-cli1592",
+      "model": "gpt-6.1-sol",
+      "reasoning_effort": "medium",
+      "service_tier": "default",
+      "codex": {
+        "path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/tooling/codex-0.159.2/package/bin/codex",
+        "version": "codex-cli 0.159.2",
+        "sha256": "16593cc2f422d5f398a8e40f550ebbaf1245392528957be342c295920a300704"
+      },
+      "skill_tree_sha256": "6adfe0ba91bd1d4414fc440900996bf3e34001e7f3a75068362731192adb1c53",
+      "selected": 3,
+      "passed": 0,
+      "failed": 3,
+      "verified_artifacts": 459,
+      "attempt_manifest_sha256": "8109ecc318ff7800a82ec9afd13131913b7605cbf378fa95bfd3c0a6d9d0b175",
+      "formal_verify_only_performed": false,
+      "cases": [
+        {
+          "unit_id": "EXP25-C01",
+          "status": "FAIL",
+          "terminal_state": "unprepared",
+          "agent_seconds": 34.873183500021696,
+          "cli_seconds": 31.614353,
+          "usage": {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 69376,
+            "input_tokens": 95394,
+            "output_tokens": 285,
+            "reasoning_output_tokens": 34
+          },
+          "gateway_subcommands": [
+            "operations"
+          ],
+          "archived_operations_bytes": 44214,
+          "archived_operations_sha256": "76a241d7c3be303d6c9a915e90d15e8e6934125563a582485821444bfb852f57",
+          "archived_operations_complete_json": true,
+          "model_visible_output_or_budget_proven": false,
+          "model_claimed_truncation": true,
+          "preview_or_execution": false,
+          "source_hash_unchanged": true,
+          "source_mtime_unchanged": true,
+          "failed_copy_retained": true,
+          "never_reuse": true,
+          "trusted_oracle_closed": true,
+          "fact_sha256": "15744401ee69f129c8045c405e1dd9361ae6e31535027e7c32c8253b211c2da7",
+          "outcome_sha256": "ce2ee3306dd978b34048c5a49a849a3df601d1bfa1a1197a0b3e2c9f750a2352"
+        },
+        {
+          "unit_id": "EXP25-C06",
+          "status": "FAIL",
+          "terminal_state": "unprepared",
+          "agent_seconds": 33.194482083199546,
+          "cli_seconds": 29.621393,
+          "usage": {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 60288,
+            "input_tokens": 94951,
+            "output_tokens": 305,
+            "reasoning_output_tokens": 19
+          },
+          "gateway_subcommands": [
+            "operations"
+          ],
+          "archived_operations_bytes": 44204,
+          "archived_operations_sha256": "ebdecc027946d76f323e58aeea877abbfe223d48bd2d6636ca7c9d40b592394d",
+          "archived_operations_complete_json": true,
+          "model_visible_output_or_budget_proven": false,
+          "model_claimed_truncation": true,
+          "preview_or_execution": false,
+          "source_hash_unchanged": true,
+          "source_mtime_unchanged": true,
+          "failed_copy_retained": true,
+          "never_reuse": true,
+          "trusted_oracle_closed": true,
+          "fact_sha256": "0df24cf5e8f6ac44880fbd15e4ef552429fa5e27e112d69f6772514f60db18f5",
+          "outcome_sha256": "81c8e3197cabde359e7ef4a289b821ae10c0b26fb2604392f7b54a7823ffbd47"
+        },
+        {
+          "unit_id": "EXP25-M01",
+          "status": "FAIL",
+          "terminal_state": "unprepared",
+          "agent_seconds": 36.360009083058685,
+          "cli_seconds": 32.869182,
+          "usage": {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 61440,
+            "input_tokens": 95519,
+            "output_tokens": 298,
+            "reasoning_output_tokens": 41
+          },
+          "gateway_subcommands": [
+            "operations"
+          ],
+          "archived_operations_bytes": 44204,
+          "archived_operations_sha256": "cedc5d7047039eaf0cc42d0b8acd77a18e705bc90f130519230be8d800576348",
+          "archived_operations_complete_json": true,
+          "model_visible_output_or_budget_proven": false,
+          "model_claimed_truncation": true,
+          "preview_or_execution": false,
+          "source_hash_unchanged": true,
+          "source_mtime_unchanged": true,
+          "failed_copy_retained": true,
+          "never_reuse": true,
+          "trusted_oracle_closed": true,
+          "fact_sha256": "07a34af98ffa318a04d6c33f630cb4dd0f9c8f28494b5a75d4948085e1874216",
+          "outcome_sha256": "e9f04140ef5d24b7e362265a57c9a048d8611bec5b5ee03dc2fb0f3a23b30f91"
+        }
+      ]
+    }
+  ],
+  "scoped_residual_processes": [],
+  "launch_agents_loaded": false
+}

@@ -4,16 +4,141 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
+import xml.etree.ElementTree as ET
+from pathlib import Path
 from typing import Any, Callable, Mapping
 
 from tests.semantic.support.codex_expansion_case_helpers import BusinessDraft, CaseBoundaryError, file_evidence
 from tests.semantic.support.codex_expansion_policy import canonical_digest
 from tests.semantic.support.codex_music_oracle_probes import SWITCH
+from tests.semantic.support.codex_filesystem_security import (
+    path_is_link_or_reparse, read_bounded_exclusive_regular_file,
+)
 
 
 ENTRY = "{903A30EC-F1F4-49FF-9CBC-99B89539598B}"
 FIGHT = "{1D0ECA1F-2749-4DBB-B92C-0DBDFDA7A825}"
 MAX_SNAPSHOT_CALLS = 64
+MEDIA_PREPARATION_REPORT_BYTES = 128 * 1024
+
+
+MEDIA_DONOR = Path("Originals/SFX/WAAPI Skill Integration V2/audit_clean.wav")
+MEDIA_DONOR_SHA256 = "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+
+
+def _confined_media_path(root: Path, relative: Path) -> Path:
+    if relative.is_absolute() or any(part in {".", ".."} for part in relative.parts):
+        raise CaseBoundaryError("media preparation path escapes its owned root")
+    cursor = root
+    for part in relative.parts:
+        cursor = cursor / part
+        try:
+            linked = path_is_link_or_reparse(cursor)
+        except FileNotFoundError:
+            linked = False
+        if linked:
+            raise CaseBoundaryError("media preparation cannot traverse links or reparse points")
+        if cursor.exists() and cursor != root / relative and not cursor.is_dir():
+            raise CaseBoundaryError("media preparation parent is not a directory")
+    return cursor
+
+
+def prepare_music_switch_reference_media(ctx, owned_wwu: Path, source_project: Path, *, evidence: dict[str, Any] | None = None) -> Mapping[str, Any]:
+    """Fill missing legacy Originals in the private copy before any goal baseline."""
+    owned = ctx.project_path.parent
+    source = source_project.parent
+    if (ctx.version != "2025.1" or owned == source or not owned.is_absolute() or not source.is_absolute()
+            or source in owned.parents or owned in source.parents
+            or owned.resolve(strict=True) != owned or source.resolve(strict=True) != source
+            or ctx.project_path.name != "SampleProject.wproj" or source_project.name != "SampleProject.wproj"):
+        raise CaseBoundaryError("media preparation requires a separate owned 2025.1 project")
+    if path_is_link_or_reparse(owned) or path_is_link_or_reparse(source):
+        raise CaseBoundaryError("media preparation roots cannot be linked")
+    relative = Path("Containers/Music/Music.wwu")
+    if owned_wwu != _confined_media_path(owned, relative):
+        raise CaseBoundaryError("media preparation requires the exact owned Music WWU")
+    def bounded(path, maximum):
+        return read_bounded_exclusive_regular_file(path, max_bytes=maximum, require_private_posix_mode=False).raw
+    raw = bounded(owned_wwu, 8 * 1_048_576)
+    source_raw = bounded(_confined_media_path(source, relative), 8 * 1_048_576)
+    if raw != source_raw or b"<!DOCTYPE" in raw.upper() or b"<!ENTITY" in raw.upper():
+        raise CaseBoundaryError("media preparation requires unchanged source-bound XML without entities")
+    roots = [node for node in ET.fromstring(raw).iter("MusicSwitchContainer") if node.get("ID") == SWITCH]
+    if len(roots) != 1:
+        raise CaseBoundaryError("media preparation has no exact Music Switch owner")
+    nodes = list(roots[0].iter("AudioFileSource"))
+    if not 1 <= len(nodes) <= 128:
+        raise CaseBoundaryError("music source set exceeds its fixture ceiling")
+    paths, ids, destinations = {}, set(), {}
+    for node in nodes:
+        identifier, filename = node.get("ID"), node.findtext("AudioFile")
+        if (not isinstance(identifier, str) or not re.fullmatch(r"\{[0-9A-F]{8}(?:-[0-9A-F]{4}){3}-[0-9A-F]{12}\}", identifier)
+                or identifier in ids or node.findtext("Language") != "SFX" or not isinstance(filename, str)):
+            raise CaseBoundaryError("music media requires unique canonical source identities and SFX paths")
+        parts = filename.split("\\")
+        if (not 1 <= len(parts) <= 16 or any(not part or part in {".", ".."} or any(char in part for char in "/:\x00")
+                                          or part.endswith((" ", ".")) for part in parts) or not parts[-1].lower().endswith(".wav")):
+            raise CaseBoundaryError("music media path contains unsupported or escaping segments")
+        target = _confined_media_path(owned, Path("Originals/SFX", *parts))
+        folded = str(target).casefold()
+        if folded in destinations and destinations[folded] != target:
+            raise CaseBoundaryError("music media paths alias the same destination")
+        destinations[folded] = target
+        ids.add(identifier)
+        paths.setdefault(target, []).append(identifier)  # Shared media references copy one file.
+    source_donor = _confined_media_path(source, MEDIA_DONOR)
+    donor = bounded(source_donor, 32 * 1_048_576)
+    if hashlib.sha256(donor).hexdigest() != MEDIA_DONOR_SHA256:
+        raise CaseBoundaryError("fixture donor differs from its pinned WAV hash")
+    owned_donor = _confined_media_path(owned, MEDIA_DONOR)
+    if bounded(owned_donor, 32 * 1_048_576) != donor:
+        raise CaseBoundaryError("owned donor differs from the fixed source WAV")
+    # Validate all existing inputs before writing; never replace their bytes.
+    existing = {path: hashlib.sha256(bounded(path, 32 * 1_048_576)).hexdigest()
+                for path in paths if path.exists()}
+    project_raw = bounded(_confined_media_path(source, Path(source_project.name)), 1_048_576)
+    report = evidence if evidence is not None else {}
+    report.update({"source_project": str(source_project), "source_project_sha256": hashlib.sha256(project_raw).hexdigest(),
+        "source_wwu_sha256": hashlib.sha256(source_raw).hexdigest(), "source_object_count": len(nodes),
+        "donor": {"path": str(source_donor), "sha256": MEDIA_DONOR_SHA256, "bytes": len(donor)},
+        "created_count": 0, "files": []})
+    for path, source_ids in paths.items():
+        created = path not in existing
+        row = {"path": str(path), "source_ids": source_ids, "created": False,
+               "creation_requested": created, "verified": False, "sha256": None, "bytes": None}
+        prospective = {**report, "files": [*report["files"], {**row, "sha256": "f" * 64, "bytes": 32 * 1_048_576}]}
+        if len(json.dumps(prospective, ensure_ascii=False).encode("utf-8")) > MEDIA_PREPARATION_REPORT_BYTES:
+            raise CaseBoundaryError("media preparation evidence exceeds its byte ceiling")
+        report["files"].append(row)
+        if created:
+            cursor = owned
+            for part in path.parent.relative_to(owned).parts:
+                cursor = cursor / part
+                try:
+                    cursor.mkdir()
+                except FileExistsError:
+                    pass
+                _confined_media_path(owned, cursor.relative_to(owned))
+                if not cursor.is_dir():
+                    raise CaseBoundaryError("media preparation parent is not a directory")
+            _confined_media_path(owned, path.relative_to(owned))
+            # Exclusive creation cannot overwrite a file appearing after preflight.
+            with path.open("xb") as output:
+                output.write(donor)
+            row["created"] = True
+            report["created_count"] += 1
+        observed = bounded(path, 32 * 1_048_576)
+        if not observed:
+            raise CaseBoundaryError("protected music media cannot be empty")
+        digest = hashlib.sha256(observed).hexdigest()
+        expected_digest = MEDIA_DONOR_SHA256 if created else existing[path]
+        if digest != expected_digest:
+            raise CaseBoundaryError("prepared media bytes drifted before the independent baseline")
+        row.update({"bytes": len(observed), "sha256": digest, "verified": True})
+    if bounded(owned_wwu, 8 * 1_048_576) != raw:
+        raise CaseBoundaryError("media preparation changed its owned XML")
+    return report
 
 
 def append_bounded_goal_receipt(receipts, argv, code, payload, *, max_total_bytes=8 * 1_048_576):

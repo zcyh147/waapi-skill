@@ -160,9 +160,9 @@ def music_read_plan(family: str, witness: Mapping[str, Any], version: str) -> tu
         platform = witness["project_platform"]["name"]
         if platform != "Mac":
             raise MusicOracleProbeError("transition investigation has no declared Mac platform")
-        for field in ("FadeTime", "FadeOffset"):
+        for meaning in ("time", "offset"):
             commands.append(("metadata", "property-state", "--exact-id", data["fade"],
-                             "--meaning", field, "--platform", platform))
+                             "--meaning", meaning, "--platform", platform))
     else:
         data = witness["music_switch"]
         commands.append(("query-schema", "--advanced"))

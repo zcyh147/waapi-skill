@@ -231,3 +231,128 @@ def test_public_snapshot_reads_complete_wrappers_and_hashes_only_owned_media(tmp
     assert len(result["entries"]) == 9 and len(result["conditions"]) == 18 and len(result["arguments"]) == 2
     assert result["media"][str(media)]["sha256"]
     assert all(argv[0] in {"query-schema", "query-object"} for argv in calls)
+
+
+def _owned_music_fixture(tmp_path):
+    from pathlib import Path
+    import shutil
+    from tests.semantic.support.codex_expansion_cases import ExpansionCaseContext
+    source = Path(__file__).resolve().parents[2] / 'tests/_org/2025.1'
+    owned = tmp_path / 'owned'
+    shutil.copytree(source, owned)
+    ctx = ExpansionCaseContext('2025.1', 'REFERENCE', owned / 'SampleProject.wproj', owned / 'assets',
+                              lambda _: pytest.fail('media preparation cannot call Gateway'))
+    return source, owned, ctx
+
+
+def test_missing_legacy_music_is_seeded_before_actual_hash_preservation(tmp_path):
+    import hashlib
+    from tests.semantic.support.codex_expansion_case_helpers import file_evidence
+    from tests.semantic.support.codex_music_switch_reference_goal import prepare_music_switch_reference_media
+    source, owned, ctx = _owned_music_fixture(tmp_path)
+    wwu = owned / 'Containers/Music/Music.wwu'
+    before_xml = wwu.read_bytes()
+    missing = owned / 'Originals/SFX/Music/Michael McCann and Tim Rideout/MenuMusic_Lp_01.wav'
+    assert not missing.exists()
+    with pytest.raises(CaseBoundaryError):
+        file_evidence(ctx, str(missing))
+    report = prepare_music_switch_reference_media(ctx, wwu, source / 'SampleProject.wproj')
+    import json
+    from tests.semantic.support.codex_music_switch_reference_goal import MEDIA_PREPARATION_REPORT_BYTES
+    assert len(json.dumps(report, ensure_ascii=False).encode('utf-8')) <= MEDIA_PREPARATION_REPORT_BYTES
+    assert report['source_object_count'] == 70
+    assert len(report['files']) == report['created_count'] == 67
+    assert len({row['path'] for row in report['files']}) == 67
+    assert file_evidence(ctx, str(missing))['sha256'] == report['donor']['sha256']
+    assert report['source_wwu_sha256'] == hashlib.sha256(before_xml).hexdigest()
+    assert wwu.read_bytes() == (source / 'Containers/Music/Music.wwu').read_bytes() == before_xml
+    assert not (source / 'Originals/SFX/Music').exists()
+    missing.write_bytes(b'changed-after-independent-before')
+    assert file_evidence(ctx, str(missing))['sha256'] != report['donor']['sha256']
+
+
+def test_media_preparation_preserves_existing_input_without_overwrite(tmp_path):
+    from tests.semantic.support.codex_music_switch_reference_goal import prepare_music_switch_reference_media
+    source, owned, ctx = _owned_music_fixture(tmp_path)
+    existing = owned / 'Originals/SFX/Music/Michael McCann and Tim Rideout/MenuMusic_Lp_01.wav'
+    existing.parent.mkdir(parents=True)
+    existing.write_bytes(b'already-owned-input')
+    report = prepare_music_switch_reference_media(ctx, owned / 'Containers/Music/Music.wwu', source / 'SampleProject.wproj')
+    assert existing.read_bytes() == b'already-owned-input'
+    assert report['created_count'] == 66
+    assert sum(row['created'] is False for row in report['files']) == 1
+
+
+@pytest.mark.parametrize('damage', ('traversal', 'absolute', 'duplicate_id', 'entity', 'too_many',
+                                    'case_alias', 'symlink', 'reparse', 'donor_drift', 'source_root'))
+def test_media_preparation_fails_closed_before_any_seed(damage, tmp_path, monkeypatch):
+    import shutil
+    from pathlib import Path
+    from tests.semantic.support.codex_expansion_cases import ExpansionCaseContext
+    from tests.semantic.support import codex_music_switch_reference_goal as goal
+    fixed = Path(__file__).resolve().parents[2] / 'tests/_org/2025.1'
+    source, owned = tmp_path / 'source', tmp_path / 'owned'
+    shutil.copytree(fixed, source)
+    wwu = source / 'Containers/Music/Music.wwu'
+    raw = wwu.read_bytes()
+    original = b'Music\\Michael McCann and Tim Rideout\\MenuMusic_Lp_01.wav'
+    if damage in {'traversal', 'absolute'}:
+        raw = raw.replace(original, b'..\\escape.wav' if damage == 'traversal' else b'/escape.wav')
+    elif damage in {'duplicate_id', 'case_alias', 'too_many'}:
+        import xml.etree.ElementTree as ET
+        root = ET.fromstring(raw)
+        switch = next(node for node in root.iter('MusicSwitchContainer') if node.get('ID') == goal.SWITCH)
+        nodes = list(switch.iter('AudioFileSource'))
+        if damage == 'duplicate_id':
+            nodes[1].set('ID', nodes[0].get('ID'))
+        elif damage == 'case_alias':
+            nodes[1].find('AudioFile').text = nodes[0].findtext('AudioFile').lower()
+        else:
+            from copy import deepcopy
+            for _ in range(60):
+                switch.append(deepcopy(nodes[0]))
+        raw = ET.tostring(root)
+    elif damage == 'entity':
+        raw = b'<!DOCTYPE WwiseDocument [<!ENTITY external SYSTEM "file:///forbidden">]>' + raw
+    wwu.write_bytes(raw)
+    shutil.copytree(source, owned)
+    ctx = ExpansionCaseContext('2025.1', 'REFERENCE', owned / 'SampleProject.wproj', owned / 'assets',
+                              lambda _: pytest.fail('preparation cannot call Gateway'))
+    music = owned / 'Originals/SFX/Music'
+    if damage == 'symlink':
+        music.symlink_to(tmp_path, target_is_directory=True)
+    elif damage == 'reparse':
+        original_check = goal.path_is_link_or_reparse
+        monkeypatch.setattr(goal, 'path_is_link_or_reparse',
+            lambda path: True if path == music else original_check(path))
+    elif damage == 'donor_drift':
+        (owned / goal.MEDIA_DONOR).write_bytes(b'drifted')
+    elif damage == 'source_root':
+        ctx = ExpansionCaseContext('2025.1', 'REFERENCE', source / 'SampleProject.wproj', source / 'assets', ctx.gateway)
+    with pytest.raises(CaseBoundaryError):
+        goal.prepare_music_switch_reference_media(ctx, ctx.project_path.parent / 'Containers/Music/Music.wwu',
+                                                 source / 'SampleProject.wproj')
+    if damage == 'symlink':
+        assert music.is_symlink()
+    else:
+        assert not list(owned.glob('Originals/SFX/Music/**/*.wav'))
+
+
+def test_partial_fixture_copy_evidence_survives_later_failure(tmp_path, monkeypatch):
+    from tests.semantic.support import codex_music_switch_reference_goal as goal
+    source, owned, ctx = _owned_music_fixture(tmp_path)
+    original = goal.read_bounded_exclusive_regular_file
+    evidence = {}
+    def fail_second_created_read(path, **kwargs):
+        if path.name == 'Stealth_Ambient_AmbientMelody1_Seg1_01.wav' and path.exists():
+            raise CaseBoundaryError('injected fixture read failure')
+        return original(path, **kwargs)
+    monkeypatch.setattr(goal, 'read_bounded_exclusive_regular_file', fail_second_created_read)
+    with pytest.raises(CaseBoundaryError, match='injected'):
+        goal.prepare_music_switch_reference_media(ctx, owned / 'Containers/Music/Music.wwu',
+                                                 source / 'SampleProject.wproj', evidence=evidence)
+    assert evidence['donor']['sha256'] == goal.MEDIA_DONOR_SHA256
+    assert evidence['created_count'] == 2
+    assert len(evidence['files']) == 2 and evidence['files'][0]['verified'] is True
+    assert evidence['files'][1]['created'] is True and evidence['files'][1]['verified'] is False
+    assert evidence['files'][1]['sha256'] is None

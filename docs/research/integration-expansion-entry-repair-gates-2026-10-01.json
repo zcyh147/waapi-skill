@@ -1,0 +1,40 @@
+{
+  "contract": "waapi-skill.integration-expansion-development-gates/v1",
+  "candidate": "4d74ebb432fc7c309e74e88b4b9501590ab7e82c",
+  "program": {
+    "candidate": "4d74ebb432fc7c309e74e88b4b9501590ab7e82c",
+    "mode": "program",
+    "command": "WAAPI_TEST_PYTHON=<pinned Poetry interpreter> ci/test.sh --mode program -- -q -ra",
+    "exit_code": 0,
+    "passed": 5888,
+    "skipped": 2,
+    "duration_seconds": 271.86,
+    "log_sha256": "692b69b9460d5289e2095118c04e2797e277385a938bfe1aaafe27bb84170d88",
+    "skip_boundaries": [
+      "native Windows shell proof",
+      "NTFS junction behavior requires Windows"
+    ],
+    "live_or_agent_credit": false
+  },
+  "nonlive": {
+    "candidate": "4d74ebb432fc7c309e74e88b4b9501590ab7e82c",
+    "mode": "nonlive",
+    "exit_code": 0,
+    "passed": 12082,
+    "skipped": 118,
+    "deselected": 27,
+    "duration_seconds": 799.11,
+    "junit_counts": {
+      "tests": 12200,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 118
+    },
+    "log_sha256": "3e51924cf48fbc2de37b361798cfcdd106b3ace72f256881d64856ce621fca95",
+    "junit_sha256": "d61e892e0611f55a60291aa9648ec81739e21a87f720786ccc439d8417a1426d",
+    "source_tracked_clean": true,
+    "live_or_agent_credit": false
+  },
+  "evidence_directory": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-4d74ebb-gates",
+  "formal_fresh_acceptance": false
+}

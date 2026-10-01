@@ -40,6 +40,54 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ## Resume update — 2026-10-01
 
+### Completed entry-repair gates and next compact-directory candidate
+
+- Frozen `4d74ebb` passed Program **5888 / skipped 2** and Non-live
+  **12082 / skipped 118 / deselected 27**. The matching 2025 smoke became
+  ready in 4.10 seconds and cleaned its copied sandbox. Exact gate digests
+  are in `../research/integration-expansion-entry-repair-gates-2026-10-01.json`.
+- Its matched CLI 0.159.2 pilot completed all six units as ordinary FAIL,
+  each after `operations`, without a Draft, Preview, or execution. The 918
+  sealed attempt artifacts were independently rehashed. Source hash/mtime
+  protection and retained failed copies were verified; both launch jobs are
+  unloaded and scoped processes are gone. Model selection remains unresolved.
+  Correcting the footer instruction alone did not remove the directory stop;
+  actual model-visible truncation or budget remains unproven. Timings, usage,
+  and raw digests are in the entry-repair pilot record.
+- Scoped repair #128 factors ordinary directory templates and common metadata
+  while preserving all identities, descriptions, host/version exceptions,
+  routing, and safety distinctions. Packaged offline CLI output is 15–25 KiB
+  across the five lanes; 2025 retains 33 named operations and 136 routes in
+  25,432 bytes. Detail output is unchanged. Independent Spec and Standards
+  reviews found no actionable issue; the combined focused regression passed
+  **452 tests**. A new frozen candidate, broad gates, and fresh evidence remain
+  required. No old FAIL receives new acceptance credit.
+
+### Music investigation follow-ups
+
+- Six platform-aware read investigations completed on `4d74ebb`, with source
+  full hash/mtime/tree metadata unchanged and scoped cleanup proven. The two
+  fade property-state requests now reach actual live-name ambiguity rather
+  than missing-platform input errors; they do not establish enabled state or
+  native physical-time units. Complete arrangement/order claims remain blocked.
+- The 2025 reference goal stopped before any Draft because its legacy music
+  Originals are absent from the committed fixture. Its original FAIL and copy
+  remain retained. The source WWU has 70 source identities sharing 67 WAV paths.
+  The reviewed main-only preparation copies an existing hash-pinned repository
+  WAV into missing owned paths, preserves source/XML/existing files, and retains
+  actual media-hash assertions. It generates no audio or new Gateway capability.
+- A reviewed populated Transition probe uses the live-attested
+  `PlaySourcePostExit` boolean, one exact edit transaction and a separately
+  approved save. Independent saved XML covers the 15-rule graph, fourteen
+  siblings, meaningful order, references, fades, and protected media. It is
+  scalar maintenance evidence only; full M04 and M06 remain false. Both new
+  probes still need execution on a new frozen candidate. Native read results
+  and the untouched failure are in the music-native-followups record.
+- The preplanned fade-state meanings are now `time` and `offset` in the exact
+  MusicFade/Mac scope. The four-field public fake regression passes **35 tests**
+  and retains the original broad-name ambiguity as a negative control. This
+  is no native enabled-state or duration-unit proof; those reads remain pending.
+
 ### Matched model pilot and shared entry repair #127
 
 - Both official CLI 0.159.2 pilot halves finished their complete three-task

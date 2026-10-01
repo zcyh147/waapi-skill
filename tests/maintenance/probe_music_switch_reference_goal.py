@@ -6,7 +6,8 @@ from tests.destructive.test_expansion_case_preflight import expansion_runtime
 from tests.semantic.support.codex_expansion_cases import ExpansionCaseContext
 from tests.semantic.support.codex_music_oracle_probes import xml_music_witness
 from tests.semantic.support.codex_music_switch_reference_goal import (
-    append_bounded_goal_receipt, music_switch_reference_snapshot, run_music_switch_reference_goal,
+    MEDIA_PREPARATION_REPORT_BYTES, append_bounded_goal_receipt, music_switch_reference_snapshot, prepare_music_switch_reference_media,
+    run_music_switch_reference_goal,
 )
 
 
@@ -29,7 +30,8 @@ def test_existing_music_switch_audio_node_reference_goal(expansion_runtime):
         if len(receipts) >= 180:
             raise AssertionError("music reference goal exceeded its total public call ceiling")
         code, payload = runtime.raw_gateway(argv)
-        append_bounded_goal_receipt(receipts, argv, code, payload)
+        append_bounded_goal_receipt(receipts, argv, code, payload,
+            max_total_bytes=8 * 1_048_576 - MEDIA_PREPARATION_REPORT_BYTES)
         assert code == 0 and payload.get("ok") is True, payload
         if payload.get("endpoint") is not None:
             assert payload["endpoint"] == {"host": runtime.lifecycle.host, "port": runtime.port,
@@ -39,6 +41,9 @@ def test_existing_music_switch_audio_node_reference_goal(expansion_runtime):
         return payload
     ctx = ExpansionCaseContext(runtime.version, "MUSIC_REFERENCE_GOAL", runtime.sandbox.sandbox_project,
                                runtime.sandbox.sandbox_path / "ReferenceGoalAssets", gateway)
+    report["media_preparation"] = {}
+    prepare_music_switch_reference_media(ctx, owned, runtime.sandbox.source_project,
+                                       evidence=report["media_preparation"])
     result = run_music_switch_reference_goal(ctx, witness,
         lambda: music_switch_reference_snapshot(ctx, witness, lambda: xml_music_witness(owned, runtime.version)))
     report.update(result)
