@@ -42,13 +42,32 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- The frozen `122eb09` pilot retained three Luna-high ordinary FAILs, all at
+  `visible_preview_notice`. C01 supplied a concrete post-Preview notice, but
+  the Chinese verb `更新` was absent from the import effect alternatives.
+  C06 and M01 genuinely had no notice between Preview and Execute; their final
+  summaries do not substitute for advance notice. Repair #131 addresses the
+  natural-wording false positive and clarifies the formal task instruction's
+  required Preview/Execute notice, without weakening authorization or oracles.
+- Sol-medium C01 obeyed a terminal rejection before Preview: requested
+  `--max-results 100` exceeded the disclosed 64-row limit. The actual Agent
+  result is FAIL. Unsupported archive replay of the authenticated rejected
+  owned-project read after an accepted exact Draft binding caused a systemic
+  stop and consolidated BLOCKED, leaving Sol C06/M01 unattempted. Repair #132
+  adds this safely isolated FAIL shape; it does not increase the row cap or
+  promote the cap violation. Both jobs were unloaded, no scoped process remained,
+  sources were unchanged and failed copies remain quarantined. All **790**
+  sealed artifact contents were independently rehashed. Exact original results
+  are in `../research/integration-expansion-archive-repair-pilot-2026-10-02.json`.
+  The six-task comparison is incomplete and no model is selected.
+
 - Frozen `122eb09` completed Program **5888 passed / 2 skipped** and
   Non-live **12156 passed / 118 skipped / 27 deselected**, both exit zero.
   The matching 2025 smoke reached readiness in **4.1306 seconds** and removed
   its clean sandbox. Exact completed reports and digests are in
   `../research/integration-expansion-archive-seal-gates-2026-10-02.json`.
-  New matched-model roots use the same candidate and pinned CLI 0.159.2;
-  the Luna-high group is running first. These gates alone provide no Fresh
+  The matched-model roots used the same candidate and pinned CLI 0.159.2,
+  with Luna-high scheduled first. These gates alone provide no Fresh
   business acceptance or model-selection credit.
 
 - Native follow-up candidate `78c3587` passed all nine selected nodes with

@@ -1,0 +1,106 @@
+{
+  "contract": "waapi-skill.integration-expansion-model-pilot/v1",
+  "candidate": "122eb09db261a6e82593ac60da658ee2dbf2a289",
+  "cli_version": "0.159.2",
+  "service_tier": "default",
+  "scheduled_tasks": 6,
+  "completed_tasks": 4,
+  "model_selected": null,
+  "formal_campaign_passes": 0,
+  "campaigns": [
+    {
+      "model": "gpt-6-luna",
+      "reasoning_effort": "high",
+      "campaign_root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-122eb09-luna-high-r1-cli1592",
+      "attempt_manifest_sha256": "23c459dcb0e09e2b74f1bb7468cc64991fbf8fe8a4761b769967619ee39bc114",
+      "sealed_artifacts_rehashed": 604,
+      "consolidated": {
+        "passed_unit_ids": [],
+        "failed_unit_ids": [
+          "EXP25-C01",
+          "EXP25-C06",
+          "EXP25-M01"
+        ],
+        "blocked_unit_ids": [],
+        "pending_unit_ids": []
+      },
+      "units": [
+        {
+          "unit_id": "EXP25-C01",
+          "runner_status": "FAIL",
+          "reason": "V3TaskRunnerError: expansion turn failed: visible_preview_notice",
+          "agent_elapsed_seconds": 122.06348249991424,
+          "source_full_hash_unchanged": true,
+          "source_mtime_unchanged": true,
+          "trusted_oracle_closed": true,
+          "sandbox_retained": true,
+          "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-122eb09-luna-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C01/evidence/quarantine.json",
+          "matrix_case_sha256": "c8125b8a387487f1ff6b3ea1e429f0e561a0ff0dca2a942a02e7affc7440d4c0"
+        },
+        {
+          "unit_id": "EXP25-C06",
+          "runner_status": "FAIL",
+          "reason": "V3TaskRunnerError: expansion turn failed: visible_preview_notice",
+          "agent_elapsed_seconds": 140.16586887510493,
+          "source_full_hash_unchanged": true,
+          "source_mtime_unchanged": true,
+          "trusted_oracle_closed": true,
+          "sandbox_retained": true,
+          "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-122eb09-luna-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP25-C06/evidence/quarantine.json",
+          "matrix_case_sha256": "7d706fd3c9b6e91e14b04bca5e6388a84b26d49c615c77820a750a0448726310"
+        },
+        {
+          "unit_id": "EXP25-M01",
+          "runner_status": "FAIL",
+          "reason": "V3TaskRunnerError: expansion turn failed: visible_preview_notice",
+          "agent_elapsed_seconds": 112.08443691697903,
+          "source_full_hash_unchanged": true,
+          "source_mtime_unchanged": true,
+          "trusted_oracle_closed": true,
+          "sandbox_retained": true,
+          "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-122eb09-luna-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/003-EXP25-M01/evidence/quarantine.json",
+          "matrix_case_sha256": "4ebd9037d3b11a48361473292f81db71f3788c26e801bc559de0833ada6d2478"
+        }
+      ],
+      "job_unloaded": true,
+      "scoped_processes_remaining": false,
+      "verify_only_performed": false
+    },
+    {
+      "model": "gpt-6.1-sol",
+      "reasoning_effort": "medium",
+      "campaign_root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-122eb09-sol-medium-r1-cli1592",
+      "attempt_manifest_sha256": "64ce619b56e06527bee62eea17c8a39c26b3b75658529bf950689aff41d36deb",
+      "sealed_artifacts_rehashed": 186,
+      "consolidated": {
+        "passed_unit_ids": [],
+        "failed_unit_ids": [],
+        "blocked_unit_ids": [
+          "EXP25-C01"
+        ],
+        "pending_unit_ids": [
+          "EXP25-C06",
+          "EXP25-M01"
+        ]
+      },
+      "units": [
+        {
+          "unit_id": "EXP25-C01",
+          "runner_status": "FAIL",
+          "reason": "V3TaskRunnerError: expansion turn failed: broker_provenance, policy_checkpoint, visible_preview_notice",
+          "agent_elapsed_seconds": 78.77123545785435,
+          "source_full_hash_unchanged": true,
+          "source_mtime_unchanged": true,
+          "trusted_oracle_closed": true,
+          "sandbox_retained": true,
+          "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-122eb09-sol-medium-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C01/evidence/quarantine.json",
+          "matrix_case_sha256": "f6bf90e728e11b20fdb23801659c29f05d139e15bbe17b2da1fb976f4408e188"
+        }
+      ],
+      "job_unloaded": true,
+      "scoped_processes_remaining": false,
+      "verify_only_performed": false
+    }
+  ],
+  "next": "Consolidate notice failures and Sol read-policy/archive isolation blocker; preserve original roots and use new candidate/root for affected reruns."
+}
