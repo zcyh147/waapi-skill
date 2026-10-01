@@ -21,7 +21,7 @@ def _entry(slot, effect, name):
 
 
 def _baseline():
-    return {"owner": {"id": OWNER, "@Volume": -3}, "entries": [
+    return {"owner": {"id": OWNER, "@Volume": -3}, "slot_order": ["slot-a", "slot-b"], "entries": [
         _entry("slot-a", "effect-a", "Old A"), _entry("slot-b", "effect-b", "Old B"),
     ]}
 
@@ -32,6 +32,7 @@ def test_effect_append_oracle_accepts_equivalent_read_order_but_not_swapped_bind
     added = _entry("slot-c", "effect-c", "New Gain")
     added["effect"]["notes"] = "requested"
     after["entries"] = [after["entries"][1], added, after["entries"][0]]
+    after["slot_order"].append("slot-c")
     result = verify_c09(before, after, version="2025.1", expected_class_id=123, expected_name="New Gain", expected_notes="requested")
     assert set(result) == C09_ASSERTIONS
     assert all(result.values())
@@ -47,6 +48,7 @@ def test_effect_append_rejects_collateral_and_extra_changes(damage):
     added = _entry("slot-c", "effect-c", "New Gain")
     added["effect"]["notes"] = "requested"
     after["entries"].append(added)
+    after["slot_order"].append(added["slot"])
     if damage == "extra":
         after["entries"].append(_entry("slot-d", "effect-d", "Extra"))
     elif damage == "missing":
@@ -126,6 +128,7 @@ def test_effect_setup_cli_parses_and_snapshot_checks_independent_bindings(versio
             return {"state": "verified", "verification": {"business_state_verified": True}}
         assert command in {"draft-declare-new", "draft-declare-existing", "draft-check", "confirm"}, argv
         return {"draft": {"revision": 4}}
+    reverse_reads = True
     def read(view, ids):
         if view == "effect_owner":
             if version == "2022.1":
@@ -135,7 +138,7 @@ def test_effect_setup_cli_parses_and_snapshot_checks_independent_bindings(versio
         if view == "effect_slot":
             return [{"id": slot, "name": "", "type": "EffectSlot", "path": rf"\Slot{index}",
                      "owner": {"id": OWNER}, "@Effect": {"id": plugins[index]}}
-                    for index, slot in reversed(list(enumerate(slots)))]
+                    for index, slot in (reversed(list(enumerate(slots))) if reverse_reads else enumerate(slots))]
         assert view == "effect_plugin"
         return [deepcopy(plugin_rows[identifier]) for identifier in reversed(ids)]
     ctx = ExpansionCaseContext(version, "C09", tmp_path / "Fixture.wproj", tmp_path / "assets", gateway, read)
@@ -143,6 +146,8 @@ def test_effect_setup_cli_parses_and_snapshot_checks_independent_bindings(versio
     assert starts == ["object.create", "object.createPlugin", "object.createPlugin"]
     assert case.policy == "allow_changes" and case.operation == "object.createPlugin"
     assert len(case.before["entries"]) == 2
+    assert case.before["slot_order"] == (["0", "1"] if version == "2022.1" else slots)
+    reverse_reads = False
     assert case.snapshot() == case.before
     declarations = [call for call in calls if call[0] == "draft-declare-existing"]
     assert all("discovered-gain" in call and "protected effect" in " ".join(call) for call in declarations)
@@ -159,6 +164,7 @@ def test_effect_append_requires_the_exact_2025_three_link_ownership_chain(damage
     added = _entry("slot-c", "effect-c", "New Gain")
     added["effect"]["notes"] = "requested"
     after["entries"].append(added)
+    after["slot_order"].append(added["slot"])
     if damage == "slot_owner":
         added["slot_state"]["owner"]["id"] = "other-sound"
     elif damage == "slot_identity":
@@ -177,12 +183,27 @@ def test_effect_append_preserves_the_2022_direct_owner_layout():
     for index, entry in enumerate(before["entries"]):
         entry.update(slot=str(index), slot_state=None)
         entry["effect"]["owner"]["id"] = OWNER
+    before["slot_order"] = ["0", "1"]
     after = deepcopy(before)
     added = _entry("2", "effect-c", "New Gain")
     added["slot_state"] = None
     added["effect"].update(owner={"id": OWNER}, notes="requested")
     after["entries"].append(added)
+    after["slot_order"].append(added["slot"])
     assert all(verify_c09(before, after, version="2022.1", expected_class_id=123,
                           expected_name="New Gain", expected_notes="requested").values())
+    assert not all(verify_c09(before, after, version="2025.1", expected_class_id=123,
+                              expected_name="New Gain", expected_notes="requested").values())
+
+
+@pytest.mark.parametrize("slot_order", (["slot-b", "slot-c", "slot-a"],
+                                        ["slot-c", "slot-a", "slot-b"]))
+def test_effect_append_rejects_reordered_or_front_inserted_owner_chain(slot_order):
+    before = _baseline()
+    after = deepcopy(before)
+    added = _entry("slot-c", "effect-c", "New Gain")
+    added["effect"]["notes"] = "requested"
+    after["entries"].append(added)
+    after["slot_order"] = slot_order
     assert not all(verify_c09(before, after, version="2025.1", expected_class_id=123,
                               expected_name="New Gain", expected_notes="requested").values())

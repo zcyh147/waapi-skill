@@ -29,6 +29,15 @@ def approve(value, version="2025.1"):
 
 
 @pytest.mark.parametrize("version", ("2022.1", "2025.1"))
+def test_preview_accepts_gateway_owned_spaced_music_type_tags(version):
+    value = artifact(version)
+    for row in value["request"]["arguments"]["imports"]:
+        row["object_path"] = row["object_path"].replace("<MusicSegment>", "<Music Segment>").replace(
+            "<MusicTrack>", "<Music Track>")
+    assert approve(value, version)
+
+
+@pytest.mark.parametrize("version", ("2022.1", "2025.1"))
 def test_preview_closes_media_track_property_and_target_scope(version):
     value = artifact(version)
     assert approve(value, version)

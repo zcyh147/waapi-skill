@@ -71,6 +71,11 @@ def _entries(snapshot: Mapping[str, Any], *, version: str) -> dict[str, Mapping[
             return None
         result[slot] = entry
         effect_ids.add(effect["id"].casefold())
+    order = snapshot.get("slot_order")
+    if (not isinstance(order, list) or any(not isinstance(slot, str) for slot in order)
+            or len(order) != len(result) or set(order) != set(result)
+            or (version == "2022.1" and order != sorted(result, key=int))):
+        return None
     return result
 
 
@@ -79,10 +84,15 @@ def verify_c09(before: Mapping[str, Any], after: Mapping[str, Any], *,
     prior, current = _entries(before, version=version), _entries(after, version=version)
     valid = prior is not None and current is not None
     added = set(current) - set(prior) if valid else set()
-    new = current[next(iter(added))]["effect"] if len(added) == 1 else {}
+    added_slot = next(iter(added)) if len(added) == 1 else None
+    new = current[added_slot]["effect"] if added_slot is not None else {}
+    appended = bool(valid and added_slot is not None
+        and after["slot_order"] == before["slot_order"] + [added_slot])
+    if appended and version == "2022.1":
+        appended = added_slot == next((str(index) for index in range(4) if str(index) not in prior), None)
     return {
         "owner_unchanged": bool(before.get("owner") and before["owner"] == after.get("owner")),
-        "exactly_one_added_binding": bool(valid and len(added) == 1 and set(prior) <= set(current)),
+        "exactly_one_added_binding": bool(appended and set(prior) <= set(current)),
         "existing_effects_and_bindings_unchanged": bool(valid and all(
             current.get(slot) == entry for slot, entry in prior.items())),
         "new_effect_matches": bool(new and new.get("type") == "Effect"
@@ -117,6 +127,7 @@ def _effect_snapshot(ctx: ExpansionCaseContext, owner_id: str) -> dict[str, Any]
             or owner["type"] != "Sound"):
         raise CaseBoundaryError("C09 owner projection is incomplete or has another identity")
     bindings: list[tuple[str, str, Mapping[str, Any] | None]] = []
+    slot_order: list[str] = []
     if ctx.version == "2022.1":
         for index in range(4):
             field = f"@Effect{index}"
@@ -125,11 +136,13 @@ def _effect_snapshot(ctx: ExpansionCaseContext, owner_id: str) -> dict[str, Any]
             plugin_id = _reference_id(owner.pop(field), empty_allowed=True)
             if plugin_id is not None:
                 bindings.append((str(index), plugin_id, None))
+                slot_order.append(str(index))
     elif ctx.version == "2025.1":
         slots = owner.pop("@Effects", None)
         if not isinstance(slots, list) or not 1 <= len(slots) <= 16:
             raise CaseBoundaryError("C09 requires a bounded nonempty EffectSlot list")
         slot_ids = tuple(_reference_id(slot) for slot in slots)
+        slot_order = list(slot_ids)
         if len({identifier.upper() for identifier in slot_ids}) != len(slot_ids):
             raise CaseBoundaryError("C09 EffectSlot list contains duplicate identities")
         slot_rows = ctx.trusted_read("effect_slot", slot_ids)
@@ -162,7 +175,9 @@ def _effect_snapshot(ctx: ExpansionCaseContext, owner_id: str) -> dict[str, Any]
         ):
             raise CaseBoundaryError("C09 effect parent differs from its versioned slot topology")
         entries.append({"slot": slot_id, "slot_state": slot, "effect": plugin})
-    return {"owner": owner, "entries": entries}
+    # Multi-ID read order is incidental; only the owner projection owns order.
+    entries.sort(key=lambda entry: entry["slot"])
+    return {"owner": owner, "entries": entries, "slot_order": slot_order}
 
 
 def prepare_c09(ctx: ExpansionCaseContext) -> PreparedExpansionCase:
@@ -200,11 +215,11 @@ def prepare_c09(ctx: ExpansionCaseContext) -> PreparedExpansionCase:
     scope = {owner["id"], *(row["effect"]["id"] for row in entries)}
     scope.update(row["slot"] for row in entries if row["slot_state"] is not None)
     return PreparedExpansionCase(
-        prompt=(f"请在声音 {owner['path']}（{owner['id']}）上新增一个名为 {name} 的 Wwise Gain 效果器，"
-                f"备注写“{_REQUESTED_NOTES}”。现有两个效果器的 GUID、slot 绑定、类型、名称和备注都要保持，"
+        prompt=(f"请在声音 {owner['path']}（{owner['id']}）的现有效果器后追加一个名为 {name} 的 Wwise Gain 效果器，"
+                f"备注写“{_REQUESTED_NOTES}”。现有两个效果器的顺序、GUID、slot 绑定、类型、名称和备注都要保持，"
                 "声音本身的音量、备注和父级也不变。不要替换现有效果器，不另设插件参数或平台值。"
                 "这是要实际完成的修改，请先核对现状、告知变更，并按允许修改策略取得独立授权后执行和核验；"
-                "只报告新增效果器及身份、绑定保持结果，不评价听感或宣称播放处理顺序。"),
+                "只报告新增效果器及身份、绑定和配置顺序保持结果，不评价听感或播放效果。"),
         operation="object.createPlugin", policy="allow_changes", before=before,
         read_object_ids=frozenset(scope), relationship_sources=frozenset({owner["id"]}),
         read_includes=frozenset({"parent", "owner", "notes", "volume-db", "plugin-name"}),

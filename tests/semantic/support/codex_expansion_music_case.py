@@ -108,7 +108,7 @@ def approve_m01_preview(artifact: Mapping[str, Any], *, version: str, parent_pat
         raw_path = row.get("object_path")
         if not isinstance(raw_path, str):
             return False
-        path = re.sub(r"<(?:MusicSegment|MusicTrack)>", "", raw_path)
+        path = re.sub(r"<Music ?(?:Segment|Track)>", "", raw_path)
         if path in seen or row.get("references", []) != []:
             return False
         seen.add(path)
