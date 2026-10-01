@@ -35,6 +35,19 @@ def _reference_id(value: Any) -> str:
     return result
 
 
+def _pitch_setup_points(ctx: ExpansionCaseContext, control_id: str) -> tuple[tuple[int | float, int], ...]:
+    """Seed the Time sibling at its live upper bound, not a guessed normalized end."""
+    control = read_object(ctx, control_id, fields=("Max",))
+    properties = control.get("properties")
+    maximum = properties.get("Max") if isinstance(properties, Mapping) else None
+    if (control.get("type") != "GameParameter"
+            or not isinstance(properties, Mapping) or set(properties) != {"Max"}
+            or type(maximum) not in {int, float} or not math.isfinite(maximum)
+            or maximum <= 0):
+        raise CaseBoundaryError("C06 requires one finite live Max for the Time control")
+    return ((0, -100), (maximum, 100))
+
+
 def _identity_projection(row: Mapping[str, Any], kind: str, *, notes: bool = True,
                          parent: bool = True) -> None:
     _reference_id(row)
@@ -169,6 +182,7 @@ def prepare_c06(ctx: ExpansionCaseContext) -> PreparedExpansionCase:
                      for name in ("Rain_Intensity", "Time"))
     if any(row.get("type") != "GameParameter" for row in controls):
         raise CaseBoundaryError("C06 pinned baseline control objects are unavailable")
+    pitch_points = _pitch_setup_points(ctx, controls[1]["id"])
     media = copy_asset(ctx, wav_assets(ctx, 1)[0], "rtpc", "C06_bed.wav")
     name = case_name(ctx, "Bed")
     draft = BusinessDraft(ctx, "audio.import")
@@ -181,7 +195,7 @@ def prepare_c06(ctx: ExpansionCaseContext) -> PreparedExpansionCase:
     owner = query_path(ctx, (*root, name))
     for meaning, control, points in (
         ("volume", controls[0], ((0, -48), (50, -12), (100, 0))),
-        ("pitch", controls[1], ((0, -100), (100, 100))),
+        ("pitch", controls[1], pitch_points),
     ):
         draft = BusinessDraft(ctx, "object.setRTPC")
         owner_handle = draft.bind(object_id=owner["id"])

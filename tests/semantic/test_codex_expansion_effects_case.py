@@ -15,9 +15,9 @@ OWNER = "{11111111-1111-1111-1111-111111111111}"
 
 
 def _entry(slot, effect, name):
-    return {"slot": slot, "slot_state": {"id": slot, "owner": {"id": OWNER}},
+    return {"slot": slot, "slot_state": {"id": slot, "type": "EffectSlot", "owner": {"id": OWNER}, "@Effect": {"id": effect}},
             "effect": {"id": effect, "type": "Effect", "classId": 123,
-                       "name": name, "notes": "preserved", "owner": {"id": OWNER}}}
+                       "name": name, "notes": "preserved", "owner": {"id": slot}}}
 
 
 def _baseline():
@@ -32,11 +32,11 @@ def test_effect_append_oracle_accepts_equivalent_read_order_but_not_swapped_bind
     added = _entry("slot-c", "effect-c", "New Gain")
     added["effect"]["notes"] = "requested"
     after["entries"] = [after["entries"][1], added, after["entries"][0]]
-    result = verify_c09(before, after, expected_class_id=123, expected_name="New Gain", expected_notes="requested")
+    result = verify_c09(before, after, version="2025.1", expected_class_id=123, expected_name="New Gain", expected_notes="requested")
     assert set(result) == C09_ASSERTIONS
     assert all(result.values())
     after["entries"][0]["effect"]["id"] = "effect-a"
-    assert not all(verify_c09(before, after, expected_class_id=123,
+    assert not all(verify_c09(before, after, version="2025.1", expected_class_id=123,
                               expected_name="New Gain", expected_notes="requested").values())
 
 
@@ -59,7 +59,7 @@ def test_effect_append_rejects_collateral_and_extra_changes(damage):
         added["effect"]["owner"]["id"] = "another-owner"
     else:
         after["owner"]["@Volume"] = -12
-    assert not all(verify_c09(before, after, expected_class_id=123,
+    assert not all(verify_c09(before, after, version="2025.1", expected_class_id=123,
                               expected_name="New Gain", expected_notes="requested").values())
 
 
@@ -99,7 +99,7 @@ def test_effect_setup_cli_parses_and_snapshot_checks_independent_bindings(versio
              "parent": {"id": "{66666666-6666-6666-6666-666666666666}"}, "@Volume": -3, "notes": ""}
     plugin_rows = {
         plugin_id: {"id": plugin_id, "name": f"Protected_Gain_{index}", "type": "Effect", "path": rf"\Gain{index}",
-                    "owner": {"id": OWNER}, "classId": 123, "notes": f"protected effect {index}"}
+                    "owner": {"id": OWNER if version == "2022.1" else slots[index]}, "classId": 123, "notes": f"protected effect {index}"}
         for index, plugin_id in enumerate(plugins)
     }
     def gateway(argv):
@@ -150,3 +150,39 @@ def test_effect_setup_cli_parses_and_snapshot_checks_independent_bindings(versio
     plugin_rows[plugins[0]].pop("owner")
     with pytest.raises(CaseBoundaryError, match="incomplete"):
         case.snapshot()
+
+
+@pytest.mark.parametrize("damage", ("slot_owner", "slot_identity", "slot_effect", "plugin_owner"))
+def test_effect_append_requires_the_exact_2025_three_link_ownership_chain(damage):
+    before = _baseline()
+    after = deepcopy(before)
+    added = _entry("slot-c", "effect-c", "New Gain")
+    added["effect"]["notes"] = "requested"
+    after["entries"].append(added)
+    if damage == "slot_owner":
+        added["slot_state"]["owner"]["id"] = "other-sound"
+    elif damage == "slot_identity":
+        added["slot_state"]["id"] = "slot-d"
+    elif damage == "slot_effect":
+        added["slot_state"]["@Effect"]["id"] = "other-effect"
+    else:
+        added["effect"]["owner"]["id"] = OWNER
+    result = verify_c09(before, after, version="2025.1", expected_class_id=123,
+                        expected_name="New Gain", expected_notes="requested")
+    assert not result["new_effect_owned_by_target"]
+
+
+def test_effect_append_preserves_the_2022_direct_owner_layout():
+    before = _baseline()
+    for index, entry in enumerate(before["entries"]):
+        entry.update(slot=str(index), slot_state=None)
+        entry["effect"]["owner"]["id"] = OWNER
+    after = deepcopy(before)
+    added = _entry("2", "effect-c", "New Gain")
+    added["slot_state"] = None
+    added["effect"].update(owner={"id": OWNER}, notes="requested")
+    after["entries"].append(added)
+    assert all(verify_c09(before, after, version="2022.1", expected_class_id=123,
+                          expected_name="New Gain", expected_notes="requested").values())
+    assert not all(verify_c09(before, after, version="2025.1", expected_class_id=123,
+                              expected_name="New Gain", expected_notes="requested").values())

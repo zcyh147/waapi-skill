@@ -45,6 +45,60 @@ def _bounded_diagnostic_bytes(value: bytes, limit: int = _GATEWAY_DIAGNOSTIC_EXC
     )
 
 
+def _receipt_text(value: Any, limit: int) -> str | None:
+    if not isinstance(value, str):
+        return None
+    return value.encode("utf-8")[:limit].decode("utf-8", errors="ignore")
+
+
+def _gateway_receipt_summary(payload: Mapping[str, Any]) -> dict[str, Any]:
+    """Keep small failure facts when a full structured Gateway receipt is too large."""
+    summary: dict[str, Any] = {}
+    for key in ("status", "operation", "verification_strength"):
+        value = _receipt_text(payload.get(key), 128)
+        if value is not None:
+            summary[key] = value
+    if type(payload.get("ok")) is bool:
+        summary["ok"] = payload["ok"]
+    error = payload.get("error")
+    if isinstance(error, Mapping):
+        error_summary = {}
+        code = _receipt_text(error.get("code"), 128)
+        message = _receipt_text(error.get("message"), 256)
+        if code is not None:
+            error_summary["code"] = code
+        if message is not None:
+            error_summary["message"] = message
+        if error_summary:
+            summary["error"] = error_summary
+    verification = payload.get("verification")
+    if isinstance(verification, Mapping):
+        verification_summary: dict[str, Any] = {}
+        for key in ("status", "operation", "verification_strength"):
+            value = _receipt_text(verification.get(key), 128)
+            if value is not None:
+                verification_summary[key] = value
+        for key in ("business_state_verified", "assertion_count", "passed_assertion_count",
+                    "failed_assertion_count", "readback_count"):
+            value = verification.get(key)
+            if type(value) in {bool, int}:
+                verification_summary[key] = value
+        assertions = verification.get("assertions")
+        if isinstance(assertions, list):
+            failed = [row for row in assertions
+                      if isinstance(row, Mapping) and row.get("passed") is False]
+            names = [name for row in failed
+                     if (name := _receipt_text(row.get("name"), 192)) is not None]
+            verification_summary["assertion_count"] = len(assertions)
+            verification_summary["failed_assertion_count"] = len(failed)
+            verification_summary["failed_assertions"] = names[:12]
+            if len(names) > 12:
+                verification_summary["omitted_failed_assertion_names"] = len(names) - 12
+        if verification_summary:
+            summary["verification"] = verification_summary
+    return summary
+
+
 def make_public_gateway(
     *,
     host: str,
@@ -188,6 +242,7 @@ def make_public_gateway(
         else:
             receipt["payload_sha256"] = hashlib.sha256(encoded_payload).hexdigest()
             receipt["payload_excerpt"] = _bounded_diagnostic_bytes(encoded_payload)
+            receipt["payload_summary"] = _gateway_receipt_summary(payload)
         if stderr:
             receipt["stderr_excerpt"] = _bounded_diagnostic_bytes(stderr)
         receipts.append(receipt)

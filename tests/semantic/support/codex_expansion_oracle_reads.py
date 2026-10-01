@@ -42,6 +42,11 @@ def expansion_oracle_reader(
         "@Volume", "notes",
     )}
 
+    if version == "2025.1":
+        # Internal Stingers omit parent in the attested 2025.1 readback.
+        # Their exact owning container is proven separately via @Stingers.
+        views["music_stinger"] = tuple(field for field in views["music_stinger"] if field != "parent")
+
     def read(view: str, object_ids: Sequence[str]) -> tuple[Mapping[str, Any], ...]:
         ids = tuple(object_ids)
         if (view not in views or not 1 <= len(ids) <= 64

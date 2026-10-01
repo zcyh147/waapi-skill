@@ -33,9 +33,12 @@ def approve_c09_preview(artifact: Mapping[str, Any], *, version: str, owner_id: 
         })
 
 
-def _entries(snapshot: Mapping[str, Any]) -> dict[str, Mapping[str, Any]] | None:
+def _entries(snapshot: Mapping[str, Any], *, version: str) -> dict[str, Mapping[str, Any]] | None:
     entries = snapshot.get("entries")
-    if not isinstance(entries, list) or not 1 <= len(entries) <= 16:
+    owner = snapshot.get("owner")
+    if (version not in {"2022.1", "2025.1"} or not isinstance(owner, Mapping)
+            or not isinstance(owner.get("id"), str)
+            or not isinstance(entries, list) or not 1 <= len(entries) <= (4 if version == "2022.1" else 16)):
         return None
     result: dict[str, Mapping[str, Any]] = {}
     effect_ids: set[str] = set()
@@ -47,14 +50,33 @@ def _entries(snapshot: Mapping[str, Any]) -> dict[str, Mapping[str, Any]] | None
                 or not isinstance(effect, Mapping) or not isinstance(effect.get("id"), str)
                 or effect["id"].casefold() in effect_ids):
             return None
+        slot_state = entry["slot_state"]
+        if version == "2022.1":
+            if slot not in {"0", "1", "2", "3"} or slot_state is not None:
+                return None
+            expected_owner = owner["id"]
+        else:
+            if (not isinstance(slot_state, Mapping) or slot_state.get("id") != slot
+                    or slot_state.get("type") != "EffectSlot"
+                    or not isinstance(slot_state.get("owner"), Mapping)
+                    or slot_state["owner"].get("id") != owner["id"]
+                    or not isinstance(slot_state.get("@Effect"), Mapping)
+                    or slot_state["@Effect"].get("id") != effect["id"]):
+                return None
+            expected_owner = slot
+        if (not isinstance(effect.get("owner"), Mapping)
+                or effect["owner"].get("id") != expected_owner
+                or ("parent" in effect and (not isinstance(effect["parent"], Mapping)
+                    or effect["parent"].get("id") != expected_owner))):
+            return None
         result[slot] = entry
         effect_ids.add(effect["id"].casefold())
     return result
 
 
 def verify_c09(before: Mapping[str, Any], after: Mapping[str, Any], *,
-               expected_class_id: int, expected_name: str, expected_notes: str) -> dict[str, bool]:
-    prior, current = _entries(before), _entries(after)
+               version: str, expected_class_id: int, expected_name: str, expected_notes: str) -> dict[str, bool]:
+    prior, current = _entries(before, version=version), _entries(after, version=version)
     valid = prior is not None and current is not None
     added = set(current) - set(prior) if valid else set()
     new = current[next(iter(added))]["effect"] if len(added) == 1 else {}
@@ -67,9 +89,7 @@ def verify_c09(before: Mapping[str, Any], after: Mapping[str, Any], *,
             and type(new.get("classId")) is int and new["classId"] == expected_class_id
             and new.get("name") == expected_name and new.get("notes") == expected_notes),
         "unique_effect_identities": valid,
-        "new_effect_owned_by_target": bool(new and isinstance(new.get("owner"), Mapping)
-            and isinstance(before.get("owner"), Mapping)
-            and new["owner"].get("id") == before["owner"].get("id")),
+        "new_effect_owned_by_target": bool(valid and new),
     }
 
 
@@ -134,7 +154,8 @@ def _effect_snapshot(ctx: ExpansionCaseContext, owner_id: str) -> dict[str, Any]
         plugin = plugins[plugin_id]
         if (not {"id", "name", "type", "path", "owner", "classId", "notes"} <= set(plugin)
                 or plugin["type"] != "Effect" or type(plugin["classId"]) is not int
-                or not isinstance(plugin["notes"], str) or _reference_id(plugin["owner"]) != owner_id):
+                or not isinstance(plugin["notes"], str) or _reference_id(plugin["owner"]) != (
+                    owner_id if ctx.version == "2022.1" else slot_id)):
             raise CaseBoundaryError("C09 plugin identity, class or owner is incomplete")
         if "parent" in plugin and _reference_id(plugin["parent"]) != (
             owner_id if ctx.version == "2022.1" else slot_id
@@ -193,8 +214,8 @@ def prepare_c09(ctx: ExpansionCaseContext) -> PreparedExpansionCase:
             artifact, version=ctx.version, owner_id=owner["id"], class_id=class_id,
             name=name, notes=_REQUESTED_NOTES),
         snapshot=snapshot, verify=lambda old, new: verify_c09(old, new,
-            expected_class_id=class_id, expected_name=name, expected_notes=_REQUESTED_NOTES),
-        archive_oracle_parameters={"expected_class_id": class_id, "expected_name": name,
+            version=ctx.version, expected_class_id=class_id, expected_name=name, expected_notes=_REQUESTED_NOTES),
+        archive_oracle_parameters={"version": ctx.version, "expected_class_id": class_id, "expected_name": name,
                                    "expected_notes": _REQUESTED_NOTES},
         archive_preview_parameters={"version": ctx.version, "owner_id": owner["id"],
                                     "class_id": class_id, "name": name, "notes": _REQUESTED_NOTES},

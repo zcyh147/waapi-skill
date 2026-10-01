@@ -8,7 +8,8 @@ import pytest
 from tests.semantic.support.codex_expansion_cases import ExpansionCaseContext
 from tests.semantic.support.codex_expansion_case_helpers import CaseBoundaryError
 from tests.semantic.support.codex_expansion_voice_case import (
-    C01_ASSERTIONS, _voice_snapshot, approve_c01_preview, prepare_c01, verify_c01,
+    C01_ASSERTIONS, _create_english_event_voice, _voice_snapshot,
+    approve_c01_preview, prepare_c01, verify_c01,
 )
 
 
@@ -105,6 +106,105 @@ def test_voice_missing_prelaunch_language_blocks_before_any_gateway_mutation(tmp
     with pytest.raises(CaseBoundaryError, match="before launch"):
         prepare_c01(ctx)
     assert calls == []
+
+
+def test_english_event_import_and_volume_use_separate_verified_gateway_transactions(
+    tmp_path: Path,
+) -> None:
+    parent_id = "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"
+    sound_id = "{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}"
+    sound = {"id": sound_id, "type": "Sound", "name": "Line_01",
+             "path": r"\Containers\Default Work Unit\Voices\Line_01",
+             "parent": {"id": parent_id}, "notes": "", "volume_db": 0.0,
+             "output_bus": None}
+    calls: list[tuple[str, ...]] = []
+    operations: dict[str, str] = {}
+    revisions: dict[str, int] = {}
+
+    def gateway(argv):
+        call = tuple(argv)
+        calls.append(call)
+        command = argv[0]
+        if command == "draft-start":
+            draft_id = f"draft-{len(operations) + 1}"
+            operations[draft_id] = argv[1]
+            revisions[draft_id] = 1
+            return {"draft": {"draft_id": draft_id, "revision": 1},
+                    "task_authority": "task-authority"}
+        if command == "draft-bind-object":
+            result = {"draft": {"revision": revisions[argv[1]] + 1}}
+            revisions[argv[1]] += 1
+            if "--object-id" in argv:
+                result["bound_object"] = {"handle": "boh-parent"}
+            else:
+                result["bound_object"] = {"handle": "boh-events"}
+            return result
+        if command == "draft-discover-fields":
+            revisions[argv[1]] += 1
+            return {"draft": {"revision": revisions[argv[1]]},
+                    "meaning_results": [{"candidates": [{"handle": "bf-volume"}]}]}
+        if command.startswith("draft-") or command == "preview-from-draft":
+            draft_id = argv[1]
+            revisions[draft_id] += 1
+            result = {"draft": {"revision": revisions[draft_id]}}
+            if command == "preview-from-draft":
+                result["transaction_id"] = f"tx-{draft_id}"
+            if command == "draft-declare-field-change":
+                assert operations[draft_id] == "object.setProperty"
+                assert argv[argv.index("--field-handle") + 1] == "bf-volume"
+                assert argv[argv.index("--business-value") + 1] == "-3"
+                sound["volume_db"] = -3.0
+            return result
+        if command == "transaction-show":
+            return {"state": "awaiting_confirmation", "confirmation": {"token": "confirm"}}
+        if command == "confirm":
+            return {"state": "confirmed"}
+        if command == "execute":
+            return {"state": "executed_unverified"}
+        if command == "verify":
+            return {"state": "verified", "verification": {"business_state_verified": True}}
+        if command == "query-object":
+            if "--exact-id" in argv:
+                assert argv[argv.index("--exact-id") + 1] == sound_id
+            else:
+                assert [argv[i + 1] for i, value in enumerate(argv[:-1])
+                        if value == "--path-segment"] == [
+                            "Containers", "Default Work Unit", "Voices", "Line_01",
+                        ]
+            return {"ok": True, "count": 1, "objects": [dict(sound)],
+                    "query_bound": {"mode": "take", "value": 2}}
+        raise AssertionError(call)
+
+    media = tmp_path / "english" / "C01_line.wav"
+    media.parent.mkdir()
+    media.write_bytes(b"RIFF-english")
+    ctx = ExpansionCaseContext("2025.1", "C01", tmp_path / "Sample.wproj",
+                               tmp_path / "assets", gateway)
+    prepared_sound = _create_english_event_voice(
+        ctx, parent={"id": parent_id, "path": r"\Containers\Default Work Unit\Voices"},
+        parent_segments=("Containers", "Default Work Unit", "Voices"),
+        sound_name="Line_01", event_name="Expansion_C01_Play_Line_01", media=media,
+    )
+
+    import_calls = [call for call in calls if call[0] == "draft-declare-import-batch"]
+    assert len(import_calls) == 1
+    assert operations[import_calls[0][1]] == "audio.import"
+    event_index = import_calls[0].index("--event")
+    assert import_calls[0][event_index + 1:event_index + 5] == (
+        "voice", "boh-events", "Expansion_C01_Play_Line_01", "Play",
+    )
+    import_fields = [import_calls[0][index + 1:index + 3]
+                     for index, value in enumerate(import_calls[0][:-2]) if value == "--field"]
+    assert ("voice", "language") in import_fields
+    assert ("voice", "volume_db") not in import_fields
+    field_change = next(call for call in calls if call[0] == "draft-declare-field-change")
+    assert operations[field_change[1]] == "object.setProperty"
+    discovery = next(call for call in calls if call[0] == "draft-discover-fields")
+    assert discovery[discovery.index("--meaning") + 1] == "Volume"
+    assert prepared_sound["volume_db"] == -3.0
+    assert any(call[0] == "verify" and call[1] == f"tx-{field_change[1]}" for call in calls)
+    exact_read = next(call for call in calls if call[0] == "query-object" and "--exact-id" in call)
+    assert "--include" in exact_read and "volume-db" in exact_read
 
 
 @pytest.mark.parametrize("fault", (

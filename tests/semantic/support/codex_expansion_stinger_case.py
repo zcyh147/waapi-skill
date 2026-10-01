@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any, Mapping
 
 from tests.semantic.support.codex_expansion_cases import ExpansionCaseContext, PreparedExpansionCase
@@ -22,6 +23,61 @@ M05_ASSERTIONS = frozenset({
 })
 
 
+_GUID = re.compile(r"^\{[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}\}$")
+
+
+def _member_ids(owner: Any, expected_owner: str) -> tuple[str, ...] | None:
+    if (not isinstance(owner, Mapping) or owner.get("id") != expected_owner
+            or owner.get("type") != "MusicPlaylistContainer"):
+        return None
+    members = owner.get("@Stingers")
+    if not isinstance(members, list) or not 1 <= len(members) <= 16:
+        return None
+    ids = tuple(row.get("id") if isinstance(row, Mapping) else None for row in members)
+    if (any(not isinstance(identifier, str) or not _GUID.fullmatch(identifier) for identifier in ids)
+            or len({identifier.casefold() for identifier in ids}) != len(ids)):
+        return None
+    return ids
+
+
+def _valid_stinger(row: Any) -> bool:
+    if (not isinstance(row, Mapping) or row.get("type") != "MusicStinger"
+            or not isinstance(row.get("id"), str) or not _GUID.fullmatch(row["id"])
+            or not all(isinstance(row.get(key), str) for key in ("name", "path", "notes"))
+            or any(type(row.get(key)) is not int for key in ("@NumSegmentAdvance", "@PlaySegmentAt"))):
+        return False
+    return all(isinstance(row.get(key), Mapping) and isinstance(row[key].get("id"), str)
+               and _GUID.fullmatch(row[key]["id"]) is not None for key in ("@Trigger", "@Segment"))
+
+
+def _valid_m05_snapshot(snapshot: Mapping[str, Any]) -> bool:
+    """Internal Stingers prove ownership through exact owner-list membership.
+
+    The pinned 2025.1 observation omits parent on these internal objects.
+    Membership, configuration and the independently owned protected witness
+    remain mandatory in both live and serialized archive verification.
+    """
+    ids = _member_ids(snapshot.get("owner"), OWNER)
+    siblings, stinger = snapshot.get("siblings"), snapshot.get("stinger")
+    if (ids is None or STINGER not in ids or not isinstance(siblings, list)
+            or len(siblings) != len(ids) or not all(_valid_stinger(row) for row in siblings)
+            or len({row["id"].casefold() for row in siblings}) != len(siblings)
+            or {row["id"] for row in siblings} != set(ids)
+            or not _valid_stinger(stinger) or stinger.get("id") != STINGER
+            or stinger != next(row for row in siblings if row["id"] == STINGER)):
+        return False
+    protected = snapshot.get("protected")
+    if not isinstance(protected, Mapping):
+        return False
+    protected_ids = _member_ids(protected.get("owner"), PROTECTED_OWNER)
+    witness = protected.get("stinger")
+    target, segment = snapshot.get("target"), snapshot.get("segment")
+    return bool(protected_ids and PROTECTED_STINGER in protected_ids
+        and _valid_stinger(witness) and witness["id"] == PROTECTED_STINGER
+        and isinstance(target, Mapping) and target.get("id") == TARGET and target.get("type") == "Trigger"
+        and isinstance(segment, Mapping) and segment.get("id") == SEGMENT and segment.get("type") == "MusicSegment")
+
+
 def _without_trigger(row: Mapping[str, Any]) -> dict[str, Any]:
     # Wwise derives these display fields from the Trigger/Segment association.
     # GUID, type, owner and the actual remaining configuration stay authoritative.
@@ -35,8 +91,11 @@ def _owner_state(row: Mapping[str, Any]) -> dict[str, Any]:
     return result
 
 
-def verify_m05(before: Mapping[str, Any], after: Mapping[str, Any], *, target_id: str) -> dict[str, bool]:
-    old, new = before.get("stinger", {}), after.get("stinger", {})
+def verify_m05(before: Mapping[str, Any], after: Mapping[str, Any], *, version: str, target_id: str) -> dict[str, bool]:
+    valid = version == "2025.1" and target_id == TARGET and _valid_m05_snapshot(before) and _valid_m05_snapshot(after)
+    if not valid:
+        return {key: False for key in sorted(M05_ASSERTIONS)}
+    old, new = before["stinger"], after["stinger"]
     def normalized_siblings(value):
         return sorted((_without_trigger(row) if row.get("id") == old.get("id") else row
                        for row in value), key=lambda row: row["id"])
@@ -45,7 +104,8 @@ def verify_m05(before: Mapping[str, Any], after: Mapping[str, Any], *, target_id
         "segment_reference_preserved": old.get("@Segment") is not None and old.get("@Segment") == new.get("@Segment"),
         "stinger_identity_and_other_configuration_preserved": bool(old) and _without_trigger(old) == _without_trigger(new),
         "other_stingers_preserved": (
-            bool(before.get("protected")) and before["protected"] == after.get("protected")
+            {**before["protected"], "owner": _owner_state(before["protected"]["owner"])}
+                == {**after["protected"], "owner": _owner_state(after["protected"]["owner"])}
             and normalized_siblings(before.get("siblings", [])) == normalized_siblings(after.get("siblings", []))),
         "target_and_segment_unchanged": before.get("target") == after.get("target") and before.get("segment") == after.get("segment"),
         "owner_unchanged": _owner_state(before.get("owner", {})) == _owner_state(after.get("owner", {})),
@@ -86,31 +146,31 @@ def prepare_m05(ctx: ExpansionCaseContext) -> PreparedExpansionCase:
         raise CaseBoundaryError("M05 requires the sealed independent read-only oracle")
 
     def snapshot() -> Mapping[str, Any]:
-        owner = ctx.trusted_read("music_stinger_owner", [OWNER])[0]
-        members = owner.get("@Stingers")
-        if (not isinstance(members, list) or not 1 <= len(members) <= 16
-                or any(not isinstance(row, Mapping) or not isinstance(row.get("id"), str) for row in members)):
-            raise CaseBoundaryError("Stinger owner does not expose bounded exact membership")
-        ids = [row["id"] for row in members]
-        if STINGER not in ids or len(set(ids)) != len(ids):
-            raise CaseBoundaryError("Stinger ownership is missing or duplicated")
-        siblings = ctx.trusted_read("music_stinger", ids)
-        by_id = {row["id"]: row for row in siblings}
-        return {"stinger": by_id[STINGER], "siblings": list(siblings), "owner": owner,
-                "target": ctx.trusted_read("identity", [TARGET])[0],
-                "segment": ctx.trusted_read("identity", [SEGMENT])[0],
-                "protected": {
-                    "stinger": ctx.trusted_read("music_stinger", [PROTECTED_STINGER])[0],
-                    "owner": ctx.trusted_read("music_stinger_owner", [PROTECTED_OWNER])[0],
-                }}
+        def one(view: str, identifier: str) -> Mapping[str, Any]:
+            rows = ctx.trusted_read(view, [identifier])
+            if len(rows) != 1 or not isinstance(rows[0], Mapping) or rows[0].get("id") != identifier:
+                raise CaseBoundaryError("M05 exact oracle read returned another identity")
+            return rows[0]
+        owner = one("music_stinger_owner", OWNER)
+        ids = _member_ids(owner, OWNER)
+        if ids is None or STINGER not in ids:
+            raise CaseBoundaryError("M05 Stinger ownership membership is missing or duplicated")
+        siblings = list(ctx.trusted_read("music_stinger", list(ids)))
+        if (len(siblings) != len(ids) or not all(_valid_stinger(row) for row in siblings)
+                or len({row["id"].casefold() for row in siblings}) != len(siblings)
+                or {row["id"] for row in siblings} != set(ids)):
+            raise CaseBoundaryError("M05 Stinger read does not close exact membership and configuration")
+        result = {"stinger": next(row for row in siblings if row["id"] == STINGER),
+                  "siblings": siblings, "owner": owner,
+                  "target": one("identity", TARGET), "segment": one("identity", SEGMENT),
+                  "protected": {"stinger": one("music_stinger", PROTECTED_STINGER),
+                                "owner": one("music_stinger_owner", PROTECTED_OWNER)}}
+        if not _valid_m05_snapshot(result):
+            raise CaseBoundaryError("M05 owned Stinger/configuration/protected witness cannot be sealed")
+        return result
 
     before = snapshot()
     stinger = before["stinger"]
-    for row in (stinger, before["protected"]["stinger"]):
-        if (not {"id", "name", "type", "path", "parent", "notes", "@Trigger", "@Segment", "@NumSegmentAdvance", "@PlaySegmentAt"} <= set(row)
-                or any(type(row[key]) is not int for key in ("@NumSegmentAdvance", "@PlaySegmentAt"))
-                or not isinstance(row["notes"], str)):
-            raise CaseBoundaryError("M05 cannot seal missing Stinger timing/configuration fields")
     if (stinger.get("@Trigger", {}).get("id") != BONUS or stinger.get("@Segment", {}).get("id") != SEGMENT
             or before["target"].get("type") != "Trigger"):
         raise CaseBoundaryError("M05 fixed fixture references differ from the reviewed baseline")
@@ -127,7 +187,7 @@ def prepare_m05(ctx: ExpansionCaseContext) -> PreparedExpansionCase:
         read_object_ids=frozenset({STINGER, OWNER, BONUS, TARGET, SEGMENT, PROTECTED_STINGER, PROTECTED_OWNER}), relationship_sources=frozenset(),
         read_includes=frozenset({"parent", "notes"}), read_fields=frozenset({"Trigger", "Segment"}),
         required_assertions=M05_ASSERTIONS, approve_preview=lambda artifact: approve_m05_preview(artifact, version=ctx.version),
-        snapshot=snapshot, verify=lambda old, new: verify_m05(old, new, target_id=TARGET),
-        archive_oracle_parameters={"target_id": TARGET},
+        snapshot=snapshot, verify=lambda old, new: verify_m05(old, new, version=ctx.version, target_id=TARGET),
+        archive_oracle_parameters={"version": ctx.version, "target_id": TARGET},
         archive_preview_parameters={"version": ctx.version},
     )

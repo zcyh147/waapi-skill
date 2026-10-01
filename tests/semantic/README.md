@@ -560,6 +560,7 @@ The separately approved V3 executable profiles are:
 | `typed_input_cross_version_25` | 25 | 39 | Fixed representative typed-input profile: five fresh tasks per Wwise version, no same-root retries, and one public Gateway continuation at each step |
 | `deep_business_cross_version_19` | 19 | 21 | #60 release profile: one reviewed packaged-Skill task for every migration family from #54/#56/#57 across all five versions; mixed proportional real-Wwise and production-Gateway Preview evidence |
 | `integration` | 12 | 36 | Six cross-operation workflows on Wwise 2022.1 and 2025.1; 20 previewed transactions and no additional per-API coverage credit |
+| `integration_expansion_v1` | 13 | 17 | Seven additional workflows on Wwise 2022.1/2025.1, with 13 transactions and a separate runner-only M05/2022 capability boundary |
 | `modification_policy_9` | 9 | 15 | Three isolated repetitions of each canonical project-modification policy on one reviewed object.create business case |
 | `switch_assignment_business_1` | 1 | 1 | Preview-only routing proof for one independent Switch assignment through three opaque business-object handles and Gateway-owned native materialization |
 | `core_business_1` | 1 | 1 | Preview-only routing proof that a zero-input Core mutation follows `request-schema` into one Gateway-owned Core business plan and immutable Preview |
@@ -572,6 +573,46 @@ The separately approved V3 executable profiles are:
 The two older six-task integration profile IDs remain internal compatibility
 entrypoints for their exact sealed roots. They are deliberately absent from the
 public profile table.
+
+The expansion profile is defined by
+`tests/semantic/data/integration-expansion-v1/profile.json`. It covers localized
+reimport (C01), same-basename media mapping (C03), existing RTPC maintenance
+(C06), attenuation (C08), appended effects (C09), music import (M01), and an
+existing Stinger reference (M05). C01/C03 use `ask_before_changes`; the other
+cases use `allow_changes`. M05/2022 has no Agent turn or business PASS: the
+trusted runner must reproduce and preserve its specific public-interface
+boundary. The totals above describe the planned full selection, not completed
+acceptance or new per-API coverage.
+
+Independent before/after project and media observations decide outcomes.
+Unordered independent edits may vary, while meaningful curve order, exact
+targets, preservation, authorization, and execute-once rules remain enforced.
+The cumulative Agent budget is 600 seconds per case, with a slow flag above
+420 seconds; preparation, Wwise startup, oracle work, and cleanup are separate.
+Failed roots remain frozen. Finish a full batch, consolidate repairs, rerun
+failed cases in new roots, then run the final complete selection and identical
+verify-only audit on one frozen candidate.
+
+The expansion's model-selection pilot compares GPT-6 Luna high with
+GPT-6.1 Sol medium on C01/M01/C06 in 2025.1: three Fresh tasks per model,
+with the default service tier. Luna medium is a conditional follow-up after
+Luna high proves reliable. No formal model choice or new acceptance is implied
+by the profile's defaults; historical profiles keep their original pins.
+
+Use a new explicit root for each model configuration. For example, after the
+fixture and program prerequisites pass, the Luna half of the pilot is:
+
+```bash
+skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py \
+  --profile integration_expansion_v1 --version 2025.1 \
+  --case-id C01 --case-id M01 --case-id C06 \
+  --model gpt-6-luna --reasoning-effort high --service-tier default \
+  --campaign-root skills/waapi-skill-workspace/expansion-pilot-luna-new-candidate
+```
+
+Use `--model gpt-6.1-sol --reasoning-effort medium` and a different root for the
+Sol half. Public callers need no custom `--suite`. Real execution stays
+sequential and uses the existing formal campaign and sandbox lifecycle.
 
 From the repository root, run each profile into a distinct campaign directory.
 Use the Skill-local Python so the runner-owned live fixture has the same pinned

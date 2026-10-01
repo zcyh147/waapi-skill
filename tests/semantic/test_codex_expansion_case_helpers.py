@@ -190,6 +190,47 @@ def test_public_gateway_preserves_structured_failure_and_bounds_process_output(
     assert receipts[0]["stderr_excerpt"] == "bounded stderr"
 
 
+def test_public_gateway_retains_failed_assertion_names_in_oversize_receipt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = tmp_path / "config.json"
+    config.write_text("{}", encoding="utf-8")
+    receipts = []
+    failure = {
+        "ok": False,
+        "status": "verification_failed",
+        "error": {"code": "VERIFY_FAILED", "message": "business verification failed"},
+        "verification": {
+            "status": "verification_failed",
+            "business_state_verified": False,
+            "assertions": [
+                {"name": "Event exact path resolves once", "passed": False,
+                 "evidence": {"diagnostic": "x" * 40_000}},
+            ],
+        },
+        "padding": "x" * 40_000,
+    }
+    monkeypatch.setattr(
+        expansion_helpers.subprocess, "run",
+        lambda command, **kwargs: expansion_helpers.subprocess.CompletedProcess(
+            command, 2, json.dumps(failure).encode(), b"",
+        ),
+    )
+    gateway = make_public_gateway(
+        host="127.0.0.1", port=8090, version="2025.1", config_path=config,
+        state_dir=tmp_path / "state", environment={}, receipts=receipts,
+        live_commands=frozenset(),
+    )
+    with pytest.raises(CaseBoundaryError):
+        gateway(["verify", "tx1-test"])
+    receipt = receipts[0]
+    assert receipt["payload_bytes"] > expansion_helpers._GATEWAY_RECEIPT_PAYLOAD_LIMIT_BYTES
+    assert receipt["payload_summary"]["verification"]["failed_assertions"] == [
+        "Event exact path resolves once",
+    ]
+    assert len(json.dumps(receipt["payload_summary"]).encode()) <= 4096
+
+
 def test_public_gateway_timeout_is_retained_as_a_bounded_receipt(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:

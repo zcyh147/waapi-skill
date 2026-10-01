@@ -18,8 +18,26 @@ pilot, and acceptance may proceed after their prerequisite gates.
   consumed execution reservations from journal-proven dispatch. Five new red
   regressions preceded the repair; 22 focused archive tests passed afterward.
 - The combined expansion-focused regression passed 282 tests on 2026-10-01.
-  Full Program, Non-live, repaired real preflight, Fresh pilot, and final
-  acceptance remain outstanding at this checkpoint.
+  Frozen candidate `e8ab17c` then passed Program (5819 passed / 2 skipped)
+  and Non-live (11766 passed / 117 skipped / 27 deselected).
+- Real preflight at `e8ab17c`: 2025 had two setup/oracle-stability passes and
+  five failures; 2022 had three setup passes, three failures, and one observed
+  M05 capability boundary. All 14 final source hash/mtime/tree-metadata guards
+  and scoped-process cleanup checks passed. This is not Agent/business PASS.
+  Durable records are summarized in
+  `../research/integration-expansion-preflight-2026-10-01.json`.
+- Scoped repairs cover attenuation read tokens (#125), versioned EffectSlot
+  ownership, Stinger owner membership and unordered-list normalization,
+  live Time.Max fixture points, and bounded failed-verification summaries.
+  C01 now probes unsplit Event import and sets Volume separately; the original
+  split-layout unmet Event effect stays tracked in #126.
+- The combined repaired fixture/oracle/attenuation focused gate passed 429
+  tests. New frozen real reruns, Fresh pilot, and final acceptance remain.
+- A subsequent review confirmed failure-classification and post-failure
+  readback gaps. Their expansion-only repair is in progress separately; no
+  timeout, infrastructure block, or uncertain execution may be promoted to PASS.
+- Tickets #109, #110, #123, and #124 are closed from their scoped evidence;
+  business and final acceptance tickets remain open.
 
 The remaining sections retain the earlier pause checkpoint as historical context.
 The two review defects listed below are repaired by the resume update; the

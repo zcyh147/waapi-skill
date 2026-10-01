@@ -346,32 +346,55 @@ def test_metadata_property_state_resolves_meaning_before_exact_native_read(
 
 
 @pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+@pytest.mark.parametrize("exact_id_scope", (False, True))
+@pytest.mark.parametrize(
+    ("curve_role", "native_curve_type"),
+    (
+        ("volume-dry", "VolumeDryUsage"),
+        ("game-defined-aux-send-volume", "VolumeWetGameUsage"),
+        ("user-defined-aux-send-volume", "VolumeWetUserUsage"),
+        ("low-pass-filter", "LowPassFilterUsage"),
+        ("high-pass-filter", "HighPassFilterUsage"),
+        ("spread", "SpreadUsage"),
+        ("focus", "FocusUsage"),
+    ),
+)
 def test_metadata_attenuation_compiles_business_curve_role(
     tmp_path: Path,
     version: str,
+    exact_id_scope: bool,
+    curve_role: str,
+    native_curve_type: str,
 ) -> None:
     responses = _metadata_responses(tmp_path, version=version)
     responses[GET_ATTENUATION_CURVE_URI] = {
-        "curveType": "VolumeDryUsage",
+        "curveType": native_curve_type,
         "use": "Custom",
         "points": [],
     }
     client = FakeClient(responses)
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        [
-            "metadata",
-            "attenuation",
+    scope_argv = (
+        ["--exact-id", OBJECT_GUID]
+        if exact_id_scope
+        else [
             "--path-segment",
             "Attenuations",
             "--path-segment",
             "Default Work Unit",
             "--path-segment",
             "Outdoor",
-            "--curve-role",
-            "volume-dry",
             "--platform",
             "Windows",
+        ]
+    )
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "metadata",
+            "attenuation",
+            *scope_argv,
+            "--curve-role",
+            curve_role,
         ],
         env=_gateway_env(tmp_path, version=version),
         client_factory=lambda _url: client,
@@ -379,16 +402,20 @@ def test_metadata_attenuation_compiles_business_curve_role(
 
     assert exit_code == 0, payload
     assert payload["agent_result"] == {
-        "curve_role": "volume-dry",
+        "curve_role": curve_role,
         "use": "Custom",
         "points": [],
     }
     assert client.calls[-1] == (
         GET_ATTENUATION_CURVE_URI,
         {
-            "object": r"\Attenuations\Default Work Unit\Outdoor",
-            "curveType": "VolumeDryUsage",
-            "platform": "Windows",
+            "object": (
+                OBJECT_GUID
+                if exact_id_scope
+                else r"\Attenuations\Default Work Unit\Outdoor"
+            ),
+            "curveType": native_curve_type,
+            **({} if exact_id_scope else {"platform": "Windows"}),
         },
         {},
     )

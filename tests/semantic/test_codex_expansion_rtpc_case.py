@@ -8,7 +8,8 @@ import pytest
 from tests.semantic.support.codex_expansion_cases import ExpansionCaseContext
 from tests.semantic.support.codex_expansion_case_helpers import CaseBoundaryError
 from tests.semantic.support.codex_expansion_rtpc_case import (
-    C06_ASSERTIONS, TARGET_POINTS, _rtpc_snapshot, approve_c06_preview, prepare_c06, verify_c06,
+    C06_ASSERTIONS, TARGET_POINTS, _pitch_setup_points, _rtpc_snapshot,
+    approve_c06_preview, prepare_c06, verify_c06,
 )
 
 
@@ -143,3 +144,34 @@ def test_rtpc_case_blocks_before_setup_without_trusted_oracle(tmp_path: Path) ->
     with pytest.raises(CaseBoundaryError, match="trusted oracle"):
         prepare_c06(ctx)
     assert calls == []
+
+
+def test_pitch_fixture_endpoint_uses_exact_live_game_parameter_max() -> None:
+    calls = []
+
+    def gateway(argv):
+        calls.append(tuple(argv))
+        return {"ok": True, "count": 1, "objects": [{
+            "id": SECOND_CONTROL,
+            "type": "GameParameter",
+            "properties": {"Max": 240.0},
+        }], "query_bound": {"mode": "take", "value": 2}}
+
+    ctx = ExpansionCaseContext("2025.1", "C06", Path("/fixture/Sample.wproj"),
+                               Path("/fixture/assets"), gateway)
+    assert _pitch_setup_points(ctx, SECOND_CONTROL) == ((0, -100), (240.0, 100))
+    assert calls == [(
+        "query-object", "--exact-id", SECOND_CONTROL, "--max-results", "2",
+        "--include-field", "Max",
+    )]
+
+
+def test_pitch_fixture_blocks_when_live_parameter_max_is_not_numeric() -> None:
+    ctx = ExpansionCaseContext(
+        "2022.1", "C06", Path("/fixture/Sample.wproj"), Path("/fixture/assets"),
+        lambda argv: {"ok": True, "count": 1, "objects": [{
+            "id": SECOND_CONTROL, "type": "GameParameter", "properties": {"Max": None},
+        }], "query_bound": {"mode": "take", "value": 2}},
+    )
+    with pytest.raises(CaseBoundaryError, match="finite live Max"):
+        _pitch_setup_points(ctx, SECOND_CONTROL)

@@ -178,6 +178,35 @@ def verify_c01(before: Mapping[str, Any], after: Mapping[str, Any], *,
     }
 
 
+def _create_english_event_voice(ctx: ExpansionCaseContext, *, parent: Mapping[str, Any],
+                                parent_segments: tuple[str, ...],
+                                sound_name: str, event_name: str, media: Path) -> dict[str, Any]:
+    """Create the Event with the Voice import, then set its scalar Volume separately."""
+    draft = BusinessDraft(ctx, "audio.import")
+    target = draft.bind(object_id=parent["id"])
+    event_parent = draft.bind(segments=("Events", "Default Work Unit"))
+    draft.step("draft-declare-import-batch", "--row-order", "voice",
+               "--new-row", "voice", target, sound_name, "sound-voice",
+               "--event", "voice", event_parent, event_name, "Play",
+               "--media-directory", str(media.parent), "--media-file", "voice", media.name,
+               "--field", "voice", "language", "English(US)")
+    draft.finish()
+    sound = query_path(ctx, (*parent_segments, sound_name), includes=VOICE_INCLUDES)
+    _sound_state(sound)
+
+    volume = BusinessDraft(ctx, "object.setProperty")
+    sound_handle = volume.bind(object_id=sound["id"])
+    field = volume.discover_field(sound_handle, "Volume")
+    volume.step("draft-declare-field-change", "--object-handle", sound_handle,
+                "--field-handle", field, "--business-value", "-3")
+    volume.finish()
+    sound = read_object(ctx, sound["id"], includes=VOICE_INCLUDES)
+    _sound_state(sound)
+    if sound["volume_db"] != -3:
+        raise CaseBoundaryError("C01 separate Volume setup did not verify the requested -3 dB readback")
+    return sound
+
+
 def prepare_c01(ctx: ExpansionCaseContext) -> PreparedExpansionCase:
     root = container_root(ctx)
     languages = {row.get("Name") for row in ET.parse(ctx.project_path).findall(".//LanguageList/Language")}
@@ -196,24 +225,21 @@ def prepare_c01(ctx: ExpansionCaseContext) -> PreparedExpansionCase:
     folder.step("draft-declare-new", "--declaration-id", "folder", "--parent-handle", parent,
                 "--name", folder_name, "--kind", "actor-mixer")
     folder.finish()
-    parent_row = query_path(ctx, (*root, folder_name))
+    parent_segments = (*root, folder_name)
+    parent_row = query_path(ctx, parent_segments)
     sound_name, event_name = "Line_01", case_name(ctx, "Play_Line_01")
-    for language, media in (("English(US)", english), ("Japanese", japanese)):
-        draft = BusinessDraft(ctx, "audio.import")
-        if language == "English(US)":
-            target = draft.bind(object_id=parent_row["id"])
-            event_parent = draft.bind(segments=("Events", "Default Work Unit"))
-            declaration = ["--new-row", "voice", target, sound_name, "sound-voice",
-                           "--event", "voice", event_parent, event_name, "Play",
-                           "--field", "voice", "volume_db", "-3"]
-        else:
-            target = draft.bind(object_id=sound["id"])
-            declaration = ["--existing-row", "voice", target]
-        draft.step("draft-declare-import-batch", "--row-order", "voice", *declaration,
-                   "--media-directory", str(media.parent), "--media-file", "voice", media.name,
-                   "--field", "voice", "language", language)
-        draft.finish()
-        sound = query_path(ctx, (*root, folder_name, sound_name))
+    sound = _create_english_event_voice(
+        ctx, parent=parent_row, parent_segments=parent_segments,
+        sound_name=sound_name, event_name=event_name, media=english,
+    )
+    draft = BusinessDraft(ctx, "audio.import")
+    target = draft.bind(object_id=sound["id"])
+    draft.step("draft-declare-import-batch", "--row-order", "voice",
+               "--existing-row", "voice", target,
+               "--media-directory", str(japanese.parent), "--media-file", "voice", japanese.name,
+               "--field", "voice", "language", "Japanese")
+    draft.finish()
+    sound = query_path(ctx, (*parent_segments, sound_name))
     decoy = BusinessDraft(ctx, "object.create")
     target = decoy.bind(object_id=parent_row["id"])
     decoy.step("draft-declare-new", "--declaration-id", "decoy", "--parent-handle", target,

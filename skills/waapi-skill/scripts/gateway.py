@@ -776,12 +776,12 @@ ADVANCED_QUERY_SCHEMA_CONTRACT = (
 )
 METADATA_CURVE_ROLES: Mapping[str, str] = {
     "volume-dry": "VolumeDryUsage",
-    "game-defined-aux-send-volume": "VolumeAuxGameDef",
-    "user-defined-aux-send-volume": "VolumeAuxUserDef",
-    "low-pass-filter": "LowPassFilter",
-    "high-pass-filter": "HighPassFilter",
-    "spread": "Spread",
-    "focus": "Focus",
+    "game-defined-aux-send-volume": "VolumeWetGameUsage",
+    "user-defined-aux-send-volume": "VolumeWetUserUsage",
+    "low-pass-filter": "LowPassFilterUsage",
+    "high-pass-filter": "HighPassFilterUsage",
+    "spread": "SpreadUsage",
+    "focus": "FocusUsage",
 }
 PROFILER_PIPELINE_IDENTITY_RETURN_FIELDS = (
     "pipelineID",

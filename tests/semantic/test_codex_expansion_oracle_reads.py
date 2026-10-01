@@ -52,3 +52,16 @@ def test_effect_owner_projection_is_pinned_to_the_actual_version_layout(version,
     read = expansion_oracle_reader(version=version, read_call=call)
     read("effect_owner", [FIRST])
     assert calls == [{"return": ["id", "name", "type", "path", "parent", *fields, "@Volume", "notes"]}]
+
+
+def test_2025_stinger_oracle_uses_membership_ownership_and_supported_configuration_projection():
+    calls = []
+    def call(uri, args, options):
+        calls.append((uri, args, options))
+        return {"return": [{"id": args["from"]["id"][0]}]}
+    read = expansion_oracle_reader(version="2025.1", read_call=call)
+    read("music_stinger", [FIRST])
+    read("music_stinger_owner", [SECOND])
+    assert calls[0][2] == {"return": ["id", "name", "type", "path", "@Trigger", "@Segment",
+                                      "@NumSegmentAdvance", "@PlaySegmentAt", "notes"]}
+    assert calls[1][2] == {"return": ["id", "name", "type", "path", "parent", "@Stingers"]}
