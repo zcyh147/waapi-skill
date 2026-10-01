@@ -40,6 +40,8 @@ from tests.semantic.support.codex_transaction_seal import (
     _validate_artifact, _validate_legal_event_states,
 )
 from tests.semantic.support.codex_task_runner_v3 import expansion_preview_notice
+from wwise_waapi.operation_drafts import load_operation_draft_archive_records, operation_draft_authority_digest
+from wwise_waapi.operation_composer import new_composition, operation_composer_digest
 from wwise_waapi.transactions import _validate_event, confirmation_token_for, validate_transaction_id
 
 
@@ -133,6 +135,16 @@ def _transaction(root: Path, transaction_id: str) -> tuple[dict, list[dict], dic
     return preview, events, state
 
 
+def _public_gateway(plan: Mapping[str, Any]):
+    spec = importlib.util.spec_from_file_location("waapi_expansion_archive_public_parser",
+        Path(plan["skill_source"]) / "scripts" / "gateway.py")
+    _require(spec is not None and spec.loader is not None, "packaged public parser is unavailable")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
 def _scope(plan: Mapping[str, Any]) -> BoundedExpansionReads:
     value = dict(plan["read_scope"])
     for key in ("object_ids", "operations", "includes", "relationship_sources", "fields", "curve_roles", "platforms"):
@@ -141,12 +153,7 @@ def _scope(plan: Mapping[str, Any]) -> BoundedExpansionReads:
         value[key] = frozenset(values)
     scope = ExpansionReadScope(**value)
     _require(scope.digest == plan["read_scope_sha256"], "read scope digest mismatch")
-    spec = importlib.util.spec_from_file_location("waapi_expansion_archive_public_parser",
-        Path(plan["skill_source"]) / "scripts" / "gateway.py")
-    _require(spec is not None and spec.loader is not None, "packaged public parser is unavailable")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
+    module = _public_gateway(plan)
     parser = module.build_parser()
     def parse(argv):
         _require(bool(argv) and not argv[0].startswith("-") and len(argv) <= 256, "invalid public read argv")
@@ -164,16 +171,7 @@ def _validate_rejected_read(record, *, argv, gate):
     again: its bound may have been repaired since this original FAIL.
     """
     rejection = "expansion policy rejected command: project query requires a bounded public source"
-    _require(record.get("authenticated") is True and record.get("accepted") is False
-        and record.get("succeeded") is False and record.get("exit_code") == 126
-        and record.get("runner_exit_code") is None and record.get("step_name") is None
-        and record.get("allowed_exit_codes") == [] and record.get("payload") is None
-        and record.get("payload_sha256") == record.get("payload_error")
-            == record.get("runner_command_sha256") == record.get("semantic_argv_sha256") == ""
-        and record.get("stdout") == "" and record.get("subscription_ack") is None
-        and record.get("rejection") == rejection
-        and record.get("stderr") == "Gateway broker rejected command: " + rejection + "\n",
-        "rejected read lacks authenticated pre-dispatch proof")
+    _validate_predispatch_rejection(record, rejection)
     _require(bool(argv) and argv[0] == "query-object" and len(argv[1:]) % 2 == 0,
         "rejection is not a closed public relationship read")
     flags = argv[1::2]
@@ -184,6 +182,58 @@ def _validate_rejected_read(record, *, argv, gate):
     _require(args.object_id in gate.scope.relationship_sources
         and set(args.business_outputs).issubset(gate.scope.includes),
         "rejected relationship read exceeds its sealed identity/projection scope")
+
+
+def _validate_predispatch_rejection(record, rejection):
+    _require(record.get("authenticated") is True and record.get("accepted") is False
+        and record.get("succeeded") is False and record.get("exit_code") == 126
+        and record.get("runner_exit_code") is None and record.get("step_name") is None
+        and record.get("allowed_exit_codes") == [] and record.get("payload") is None
+        and record.get("payload_sha256") == record.get("payload_error")
+            == record.get("runner_command_sha256") == record.get("semantic_argv_sha256") == ""
+        and record.get("stdout") == "" and record.get("subscription_ack") is None
+        and record.get("rejection") == rejection
+        and record.get("stderr") == "Gateway broker rejected command: " + rejection + "\n",
+        "rejected command lacks authenticated pre-dispatch proof")
+
+
+def _validate_rejected_draft_bind(record, *, argv, gate, draft_id, authority, revision):
+    _validate_predispatch_rejection(record,
+        "expansion policy rejected command: bound object is outside the approved fixture")
+    _require(len(argv) == 8 and argv[:2] == ["draft-bind-object", draft_id]
+        and argv[2:4] == ["--task-authority", authority]
+        and argv[4:6] == ["--expected-revision", "1"] and revision == 1
+        and argv[6] == "--object-id" and re.fullmatch(
+            r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}", argv[7])
+        and ("{" + argv[7] + "}").upper() in {value.upper() for value in gate.scope.object_ids},
+        "rejected Draft binding is not the exact invalid brace-less fixture GUID")
+
+
+def _pristine_rejected_draft(root, plan, records):
+    starts = [row for row in records if row["gateway_arguments"][0] == "draft-start"]
+    _require(len(starts) == 1 and all(row["gateway_arguments"][0] in _READS | {"draft-start", "draft-bind-object"}
+        for row in records) and not any(row.get("accepted") is True and row["gateway_arguments"][0] == "draft-bind-object"
+        for row in records), "rejected binding contains another Draft action")
+    payload = starts[0]["payload"]
+    draft = payload["draft"]
+    stored = load_operation_draft_archive_records((root / "broker/state").absolute(), [draft["draft_id"]])[draft["draft_id"]]
+    _require(stored.state.value == "editable" and stored.revision == draft.get("revision") == 1
+        and stored.operation == (plan.get("request_schema_uri") or plan["operation"])
+        and draft.get("binding") == {"operation": stored.operation, "version": stored.version, "schema_digest": stored.schema_digest}
+        and stored.version == plan["version"]
+        and stored.schema_digest == _public_gateway(plan).operation_draft_schema_digest(stored.operation, stored.version)
+        and stored.authority_digest == operation_draft_authority_digest(payload["task_authority"])
+        and stored.created_at == stored.updated_at == draft.get("created_at") == draft.get("updated_at")
+        and stored.expires_at == draft.get("expires_at") and stored.terminal_at is None
+        and stored.schema_version == 2 and stored.composer_digest == operation_composer_digest(stored.operation, stored.version)
+        and stored.composition == new_composition(stored.operation, stored.version)
+        and stored.check is stored.seal is None
+        and len(stored.audit) == 1 and stored.audit[0]["event_type"] == "started"
+        and draft.get("contract") == "waapi-skill.operation-draft/v1"
+        and draft.get("lifecycle_state") == "editable" and draft.get("business_revision") == 0
+        and draft.get("declarations") == [] and all(key in draft and draft[key] is None for key in ("check", "seal", "preview")),
+        "rejected binding lacks its pristine Gateway-owned Draft start")
+    _require(not (root / "broker/state/transactions").exists(), "rejected binding contains transaction evidence")
 
 
 def _receipts(root: Path, plan: Mapping[str, Any], broker: Mapping[str, Any]) -> list[Mapping[str, Any]]:
@@ -212,7 +262,11 @@ def _receipts(root: Path, plan: Mapping[str, Any], broker: Mapping[str, Any]) ->
             and list(resolved.normalized_model_argv) == record["normalized_model_argv"], "recorded Gateway argv differs from actual invocation")
         gate.public_parser(argv)  # Reject non-public flags for every receipt.
         if record.get("accepted") is not True:
-            _validate_rejected_read(record, argv=argv, gate=gate)
+            if argv[:1] == ["draft-bind-object"]:
+                _validate_rejected_draft_bind(record, argv=argv, gate=gate,
+                    draft_id=draft_id, authority=authority, revision=revision)
+            else:
+                _validate_rejected_read(record, argv=argv, gate=gate)
             _require(index == len(records), "dispatch followed a rejected read")
             failed_accepted = True
             continue
@@ -439,12 +493,20 @@ def _verify_task(root: Path, unit_id: str, version: str, inputs_sha256: str) -> 
         _require(result["passed"] is False and result.get("status") == "FAIL"
             and result.get("terminal_state") == "unprepared"
             and len(turns) == 1 and not turns[0].get("incomplete")
-            and all(record["gateway_arguments"][0] in _READS for record in records)
+            and all(record["gateway_arguments"][0] in _READS | {"draft-start", "draft-bind-object"} for record in records)
             and oracle.get("transaction_id") is None and oracle.get("artifact_hash") is None
             and oracle.get("authorization") is None and oracle.get("permit") is None
             and oracle.get("after") is None and result.get("assertions") == {}
             and broker.get("passed") is False and broker.get("complete") is False,
             "rejected read cannot carry a Preview, mutation or successful outcome")
+        if records[-1]["gateway_arguments"][0] == "draft-bind-object":
+            _pristine_rejected_draft(root, plan, records)
+            _require(all(key in oracle and oracle[key] is None for key in
+                ("transaction_id", "artifact_hash", "authorization", "permit", "after", "preview_before", "preview_after", "gateway_verification_state"))
+                and result.get("gateway_verification_state") is None,
+                "rejected binding carries preparation or verification evidence")
+        else:
+            _require(all(record["gateway_arguments"][0] in _READS for record in records), "rejected read contains Draft actions")
         accepted_names = [record.get("step_name") for record in records if record.get("accepted") is True]
         _require(all(isinstance(name, str) and name for name in accepted_names)
             and len(accepted_names) == len(set(accepted_names))

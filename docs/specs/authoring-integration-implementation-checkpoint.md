@@ -40,6 +40,46 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ## Resume update — 2026-10-01
 
+### Pristine rejected-Draft archive review
+
+- The invalid-GUID terminal rejection now retains original FAIL/unprepared and
+  false gates while proving ordered command receipts, the pristine started Draft,
+  its authoritative versioned Gateway schema, no Preview/authorization/execution,
+  unchanged reconciliation, and complete cleanup. Public GUID grammar is unchanged.
+- Combined archive/CLI/task-runner/documentation validation passed **166 tests**.
+  Independent Spec and Standards reviews are resolved. A read-only derived check
+  of the original failed task retains FAIL and zero executions; all twenty task
+  file hashes and mtimes remained unchanged. It was not a formal verify-only run.
+- The reviewed candidate still needs its broad regression and new real roots.
+
+### Priority music read-probe preparation
+
+- Added three developer-owned, copied-project public Gateway read investigations
+  for Playlist, existing-fade Transition, and Music Switch paths on 2022.1/2025.1.
+  The XML witness retains fifteen rules and all nine condition tuples. No new
+  Skill functionality, native client, playback, or Agent acceptance is included.
+- Independent review corrected cap-completeness and 2022 missing-identity
+  comparisons. Three fake public-dispatch regressions additionally prove current
+  exact, relationship, and advanced query reply bounds. Focused validation passed
+  **22 tests**; real probes have not yet run. Ordering and native time conversion
+  remain unproven, not silently accepted.
+
+### Completed receipt regression and subsequent model input failure
+
+- Frozen `dd1ad71` passed Full Non-live: **11998 passed, 118 skipped,
+  27 deselected**, exit zero (784.07 s). Logs/JUnit digests are in
+  `../research/integration-expansion-read-receipt-gates-2026-10-01.json`.
+- The next Luna-high C01 turn consumed 74.59 Agent seconds and failed before
+  Preview: its object binding omitted the required GUID braces. Two independent
+  code audits confirmed this is invalid public input, correctly rejected before
+  dispatch. Preserve the original model FAIL and public grammar.
+- The pristine mutable Draft and unchanged source/cleanup proofs need a narrow
+  negative archive continuation check before remaining C06/M01 tasks can run.
+  No immutable Preview, authorization, execution, or native change occurred.
+  Full model comparison and final acceptance remain pending. Exact attribution
+  and artifact digests are in
+  `../research/integration-expansion-invalid-bind-pilot-2026-10-01.json`.
+
 ### Subsequent real pilot and receipt repairs
 
 - `c566e85` Luna-high C01 entered a real isolated Codex task and consumed

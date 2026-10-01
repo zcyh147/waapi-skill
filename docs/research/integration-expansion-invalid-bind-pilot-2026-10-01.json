@@ -1,0 +1,96 @@
+{
+  "candidate": "dd1ad71",
+  "campaign_root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-dd1ad71-luna-high-r1",
+  "model": "gpt-6-luna",
+  "reasoning_effort": "high",
+  "service_tier": "default",
+  "selected": [
+    "EXP25-C01",
+    "EXP25-C06",
+    "EXP25-M01"
+  ],
+  "completed": [
+    "EXP25-C01"
+  ],
+  "task_status": "FAIL",
+  "campaign_status": "BLOCKED",
+  "pending": [
+    "EXP25-C06",
+    "EXP25-M01"
+  ],
+  "model_quality_comparison_complete": false,
+  "attribution": "Ordinary model input error: draft-bind-object supplied a brace-less GUID, which the public Gateway requires to be braced. Correct pre-dispatch policy rejection; no public grammar relaxation warranted. Incomplete negative draft-bind archive proof stopped the batch.",
+  "agent_seconds": 74.59221974993125,
+  "cli_seconds": 71.292876,
+  "usage": {
+    "cache_write_input_tokens": 0,
+    "cached_input_tokens": 172288,
+    "input_tokens": 204189,
+    "output_tokens": 2370,
+    "reasoning_output_tokens": 1542
+  },
+  "terminal_state": "unprepared",
+  "source_hash_unchanged": true,
+  "source_mtime_unchanged": true,
+  "failed_copy_retained": true,
+  "gateway_records": [
+    {
+      "sequence": 1,
+      "accepted": true,
+      "authenticated": true,
+      "command": "operations",
+      "exit_code": 0,
+      "runner_exit_code": 0,
+      "rejection": ""
+    },
+    {
+      "sequence": 2,
+      "accepted": true,
+      "authenticated": true,
+      "command": "operation-schema",
+      "exit_code": 0,
+      "runner_exit_code": 0,
+      "rejection": ""
+    },
+    {
+      "sequence": 3,
+      "accepted": true,
+      "authenticated": true,
+      "command": "draft-start",
+      "exit_code": 0,
+      "runner_exit_code": 0,
+      "rejection": ""
+    },
+    {
+      "sequence": 4,
+      "accepted": false,
+      "authenticated": true,
+      "command": "draft-bind-object",
+      "exit_code": 126,
+      "runner_exit_code": null,
+      "rejection": "expansion policy rejected command: bound object is outside the approved fixture"
+    }
+  ],
+  "raw_artifacts": [
+    {
+      "path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-dd1ad71-luna-high-r1/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C01/evidence/codex-task/expansion-task-result.json",
+      "sha256": "a5826967930cb19a4a706a43c914bd05f012e17cac03bc325dfd1a910d4c6e35"
+    },
+    {
+      "path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-dd1ad71-luna-high-r1/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C01/evidence/codex-task/turns/turn-01/codex-facts.json",
+      "sha256": "8a716815d1c347b83fb079f738861d2d58a96c09997b15936d3067ed03a2a667"
+    },
+    {
+      "path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-dd1ad71-luna-high-r1/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C01/evidence/codex-task/expansion-broker.json",
+      "sha256": "45023c8cec9decb205335c78829177f988ae8e7e4e0885179374ae5737cad1c2"
+    },
+    {
+      "path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-dd1ad71-luna-high-r1/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C01/evidence/lifecycle.json",
+      "sha256": "288a7d99090846ebcab42e7dc8efa128ac364ec26b1b6b4f0711dd408c5fa66a"
+    },
+    {
+      "path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-dd1ad71-luna-high-r1/consolidated-summary.json",
+      "sha256": "f43b9f1adee2d8ab506ef16a7db61c4757e1febc29d4611dd260fbd318e9c532"
+    }
+  ]
+}

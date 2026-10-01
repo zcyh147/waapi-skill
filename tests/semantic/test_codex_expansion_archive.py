@@ -1,6 +1,7 @@
 """Read-only expansion replay rejects missing or inconsistent sealed evidence."""
 
 import json
+import importlib.util
 import hashlib
 import shlex
 import sys
@@ -20,7 +21,17 @@ from tests.semantic.support.codex_expansion_attenuation_case import C08_ASSERTIO
 from tests.semantic.support.codex_harness import completed_command_records
 from tests.semantic.test_codex_transaction_seal import _artifact
 from wwise_waapi.transactions import TransactionStore
+from wwise_waapi.operation_drafts import OperationDraftStore, _record_digest
+from wwise_waapi.operation_composer import operation_composer_digest
+from wwise_waapi.canonical import canonical_json_bytes
 
+
+_GATEWAY_SPEC = importlib.util.spec_from_file_location("waapi_expansion_archive_test_gateway",
+    Path(__file__).resolve().parents[2] / "skills/waapi-skill/scripts/gateway.py")
+assert _GATEWAY_SPEC is not None and _GATEWAY_SPEC.loader is not None
+_GATEWAY = importlib.util.module_from_spec(_GATEWAY_SPEC)
+sys.modules[_GATEWAY_SPEC.name] = _GATEWAY
+_GATEWAY_SPEC.loader.exec_module(_GATEWAY)
 
 INPUTS = "a" * 64
 
@@ -739,4 +750,201 @@ def test_completed_rejected_read_turn_cannot_omit_terminal_receipt(tmp_path):
     grade['broker_prefix_count'] = 1
     _write(directory / 'turn-grade.json', grade)
     with pytest.raises(ExpansionArchiveError, match='omitted.*receipt'):
+        _verify(tmp_path)
+
+
+def _sealed_invalid_draft_bind(root):
+    _sealed_read_rejection(root)
+    plan = json.loads((root / 'expansion-plan.json').read_text())
+    plan['operation'] = 'audio.import'
+    plan.pop('request_schema_uri', None)
+    plan['read_scope']['operations'] = ['audio.import']
+    scope = ExpansionReadScope(**{key: frozenset(value) if isinstance(value, list) else value
+        for key, value in plan['read_scope'].items()})
+    plan['read_scope_sha256'] = scope.digest
+    plan.pop('sha256')
+    plan['sha256'] = canonical_digest(plan)
+    _write(root / 'expansion-plan.json', plan)
+    start = OperationDraftStore(root / 'broker/state').start(operation='audio.import', version='2025.1',
+        schema_digest=_GATEWAY.operation_draft_schema_digest('audio.import', '2025.1'), composer_digest=operation_composer_digest('audio.import', '2025.1'))
+    record = start.record
+    draft = {'contract': 'waapi-skill.operation-draft/v1', 'draft_id': start.draft_id,
+        'revision': 1, 'business_revision': 0, 'lifecycle_state': 'editable',
+        'binding': {'operation': record.operation, 'version': record.version, 'schema_digest': record.schema_digest},
+        'created_at': record.created_at, 'updated_at': record.updated_at, 'expires_at': record.expires_at,
+        'declarations': [], 'check': None, 'seal': None, 'preview': None}
+    broker = json.loads((root / 'expansion-broker.json').read_text())
+    first, last = broker['records']
+    first['gateway_arguments'] = ['draft-start', 'audio.import']
+    first['payload'] = {'ok': True, 'command': 'draft-start', 'draft': draft, 'task_authority': start.task_authority}
+    first['payload_sha256'] = canonical_digest(first['payload'])
+    first['stdout'] = json.dumps(first['payload'])
+    last['gateway_arguments'] = ['draft-bind-object', start.draft_id, '--task-authority', start.task_authority,
+        '--expected-revision', '1', '--object-id', plan['read_scope']['object_ids'][0][1:-1]]
+    last['rejection'] = 'expansion policy rejected command: bound object is outside the approved fixture'
+    last['stderr'] = 'Gateway broker rejected command: ' + last['rejection'] + '\n'
+    for row in broker['records']:
+        argv = row['gateway_arguments']
+        row['model_argv'] = ['python', plan['skill_source'] + '/scripts/run.py', 'gateway.py', *argv]
+        row['normalized_model_argv'] = row['model_argv']
+        row['raw_argv_sha256'] = row['argv_sha256'] = canonical_digest(row['model_argv'])
+        if row['accepted']:
+            row['semantic_argv_sha256'] = canonical_digest(['runner-owned-version', '2025.1', *argv])
+            row['runner_command_sha256'] = canonical_digest([plan['trusted_python'], plan['skill_source'] + '/scripts/run.py', 'gateway.py', *argv])
+    _write(root / 'expansion-broker.json', broker)
+    directory = root / 'turns/turn-01'
+    events = [json.loads(line) for line in (directory / 'events.jsonl').read_text().splitlines()]
+    for event in events:
+        item = event.get('item', {})
+        if item.get('id') in {'cmd-1', 'cmd-2'}:
+            row = broker['records'][int(item['id'][-1]) - 1]
+            item['command'] = shlex.join(row['model_argv'])
+            item['aggregated_output'] = row['stdout']
+    (directory / 'events.jsonl').write_text(''.join(json.dumps(event) + '\n' for event in events))
+    result = json.loads((root / 'expansion-task-result.json').read_text())
+    oracle = json.loads((root / 'expansion-oracle.json').read_text())
+    oracle.update(artifact_hash=None, authorization=None, permit=None,
+        preview_before=None, preview_after=None, gateway_verification_state=None)
+    _write(root / 'expansion-oracle.json', oracle)
+    result['plan_sha256'] = plan['sha256']
+    _write(root / 'expansion-task-result.json', result)
+    _realistic_command_paths(root)
+
+
+def test_terminal_invalid_guid_draft_bind_preserves_failed_zero_mutation_archive(tmp_path):
+    _sealed_invalid_draft_bind(tmp_path)
+    before = {str(path): (path.read_bytes(), path.stat().st_mtime_ns) for path in tmp_path.rglob('*') if path.is_file()}
+    replay = _verify(tmp_path)
+    assert replay['archive_valid'] is True and replay['original_status'] == 'FAIL'
+    assert replay['business_pass'] is False and replay['executions'] == replay['execution_reservations'] == 0
+    assert {str(path): (path.read_bytes(), path.stat().st_mtime_ns) for path in tmp_path.rglob('*') if path.is_file()} == before
+
+
+@pytest.mark.parametrize('damage', ('authority', 'revision', 'wrong_guid', 'braced_guid', 'other_rejection',
+    'runner_evidence', 'extra_draft', 'composition', 'audit', 'schema', 'start_projection', 'terminal_omission',
+    'later_dispatch', 'transaction', 'authorization', 'preview', 'pending_preview', 'missing_null', 'reconciliation', 'changed_state', 'reap', 'pass_gate'))
+def test_invalid_draft_bind_requires_exact_pristine_negative_proof(tmp_path, damage):
+    _sealed_invalid_draft_bind(tmp_path)
+    broker_path = tmp_path / 'expansion-broker.json'
+    broker = json.loads(broker_path.read_text())
+    last = broker['records'][-1]
+    if damage in {'authority', 'revision', 'wrong_guid', 'braced_guid', 'other_rejection', 'runner_evidence', 'later_dispatch', 'start_projection'}:
+        if damage == 'authority':
+            last['gateway_arguments'][3] = 'da1-' + '0' * 40
+        elif damage == 'revision':
+            last['gateway_arguments'][5] = '2'
+        elif damage == 'wrong_guid':
+            last['gateway_arguments'][-1] = '99999999-9999-9999-9999-999999999999'
+        elif damage == 'braced_guid':
+            last['gateway_arguments'][-1] = '{' + last['gateway_arguments'][-1] + '}'
+        elif damage == 'other_rejection':
+            last['rejection'] = 'expansion policy rejected command: Draft identity, authority or revision is stale'
+            last['stderr'] = 'Gateway broker rejected command: ' + last['rejection'] + '\n'
+        elif damage == 'runner_evidence':
+            last['runner_command_sha256'] = 'a' * 64
+        elif damage == 'start_projection':
+            first = broker['records'][0]
+            first['payload']['draft']['business_revision'] = 1
+            first['payload_sha256'] = canonical_digest(first['payload'])
+            first['stdout'] = json.dumps(first['payload'])
+        else:
+            broker['records'].append(deepcopy(broker['records'][0]))
+            broker['records'][-1]['sequence'] = 3
+        _write(broker_path, broker)
+        # Rebind all modified receipt argv and raw facts, so the rejection
+        # depends on semantic proof rather than stale digests.
+        directory = tmp_path / 'turns/turn-01'
+        events = [json.loads(line) for line in (directory / 'events.jsonl').read_text().splitlines()]
+        for row in broker['records']:
+            row['model_argv'] = ['python', '.agents/skills/waapi-skill/scripts/run.py', 'gateway.py', *row['gateway_arguments']]
+            for event in events:
+                if event.get('item', {}).get('id') == 'cmd-' + str(row['sequence']):
+                    event['item']['command'] = shlex.join(row['model_argv'])
+        _write(broker_path, broker)
+        (directory / 'events.jsonl').write_text(''.join(json.dumps(event) + '\n' for event in events))
+        _realistic_command_paths(tmp_path)
+    elif damage in {'extra_draft', 'composition', 'audit', 'schema'}:
+        path = next((tmp_path / 'broker/state/operation-drafts-v1/records').glob('*.json'))
+        stored = json.loads(path.read_text())
+        if damage == 'extra_draft':
+            _write(path.with_name('od1-' + '0' * 32 + '.json'), stored)
+        else:
+            if damage == 'composition':
+                stored['composition']['bound_objects'] = {'forged': {'id': '{11111111-1111-1111-1111-111111111111}'}}
+            elif damage == 'schema':
+                stored['schema_digest'] = 'd' * 64
+            else:
+                stored['audit'][0]['event_type'] = 'modified'
+                event = stored['audit'][0]
+                event.pop('event_hash')
+                event['event_hash'] = canonical_digest(event)
+            stored.pop('record_digest')
+            stored['record_digest'] = _record_digest(stored)
+            path.write_bytes(canonical_json_bytes(stored))
+    elif damage == 'terminal_omission':
+        directory = tmp_path / 'turns/turn-01'
+        events = [json.loads(line) for line in (directory / 'events.jsonl').read_text().splitlines()]
+        events = [event for event in events if event.get('item', {}).get('id') != 'cmd-2']
+        (directory / 'events.jsonl').write_text(''.join(json.dumps(event) + '\n' for event in events))
+        facts = json.loads((directory / 'codex-facts.json').read_text())
+        facts['command_facts']['command_records'] = [asdict(row) for row in completed_command_records(events, platform_name='posix')]
+        _write(directory / 'codex-facts.json', facts)
+        grade = json.loads((directory / 'turn-grade.json').read_text())
+        grade['broker_prefix_count'] = 1
+        _write(directory / 'turn-grade.json', grade)
+    elif damage == 'transaction':
+        (tmp_path / 'broker/state/transactions').mkdir()
+    elif damage == 'pass_gate':
+        path = tmp_path / 'turns/turn-01/turn-grade.json'
+        grade = json.loads(path.read_text())
+        grade['common_gates']['policy_checkpoint'] = True
+        _write(path, grade)
+    else:
+        path = tmp_path / 'expansion-oracle.json'
+        oracle = json.loads(path.read_text())
+        if damage == 'authorization':
+            oracle['authorization'] = {'authorized': True}
+        elif damage == 'preview':
+            oracle['transaction_id'] = 'tx1-00000000000000000001'
+        elif damage == 'pending_preview':
+            oracle['preview_after'] = {'pending': True}
+        elif damage == 'missing_null':
+            oracle.pop('permit')
+        elif damage == 'reconciliation':
+            oracle.pop('reconciliation')
+        elif damage == 'changed_state':
+            oracle['reconciliation']['snapshot']['source']['notes'] = 'changed'
+            oracle['reconciliation']['snapshot_sha256'] = canonical_digest(oracle['reconciliation']['snapshot'])
+        else:
+            oracle['reconciliation']['child_reaped'] = False
+        _write(path, oracle)
+    with pytest.raises(ExpansionArchiveError):
+        _verify(tmp_path)
+
+
+def test_rejected_bind_rejects_self_consistent_wrong_gateway_schema_digest(tmp_path):
+    _sealed_invalid_draft_bind(tmp_path)
+    path = next((tmp_path / 'broker/state/operation-drafts-v1/records').glob('*.json'))
+    stored = json.loads(path.read_text())
+    stored['schema_digest'] = 'd' * 64
+    stored.pop('record_digest')
+    stored['record_digest'] = _record_digest(stored)
+    path.write_bytes(canonical_json_bytes(stored))
+    broker_path = tmp_path / 'expansion-broker.json'
+    broker = json.loads(broker_path.read_text())
+    first = broker['records'][0]
+    first['payload']['draft']['binding']['schema_digest'] = stored['schema_digest']
+    first['payload_sha256'] = canonical_digest(first['payload'])
+    first['stdout'] = json.dumps(first['payload'])
+    _write(broker_path, broker)
+    directory = tmp_path / 'turns/turn-01'
+    events = [json.loads(line) for line in (directory / 'events.jsonl').read_text().splitlines()]
+    for event in events:
+        if event.get('item', {}).get('id') == 'cmd-1':
+            event['item']['aggregated_output'] = first['stdout']
+    (directory / 'events.jsonl').write_text(''.join(json.dumps(event) + '\n' for event in events))
+    facts = json.loads((directory / 'codex-facts.json').read_text())
+    facts['command_facts']['command_records'] = [asdict(row) for row in completed_command_records(events, platform_name='posix')]
+    _write(directory / 'codex-facts.json', facts)
+    with pytest.raises(ExpansionArchiveError, match='pristine'):
         _verify(tmp_path)

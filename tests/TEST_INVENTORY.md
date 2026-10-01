@@ -7,6 +7,22 @@ are not live-Wwise or Fresh Agent evidence.
 
 ## Runner modes and strict real behavior
 
+### 2026-10-01 Expansion receipt binding and completed regression
+
+Frozen macOS candidate `dd1ad71` (harness implementation `7c81406`) passed
+Full Non-live: **11998 passed, 118 skipped, 27 deselected** (784.07 s), exit zero.
+JUnit reports zero failures and errors. This is program/harness evidence;
+it grants no live-Wwise or Fresh Agent business acceptance.
+See [completed gate records](../docs/research/integration-expansion-read-receipt-gates-2026-10-01.json).
+
+Its Luna-high C01 pilot retained an ordinary model input FAIL: the Agent omitted
+the required GUID braces during object binding. The authenticated command was
+rejected before dispatch; no Preview or project change occurred. Source full
+hash and mtime remained unchanged and the failed copy was quarantined. Negative
+archive validation stopped the batch, leaving C06/M01 pending. The model
+comparison remains incomplete; no Gateway grammar relaxation is justified.
+See [pilot evidence](../docs/research/integration-expansion-invalid-bind-pilot-2026-10-01.json).
+
 ### 2026-10-01 Fresh workspace repository-boundary repair
 
 Frozen macOS harness candidate `d78be5b` completed Full Non-live:
