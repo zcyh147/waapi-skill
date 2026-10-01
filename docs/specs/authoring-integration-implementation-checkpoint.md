@@ -42,6 +42,16 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- Candidate `ae3d355` completed Program with **9 failed, 5879 passed,
+  2 skipped**. The nine old catalog consumers expected repeated row fields;
+  the producer's compact contract and all schema obligations remain unchanged.
+  A tests-only static-directory expansion helper updates the three affected
+  files without weakening host/version, safety, refusal, native-field, or
+  schema-reachability checks. Focused validation passed **509 tests**;
+  independent Spec and Standards reviews found no actionable issue. The
+  original full-gate failure is retained in the catalog-consumer gate record.
+  A new complete gate is required before real follow-ups or Fresh execution.
+
 - Frozen `4d74ebb` passed Program **5888 / skipped 2** and Non-live
   **12082 / skipped 118 / deselected 27**. The matching 2025 smoke became
   ready in 4.10 seconds and cleaned its copied sandbox. Exact gate digests

@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 import pytest  # pyright: ignore[reportMissingImports]
+from tests.support.operation_directory import expand_operations_directory_row
 
 from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImports]
     BUSINESS_DECLARATION_INPUT_MODE,
@@ -867,8 +868,10 @@ def test_operation_inventory_does_not_republish_native_fields_for_business_lanes
         row = rows[operation]
         if set(compact["versions"]).intersection(row["supported_versions"]):
             compact_row = compact_rows[operation]
-            assert set(compact_row) == {"name", "summary", "next_command"}
-            assert compact_row["next_command"] == ["operation-schema", operation]
+            assert set(compact_row) == {"name", "summary"}
+            assert expand_operations_directory_row(compact, compact_row)["next_command"] == [
+                "operation-schema", operation,
+            ]
         else:
             assert operation not in compact_rows
         assert set(row["input_modes_by_version"].values()) == {

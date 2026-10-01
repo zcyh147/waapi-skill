@@ -10,6 +10,7 @@ from typing import Any, Mapping, Sequence
 
 import pytest  # pyright: ignore[reportMissingImports]
 from tests.support.canonical_preview import bind_canonical_preview_fixture
+from tests.support.operation_directory import expand_operations_directory_row
 
 from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImports]
     OPERATION_REQUEST_CONTRACT,
@@ -290,7 +291,7 @@ def test_compact_inventory_keeps_named_ui_command_ids_on_the_ui_route(
     )
     assert "SaveProject" in execute_row["summary"]
     assert "without translating" in execute_row["summary"]
-    assert execute_row["next_command"] == [
+    assert expand_operations_directory_row(payload, execute_row)["next_command"] == [
         "operation-schema",
         "ui.commands.execute",
     ]

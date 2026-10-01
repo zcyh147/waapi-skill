@@ -1,0 +1,14 @@
+{
+  "candidate_short": "ae3d355",
+  "mode": "program",
+  "exit_code": 1,
+  "passed": 5879,
+  "failed": 9,
+  "skipped": 2,
+  "duration_seconds": 249.51,
+  "failure_family": "Legacy compact-directory row consumers expected per-row next_command/supported_versions instead of disclosed templates/defaults. Original routing and schema-reachability obligations remain.",
+  "log_sha256": "cfe4a0748d1dabcb68dee0a5ea8c17dd948240d28f11e7251310ccddeead5fd7",
+  "log_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ae3d355-gates/program.log",
+  "original_failure_retained": true,
+  "semantic_credit": false
+}
