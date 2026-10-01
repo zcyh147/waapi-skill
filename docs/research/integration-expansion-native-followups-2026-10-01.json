@@ -1,0 +1,922 @@
+{
+  "contract": "waapi-skill.expansion-native-followup-summary/v1",
+  "date": "2026-10-01",
+  "scope": "Failed-only fixture/preflight reruns plus developer-owned M01/C06 public-Gateway goals. No Fresh Agent semantic credit. Original failed roots remain immutable.",
+  "records": [
+    {
+      "candidate": "c626f9439d091082f6b6fd0b6b8f49f9cac6095c",
+      "version": "2025.1",
+      "selected_test_nodeids": [
+        "tests/destructive/test_expansion_case_preflight.py::test_expansion_case_setup_and_independent_oracle_are_stable[C01]"
+      ],
+      "outcome": "FAIL",
+      "categories": [
+        {
+          "agent_pass": false,
+          "business_effect_verified": false,
+          "category": "expansion-preflight-C01",
+          "diagnostics_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-preflight-20261001-2025-r3/pytest-tmp/gateway-workflows-2025-10/expansion-preflight-diagnostics/2025-1-C01.json",
+          "gateway_call_count": 20,
+          "oracle_call_count": 0,
+          "reason": "public fixture Gateway failed (exit=2, status=verification_failed, error=None)",
+          "status": "FAIL",
+          "verifier_strength": "setup_failed_with_preserved_gateway_and_oracle_diagnostics"
+        }
+      ],
+      "full_record_sha256": "b23da6c9c2eda06b67a80fc47da8a5983760f618eb9073ce62a81e91ecbaff80",
+      "source_guard": {
+        "full_hash_unchanged": true,
+        "project_mtime_unchanged": true,
+        "tree_metadata_unchanged": true
+      },
+      "process_cleanup_proven": true,
+      "sandbox_state": "quarantined",
+      "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-eb630c8e65874301ba1aa9e002f3616c"
+    },
+    {
+      "candidate": "c626f9439d091082f6b6fd0b6b8f49f9cac6095c",
+      "version": "2025.1",
+      "selected_test_nodeids": [
+        "tests/destructive/test_expansion_case_preflight.py::test_expansion_case_setup_and_independent_oracle_are_stable[C06]"
+      ],
+      "outcome": "PASS",
+      "categories": [
+        {
+          "agent_pass": false,
+          "assertion_names": [
+            "control_identity_notes_and_parent_unchanged",
+            "media_unchanged",
+            "owner_configuration_unchanged",
+            "rtpc_identity_set_unchanged",
+            "sibling_curves_unchanged",
+            "target_curve_matches",
+            "target_identity_and_binding_unchanged"
+          ],
+          "baseline_assertions": {
+            "control_identity_notes_and_parent_unchanged": true,
+            "media_unchanged": true,
+            "owner_configuration_unchanged": true,
+            "rtpc_identity_set_unchanged": true,
+            "sibling_curves_unchanged": true,
+            "target_curve_matches": false,
+            "target_identity_and_binding_unchanged": true
+          },
+          "before_sha256": "2701cadd79b30a96a0ccf94fccfad5296de555094a5b3aa40651d1ea85acc3f1",
+          "business_effect_verified": false,
+          "category": "expansion-preflight-C06",
+          "setup_execute_count": 3,
+          "status": "PASS",
+          "verifier_strength": "fixture_setup_and_repeated_independent_snapshot_only"
+        }
+      ],
+      "full_record_sha256": "196da0da9b45eab4c27cc0167e655c9f1c406e4328f5fc41fca83e546c69a831",
+      "source_guard": {
+        "full_hash_unchanged": true,
+        "project_mtime_unchanged": true,
+        "tree_metadata_unchanged": true
+      },
+      "process_cleanup_proven": true,
+      "sandbox_state": "deleted",
+      "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-86872359d44248b79603a495090806ab"
+    },
+    {
+      "candidate": "c626f9439d091082f6b6fd0b6b8f49f9cac6095c",
+      "version": "2025.1",
+      "selected_test_nodeids": [
+        "tests/destructive/test_expansion_case_preflight.py::test_expansion_case_setup_and_independent_oracle_are_stable[C08]"
+      ],
+      "outcome": "FAIL",
+      "categories": [
+        {
+          "agent_pass": false,
+          "business_effect_verified": false,
+          "category": "expansion-preflight-C08",
+          "diagnostics_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-preflight-20261001-2025-r3/pytest-tmp/gateway-workflows-2025-12/expansion-preflight-diagnostics/2025-1-C08.json",
+          "gateway_call_count": 39,
+          "oracle_call_count": 0,
+          "reason": "public fixture Gateway failed (exit=2, status=error, error=None)",
+          "status": "FAIL",
+          "verifier_strength": "setup_failed_with_preserved_gateway_and_oracle_diagnostics"
+        }
+      ],
+      "full_record_sha256": "9139494e977423163a32e3630e013d79bb6cb7d66e3aa03e40c730492911890e",
+      "source_guard": {
+        "full_hash_unchanged": true,
+        "project_mtime_unchanged": true,
+        "tree_metadata_unchanged": true
+      },
+      "process_cleanup_proven": true,
+      "sandbox_state": "quarantined",
+      "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-87876489d3234110bdc50c84e654fa7f"
+    },
+    {
+      "candidate": "c626f9439d091082f6b6fd0b6b8f49f9cac6095c",
+      "version": "2025.1",
+      "selected_test_nodeids": [
+        "tests/destructive/test_expansion_case_preflight.py::test_expansion_case_setup_and_independent_oracle_are_stable[C09]"
+      ],
+      "outcome": "PASS",
+      "categories": [
+        {
+          "agent_pass": false,
+          "assertion_names": [
+            "exactly_one_added_binding",
+            "existing_effects_and_bindings_unchanged",
+            "new_effect_matches",
+            "new_effect_owned_by_target",
+            "owner_unchanged",
+            "unique_effect_identities"
+          ],
+          "baseline_assertions": {
+            "exactly_one_added_binding": false,
+            "existing_effects_and_bindings_unchanged": true,
+            "new_effect_matches": false,
+            "new_effect_owned_by_target": false,
+            "owner_unchanged": true,
+            "unique_effect_identities": true
+          },
+          "before_sha256": "0b4b1c63130f24580f6d481dbde6fd1a8a3873b25531b92060c7a5c0cdb5426e",
+          "business_effect_verified": false,
+          "category": "expansion-preflight-C09",
+          "setup_execute_count": 3,
+          "status": "PASS",
+          "verifier_strength": "fixture_setup_and_repeated_independent_snapshot_only"
+        }
+      ],
+      "full_record_sha256": "97424c703b309ed9c7ef13976cf015889de07dde90a2aabed1972fa85f4cf6a3",
+      "source_guard": {
+        "full_hash_unchanged": true,
+        "project_mtime_unchanged": true,
+        "tree_metadata_unchanged": true
+      },
+      "process_cleanup_proven": true,
+      "sandbox_state": "deleted",
+      "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-376545c3b9774e399443a5c9a8713e0c"
+    },
+    {
+      "candidate": "c626f9439d091082f6b6fd0b6b8f49f9cac6095c",
+      "version": "2025.1",
+      "selected_test_nodeids": [
+        "tests/destructive/test_expansion_case_preflight.py::test_expansion_case_setup_and_independent_oracle_are_stable[M05]"
+      ],
+      "outcome": "PASS",
+      "categories": [
+        {
+          "agent_pass": false,
+          "assertion_names": [
+            "other_stingers_preserved",
+            "owner_unchanged",
+            "requested_trigger_matches",
+            "segment_reference_preserved",
+            "stinger_identity_and_other_configuration_preserved",
+            "target_and_segment_unchanged"
+          ],
+          "baseline_assertions": {
+            "other_stingers_preserved": true,
+            "owner_unchanged": true,
+            "requested_trigger_matches": false,
+            "segment_reference_preserved": true,
+            "stinger_identity_and_other_configuration_preserved": true,
+            "target_and_segment_unchanged": true
+          },
+          "before_sha256": "45c8f4ef07579be5477246b155f728712c1767c626dc03a6e1f932660d893e80",
+          "business_effect_verified": false,
+          "category": "expansion-preflight-M05",
+          "setup_execute_count": 0,
+          "status": "PASS",
+          "verifier_strength": "fixture_setup_and_repeated_independent_snapshot_only"
+        }
+      ],
+      "full_record_sha256": "3449bf707202070b6d5c8b13741cdd43c7ac70315ac193066fe29fae53734c43",
+      "source_guard": {
+        "full_hash_unchanged": true,
+        "project_mtime_unchanged": true,
+        "tree_metadata_unchanged": true
+      },
+      "process_cleanup_proven": true,
+      "sandbox_state": "deleted",
+      "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-5f84811d18894770ba13a66abc70ffab"
+    },
+    {
+      "candidate": "c626f9439d091082f6b6fd0b6b8f49f9cac6095c",
+      "version": "2022.1",
+      "selected_test_nodeids": [
+        "tests/destructive/test_expansion_case_preflight.py::test_expansion_case_setup_and_independent_oracle_are_stable[C01]"
+      ],
+      "outcome": "FAIL",
+      "categories": [
+        {
+          "agent_pass": false,
+          "business_effect_verified": false,
+          "category": "expansion-preflight-C01",
+          "diagnostics_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-preflight-20261001-2022-r2/pytest-tmp/gateway-workflows-2022-10/expansion-preflight-diagnostics/2022-1-C01.json",
+          "gateway_call_count": 20,
+          "oracle_call_count": 0,
+          "reason": "public fixture Gateway failed (exit=2, status=verification_failed, error=None)",
+          "status": "FAIL",
+          "verifier_strength": "setup_failed_with_preserved_gateway_and_oracle_diagnostics"
+        }
+      ],
+      "full_record_sha256": "940ac0bf1913b1e8ac60093b45978248a125df22f6b3074827895324704248c4",
+      "source_guard": {
+        "full_hash_unchanged": true,
+        "project_mtime_unchanged": true,
+        "tree_metadata_unchanged": true
+      },
+      "process_cleanup_proven": true,
+      "sandbox_state": "quarantined",
+      "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-273d65654589479d9299704664a7a5b0"
+    },
+    {
+      "candidate": "c626f9439d091082f6b6fd0b6b8f49f9cac6095c",
+      "version": "2022.1",
+      "selected_test_nodeids": [
+        "tests/destructive/test_expansion_case_preflight.py::test_expansion_case_setup_and_independent_oracle_are_stable[C06]"
+      ],
+      "outcome": "PASS",
+      "categories": [
+        {
+          "agent_pass": false,
+          "assertion_names": [
+            "control_identity_notes_and_parent_unchanged",
+            "media_unchanged",
+            "owner_configuration_unchanged",
+            "rtpc_identity_set_unchanged",
+            "sibling_curves_unchanged",
+            "target_curve_matches",
+            "target_identity_and_binding_unchanged"
+          ],
+          "baseline_assertions": {
+            "control_identity_notes_and_parent_unchanged": true,
+            "media_unchanged": true,
+            "owner_configuration_unchanged": true,
+            "rtpc_identity_set_unchanged": true,
+            "sibling_curves_unchanged": true,
+            "target_curve_matches": false,
+            "target_identity_and_binding_unchanged": true
+          },
+          "before_sha256": "ca0fd835d66bdf601fa2bc827ff8a1a2020399b27f6431f00343542cf81466b5",
+          "business_effect_verified": false,
+          "category": "expansion-preflight-C06",
+          "setup_execute_count": 3,
+          "status": "PASS",
+          "verifier_strength": "fixture_setup_and_repeated_independent_snapshot_only"
+        }
+      ],
+      "full_record_sha256": "2f4d7f1fbc226fd83be2a79554624af0c62b47545187d46eaf4cd4a4349cd1eb",
+      "source_guard": {
+        "full_hash_unchanged": true,
+        "project_mtime_unchanged": true,
+        "tree_metadata_unchanged": true
+      },
+      "process_cleanup_proven": true,
+      "sandbox_state": "deleted",
+      "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-336128d864e949f2bc461158fb328050"
+    },
+    {
+      "candidate": "c626f9439d091082f6b6fd0b6b8f49f9cac6095c",
+      "version": "2022.1",
+      "selected_test_nodeids": [
+        "tests/destructive/test_expansion_case_preflight.py::test_expansion_case_setup_and_independent_oracle_are_stable[C08]"
+      ],
+      "outcome": "FAIL",
+      "categories": [
+        {
+          "agent_pass": false,
+          "business_effect_verified": false,
+          "category": "expansion-preflight-C08",
+          "diagnostics_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-preflight-20261001-2022-r2/pytest-tmp/gateway-workflows-2022-12/expansion-preflight-diagnostics/2022-1-C08.json",
+          "gateway_call_count": 39,
+          "oracle_call_count": 0,
+          "reason": "public fixture Gateway failed (exit=2, status=error, error=None)",
+          "status": "FAIL",
+          "verifier_strength": "setup_failed_with_preserved_gateway_and_oracle_diagnostics"
+        }
+      ],
+      "full_record_sha256": "4b7b1a62817593452fd436f365707c2562f153597aeae3d809ed83a2fb2bd691",
+      "source_guard": {
+        "full_hash_unchanged": true,
+        "project_mtime_unchanged": true,
+        "tree_metadata_unchanged": true
+      },
+      "process_cleanup_proven": true,
+      "sandbox_state": "quarantined",
+      "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-f690b142cf0347d894e37b0148dec9d8"
+    },
+    {
+      "candidate": "78234f6bb743d61739c46157021e8eb1346afa95",
+      "version": "2025.1",
+      "selected_test_nodeids": [
+        "tests/destructive/test_expansion_case_preflight.py::test_expansion_case_setup_and_independent_oracle_are_stable[C01]"
+      ],
+      "outcome": "FAIL",
+      "categories": [
+        {
+          "agent_pass": false,
+          "business_effect_verified": false,
+          "category": "expansion-preflight-C01",
+          "diagnostics_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-preflight-20261001-2025-r4/pytest-tmp/gateway-workflows-2025-10/expansion-preflight-diagnostics/2025-1-C01.json",
+          "gateway_call_count": 22,
+          "oracle_call_count": 0,
+          "reason": "public fixture Gateway failed (exit=2, status=verification_failed, error=None)",
+          "status": "FAIL",
+          "verifier_strength": "setup_failed_with_preserved_gateway_and_oracle_diagnostics"
+        }
+      ],
+      "full_record_sha256": "0df78411280a0cf97744312b6666c540da181c01e60eb68c49a56c49d9e66af4",
+      "source_guard": {
+        "full_hash_unchanged": true,
+        "project_mtime_unchanged": true,
+        "tree_metadata_unchanged": true
+      },
+      "process_cleanup_proven": true,
+      "sandbox_state": "quarantined",
+      "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-f825531ce83242309bc5be05e8ab6ec2"
+    },
+    {
+      "candidate": "78234f6bb743d61739c46157021e8eb1346afa95",
+      "version": "2025.1",
+      "selected_test_nodeids": [
+        "tests/destructive/test_expansion_case_preflight.py::test_expansion_case_setup_and_independent_oracle_are_stable[C08]"
+      ],
+      "outcome": "PASS",
+      "categories": [
+        {
+          "agent_pass": false,
+          "assertion_names": [
+            "attenuation_identity_unchanged",
+            "other_curves_unchanged",
+            "requested_curve_matches",
+            "source_attenuation_unchanged",
+            "users_and_references_unchanged"
+          ],
+          "baseline_assertions": {
+            "attenuation_identity_unchanged": true,
+            "other_curves_unchanged": true,
+            "requested_curve_matches": false,
+            "source_attenuation_unchanged": true,
+            "users_and_references_unchanged": true
+          },
+          "before_sha256": "dbb4a0f32c89a51abb4ee648017fafdfe7edf44636b91bfa51796c26c9c9f040",
+          "business_effect_verified": false,
+          "category": "expansion-preflight-C08",
+          "setup_execute_count": 4,
+          "status": "PASS",
+          "verifier_strength": "fixture_setup_and_repeated_independent_snapshot_only"
+        }
+      ],
+      "full_record_sha256": "d7348baf2e1d7aec01ea8b3b4ff3cdeaee49eaf1c905eb1e66ee52bc1f45813c",
+      "source_guard": {
+        "full_hash_unchanged": true,
+        "project_mtime_unchanged": true,
+        "tree_metadata_unchanged": true
+      },
+      "process_cleanup_proven": true,
+      "sandbox_state": "deleted",
+      "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-b05064157078452a808429ed1deb38f0"
+    },
+    {
+      "candidate": "78234f6bb743d61739c46157021e8eb1346afa95",
+      "version": "2022.1",
+      "selected_test_nodeids": [
+        "tests/destructive/test_expansion_case_preflight.py::test_expansion_case_setup_and_independent_oracle_are_stable[C01]"
+      ],
+      "outcome": "FAIL",
+      "categories": [
+        {
+          "agent_pass": false,
+          "business_effect_verified": false,
+          "category": "expansion-preflight-C01",
+          "diagnostics_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-preflight-20261001-2022-r3/pytest-tmp/gateway-workflows-2022-10/expansion-preflight-diagnostics/2022-1-C01.json",
+          "gateway_call_count": 22,
+          "oracle_call_count": 0,
+          "reason": "public fixture Gateway failed (exit=2, status=verification_failed, error=None)",
+          "status": "FAIL",
+          "verifier_strength": "setup_failed_with_preserved_gateway_and_oracle_diagnostics"
+        }
+      ],
+      "full_record_sha256": "8216e4811614927b8ba1035845e4f2c0d897579f05024fafd9739eec185906d8",
+      "source_guard": {
+        "full_hash_unchanged": true,
+        "project_mtime_unchanged": true,
+        "tree_metadata_unchanged": true
+      },
+      "process_cleanup_proven": true,
+      "sandbox_state": "quarantined",
+      "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-c7b65981e2604b44afa13572af835fa3"
+    },
+    {
+      "candidate": "78234f6bb743d61739c46157021e8eb1346afa95",
+      "version": "2022.1",
+      "selected_test_nodeids": [
+        "tests/destructive/test_expansion_case_preflight.py::test_expansion_case_setup_and_independent_oracle_are_stable[C08]"
+      ],
+      "outcome": "PASS",
+      "categories": [
+        {
+          "agent_pass": false,
+          "assertion_names": [
+            "attenuation_identity_unchanged",
+            "other_curves_unchanged",
+            "requested_curve_matches",
+            "source_attenuation_unchanged",
+            "users_and_references_unchanged"
+          ],
+          "baseline_assertions": {
+            "attenuation_identity_unchanged": true,
+            "other_curves_unchanged": true,
+            "requested_curve_matches": false,
+            "source_attenuation_unchanged": true,
+            "users_and_references_unchanged": true
+          },
+          "before_sha256": "b051f0c8d069fd8570f79a553427dc7040dde5c4cbba309e653e547c7a6e9f64",
+          "business_effect_verified": false,
+          "category": "expansion-preflight-C08",
+          "setup_execute_count": 4,
+          "status": "PASS",
+          "verifier_strength": "fixture_setup_and_repeated_independent_snapshot_only"
+        }
+      ],
+      "full_record_sha256": "e55121323e6c454aec5ef735beae580a12ba6d649401176077deefa151d8ccea",
+      "source_guard": {
+        "full_hash_unchanged": true,
+        "project_mtime_unchanged": true,
+        "tree_metadata_unchanged": true
+      },
+      "process_cleanup_proven": true,
+      "sandbox_state": "deleted",
+      "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-893626f0174e459e8da23a0c37f4e8b0"
+    },
+    {
+      "candidate": "ca22052d777fd3cada55a61fada7efedff60651a",
+      "version": "2025.1",
+      "selected_test_nodeids": [
+        "tests/destructive/test_expansion_case_preflight.py::test_expansion_case_setup_and_independent_oracle_are_stable[C01]"
+      ],
+      "outcome": "PASS",
+      "categories": [
+        {
+          "agent_pass": false,
+          "assertion_names": [
+            "distractor_unchanged",
+            "event_and_action_unchanged",
+            "exact_language_set",
+            "fixture_membership_unchanged",
+            "other_language_unchanged",
+            "requested_language_media_matches",
+            "requested_language_source_identity_preserved",
+            "sound_identity_and_configuration_unchanged",
+            "source_gain_unchanged"
+          ],
+          "baseline_assertions": {
+            "distractor_unchanged": true,
+            "event_and_action_unchanged": true,
+            "exact_language_set": true,
+            "fixture_membership_unchanged": true,
+            "other_language_unchanged": true,
+            "requested_language_media_matches": false,
+            "requested_language_source_identity_preserved": true,
+            "sound_identity_and_configuration_unchanged": true,
+            "source_gain_unchanged": true
+          },
+          "before_sha256": "a0a8385693e8741f32e711c4257f0a6a09d1d725fdf25201c25c5b808079fa49",
+          "business_effect_verified": false,
+          "category": "expansion-preflight-C01",
+          "setup_execute_count": 5,
+          "status": "PASS",
+          "verifier_strength": "fixture_setup_and_repeated_independent_snapshot_only"
+        }
+      ],
+      "full_record_sha256": "d1b522ceb6cdcc1998d19e080797f7edf3a59d9ba3c04e80edb8cca694ecfb95",
+      "source_guard": {
+        "full_hash_unchanged": true,
+        "project_mtime_unchanged": true,
+        "tree_metadata_unchanged": true
+      },
+      "process_cleanup_proven": true,
+      "sandbox_state": "deleted",
+      "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-c278c8527e27466c8b89564be569d690"
+    },
+    {
+      "candidate": "ca22052d777fd3cada55a61fada7efedff60651a",
+      "version": "2022.1",
+      "selected_test_nodeids": [
+        "tests/destructive/test_expansion_case_preflight.py::test_expansion_case_setup_and_independent_oracle_are_stable[C01]"
+      ],
+      "outcome": "PASS",
+      "categories": [
+        {
+          "agent_pass": false,
+          "assertion_names": [
+            "distractor_unchanged",
+            "event_and_action_unchanged",
+            "exact_language_set",
+            "fixture_membership_unchanged",
+            "other_language_unchanged",
+            "requested_language_media_matches",
+            "requested_language_source_identity_preserved",
+            "sound_identity_and_configuration_unchanged",
+            "source_gain_unchanged"
+          ],
+          "baseline_assertions": {
+            "distractor_unchanged": true,
+            "event_and_action_unchanged": true,
+            "exact_language_set": true,
+            "fixture_membership_unchanged": true,
+            "other_language_unchanged": true,
+            "requested_language_media_matches": false,
+            "requested_language_source_identity_preserved": true,
+            "sound_identity_and_configuration_unchanged": true,
+            "source_gain_unchanged": true
+          },
+          "before_sha256": "0d77a6ae5b69fe06d4e73b6deccb0a910024a0cf8be0f2edae6d52a765d50c94",
+          "business_effect_verified": false,
+          "category": "expansion-preflight-C01",
+          "setup_execute_count": 5,
+          "status": "PASS",
+          "verifier_strength": "fixture_setup_and_repeated_independent_snapshot_only"
+        }
+      ],
+      "full_record_sha256": "4d83a0af38eb415dfc3225cba9fc2fc454d0f93ded91224edaf313db3822f89e",
+      "source_guard": {
+        "full_hash_unchanged": true,
+        "project_mtime_unchanged": true,
+        "tree_metadata_unchanged": true
+      },
+      "process_cleanup_proven": true,
+      "sandbox_state": "deleted",
+      "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-ac9a581b00cb4a16a272cb1e34ea10f2"
+    },
+    {
+      "candidate": "ca22052d777fd3cada55a61fada7efedff60651a",
+      "version": "2025.1",
+      "selected_test_nodeids": [
+        "tests/destructive/test_expansion_gateway_goals.py::test_expansion_gateway_goal_has_verified_business_effect[M01-music-import]"
+      ],
+      "outcome": "FAIL",
+      "categories": [
+        {
+          "agent_pass": false,
+          "business_effect_verified": false,
+          "category": "expansion-gateway-goal-M01",
+          "diagnostics_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-goals-20261001-2025-r1/pytest-tmp/gateway-workflows-2025-10/expansion-preflight-diagnostics/2025-1-goal-M01.json",
+          "gateway_call_count": 36,
+          "oracle_call_count": 0,
+          "status": "FAIL",
+          "verifier_strength": "gateway_goal_failed_with_persisted_receipts"
+        }
+      ],
+      "full_record_sha256": "e05b22d0dcd3ef858ac036c32fc1d2e4941b35ce24973489f45db1d349f584c1",
+      "source_guard": {
+        "full_hash_unchanged": true,
+        "project_mtime_unchanged": true,
+        "tree_metadata_unchanged": true
+      },
+      "process_cleanup_proven": true,
+      "sandbox_state": "quarantined",
+      "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-59fea6cb18f4489993b1528470a6238f"
+    },
+    {
+      "candidate": "ca22052d777fd3cada55a61fada7efedff60651a",
+      "version": "2025.1",
+      "selected_test_nodeids": [
+        "tests/destructive/test_expansion_gateway_goals.py::test_expansion_gateway_goal_has_verified_business_effect[C06-existing-rtpc]"
+      ],
+      "outcome": "PASS",
+      "categories": [
+        {
+          "after_sha256": "35a7f682d083fcc49dc736af61f22c19c76779892b49159989774b0e2a9428bf",
+          "agent_pass": false,
+          "artifact_hash": "2f70904648aa066b5a7ff53f56f55046389ae919b1ee36e63b85dc365c7fb738",
+          "assertions": {
+            "control_identity_notes_and_parent_unchanged": true,
+            "media_unchanged": true,
+            "owner_configuration_unchanged": true,
+            "rtpc_identity_set_unchanged": true,
+            "sibling_curves_unchanged": true,
+            "target_curve_matches": true,
+            "target_identity_and_binding_unchanged": true
+          },
+          "before_sha256": "9b2cb1862ffbd0304b4a3c1b9c9037d5fd65d5101033a121dae441f54ee9f1e8",
+          "business_effect_verified": true,
+          "business_state_verified": true,
+          "case_id": "C06",
+          "category": "expansion-gateway-goal-C06",
+          "gateway_verification_state": "verified",
+          "goal_gateway_commands": [
+            "draft-start",
+            "draft-bind-object",
+            "draft-discover-fields",
+            "draft-bind-object",
+            "draft-declare-rtpc",
+            "draft-check",
+            "preview-from-draft",
+            "transaction-show",
+            "confirm",
+            "execute",
+            "verify"
+          ],
+          "status": "PASS",
+          "transaction_id": "tx1-3n1cgmaxvqxf1aq8kwbh",
+          "verifier_strength": "closed_gateway_transaction_plus_independent_adapter_oracle"
+        }
+      ],
+      "full_record_sha256": "f966eb9513572a57b49c3843fb8b06022e8d6112f2f8096a8f1f7ad8e55a77da",
+      "source_guard": {
+        "full_hash_unchanged": true,
+        "project_mtime_unchanged": true,
+        "tree_metadata_unchanged": true
+      },
+      "process_cleanup_proven": true,
+      "sandbox_state": "deleted",
+      "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-744a677ffd5b419d821456dfa7f132e5"
+    },
+    {
+      "candidate": "90bddc0abe4c90712c3cef1b5f564f1c131c905a",
+      "version": "2025.1",
+      "selected_test_nodeids": [
+        "tests/destructive/test_expansion_gateway_goals.py::test_expansion_gateway_goal_has_verified_business_effect[M01-music-import]"
+      ],
+      "outcome": "PASS",
+      "categories": [
+        {
+          "after_sha256": "f46fbb59fa9db001e4487a602ba62890a13195ad106e35a9858f216bc027d9ed",
+          "agent_pass": false,
+          "artifact_hash": "ad7b0b341eb7929b33822f4c4f4b55679182a02f5e590eb2cb0ef2f8e64ab93c",
+          "assertions": {
+            "clip_media_matches_its_source": true,
+            "each_track_has_one_sequence_and_clip": true,
+            "exact_segment_track_source_topology": true,
+            "media_hashes_match_each_requested_track": true,
+            "only_track_has_requested_volume": true,
+            "parent_and_protected_sibling_unchanged": true
+          },
+          "before_sha256": "a4842a6aef42a342de3dd37545116bbd593d3c22a81c5ccd3ad20573e5da92f3",
+          "business_effect_verified": true,
+          "business_state_verified": true,
+          "case_id": "M01",
+          "category": "expansion-gateway-goal-M01",
+          "gateway_verification_state": "verified",
+          "goal_gateway_commands": [
+            "draft-start",
+            "draft-bind-object",
+            "draft-declare-import-batch",
+            "draft-check",
+            "preview-from-draft",
+            "transaction-show",
+            "confirm",
+            "execute",
+            "verify"
+          ],
+          "status": "PASS",
+          "transaction_id": "tx1-ss0wdkvp9vm6drf80qc1",
+          "verifier_strength": "closed_gateway_transaction_plus_independent_adapter_oracle"
+        }
+      ],
+      "full_record_sha256": "e75178c4880b90582aad10db85c5b797653a4b95477f69a52d57fe35e6beead9",
+      "source_guard": {
+        "full_hash_unchanged": true,
+        "project_mtime_unchanged": true,
+        "tree_metadata_unchanged": true
+      },
+      "process_cleanup_proven": true,
+      "sandbox_state": "deleted",
+      "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-4dadbf287349496d852b77ecc3ea22af"
+    },
+    {
+      "candidate": "90bddc0abe4c90712c3cef1b5f564f1c131c905a",
+      "version": "2022.1",
+      "selected_test_nodeids": [
+        "tests/destructive/test_expansion_gateway_goals.py::test_expansion_gateway_goal_has_verified_business_effect[M01-music-import]"
+      ],
+      "outcome": "PASS",
+      "categories": [
+        {
+          "after_sha256": "a70f89caf3ca1276b9fd5e59d1b7ae02cd6eeb65125cf7a2e3683d887736442e",
+          "agent_pass": false,
+          "artifact_hash": "48bba213a57d5acc22f8d4d66c1f54bc3d460675a593ec056023560d46febd80",
+          "assertions": {
+            "clip_media_matches_its_source": true,
+            "each_track_has_one_sequence_and_clip": true,
+            "exact_segment_track_source_topology": true,
+            "media_hashes_match_each_requested_track": true,
+            "only_track_has_requested_volume": true,
+            "parent_and_protected_sibling_unchanged": true
+          },
+          "before_sha256": "3cd01152621e1cac8185e3cec2589962232bafdcdb62b71a0afd3ddaec0fca22",
+          "business_effect_verified": true,
+          "business_state_verified": true,
+          "case_id": "M01",
+          "category": "expansion-gateway-goal-M01",
+          "gateway_verification_state": "verified",
+          "goal_gateway_commands": [
+            "draft-start",
+            "draft-bind-object",
+            "draft-declare-import-batch",
+            "draft-check",
+            "preview-from-draft",
+            "transaction-show",
+            "confirm",
+            "execute",
+            "verify"
+          ],
+          "status": "PASS",
+          "transaction_id": "tx1-y14vmqr93s1140q78sce",
+          "verifier_strength": "closed_gateway_transaction_plus_independent_adapter_oracle"
+        }
+      ],
+      "full_record_sha256": "3a21768f2d35d614a4e05961f1b38206801916ca16b946248ce0a940935980c5",
+      "source_guard": {
+        "full_hash_unchanged": true,
+        "project_mtime_unchanged": true,
+        "tree_metadata_unchanged": true
+      },
+      "process_cleanup_proven": true,
+      "sandbox_state": "deleted",
+      "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-a6b7e6b3db3c4787b6680f36a06fbf91"
+    },
+    {
+      "candidate": "90bddc0abe4c90712c3cef1b5f564f1c131c905a",
+      "version": "2022.1",
+      "selected_test_nodeids": [
+        "tests/destructive/test_expansion_gateway_goals.py::test_expansion_gateway_goal_has_verified_business_effect[C06-existing-rtpc]"
+      ],
+      "outcome": "PASS",
+      "categories": [
+        {
+          "after_sha256": "4b7dd78feb9096addfc4db99e727489d24c9501b4d008a2b4271d320a74023ec",
+          "agent_pass": false,
+          "artifact_hash": "9c87e9c5f30454e9a171086f37707a52b6b448684cfdaca9b36eb92b1c410fb1",
+          "assertions": {
+            "control_identity_notes_and_parent_unchanged": true,
+            "media_unchanged": true,
+            "owner_configuration_unchanged": true,
+            "rtpc_identity_set_unchanged": true,
+            "sibling_curves_unchanged": true,
+            "target_curve_matches": true,
+            "target_identity_and_binding_unchanged": true
+          },
+          "before_sha256": "54e61c1a7e997ca2c0fbc8a3a1b920e80129a7c545d5850b1f47cef20f0df7f8",
+          "business_effect_verified": true,
+          "business_state_verified": true,
+          "case_id": "C06",
+          "category": "expansion-gateway-goal-C06",
+          "gateway_verification_state": "verified",
+          "goal_gateway_commands": [
+            "draft-start",
+            "draft-bind-object",
+            "draft-discover-fields",
+            "draft-bind-object",
+            "draft-declare-rtpc",
+            "draft-check",
+            "preview-from-draft",
+            "transaction-show",
+            "confirm",
+            "execute",
+            "verify"
+          ],
+          "status": "PASS",
+          "transaction_id": "tx1-vewamatpbmwr3sxe7jwh",
+          "verifier_strength": "closed_gateway_transaction_plus_independent_adapter_oracle"
+        }
+      ],
+      "full_record_sha256": "595ea159fe77a9438aae88f3710b0ade03d095a5e222faf97736fcfcc66d321d",
+      "source_guard": {
+        "full_hash_unchanged": true,
+        "project_mtime_unchanged": true,
+        "tree_metadata_unchanged": true
+      },
+      "process_cleanup_proven": true,
+      "sandbox_state": "deleted",
+      "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-d10c4c5ccb8443e093e71eacd28e6ade"
+    }
+  ],
+  "runs": [
+    {
+      "root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-goals-20261001-2022-r1",
+      "junit": {
+        "tests": "2",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "time": "37.012"
+      },
+      "files_sha256": {
+        "run.log": "e3b3872616af1e9f6cb2085126eb9655ad6cfcac7b92cc27ca342f8e89e4013f",
+        "junit.xml": "9ac56713d89417339dd466b7304c956d0d96fa787271c16fc9c1498bf499da0a"
+      }
+    },
+    {
+      "root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-goals-20261001-2025-r1",
+      "junit": {
+        "tests": "2",
+        "failures": "1",
+        "errors": "0",
+        "skipped": "0",
+        "time": "36.320"
+      },
+      "files_sha256": {
+        "run.log": "b4544e31bb467e7c44517d7e56ca2c607983d229b9d3f662cd55bacef3efc871",
+        "junit.xml": "5ea19bdf6431fd1f3dc8a43d27b0e7e46a677899c654c863ca2970d3b34ae187"
+      }
+    },
+    {
+      "root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-goals-20261001-2025-r2",
+      "junit": {
+        "tests": "1",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "time": "17.255"
+      },
+      "files_sha256": {
+        "run.log": "33aa73ad93175cae48e3c7a81ecf8057a6349a017b8e75e9de30af4a1359e903",
+        "junit.xml": "8bb15b9bec03eabfbb39f75b75b8b00a6c13cf440af758d4b1d25f2870dab8ed"
+      }
+    },
+    {
+      "root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-preflight-20261001-2022-r2",
+      "junit": {
+        "tests": "3",
+        "failures": "2",
+        "errors": "0",
+        "skipped": "0",
+        "time": "41.144"
+      },
+      "files_sha256": {
+        "run.log": "d42bbda2d3ad9788affcc935e7df5f09323036ea2eade57a641f2e59334c199e",
+        "junit.xml": "348ec450bfed059548b68f74a85e71a2e668f3a3d0416e2fd9482851a293d1e1"
+      }
+    },
+    {
+      "root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-preflight-20261001-2022-r3",
+      "junit": {
+        "tests": "2",
+        "failures": "1",
+        "errors": "0",
+        "skipped": "0",
+        "time": "42.666"
+      },
+      "files_sha256": {
+        "run.log": "559306d73a8f733698ef76fc2bce63523eec34404f214af7fc8a1c4f8b4926ca",
+        "junit.xml": "a20035177d67874969ec3597c1c6337ce100f053335709220312248f25d1965d"
+      }
+    },
+    {
+      "root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-preflight-20261001-2022-r4",
+      "junit": {
+        "tests": "1",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "time": "26.139"
+      },
+      "files_sha256": {
+        "run.log": "70f84c64b77333d1fd8420b7ad18658c3dea4e80cfa7c5576138d8b189721a96",
+        "junit.xml": "04082db70b28efdcbe9cbebdaeb59e94641545f37fcd02b5aab0beaf42eab4c1"
+      }
+    },
+    {
+      "root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-preflight-20261001-2025-r3",
+      "junit": {
+        "tests": "5",
+        "failures": "2",
+        "errors": "0",
+        "skipped": "0",
+        "time": "53.991"
+      },
+      "files_sha256": {
+        "run.log": "4a11ac106e78bce8eaefc96d9513e684854c14e78c117ee6a02f91cb2d40a4b8",
+        "junit.xml": "8af2fa1a28976fb7c8fa353e5181b8c29bff6a28e9513c8171dd7026bfa88eee"
+      }
+    },
+    {
+      "root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-preflight-20261001-2025-r4",
+      "junit": {
+        "tests": "2",
+        "failures": "1",
+        "errors": "0",
+        "skipped": "0",
+        "time": "44.040"
+      },
+      "files_sha256": {
+        "run.log": "8c39eca46cf931444c6c4db00e829f7a10b64f204b58af0538f0f872b84d661a",
+        "junit.xml": "8a70672355187efc07ce6c4246897a0eefc80cca712303ad1c2958d8a169a14a"
+      }
+    },
+    {
+      "root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-preflight-20261001-2025-r5",
+      "junit": {
+        "tests": "1",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "time": "29.398"
+      },
+      "files_sha256": {
+        "run.log": "29ae4c143f04d1efaa237320e648d0b3822f7115f967629fa451bbff43b50034",
+        "junit.xml": "0a225282a3e0b722ed0a86660dbed7f85e20f11681e07e37827c857d98efc379"
+      }
+    }
+  ]
+}

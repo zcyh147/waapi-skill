@@ -14,12 +14,12 @@ OWNER = "{11111111-1111-1111-1111-111111111111}"
 PATH = r"\Containers\Default Work Unit\Music"
 
 
-def make_policy(operation="audio.import", request_schema_uri=None):
+def make_policy(operation="audio.import", request_schema_uri=None, approve_preview=None):
     case = PreparedExpansionCase(
         prompt="导入两个音乐轨道并完成核验", operation=operation, policy="allow_changes",
         before={"objects": [OWNER]}, read_object_ids=frozenset({OWNER}),
         relationship_sources=frozenset({OWNER}), read_includes=frozenset({"parent"}),
-        required_assertions=frozenset({"media"}), approve_preview=lambda _: True,
+        required_assertions=frozenset({"media"}), approve_preview=approve_preview or (lambda _: True),
         snapshot=lambda: {"objects": [OWNER]}, verify=lambda _old, _new: {"media": True},
         request_schema_uri=request_schema_uri,
     )
@@ -79,6 +79,38 @@ def test_new_case_preview_uses_production_auto_apply_contract_without_magic_flag
     assert step.subcommand == "preview-from-draft"
     assert policy.before_preview is not None
     assert policy.transaction.state == "unprepared"  # no fabricated Preview/authorization
+
+
+def test_wrong_effect_preview_is_bound_as_rejected_without_runner_authorization(tmp_path):
+    from tests.semantic.test_codex_transaction_seal import _artifact
+    from wwise_waapi.transactions import TransactionStore
+
+    policy = make_policy(approve_preview=lambda _artifact: False)
+    start(policy, tmp_path)
+    step = policy.prepare(("preview-from-draft", "draft-test", "--task-authority", "authority-test",
+                           "--expected-revision", "1"), state_directory=tmp_path)
+    tx = "tx1-" + "1" * 20
+    artifact = _artifact()
+    record = TransactionStore(tmp_path).create_preview(tx, artifact)
+
+    policy.observe(step, {"ok": True, "command": "preview-from-draft", "transaction_id": tx,
+                          "artifact_hash": record.artifact_hash}, state_directory=tmp_path)
+
+    assert policy.transaction_id == tx
+    assert policy.artifact_hash == record.artifact_hash
+    assert policy.oracle_evidence["transaction_id"] == tx
+    assert policy.oracle_evidence["artifact_hash"] == record.artifact_hash
+    assert policy.oracle_evidence["preview_approved"] is False
+    assert policy.transaction.state == "preview_rejected"
+    assert policy.permit is None
+    assert policy.oracle_evidence["authorization"] is None
+    assert policy.oracle_evidence["permit"] is None
+    for command in (
+        ("confirm", tx, "--confirmation-token", "ct1-" + "a" * 24),
+        ("execute", tx),
+    ):
+        with pytest.raises(ExpansionPolicyError, match="rejected Preview"):
+            policy.prepare(command, state_directory=tmp_path)
 
 
 def test_outcome_broker_does_not_finish_on_last_discovery_or_allow_unapproved_execute(tmp_path):

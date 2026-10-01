@@ -164,6 +164,9 @@ class ExpansionBrokerPolicy:
         elif command in {"transaction-show", "confirm", "execute", "verify"}:
             if getattr(args, "transaction_id", None) != self.transaction_id or self.transaction_id is None:
                 raise ExpansionPolicyError("transaction is outside the current Preview")
+            if (self.transaction.state == "preview_rejected"
+                    and command in {"confirm", "execute", "verify"}):
+                raise ExpansionPolicyError("confirm, execute and verification are unavailable for a rejected Preview")
             store = TransactionStore(state_directory)
             preview = store.load_preview(self.transaction_id)
             if preview.artifact_hash != self.artifact_hash:
@@ -224,14 +227,35 @@ class ExpansionBrokerPolicy:
         if command == "preview-from-draft":
             transaction_id = payload["transaction_id"]
             preview = TransactionStore(state_directory).load_preview(transaction_id)
-            self.oracle_evidence["preview_after"] = self.prepared.snapshot()
+            preview_after = self.prepared.snapshot()
+            preview_after_sha256 = canonical_digest(preview_after)
+            self.oracle_evidence["preview_after"] = preview_after
+            if (self.transaction.state != "unprepared" or self.turn < 1
+                    or not isinstance(transaction_id, str) or not transaction_id.startswith("tx1-")
+                    or preview.transaction_id != transaction_id
+                    or preview.artifact_hash != canonical_digest(preview.artifact)
+                    or self.before_preview is None or self.before_preview != preview_after_sha256):
+                raise ExpansionPolicyError("Preview changed state or failed independent effect approval")
+            approval = self.prepared.approve_preview(preview.artifact)
+            if type(approval) is not bool:
+                raise ExpansionPolicyError("Preview approval did not return an exact boolean")
+            if approval is False:
+                # Preserve the authenticated Gateway Preview for an ordinary
+                # business FAIL, while withholding the runner-owned execution
+                # permit and every later confirmation/execution action.
+                self.transaction_id, self.artifact_hash = transaction_id, preview.artifact_hash
+                self.transaction.state = "preview_rejected"
+                self.oracle_evidence.update(transaction_id=transaction_id,
+                    artifact_hash=preview.artifact_hash, preview_approved=False)
+                return
             self.transaction.seal_preview(
                 transaction_id=transaction_id, artifact=preview.artifact,
                 artifact_sha256=preview.artifact_hash, before_sha256=self.before_preview,
-                after_sha256=canonical_digest(self.oracle_evidence["preview_after"]),
+                after_sha256=preview_after_sha256,
             )
             self.transaction_id, self.artifact_hash = transaction_id, preview.artifact_hash
-            self.oracle_evidence.update(transaction_id=transaction_id, artifact_hash=preview.artifact_hash)
+            self.oracle_evidence.update(transaction_id=transaction_id, artifact_hash=preview.artifact_hash,
+                                         preview_approved=True)
         elif command == "execute":
             record = TransactionStore(state_directory).load(self.transaction_id)
             indeterminate = (payload.get("ok") is False and payload.get("status") == "indeterminate"

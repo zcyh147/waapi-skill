@@ -34,10 +34,46 @@ pilot, and acceptance may proceed after their prerequisite gates.
 - The combined repaired fixture/oracle/attenuation focused gate passed 429
   tests. New frozen real reruns, Fresh pilot, and final acceptance remain.
 - A subsequent review confirmed failure-classification and post-failure
-  readback gaps. Their expansion-only repair is in progress separately; no
+  readback gaps. Their expansion-only repair is committed in `78234f6`; no
   timeout, infrastructure block, or uncertain execution may be promoted to PASS.
 - Tickets #109, #110, #123, and #124 are closed from their scoped evidence;
   business and final acceptance tickets remain open.
+
+## Subsequent repair checkpoint — 2026-10-01
+
+- Attenuation preparation passed on both versions after removing unsupported
+  binding-role flags; #125 is closed from its getter repair and real metadata
+  evidence. The production Program gate at `c626f94` passed 5884 / skipped 2.
+- C01's bounded read diagnostics proved that Wwise created its Event but
+  normalized hyphens to underscores in the Event name. Choosing the stable
+  fixture name before import (`ca22052`) passed strict setup/verification on
+  both versions; #126 is closed as a fixture diagnosis, not an import rewrite.
+- Developer-owned public Gateway goal probes passed M01 music import and C06
+  existing RTPC update on both versions. They approved the immutable Preview
+  before authorization and execution, then required all independent after-state
+  assertions. The first M01 probe's type-tag approval failure remains frozen;
+  `90bddc0` accepts the evidenced spaced Music type tags.
+- Independent review identified three harness defects: lost rejected-Preview
+  FAIL evidence, discarded meaningful EffectSlot order, and premature batch
+  termination for isolated uncertain outcomes. The repairs preserve exact
+  negative classifications and keep execution prohibited after rejection.
+  C09 now seals the owner's slot sequence separately from incidental read-row
+  order. Expansion batches continue only after source and cleanup isolation is
+  proven; historical profiles retain their previous behavior.
+- The combined current expansion/metadata focused gate passed **504 tests**.
+  The full 2022 fixture-preflight selection at `f9966f3` passed its seven pytest
+  nodes: six prepared baselines plus the separate M05 capability boundary.
+  Neither that boundary nor a prepared baseline grants Agent business PASS.
+- Original failed roots, source protection, cleanup, and narrow goal results
+  are recorded in `../research/integration-expansion-native-followups-2026-10-01.json`.
+  That file presently covers 19 failed-only/native-goal follow-up lifecycle
+  records; complete preparation runs are recorded separately when finished.
+- `../research/music-expansion-dispositions-2026-10-01.md` defines three full
+  structural oracles, Chinese allow-mode case drafts, version-specific gaps,
+  and four minimal follow-up scopes. Scalar maintenance is not full Playlist,
+  Transition/fade, or Music Switch acceptance. Those tickets remain open.
+- Complete 2025 preparation, final Non-live regression, the six-task model
+  pilot, final Fresh acceptance, and identical verify-only are still pending.
 
 The remaining sections retain the earlier pause checkpoint as historical context.
 The two review defects listed below are repaired by the resume update; the

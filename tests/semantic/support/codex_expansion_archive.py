@@ -376,6 +376,7 @@ def _verify_task(root: Path, unit_id: str, version: str, inputs_sha256: str) -> 
     _require(oracle.get("before") == plan["before"], "independent pre-state changed")
     transaction_id = oracle.get("transaction_id")
     events = ()
+    preview_approval: bool | None = None
     transactions_directory = root / "broker" / "state" / "transactions"
     if transactions_directory.exists():
         _require(not path_is_link_or_reparse(transactions_directory), "transaction directory is linked")
@@ -393,8 +394,34 @@ def _verify_task(root: Path, unit_id: str, version: str, inputs_sha256: str) -> 
         for key in ("mappings", "media"):
             if key in parameters:
                 parameters[key] = {name: Path(path) for name, path in parameters[key].items()}
-        _require(getattr(module, "approve_" + case_id.lower() + "_preview")(preview["artifact"], **parameters) is True,
-                 "immutable artifact is outside the sealed business request")
+        preview_approval = getattr(module, "approve_" + case_id.lower() + "_preview")(
+            preview["artifact"], **parameters)
+        _require(type(preview_approval) is bool, "adapter Preview approval is not an exact boolean")
+        recorded_approval = oracle.get("preview_approved")
+        if preview_approval is True:
+            _require("preview_approved" not in oracle or recorded_approval is True,
+                     "preview approval record differs from the independent adapter")
+        else:
+            preview_receipts = [row for row in records if row.get("accepted") is True
+                and row["gateway_arguments"][:1] == ["preview-from-draft"]]
+            _require(not result["passed"] and recorded_approval is False
+                and "preview_approved" in oracle,
+                "rejected Preview lacks an explicit false preview approval record")
+            _require(len(preview_receipts) == 1 and preview_receipts[0].get("succeeded") is True
+                and preview_receipts[0].get("payload", {}).get("transaction_id") == transaction_id
+                and preview_receipts[0].get("payload", {}).get("artifact_hash") == preview["artifact_hash"],
+                "rejected Preview identity is not bound to its authenticated Gateway receipt")
+            _require(not any(row["gateway_arguments"][:1] in (["confirm"], ["execute"])
+                    for row in records)
+                and not any(event.get("to_state") in {"confirmed", "executing"} for event in events)
+                and "authorization" in oracle and oracle["authorization"] is None
+                and "permit" in oracle and oracle["permit"] is None,
+                "rejected Preview has a confirmation or execution authorization")
+            _require(oracle.get("after") is None and oracle.get("assertions") == {}
+                and oracle.get("gateway_verification_state") is None
+                and result.get("assertions", {}) == {}
+                and result.get("gateway_verification_state") is None,
+                "rejected Preview claims post-execution business verification")
         executed_events = [event for event in events if event["to_state"] == "executing"]
         # Admission consumes the at-most-once reservation before launching the
         # subprocess. A timeout can precede Gateway begin_execution; the journal
@@ -445,6 +472,8 @@ def _verify_task(root: Path, unit_id: str, version: str, inputs_sha256: str) -> 
                  "infrastructure classification differs from raw pre-action evidence")
     original_status = classify_expansion_outcome(passed=result["passed"], records=records, events=events,
                                                  infrastructure=infrastructure)
+    if preview_approval is False:
+        _require(original_status == "FAIL", "rejected Preview did not remain an ordinary business FAIL")
     reconciliation = oracle.get("reconciliation")
     if reconciliation is not None:
         _require(not result["passed"] and isinstance(reconciliation, dict)
@@ -470,7 +499,8 @@ def _verify_task(root: Path, unit_id: str, version: str, inputs_sha256: str) -> 
     if "status" in result and not result["passed"]:
         _require(reconciliation is not None, "classified negative outcome omitted reconciliation")
     return {"archive_valid": True, "original_status": original_status,
-        "business_pass": result["passed"], "gateway_verification_state": result.get("gateway_verification_state"),
+        "business_pass": result["passed"], "preview_approved": preview_approval,
+        "gateway_verification_state": result.get("gateway_verification_state"),
         "agent_seconds": budget["elapsed_seconds"], "slow": budget["slow"], "reconciliation": reconciliation,
         "turn_count": len(turns), "execution_reservations": len(mutations),
         "executions": len(executed_events) if transaction_id is not None else 0}

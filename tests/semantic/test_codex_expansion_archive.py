@@ -93,10 +93,12 @@ def test_boundary_never_counts_as_an_agent_or_business_pass(tmp_path):
             expected_version="2022.1", expected_inputs_sha256=INPUTS)
 
 
-def _sealed_c08(root: Path, *, passed=True):
+def _sealed_c08(root: Path, *, passed=True, rejected_preview=False):
     identifier = "{11111111-1111-1111-1111-111111111111}"
     tx = "tx1-00000000000000000001"
     points = [{"x": 0, "y": 0, "shape": "Linear"}, {"x": 100, "y": -48, "shape": "Linear"}]
+    preview_points = ([{"x": 0, "y": 0, "shape": "Linear"}, {"x": 80, "y": -48, "shape": "Linear"}]
+                      if rejected_preview else points)
     before = {"attenuation": {"id": identifier, "name": "FixtureAttenuation"}, "users": {"sound": {"id": identifier}},
               "source": {"id": identifier, "notes": "original"}, "curves": {
         "volume-dry": {"use": "Custom", "points": [{"x": 0, "y": -6, "shape": "Linear"}]},
@@ -111,16 +113,17 @@ def _sealed_c08(root: Path, *, passed=True):
         artifact[key]["fingerprint"] = canonical_digest(body)
     api = "ak.wwise.core.object.setAttenuationCurve"
     artifact["request"].update(operation="waapi.call", arguments={"api": api, "options": {}, "args": {
-        "object": identifier, "curveType": "VolumeDryUsage", "use": "Custom", "points": points}})
+        "object": identifier, "curveType": "VolumeDryUsage", "use": "Custom", "points": preview_points}})
     artifact["prepared_operation"]["operation"] = "waapi.call"
     store = TransactionStore(root / "broker" / "state")
     store.create_preview(tx, artifact)
     authority = "caller_asserted_current_user_change_request"
-    store.transition(tx, "policy_authorized", expected_state="draft", event_type="policy_authorized",
-                     details={"policy": "allow_changes", "authority": authority, "explicit_confirmation": False})
-    store.begin_execution(tx, expected_authorization="policy_authorized")
-    store.mark_executed_unverified(tx)
-    store.record_verification(tx, outcome="result_schema_checked")
+    if not rejected_preview:
+        store.transition(tx, "policy_authorized", expected_state="draft", event_type="policy_authorized",
+                         details={"policy": "allow_changes", "authority": authority, "explicit_confirmation": False})
+        store.begin_execution(tx, expected_authorization="policy_authorized")
+        store.mark_executed_unverified(tx)
+        store.record_verification(tx, outcome="result_schema_checked")
     scope = ExpansionReadScope(frozenset({identifier}), frozenset({api}))
     plan = {"contract": "waapi-skill.integration-expansion-task-plan/v1", "unit_id": "EXP25-C08",
         "version": "2025.1", "inputs_sha256": INPUTS, "policy": "allow_changes", "prompts": ["Perform this change."],
@@ -134,15 +137,25 @@ def _sealed_c08(root: Path, *, passed=True):
     digest = canonical_digest(plan)
     _write(root / "expansion-plan.json", {**plan, "sha256": digest})
     artifact_hash = canonical_digest(artifact)
-    assertions = verify_c08(before, after, expected_points=points)
-    _write(root / "expansion-oracle.json", {"before": before, "after": after,
+    assertions = {} if rejected_preview else verify_c08(before, after, expected_points=points)
+    oracle = {"before": before, "after": None if rejected_preview else after,
         "preview_before": before, "preview_after": before, "assertions": assertions,
-        "transaction_id": tx, "artifact_hash": artifact_hash, "gateway_verification_state": "result_schema_checked",
-        "authorization": {"mode": "policy_authorization", "authority": authority, "explicit_confirmation": False},
-        "permit": {"transaction_id": tx, "artifact_sha256": artifact_hash, "authorization_nonce": "b" * 64,
-                   "preview_turn": 1, "authorized_turn": 1}})
-    argv_rows = [["draft-start", api], ["preview-from-draft", "draft", "--task-authority", "auth", "--expected-revision", "1"],
-                 ["execute", tx], ["verify", tx]]
+        "transaction_id": tx, "artifact_hash": artifact_hash,
+        "gateway_verification_state": None if rejected_preview else "result_schema_checked",
+        "authorization": None if rejected_preview else {
+            "mode": "policy_authorization", "authority": authority, "explicit_confirmation": False},
+        "permit": None if rejected_preview else {
+            "transaction_id": tx, "artifact_sha256": artifact_hash, "authorization_nonce": "b" * 64,
+            "preview_turn": 1, "authorized_turn": 1},
+        "preview_approved": not rejected_preview}
+    if rejected_preview:
+        oracle["reconciliation"] = {"status": "completed", "seconds": 30, "read_seconds": 10,
+            "elapsed_seconds": 1, "child_reaped": True, "subprocesses_reaped": True,
+            "snapshot": before, "snapshot_sha256": canonical_digest(before)}
+    _write(root / "expansion-oracle.json", oracle)
+    argv_rows = [["draft-start", api], ["preview-from-draft", "draft", "--task-authority", "auth", "--expected-revision", "1"]]
+    if not rejected_preview:
+        argv_rows.extend([["execute", tx], ["verify", tx]])
     records, events = [], [{"type": "thread.started", "thread_id": "thread"}, {"type": "turn.started"}]
     skill_path = Path(plan["skill_source"]) / "SKILL.md"
     skill_read = {"id": "read-skill", "type": "command_execution", "command": shlex.join(["cat", str(skill_path)]),
@@ -178,34 +191,46 @@ def _sealed_c08(root: Path, *, passed=True):
                        {"type": "item.completed", "item": command}])
         if argv[0] == "preview-from-draft":
             events.append({"type": "item.completed", "item": {
-                "id": "preview-notice", "type": "agent_message", "text": "The preview updates FixtureAttenuation's dry volume curve; applying it now."}})
-    events.extend([{"type": "item.completed", "item": {"id": "message", "type": "agent_message", "text": "Done."}},
+                "id": "preview-notice", "type": "agent_message", "text": (
+                    "The preview does not match the requested curve; I will not execute it."
+                    if rejected_preview else
+                    "The preview updates FixtureAttenuation's dry volume curve; applying it now.")}})
+    final_response = ("I did not execute because the immutable Preview did not match the requested curve."
+                      if rejected_preview else "Done.")
+    events.extend([{"type": "item.completed", "item": {"id": "message", "type": "agent_message", "text": final_response}},
                    {"type": "turn.completed"}])
     names = [record["step_name"] for record in records]
-    _write(root / "expansion-broker.json", {"records": records, "passed": True, "complete": True,
+    _write(root / "expansion-broker.json", {"records": records, "passed": not rejected_preview,
+        "complete": not rejected_preview,
         "expected_step_names": names, "consumed_step_names": names})
     gates = {key: True for key in ("memory_isolated", "completed_turn", "one_target_skill", "no_collaboration",
         "only_packaged_references", "only_authenticated_gateway_and_skill_reads", "no_discovery_or_direct_waapi",
         "no_write_like_commands", "source_and_workspace_unchanged", "broker_provenance", "policy_checkpoint", "visible_preview_notice",
         "final_response_present", "cumulative_agent_budget")}
+    if rejected_preview:
+        gates["policy_checkpoint"] = False
     turns = [{"index": 1, "gates": gates, "agent_seconds": 12}]
     _write(root / "expansion-agent-budget.json", {"hard_seconds": 600, "slow_seconds": 420,
         "elapsed_seconds": 12, "slow": False, "turns": turns,
         "turn_measurements": [{"started_monotonic": 100, "finished_monotonic": 112, "elapsed_seconds": 12}]})
     _write(root / "expansion-task-result.json", {"unit_id": "EXP25-C08", "version": "2025.1",
-        "passed": passed, "thread_id": "thread", "plan_sha256": digest, "assertions": assertions,
-        "agent_seconds": 12, "slow": False, "turns": turns, "gateway_verification_state": "result_schema_checked"})
+        "passed": passed and not rejected_preview,
+        **({"status": "FAIL"} if rejected_preview else {}),
+        "thread_id": "thread", "plan_sha256": digest, "assertions": assertions,
+        "agent_seconds": 12, "slow": False, "turns": turns,
+        "gateway_verification_state": None if rejected_preview else "result_schema_checked"})
     directory = root / "turns" / "turn-01"
     _write(directory / "turn-grade.json", {"index": 1, "prompt_sha256": hashlib.sha256(plan["prompts"][0].encode()).hexdigest(),
-        "common_gates": gates, "broker_prefix_count": len(records), "passed": True, "errors": []})
-    _write(directory / "codex-facts.json", {"thread_id": "thread", "final_response": "Done.",
+        "common_gates": gates, "broker_prefix_count": len(records),
+        "passed": not rejected_preview, "errors": ["policy checkpoint failed"] if rejected_preview else []})
+    _write(directory / "codex-facts.json", {"thread_id": "thread", "final_response": final_response,
         "exit_status": 0, "timed_out": False, "prompt_audit": {"passed": True, "has_memory": False},
         "isolation_audit": {"passed": True}, "skill_tree_unchanged": True,
         "skill_tree_sha256_before": INPUTS, "skill_tree_sha256_after": INPUTS,
         "command_facts": {"command_records": [asdict(row) for row in completed_command_records(events, platform_name="posix")]}})
     (directory / "events.jsonl").write_text("".join(json.dumps(event) + "\n" for event in events))
     (directory / "prompt.txt").write_text(plan["prompts"][0] + "\n")
-    (directory / "final.txt").write_text("Done.\n")
+    (directory / "final.txt").write_text(final_response + "\n")
     (directory / "stderr.txt").write_text("")
 
 
@@ -224,6 +249,46 @@ def test_complete_archive_retains_weaker_gateway_verification(tmp_path):
     result = _verify(tmp_path)
     assert result["business_pass"] is True
     assert result["gateway_verification_state"] == "result_schema_checked"
+
+
+def test_rejected_wrong_effect_preview_replays_as_fail_without_execution_or_writes(tmp_path):
+    _sealed_c08(tmp_path, rejected_preview=True)
+    before = {str(path): (path.read_bytes(), path.stat().st_mtime_ns)
+              for path in tmp_path.rglob("*") if path.is_file()}
+
+    result = _verify(tmp_path)
+
+    assert result["archive_valid"] is True and result["original_status"] == "FAIL"
+    assert result["business_pass"] is False
+    assert result["preview_approved"] is False and result["executions"] == 0
+    oracle = json.loads((tmp_path / "expansion-oracle.json").read_text())
+    broker = json.loads((tmp_path / "expansion-broker.json").read_text())
+    assert oracle["transaction_id"] == "tx1-00000000000000000001"
+    assert oracle["artifact_hash"] == broker["records"][1]["payload"]["artifact_hash"]
+    assert oracle["authorization"] is None and oracle["permit"] is None
+    assert [row["gateway_arguments"][0] for row in broker["records"]] == ["draft-start", "preview-from-draft"]
+    transaction_root = tmp_path / "broker" / "state" / "transactions" / oracle["transaction_id"]
+    state = json.loads((transaction_root / "state.json").read_text())
+    events = [json.loads(line) for line in (transaction_root / "events.jsonl").read_text().splitlines()]
+    assert state["state"] == "draft" and [event["to_state"] for event in events] == ["draft"]
+    after = {str(path): (path.read_bytes(), path.stat().st_mtime_ns)
+             for path in tmp_path.rglob("*") if path.is_file()}
+    assert after == before
+
+
+@pytest.mark.parametrize("tamper", ("true", "missing"))
+def test_rejected_preview_requires_explicit_adapter_matched_false_approval(tmp_path, tamper):
+    _sealed_c08(tmp_path, rejected_preview=True)
+    path = tmp_path / "expansion-oracle.json"
+    oracle = json.loads(path.read_text())
+    if tamper == "true":
+        oracle["preview_approved"] = True
+    else:
+        del oracle["preview_approved"]
+    _write(path, oracle)
+
+    with pytest.raises(ExpansionArchiveError, match="preview approval record"):
+        _verify(tmp_path)
 
 
 @pytest.mark.parametrize("missing_after", (False, True))
