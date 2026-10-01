@@ -1,6 +1,6 @@
 # Music expansion investigation dispositions
 
-Date: 2026-10-01. Scope: #119, #120, and #121 under #108. This document completes the bounded evidence review and proposes follow-up scopes; it does not claim that those issues' complete configuration acceptance criteria have passed or authorize implementation. No new Wwise, Codex, or test execution was performed for this document.
+Date: 2026-10-01; native evidence update: 2026-10-02. Scope: #119, #120, and #121 under #108. This document completes the bounded evidence review and proposes follow-up scopes; it does not claim that those issues' complete configuration acceptance criteria have passed or authorize implementation. No new Wwise, Codex, or test execution was performed for this document.
 
 The acceptance target is structural configuration, with meaningful order and preservation, as defined in [the expansion specification](../specs/authoring-integration-expansion.md) and [the three investigation tickets](../specs/authoring-integration-ticket-proposal.md). Playback, listening, beat scheduling, and audible fade behavior receive no credit from these proposed cases.
 
@@ -19,7 +19,21 @@ The acceptance target is structural configuration, with meaningful order and pre
 
 The records show equal project/workunit (`.wproj`/`.wwu`) before/after content hashes, project mtimes, and whole-tree metadata (not full media/source byte hashes), with empty final scoped process lists. Failed invocations retained quarantined sandboxes. A later 2025 finite-loop dependency-read attempt resolved two meanings to the same output field and failed before loop mutation, as recorded in the investigation's executed update; the compact maintenance JSON is not a separate passing record for that attempt. No failed record is regraded here.
 
-## Per-version disposition
+## Native update, 2026-10-02: existing mechanisms only
+
+[The exact native evidence summary](music-native-maintenance-evidence-2026-10-02.md) records candidate `78c3587e15951e784e86791714bcd13d016716c2`: four selected 2022.1 nodes and five selected 2025.1 nodes passed with final sealed records on macOS. All nine records protect full source content hashes, project mtimes and tree metadata, delete their passing owned copies, and retain empty scoped residual-process lists. This is developer investigation/maintenance evidence, with no Fresh Agent or Windows credit and no newly expanded public contract. The six read-node PASSs retain rejected and clarifying reads; they are not six complete music-configuration passes.
+
+| Investigation / lane | New narrow outcome | Residual complete-case gap |
+| --- | --- | --- |
+| #119 Playlist / 2022.1 | Bounded read investigation completed: 7 returned reads, 1 clarification, 3 rejections. Earlier exact LoopCount maintenance remains its original narrow evidence. | Complete ordered recursive item/Segment/configuration oracle and M03 construction/reordering remain unproven. |
+| #119 Playlist / 2025.1 | All 11 planned reads returned. No loop mutation in this run. | Finite-loop dependency maintenance and complete M03 still lack passing evidence. |
+| #120 Transition / both lanes | All 41 planned reads returned per lane. Narrowed `time`/`offset` reads resolve the four-field MusicFade scope and report enabled on Mac. The populated rule's boolean false→true passed with exact Preview/confirmation/execute/verify, separately approved save, and independent saved 15-rule order/14-sibling/reference/fade/music/media preservation. | Native fade units/conversion and maintenance remain unproved; source/destination context, exit/sync/cue and requested fade changes were not executed. Save is honestly result-schema-only at Gateway, supplemented by owned XML. Full M04 stays false. This differs from the historical one-rule/no-fade true→false target. |
+| #121 Music Switch / 2022.1 | Read investigation completed while retaining native unknown-property errors for `@Arguments` and `@Entries`. | Earlier representation's complete tuple maintenance and authoritative order remain unproven; do not substitute 2025 accessors. |
+| #121 Music Switch / 2025.1 | All 45 planned reads returned. One existing `(InGame, None)` entry's AudioNode changed Stealth→Fight with strong public verification and all 12 independent preservation assertions. The other eight entries, two groups, eighteen condition references, owner/music contents and media were preserved. | Existing selected-reference proof does not close M06: condition/path order authority and complete configuration acceptance remain unproven; unsaved XML remained baseline evidence. No general tuple compiler or new-path creation was added. |
+
+The original `4d74ebb` FadeTime/FadeOffset ambiguity records and the b23011f Transition call-PASS/teardown-error record remain frozen, without promotion or regrading. Field-enabled results do not prove physical units or fade timing. Full M03/M04/M06 remain outside the completed native scope.
+
+## Historical per-version disposition (prior evidence)
 
 “Upstream boundary” below means an observed native rejection of the particular read, not an inference that an entire feature is impossible. “Missing oracle” means that current evidence cannot independently prove the complete business outcome.
 
