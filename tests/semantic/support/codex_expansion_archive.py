@@ -42,6 +42,7 @@ from tests.semantic.support.codex_transaction_seal import (
 from tests.semantic.support.codex_task_runner_v3 import expansion_preview_notice
 from wwise_waapi.operation_drafts import load_operation_draft_archive_records, operation_draft_authority_digest
 from wwise_waapi.operation_composer import new_composition, operation_composer_digest
+from wwise_waapi.business_declaration_state import BusinessDeclarationSession
 from wwise_waapi.transactions import _validate_event, confirmation_token_for, validate_transaction_id
 
 
@@ -180,8 +181,12 @@ def _validate_rejected_read(record, *, argv, gate):
         and flags.count("--max-results") <= 1, "rejected read exceeds the closed selector contract")
     args = gate.public_parser(argv)
     _require(args.object_id in gate.scope.relationship_sources
-        and set(args.business_outputs).issubset(gate.scope.includes),
+        and (gate.scope.owned_project_reads is True or set(args.business_outputs).issubset(gate.scope.includes)),
         "rejected relationship read exceeds its sealed identity/projection scope")
+    if gate.scope.owned_project_reads is True:
+        _require(args.relationships == ["children"] and (
+            args.max_results is None or not 1 <= args.max_results <= gate.scope.max_rows),
+            "rejected owned relationship read does not violate its sealed row bound")
 
 
 def _validate_predispatch_rejection(record, rejection):
@@ -234,6 +239,72 @@ def _pristine_rejected_draft(root, plan, records):
         and draft.get("declarations") == [] and all(key in draft and draft[key] is None for key in ("check", "seal", "preview")),
         "rejected binding lacks its pristine Gateway-owned Draft start")
     _require(not (root / "broker/state/transactions").exists(), "rejected binding contains transaction evidence")
+
+
+def _bound_draft_rejected_read(root, plan, records):
+    """Prove the one unchanged editable binding preceding an owned-read FAIL."""
+    _require(plan["read_scope"].get("owned_project_reads") is True
+        and plan.get("operation") == "audio.import", "rejected bound Draft lacks its owned import scope")
+    starts = [row for row in records if row["gateway_arguments"][0] == "draft-start"]
+    binds = [row for row in records if row["gateway_arguments"][0] == "draft-bind-object"]
+    _require(len(starts) == len(binds) == 1
+        and starts[0].get("succeeded") is True and binds[0].get("succeeded") is True
+        and starts[0]["sequence"] < binds[0]["sequence"] < records[-1]["sequence"],
+        "rejected read lacks its exact accepted Draft binding prefix")
+    start, bound = starts[0]["payload"], binds[0]["payload"]
+    draft, bound_draft = start["draft"], bound["draft"]
+    argv = binds[0]["gateway_arguments"]
+    _require(len(argv) == 8 and argv == ["draft-bind-object", draft["draft_id"],
+        "--task-authority", start["task_authority"], "--expected-revision", "1", "--object-id", argv[-1]]
+        and argv[-1] in plan["read_scope"]["object_ids"], "rejected read has another Draft selector")
+    stored = load_operation_draft_archive_records((root / "broker/state").absolute(), [draft["draft_id"]])[draft["draft_id"]]
+    binding = {"operation": stored.operation, "version": stored.version, "schema_digest": stored.schema_digest}
+    _require(stored.state.value == "editable" and stored.revision == bound_draft.get("revision") == 2
+        and stored.operation == plan["operation"] and stored.version == plan["version"]
+        and stored.schema_digest == _public_gateway(plan).operation_draft_schema_digest(stored.operation, stored.version)
+        and stored.composer_digest == operation_composer_digest(stored.operation, stored.version)
+        and stored.authority_digest == operation_draft_authority_digest(start["task_authority"])
+        and stored.schema_version == 2 and stored.check is stored.seal is stored.terminal_at is None
+        and stored.created_at == draft.get("created_at") == draft.get("updated_at")
+        and stored.expires_at == draft.get("expires_at")
+        and len(stored.audit) == 2 and [row["event_type"] for row in stored.audit] == ["started", "handles.bound"]
+        and stored.updated_at == stored.audit[-1]["timestamp"]
+        and draft.get("revision") == 1 and draft.get("binding") == bound_draft.get("binding") == binding
+        and all(row.get("contract") == "waapi-skill.operation-draft/v1"
+            and row.get("draft_id") == stored.draft_id and row.get("lifecycle_state") == "editable"
+            and row.get("business_revision") == 0 for row in (draft, bound_draft))
+        and draft.get("declarations") == [] and all(key in draft and draft[key] is None for key in ("check", "seal", "preview")),
+        "rejected read changed its editable Draft record or projection")
+    session = BusinessDeclarationSession.from_dict(stored.composition.get("business_session"))
+    handles = session.handles.as_dict()
+    objects = handles["objects"]
+    _require(stored.composition == {**new_composition(stored.operation, stored.version), "business_session": session.as_dict()}
+        and session.context.task_authority_digest == stored.authority_digest
+        and session.context.wwise_version == stored.version
+        and session.revision == 0 and not session.declarations and not session.settings
+        and session.active_preview is None and not session.preview_audit
+        and len(objects) == 1 and not handles["fields"] and not handles["types"],
+        "rejected read carries Draft declarations, fields, settings or Preview state")
+    obj = objects[0]
+    receipt = bound.get("bound_object", {})
+    _require(obj["object_id"] == argv[-1] and all(receipt.get(key) == obj[value] for key, value in
+        (("handle", "handle"), ("name", "name"), ("type", "object_type"), ("semantic_kind", "semantic_kind"))),
+        "rejected read binding differs from its authenticated receipt")
+    pending, identities, count = [plan["before"]], [], 0
+    while pending:
+        value = pending.pop()
+        count += 1
+        _require(count <= 2048, "rejected read baseline identity traversal exceeds its bound")
+        if isinstance(value, Mapping):
+            if value.get("id") == obj["object_id"] and all(key in value for key in ("name", "type", "path")):
+                identities.append(value)
+            pending.extend(value.values())
+        elif isinstance(value, list):
+            pending.extend(value)
+    _require(len(identities) == 1 and all(identities[0][key] == obj[value] for key, value in
+        (("name", "name"), ("type", "object_type"), ("path", "path"))),
+        "rejected read stored binding differs from its independent baseline")
+    _require(not (root / "broker/state/transactions").exists(), "rejected read contains transaction evidence")
 
 
 def _receipts(root: Path, plan: Mapping[str, Any], broker: Mapping[str, Any]) -> list[Mapping[str, Any]]:
@@ -506,7 +577,14 @@ def _verify_task(root: Path, unit_id: str, version: str, inputs_sha256: str) -> 
                 and result.get("gateway_verification_state") is None,
                 "rejected binding carries preparation or verification evidence")
         else:
-            _require(all(record["gateway_arguments"][0] in _READS for record in records), "rejected read contains Draft actions")
+            if any(record["gateway_arguments"][0] == "draft-start" for record in records):
+                _bound_draft_rejected_read(root, plan, records)
+                _require(all(key in oracle and oracle[key] is None for key in
+                    ("transaction_id", "artifact_hash", "authorization", "permit", "after", "preview_before", "preview_after", "gateway_verification_state"))
+                    and result.get("gateway_verification_state") is None,
+                    "rejected bound read carries preparation or verification evidence")
+            else:
+                _require(all(record["gateway_arguments"][0] in _READS for record in records), "rejected read contains Draft actions")
         accepted_names = [record.get("step_name") for record in records if record.get("accepted") is True]
         _require(all(isinstance(name, str) and name for name in accepted_names)
             and len(accepted_names) == len(set(accepted_names))

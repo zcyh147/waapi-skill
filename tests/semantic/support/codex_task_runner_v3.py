@@ -209,7 +209,7 @@ def _expansion_effect_groups(artifact: Mapping[str, Any], before: Mapping[str, A
                 groups.extend((("volume", "音量", "增益"), (format(row["value"], "g"),)))
 
     if operation == "audio.import":
-        groups.append(("import", "replace", "reimport", "create", "导入", "替换", "重导", "创建", "建立", "新增"))
+        groups.append(("import", "replace", "reimport", "create", "update", "导入", "替换", "重导", "创建", "建立", "新增", "更新"))
         defaults = arguments.get("defaults", {})
         for item in arguments.get("imports", []):
             row = {**defaults, **item}

@@ -1,11 +1,12 @@
 from pathlib import Path
 import json
+from dataclasses import replace
 
 import pytest
 
 from tests.semantic.support.codex_expansion_broker_policy import ExpansionBrokerPolicy
 from tests.semantic.support.codex_expansion_cases import PreparedExpansionCase
-from tests.semantic.support.codex_expansion_policy import ExpansionPolicyError
+from tests.semantic.support.codex_expansion_policy import ExpansionPolicyError, ExpansionReadScope
 from tests.semantic.support.codex_gateway_broker import CodexGatewayBroker, ResponseBinding
 
 
@@ -240,6 +241,74 @@ def test_owned_project_reads_allow_relations_new_guids_and_disclosed_advanced_wi
                         "--expected-revision", "1", "--object-id", new_id), state_directory=tmp_path)
 
 
+@pytest.mark.parametrize("limit", [100, 1000])
+def test_owned_children_read_uses_public_gateway_budget_at_authenticated_broker(monkeypatch, tmp_path, limit):
+    from types import SimpleNamespace
+    policy = make_policy()
+    argv = ("query-object", "--exact-id", OWNER, "--relationship", "children",
+            "--include", "parent", "--include", "source-language", "--include", "original-file-path",
+            "--include", "file-path", "--max-results", str(limit))
+    args = policy.gateway_module.build_parser().parse_args(["--version", policy.version, *argv])
+    policy.gateway_module.preflight_query_object_input(args, env={})
+    assert args.take == limit
+    dispatched = []
+    with CodexGatewayBroker(skill_source=SKILL, expected_steps=(), runner_environment={},
+                            transport="tcp", expansion_outcome_policy=policy,
+                            working_root=tmp_path / "broker") as broker:
+        def launch(command, *, runner_env):
+            dispatched.append(command[3:])
+            payload = {"contract": "waapi-skill.gateway-result/v1", "ok": True, "command": "query-object", "objects": [], "count": 0,
+                       "query_bound": {"mode": "take", "value": limit}}
+            return SimpleNamespace(returncode=0, stdout=json.dumps(payload))
+        monkeypatch.setattr(broker, "_launch_runner", launch)
+        monkeypatch.setattr(broker, "_communicate_runner", lambda process: (process.stdout, ""))
+        response = broker._handle_request({"token": broker._token, "interpreter": "python",
+            "argv": [str(broker.runner_path), "gateway.py", *argv]})
+        assert response["exit_code"] == 0, response
+        record = broker.evidence().records[0]
+        assert record.authenticated and record.accepted and record.succeeded
+    assert dispatched == [list(argv)] and len(policy.reads.receipts) == 1
+
+
+@pytest.mark.parametrize("argv", [
+    ("query-object", "--exact-id", OWNER, "--relationship", "children", "--max-results", "1001"),
+    ("query-object", "--exact-id", OWNER, "--relationship", "children"),
+    ("--host", "elsewhere", "query-object", "--exact-id", OWNER, "--max-results", "100"),
+    ("call", "ak.wwise.core.object.get"),
+])
+def test_owned_public_row_budget_does_not_admit_unbounded_or_outside_gateway_reads(tmp_path, argv):
+    with pytest.raises(ExpansionPolicyError):
+        make_policy().prepare(argv, state_directory=tmp_path)
+
+
+def test_sealed_owned_64_row_scope_retains_its_original_limit_and_digest(tmp_path):
+    policy = make_policy()
+    scope = policy.reads.scope
+    historical = {**scope.__dict__, "max_rows": 64}
+    policy.reads.scope = ExpansionReadScope(**historical)
+    digest = policy.reads.scope.digest
+    with pytest.raises(ExpansionPolicyError, match="bounded public source"):
+        policy.prepare(("query-object", "--exact-id", OWNER, "--relationship", "children",
+                        "--max-results", "100"), state_directory=tmp_path)
+    assert policy.reads.scope.max_rows == 64 and policy.reads.scope.digest == digest
+
+
+@pytest.mark.parametrize("restriction", ["bytes", "calls"])
+def test_owned_public_row_budget_preserves_other_read_capacity(tmp_path, restriction):
+    policy = make_policy()
+    policy.reads.scope = replace(policy.reads.scope, **(
+        {"max_result_bytes": 80} if restriction == "bytes" else {"max_calls": 1}))
+    step = policy.prepare(("query-schema",), state_directory=tmp_path)
+    if restriction == "bytes":
+        with pytest.raises(ExpansionPolicyError, match="byte"):
+            policy.observe(step, {"ok": True, "command": "query-schema", "text": "音" * 30}, state_directory=tmp_path)
+        assert not policy.reads.receipts
+    else:
+        policy.observe(step, {"ok": True, "command": "query-schema"}, state_directory=tmp_path)
+        with pytest.raises(ExpansionPolicyError, match="capacity"):
+            policy.prepare(("operations",), state_directory=tmp_path)
+
+
 @pytest.mark.parametrize("max_results", [None, 100])
 def test_owned_event_actions_read_uses_gateway_fixed_bound_and_sealed_projection(tmp_path, max_results):
     policy = make_event_read_policy()
@@ -261,7 +330,7 @@ def test_owned_event_actions_read_uses_gateway_fixed_bound_and_sealed_projection
     assert step.arguments == argv[1:]  # the accepted Agent argv is recorded unchanged
     policy.observe(step, event_actions_receipt(), state_directory=tmp_path)
 
-    assert policy.reads.scope.max_rows == 64
+    assert policy.reads.scope.max_rows == 1000
     assert policy.reads.receipts[0][0] == argv
     assert policy.prepared.read_object_ids == frozenset({EVENT, ACTION, OTHER_EVENT})
     assert not policy.reads.failed_receipts
@@ -302,10 +371,10 @@ def test_owned_event_actions_read_rejects_publicly_unsupported_custom_fields(tmp
         policy.prepare(argv, state_directory=tmp_path)
 
 
-def test_owned_event_actions_read_rejects_rows_over_the_case_budget(tmp_path):
+def test_owned_event_actions_read_rejects_rows_over_the_gateway_fixed_budget(tmp_path):
     policy = make_event_read_policy()
     step = policy.prepare(event_actions_argv(), state_directory=tmp_path)
-    rows = tuple(f"{{00000000-0000-0000-0000-{index:012X}}}" for index in range(1, 66))
+    rows = tuple(f"{{00000000-0000-0000-0000-{index:012X}}}" for index in range(1, 102))
     with pytest.raises(ExpansionPolicyError, match="rows exceed scope"):
         policy.observe(step, event_actions_receipt(rows), state_directory=tmp_path)
     assert policy.reads.receipts == []

@@ -2166,7 +2166,7 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "fixed_argv_prefix" in instructions
     assert "never reconstruct" in instructions
     assert "Omit workdir/cwd" in instructions
-    assert "Read now; no pre-read reply/questions" in instructions
+    assert "First read SKILL.md once, standalone; no pre-read reply/questions" in instructions
     assert "draft-apply: 1 argv/fact" in instructions
     assert "all facts" in instructions
     assert "batch=6" in instructions
@@ -2218,11 +2218,12 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "timeout_ms>=30000" in instructions
     assert "draft-check!=Preview" in instructions
     assert (
-        "Preview-now: finish schema/metadata/Preview now; "
+        "Finish schema/metadata/Preview now; "
         "only execution waits for confirmation"
     ) in instructions
     assert "Draft same turn" in instructions
-    assert "no progress reply" in instructions
+    assert "Preview: announce edits before Execute" in instructions
+    assert "Draft same turn; no progress reply." not in instructions
     assert "requires_later_user_message" in instructions
 
 

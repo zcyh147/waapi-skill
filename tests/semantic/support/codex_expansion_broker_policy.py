@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from wwise_waapi.transactions import TransactionStore
+from wwise_waapi.builders.query import MAX_QUERY_TAKE
 from tests.semantic.support.codex_expansion_cases import PreparedExpansionCase
 from tests.semantic.support.codex_expansion_policy import (
     BoundedExpansionReads, ExpansionPolicyError, ExpansionReadScope,
@@ -51,7 +52,7 @@ class ExpansionBrokerPolicy:
             includes=prepared.read_includes, fields=prepared.read_fields,
             relationship_sources=prepared.relationship_sources,
             curve_roles=prepared.read_curve_roles, platforms=prepared.read_platforms,
-            owned_project_reads=True,
+            owned_project_reads=True, max_rows=MAX_QUERY_TAKE,
         ), public_parser=self._parse)
         self.transaction = ExpansionTransaction(
             policy=prepared.policy, request_prompt_sha256=canonical_digest(prepared.prompt),

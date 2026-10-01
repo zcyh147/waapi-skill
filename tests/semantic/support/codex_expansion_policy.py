@@ -15,6 +15,8 @@ import secrets
 from dataclasses import dataclass, replace
 from typing import Callable, Mapping, Sequence
 
+from wwise_waapi.builders.query import MAX_QUERY_TAKE
+
 
 POLICY_CONTRACT = "waapi-skill.integration-expansion-outcome-policy/v1"
 _GUID = re.compile(r"^\{[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}\}$")
@@ -65,6 +67,8 @@ class ExpansionReadScope:
     owned_project_reads: bool = False
 
     def __post_init__(self) -> None:
+        if type(self.owned_project_reads) is not bool:
+            raise ExpansionPolicyError("owned-project read scope flag must be boolean")
         if not self.object_ids or any(not _GUID.fullmatch(item) for item in self.object_ids):
             raise ExpansionPolicyError("read scope requires canonical object GUIDs")
         if not self.relationship_sources.issubset(self.object_ids):
@@ -73,7 +77,8 @@ class ExpansionReadScope:
             raise ExpansionPolicyError("read scope requires closed operation names")
         if not self.curve_roles.issubset(_CURVE_ROLES):
             raise ExpansionPolicyError("unknown public attenuation curve role")
-        for value, ceiling in ((self.max_rows, 64), (self.max_calls, 128),
+        row_ceiling = MAX_QUERY_TAKE if self.owned_project_reads is True else 64
+        for value, ceiling in ((self.max_rows, row_ceiling), (self.max_calls, 128),
                                (self.max_result_bytes, 1_048_576)):
             if type(value) is not int or not 1 <= value <= ceiling:
                 raise ExpansionPolicyError("read scope exceeds expansion ceilings")

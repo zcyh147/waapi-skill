@@ -42,6 +42,18 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- Consolidated #131/#132/#133 repairs passed **711 focused tests / 9 native
+  Windows-only skips** in 4.98 seconds, exit zero, with independent Spec and
+  Standards review on each seam. Natural import `更新`/`update` notices are
+  accepted while missing advance notices remain failures; concise general
+  Preview/notice/Execute guidance stays below the existing instruction ceiling.
+  Historical terminal rejection replay now proves the exact unchanged bound
+  Draft without granting business PASS. New owned-project read scopes use the
+  public Gateway `MAX_QUERY_TAKE=1000`, preserve explicit historical/default
+  64-row scopes and byte/call/source fences, and reject non-boolean ownership
+  flags. No packaged Skill, matrix isolation bypass or frozen regrade was added.
+  A new frozen candidate's broad gates and fresh model runs remain required.
+
 - The frozen `122eb09` pilot retained three Luna-high ordinary FAILs, all at
   `visible_preview_notice`. C01 supplied a concrete post-Preview notice, but
   the Chinese verb `更新` was absent from the import effect alternatives.

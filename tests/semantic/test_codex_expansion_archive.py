@@ -820,6 +820,182 @@ def test_terminal_invalid_guid_draft_bind_preserves_failed_zero_mutation_archive
     assert {str(path): (path.read_bytes(), path.stat().st_mtime_ns) for path in tmp_path.rglob('*') if path.is_file()} == before
 
 
+def _sealed_bound_draft_read_rejection(root):
+    """Production Draft update plus the terminal owned-read pattern from #132."""
+    from wwise_waapi.business_declarations import BusinessContext, BusinessHandleRegistry
+    _sealed_invalid_draft_bind(root)
+    plan = json.loads((root / 'expansion-plan.json').read_text())
+    identifier = plan['read_scope']['object_ids'][0]
+    identity = {'id': identifier, 'name': 'FixtureSound', 'type': 'Sound', 'path': r'\Containers\FixtureSound'}
+    plan['before']['sound'] = identity
+    plan.pop('sha256')
+    plan['sha256'] = canonical_digest(plan)
+    _write(root / 'expansion-plan.json', plan)
+    broker = json.loads((root / 'expansion-broker.json').read_text())
+    first = broker['records'][0]
+    start = first['payload']
+    context = BusinessContext.create(task_authority=start['task_authority'], project_id=identifier,
+        project_path='/fixture/SampleProject.wproj', wwise_version='2025.1', wwise_build='v2025.1.7')
+    captured = []
+    def bind(session):
+        handles = BusinessHandleRegistry.from_dict(session.handles.as_dict())
+        captured.append(handles.bind_object(object_id=identifier, name=identity['name'],
+            object_type='Sound', path=identity['path'], semantic_kind='sound-voice'))
+        return session.with_handle_registry(handles)
+    updated = OperationDraftStore(root / 'broker/state').apply_business_update(start['draft']['draft_id'],
+        task_authority=start['task_authority'], expected_revision=1,
+        schema_digest=start['draft']['binding']['schema_digest'],
+        composer_digest=operation_composer_digest('audio.import', '2025.1'),
+        context=context, update=bind, event_type='handles.bound')
+    bound = captured[0]
+    payload = {'ok': True, 'command': 'draft-bind-object', 'draft': {
+        'contract': 'waapi-skill.operation-draft/v1', 'draft_id': updated.draft_id,
+        'revision': 2, 'business_revision': 0, 'lifecycle_state': 'editable', 'binding': start['draft']['binding']},
+        'bound_object': {'handle': bound.handle, 'name': bound.name, 'type': bound.object_type,
+                         'semantic_kind': bound.semantic_kind}}
+    accepted = deepcopy(first)
+    accepted.update(sequence=2, step_name='expansion.step.0002', payload=payload,
+        payload_sha256=canonical_digest(payload), stdout=json.dumps(payload), gateway_arguments=[
+        'draft-bind-object', updated.draft_id, '--task-authority', start['task_authority'],
+        '--expected-revision', '1', '--object-id', identifier])
+    rejected = deepcopy(broker['records'][-1])
+    rejected.update(sequence=3, gateway_arguments=['query-object', '--exact-id', identifier,
+        '--relationship', 'children', '--include', 'parent', '--include', 'file-path', '--max-results', '100'],
+        rejection='expansion policy rejected command: project query requires a bounded public source')
+    rejected['stderr'] = 'Gateway broker rejected command: ' + rejected['rejection'] + '\n'
+    broker.update(records=[first, accepted, rejected],
+        expected_step_names=['expansion.step.0001', 'expansion.step.0002'],
+        consumed_step_names=['expansion.step.0001', 'expansion.step.0002'])
+    directory = root / 'turns/turn-01'
+    events = [json.loads(line) for line in (directory / 'events.jsonl').read_text().splitlines()]
+    events = [event for event in events if not event.get('item', {}).get('id', '').startswith('cmd-')]
+    final = events[-2:]
+    events = events[:-2]
+    for row in broker['records']:
+        argv = row['gateway_arguments']
+        model = ['python', plan['skill_source'] + '/scripts/run.py', 'gateway.py', *argv]
+        row.update(model_argv=model, normalized_model_argv=model,
+            raw_argv_sha256=canonical_digest(model), argv_sha256=canonical_digest(model))
+        if row['accepted']:
+            semantic = ['runner-owned-version', '2025.1', *argv]
+            if '--expected-revision' in argv:
+                semantic[2 + argv.index('--expected-revision') + 1] = 1
+            row['semantic_argv_sha256'] = canonical_digest(semantic)
+            row['runner_command_sha256'] = canonical_digest([plan['trusted_python'], plan['skill_source'] + '/scripts/run.py', 'gateway.py', *argv])
+        item = {'id': 'cmd-' + str(row['sequence']), 'type': 'command_execution', 'command': shlex.join(model),
+            'status': 'completed', 'exit_code': row['exit_code'], 'aggregated_output': row['stdout']}
+        events.extend([{'type': 'item.started', 'item': {**item, 'status': 'in_progress'}},
+                       {'type': 'item.completed', 'item': item}])
+    _write(root / 'expansion-broker.json', broker)
+    (directory / 'events.jsonl').write_text(''.join(json.dumps(event) + '\n' for event in [*events, *final]))
+    oracle = json.loads((root / 'expansion-oracle.json').read_text())
+    oracle['before'] = oracle['reconciliation']['snapshot'] = plan['before']
+    oracle['reconciliation']['snapshot_sha256'] = canonical_digest(plan['before'])
+    _write(root / 'expansion-oracle.json', oracle)
+    result = json.loads((root / 'expansion-task-result.json').read_text())
+    result['plan_sha256'] = plan['sha256']
+    _write(root / 'expansion-task-result.json', result)
+    grade = json.loads((directory / 'turn-grade.json').read_text())
+    grade['broker_prefix_count'] = 3
+    _write(directory / 'turn-grade.json', grade)
+    _realistic_command_paths(root)
+
+
+def test_terminal_owned_read_cap_rejection_after_bound_draft_remains_isolated_fail(tmp_path):
+    _sealed_bound_draft_read_rejection(tmp_path)
+    before = {str(path): (path.read_bytes(), path.stat().st_mtime_ns) for path in tmp_path.rglob('*') if path.is_file()}
+    replay = _verify(tmp_path)
+    assert replay['archive_valid'] is True and replay['original_status'] == 'FAIL'
+    assert replay['business_pass'] is False and replay['executions'] == replay['execution_reservations'] == 0
+    assert {str(path): (path.read_bytes(), path.stat().st_mtime_ns) for path in tmp_path.rglob('*') if path.is_file()} == before
+
+
+def _refresh_bound_rejection_receipts(root, broker):
+    directory = root / 'turns/turn-01'
+    events = [json.loads(line) for line in (directory / 'events.jsonl').read_text().splitlines()]
+    final = events[-2:]
+    events = [event for event in events[:-2] if not event.get('item', {}).get('id', '').startswith('cmd-')]
+    for row in broker['records']:
+        argv = row['gateway_arguments']
+        model = ['python', '.agents/skills/waapi-skill/scripts/run.py', 'gateway.py', *argv]
+        row['model_argv'] = model
+        if row['accepted']:
+            row['payload_sha256'] = canonical_digest(row['payload'])
+            row['stdout'] = json.dumps(row['payload'])
+            semantic = ['runner-owned-version', '2025.1', *argv]
+            if '--expected-revision' in argv:
+                semantic[2 + argv.index('--expected-revision') + 1] = int(argv[argv.index('--expected-revision') + 1])
+            row['semantic_argv_sha256'] = canonical_digest(semantic)
+            plan = json.loads((root / 'expansion-plan.json').read_text())
+            row['runner_command_sha256'] = canonical_digest([plan['trusted_python'], plan['skill_source'] + '/scripts/run.py', 'gateway.py', *argv])
+        item = {'id': 'cmd-' + str(row['sequence']), 'type': 'command_execution', 'command': shlex.join(model),
+            'status': 'completed', 'exit_code': row['exit_code'], 'aggregated_output': row['stdout']}
+        events.extend([{'type': 'item.started', 'item': {**item, 'status': 'in_progress'}},
+                       {'type': 'item.completed', 'item': item}])
+    _write(root / 'expansion-broker.json', broker)
+    (directory / 'events.jsonl').write_text(''.join(json.dumps(event) + '\n' for event in [*events, *final]))
+    _realistic_command_paths(root)
+
+
+@pytest.mark.parametrize('damage', ('bound_identity', 'revision', 'settings', 'audit', 'projection',
+    'within_cap', 'authority', 'transaction', 'later_dispatch', 'raw_order', 'reconciliation', 'preview'))
+def test_bound_draft_rejected_read_requires_exact_unchanged_failure_proof(tmp_path, damage):
+    _sealed_bound_draft_read_rejection(tmp_path)
+    broker = json.loads((tmp_path / 'expansion-broker.json').read_text())
+    path = next((tmp_path / 'broker/state/operation-drafts-v1/records').glob('*.json'))
+    if damage in {'bound_identity', 'revision', 'settings', 'audit'}:
+        stored = json.loads(path.read_text())
+        if damage == 'bound_identity':
+            from wwise_waapi.business_declarations import BusinessContext, BusinessHandleRegistry
+            raw = stored['composition']['business_session']
+            obj = raw['handles']['objects'][0]
+            registry = BusinessHandleRegistry(BusinessContext.from_binding_dict(raw['context']),
+                token_bytes=lambda _size: bytes.fromhex(obj['handle'].split('-', 1)[1]))
+            registry.bind_object(object_id=obj['object_id'], name='ForgedName', object_type=obj['object_type'],
+                path=obj['path'], semantic_kind=obj['semantic_kind'])
+            raw['handles'] = registry.as_dict()
+            broker['records'][1]['payload']['bound_object']['name'] = 'ForgedName'
+            _refresh_bound_rejection_receipts(tmp_path, broker)
+        elif damage == 'revision':
+            stored['revision'] = 3
+        elif damage == 'settings':
+            stored['composition']['business_session']['settings'] = {'source_gain_db': 1}
+        else:
+            stored['audit'][-1]['event_type'] = 'settings.changed'
+            event = stored['audit'][-1]
+            event.pop('event_hash')
+            event['event_hash'] = canonical_digest(event)
+        stored.pop('record_digest')
+        stored['record_digest'] = _record_digest(stored)
+        path.write_bytes(canonical_json_bytes(stored))
+    elif damage in {'projection', 'within_cap', 'authority', 'later_dispatch'}:
+        if damage == 'projection':
+            broker['records'][1]['payload']['draft']['business_revision'] = 1
+        elif damage == 'within_cap':
+            broker['records'][-1]['gateway_arguments'][-1] = '64'
+        elif damage == 'authority':
+            broker['records'][1]['gateway_arguments'][3] = 'da1-' + '0' * 40
+        else:
+            extra = deepcopy(broker['records'][0])
+            extra['sequence'] = 4
+            broker['records'].append(extra)
+        _refresh_bound_rejection_receipts(tmp_path, broker)
+    elif damage == 'raw_order':
+        _swap_raw_command_blocks(tmp_path, 'cmd-2', 'cmd-3')
+    elif damage == 'transaction':
+        (tmp_path / 'broker/state/transactions').mkdir()
+    else:
+        oracle = json.loads((tmp_path / 'expansion-oracle.json').read_text())
+        if damage == 'preview':
+            oracle['preview_after'] = {'pending': True}
+        else:
+            oracle['reconciliation']['snapshot']['sound']['name'] = 'changed'
+            oracle['reconciliation']['snapshot_sha256'] = canonical_digest(oracle['reconciliation']['snapshot'])
+        _write(tmp_path / 'expansion-oracle.json', oracle)
+    with pytest.raises(ExpansionArchiveError):
+        _verify(tmp_path)
+
+
 @pytest.mark.parametrize('damage', ('authority', 'revision', 'wrong_guid', 'braced_guid', 'other_rejection',
     'runner_evidence', 'extra_draft', 'composition', 'audit', 'schema', 'start_projection', 'terminal_omission',
     'later_dispatch', 'transaction', 'authorization', 'preview', 'pending_preview', 'missing_null', 'reconciliation', 'changed_state', 'reap', 'pass_gate'))

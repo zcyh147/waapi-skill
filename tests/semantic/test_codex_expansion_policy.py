@@ -89,6 +89,20 @@ def test_failed_read_attempts_cannot_evade_capacity():
         gate.admit(("query-schema",))
 
 
+def test_public_row_ceiling_applies_only_to_owned_scopes_and_preserves_legacy_default():
+    assert reads().scope.max_rows == reads(owned_project_reads=True).scope.max_rows == 64
+    assert reads(owned_project_reads=True, max_rows=1000).scope.max_rows == 1000
+    for overrides in ({"max_rows": 65}, {"owned_project_reads": True, "max_rows": 1001}):
+        with pytest.raises(ExpansionPolicyError, match="ceilings"):
+            reads(**overrides)
+
+
+@pytest.mark.parametrize("flag", [0, 1, "true", "false", None, [], {}])
+def test_owned_read_scope_rejects_non_boolean_ownership_flags(flag):
+    with pytest.raises(ExpansionPolicyError, match="boolean"):
+        reads(owned_project_reads=flag)
+
+
 def test_exact_id_default_is_intrinsically_bounded_and_failed_read_can_be_repaired():
     gate = reads()
     gate.admit(("query-object", "--exact-id", OWNER))

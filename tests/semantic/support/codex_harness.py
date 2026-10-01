@@ -47,8 +47,7 @@ DEFAULT_SERVICE_TIER = "priority"
 DEFAULT_TIMEOUT_SECONDS = 180.0
 WINDOWS_UTF8_CODE_PAGE = 65001
 SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
-    "First read SKILL.md once, standalone. "
-    "Read now; no pre-read reply/questions. "
+    "First read SKILL.md once, standalone; no pre-read reply/questions. "
     "copy source_field/fixed_argv_prefix_copy verbatim; keep quotes/runner; never reconstruct; "
     "opaque IDs/handles/tokens/digests. draft-apply: 1 argv/fact; batch=6; "
     "final=remaining; all facts. Rows obey returned max. "
@@ -73,8 +72,8 @@ SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
     "POSIX path: single-quote; keep backslashes; one arg/child. "
     "Files absolute; no traversal. "
     "timeout_ms>=30000; use shell_tool_timeout_ms; scalars first. "
-    "Draft same turn; no progress reply. "
-    "draft-check!=Preview. Preview-now: finish schema/metadata/Preview now; "
+    "Draft same turn; Preview: announce edits before Execute. "
+    "draft-check!=Preview. Finish schema/metadata/Preview now; "
     "only execution waits for confirmation. next_command unless "
     "requires_later_user_message. Omit workdir/cwd."
 )

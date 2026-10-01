@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -8,6 +9,31 @@ from tests.semantic.support.codex_task_runner_v3 import expansion_preview_notice
 
 ARTIFACT = {"request": {"operation": "audio.import", "arguments": {
     "imports": [{"object_path": r"\Music\Quiet", "properties": [{"name": "Volume", "value": -6.0}]}]}}}
+
+
+@pytest.mark.parametrize("unit,expected", [("EXP25-C01", True), ("EXP25-C06", False), ("EXP25-M01", False)])
+def test_actual_archived_preview_notice_wording_and_order(unit, expected):
+    fixture = json.loads((Path(__file__).parents[1] / "fixtures/semantic/expansion-preview-notice-122eb09.json").read_text())
+    case = next(case for case in fixture["cases"] if case["unit"] == unit)
+    assert _notice(case["events"], artifact=case["preview_artifact"],
+        before=case["before_snapshot"], execute_expected=case["execute_expected"]) is expected
+
+
+@pytest.mark.parametrize("text", ["将更新 Quiet 的轨道音量为 -6 dB。", "I will update Quiet with volume at -6 dB."])
+def test_import_notice_accepts_equivalent_update_wording(text):
+    assert _notice([PREVIEW, _message(text), EXECUTE])
+
+
+@pytest.mark.parametrize("text", ["正在更新进度。", "将更新 Full 的音量为 -6 dB。", "将更新 Quiet 的音量为 -60 dB。"])
+def test_update_wording_does_not_relax_concrete_effect_obligations(text):
+    assert not _notice([PREVIEW, _message(text), EXECUTE])
+
+
+@pytest.mark.parametrize("text", ["将更新 Line_01 的 English(US) 素材。", "将更新 Line_01。", "Japanese 已核对，正在处理。"])
+def test_update_notice_keeps_target_and_requested_language_obligations(text):
+    artifact = {"request": {"operation": "audio.import", "arguments": {
+        "imports": [{"object_path": r"\Voices\Line_01", "import_language": "Japanese"}]}}}
+    assert not _notice([PREVIEW, _message(text), EXECUTE], artifact=artifact)
 
 
 @pytest.mark.parametrize("after_preview,before_execute,expected", [
