@@ -42,6 +42,29 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- Frozen `0997d20` completed Program **5888 passed / 2 skipped** and
+  Non-live **12197 passed / 118 skipped / 27 deselected**, both exit zero;
+  matching 2025 smoke was ready in **3.3797 seconds** and cleaned its sandbox.
+  Exact reports/digests are in `../research/integration-expansion-notice-read-gates-2026-10-02.json`.
+  Its entire matched six-task batch completed: Luna C01 and Sol M01 PASS;
+  both C06s, Luna M01 and Sol C01 FAIL, without BLOCKED or pending units.
+  All **982** sealed artifacts were independently rehashed; full source hashes
+  and mtimes were unchanged, PASS copies deleted and FAIL copies quarantined,
+  both jobs unloaded and no scoped process remained. No model is selected.
+- Read-only diagnosis identifies three concrete-notice false negatives:
+  Luna C06 uses the uniquely attested association GUID, Sol C06 describes the
+  accurate before-to-after midpoint delta in its uniquely bound relationship
+  context, and Luna M01 uses mathematical `−6` rather than ASCII `-6`.
+  Independent `verify_c06` checks (seven per case) and `verify_m01` (six)
+  passed separately from Gateway assertions. Sol C01's thirteen admitted,
+  successful authenticated receipts are rejected only by an immediate-next-
+  Draft copy assumption: six bounded preservation reads precede an exact
+  unchanged declaration continuation. It stopped after Preview without execution.
+  Repairs #134/#135 address contextual notices/numeric formatting and exact
+  copy validation across authenticated reads. These original FAILs remain
+  frozen; no verify-only or regrading was performed. Exact records are in
+  `../research/integration-expansion-context-notice-pilot-2026-10-02.json`.
+
 - Consolidated #131/#132/#133 repairs passed **711 focused tests / 9 native
   Windows-only skips** in 4.98 seconds, exit zero, with independent Spec and
   Standards review on each seam. Natural import `更新`/`update` notices are
