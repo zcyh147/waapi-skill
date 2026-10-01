@@ -26541,10 +26541,12 @@ def _business_next_action_binding(
                     "maximum": AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS,
                 },
                 "row_completeness": (
-                    "each_row_must_include_its_media_every_known_requested_field_"
+                    "each_row_must_include_every_known_requested_field_"
                     "switch_assignment_and_event_in_the_same_command; partial_"
-                    "rows_are_forbidden"
+                    "rows_are_forbidden; media_bearing_rows_include_their_media; "
+                    "structure_only_rows_omit_media_and_language"
                 ),
+                "row_requirements": business_contract["row_requirements"],
                 "dependency_closure": dependency_closure,
                 "repeat_with_next_response_revision": True,
                 "check_only_after": (
@@ -27561,6 +27563,7 @@ def operation_draft_payload(
                     "row_order",
                     "rows_per_command",
                     "row_completeness",
+                    "row_requirements",
                     "dependency_closure",
                 )
             }

@@ -70,6 +70,24 @@ def audio_import_business_contract_data(version: str) -> dict[str, Any]:
         "declaration_fields": sorted(AUDIO_IMPORT_BUSINESS_DECLARATION_FIELDS),
         "field_value_types": dict(AUDIO_IMPORT_BUSINESS_VALUE_TYPES),
         "semantic_kinds": list(SUPPORTED_BUSINESS_KINDS),
+        "row_requirements": {
+            "structure_only": {
+                "semantic_kinds": list(SUPPORTED_BUSINESS_KINDS),
+                "media": "omit_media_file_and_inline_wav",
+                "language": "omit",
+            },
+            "media_bearing": {
+                "media": "include_exactly_one_media_file_or_inline_wav_in_that_row",
+                "language": (
+                    "sound-sfx_and_music-track_default_to_SFX; "
+                    "otherwise_supply_the_exact_project_language"
+                ),
+            },
+            "new_parent": (
+                "bound_parent_handle_or_earlier_new_row_id_in_this_Draft; "
+                "declare_parent_before_children"
+            ),
+        },
         "modes": ["replace"],
         "mode_selection": {
             "all_new_rows": "derive_create",

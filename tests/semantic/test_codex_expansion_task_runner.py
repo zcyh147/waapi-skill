@@ -130,6 +130,92 @@ def test_rtpc_context_requires_unique_immutable_and_baseline_agreement(defect):
     assert not _notice(case["events"], artifact=artifact, before=before)
 
 
+def _scalar_notice_case():
+    return json.loads((Path(__file__).parents[1] / "fixtures/semantic/expansion-midpoint-notice-919043f.json").read_text())
+
+
+def test_actual_scalar_midpoint_notice_in_attested_relationship_context():
+    case = _scalar_notice_case()
+    assert _notice(case["events"], artifact=case["preview_artifact"], before=case["before_snapshot"])
+
+
+@pytest.mark.parametrize("role,value,endpoints,shape,expected", [
+    ("中点", "-6.0", "(0,-48) 和 (100,0)", "线性", True),
+    ("中点", "−6", "(0,-48) 和 (100,0)", "线性", True),
+    ("端点", "-6", "(0,-48) 和 (100,0)", "线性", False),
+    ("中点", "+6", "(0,-48) 和 (100,0)", "线性", False),
+    ("中点", "-60", "(0,-48) 和 (100,0)", "线性", False),
+    ("中点", "-6.5", "(0,-48) 和 (100,0)", "线性", False),
+    ("中点", "-6e2", "(0,-48) 和 (100,0)", "线性", False),
+    ("中点", "-6", "(0,-48) 和 (100,2)", "线性", False),
+    ("中点", "-6", "(100,0)", "线性", False),
+    ("中点", "-6", "(0,-48) 和 (100,0)", "非线性", False),
+    ("中点", "-6", "(0,-48) 和 (100,0)", "不保持线性", False),
+])
+def test_scalar_midpoint_requires_exact_role_value_endpoints_and_shape(role, value, endpoints, shape, expected):
+    case = _scalar_notice_case()
+    text = f"我将该关系的{role}改为 {value}，保持 {endpoints} 不变、三个点均为{shape}。"
+    assert _notice([PREVIEW, _message(text), EXECUTE],
+        artifact=case["preview_artifact"], before=case["before_snapshot"]) is expected
+
+
+@pytest.mark.parametrize("defect", ["one_point", "four_points", "different_domain", "multiple_changes", "ambiguous_volume"])
+def test_scalar_role_is_only_defined_in_unique_three_point_single_middle_y_change(defect):
+    from copy import deepcopy
+    case = _scalar_notice_case()
+    artifact, before = case["preview_artifact"], case["before_snapshot"]
+    args, prepared = artifact["request"]["arguments"], artifact["prepared_operation"]
+    if defect == "one_point":
+        args["points"] = [args["points"][1]]
+    elif defect == "four_points":
+        args["points"].insert(1, {"x": 25, "y": -24, "shape": "Linear"})
+    elif defect == "different_domain":
+        args["points"][1]["x"] = 60
+    elif defect == "multiple_changes":
+        args["points"][0]["y"] = -30
+    else:
+        row = deepcopy(next(row for row in before["rtpcs"].values() if row["@PropertyName"] == "Volume"))
+        row["id"] = "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"
+        before["rtpcs"][row["id"]] = row
+        prepared["pre_state"]["rtpc_snapshot"]["rows"].append(deepcopy(row))
+        prepared["verification_plan"]["before_rows"].append(row)
+    prepared["verification_plan"]["points"] = deepcopy(args["points"])
+    assert not _notice(case["events"], artifact=artifact, before=before)
+
+
+@pytest.mark.parametrize("text", [
+    "现在处理该关系，并保持其他项不变。",
+    "我将该关系的中点改为 -6，三个点均为线性。",
+    "我不将该关系的中点改为 -6，保持 (0,-48) 和 (100,0) 不变、三个点均为线性。",
+    "我将该关系的中点改为 -6，保持 (0,-48) 和 (100,0) 不变、三个点均为线性；修改备注。",
+])
+def test_scalar_role_keeps_concrete_retention_and_preservation_obligations(text):
+    case = _scalar_notice_case()
+    assert not _notice([PREVIEW, _message(text), EXECUTE],
+        artifact=case["preview_artifact"], before=case["before_snapshot"])
+
+
+@pytest.mark.parametrize("text", [
+    "我将该关系的中点改为 -6，但中点改为 -60，保持 (0,-48) 和 (100,0) 不变、三个点均为线性。",
+    "现有音量曲线中点为 (50,-24)，我将该关系的中点改为 -6，保持 (0,-48) 和 (100,0) 不变、三个点均为线性。",
+])
+def test_scalar_notice_rejects_conflicting_claims_and_wrong_historical_points(text):
+    case = _scalar_notice_case()
+    assert not _notice([PREVIEW, _message(text), EXECUTE],
+        artifact=case["preview_artifact"], before=case["before_snapshot"])
+
+
+@pytest.mark.parametrize("target,expected", [
+    ("该关系", True), ("Volume/Rain_Intensity 曲线", True),
+    ("Pitch 曲线", False), ("Time 控制的该关系", False),
+])
+def test_scalar_role_cannot_override_explicit_property_or_control_target(target, expected):
+    case = _scalar_notice_case()
+    text = f"我将 {target} 的中点改为 -6，保持 (0,-48) 和 (100,0) 不变、三个点均为线性。"
+    assert _notice([PREVIEW, _message(text), EXECUTE],
+        artifact=case["preview_artifact"], before=case["before_snapshot"]) is expected
+
+
 def test_rtpc_context_accepts_independent_snapshot_row_permutations():
     case = _current_notice_case()
     case["preview_artifact"]["prepared_operation"]["verification_plan"]["before_rows"].reverse()

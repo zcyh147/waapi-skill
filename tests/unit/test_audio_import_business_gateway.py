@@ -435,8 +435,9 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
     }
     assert batch_action["rows_per_command"] == {"minimum": 1, "maximum": 6}
     assert batch_action["row_completeness"] == (
-        "each_row_must_include_its_media_every_known_requested_field_switch_"
-        "assignment_and_event_in_the_same_command; partial_rows_are_forbidden"
+        "each_row_must_include_every_known_requested_field_switch_"
+        "assignment_and_event_in_the_same_command; partial_rows_are_forbidden; "
+        "media_bearing_rows_include_their_media; structure_only_rows_omit_media_and_language"
     )
     assert batch_action["dependency_closure"] == {
         "scope": "all_remaining_user_requested_rows_not_only_the_next_chunk",
@@ -877,8 +878,9 @@ def test_audio_import_batch_chunks_are_atomic_cumulative_and_compact(
         "supply_one_to_six_ids"
     )
     assert first_next["append_import_chunk"]["row_completeness"] == (
-        "each_row_must_include_its_media_every_known_requested_field_switch_"
-        "assignment_and_event_in_the_same_command; partial_rows_are_forbidden"
+        "each_row_must_include_every_known_requested_field_switch_"
+        "assignment_and_event_in_the_same_command; partial_rows_are_forbidden; "
+        "media_bearing_rows_include_their_media; structure_only_rows_omit_media_and_language"
     )
     assert first_next["append_import_chunk"]["dependency_closure"][
         "event_row"
@@ -1033,8 +1035,19 @@ def test_music_import_batch_accepts_omitted_language_without_native_dispatch(
             [*state_args, *argv], env=env,
             client_factory=lambda _: pytest.fail("declaration must not connect"),
         )
+    code, schema = offline("operation-schema", "audio.import")
+    assert code == 0, schema
+    requirements = schema["business_adapter"]["row_requirements"]
+    assert requirements["structure_only"]["semantic_kinds"] == schema["business_adapter"]["semantic_kinds"]
+    assert "music-segment" in requirements["structure_only"]["semantic_kinds"]
+    assert requirements["structure_only"]["media"] == "omit_media_file_and_inline_wav"
+    assert requirements["structure_only"]["language"] == "omit"
+    assert requirements["new_parent"] == "bound_parent_handle_or_earlier_new_row_id_in_this_Draft; declare_parent_before_children"
+    assert requirements["media_bearing"]["media"] == "include_exactly_one_media_file_or_inline_wav_in_that_row"
+    assert requirements["media_bearing"]["language"] == "sound-sfx_and_music-track_default_to_SFX; otherwise_supply_the_exact_project_language"
     code, started = offline("draft-start", "audio.import")
     assert code == 0, started
+    assert started["draft"]["next_action_binding"]["business_contract"]["row_requirements"] == requirements
     info = _info()
     info["version"]["year"] = int(version[:4])
     info["version"]["displayName"] = f"v{version}.0.1"
@@ -1058,6 +1071,9 @@ def test_music_import_batch_accepts_omitted_language_without_native_dispatch(
         "--expected-revision", "1", "--object-id", PARENT_ID,
     ], env=env, client_factory=lambda _: client)
     assert code == 0, bound
+    batch = bound["draft"]["next_action_binding"]["declare_import_batch"]
+    assert batch["row_requirements"] == requirements
+    assert "structure_only_rows_omit_media_and_language" in batch["row_completeness"]
     media = tmp_path / "music.wav"
     media.write_bytes(b"RIFF-test")
     code, declared = offline(
@@ -1070,6 +1086,7 @@ def test_music_import_batch_accepts_omitted_language_without_native_dispatch(
     )
     assert code == 0, declared
     assert declared["draft"]["revision"] > 2
+    assert declared["draft"]["next_action_binding"]["append_import_chunk"]["row_requirements"] == requirements
     assert not any(uri == "ak.wwise.core.audio.import" for uri, _, _ in client.calls)
 
 

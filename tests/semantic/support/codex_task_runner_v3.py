@@ -323,8 +323,17 @@ def _rtpc_notice_context(artifact: Mapping[str, Any], before: Mapping[str, Any])
     if old is None or new is None or plan.get("points") != args.get("points") or old == new:
         return None
     delta = [point for point in new if point not in old]
+    foreign_names = {row["@PropertyName"] for row in rows
+                     if isinstance(row.get("@PropertyName"), str) and row["@PropertyName"] != "Volume"}
+    foreign_names.update(row[key] for row in controls if isinstance(row, Mapping) and row.get("id") != control
+                         for key in ("name", "path") if isinstance(row.get(key), str) and row[key])
     return {"ids": (owner, control, association), "old": old, "new": new, "delta": delta,
+            "foreign_names": tuple(sorted(foreign_names)),
             "same_domain": [p[0] for p in old] == [p[0] for p in new]}
+
+
+def _notice_qualifier_is_negated(qualifier: str) -> bool:
+    return re.search(r"不|未|非|(?<![a-z])(?:not|never|without|non)(?![a-z])|n't", qualifier) is not None
 
 
 def _affirmative_linear_interpolation(effect_clause: str) -> bool:
@@ -334,8 +343,8 @@ def _affirmative_linear_interpolation(effect_clause: str) -> bool:
         # A qualifier may contain an intervening predicate ("不保持线性",
         # "not keep linear"). Any negator in that local qualifier makes the
         # requested affirmative shape unclear; do not guess its scope.
-        qualifier = re.split(r"[，,。；;\n]", effect_clause[:mention.start()])[-1]
-        if re.search(r"不|未|非|(?<![a-z])(?:not|never|without|non)(?![a-z])|n't", qualifier):
+        qualifier = re.split(r"[，,、。；;\n]", effect_clause[:mention.start()])[-1]
+        if _notice_qualifier_is_negated(qualifier):
             return False
     return bool(mentions)
 
@@ -369,13 +378,44 @@ def _rtpc_notice_effect(text: str, context: Mapping[str, Any], *, earlier_points
     full = False
     effect = False
     for clause in re.split(r"[。；;\n]", numeric):
-        if not any(term in clause for term in ("volume", "音量", "增益")) or not any(term in clause for term in ("curve", "曲线", "rtpc")):
-            continue
-        if any(term in clause for term in ("现有", "当前", "现状", "existing", "current")):
-            # Historical points may be a subset (e.g. the former midpoint).
+        scalar_middles = tuple(re.finditer(
+            rf"(?:中点|中间点|midpoint|middle point)\s*(?:改为|改成|设为|设置为|(?:will be )?set to|change to)\s*({number})(?![a-z\d_.])", clause))
+        target_clause = (any(term in clause for term in ("volume", "音量", "增益"))
+                         and any(term in clause for term in ("curve", "曲线", "rtpc")))
+        if (target_clause or scalar_middles) and any(term in clause for term in ("现有", "当前", "现状", "existing", "current")):
+            # Validate claimed history before either tuple or scalar dispatch.
             previous = pairs(re.split(r"改为|改成|更新为|修改为|设为|设置为|update|replace|change|set", clause)[0])
             if any(point not in context["old"] for point in previous):
                 return False, False
+        if scalar_middles:
+            if len(context["new"]) != 3:
+                return False, False
+            if any(float(claim.group(1)) != context["new"][1][1]
+                   or _notice_qualifier_is_negated(re.split(r"[，,、]", clause[:claim.start()])[-1])
+                   or any(re.search(rf"(?<![a-z0-9_]){re.escape(name.casefold())}(?![a-z0-9_])",
+                                    re.split(r"[，,、]", clause[:claim.start()])[-1])
+                          for name in context["foreign_names"])
+                   for claim in scalar_middles):
+                return False, False
+            scalar_middle = scalar_middles[-1]
+            old, new = context["old"], context["new"]
+            following = clause[scalar_middle.end():]
+            # This point role has one meaning only in an attested three-point
+            # curve whose sole change is the middle y value. Endpoints must
+            # be stated, not inferred from a generic preservation claim.
+            if (len(old) != 3 or len(new) != 3 or not context["same_domain"]
+                    or old[0] != new[0] or old[2] != new[2]
+                    or context["delta"] != [new[1]] or old[1][1] == new[1][1]
+                    or float(scalar_middle.group(1)) != new[1][1]
+                    or pairs(following) != [new[0], new[2]]
+                    or not any(term in following for term in ("保持", "unchanged", "retain"))
+                    or not any(term in following for term in ("不变", "原值", "unchanged"))
+                    or not _affirmative_linear_interpolation(following)):
+                return False, False
+            effect = True
+            continue
+        if not target_clause:
+            continue
         for action in re.finditer(r"更新为|替换为|修改为|改为|改成|设为|设置为|update|replace|change|set", clause):
             following = clause[action.end():]
             stated = pairs(following)
