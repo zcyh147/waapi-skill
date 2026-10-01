@@ -42,6 +42,21 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- The final model pilot completed **nine tasks / twelve turns** on `977e71e`.
+  Luna high and Sol medium each passed all three cases and identical verify-only;
+  Luna medium passed two and retained one genuine continuation-copy FAIL, despite
+  correct business effects. All nine independent business oracles passed, but the
+  failed Medium root stayed frozen without verify-only. Independent reviews
+  rehashed **882** artifacts and eighteen metadata seals and confirmed the exact
+  lifecycle, usage, and separate failure attribution. The formal model is now
+  frozen as **GPT-6 Luna / high / default tier**, following the user's Luna
+  preference, with **600-second cumulative Agent / 420-second slow / 180-second
+  startup** limits and no same-root retry. No USD-price advantage or long-term
+  success rate is claimed. Exact settings and comparison are in
+  `../research/integration-expansion-model-selection-2026-10-02.json`.
+  Full 2022.1/2025.1 acceptance remains pending: thirteen positive Agent units
+  plus the separately credited M05/2022 runner-only boundary on one candidate.
+
 - Consolidated notice-evidence candidate `977e71e` passed **344 focused tests**
   and Non-live **12360 / skipped 118 / deselected 27**, exit zero. Its public Skill
   and Program inputs remain byte-identical to `cf94158`; no new Program rerun is
