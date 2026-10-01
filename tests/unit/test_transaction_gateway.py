@@ -321,6 +321,14 @@ def z_wire_path(path: Path) -> str:
     return "Z:\\" + "\\".join(resolved.parts[1:])
 
 
+def expected_wine_dispatch_path(path: Path, *, account_home: Path) -> str:
+    """Wine prefers the pinned account's Y: mapping; other paths use Z:."""
+    resolved = path.resolve()
+    if resolved.is_relative_to(account_home):
+        return "Y:\\" + "\\".join(resolved.relative_to(account_home).parts)
+    return z_wire_path(resolved)
+
+
 def test_runtime_state_uses_native_project_containment(tmp_path: Path) -> None:
     project_row = local_project(tmp_path)
     project_root = Path(project_row["path"]).parent
@@ -6885,9 +6893,14 @@ def test_remote_named_capture_screen_still_requires_authoring(
     os.name == "nt",
     reason="Wine host path translation is POSIX-only",
 )
+@pytest.mark.parametrize("inside_home", (False, True))
 def test_local_wine_cli_execute_translates_only_the_transient_dispatch_paths(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, inside_home: bool,
 ) -> None:
+    from wwise_waapi import platform_paths
+    account_home = tmp_path.resolve() if inside_home else tmp_path / "mapped-account-home"
+    account_home.mkdir(exist_ok=True)
+    monkeypatch.setattr(platform_paths, "_account_home", lambda value: account_home)
     state_dir = tmp_path / "wine-cli-state"
     io_root = (tmp_path / "wine-cli-case").resolve()
     target_project = io_root / "project" / "SampleProject.wproj"
@@ -6952,10 +6965,10 @@ def test_local_wine_cli_execute_translates_only_the_transient_dispatch_paths(
         (
             "ak.wwise.cli.convertExternalSource",
             {
-                "project": z_wire_path(target_project),
+                "project": expected_wine_dispatch_path(target_project, account_home=account_home),
                 "platform": ["Windows"],
-                "source-file": z_wire_path(manifest),
-                "output": z_wire_path(output),
+                "source-file": expected_wine_dispatch_path(manifest, account_home=account_home),
+                "output": expected_wine_dispatch_path(output, account_home=account_home),
             },
             {},
         )
@@ -7008,9 +7021,14 @@ def test_console_project_open_selects_the_sealed_isolated_io_audit() -> None:
     os.name == "nt",
     reason="Wine host path translation is POSIX-only",
 )
+@pytest.mark.parametrize("inside_home", (False, True))
 def test_local_wine_authoring_project_open_translates_target_after_close(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, inside_home: bool,
 ) -> None:
+    from wwise_waapi import platform_paths
+    account_home = tmp_path.resolve() if inside_home else tmp_path / "mapped-account-home"
+    account_home.mkdir(exist_ok=True)
+    monkeypatch.setattr(platform_paths, "_account_home", lambda value: account_home)
     version = "2022.1"
     api = "ak.wwise.ui.project.open"
     state_dir = tmp_path / "wine-authoring-project-state"
@@ -7070,7 +7088,7 @@ def test_local_wine_authoring_project_open_translates_target_after_close(
     assert exit_code == 0, json.dumps(payload, indent=2)
     assert next(call for call in execute_client.calls if call[0] == api) == (
         api,
-        {"path": z_wire_path(target)},
+        {"path": expected_wine_dispatch_path(target, account_home=account_home)},
         {},
     )
     assert payload["wire_path_adaptation"]["mapping"]["anchor_source"] == (
@@ -7082,9 +7100,14 @@ def test_local_wine_authoring_project_open_translates_target_after_close(
     os.name == "nt",
     reason="Wine host path translation is POSIX-only",
 )
+@pytest.mark.parametrize("inside_home", (False, True))
 def test_local_wine_soundbank_execute_translates_sealed_host_paths_transiently(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, inside_home: bool,
 ) -> None:
+    from wwise_waapi import platform_paths
+    account_home = tmp_path.resolve() if inside_home else tmp_path / "mapped-account-home"
+    account_home.mkdir(exist_ok=True)
+    monkeypatch.setattr(platform_paths, "_account_home", lambda value: account_home)
     state_dir = tmp_path / "wine-soundbank-state"
     io_root = (tmp_path / "wine-soundbank-case").resolve()
     project_root = io_root / "project"
@@ -7164,9 +7187,9 @@ def test_local_wine_soundbank_execute_translates_sealed_host_paths_transiently(
             {
                 "sources": [
                     {
-                        "input": z_wire_path(source_list),
+                        "input": expected_wine_dispatch_path(source_list, account_home=account_home),
                         "platform": "{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}",
-                        "output": z_wire_path(io_root / "external-output"),
+                        "output": expected_wine_dispatch_path(io_root / "external-output", account_home=account_home),
                     }
                 ]
             },
@@ -8104,9 +8127,12 @@ def test_project_transition_mismatch_stays_executed_unverified_for_manual_verify
     assert "agent_result" not in payload
 
 
+@pytest.mark.parametrize("compact", (False, True))
 def test_undo_group_success_uses_one_client_and_aggregates_child_verification(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, compact: bool,
 ) -> None:
+    if compact:
+        monkeypatch.setattr(waapi_gateway, "TRANSACTION_VERIFY_AGENT_VIEW_TARGET_BYTES", 1)
     state_dir = tmp_path / "state"
     transaction = preview_and_confirm_undo_group(tmp_path=tmp_path, state_dir=state_dir)
     execute_client = FakeClient(
@@ -8179,10 +8205,24 @@ def test_undo_group_success_uses_one_client_and_aggregates_child_verification(
     assert verify_payload["verification"]["verification_strength"] == (
         "compound_child_readback"
     )
+    # Successful stdout can compact its evidence under longer state paths.
+    # Prove the same complete child readback from the durable journal and bind
+    # it to the returned projection rather than requiring one stdout variant.
+    verification_event = next(event for event in TransactionStore(state_dir).read_events(
+        transaction["transaction_id"]
+    ) if event["event_type"] == "verification_recorded")
+    journal_verification = verification_event["details"]["verification"]
+    assert canonical_sha256(journal_verification) == (
+        verify_payload["stdout_projection"]["verification_canonical_sha256"]
+    )
     assert any(
         assertion["name"].startswith("Undo Group child[0]")
-        for assertion in verify_payload["verification"]["assertions"]
+        for assertion in journal_verification["assertions"]
     )
+    assert all(assertion["passed"] is True for assertion in journal_verification["assertions"])
+    if compact:
+        assert verify_payload["stdout_projection"]["full_verification_evidence_in_stdout"] is False
+        assert verify_payload["verification"]["canonical_sha256"] == canonical_sha256(journal_verification)
 
 
 def test_undo_group_success_keeps_one_phase_copy_below_the_final_gateway_ceiling(

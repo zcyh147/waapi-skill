@@ -91,6 +91,16 @@ pilot, and acceptance may proceed after their prerequisite gates.
   `expansion-nonlive-20261001-final-r1`. Fake CI environments now exclude that
   host override; the two affected files passed 67 / skipped 11 with an explicit
   pinned interpreter. A new full gate root is required.
+- The next full Non-live attempt at `753d721` completed with 11924 passed,
+  19 failed, 6 errors, 118 skipped, and 27 deselected (810.05 seconds). It is
+  retained as a FAIL, not final acceptance. Twenty failure/error observations
+  came from unhydrated local Git LFS fixtures: expanding 32 locally cached
+  objects cleared all 75 associated focused tests. No source revision changed.
+  Remaining fixture defects were fixed without production edits: Wine paths
+  now test pinned Y/Z home mapping, Undo Group proves the complete journal
+  verification and its compact-output digest, and Harbor checks its actual
+  per-field path ceiling with explicit short/long roots. The combined targeted
+  rerun passed 17 tests. A new complete Non-live run remains required.
 
 The remaining sections retain the earlier pause checkpoint as historical context.
 The two review defects listed below are repaired by the resume update; the

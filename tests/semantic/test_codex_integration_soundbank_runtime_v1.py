@@ -429,12 +429,22 @@ def test_harbor_unsafe_project_info_path_is_archived_before_fail_closed(
     }
 
 
+@pytest.mark.parametrize(
+    "long_runtime_root",
+    (False, True),
+    ids=("short-runtime-root", "long-runtime-root"),
+)
 def test_harbor_overlimit_raw_path_evidence_is_hashed_but_omitted(
     tmp_path: Path,
+    long_runtime_root: bool,
 ) -> None:
     unit = _unit("2022.1")
+    runtime_root = tmp_path
+    if long_runtime_root:
+        runtime_root = tmp_path / ("owned-" + "p" * 180)
+        runtime_root.mkdir()
     runtime = _runtime(
-        tmp_path,
+        runtime_root,
         scenario_id=unit.scenario.id,
         version=unit.version,
     )
@@ -474,7 +484,17 @@ def test_harbor_overlimit_raw_path_evidence_is_hashed_but_omitted(
     assert root_row["raw_sha256"] == hashlib.sha256(encoded).hexdigest()
     assert root_row["lexical_flavor"] == "unc"
     assert root_row["trailing_separator"] is True
-    assert evidence_path.stat().st_size < HARBOR_PROJECT_INFO_RAW_PATH_MAX_BYTES
+    for observation in evidence["observations"]:
+        for row in observation["paths"]:
+            assert row["raw_utf8_limit"] == HARBOR_PROJECT_INFO_RAW_PATH_MAX_BYTES
+            raw_value = row["raw_value"]
+            if raw_value is not None:
+                assert isinstance(raw_value, str)
+                assert len(raw_value.encode("utf-8")) <= row["raw_utf8_limit"]
+    if long_runtime_root:
+        # The per-path ceiling does not limit the whole multi-row evidence
+        # document; a longer owned root can make that document larger.
+        assert evidence_path.stat().st_size > HARBOR_PROJECT_INFO_RAW_PATH_MAX_BYTES
 
 
 def test_harbor_path_evidence_caps_platform_rows_and_observation_count(
