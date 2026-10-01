@@ -23,6 +23,12 @@ _POLICIES = frozenset({"read_only", "ask_before_changes", "allow_changes"})
 _CURVE_ROLES = frozenset({"volume-dry", "game-defined-aux-send-volume",
                           "user-defined-aux-send-volume", "low-pass-filter",
                           "high-pass-filter", "spread", "focus"})
+_EVENT_ACTIONS_RELATIONSHIP = "event-actions"
+# The Gateway query-schema owns this fixed preset bound in every supported
+# lane. The focused broker regression compares this value with that public
+# schema so policy admission fails closed if the packaged contract changes.
+_EVENT_ACTIONS_FIXED_MAX_RESULTS = 100
+_EVENT_ACTIONS_AUTOMATIC_OUTPUTS = frozenset({"action-type", "target"})
 
 
 class ExpansionPolicyError(ValueError):
@@ -115,11 +121,41 @@ class BoundedExpansionReads:
                                 "request-schema", "query-object", "metadata"}:
             raise ExpansionPolicyError("not a public read command")
         if args.command == "query-object":
+            relationships = tuple(getattr(args, "relationships", ()) or ())
             limit = getattr(args, "max_results", None)
             exact = bool(getattr(args, "object_id", None) or getattr(args, "path_segments", None))
-            if getattr(args, "relationships", None):
+            if _EVENT_ACTIONS_RELATIONSHIP in relationships:
+                if relationships != (_EVENT_ACTIONS_RELATIONSHIP,):
+                    raise ExpansionPolicyError("event-actions preset cannot be composed with another relationship")
+                source_id = getattr(args, "object_id", None)
+                if (not isinstance(source_id, str) or not _GUID.fullmatch(source_id)
+                        or source_id.casefold() not in {item.casefold() for item in self.scope.relationship_sources}):
+                    raise ExpansionPolicyError("event-actions source must be a sealed exact Event identity")
+                if limit is not None and (type(limit) is not int or limit != _EVENT_ACTIONS_FIXED_MAX_RESULTS):
+                    raise ExpansionPolicyError("event-actions uses its fixed Gateway result bound")
+                for flag in ("--max-results", "--exact-id", "--relationship"):
+                    if sum(item == flag or item.startswith(flag + "=") for item in argv) > 1:
+                        raise ExpansionPolicyError("event-actions selectors and fixed bound must be unique")
+                if (getattr(args, "business_view", None) is not None
+                        or getattr(args, "business_predicates", None)
+                        or getattr(args, "custom_kind_meaning", None) is not None
+                        or getattr(args, "semantic_kind", None) is not None
+                        or getattr(args, "search", None) is not None
+                        or getattr(args, "query", None) is not None
+                        or getattr(args, "advanced_waql", None) is not None
+                        or getattr(args, "match_original_file_paths", None)):
+                    raise ExpansionPolicyError("event-actions requires its exact uncomposed public query")
+                includes = tuple(getattr(args, "business_outputs", ()) or ())
+                custom_fields = tuple(getattr(args, "custom_field_meanings", ()) or ())
+                if (len(includes) != len(set(includes))
+                        or not set(includes).issubset(self.scope.includes)
+                        or not _EVENT_ACTIONS_AUTOMATIC_OUTPUTS.union(includes).issubset(self.scope.includes)
+                        or custom_fields):
+                    raise ExpansionPolicyError("event-actions projection exceeds the sealed read scope")
+            elif relationships:
                 exact = False
-            if (limit is not None and (type(limit) is not int or not 1 <= limit <= self.scope.max_rows)
+            if _EVENT_ACTIONS_RELATIONSHIP not in relationships and (
+                    limit is not None and (type(limit) is not int or not 1 <= limit <= self.scope.max_rows)
                     or limit is None and not exact):
                 raise ExpansionPolicyError("project query requires a bounded public source")
             if getattr(args, "advanced_waql", None) and not self.advanced_disclosed:
@@ -208,9 +244,20 @@ class BoundedExpansionReads:
             raise ExpansionPolicyError("read receipt has no definite outcome")
         if self._pending[0] == "query-object":
             rows = payload.get("objects")
-            requested_limit = (int(self._pending[self._pending.index("--max-results") + 1])
-                               if "--max-results" in self._pending else 1)
+            if self.scope.owned_project_reads:
+                query_args = self.public_parser(self._pending)
+                relationships = tuple(getattr(query_args, "relationships", ()) or ())
+                explicit_limit = getattr(query_args, "max_results", None) is not None
+                if relationships == (_EVENT_ACTIONS_RELATIONSHIP,):
+                    requested_limit = _EVENT_ACTIONS_FIXED_MAX_RESULTS
+                else:
+                    requested_limit = getattr(query_args, "max_results", None) or 1
+            else:
+                requested_limit = (int(self._pending[self._pending.index("--max-results") + 1])
+                                   if "--max-results" in self._pending else 1)
+                explicit_limit = "--max-results" in self._pending
             if (not isinstance(rows, list) or len(rows) > requested_limit
+                    or len(rows) > self.scope.max_rows
                     or type(payload.get("count")) is not int or payload["count"] != len(rows)):
                 raise ExpansionPolicyError("query rows exceed scope")
             bound = payload.get("query_bound")
@@ -220,7 +267,9 @@ class BoundedExpansionReads:
             expected_bound = ({"mode": "gateway-appended-take", "value": requested_limit}
                               if "--advanced-waql" in self._pending else
                               {"mode": "take", "value": requested_limit}
-                              if "--max-results" in self._pending else {"mode": "exact-object"})
+                              if explicit_limit or self.scope.owned_project_reads
+                              and relationships == (_EVENT_ACTIONS_RELATIONSHIP,)
+                              else {"mode": "exact-object"})
             if bound != expected_bound:
                 raise ExpansionPolicyError("query completeness is not proven")
             if payload.get("limit_reached") is True or not exact and len(rows) >= requested_limit:

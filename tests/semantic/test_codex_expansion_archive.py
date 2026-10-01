@@ -511,3 +511,183 @@ def test_archive_preserves_blocked_infrastructure_only_from_raw_pre_action_event
     (directory / "events.jsonl").write_text("".join(json.dumps(event) + "\n" for event in events))
     with pytest.raises(ExpansionArchiveError, match="pre-action"):
         _verify(root)
+
+
+def _realistic_command_paths(root):
+    """CLI shell argv differs from the authenticated shim's received argv."""
+    broker = json.loads((root / 'expansion-broker.json').read_text())
+    directory = root / 'turns/turn-01'
+    events = [json.loads(line) for line in (directory / 'events.jsonl').read_text().splitlines()]
+    for record in broker['records']:
+        old = shlex.join(record['model_argv'])
+        raw = ['python', '.agents/skills/waapi-skill/scripts/run.py', 'gateway.py', *record['gateway_arguments']]
+        record['model_argv'] = [str(root / 'broker/bin/python'), *raw[1:]]
+        record['normalized_model_argv'] = ['python', str(root / 'agent-workspace/.agents/skills/waapi-skill/scripts/run.py'), 'gateway.py', *record['gateway_arguments']]
+        record['raw_argv_sha256'] = canonical_digest(record['model_argv'])
+        record['argv_sha256'] = canonical_digest(record['normalized_model_argv'])
+        for event in events:
+            item = event.get('item', {})
+            if item.get('command') == old:
+                item['command'] = shlex.join(raw)
+    _write(root / 'expansion-broker.json', broker)
+    (directory / 'events.jsonl').write_text(''.join(json.dumps(event) + '\n' for event in events))
+    facts = json.loads((directory / 'codex-facts.json').read_text())
+    facts['command_facts']['command_records'] = [asdict(row) for row in completed_command_records(events, platform_name='posix')]
+    _write(directory / 'codex-facts.json', facts)
+
+
+def _sealed_read_rejection(root):
+    import shutil
+    _sealed_c08(root, passed=False)
+    shutil.rmtree(root / 'broker/state/transactions')
+    plan = json.loads((root / 'expansion-plan.json').read_text())
+    plan['read_scope']['owned_project_reads'] = True
+    scope = ExpansionReadScope(frozenset(plan['read_scope']['object_ids']), frozenset(plan['read_scope']['operations']),
+        includes=frozenset({'parent'}), relationship_sources=frozenset(plan['read_scope']['object_ids']), owned_project_reads=True)
+    plan['read_scope'] = {key: sorted(value) if isinstance(value, frozenset) else value for key, value in asdict(scope).items()}
+    plan['read_scope_sha256'] = scope.digest
+    plan.pop('sha256')
+    plan['sha256'] = canonical_digest(plan)
+    _write(root / 'expansion-plan.json', plan)
+    identifier = plan['read_scope']['object_ids'][0]
+    argv_rows = [['query-object', '--exact-id', identifier],
+                 ['query-object', '--exact-id', identifier, '--relationship', 'children', '--include', 'parent']]
+    broker = json.loads((root / 'expansion-broker.json').read_text())
+    originals = broker['records']
+    records = []
+    directory = root / 'turns/turn-01'
+    events = [json.loads(line) for line in (directory / 'events.jsonl').read_text().splitlines()]
+    events = [event for event in events if not event.get('item', {}).get('id', '').startswith(('cmd-', 'preview-notice'))]
+    final_events = events[-2:]
+    events = events[:-2]
+    for index, argv in enumerate(argv_rows, 1):
+        record = deepcopy(originals[index - 1])
+        model = ['python', plan['skill_source'] + '/scripts/run.py', 'gateway.py', *argv]
+        payload = {'ok': True, 'command': 'query-object', 'objects': [{'id': identifier}], 'count': 1, 'query_bound': {'mode': 'exact-object'}}
+        record.update(sequence=index, model_argv=model, normalized_model_argv=model, gateway_arguments=argv,
+            raw_argv_sha256=canonical_digest(model), argv_sha256=canonical_digest(model),
+            semantic_argv_sha256=canonical_digest(['runner-owned-version', '2025.1', *argv]),
+            runner_command_sha256=canonical_digest([plan['trusted_python'], plan['skill_source'] + '/scripts/run.py', 'gateway.py', *argv]),
+            payload=payload, payload_sha256=canonical_digest(payload), stdout=json.dumps(payload))
+        if index == 2:
+            rejection = 'expansion policy rejected command: project query requires a bounded public source'
+            record.update(authenticated=True, accepted=False, succeeded=False, exit_code=126, runner_exit_code=None,
+                step_name=None, allowed_exit_codes=[], payload=None, payload_sha256='', payload_error='',
+                runner_command_sha256='', semantic_argv_sha256='', rejection=rejection,
+                stdout='', stderr='Gateway broker rejected command: ' + rejection + '\n')
+        records.append(record)
+        item = {'id': 'cmd-' + str(index), 'type': 'command_execution', 'command': shlex.join(model),
+                'status': 'completed', 'exit_code': record['exit_code'], 'aggregated_output': record['stdout']}
+        events += [{'type': 'item.started', 'item': {**item, 'status': 'in_progress'}}, {'type': 'item.completed', 'item': item}]
+    events += final_events
+    broker.update(records=records, passed=False, complete=False, expected_step_names=['expansion.step.0001'], consumed_step_names=['expansion.step.0001'])
+    _write(root / 'expansion-broker.json', broker)
+    (directory / 'events.jsonl').write_text(''.join(json.dumps(event) + '\n' for event in events))
+    facts = json.loads((directory / 'codex-facts.json').read_text())
+    facts['command_facts']['command_records'] = [asdict(row) for row in completed_command_records(events, platform_name='posix')]
+    _write(directory / 'codex-facts.json', facts)
+    oracle = {'before': plan['before'], 'after': None, 'transaction_id': None, 'assertions': {},
+              'reconciliation': {'status': 'completed', 'seconds': 30, 'read_seconds': 10, 'elapsed_seconds': 1,
+                  'child_reaped': True, 'subprocesses_reaped': True, 'snapshot': plan['before'], 'snapshot_sha256': canonical_digest(plan['before'])}}
+    _write(root / 'expansion-oracle.json', oracle)
+    budget = json.loads((root / 'expansion-agent-budget.json').read_text())
+    gates = budget['turns'][0]['gates']
+    for key in ('broker_provenance', 'policy_checkpoint', 'visible_preview_notice'):
+        gates[key] = False
+    _write(root / 'expansion-agent-budget.json', budget)
+    result = json.loads((root / 'expansion-task-result.json').read_text())
+    result.update(passed=False, status='FAIL', terminal_state='unprepared', assertions={}, gateway_verification_state=None,
+                  plan_sha256=plan['sha256'], turns=budget['turns'])
+    _write(root / 'expansion-task-result.json', result)
+    grade = json.loads((directory / 'turn-grade.json').read_text())
+    grade.update(common_gates=gates, broker_prefix_count=2, passed=False, errors=['broker_provenance', 'policy_checkpoint', 'visible_preview_notice'])
+    _write(directory / 'turn-grade.json', grade)
+    _realistic_command_paths(root)
+
+
+def test_realistic_relative_shell_argv_binds_accepted_pass_receipts(tmp_path):
+    _sealed_c08(tmp_path)
+    _realistic_command_paths(tmp_path)
+    assert _verify(tmp_path)['business_pass'] is True
+
+
+def test_authenticated_predispatch_read_rejection_stays_fail_and_zero_mutation(tmp_path):
+    _sealed_read_rejection(tmp_path)
+    before = {str(path): (path.read_bytes(), path.stat().st_mtime_ns) for path in tmp_path.rglob('*') if path.is_file()}
+    replay = _verify(tmp_path)
+    assert replay['archive_valid'] is True and replay['original_status'] == 'FAIL'
+    assert replay['business_pass'] is False and replay['executions'] == replay['execution_reservations'] == 0
+    assert {str(path): (path.read_bytes(), path.stat().st_mtime_ns) for path in tmp_path.rglob('*') if path.is_file()} == before
+
+
+@pytest.mark.parametrize('damage', ('unauthenticated', 'runner_evidence', 'payload', 'mutation', 'raw_bypass'))
+def test_predispatch_read_rejection_requires_closed_negative_proof(tmp_path, damage):
+    _sealed_read_rejection(tmp_path)
+    path = tmp_path / 'expansion-broker.json'
+    broker = json.loads(path.read_text())
+    record = broker['records'][-1]
+    if damage == 'unauthenticated':
+        record['authenticated'] = False
+    elif damage == 'runner_evidence':
+        record['runner_command_sha256'] = 'b' * 64
+    elif damage == 'payload':
+        record['payload'] = {'ok': False}
+    elif damage == 'mutation':
+        argv = ['execute', 'tx1-00000000000000000001']
+        record.update(gateway_arguments=argv,
+            model_argv=[*record['model_argv'][:3], *argv],
+            normalized_model_argv=[*record['normalized_model_argv'][:3], *argv])
+        record['raw_argv_sha256'] = canonical_digest(record['model_argv'])
+        record['argv_sha256'] = canonical_digest(record['normalized_model_argv'])
+    else:
+        directory = tmp_path / 'turns/turn-01'
+        events = [json.loads(line) for line in (directory / 'events.jsonl').read_text().splitlines()]
+        item = {'id': 'bypass', 'type': 'command_execution', 'command': "python -c 'print(1)'", 'status': 'completed', 'exit_code': 0, 'aggregated_output': '1'}
+        events[-2:-2] = [{'type': 'item.started', 'item': {**item, 'status': 'in_progress'}}, {'type': 'item.completed', 'item': item}]
+        (directory / 'events.jsonl').write_text(''.join(json.dumps(event) + '\n' for event in events))
+        facts = json.loads((directory / 'codex-facts.json').read_text())
+        facts['command_facts']['command_records'] = [asdict(row) for row in completed_command_records(events, platform_name='posix')]
+        _write(directory / 'codex-facts.json', facts)
+    _write(path, broker)
+    with pytest.raises(ExpansionArchiveError):
+        _verify(tmp_path)
+
+
+@pytest.mark.parametrize('damage', ('extra', 'missing', 'duplicate_receipt', 'changed_argument', 'nonclosed_argument'))
+def test_canonical_command_binding_keeps_exact_arguments_and_multiplicity(tmp_path, damage):
+    if damage == 'duplicate_receipt':
+        _sealed_read_rejection(tmp_path)
+    else:
+        _sealed_c08(tmp_path)
+        _realistic_command_paths(tmp_path)
+    directory = tmp_path / 'turns/turn-01'
+    events = [json.loads(line) for line in (directory / 'events.jsonl').read_text().splitlines()]
+    if damage == 'duplicate_receipt':
+        broker = json.loads((tmp_path / 'expansion-broker.json').read_text())
+        broker['records'].insert(1, deepcopy(broker['records'][0]))
+        for index, row in enumerate(broker['records'], 1):
+            row['sequence'] = index
+        _write(tmp_path / 'expansion-broker.json', broker)
+    else:
+        selected = [event for event in events if event.get('item', {}).get('id') == 'cmd-1']
+        if damage == 'extra':
+            extra = deepcopy(selected)
+            for event in extra:
+                event['item']['id'] = 'extra-cmd'
+            events[-2:-2] = extra
+        elif damage == 'missing':
+            events = [event for event in events if event not in selected]
+        else:
+            for event in selected:
+                argv = shlex.split(event['item']['command'])
+                if damage == 'changed_argument':
+                    argv[-1] = 'ak.wwise.core.object.setNotes'
+                else:
+                    argv += ['--nonclosed-option', 'value']
+                event['item']['command'] = shlex.join(argv)
+        (directory / 'events.jsonl').write_text(''.join(json.dumps(event) + '\n' for event in events))
+        facts = json.loads((directory / 'codex-facts.json').read_text())
+        facts['command_facts']['command_records'] = [asdict(row) for row in completed_command_records(events, platform_name='posix')]
+        _write(directory / 'codex-facts.json', facts)
+    with pytest.raises(ExpansionArchiveError):
+        _verify(tmp_path)

@@ -157,6 +157,35 @@ def _scope(plan: Mapping[str, Any]) -> BoundedExpansionReads:
     return BoundedExpansionReads(scope, public_parser=parse)
 
 
+def _validate_rejected_read(record, *, argv, gate):
+    """One known read-bound rejection proves no runner was dispatched.
+
+    Replay deliberately does not ask the current admission policy to reject
+    again: its bound may have been repaired since this original FAIL.
+    """
+    rejection = "expansion policy rejected command: project query requires a bounded public source"
+    _require(record.get("authenticated") is True and record.get("accepted") is False
+        and record.get("succeeded") is False and record.get("exit_code") == 126
+        and record.get("runner_exit_code") is None and record.get("step_name") is None
+        and record.get("allowed_exit_codes") == [] and record.get("payload") is None
+        and record.get("payload_sha256") == record.get("payload_error")
+            == record.get("runner_command_sha256") == record.get("semantic_argv_sha256") == ""
+        and record.get("stdout") == "" and record.get("subscription_ack") is None
+        and record.get("rejection") == rejection
+        and record.get("stderr") == "Gateway broker rejected command: " + rejection + "\n",
+        "rejected read lacks authenticated pre-dispatch proof")
+    _require(bool(argv) and argv[0] == "query-object" and len(argv[1:]) % 2 == 0,
+        "rejection is not a closed public relationship read")
+    flags = argv[1::2]
+    _require(set(flags) <= {"--exact-id", "--relationship", "--include", "--max-results"}
+        and flags.count("--exact-id") == flags.count("--relationship") == 1
+        and flags.count("--max-results") <= 1, "rejected read exceeds the closed selector contract")
+    args = gate.public_parser(argv)
+    _require(args.object_id in gate.scope.relationship_sources
+        and set(args.business_outputs).issubset(gate.scope.includes),
+        "rejected relationship read exceeds its sealed identity/projection scope")
+
+
 def _receipts(root: Path, plan: Mapping[str, Any], broker: Mapping[str, Any]) -> list[Mapping[str, Any]]:
     records = broker.get("records")
     _require(isinstance(records, list) and len(records) <= 128, "broker receipt count is invalid")
@@ -175,15 +204,18 @@ def _receipts(root: Path, plan: Mapping[str, Any], broker: Mapping[str, Any]) ->
         for key in ("started_at_unix", "finished_at_unix", "duration_seconds"):
             _require(_finite(record.get(key)), "invalid broker timing")
         _require(record["finished_at_unix"] >= record["started_at_unix"], "backwards broker timing")
-        if record.get("accepted") is not True:
-            _require(record.get("succeeded") is False and bool(record.get("rejection")), "invalid rejected receipt")
-            continue
         _require(not failed_accepted, "accepted command followed a terminal failed receipt")
         resolved = resolve_gateway_invocation(record["model_argv"], skill_source=Path(plan["skill_source"]),
             invocation_skill_source=workspace_skill_install_path(root / "agent-workspace"),
             shim_directory=root / "broker" / "bin")
         _require(list(resolved.gateway_arguments) == argv
             and list(resolved.normalized_model_argv) == record["normalized_model_argv"], "recorded Gateway argv differs from actual invocation")
+        gate.public_parser(argv)  # Reject non-public flags for every receipt.
+        if record.get("accepted") is not True:
+            _validate_rejected_read(record, argv=argv, gate=gate)
+            _require(index == len(records), "dispatch followed a rejected read")
+            failed_accepted = True
+            continue
         runner = str((Path(plan["skill_source"]) / "scripts" / "run.py").resolve())
         _require(record.get("runner_command_sha256") == canonical_digest(
             [plan["trusted_python"], runner, "gateway.py", *argv]), "trusted runner command digest mismatch")
@@ -289,11 +321,28 @@ def _turns(root: Path, plan: Mapping[str, Any], result: Mapping[str, Any],
         archived_commands = facts.get("command_facts", {}).get("command_records")
         _require(canonical_digest([asdict(command) for command in commands]) == canonical_digest(archived_commands),
                  "Codex command facts differ from raw events")
+        resolved_commands = []
+        recoverable = recoverable_preprocess_attempt_indexes(commands)
+        for command_index, command in enumerate(commands):
+            if command_index in recoverable:
+                continue
+            try:
+                resolved = resolve_gateway_invocation(command.argv, skill_source=Path(plan["skill_source"]),
+                    invocation_skill_source=workspace_skill_install_path(root / "agent-workspace"),
+                    shim_directory=root / "broker" / "bin")
+            except ValueError:
+                continue  # Skill reads are classified separately below.
+            resolved_commands.append((command, resolved))
         for record in records[prefix:count]:
-            matches = [command for command in commands if list(command.argv) == record["model_argv"]]
-            _require(bool(matches) and any(command.exit_code == record["exit_code"] for command in matches),
-                     "Broker receipt has no matching raw Codex command")
-        if result["passed"]:
+            matching = next((position for position, (command, resolved) in enumerate(resolved_commands)
+                if list(resolved.normalized_model_argv) == record["normalized_model_argv"]
+                and list(resolved.gateway_arguments) == record["gateway_arguments"]
+                and command.exit_code == record["exit_code"]), None)
+            _require(matching is not None, "Broker receipt has no matching raw Codex command")
+            resolved_commands.pop(matching)
+        _require(not resolved_commands, "raw Codex Gateway command has no Broker receipt")
+        rejected_read = any(record.get("accepted") is False for record in records)
+        if result["passed"] or rejected_read:
             classified = classify_task_commands(commands, workspace=root / "agent-workspace",
                 skill_source=Path(plan["skill_source"]), expected_wwise_version=plan["version"],
                 expected_gateway_subcommands=tuple(sorted({row["gateway_arguments"][0] for row in records if row["gateway_arguments"]})))
@@ -306,13 +355,22 @@ def _turns(root: Path, plan: Mapping[str, Any], result: Mapping[str, Any],
                 and (index != 1 or bool(references) and references[0] == "SKILL.md")
                 and len(commands) - len(recoverable_preprocess_attempt_indexes(commands))
                     == count - prefix + len(classified.allowed_read_commands), "raw commands violate Skill-only/no-bypass gates")
-            _require(index != 1 or expansion_preview_notice(SimpleNamespace(stdout=events_raw.decode("utf-8")),
+            _require(not result["passed"] or index != 1 or expansion_preview_notice(SimpleNamespace(stdout=events_raw.decode("utf-8")),
                 commands, version=plan["version"], execute_expected=plan["policy"] == "allow_changes",
                 preview_artifact=_transaction(root, oracle["transaction_id"])[0]["artifact"],
                 before_snapshot=oracle.get("preview_before") or plan["before"]),
                      "visible post-Preview notice is missing")
-            _require(grade.get("passed") is True and not grade.get("errors")
-                and all(value is True for value in grade["common_gates"].values())
+            if rejected_read:
+                false_gates = {"broker_provenance", "policy_checkpoint", "visible_preview_notice"}
+                _require(result["passed"] is False and grade.get("passed") is False
+                    and set(grade.get("errors", [])) == false_gates
+                    and all(value is (key not in false_gates) for key, value in grade["common_gates"].items()),
+                    "read rejection changed the original failed gates")
+                session = audit_session_events(events)
+                _require(session.file_change_count == session.collab_call_count == 0,
+                    "read rejection contains file changes or collaboration")
+            _require((not result["passed"] or grade.get("passed") is True and not grade.get("errors")
+                and all(value is True for value in grade["common_gates"].values()))
                 and audit_session_events(events).passed
                 and facts.get("thread_id") == result.get("thread_id")
                 and final_agent_message(events) == facts.get("final_response")
@@ -374,6 +432,27 @@ def _verify_task(root: Path, unit_id: str, version: str, inputs_sha256: str) -> 
     mutations = [row for row in records if row.get("accepted") is True and row["gateway_arguments"][:1] == ["execute"]]
     _require(len(mutations) <= 1, "more than one execution was admitted")
     _require(oracle.get("before") == plan["before"], "independent pre-state changed")
+    rejected_read = any(record.get("accepted") is False for record in records)
+    if rejected_read:
+        _require(result["passed"] is False and result.get("status") == "FAIL"
+            and result.get("terminal_state") == "unprepared"
+            and len(turns) == 1 and not turns[0].get("incomplete")
+            and all(record["gateway_arguments"][0] in _READS for record in records)
+            and oracle.get("transaction_id") is None and oracle.get("artifact_hash") is None
+            and oracle.get("authorization") is None and oracle.get("permit") is None
+            and oracle.get("after") is None and result.get("assertions") == {}
+            and broker.get("passed") is False and broker.get("complete") is False,
+            "rejected read cannot carry a Preview, mutation or successful outcome")
+        accepted_names = [record.get("step_name") for record in records if record.get("accepted") is True]
+        _require(all(isinstance(name, str) and name for name in accepted_names)
+            and len(accepted_names) == len(set(accepted_names))
+            and broker.get("expected_step_names") == broker.get("consumed_step_names") == accepted_names,
+            "rejected read lacks its exact consumed Broker prefix")
+        reconciliation = oracle.get("reconciliation")
+        _require(isinstance(reconciliation, dict) and reconciliation.get("status") == "completed"
+            and reconciliation.get("snapshot") == plan["before"]
+            and reconciliation.get("child_reaped") is True and reconciliation.get("subprocesses_reaped") is True,
+            "rejected read lacks complete unchanged-state reconciliation")
     transaction_id = oracle.get("transaction_id")
     events = ()
     preview_approval: bool | None = None

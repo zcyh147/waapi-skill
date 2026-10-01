@@ -11,6 +11,9 @@ from tests.semantic.support.codex_gateway_broker import CodexGatewayBroker, Resp
 
 SKILL = Path(__file__).resolve().parents[2] / "skills" / "waapi-skill"
 OWNER = "{11111111-1111-1111-1111-111111111111}"
+EVENT = "{33333333-3333-3333-3333-333333333333}"
+ACTION = "{44444444-4444-4444-4444-444444444444}"
+OTHER_EVENT = "{55555555-5555-5555-5555-555555555555}"
 PATH = r"\Containers\Default Work Unit\Music"
 
 
@@ -27,6 +30,48 @@ def make_policy(operation="audio.import", request_schema_uri=None, approve_previ
                                    scoped_paths={OWNER: PATH})
     policy.begin_turn(1)
     return policy
+
+
+def make_event_read_policy(*, includes=("action-type", "target"), fields=()):
+    case = PreparedExpansionCase(
+        prompt="Check the Event's existing playback actions", operation="audio.import",
+        policy="allow_changes", before={"event": EVENT},
+        read_object_ids=frozenset({EVENT, ACTION, OTHER_EVENT}),
+        relationship_sources=frozenset({EVENT}),
+        read_includes=frozenset(includes),
+        read_fields=frozenset(fields),
+        required_assertions=frozenset({"media"}), approve_preview=lambda _: True,
+        snapshot=lambda: {"event": EVENT}, verify=lambda _old, _new: {"media": True},
+    )
+    policy = ExpansionBrokerPolicy(
+        prepared=case, version="2025.1", skill_source=SKILL,
+        scoped_paths={EVENT: r"\Events\Default Work Unit\Play_Line_01"},
+    )
+    policy.begin_turn(1)
+    return policy
+
+
+def event_actions_argv(*, event_id=EVENT, extra=(), includes=("action-type", "target"),
+                       max_results=None):
+    argv = ["query-object", "--exact-id", event_id, "--relationship", "event-actions"]
+    for output in includes:
+        argv.extend(("--include", output))
+    argv.extend(extra)
+    if max_results is not None:
+        argv.extend(("--max-results", str(max_results)))
+    return tuple(argv)
+
+
+def event_actions_receipt(rows=(ACTION,), *, bound=100, count=None, limit_reached=False):
+    objects = [
+        {"id": object_id, "name": f"Action_{index}", "type": "Action", "path": rf"\Events\Play\Action_{index}",
+         "action_type": "Play", "target": {"id": OWNER, "name": "Voice", "type": "Sound", "path": PATH}}
+        for index, object_id in enumerate(rows, 1)
+    ]
+    return {"ok": True, "command": "query-object", "objects": objects,
+            "count": len(objects) if count is None else count,
+            "query_bound": {"mode": "take", "value": bound},
+            "limit_reached": limit_reached}
 
 
 def start(policy, tmp_path):
@@ -179,7 +224,7 @@ def test_owned_project_reads_allow_relations_new_guids_and_disclosed_advanced_wi
     policy = make_policy()
     new_id = "{22222222-2222-2222-2222-222222222222}"
     for argv in (("status",), ("query-object", "--exact-id", new_id),
-                 ("query-object", "--exact-id", OWNER, "--relationship", "event-actions", "--max-results", "8"),
+                 ("query-object", "--exact-id", OWNER, "--relationship", "children", "--max-results", "8"),
                  ("query-schema", "--advanced"),
                  ("query-object", "--advanced-waql", f'from object "{OWNER}" select @Effects', "--max-results", "8")):
         step = policy.prepare(argv, state_directory=tmp_path)
@@ -193,6 +238,90 @@ def test_owned_project_reads_allow_relations_new_guids_and_disclosed_advanced_wi
     with pytest.raises(ExpansionPolicyError, match="outside"):
         policy.prepare(("draft-bind-object", "draft-test", "--task-authority", "authority-test",
                         "--expected-revision", "1", "--object-id", new_id), state_directory=tmp_path)
+
+
+@pytest.mark.parametrize("max_results", [None, 100])
+def test_owned_event_actions_read_uses_gateway_fixed_bound_and_sealed_projection(tmp_path, max_results):
+    policy = make_event_read_policy()
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        schema = policy.gateway_module.query_business_schema_payload(version, advanced=False)
+        assert schema["relationship_presets"]["event-actions"]["fixed_max_results"] == 100
+        assert schema["relationship_presets"]["event-actions"]["automatic_outputs"] == ["action-type", "target"]
+
+    argv = event_actions_argv(max_results=max_results)
+    public_args = policy.gateway_module.build_parser().parse_args(
+        ["--version", policy.version, *argv]
+    )
+    policy.gateway_module.preflight_query_object_input(public_args, env={})
+    assert public_args.max_results == public_args.take == 100
+    assert public_args.select == ["children"]
+    assert {binding[2] for binding in public_args.query_output_bindings} == {"action_type", "target"}
+
+    step = policy.prepare(argv, state_directory=tmp_path)
+    assert step.arguments == argv[1:]  # the accepted Agent argv is recorded unchanged
+    policy.observe(step, event_actions_receipt(), state_directory=tmp_path)
+
+    assert policy.reads.scope.max_rows == 64
+    assert policy.reads.receipts[0][0] == argv
+    assert policy.prepared.read_object_ids == frozenset({EVENT, ACTION, OTHER_EVENT})
+    assert not policy.reads.failed_receipts
+
+
+@pytest.mark.parametrize("argv", [
+    event_actions_argv(event_id=OTHER_EVENT),
+    event_actions_argv(extra=("--relationship", "children")),
+    event_actions_argv(max_results=64),
+    event_actions_argv(max_results=99),
+    event_actions_argv(extra=("--max-results", "100"), max_results=100),
+    event_actions_argv(extra=("--exact-id", EVENT)),
+    event_actions_argv(includes=("action-type", "target", "notes")),
+    event_actions_argv(includes=("action-type", "target", "target")),
+    ("query-object", "--kind", "event", "--relationship", "event-actions", "--max-results", "100"),
+])
+def test_owned_event_actions_read_rejects_unsealed_or_composed_preset(argv, tmp_path):
+    policy = make_event_read_policy()
+    with pytest.raises(ExpansionPolicyError):
+        policy.prepare(argv, state_directory=tmp_path)
+
+
+def test_owned_event_actions_read_requires_the_automatic_projection_in_case_scope(tmp_path):
+    policy = make_event_read_policy(includes=("action-type",))
+    with pytest.raises(ExpansionPolicyError, match="projection"):
+        policy.prepare(event_actions_argv(includes=("action-type",)), state_directory=tmp_path)
+
+
+def test_owned_event_actions_read_rejects_publicly_unsupported_custom_fields(tmp_path):
+    policy = make_event_read_policy(fields=("volume-db",))
+    argv = event_actions_argv(extra=("--include-field", "volume-db"))
+    public_args = policy.gateway_module.build_parser().parse_args(
+        ["--version", policy.version, *argv]
+    )
+    with pytest.raises(policy.gateway_module.GatewayInputError, match="cannot be combined with --relationship"):
+        policy.gateway_module.preflight_query_object_input(public_args, env={})
+    with pytest.raises(ExpansionPolicyError, match="projection"):
+        policy.prepare(argv, state_directory=tmp_path)
+
+
+def test_owned_event_actions_read_rejects_rows_over_the_case_budget(tmp_path):
+    policy = make_event_read_policy()
+    step = policy.prepare(event_actions_argv(), state_directory=tmp_path)
+    rows = tuple(f"{{00000000-0000-0000-0000-{index:012X}}}" for index in range(1, 66))
+    with pytest.raises(ExpansionPolicyError, match="rows exceed scope"):
+        policy.observe(step, event_actions_receipt(rows), state_directory=tmp_path)
+    assert policy.reads.receipts == []
+
+
+def test_owned_event_actions_ceiling_or_mismatched_receipt_never_proves_a_read(tmp_path):
+    policy = make_event_read_policy()
+    step = policy.prepare(event_actions_argv(), state_directory=tmp_path)
+    rows = tuple(f"{{00000000-0000-0000-0000-{index:012X}}}" for index in range(1, 65))
+    assert policy.reads.observe(event_actions_receipt(rows, limit_reached=True)) is False
+    assert policy.reads.receipts == [] and len(policy.reads.failed_receipts) == 1
+
+    step = policy.prepare(event_actions_argv(), state_directory=tmp_path)
+    with pytest.raises(ExpansionPolicyError, match="completeness"):
+        policy.observe(step, event_actions_receipt(bound=64), state_directory=tmp_path)
+    assert len(policy.reads.receipts) == 0
 
 
 def test_malformed_runner_receipt_makes_outcome_broker_terminal_before_next_dispatch(tmp_path):
