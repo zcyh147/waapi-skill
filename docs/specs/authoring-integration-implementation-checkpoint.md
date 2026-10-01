@@ -42,6 +42,20 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- The complete matched `86e23cd` pilot finished **six tasks / eight turns**:
+  each model passed C01/M01 and retained a C06 notice FAIL, for **4 PASS / 2 FAIL**.
+  All six independent business oracles passed. Both C06 notices were precise and
+  timely; Luna's delta plus full result produces redundant tuple mentions, while
+  Sol's current curve and expected midpoint span clauses. These are grader
+  defects, not observed mutation, preservation, or advance-notice failures.
+  The two mixed roots were frozen without verify-only; all **740** artifacts and
+  twelve metadata seals were independently audited, sources unchanged, PASS
+  copies deleted and FAIL copies quarantined. Both jobs were unloaded.
+  #134 was reopened for a consolidated repair, then both failed units and a
+  complete new-candidate selection must run. No model or final acceptance is
+  selected. Exact outcomes, usage, timing and attribution are recorded in
+  `../research/integration-expansion-matched-pilot-86e23cd-2026-10-02.json`.
+
 - Coherent RTPC notice-context repair `86e23cd` passed **321 focused tests** and
   Non-live **12337 / skipped 118 / deselected 27**, exit zero. The packaged Skill,
   CI, unit tests, and maintenance tree are unchanged from `cf94158`, whose Program
