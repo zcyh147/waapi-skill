@@ -1,0 +1,296 @@
+{
+  "contract": "waapi-skill.integration-expansion-model-pilot-observations/v1",
+  "recorded_at": "2026-10-01T12:24:06.283598+00:00",
+  "same_cli_six_task_batch_completed": true,
+  "model_selection": "unresolved_shared_entry_failure",
+  "semantic_pass_credit": 0,
+  "repair_ticket": 127,
+  "diagnosis": "Unconditional typed-container-footer requirement contradicts ordinary Gateway stdout. Complete archived JSON does not prove the model saw all output. No old FAIL is regraded.",
+  "models": [
+    {
+      "campaign_root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-cc8707a-luna-high-r3-cli1592",
+      "model": "gpt-6-luna",
+      "reasoning_effort": "high",
+      "service_tier": "default",
+      "cli": {
+        "path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/tooling/codex-0.159.2/package/bin/codex",
+        "version": "codex-cli 0.159.2",
+        "sha256": "16593cc2f422d5f398a8e40f550ebbaf1245392528957be342c295920a300704"
+      },
+      "skill_tree_sha256": "1788c0904221fd74754968a19685bbf959933a7a61740682099726f10d88861c",
+      "frozen_candidate": "cc8707a",
+      "completed_units": 3,
+      "passed_units": 0,
+      "failed_units": 3,
+      "attempt_manifest_sha256": "8ac6d38ceaaa684d4219069b3fa3c12be4086c1c1f8f9304b22aba26521e6f00",
+      "independent_artifact_hash_checks": 461,
+      "formal_verify_only_performed": false,
+      "cases": [
+        {
+          "unit_id": "EXP25-C01",
+          "status": "FAIL",
+          "agent_seconds": 47.18873533396982,
+          "cli_seconds": 43.980349,
+          "usage": {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 68608,
+            "input_tokens": 91949,
+            "output_tokens": 1239,
+            "reasoning_output_tokens": 904
+          },
+          "attribution": "Agent claimed operations truncation before Preview; ordinary reply lacks typed-container footer; actual visible truncation unproven",
+          "operations": [
+            {
+              "archived_stdout_bytes": 44214,
+              "archived_stdout_sha256": "1e5e80fc0f73f2b66b6b69b3cd9b3f7de2abc6373ce27db6f7e97e4a41cad816",
+              "complete_json_parse": true,
+              "named_operations": 33,
+              "request_schema_routes": 136,
+              "typed_response_end_present": false,
+              "model_facing_budget_archived": false
+            }
+          ],
+          "rejected_commands": [],
+          "gateway_subcommands": [
+            "operations"
+          ],
+          "preview_or_execution": false,
+          "source_hash_unchanged": true,
+          "source_mtime_unchanged": true,
+          "trusted_oracle_closed": true,
+          "failed_copy_retained": true,
+          "quarantine_never_reuse": true,
+          "raw_fact_sha256": "fe3f109590b4f21b8ab58b3ab490b5183ef8095126fa04f39b0eda932a9c063f",
+          "outcome_sha256": "ea2ac9b3d686fc9c0830d6fe43c503e4cd1f7890f9feefd985083f6236c1f89e",
+          "task_result_sha256": "852eb34ae17039d84cf337ee736a3e11624d8a5c0d00d3f5a31c836e748cce90"
+        },
+        {
+          "unit_id": "EXP25-C06",
+          "status": "FAIL",
+          "agent_seconds": 58.8726125000976,
+          "cli_seconds": 55.32015,
+          "usage": {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 67584,
+            "input_tokens": 90967,
+            "output_tokens": 1185,
+            "reasoning_output_tokens": 854
+          },
+          "attribution": "Agent claimed operations truncation before Preview; ordinary reply lacks typed-container footer; actual visible truncation unproven",
+          "operations": [
+            {
+              "archived_stdout_bytes": 44204,
+              "archived_stdout_sha256": "cccf28fb0cd3e8267697bb795471b91aa686d430b7b83cfe689263165982ea2d",
+              "complete_json_parse": true,
+              "named_operations": 33,
+              "request_schema_routes": 136,
+              "typed_response_end_present": false,
+              "model_facing_budget_archived": false
+            }
+          ],
+          "rejected_commands": [],
+          "gateway_subcommands": [
+            "operations"
+          ],
+          "preview_or_execution": false,
+          "source_hash_unchanged": true,
+          "source_mtime_unchanged": true,
+          "trusted_oracle_closed": true,
+          "failed_copy_retained": true,
+          "quarantine_never_reuse": true,
+          "raw_fact_sha256": "302504c877488b1454d187e0beaa019e3ab8f0953efc8e935f121b9ffacb3672",
+          "outcome_sha256": "9a6d33b45229d6fa6d224b2d1ba3b4755e4ed2ceac37d23cf180c84bbb98709a",
+          "task_result_sha256": "859973daccbce4ce88dcaea043766883812fd5248210bd88199f47f1a254b317"
+        },
+        {
+          "unit_id": "EXP25-M01",
+          "status": "FAIL",
+          "agent_seconds": 71.17111612507142,
+          "cli_seconds": 67.642436,
+          "usage": {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 122368,
+            "input_tokens": 143640,
+            "output_tokens": 1713,
+            "reasoning_output_tokens": 427
+          },
+          "attribution": "brace-less GUID rejected before dispatch",
+          "operations": [],
+          "rejected_commands": [
+            {
+              "subcommand": "draft-bind-object",
+              "exit_code": 126
+            }
+          ],
+          "gateway_subcommands": [
+            "operation-schema",
+            "draft-start",
+            "draft-bind-object"
+          ],
+          "preview_or_execution": false,
+          "source_hash_unchanged": true,
+          "source_mtime_unchanged": true,
+          "trusted_oracle_closed": true,
+          "failed_copy_retained": true,
+          "quarantine_never_reuse": true,
+          "raw_fact_sha256": "f9adef6202cfecedce5497e022efa679105dd0dbdadf97bcc0e315b68b7f3577",
+          "outcome_sha256": "3da3a7262d5656188ca698a1c34fa7383d23437c182e20b6c8010a18b90e9f60",
+          "task_result_sha256": "1066b3eca51841e3ab6345c51af63b062f391627c1bcb919862f90145d7c999c"
+        }
+      ]
+    },
+    {
+      "campaign_root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-cc8707a-sol-medium-r3-cli1592",
+      "model": "gpt-6.1-sol",
+      "reasoning_effort": "medium",
+      "service_tier": "default",
+      "cli": {
+        "path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/tooling/codex-0.159.2/package/bin/codex",
+        "version": "codex-cli 0.159.2",
+        "sha256": "16593cc2f422d5f398a8e40f550ebbaf1245392528957be342c295920a300704"
+      },
+      "skill_tree_sha256": "1788c0904221fd74754968a19685bbf959933a7a61740682099726f10d88861c",
+      "frozen_candidate": "cc8707a",
+      "completed_units": 3,
+      "passed_units": 0,
+      "failed_units": 3,
+      "attempt_manifest_sha256": "3cc6e5101d8683587d35935c519f55198e383836b98c40b966ebf5f9639c7636",
+      "independent_artifact_hash_checks": 459,
+      "formal_verify_only_performed": false,
+      "cases": [
+        {
+          "unit_id": "EXP25-C01",
+          "status": "FAIL",
+          "agent_seconds": 32.9448264578823,
+          "cli_seconds": 29.544188,
+          "usage": {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 72832,
+            "input_tokens": 95315,
+            "output_tokens": 299,
+            "reasoning_output_tokens": 27
+          },
+          "attribution": "Agent claimed operations truncation before Preview; ordinary reply lacks typed-container footer; actual visible truncation unproven",
+          "operations": [
+            {
+              "archived_stdout_bytes": 44214,
+              "archived_stdout_sha256": "b81c2085aba88263cc2a07f7fa416ce615595463111a2ccfd6305bb239bc6912",
+              "complete_json_parse": true,
+              "named_operations": 33,
+              "request_schema_routes": 136,
+              "typed_response_end_present": false,
+              "model_facing_budget_archived": false
+            }
+          ],
+          "rejected_commands": [],
+          "gateway_subcommands": [
+            "operations"
+          ],
+          "preview_or_execution": false,
+          "source_hash_unchanged": true,
+          "source_mtime_unchanged": true,
+          "trusted_oracle_closed": true,
+          "failed_copy_retained": true,
+          "quarantine_never_reuse": true,
+          "raw_fact_sha256": "0a0e839c90207f24e1d31c9d03d30419200e81d8c10fc35d301fcd9606169241",
+          "outcome_sha256": "4d1d779ddc5f6010c83592d8fe5ee9c3bfb0b111e2fa432c7e311130b8f58e20",
+          "task_result_sha256": "c4d5ec344dc30a6e8b69a7c39e714cf02231f11d252dda3d724f8f896a5887ef"
+        },
+        {
+          "unit_id": "EXP25-C06",
+          "status": "FAIL",
+          "agent_seconds": 36.78668579203077,
+          "cli_seconds": 33.346114,
+          "usage": {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 72448,
+            "input_tokens": 94865,
+            "output_tokens": 311,
+            "reasoning_output_tokens": 38
+          },
+          "attribution": "Agent claimed operations truncation before Preview; ordinary reply lacks typed-container footer; actual visible truncation unproven",
+          "operations": [
+            {
+              "archived_stdout_bytes": 44204,
+              "archived_stdout_sha256": "c047c18a901dc0df80fb4e8497e56b03e412e3b0e6321bf854741ec1b05e236c",
+              "complete_json_parse": true,
+              "named_operations": 33,
+              "request_schema_routes": 136,
+              "typed_response_end_present": false,
+              "model_facing_budget_archived": false
+            }
+          ],
+          "rejected_commands": [],
+          "gateway_subcommands": [
+            "operations"
+          ],
+          "preview_or_execution": false,
+          "source_hash_unchanged": true,
+          "source_mtime_unchanged": true,
+          "trusted_oracle_closed": true,
+          "failed_copy_retained": true,
+          "quarantine_never_reuse": true,
+          "raw_fact_sha256": "87aef4dc012ad541d9155f21331a1b9cfffafd9a48d931d2adee68c051bb31ff",
+          "outcome_sha256": "5504500eb18cd0f41975177831e0d4aa2e145657e1547cd679d75149052d63cf",
+          "task_result_sha256": "517f6d34e204e19ce59ea7115a09dfc3505e789f2921a68dc1ec14d436f0f88a"
+        },
+        {
+          "unit_id": "EXP25-M01",
+          "status": "FAIL",
+          "agent_seconds": 31.621362915961072,
+          "cli_seconds": 28.432604,
+          "usage": {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 57088,
+            "input_tokens": 95425,
+            "output_tokens": 285,
+            "reasoning_output_tokens": 30
+          },
+          "attribution": "Agent claimed operations truncation before Preview; ordinary reply lacks typed-container footer; actual visible truncation unproven",
+          "operations": [
+            {
+              "archived_stdout_bytes": 44204,
+              "archived_stdout_sha256": "dbde192b67c4b5f20a1f0a1dcd3f2274b5c83c87e2f19c4cb8b44d60682013a6",
+              "complete_json_parse": true,
+              "named_operations": 33,
+              "request_schema_routes": 136,
+              "typed_response_end_present": false,
+              "model_facing_budget_archived": false
+            }
+          ],
+          "rejected_commands": [],
+          "gateway_subcommands": [
+            "operations"
+          ],
+          "preview_or_execution": false,
+          "source_hash_unchanged": true,
+          "source_mtime_unchanged": true,
+          "trusted_oracle_closed": true,
+          "failed_copy_retained": true,
+          "quarantine_never_reuse": true,
+          "raw_fact_sha256": "b9ddf84a1a42cc30402fa899968cf85410f044bf835c70506931da2abbfba0d2",
+          "outcome_sha256": "b251ea9571edfb41f5690748c216f0588d6709656f7e997144ecdefbc7db1ad6",
+          "task_result_sha256": "aeda215efcd28ab2eff36d6a01e566f10f719de17f72c04dca0ffb5f7cd0ad38"
+        }
+      ]
+    }
+  ],
+  "current_process_check": {
+    "scoped_residual_processes": [],
+    "launch_agents": [
+      {
+        "label": "local.codex.waapi.expansion-pilot-cc8707a-luna-high-r3-cli1592",
+        "loaded": false,
+        "print_exit_code": 113,
+        "plist_sha256": "0fff9db3e59e7095fd067b80abad17c21e0ff9c79ad12cdff75c5af9b7a164b3"
+      },
+      {
+        "label": "local.codex.waapi.expansion-pilot-cc8707a-sol-medium-r3-cli1592",
+        "loaded": false,
+        "print_exit_code": 113,
+        "plist_sha256": "c297bf2c57721d923ff6b0641f66834e849995b1dbe6bd6434ab1a33d55a6074"
+      }
+    ]
+  },
+  "next": "Review repair127, freeze new candidate and rerun matched pilot; do not advance Luna medium before reliability is demonstrated."
+}

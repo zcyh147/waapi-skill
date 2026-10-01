@@ -1,12 +1,12 @@
 # WAAPI operate lane
 
-Read this reference using the loading rules in `SKILL.md`. It is complete only when the unique terminal sentinel is final and no truncation or omission marker appears; otherwise do not reread a range or invoke the Gateway.
+Use loading rules in `SKILL.md`: unique terminal sentinel is final; no truncation or omission marker. Otherwise do not reread a range or invoke the Gateway.
 
 ## Core boundaries
 
 - The only normal change path is the packaged transaction CLI: `scripts/run.py gateway.py`. Do not import builders or planners from inline Python, call `WaapiClient`, or use raw WAAPI/XML/generic call. Do not write code to bypass an unsupported boundary. That boundary does not authorize code generation.
 - POSIX: single-quote Wwise path values to preserve backslashes. One read/Gateway invocation per shell call.
-- Read complete JSON; exit 0 proves nothing. `WAAPI_TYPED_CONTAINER_RESPONSE_END` must say complete/not truncated; then continue from that response.
+- Read full visible JSON. Only typed-container replies require final `WAAPI_TYPED_CONTAINER_RESPONSE_END` complete/not truncated; missing footer stops. Honor applicable integrity, then continue from that response. Truncation/omission stops; no retries.
 - A rejected or nonzero Gateway invocation is also a hard stop. Only a successful result whose `fallback_detail_scan.status` is `partial` permits the one metadata retry below.
 - The one complete terminal `verify` result ends the transaction; no extra proof query/filesystem call.
 

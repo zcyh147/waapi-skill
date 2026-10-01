@@ -40,6 +40,32 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ## Resume update — 2026-10-01
 
+### Matched model pilot and shared entry repair #127
+
+- Both official CLI 0.159.2 pilot halves finished their complete three-task
+  selection on frozen `cc8707a`: Luna high **0/3**, GPT-6.1 Sol medium **0/3**.
+  Five tasks stopped after `operations` claiming truncation; Luna M01 instead
+  reached an invalid brace-less GUID binding rejected before dispatch.
+  No task reached Preview or execution. Sources remained unchanged, failed
+  copies remain sealed, both launch jobs are unloaded, and scoped processes
+  are gone. The 920 attempt-artifact hashes were independently checked without
+  invoking formal verify-only or changing a recorded FAIL.
+- The operate reference requires a typed-container footer unconditionally,
+  although ordinary `operations` returns complete JSON without that footer.
+  Archived command stdout does not prove how much the model actually saw.
+  Repair #127 narrows that instruction, preserves real-truncation stops and
+  exact GUID grammar, and leaves Gateway output shapes and graders unchanged.
+  The model choice remains unresolved; Luna medium is not yet eligible.
+- Exact model settings, timings, usage, source guards, and artifact digests are
+  in `../research/integration-expansion-matched-model-pilot-2026-10-01.json`.
+  Review, regression gates, and a new frozen matched pilot remain required.
+
+- Repair #127's producer-backed focused regression passed **93 tests** after
+  two red regressions. Independent Spec and Standards reviews found no
+  actionable mismatch. The revised instructions preserve actual truncation,
+  missing typed-footer, invalid-GUID, and failure stops. Broad gates and fresh
+  matched model evidence are pending; the original six FAILs remain unchanged.
+
 ### Completed pristine-Draft gate, native reads, and model prerequisites
 
 - `cc8707a` completed Full Non-live: **12044 passed, 118 skipped,
