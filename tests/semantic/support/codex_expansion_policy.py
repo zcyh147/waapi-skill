@@ -326,14 +326,16 @@ class ExpansionTransaction:
         self.state = "execution_reserved"
 
     def observe_execution(self, *, transaction_id: str, artifact_sha256: str,
-                          completed: bool) -> None:
+                          completed: bool, terminal_indeterminate: bool = False) -> None:
         if self.state != "execution_reserved" or self._permit is None:
             raise ExpansionPolicyError("execution receipt has no reserved call")
         self.state = "indeterminate"
         if (transaction_id != self._permit.transaction_id
-                or artifact_sha256 != self._permit.artifact_sha256 or completed is not True):
+                or artifact_sha256 != self._permit.artifact_sha256
+                or (completed is not True and terminal_indeterminate is not True)):
             raise ExpansionPolicyError("execution outcome is ambiguous or misbound; do not retry")
-        self.state = "executed"
+        if not terminal_indeterminate:
+            self.state = "executed"
 
     def verify(self, *, transaction_id: str, artifact_sha256: str,
                assertions: Mapping[str, bool], gateway_verification_state: str) -> None:
@@ -412,3 +414,29 @@ class CumulativeAgentBudget:
     @property
     def slow(self) -> bool:
         return self.elapsed_seconds >= self.slow_seconds
+
+
+def classify_expansion_outcome(*, passed: bool, records: Sequence[Mapping[str, object]],
+                               events: Sequence[Mapping[str, object]],
+                               infrastructure: Mapping[str, object] | None = None) -> str:
+    """Preserve uncertainty and proven pre-action infrastructure independently.
+
+    Admission consumes a reservation even when the runner returns no JSON.
+    Only a durable terminal execution event proves completion or definite
+    failure; an oracle snapshot never upgrades an incomplete Agent task.
+    """
+    if passed:
+        return "PASS"
+    reserved = any(row.get("accepted") is True and tuple(row.get("gateway_arguments", ()))[:1] == ("execute",)
+                   for row in records)
+    states = [event.get("to_state") for event in events]
+    state = states[-1] if states else None
+    if state == "indeterminate" or ((reserved or "executing" in states) and state not in {
+            "executed_unverified", "verified", "result_schema_checked", "verification_failed",
+            "execution_failed", "execution_cancelled", "repreview_required"}):
+        return "INDETERMINATE"
+    if infrastructure and infrastructure.get("agent_item_event_count") == 0 and infrastructure.get("category") in {
+            "authentication", "quota_or_rate_limit", "service_unavailable", "timeout_before_agent_action",
+            "turn_failed_before_agent_action"}:
+        return "BLOCKED"
+    return "FAIL"

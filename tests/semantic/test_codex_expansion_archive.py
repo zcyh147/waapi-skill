@@ -362,7 +362,9 @@ def test_failed_execute_reservation_is_not_proof_of_gateway_dispatch(tmp_path, d
     _write(directory / "state.json", state)
     oracle_path = tmp_path / "expansion-oracle.json"
     oracle = json.loads(oracle_path.read_text())
-    oracle.update(after=None, assertions={}, gateway_verification_state=None)
+    oracle.update(after=None, assertions={}, gateway_verification_state=None, reconciliation={
+        "status": "error", "seconds": 30, "read_seconds": 10, "elapsed_seconds": 1,
+        "child_reaped": True, "subprocesses_reaped": True, "error": {"type": "TimeoutError", "message": "read timed out"}})
     _write(oracle_path, oracle)
     budget_path = tmp_path / "expansion-agent-budget.json"
     budget = json.loads(budget_path.read_text())
@@ -370,11 +372,77 @@ def test_failed_execute_reservation_is_not_proof_of_gateway_dispatch(tmp_path, d
     _write(budget_path, budget)
     result_path = tmp_path / "expansion-task-result.json"
     result = json.loads(result_path.read_text())
-    result.update(turns=budget["turns"], assertions={}, gateway_verification_state=None)
+    result.update(turns=budget["turns"], assertions={}, gateway_verification_state=None, status="INDETERMINATE")
     _write(result_path, result)
     before = {str(path): (path.read_bytes(), path.stat().st_mtime_ns) for path in tmp_path.rglob("*") if path.is_file()}
     replay = _verify(tmp_path)
-    assert replay["business_pass"] is False and replay["original_status"] == "FAIL"
+    assert replay["business_pass"] is False and replay["original_status"] == "INDETERMINATE"
     assert replay["execution_reservations"] == 1
     assert replay["executions"] == int(dispatch_started)
     assert {str(path): (path.read_bytes(), path.stat().st_mtime_ns) for path in tmp_path.rglob("*") if path.is_file()} == before
+
+
+@pytest.mark.parametrize("status", ("PASS", "BLOCKED", "INDETERMINATE"))
+def test_archive_rejects_claimed_status_without_matching_original_proof(tmp_path, status):
+    _sealed_c08(tmp_path, passed=False)
+    path = tmp_path / "expansion-task-result.json"
+    result = json.loads(path.read_text())
+    result["status"] = status
+    _write(path, result)
+    with pytest.raises(ExpansionArchiveError, match="classification"):
+        _verify(tmp_path)
+
+
+@pytest.mark.parametrize("complete", (True, False))
+def test_negative_archive_preserves_bounded_read_only_reconciliation_without_promoting_pass(tmp_path, complete):
+    _sealed_c08(tmp_path, passed=False)
+    path = tmp_path / "expansion-oracle.json"
+    oracle = json.loads(path.read_text())
+    receipt = {"status": "completed" if complete else "error", "seconds": 30, "read_seconds": 10,
+               "elapsed_seconds": 1, "child_reaped": True, "subprocesses_reaped": True}
+    if complete:
+        receipt.update(snapshot=oracle["after"], snapshot_sha256=canonical_digest(oracle["after"]))
+    else:
+        receipt["error"] = {"type": "TimeoutError", "message": "oracle read timed out"}
+    oracle["reconciliation"] = receipt
+    _write(path, oracle)
+    replay = _verify(tmp_path)
+    assert replay["original_status"] == "FAIL" and replay["business_pass"] is False
+    assert replay["reconciliation"]["status"] == receipt["status"]
+    if complete:
+        oracle["reconciliation"]["snapshot_sha256"] = "0" * 64
+        _write(path, oracle)
+        with pytest.raises(ExpansionArchiveError, match="reconciliation"):
+            _verify(tmp_path)
+
+
+def test_archive_preserves_blocked_infrastructure_only_from_raw_pre_action_events(tmp_path):
+    donor = tmp_path / "complete-fixture"
+    _sealed_c08(donor, passed=False)
+    root = tmp_path / "blocked-fixture"
+    plan = json.loads((donor / "expansion-plan.json").read_text())
+    _write(root / "expansion-plan.json", plan)
+    budget = json.loads((donor / "expansion-agent-budget.json").read_text())
+    budget["turns"] = [{"index": 1, "agent_seconds": 12, "gates": {}, "incomplete": True}]
+    _write(root / "expansion-agent-budget.json", budget)
+    infrastructure = {"category": "authentication", "message": "authentication failed", "turn_failed": True,
+                      "timed_out": False, "agent_item_event_count": 0}
+    result = json.loads((donor / "expansion-task-result.json").read_text())
+    result.update(status="BLOCKED", infrastructure=infrastructure, assertions={}, gateway_verification_state=None,
+                  turns=budget["turns"])
+    _write(root / "expansion-task-result.json", result)
+    _write(root / "expansion-broker.json", {"records": [], "passed": False, "complete": False})
+    _write(root / "expansion-oracle.json", {"before": plan["before"], "transaction_id": None,
+        "reconciliation": {"status": "error", "seconds": 30, "read_seconds": 10, "elapsed_seconds": 1,
+            "child_reaped": True, "subprocesses_reaped": True, "error": {"type": "TimeoutError", "message": "read timed out"}}})
+    directory = root / "turns" / "turn-01"
+    _write(directory / "codex-facts.json", {"timed_out": False})
+    events = [{"type": "turn.failed", "error": {"message": "authentication failed"}}]
+    (directory / "events.jsonl").write_text("".join(json.dumps(event) + "\n" for event in events))
+    (directory / "stderr.txt").write_text("")
+    replay = _verify(root)
+    assert replay["original_status"] == "BLOCKED" and replay["business_pass"] is False
+    events.append({"type": "item.completed", "item": {"type": "agent_message", "text": "Working"}})
+    (directory / "events.jsonl").write_text("".join(json.dumps(event) + "\n" for event in events))
+    with pytest.raises(ExpansionArchiveError, match="pre-action"):
+        _verify(root)

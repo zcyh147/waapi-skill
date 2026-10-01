@@ -17,6 +17,41 @@ SOUND_PATH = r"\Containers\Default Work Unit\Voice"
 REPLACEMENT = Path("/fixture/replacement/C01_line.wav")
 
 
+@pytest.mark.parametrize("cleanup_unproved", (False, True))
+def test_failed_voice_import_only_reads_candidates_and_preserves_failure(tmp_path, monkeypatch, cleanup_unproved):
+    from tests.semantic.support import codex_expansion_voice_case as voice
+    from tests.semantic.support.codex_expansion_reconciliation import ReconciliationCleanupError
+    operations, reads = [], []
+    original = CaseBoundaryError("Event verification failed")
+    class FailedDraft:
+        def __init__(self, ctx, operation):
+            operations.append(operation)
+        def bind(self, **kwargs):
+            return "bound"
+        def step(self, *args):
+            pass
+        def finish(self):
+            raise original
+    def gateway(argv):
+        reads.append(argv)
+        assert argv[0] == "query-object"
+        if cleanup_unproved:
+            raise ReconciliationCleanupError("unreaped child")
+        if "--relationship" not in argv:
+            raise CaseBoundaryError("literal Event absent")
+        return {"ok": True, "objects": []}
+    monkeypatch.setattr(voice, "BusinessDraft", FailedDraft)
+    ctx = ExpansionCaseContext("2025.1", "C01", tmp_path / "Sample.wproj", tmp_path / "assets", gateway)
+    with pytest.raises(ReconciliationCleanupError if cleanup_unproved else CaseBoundaryError) as error:
+        _create_english_event_voice(ctx, parent={"id": "parent"}, parent_segments=("Containers", "Unit"),
+            sound_name="Line", event_name="Play_Line", media=tmp_path / "line.wav")
+    if not cleanup_unproved:
+        assert error.value is original
+        assert reads[-1][reads[-1].index("--max-results") + 1] == "64"
+    assert "Play_Line@Play" in reads[0]
+    assert operations == ["audio.import"]
+
+
 def _artifact():
     return {"request": {"version": "2025.1", "operation": "audio.import", "arguments": {
         "import_operation": "useExisting", "imports": [{

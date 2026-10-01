@@ -206,7 +206,8 @@ def test_authenticated_execute_then_new_identity_read_and_no_second_execute(monk
             if argv[0] == "execute":
                 store.begin_execution(tx, expected_authorization="policy_authorized")
                 store.mark_executed_unverified(tx)
-                payload.update(transaction_id=tx, artifact_hash=record.artifact_hash, state="executed_unverified")
+                payload.update(transaction_id=tx, artifact_hash=record.artifact_hash, state="executed_unverified",
+                               status="executed_unverified", executed=True, verified=False, automatic_retry=False)
             else:
                 payload.update(objects=[{"id": new_id}], count=1, query_bound={"mode": "exact-object"})
             return SimpleNamespace(returncode=0, stdout=json.dumps(payload))
@@ -253,3 +254,40 @@ def test_incomplete_project_query_is_repairable_but_not_complete_read_evidence(t
                          "objects": [{"id": OWNER}], "query_bound": {"mode": "take", "value": 1}}, state_directory=tmp_path)
     assert not policy.reads.receipts and len(policy.reads.failed_receipts) == 1
     policy.prepare(("query-object", "--exact-id", OWNER), state_directory=tmp_path)
+
+
+def test_structured_indeterminate_execution_is_a_terminal_non_retryable_receipt(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+    from wwise_waapi.transactions import TransactionStore
+    from tests.semantic.support.codex_expansion_policy import canonical_digest
+    policy = make_policy()
+    with CodexGatewayBroker(skill_source=SKILL, expected_steps=(), runner_environment={},
+                            transport="tcp", expansion_outcome_policy=policy,
+                            working_root=tmp_path.resolve() / "broker") as broker:
+        store = TransactionStore(broker.state_directory)
+        tx = "tx1-" + "3" * 20
+        artifact = {"request": {"operation": "audio.import"}}
+        record = store.create_preview(tx, artifact)
+        policy.transaction.seal_preview(transaction_id=tx, artifact=artifact, artifact_sha256=record.artifact_hash,
+            before_sha256=canonical_digest(policy.prepared.before), after_sha256=canonical_digest(policy.prepared.before))
+        policy.transaction_id, policy.artifact_hash = tx, record.artifact_hash
+        store.authorize_by_policy(tx, policy="allow_changes", authority=policy.gateway_module.POLICY_AUTHORIZATION_AUTHORITY)
+        launches = []
+        def launch(command, *, runner_env):
+            launches.append(command)
+            store.begin_execution(tx, expected_authorization="policy_authorized")
+            store.mark_execution_indeterminate(tx)
+            payload = {"contract": "waapi-skill.gateway-result/v1", "ok": False, "command": "execute",
+                "status": "indeterminate", "state": "indeterminate", "automatic_retry": False,
+                "transaction_id": tx, "artifact_hash": record.artifact_hash}
+            return SimpleNamespace(returncode=2, stdout=json.dumps(payload))
+        monkeypatch.setattr(broker, "_launch_runner", launch)
+        monkeypatch.setattr(broker, "_communicate_runner", lambda process: (process.stdout, ""))
+        def invoke():
+            return broker._handle_request({"token": broker._token, "interpreter": "python",
+                "argv": [str(broker.runner_path), "gateway.py", "execute", tx]})
+        assert invoke()["exit_code"] == 2
+        assert policy.transaction.state == "indeterminate"
+        assert broker.evidence().terminal_indeterminate
+        assert invoke()["exit_code"] != 0
+        assert len(launches) == 1

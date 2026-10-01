@@ -117,8 +117,8 @@ def prepare_c08(ctx: ExpansionCaseContext) -> PreparedExpansionCase:
     create.finish()
     sound = query_path(ctx, (*root, sound_name))
     reference = BusinessDraft(ctx, "object.setReference")
-    owner = reference.bind(object_id=sound["id"], role="object")
-    target = reference.bind(object_id=copied_id, role="reference_target")
+    owner = reference.bind(object_id=sound["id"])
+    target = reference.bind(object_id=copied_id)
     field = reference.discover_field(owner, "Attenuation")
     reference.step("draft-declare-field-change", "--object-handle", owner,
                    "--field-handle", field, "--target-handle", target)

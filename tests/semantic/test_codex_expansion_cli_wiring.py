@@ -213,6 +213,27 @@ def test_expansion_outcome_requires_independent_archive_verifier(tmp_path, monke
                                          "expected_inputs_sha256": "a" * 64})]
 
 
+@pytest.mark.parametrize("task_status", ("FAIL", "BLOCKED", "INDETERMINATE"))
+def test_expansion_campaign_preserves_classified_negative_archive(tmp_path, monkeypatch, task_status):
+    from tests.semantic.support import codex_expansion_archive as archive
+    options = replace(_options(tmp_path, monkeypatch, "campaign", "--case-id", "C06", "--version", "2025.1"),
+                      campaign_inputs_sha256="a" * 64)
+    unit, = campaign.load_heavy_v3_campaign_units(options)
+    lifecycle = {"scenario_id": unit.unit_id, "version": unit.version,
+                 "source_hash_before": {"sha256": "source"}, "source_hash_after": {"sha256": "source"},
+                 "source_mtime_before_ns": 1, "source_mtime_after_ns": 1}
+    (tmp_path / "evidence").mkdir()
+    (tmp_path / "evidence" / "lifecycle.json").write_text(json.dumps(lifecycle), encoding="utf-8")
+    monkeypatch.setattr(archive, "verify_expansion_task_archive", lambda *args, **kwargs: {
+        "archive_valid": True, "original_status": task_status, "business_pass": False})
+    outcome = {"status": task_status, "task_root": str(tmp_path / "task"), "lifecycle": lifecycle,
+               "checks": {"task": {"passed": False, "status": task_status}}}
+    campaign._validate_expansion_outcome(outcome, expected_unit=unit, scenario_root=tmp_path, options=options)
+    outcome["checks"]["task"]["status"] = "PASS"
+    with pytest.raises(campaign.CampaignEvidenceError):
+        campaign._validate_expansion_outcome(outcome, expected_unit=unit, scenario_root=tmp_path, options=options)
+
+
 def test_boundary_replays_through_real_campaign_seal_and_archive_verifier(tmp_path, monkeypatch):
     """Only the external Wwise observation is fake; sealing and replay are real."""
     from tests.semantic.support.codex_expansion_runtime import ExpansionOutcome

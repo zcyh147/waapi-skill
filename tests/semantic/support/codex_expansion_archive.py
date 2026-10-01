@@ -21,7 +21,7 @@ from typing import Any, Mapping
 
 from tests.semantic.support.codex_archive_paths import parse_archive_relative_path
 from tests.semantic.support.codex_expansion_policy import (
-    BoundedExpansionReads, ExpansionReadScope, canonical_digest,
+    BoundedExpansionReads, ExpansionReadScope, canonical_digest, classify_expansion_outcome,
 )
 from tests.semantic.support.codex_expansion_broker_policy import (
     _BUSINESS_EDITS, _DECLARATIONS, _DRAFT_READS, _READ_COMMANDS,
@@ -32,9 +32,10 @@ from tests.semantic.support.codex_filesystem_security import (
 from tests.semantic.support.codex_harness import (
     WindowsPowerShellCoreHost, audit_session_events, completed_command_records,
     final_agent_message, classify_task_commands, recoverable_preprocess_attempt_indexes,
+    classify_codex_infrastructure_failure,
     workspace_skill_install_path,
 )
-from tests.semantic.support.codex_gateway_broker import resolve_gateway_invocation
+from tests.semantic.support.codex_gateway_broker import resolve_gateway_invocation, _validate_branching_execute_payload
 from tests.semantic.support.codex_transaction_seal import (
     _validate_artifact, _validate_legal_event_states,
 )
@@ -231,6 +232,10 @@ def _receipts(root: Path, plan: Mapping[str, Any], broker: Mapping[str, Any]) ->
             gate.admit(argv)
             if record.get("succeeded") is True:
                 gate.observe(payload)
+        if command == "execute" and record.get("succeeded") is True and record.get("allowed_exit_codes") == [0, 2]:
+            _validate_branching_execute_payload(payload, exit_code=record.get("runner_exit_code"))
+            if payload.get("status") == "indeterminate":
+                failed_accepted = True  # terminal non-retryable branch, not a repairable preparation
         if record.get("succeeded") is True:
             _require(record.get("exit_code") == record.get("runner_exit_code")
                 and record.get("runner_exit_code") in record.get("allowed_exit_codes", [])
@@ -370,6 +375,7 @@ def _verify_task(root: Path, unit_id: str, version: str, inputs_sha256: str) -> 
     _require(len(mutations) <= 1, "more than one execution was admitted")
     _require(oracle.get("before") == plan["before"], "independent pre-state changed")
     transaction_id = oracle.get("transaction_id")
+    events = ()
     transactions_directory = root / "broker" / "state" / "transactions"
     if transactions_directory.exists():
         _require(not path_is_link_or_reparse(transactions_directory), "transaction directory is linked")
@@ -427,9 +433,45 @@ def _verify_task(root: Path, unit_id: str, version: str, inputs_sha256: str) -> 
             and all(row.get("succeeded") is True for row in records)
             and broker.get("expected_step_names") == broker.get("consumed_step_names")
             == [row["step_name"] for row in records], "passing Broker evidence is incomplete")
-    return {"archive_valid": True, "original_status": "PASS" if result["passed"] else "FAIL",
+    infrastructure = result.get("infrastructure")
+    if infrastructure is not None:
+        _require(isinstance(infrastructure, dict) and bool(turns), "infrastructure classification lacks raw turn evidence")
+        directory = f"turns/turn-{len(turns):02d}/"
+        raw_events = [_decode(line) for line in _bytes(root, directory + "events.jsonl", empty=True).splitlines() if line]
+        facts = _json(root, directory + "codex-facts.json")
+        observed = classify_codex_infrastructure_failure(raw_events,
+            stderr=_bytes(root, directory + "stderr.txt", empty=True).decode("utf-8"), timed_out=facts.get("timed_out") is True)
+        _require(observed is not None and asdict(observed) == infrastructure,
+                 "infrastructure classification differs from raw pre-action evidence")
+    original_status = classify_expansion_outcome(passed=result["passed"], records=records, events=events,
+                                                 infrastructure=infrastructure)
+    reconciliation = oracle.get("reconciliation")
+    if reconciliation is not None:
+        _require(not result["passed"] and isinstance(reconciliation, dict)
+            and reconciliation.get("status") in {"completed", "error"}
+            and _finite(reconciliation.get("elapsed_seconds"))
+            and reconciliation.get("seconds") == 30 and reconciliation.get("read_seconds") == 10
+            and type(reconciliation.get("child_reaped")) is bool
+            and type(reconciliation.get("subprocesses_reaped")) is bool,
+            "reconciliation receipt lacks bounded timing/cleanup evidence")
+        if reconciliation["status"] == "completed":
+            _require(isinstance(reconciliation.get("snapshot"), dict)
+                and len(json.dumps(reconciliation["snapshot"], ensure_ascii=False).encode("utf-8")) <= 131_072
+                and reconciliation.get("snapshot_sha256") == canonical_digest(reconciliation["snapshot"]),
+                "reconciliation snapshot digest or bounds changed")
+        else:
+            error = reconciliation.get("error")
+            _require(isinstance(error, dict) and isinstance(error.get("type"), str)
+                and isinstance(error.get("message"), str) and len(error["message"].encode("utf-8")) <= 2048,
+                "reconciliation error is missing or unbounded")
+        if reconciliation["child_reaped"] is not True or reconciliation["subprocesses_reaped"] is not True:
+            original_status = "BLOCKED"
+    _require(result.get("status", original_status) == original_status, "original outcome classification changed")
+    if "status" in result and not result["passed"]:
+        _require(reconciliation is not None, "classified negative outcome omitted reconciliation")
+    return {"archive_valid": True, "original_status": original_status,
         "business_pass": result["passed"], "gateway_verification_state": result.get("gateway_verification_state"),
-        "agent_seconds": budget["elapsed_seconds"], "slow": budget["slow"],
+        "agent_seconds": budget["elapsed_seconds"], "slow": budget["slow"], "reconciliation": reconciliation,
         "turn_count": len(turns), "execution_reservations": len(mutations),
         "executions": len(executed_events) if transaction_id is not None else 0}
 

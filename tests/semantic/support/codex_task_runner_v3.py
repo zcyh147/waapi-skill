@@ -299,6 +299,7 @@ def expansion_preview_notice(result: Any, command_records: Sequence[Any], *,
 def run_expansion_codex_task(
     *, unit: Any, prepared: Any, task_root: Path, options: Any,
     runner_environment: Mapping[str, str], scoped_paths: Mapping[str, str],
+    reconcile_after_failure: Callable[[], Mapping[str, Any]],
 ) -> Mapping[str, Any]:
     """Use the existing fresh task/Broker with the opt-in outcome policy.
 
@@ -308,7 +309,7 @@ def run_expansion_codex_task(
     """
     from tests.semantic.support.codex_expansion_broker_policy import ExpansionBrokerPolicy
     from wwise_waapi.transactions import TransactionStore
-    from tests.semantic.support.codex_expansion_policy import CumulativeAgentBudget, canonical_digest
+    from tests.semantic.support.codex_expansion_policy import CumulativeAgentBudget, canonical_digest, classify_expansion_outcome
 
     root = Path(task_root)
     if root.exists():
@@ -380,6 +381,7 @@ def run_expansion_codex_task(
                           "references/waapi-setup.md", "references/waapi-coverage.md"}
     thread_id = ""
     failure: Exception | None = None
+    infrastructure: Mapping[str, Any] | None = None
     try:
         with broker:
             with CodexCliTask(config, extra_env=broker.model_environment_overrides(),
@@ -392,6 +394,7 @@ def run_expansion_codex_task(
                         result = (task.run_initial(prompt, output_dir=output_dir) if index == 1 else
                                   task.run_followup(prompt, output_dir=output_dir))
                     except CodexInfrastructureError as exc:
+                        infrastructure = asdict(exc.failure)
                         thread_id = task.thread_id
                         reconciliation = broker.reconcile(cumulative_argvs, require_complete=False)
                         grade = V3TurnGrade(index, _sha256_text(prompt), len(broker.evidence().records),
@@ -455,8 +458,25 @@ def run_expansion_codex_task(
                     raise V3TaskRunnerError("expansion final Broker reconciliation failed", thread_id=thread_id)
     except Exception as exc:
         failure = exc
-        raise
     finally:
+        if failure is not None:
+            # Both contexts have exited: the Broker must reap its runner before
+            # independent reads can observe project state. Never retry execute.
+            if getattr(broker, "_started", False):
+                policy.oracle_evidence["reconciliation"] = {
+                    "status": "error", "child_reaped": False, "subprocesses_reaped": False,
+                    "seconds": 30, "read_seconds": 10, "elapsed_seconds": 0.0,
+                    "error": {"type": "BrokerCleanupUnproven", "message": "Broker runner teardown did not complete"},
+                }
+            else:
+                try:
+                    policy.oracle_evidence["reconciliation"] = dict(reconcile_after_failure())
+                except Exception as exc:
+                    policy.oracle_evidence["reconciliation"] = {
+                        "status": "error", "child_reaped": False, "subprocesses_reaped": False,
+                        "seconds": 30, "read_seconds": 10, "elapsed_seconds": 0.0,
+                        "error": {"type": type(exc).__name__, "message": str(exc).encode("utf-8")[:2048].decode("utf-8", "ignore")},
+                    }
         if failure is not None and len(budget.turn_measurements) > len(turn_rows):
             turn_rows.append({"index": len(turn_rows) + 1, "gates": {}, "incomplete": True,
                               "agent_seconds": budget.turn_measurements[-1]["elapsed_seconds"]})
@@ -468,10 +488,20 @@ def run_expansion_codex_task(
             "measurement_scope": "CodexCliTask._record_turn including prompt audit and fresh/resume CLI",
             "turn_measurements": budget.turn_measurements,
         })
+        passed = failure is None and policy.complete and broker.evidence().passed
+        journal = (TransactionStore(broker.state_directory).read_events(policy.transaction_id)
+                   if policy.transaction_id else ())
+        status = classify_expansion_outcome(passed=passed,
+            records=broker.evidence().as_dict(include_output=True).get("records", ()), events=journal,
+            infrastructure=infrastructure)
+        reconciliation_receipt = policy.oracle_evidence.get("reconciliation")
+        if reconciliation_receipt and (reconciliation_receipt.get("child_reaped") is not True
+                or reconciliation_receipt.get("subprocesses_reaped") is not True):
+            status = "BLOCKED"
         outcome = {
             "contract": "waapi-skill.integration-expansion-task-result/v1",
             "unit_id": unit.unit_id, "version": unit.version, "thread_id": thread_id,
-            "passed": failure is None and policy.complete and broker.evidence().passed,
+            "passed": passed, "status": status, "infrastructure": infrastructure,
             "error": None if failure is None else f"{type(failure).__name__}: {failure}",
             "terminal_state": policy.transaction.state,
             "assertions": dict(policy.assertions), "required_assertions": sorted(prepared.required_assertions),

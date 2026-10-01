@@ -103,6 +103,8 @@ def test_attenuation_setup_cli_parses_and_snapshot_checks_independent_curves(ver
             starts.append(argv[1])
             return {"draft": {"draft_id": str(len(starts)), "revision": 1}, "task_authority": "authority"}
         if command == "draft-bind-object":
+            if starts[-1] == "object.setReference":
+                assert "--role" not in argv, "metadata-owned object bindings have no business role"
             return {"bound_object": {"handle": "handle"}, "draft": {"revision": 2}}
         if command == "draft-discover-fields":
             return {"meaning_results": [{"candidates": [{"handle": "attenuation-field"}]}], "draft": {"revision": 3}}
@@ -124,6 +126,12 @@ def test_attenuation_setup_cli_parses_and_snapshot_checks_independent_curves(ver
     assert case.request_schema_uri == "ak.wwise.core.object.setAttenuationCurve"
     assert case.read_curve_roles == set(C08_CURVE_ROLES)
     assert len([call for call in calls if call[0] == "confirm"]) == 4
+    reference_start = next(index for index, call in enumerate(calls)
+                           if call[:2] == ("draft-start", "object.setReference"))
+    reference_bindings = [call for call in calls[reference_start:]
+                          if call[0] == "draft-bind-object"]
+    assert len(reference_bindings) == 2
+    assert [call[call.index("--object-id") + 1] for call in reference_bindings] == [sound_id, copied_id]
     target_curves["volume-dry"] = {"use": "Custom", "points": [
         {"x": 0.0, "y": 0.0, "shape": "Linear"}, {"x": 50.0, "y": -12.0, "shape": "Linear"},
         {"x": 100.0, "y": -48.0, "shape": "Linear"},

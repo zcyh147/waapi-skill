@@ -15,7 +15,7 @@ def test_fixture_gateway_uses_separate_packaged_process_and_private_endpoint(mon
         calls.append((command, kwargs))
         return SimpleNamespace(returncode=0, stdout=json.dumps({"ok": True, "command": "status",
             "endpoint": {"host": "127.0.0.1", "port": 41234}}))
-    monkeypatch.setattr(runtime.subprocess, "run", run)
+    monkeypatch.setattr(runtime, "run_owned_gateway", run)
     owned = SimpleNamespace(host="127.0.0.1", port=41234, owned_root=tmp_path,
                             runner_environment={"WWISE_WAAPI_PORT": "41234"})
     receipts = []
@@ -25,13 +25,16 @@ def test_fixture_gateway_uses_separate_packaged_process_and_private_endpoint(mon
     command, kwargs = calls[0]
     assert command[1:3] == [str(tmp_path / "skill" / "scripts" / "run.py"), "gateway.py"]
     assert command[command.index("--port") + 1] == "41234"
-    assert kwargs["env"]["WAAPI_SKILL_CONFIG_PATH"] == str(tmp_path / "setup-config.json")
-    assert kwargs["timeout"] == 45 and kwargs["encoding"] == "utf-8"
+    assert kwargs["environment"]["WAAPI_SKILL_CONFIG_PATH"] == str(tmp_path / "setup-config.json")
+    assert kwargs["timeout_seconds"] == 45
     assert receipts[0]["argv"] == ["status"]
 
 
 @pytest.mark.parametrize("case,version,boundary,expected", [
     ("M01", "2025.1", False, "PASS"),
+    ("M01", "2025.1", False, "FAIL"),
+    ("M01", "2025.1", False, "BLOCKED"),
+    ("M01", "2025.1", False, "INDETERMINATE"),
     ("M05", "2022.1", True, "BOUNDARY_PROVEN"),
     ("M01", "2025.1", True, "BLOCKED"),
 ])
@@ -69,7 +72,7 @@ def test_existing_lifecycle_dispatch_and_boundary_never_start_an_agent(monkeypat
         return prepared
     def run_task(**kwargs):
         calls.append(("agent", kwargs))
-        return {"passed": True, "thread_id": "one-thread"}
+        return {"passed": expected == "PASS", "status": expected, "thread_id": "one-thread"}
     monkeypatch.setattr(runtime, "ScenarioLifecycle", Lifecycle)
     monkeypatch.setattr(runtime, "OwnedDirectWaapiCall", Direct)
     monkeypatch.setattr(runtime, "fixture_gateway", lambda **kwargs: lambda argv: {"ok": True})
@@ -86,3 +89,20 @@ def test_existing_lifecycle_dispatch_and_boundary_never_start_an_agent(monkeypat
     if boundary:
         assert outcome.task_root is None and outcome.thread_id is None
         assert outcome.checks["capability_boundary"]["business_pass"] is False
+
+
+def test_fixture_timeout_preserves_bounded_failure_receipt_without_retry(monkeypatch, tmp_path):
+    launches = []
+    def fail(command, **kwargs):
+        launches.append(command)
+        raise runtime.subprocess.TimeoutExpired(command, kwargs["timeout_seconds"])
+    monkeypatch.setattr(runtime, "run_owned_gateway", fail)
+    owned = SimpleNamespace(host="127.0.0.1", port=41234, owned_root=tmp_path, runner_environment={})
+    receipts = []
+    gateway = runtime.fixture_gateway(skill_source=tmp_path / "skill", runtime=owned,
+                                      version="2025.1", receipts=receipts)
+    with pytest.raises(runtime.subprocess.TimeoutExpired):
+        gateway(["execute", "tx1-owned"])
+    assert len(launches) == len(receipts) == 1
+    assert receipts[0]["argv"] == ["execute", "tx1-owned"] and receipts[0]["processes_reaped"] is True
+    assert len(receipts[0]["error"]["message"].encode()) <= 2048

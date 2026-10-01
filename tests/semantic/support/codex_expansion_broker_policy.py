@@ -193,7 +193,7 @@ class ExpansionBrokerPolicy:
                 raise ExpansionPolicyError("verification needs one proven completed execution")
         else:
             raise ExpansionPolicyError("command is outside the expansion business surface")
-        return ExpectedGatewayStep(name, command, tuple(values))
+        return ExpectedGatewayStep(name, command, tuple(values), allowed_exit_codes=(0, 2) if command == "execute" else (0,))
 
     def observe(self, step, payload: Mapping[str, Any], *, state_directory: Path) -> None:
         command = step.subcommand
@@ -234,9 +234,13 @@ class ExpansionBrokerPolicy:
             self.oracle_evidence.update(transaction_id=transaction_id, artifact_hash=preview.artifact_hash)
         elif command == "execute":
             record = TransactionStore(state_directory).load(self.transaction_id)
+            indeterminate = (payload.get("ok") is False and payload.get("status") == "indeterminate"
+                and payload.get("state") == record.state.value == "indeterminate"
+                and payload.get("automatic_retry") is False and record.artifact_hash == self.artifact_hash)
             self.transaction.observe_execution(transaction_id=payload.get("transaction_id"),
                 artifact_sha256=payload.get("artifact_hash"), completed=(payload.get("state") == "executed_unverified"
-                    and record.state.value == "executed_unverified" and record.artifact_hash == self.artifact_hash))
+                    and record.state.value == "executed_unverified" and record.artifact_hash == self.artifact_hash),
+                terminal_indeterminate=indeterminate)
         elif command == "verify":
             record = TransactionStore(state_directory).load(self.transaction_id)
             if record.state.value != payload.get("state") or record.artifact_hash != self.artifact_hash:

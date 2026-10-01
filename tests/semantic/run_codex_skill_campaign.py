@@ -1418,8 +1418,15 @@ def _validate_expansion_outcome(outcome: Mapping[str, Any], *, expected_unit: An
             return
     except ExpansionArchiveError as exc:
         raise CampaignEvidenceError(f"expansion archive is untrusted: {exc}") from exc
-    task_passed = outcome["checks"].get("task", {}).get("passed") is True
-    expected_original = "BOUNDARY_PROVEN" if status == "BOUNDARY_PROVEN" else "PASS" if task_passed else "FAIL"
+    task_result = outcome["checks"].get("task", {})
+    task_passed = task_result.get("passed") is True
+    if status == "BOUNDARY_PROVEN":
+        expected_original = "BOUNDARY_PROVEN"
+    else:
+        expected_original = task_result.get("status", "PASS" if task_passed else "FAIL")
+        if (expected_original not in {"PASS", "FAIL", "BLOCKED", "INDETERMINATE"}
+                or task_passed is not (expected_original == "PASS")):
+            raise CampaignEvidenceError("expansion task verdict and completion flag disagree")
     if (evidence.get("archive_valid") is not True or evidence.get("original_status") != expected_original
             or evidence.get("business_pass") is not (expected_original == "PASS")
             or (status == "PASS" and not task_passed)):

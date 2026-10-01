@@ -248,3 +248,30 @@ def test_agent_budget_accumulates_turns_excludes_fixture_time_and_never_resets()
 def test_budget_rejects_nonfinite_bool_or_unordered_bounds(hard, slow):
     with pytest.raises(ExpansionPolicyError):
         CumulativeAgentBudget(hard_seconds=hard, slow_seconds=slow)
+
+
+@pytest.mark.parametrize("argv", (["execute", "tx1-owned"], ("execute", "tx1-owned")))
+@pytest.mark.parametrize("state,expected", [("executing", "INDETERMINATE"), ("indeterminate", "INDETERMINATE"),
+                                            ("policy_authorized", "INDETERMINATE"), ("executed_unverified", "FAIL"),
+                                            ("execution_failed", "FAIL")])
+def test_outcome_distinguishes_unproven_execution_from_incomplete_agent_work(state, expected, argv):
+    from tests.semantic.support.codex_expansion_policy import classify_expansion_outcome
+    records = [{"accepted": True, "gateway_arguments": argv, "succeeded": False}]
+    events = [{"to_state": state}]
+    assert classify_expansion_outcome(passed=False, records=records, events=events) == expected
+
+
+@pytest.mark.parametrize("category", ("authentication", "quota_or_rate_limit", "service_unavailable", "timeout_before_agent_action"))
+def test_pre_agent_infrastructure_is_blocked_without_mutation(category):
+    from tests.semantic.support.codex_expansion_policy import classify_expansion_outcome
+    assert classify_expansion_outcome(passed=False, records=[], events=[],
+        infrastructure={"category": category, "agent_item_event_count": 0}) == "BLOCKED"
+
+
+def test_infrastructure_label_cannot_erase_an_admitted_uncertain_mutation_or_agent_failure():
+    from tests.semantic.support.codex_expansion_policy import classify_expansion_outcome
+    infrastructure = {"category": "quota_or_rate_limit", "agent_item_event_count": 0}
+    assert classify_expansion_outcome(passed=False, records=[{"accepted": True, "gateway_arguments": ["execute", "tx1-owned"]}],
+        events=[], infrastructure=infrastructure) == "INDETERMINATE"
+    assert classify_expansion_outcome(passed=False, records=[], events=[],
+        infrastructure={**infrastructure, "agent_item_event_count": 1}) == "FAIL"

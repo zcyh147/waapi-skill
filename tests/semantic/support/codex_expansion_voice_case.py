@@ -178,6 +178,26 @@ def verify_c01(before: Mapping[str, Any], after: Mapping[str, Any], *,
     }
 
 
+def _read_failed_event_candidates(ctx: ExpansionCaseContext, event_name: str) -> None:
+    """Preserve bounded read diagnostics without retrying the failed import."""
+    from tests.semantic.support.codex_expansion_reconciliation import ReconciliationCleanupError
+    commands = (
+        ["query-object", "--path-segment", "Events", "--path-segment", "Default Work Unit",
+         "--path-segment", event_name + "@Play", "--include", "parent"],
+        ["query-object", "--path-segment", "Events", "--path-segment", "Default Work Unit",
+         "--relationship", "children", "--max-results", "64", "--include", "parent"],
+    )
+    for command in commands:
+        try:
+            ctx.gateway(command)
+        except ReconciliationCleanupError:
+            raise
+        except CaseBoundaryError:
+            # The owned Gateway already persisted the complete bounded failure
+            # receipt. Neither an absent candidate nor a read error is a PASS.
+            continue
+
+
 def _create_english_event_voice(ctx: ExpansionCaseContext, *, parent: Mapping[str, Any],
                                 parent_segments: tuple[str, ...],
                                 sound_name: str, event_name: str, media: Path) -> dict[str, Any]:
@@ -190,7 +210,11 @@ def _create_english_event_voice(ctx: ExpansionCaseContext, *, parent: Mapping[st
                "--event", "voice", event_parent, event_name, "Play",
                "--media-directory", str(media.parent), "--media-file", "voice", media.name,
                "--field", "voice", "language", "English(US)")
-    draft.finish()
+    try:
+        draft.finish()
+    except CaseBoundaryError:
+        _read_failed_event_candidates(ctx, event_name)
+        raise
     sound = query_path(ctx, (*parent_segments, sound_name), includes=VOICE_INCLUDES)
     _sound_state(sound)
 

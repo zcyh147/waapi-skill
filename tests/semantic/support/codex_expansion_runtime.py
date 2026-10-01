@@ -7,6 +7,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Mapping
@@ -14,6 +15,7 @@ from typing import Any, Mapping
 from tests.semantic.support.codex_expansion_cases import ExpansionCaseContext, ExpectedCapabilityBoundary
 from tests.semantic.support.codex_expansion_case_helpers import CaseBoundaryError
 from tests.semantic.support.codex_expansion_oracle_reads import expansion_oracle_reader
+from tests.semantic.support.codex_expansion_reconciliation import ExpansionReconciliationGuard, ReconciliationCleanupError, run_owned_gateway
 from tests.semantic.support.codex_expansion_profile import validate_model_configuration
 from tests.semantic.support.codex_heavy_project_runner_v3 import OwnedDirectWaapiCall, HeavyProjectRunnerOptions
 from tests.semantic.support.codex_project_prelaunch_v3 import ProjectPrelaunchRequest, make_project_prelaunch_hook
@@ -40,14 +42,20 @@ def fixture_gateway(*, skill_source: Path, runtime: Any, version: str, receipts:
     environment = {**os.environ, **runtime.runner_environment,
         "WAAPI_SKILL_CONFIG_PATH": str(runtime.owned_root / "setup-config.json"),
         "PYTHONDONTWRITEBYTECODE": "1", "PYTHONIOENCODING": "utf-8:strict"}
-    def gateway(arguments):
+    def gateway(arguments, *, timeout_seconds=45):
         if not arguments or str(arguments[0]).startswith("-"):
             raise CaseBoundaryError("fixture Gateway requires one public command")
         command = [sys.executable, str(skill_source / "scripts" / "run.py"), "gateway.py",
             "--host", runtime.host, "--port", str(runtime.port), "--version", version,
-            "--state-dir", str(runtime.owned_root / "setup-state"), "--timeout", "30", *arguments]
-        completed = subprocess.run(command, env=environment, capture_output=True,
-            encoding="utf-8", errors="strict", timeout=45, check=False)
+            "--state-dir", str(runtime.owned_root / "setup-state"), "--timeout", str(min(30, timeout_seconds)), *arguments]
+        started = time.monotonic()
+        try:
+            completed = run_owned_gateway(command, environment=environment, timeout_seconds=timeout_seconds)
+        except (subprocess.TimeoutExpired, OSError, ReconciliationCleanupError) as exc:
+            receipts.append({"argv": list(arguments), "elapsed_seconds": time.monotonic() - started,
+                "processes_reaped": not isinstance(exc, ReconciliationCleanupError),
+                "error": {"type": type(exc).__name__, "message": str(exc).encode("utf-8")[:2048].decode("utf-8", "ignore")}})
+            raise
         if len(completed.stdout.encode("utf-8")) > 1_048_576:
             raise CaseBoundaryError("fixture Gateway receipt exceeds its byte ceiling")
         try:
@@ -109,8 +117,10 @@ def run_expansion_unit(unit: Any, *, scenario_root: Path, options: Any) -> Expan
         gateway = fixture_gateway(skill_source=options.skill_source, runtime=runtime,
                                   version=unit.version, receipts=checks["fixture_gateway_receipts"])
         gateway(["config-set", "--project-modification-policy", "ask_before_changes"])
+        reconciliation_guard = ExpansionReconciliationGuard(version=unit.version, host=runtime.host, port=runtime.port,
+            gateway=gateway, trusted_read=expansion_oracle_reader(version=unit.version, read_call=direct))
         context = ExpansionCaseContext(unit.version, unit.unit_id, runtime.sandbox.sandbox_project,
-            runtime.asset_root, gateway, expansion_oracle_reader(version=unit.version, read_call=direct))
+            runtime.asset_root, reconciliation_guard.gateway, reconciliation_guard.trusted_read)
         module_name, function_name = _ADAPTERS[unit.case_id]
         adapter = importlib.import_module(f"tests.semantic.support.codex_expansion_{module_name}_case")
         prepared = getattr(adapter, function_name)(context)
@@ -126,10 +136,12 @@ def run_expansion_unit(unit: Any, *, scenario_root: Path, options: Any) -> Expan
         checks["fixture_before"] = prepared.before
         task_root = runtime.evidence_root / "codex-task"
         result = run_expansion_codex_task(unit=unit, prepared=prepared, task_root=task_root,
-            options=options, runner_environment=runtime.runner_environment, scoped_paths=scoped_paths)
+            options=options, runner_environment=runtime.runner_environment, scoped_paths=scoped_paths,
+            reconcile_after_failure=lambda: reconciliation_guard.reconcile(prepared.snapshot))
         checks["task"] = result
         checks["trusted_oracle_calls"] = direct.calls
-        status = "PASS" if result.get("passed") is True else "FAIL"
+        status = result.get("status") or ("PASS" if result.get("passed") is True else "FAIL")
+        reason = str(result.get("error") or "")
     except ExpectedCapabilityBoundary as exc:
         boundary_proven = (unit.case_id == "M05" and unit.version == "2022.1"
                            and exc.case_id == "M05" and exc.version == "2022.1")

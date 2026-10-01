@@ -132,6 +132,9 @@ def make_public_gateway(
         raise CaseBoundaryError("fixture Gateway receipts must start empty for this case")
 
     def invoke(command: Sequence[str]) -> Mapping[str, Any]:
+        from tests.semantic.support.codex_expansion_reconciliation import (
+            ReconciliationCleanupError, run_owned_gateway,
+        )
         argv = tuple(command)
         if (not argv or len(argv) > 128
                 or any(not isinstance(item, str) or not item or "\0" in item for item in argv)
@@ -161,14 +164,12 @@ def make_public_gateway(
         }
         started = time.monotonic()
         try:
-            completed = subprocess.run(
+            completed = run_owned_gateway(
                 process_argv,
                 cwd=_GATEWAY_CWD,
-                env=child_environment,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                timeout=_GATEWAY_CALL_TIMEOUT_SECONDS,
-                check=False,
+                environment=child_environment,
+                timeout_seconds=_GATEWAY_CALL_TIMEOUT_SECONDS,
+                text=False,
             )
         except subprocess.TimeoutExpired as exc:
             stdout = exc.stdout if isinstance(exc.stdout, bytes) else b""
@@ -193,6 +194,15 @@ def make_public_gateway(
                 "error": f"{type(exc).__name__}: {exc}",
             })
             raise CaseBoundaryError("public fixture Gateway process could not start") from exc
+        except ReconciliationCleanupError as exc:
+            receipts.append({
+                "argv": list(argv), "command": process_argv,
+                "elapsed_seconds": round(time.monotonic() - started, 3),
+                "error": "gateway_process_cleanup_unproved",
+                "cleanup_proven": False,
+                "message": str(exc).encode("utf-8")[:2_048].decode("utf-8", "ignore"),
+            })
+            raise
 
         stdout = completed.stdout if isinstance(completed.stdout, bytes) else b""
         stderr = completed.stderr if isinstance(completed.stderr, bytes) else b""

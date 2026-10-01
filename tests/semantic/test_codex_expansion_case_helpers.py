@@ -7,6 +7,7 @@ import pytest
 
 from tests.semantic.support.codex_expansion_cases import ExpansionCaseContext
 from tests.semantic.support import codex_expansion_case_helpers as expansion_helpers
+from tests.semantic.support import codex_expansion_reconciliation as reconciliation
 from tests.semantic.support.codex_expansion_case_helpers import (
     BusinessDraft, CaseBoundaryError, file_evidence, make_public_gateway,
     read_object, rows, wav_assets,
@@ -15,6 +16,43 @@ from tests.semantic.support.codex_expansion_case_helpers import (
 
 GUID = "{11111111-1111-1111-1111-111111111111}"
 OTHER = "{22222222-2222-2222-2222-222222222222}"
+
+
+def test_public_fixture_gateway_delegates_to_owned_process_group(tmp_path, monkeypatch):
+    config = tmp_path / "config.json"
+    config.write_text("{}", encoding="utf-8")
+    calls = []
+    def owned(command, **kwargs):
+        calls.append((command, kwargs))
+        return expansion_helpers.subprocess.CompletedProcess(command, 0, b'{"ok":true}', b"")
+    monkeypatch.setattr(reconciliation, "run_owned_gateway", owned)
+    monkeypatch.setattr(expansion_helpers.subprocess, "run", lambda *a, **kw: pytest.fail("unowned launcher"))
+    gateway = make_public_gateway(host="127.0.0.1", port=8090, version="2025.1",
+        config_path=config, state_dir=tmp_path / "state", environment={}, receipts=[], live_commands=frozenset())
+    assert gateway(["operations"]) == {"ok": True}
+    assert len(calls) == 1
+    assert calls[0][1]["text"] is False
+    assert calls[0][1]["timeout_seconds"] == 60
+
+
+def test_public_fixture_gateway_preserves_unproved_cleanup_without_retry(tmp_path, monkeypatch):
+    config = tmp_path / "config.json"
+    config.write_text("{}", encoding="utf-8")
+    receipts = []
+    calls = []
+    def fail(*args, **kwargs):
+        calls.append(args)
+        raise reconciliation.ReconciliationCleanupError("group did not reap")
+    monkeypatch.setattr(reconciliation, "run_owned_gateway", fail)
+    gateway = make_public_gateway(host="127.0.0.1", port=8090, version="2025.1",
+        config_path=config, state_dir=tmp_path / "state", environment={}, receipts=receipts,
+        live_commands=frozenset())
+    with pytest.raises(reconciliation.ReconciliationCleanupError):
+        gateway(["execute", "tx1-case"])
+    assert len(receipts) == 1
+    assert len(calls) == 1
+    assert receipts[0]["error"] == "gateway_process_cleanup_unproved"
+    assert receipts[0]["cleanup_proven"] is False
 
 
 def _payload(items, limit=2):
@@ -148,14 +186,14 @@ def test_public_gateway_uses_the_packaged_runner_and_owned_live_scope(
         assert command[command.index("--version") + 1] == "2025.1"
         assert command[command.index("--state-dir") + 1] == str(state)
         assert kwargs["cwd"] == expansion_helpers._GATEWAY_CWD
-        assert kwargs["env"]["WAAPI_SKILL_CONFIG_PATH"] == str(config)
-        assert kwargs["env"]["WAAPI_SKILL_STATE_DIR"] == str(state)
-        assert kwargs["timeout"] == 60
+        assert kwargs["environment"]["WAAPI_SKILL_CONFIG_PATH"] == str(config)
+        assert kwargs["environment"]["WAAPI_SKILL_STATE_DIR"] == str(state)
+        assert kwargs["timeout_seconds"] == 60
         return expansion_helpers.subprocess.CompletedProcess(
             command, 0, json.dumps(expected).encode("utf-8"), b"",
         )
 
-    monkeypatch.setattr(expansion_helpers.subprocess, "run", run)
+    monkeypatch.setattr(reconciliation, "run_owned_gateway", run)
     gateway = make_public_gateway(
         host="127.0.0.1", port=8090, version="2025.1", config_path=config,
         state_dir=state, environment={}, receipts=receipts,
@@ -174,7 +212,7 @@ def test_public_gateway_preserves_structured_failure_and_bounds_process_output(
     receipts = []
     failure = {"ok": False, "status": "failed", "error": {"code": "HOST_TIMEOUT"}}
     monkeypatch.setattr(
-        expansion_helpers.subprocess, "run",
+        reconciliation, "run_owned_gateway",
         lambda command, **kwargs: expansion_helpers.subprocess.CompletedProcess(
             command, 2, json.dumps(failure).encode(), b"bounded stderr",
         ),
@@ -211,7 +249,7 @@ def test_public_gateway_retains_failed_assertion_names_in_oversize_receipt(
         "padding": "x" * 40_000,
     }
     monkeypatch.setattr(
-        expansion_helpers.subprocess, "run",
+        reconciliation, "run_owned_gateway",
         lambda command, **kwargs: expansion_helpers.subprocess.CompletedProcess(
             command, 2, json.dumps(failure).encode(), b"",
         ),
@@ -240,10 +278,10 @@ def test_public_gateway_timeout_is_retained_as_a_bounded_receipt(
 
     def run(command, **kwargs):
         raise expansion_helpers.subprocess.TimeoutExpired(
-            command, kwargs["timeout"], output=b"partial output", stderr=b"still running",
+            command, kwargs["timeout_seconds"], output=b"partial output", stderr=b"still running",
         )
 
-    monkeypatch.setattr(expansion_helpers.subprocess, "run", run)
+    monkeypatch.setattr(reconciliation, "run_owned_gateway", run)
     gateway = make_public_gateway(
         host="127.0.0.1", port=8090, version="2025.1", config_path=config,
         state_dir=tmp_path / "state", environment={}, receipts=receipts,

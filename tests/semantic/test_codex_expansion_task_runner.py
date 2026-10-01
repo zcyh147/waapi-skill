@@ -111,3 +111,79 @@ def test_notice_is_bound_to_sealed_selector_identity_and_effect_name():
 
 def test_absent_sealed_effect_fails_closed():
     assert not _notice([PREVIEW, _message("I’ll create Quiet with volume at -6 dB."), EXECUTE], artifact={})
+
+
+@pytest.mark.parametrize("failure_kind,expected", [("infrastructure", "BLOCKED"), ("budget", "FAIL"), ("uncertain_execute", "INDETERMINATE")])
+def test_expansion_returns_classified_failure_and_reconciles_only_after_broker_close(monkeypatch, tmp_path, failure_kind, expected):
+    from tests.semantic.support import codex_task_runner_v3 as runner
+    from tests.semantic.support import codex_expansion_broker_policy as policy_module
+    from tests.semantic.support.codex_harness import CodexInfrastructureError, CodexInfrastructureFailure
+    from tests.semantic.test_codex_expansion_broker_policy import make_policy, SKILL
+    calls = []
+    recorded_commands = []
+    prepared = make_policy().prepared
+    policy = policy_module.ExpansionBrokerPolicy(prepared=prepared, version="2025.1", skill_source=SKILL, scoped_paths={})
+    class Broker:
+        state_directory = tmp_path / "broker-state"
+        def __init__(self, **kwargs):
+            pass
+        def __enter__(self):
+            calls.append("broker-open")
+            return self
+        def __exit__(self, *_):
+            calls.append("broker-closed-reaped")
+        def model_environment_overrides(self):
+            return {}
+        def evidence(self):
+            return SimpleNamespace(records=(), passed=False, as_dict=lambda **_: {"records": recorded_commands})
+        def reconcile(self, *args, **kwargs):
+            return SimpleNamespace(passed=True)
+    class Task:
+        thread_id = "failed-thread"
+        def __init__(self, *args, **kwargs):
+            self.budget = kwargs["agent_case_budget"]
+        def __enter__(self):
+            return self
+        def __exit__(self, *_):
+            pass
+        def run_initial(self, *_args, **_kwargs):
+            self.budget.start_turn(100)
+            self.budget.finish_turn(701 if failure_kind != "infrastructure" else 101)
+            if failure_kind == "uncertain_execute":
+                from wwise_waapi.transactions import TransactionStore
+                store = TransactionStore(Broker.state_directory)
+                tx = "tx1-" + "7" * 20
+                artifact = {"request": {"operation": "audio.import"}}
+                preview = store.create_preview(tx, artifact)
+                store.authorize_by_policy(tx, policy="allow_changes", authority=policy.gateway_module.POLICY_AUTHORIZATION_AUTHORITY)
+                store.begin_execution(tx, expected_authorization="policy_authorized")
+                policy.transaction_id = tx
+                recorded_commands.append({"accepted": True, "gateway_arguments": ("execute", tx), "succeeded": False})
+            if failure_kind != "infrastructure":
+                raise TimeoutError("Agent budget expired after action")
+            raise CodexInfrastructureError(CodexInfrastructureFailure("authentication", "No auth", True, False, 0),
+                                           SimpleNamespace())
+    monkeypatch.setattr(runner, "prepare_workspace_skill_install", lambda *args: SKILL)
+    monkeypatch.setattr(runner, "CodexGatewayBroker", Broker)
+    monkeypatch.setattr(runner, "CodexCliTask", Task)
+    monkeypatch.setattr(policy_module, "ExpansionBrokerPolicy", lambda **kwargs: policy)
+    monkeypatch.setattr(runner, "_archive_turn", lambda *args, **kwargs: None)
+    def reconcile():
+        assert calls[-1] == "broker-closed-reaped"
+        calls.append("independent-read")
+        return {"status": "completed", "child_reaped": True, "subprocesses_reaped": True, "snapshot": prepared.before, "elapsed_seconds": 0.1}
+    options = SimpleNamespace(skill_source=SKILL, model="gpt-6.1-sol", reasoning_effort="medium",
+        service_tier="default", campaign_inputs_sha256="a" * 64, codex_binary=tmp_path / "codex", auth_json=tmp_path / "auth",
+        windows_powershell_core_host=None)
+    outcome = runner.run_expansion_codex_task(unit=SimpleNamespace(unit_id="EXP25-M01", version="2025.1"),
+        prepared=prepared, task_root=tmp_path / "task", options=options, runner_environment={}, scoped_paths={},
+        reconcile_after_failure=reconcile)
+    assert outcome["status"] == expected and outcome["passed"] is False
+    if failure_kind == "infrastructure":
+        assert outcome["infrastructure"]["category"] == "authentication"
+    else:
+        assert outcome["agent_seconds"] == 601 and outcome["infrastructure"] is None
+    assert len(recorded_commands) == (1 if failure_kind == "uncertain_execute" else 0)
+    assert calls == ["broker-open", "broker-closed-reaped", "independent-read"]
+    oracle = json.loads((tmp_path / "task" / "expansion-oracle.json").read_text())
+    assert oracle["reconciliation"]["child_reaped"] is True
