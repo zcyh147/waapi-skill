@@ -2821,6 +2821,8 @@ def validate_heavy_v3_child_run(
         if index > len(attempted_ids):
             break
         scenario_root = actual_scenario_dirs[f"{index:03d}-{scenario_id}"]
+        continuation_possible = (index < len(attempted_ids)
+            or bool(summary["pending_unit_ids"]) and summary["stop_reason"] is None)
         try:
             matrix_case = load_strict_regular_json(
                 scenario_root / "matrix-case.json"
@@ -2834,12 +2836,14 @@ def validate_heavy_v3_child_run(
                 options=options,
             )
         except (CampaignEvidenceError, OSError) as exc:
+            if options.profile == EXPANSION_PROFILE_ID and continuation_possible:
+                raise CampaignEvidenceError("expansion continued after untrusted case evidence") from exc
             append_blocked(
                 scenario_id,
                 f"untrusted heavy case evidence: {exc}",
             )
             continue
-        if (options.profile == EXPANSION_PROFILE_ID and index < len(attempted_ids)
+        if (options.profile == EXPANSION_PROFILE_ID and continuation_possible
                 and not matrix.expansion_case_isolated(matrix_case)):
             raise CampaignEvidenceError("expansion continued after unproved case isolation")
         status = str(matrix_case["status"])

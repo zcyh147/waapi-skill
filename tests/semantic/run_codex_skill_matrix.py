@@ -996,9 +996,14 @@ def load_heavy_v3_units(options: RunnerOptions) -> tuple[Any, ...]:
 
 def expansion_case_isolated(record: Mapping[str, Any]) -> bool:
     """Prove that this owned attempt cannot invalidate a later expansion unit."""
-    from tests.semantic.support.codex_campaign_runner import load_strict_regular_json, CampaignEvidenceError
+    from tests.semantic.support.codex_expansion_archive import (
+        ExpansionArchiveError, verify_expansion_task_archive, verify_expansion_boundary_archive,
+    )
     outcome = record.get("runner_outcome")
     if not isinstance(outcome, Mapping):
+        return False
+    checks = outcome.get("checks")
+    if not isinstance(checks, Mapping) or checks.get("trusted_oracle_closed") is not True:
         return False
     lifecycle = outcome.get("lifecycle")
     if not isinstance(lifecycle, Mapping):
@@ -1015,20 +1020,30 @@ def expansion_case_isolated(record: Mapping[str, Any]) -> bool:
             or any(not isinstance(error, str) or not error.startswith("scenario:") for error in errors)):
         return False
     task_root = outcome.get("task_root")
-    if task_root is not None:
-        try:
+    expected = {"expected_unit_id": record.get("scenario_id"),
+                "expected_version": record.get("version"),
+                "expected_inputs_sha256": outcome.get("inputs_sha256")}
+    try:
+        if task_root is not None:
             task_path = Path(task_root).resolve(strict=True)
             task_path.relative_to(Path(record["scenario_root"]).resolve(strict=True))
-            oracle = load_strict_regular_json(task_path / "expansion-oracle.json")
-            if not isinstance(oracle, Mapping):
-                return False
-            reconciliation = oracle.get("reconciliation")
-            if reconciliation is not None and (not isinstance(reconciliation, Mapping)
-                    or reconciliation.get("child_reaped") is not True
-                    or reconciliation.get("subprocesses_reaped") is not True):
-                return False
-        except (CampaignEvidenceError, OSError, ValueError, TypeError):
+            replay = verify_expansion_task_archive(task_path, **expected)
+        elif record.get("status") == "BOUNDARY_PROVEN":
+            replay = verify_expansion_boundary_archive(Path(record["scenario_root"]), **expected)
+        else:
+            # A fixture failure before any Agent task has no task archive.
+            return record.get("status") == "BLOCKED"
+        if (not isinstance(replay, Mapping) or replay.get("archive_valid") is not True
+                or replay.get("original_status") != record.get("status")
+                or replay.get("business_pass") is not (record.get("status") == "PASS")):
             return False
+        reconciliation = replay.get("reconciliation")
+        if reconciliation is not None and (not isinstance(reconciliation, Mapping)
+                or reconciliation.get("child_reaped") is not True
+                or reconciliation.get("subprocesses_reaped") is not True):
+            return False
+    except (ExpansionArchiveError, OSError, ValueError, TypeError):
+        return False
     return True
 
 

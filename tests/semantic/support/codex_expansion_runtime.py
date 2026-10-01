@@ -17,7 +17,9 @@ from tests.semantic.support.codex_expansion_case_helpers import CaseBoundaryErro
 from tests.semantic.support.codex_expansion_oracle_reads import expansion_oracle_reader
 from tests.semantic.support.codex_expansion_reconciliation import ExpansionReconciliationGuard, ReconciliationCleanupError, run_owned_gateway
 from tests.semantic.support.codex_expansion_profile import validate_model_configuration
-from tests.semantic.support.codex_heavy_project_runner_v3 import OwnedDirectWaapiCall, HeavyProjectRunnerOptions
+from tests.semantic.support.codex_heavy_project_runner_v3 import (
+    HeavyProjectRunnerOptions, OwnedDirectWaapiCall, _bounded_exception_summary,
+)
 from tests.semantic.support.codex_project_prelaunch_v3 import ProjectPrelaunchRequest, make_project_prelaunch_hook
 from tests.semantic.support.codex_scenario_lifecycle_v3 import ScenarioLifecycle
 from tests.semantic.support.codex_task_runner_v3 import run_expansion_codex_task
@@ -106,10 +108,12 @@ def run_expansion_unit(unit: Any, *, scenario_root: Path, options: Any) -> Expan
     direct = None
     result = None
     lifecycle_result = None
-    checks: dict[str, Any] = {}
+    checks: dict[str, Any] = {"trusted_oracle_closed": False}
     status, reason = "BLOCKED", ""
     task_root = None
     boundary_proven = False
+    direct_close_deferred = False
+    direct_close_error: str | None = None
     try:
         runtime = lifecycle.start()
         direct = OwnedDirectWaapiCall(host=runtime.host, port=runtime.port)
@@ -156,19 +160,63 @@ def run_expansion_unit(unit: Any, *, scenario_root: Path, options: Any) -> Expan
     finally:
         if direct is not None:
             try:
-                if direct.close() is not True:
-                    status, reason = "BLOCKED", "trusted oracle client did not prove disconnect"
+                close_result = direct.close()
             except Exception as exc:
-                status, reason = "BLOCKED", f"trusted oracle cleanup: {exc}"
-                boundary_proven = False
+                direct_close_deferred = True
+                direct_close_error = f"trusted oracle close raised {_bounded_exception_summary(exc)}"
+                status, reason = "BLOCKED", direct_close_error
+            else:
+                try:
+                    fully_closed = direct.fully_closed is True
+                except Exception as exc:
+                    fully_closed = False
+                    direct_close_error = f"trusted oracle closure proof raised {_bounded_exception_summary(exc)}"
+                if close_result is True and fully_closed:
+                    checks["trusted_oracle_closed"] = True
+                else:
+                    direct_close_deferred = True
+                    if type(close_result) is not bool and direct_close_error is None:
+                        direct_close_error = "trusted oracle close did not return an exact boolean result"
+                    if direct_close_error is not None:
+                        status, reason = "BLOCKED", direct_close_error
         if runtime is not None:
-            lifecycle_result = lifecycle.finish(status, reason=reason)
+            def finish_trusted_oracle_after_shutdown(_runtime_value: Any) -> None:
+                if direct is None:
+                    raise RuntimeError("trusted oracle actor is unavailable for closure proof")
+                if not direct_close_deferred:
+                    if checks.get("trusted_oracle_closed") is not True:
+                        raise RuntimeError("trusted oracle actor closure was not proved")
+                    return
+                finish_close = getattr(direct, "finish_close", None)
+                if not callable(finish_close):
+                    raise RuntimeError("trusted oracle actor has no post-shutdown close boundary")
+                try:
+                    reaped = finish_close()
+                except BaseException as exc:  # noqa: BLE001 - closure failure blocks continuation
+                    raise RuntimeError(
+                        f"trusted oracle post-shutdown close raised {_bounded_exception_summary(exc)}"
+                    ) from exc
+                try:
+                    fully_closed = direct.fully_closed is True
+                except BaseException as exc:  # noqa: BLE001 - closure proof is systemic
+                    raise RuntimeError(
+                        f"trusted oracle post-shutdown closure proof raised {_bounded_exception_summary(exc)}"
+                    ) from exc
+                if reaped is not True or not fully_closed:
+                    raise RuntimeError("trusted oracle actor remained unreaped after Wwise shutdown")
+                if direct_close_error is not None:
+                    raise RuntimeError(direct_close_error)
+                checks["trusted_oracle_closed"] = True
+
+            lifecycle_result = lifecycle.finish(
+                status, reason=reason, post_shutdown_hook=finish_trusted_oracle_after_shutdown
+            )
             status = lifecycle_result.final_status
     if (boundary_proven and task_root is None and lifecycle_result is not None
             and lifecycle_result.source_hash_before == lifecycle_result.source_hash_after
             and lifecycle_result.source_mtime_before_ns == lifecycle_result.source_mtime_after_ns
             and not any(not item.startswith("scenario:") for item in lifecycle_result.errors)
-            and direct is not None and direct.fully_closed):
+            and checks.get("trusted_oracle_closed") is True):
         status = "BOUNDARY_PROVEN"
     outcome = ExpansionOutcome(unit.unit_id, unit.version, status, reason, str(root),
         str(task_root) if task_root else None, result.get("thread_id") if result else None,

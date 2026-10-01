@@ -337,7 +337,7 @@ def _turns(root: Path, plan: Mapping[str, Any], result: Mapping[str, Any],
 
 def verify_expansion_task_archive(task_root: Path, *, expected_unit_id: str,
         expected_version: str, expected_inputs_sha256: str) -> dict[str, Any]:
-    """Validate a task after its enclosing formal attempt seal was verified."""
+    """Recompute complete task evidence; campaign seal validation is separate."""
     try:
         return _verify_task(Path(task_root), expected_unit_id, expected_version, expected_inputs_sha256)
     except ExpansionArchiveError:

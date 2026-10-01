@@ -99,16 +99,23 @@ def test_matrix_dispatches_expansion_runtime_with_frozen_digest(tmp_path, monkey
 def test_full_matrix_accounts_boundary_separately_from_thirteen_agent_passes(tmp_path, monkeypatch):
     from tests.semantic.support.codex_expansion_runtime import ExpansionOutcome
     options = _options(tmp_path, monkeypatch)
+    from tests.semantic.support import codex_expansion_archive as archive
+    monkeypatch.setattr(archive, "verify_expansion_task_archive", lambda *args, **kwargs:
+        {"archive_valid": True, "original_status": "PASS", "business_pass": True})
+    monkeypatch.setattr(archive, "verify_expansion_boundary_archive", lambda *args, **kwargs:
+        {"archive_valid": True, "original_status": "BOUNDARY_PROVEN", "business_pass": False})
     units = matrix.load_heavy_v3_units(options)
     monkeypatch.setattr(matrix, "prepare_iteration_root", lambda root, **kwargs: root.mkdir())
     called = []
     def run(unit, *, scenario_root, options):
         called.append(unit.unit_id)
         boundary = unit.evidence_kind == "capability_boundary"
+        task_root = scenario_root / "task"
+        task_root.mkdir(parents=True)
         return ExpansionOutcome(unit.unit_id, unit.version, "BOUNDARY_PROVEN" if boundary else "PASS", "",
-            str(scenario_root), None,
+            str(scenario_root), None if boundary else str(task_root),
             None if boundary else unit.unit_id + "-thread",
-            {"capability_boundary": {"agent_started": False, "business_pass": False}} if boundary else {}, _safe_expansion_lifecycle(unit), "a" * 64)
+            {"trusted_oracle_closed": True, **({"capability_boundary": {"agent_started": False, "business_pass": False}} if boundary else {})}, _safe_expansion_lifecycle(unit), "a" * 64)
     assert matrix.run_heavy_v3_matrix(options, unit_runner=run, dependency_preflight=lambda: {"ok": True}) == 0
     summary = json.loads((options.iteration_root / "summary.json").read_text())
     assert called[0] == "EXP22-M05"
@@ -259,7 +266,7 @@ def test_boundary_replays_through_real_campaign_seal_and_archive_verifier(tmp_pa
             "source_hash_before": {"sha256": "source"}, "source_hash_after": {"sha256": "source"},
             "source_mtime_before_ns": 1, "source_mtime_after_ns": 1}
         outcome = ExpansionOutcome(unit.unit_id, unit.version, "BOUNDARY_PROVEN", "reviewed unavailable reference",
-            str(scenario_root), None, None, {"capability_boundary": {"case_id": "M05", "version": "2022.1",
+            str(scenario_root), None, None, {"trusted_oracle_closed": True, "capability_boundary": {"case_id": "M05", "version": "2022.1",
                 "boundary_code": "CAPABILITY_UNAVAILABLE", "evidence": evidence,
                 "agent_started": False, "business_pass": False}}, lifecycle, digest)
         matrix.write_json(scenario_root / "outcome.json", outcome.as_dict())
@@ -302,15 +309,23 @@ def test_expansion_completes_independent_selection_after_safe_negative(tmp_path,
                        "--case-id", "C01", "--case-id", "C03", "--case-id", "C06")
     units = matrix.load_heavy_v3_units(options)
     monkeypatch.setattr(matrix, "prepare_iteration_root", lambda root, **kwargs: root.mkdir())
+    from tests.semantic.support import codex_expansion_archive as archive
+    replay_statuses = {}
+    def replay(root, **expected):
+        status = replay_statuses[expected["expected_unit_id"]]
+        return {"archive_valid": True, "original_status": status, "business_pass": status == "PASS",
+                "reconciliation": {"child_reaped": True, "subprocesses_reaped": True}}
+    monkeypatch.setattr(archive, "verify_expansion_task_archive", replay)
     called = []
     def run(unit, *, scenario_root, options):
         called.append(unit.unit_id)
         status = first_status if len(called) == 1 else "PASS"
+        replay_statuses[unit.unit_id] = status
         task_root = scenario_root / "task"
         matrix.write_json(task_root / "expansion-oracle.json", {"reconciliation": {
             "child_reaped": True, "subprocesses_reaped": True}} if status != "PASS" else {})
         return ExpansionOutcome(unit.unit_id, unit.version, status, "isolated result", str(scenario_root),
-            str(task_root), unit.unit_id + "-thread", {}, _safe_expansion_lifecycle(unit), "a" * 64)
+            str(task_root), unit.unit_id + "-thread", {"trusted_oracle_closed": True}, _safe_expansion_lifecycle(unit), "a" * 64)
     assert matrix.run_heavy_v3_matrix(options, unit_runner=run, dependency_preflight=lambda: {"ok": True}) == 1
     assert called == [unit.unit_id for unit in units]
     summary = json.loads((options.iteration_root / "summary.json").read_text())
@@ -330,6 +345,10 @@ def test_expansion_stops_when_negative_isolation_is_unproved(tmp_path, monkeypat
                        "--case-id", "C01", "--case-id", "C03")
     units = matrix.load_heavy_v3_units(options)
     monkeypatch.setattr(matrix, "prepare_iteration_root", lambda root, **kwargs: root.mkdir())
+    from tests.semantic.support import codex_expansion_archive as archive
+    monkeypatch.setattr(archive, "verify_expansion_task_archive", lambda *args, **kwargs:
+        {"archive_valid": True, "original_status": first_status, "business_pass": False,
+         "reconciliation": {"child_reaped": fault != "reap", "subprocesses_reaped": True}})
     called = []
     def run(unit, *, scenario_root, options):
         called.append(unit.unit_id)
@@ -344,7 +363,7 @@ def test_expansion_stops_when_negative_isolation_is_unproved(tmp_path, monkeypat
         matrix.write_json(task_root / "expansion-oracle.json", {"reconciliation": {
             "child_reaped": fault != "reap", "subprocesses_reaped": True}})
         return ExpansionOutcome(unit.unit_id, unit.version, first_status, "fault", str(scenario_root),
-            str(task_root), unit.unit_id + "-thread", {}, lifecycle, "a" * 64)
+            str(task_root), unit.unit_id + "-thread", {"trusted_oracle_closed": True}, lifecycle, "a" * 64)
     assert matrix.run_heavy_v3_matrix(options, unit_runner=run, dependency_preflight=lambda: {"ok": True}) == 1
     assert called == [units[0].unit_id]
     summary = json.loads((options.iteration_root / "summary.json").read_text())
@@ -364,3 +383,76 @@ def test_expansion_abnormal_child_can_preserve_safe_negative_prefix(tmp_path, mo
         run_errors=[], stop_reason="", preflight_state="passed", started_at=matrix.utc_now(), completed_at=None)
     campaign._validate_heavy_v3_summary(summary, expected_ids=tuple(unit.unit_id for unit in units),
         returncode=137, expected_profile=PROFILE, expected_rows=rows)
+
+
+def test_expansion_stops_after_oracle_written_but_task_archive_incomplete(tmp_path, monkeypatch):
+    """A failed budget write leaves an oracle file, not complete task evidence."""
+    from tests.semantic.support.codex_expansion_runtime import ExpansionOutcome
+    options = _options(tmp_path, monkeypatch, "matrix", "--version", "2025.1",
+                       "--case-id", "C01", "--case-id", "C03")
+    units = matrix.load_heavy_v3_units(options)
+    monkeypatch.setattr(matrix, "prepare_iteration_root", lambda root, **kwargs: root.mkdir())
+    called = []
+    def run(unit, *, scenario_root, options):
+        called.append(unit.unit_id)
+        task_root = scenario_root / "task"
+        matrix.write_json(task_root / "expansion-oracle.json", {"reconciliation": {
+            "child_reaped": True, "subprocesses_reaped": True}})
+        return ExpansionOutcome(unit.unit_id, unit.version, "FAIL", "OSError: failed budget write",
+            str(scenario_root), str(task_root), unit.unit_id + "-thread", {"trusted_oracle_closed": True},
+            _safe_expansion_lifecycle(unit), "a" * 64)
+    assert matrix.run_heavy_v3_matrix(options, unit_runner=run, dependency_preflight=lambda: {"ok": True}) == 1
+    assert called == [units[0].unit_id]
+    summary = json.loads((options.iteration_root / "summary.json").read_text())
+    assert summary["stop_reason"] == "fail:" + units[0].unit_id
+
+
+@pytest.mark.parametrize("closed", (False, None))
+def test_expansion_isolation_requires_explicit_trusted_oracle_close(tmp_path, monkeypatch, closed):
+    options = _options(tmp_path, monkeypatch, "matrix", "--version", "2025.1", "--case-id", "C01")
+    unit, = matrix.load_heavy_v3_units(options)
+    checks = {} if closed is None else {"trusted_oracle_closed": closed}
+    record = {"scenario_id": unit.unit_id, "version": unit.version, "status": "BLOCKED",
+              "scenario_root": str(tmp_path), "runner_outcome": {
+                  "checks": checks, "task_root": None, "lifecycle": _safe_expansion_lifecycle(unit)}}
+    assert matrix.expansion_case_isolated(record) is False
+
+
+@pytest.mark.parametrize("mode", ("unsafe_abnormal", "safe_abnormal", "intentional_stop"))
+def test_campaign_abnormal_prefix_checks_last_completed_case_before_resuming(tmp_path, monkeypatch, mode):
+    options = _options(tmp_path, monkeypatch, "campaign", "--version", "2025.1",
+                       "--case-id", "C01", "--case-id", "C03", "--case-id", "C06")
+    units = campaign.load_heavy_v3_campaign_units(options)
+    rows = [campaign.heavy_v3_unit_row(unit, sequence=index) for index, unit in enumerate(units, 1)]
+    root = tmp_path / "child"
+    records = []
+    for index, (unit, row) in enumerate(zip(units[:2], rows[:2]), 1):
+        scenario_root = root / "scenarios" / f"{index:03d}-{unit.unit_id}"
+        record = {"contract": matrix.HEAVY_V3_CASE_RECORD_CONTRACT, **row, "status": "BLOCKED",
+                  "reason": "isolated fixture failure", "scenario_root": str(scenario_root), "runner_outcome": {
+                      "task_root": None, "checks": {"trusted_oracle_closed": index == 1 or mode == "safe_abnormal"},
+                      "lifecycle": _safe_expansion_lifecycle(unit)}}
+        matrix.write_json(scenario_root / "matrix-case.json", record)
+        records.append(record)
+    stop_reason = "blocked:" + units[1].unit_id if mode == "intentional_stop" else ""
+    run_errors = ["[heavy-unit:" + units[1].unit_id + "] isolation unproved"] if stop_reason else []
+    completed_at = matrix.utc_now() if stop_reason else None
+    summary = matrix._heavy_v3_summary(profile=PROFILE, unit_rows=rows, records=records,
+        run_errors=run_errors, stop_reason=stop_reason, preflight_state="passed", started_at=matrix.utc_now(), completed_at=completed_at)
+    config = matrix._heavy_v3_run_config(options, unit_rows=rows, records=records, run_errors=run_errors,
+        stop_reason=stop_reason, preflight_state="passed", started_at=summary["started_at"], completed_at=completed_at)
+    config["case_ids"] = [unit.unit_id for unit in units]
+    config["versions"] = []
+    matrix.write_json(root / "summary.json", summary)
+    matrix.write_json(root / "run-config.json", config)
+    # Lifecycle and case archive validation have separate coverage; this seam
+    # tests which already-completed cases must prove safe continuation.
+    monkeypatch.setattr(campaign, "_validate_heavy_v3_matrix_case", lambda *args, **kwargs: None)
+    monkeypatch.setattr(campaign, "_validate_heavy_v3_live_preflight", lambda *args, **kwargs: None)
+    if mode == "unsafe_abnormal":
+        with pytest.raises(campaign.CampaignEvidenceError, match="unproved case isolation"):
+            campaign.validate_heavy_v3_child_run(root, expected_units=units, options=options, returncode=137)
+    else:
+        validation = campaign.validate_heavy_v3_child_run(root, expected_units=units, options=options,
+            returncode=1 if mode == "intentional_stop" else 137)
+        assert validation.executed_session_ids == tuple(unit.unit_id for unit in units[:2])

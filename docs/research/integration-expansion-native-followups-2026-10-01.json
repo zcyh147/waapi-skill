@@ -918,5 +918,739 @@
         "junit.xml": "0a225282a3e0b722ed0a86660dbed7f85e20f11681e07e37827c857d98efc379"
       }
     }
-  ]
+  ],
+  "full_preparation": {
+    "scope": "13 prepared baselines and separately reproduced M05/2022 boundary, no Agent acceptance. Two frozen preparation candidates; not one final Fresh campaign.",
+    "records": [
+      {
+        "candidate": "f9966f3f027e4ef81d4059ec00b2dffa35fe1a07",
+        "version": "2022.1",
+        "selected_test_nodeids": [
+          "tests/destructive/test_expansion_case_preflight.py::test_expansion_case_setup_and_independent_oracle_are_stable[C01]"
+        ],
+        "pytest_outcome": "PASS",
+        "categories": [
+          {
+            "agent_pass": false,
+            "assertion_names": [
+              "distractor_unchanged",
+              "event_and_action_unchanged",
+              "exact_language_set",
+              "fixture_membership_unchanged",
+              "other_language_unchanged",
+              "requested_language_media_matches",
+              "requested_language_source_identity_preserved",
+              "sound_identity_and_configuration_unchanged",
+              "source_gain_unchanged"
+            ],
+            "baseline_assertions": {
+              "distractor_unchanged": true,
+              "event_and_action_unchanged": true,
+              "exact_language_set": true,
+              "fixture_membership_unchanged": true,
+              "other_language_unchanged": true,
+              "requested_language_media_matches": false,
+              "requested_language_source_identity_preserved": true,
+              "sound_identity_and_configuration_unchanged": true,
+              "source_gain_unchanged": true
+            },
+            "before_sha256": "e0de8acdd96ed040b0aea7af961bdaada1ad92c9bbc4a6eba263cdc0bbc8b6f9",
+            "business_effect_verified": false,
+            "category": "expansion-preflight-C01",
+            "setup_execute_count": 5,
+            "status": "PASS",
+            "verifier_strength": "fixture_setup_and_repeated_independent_snapshot_only"
+          }
+        ],
+        "full_record_sha256": "ffacdbe8288858206979dae9f487f3b80fe22356b44d4d7575ebf3b42e2a4344",
+        "source_guard": {
+          "full_hash_unchanged": true,
+          "project_mtime_unchanged": true,
+          "tree_metadata_unchanged": true
+        },
+        "process_cleanup_proven": true,
+        "sandbox_state": "deleted",
+        "agent_pass": false
+      },
+      {
+        "candidate": "f9966f3f027e4ef81d4059ec00b2dffa35fe1a07",
+        "version": "2022.1",
+        "selected_test_nodeids": [
+          "tests/destructive/test_expansion_case_preflight.py::test_expansion_case_setup_and_independent_oracle_are_stable[C03]"
+        ],
+        "pytest_outcome": "PASS",
+        "categories": [
+          {
+            "agent_pass": false,
+            "assertion_names": [
+              "distractor_unchanged",
+              "exact_media_mapping",
+              "exact_target_set",
+              "fixture_membership_unchanged",
+              "media_destinations_preserved",
+              "sound_identities_and_configuration_preserved",
+              "source_identities_and_configuration_preserved"
+            ],
+            "baseline_assertions": {
+              "distractor_unchanged": true,
+              "exact_media_mapping": false,
+              "exact_target_set": true,
+              "fixture_membership_unchanged": true,
+              "media_destinations_preserved": true,
+              "sound_identities_and_configuration_preserved": true,
+              "source_identities_and_configuration_preserved": true
+            },
+            "before_sha256": "3981778ed138c2f06610259e3af9dd1761a9bd5159f1e0284052148c94a0c343",
+            "business_effect_verified": false,
+            "category": "expansion-preflight-C03",
+            "setup_execute_count": 4,
+            "status": "PASS",
+            "verifier_strength": "fixture_setup_and_repeated_independent_snapshot_only"
+          }
+        ],
+        "full_record_sha256": "d0a38ab3cdfa5f07889558733e47ac6f16158b6ec597fa7304191b8798323acc",
+        "source_guard": {
+          "full_hash_unchanged": true,
+          "project_mtime_unchanged": true,
+          "tree_metadata_unchanged": true
+        },
+        "process_cleanup_proven": true,
+        "sandbox_state": "deleted",
+        "agent_pass": false
+      },
+      {
+        "candidate": "f9966f3f027e4ef81d4059ec00b2dffa35fe1a07",
+        "version": "2022.1",
+        "selected_test_nodeids": [
+          "tests/destructive/test_expansion_case_preflight.py::test_expansion_case_setup_and_independent_oracle_are_stable[C06]"
+        ],
+        "pytest_outcome": "PASS",
+        "categories": [
+          {
+            "agent_pass": false,
+            "assertion_names": [
+              "control_identity_notes_and_parent_unchanged",
+              "media_unchanged",
+              "owner_configuration_unchanged",
+              "rtpc_identity_set_unchanged",
+              "sibling_curves_unchanged",
+              "target_curve_matches",
+              "target_identity_and_binding_unchanged"
+            ],
+            "baseline_assertions": {
+              "control_identity_notes_and_parent_unchanged": true,
+              "media_unchanged": true,
+              "owner_configuration_unchanged": true,
+              "rtpc_identity_set_unchanged": true,
+              "sibling_curves_unchanged": true,
+              "target_curve_matches": false,
+              "target_identity_and_binding_unchanged": true
+            },
+            "before_sha256": "b914f0fa762e3811b86e84c1d4187695e1c06adbd1f5a3297f2954f9c5228fb1",
+            "business_effect_verified": false,
+            "category": "expansion-preflight-C06",
+            "setup_execute_count": 3,
+            "status": "PASS",
+            "verifier_strength": "fixture_setup_and_repeated_independent_snapshot_only"
+          }
+        ],
+        "full_record_sha256": "bce7dc7e37f1f07ae8426fb636a83c31940a1ea56b10bc95fc46a5074198b361",
+        "source_guard": {
+          "full_hash_unchanged": true,
+          "project_mtime_unchanged": true,
+          "tree_metadata_unchanged": true
+        },
+        "process_cleanup_proven": true,
+        "sandbox_state": "deleted",
+        "agent_pass": false
+      },
+      {
+        "candidate": "f9966f3f027e4ef81d4059ec00b2dffa35fe1a07",
+        "version": "2022.1",
+        "selected_test_nodeids": [
+          "tests/destructive/test_expansion_case_preflight.py::test_expansion_case_setup_and_independent_oracle_are_stable[C08]"
+        ],
+        "pytest_outcome": "PASS",
+        "categories": [
+          {
+            "agent_pass": false,
+            "assertion_names": [
+              "attenuation_identity_unchanged",
+              "other_curves_unchanged",
+              "requested_curve_matches",
+              "source_attenuation_unchanged",
+              "users_and_references_unchanged"
+            ],
+            "baseline_assertions": {
+              "attenuation_identity_unchanged": true,
+              "other_curves_unchanged": true,
+              "requested_curve_matches": false,
+              "source_attenuation_unchanged": true,
+              "users_and_references_unchanged": true
+            },
+            "before_sha256": "622a83753ce874fee9d17a251a061063ad185729b53edc742f657130210735ae",
+            "business_effect_verified": false,
+            "category": "expansion-preflight-C08",
+            "setup_execute_count": 4,
+            "status": "PASS",
+            "verifier_strength": "fixture_setup_and_repeated_independent_snapshot_only"
+          }
+        ],
+        "full_record_sha256": "96e58fbbb6abd8379645780d9f7f4dd007db31d35668d73041bd8a01dd6bbdad",
+        "source_guard": {
+          "full_hash_unchanged": true,
+          "project_mtime_unchanged": true,
+          "tree_metadata_unchanged": true
+        },
+        "process_cleanup_proven": true,
+        "sandbox_state": "deleted",
+        "agent_pass": false
+      },
+      {
+        "candidate": "f9966f3f027e4ef81d4059ec00b2dffa35fe1a07",
+        "version": "2022.1",
+        "selected_test_nodeids": [
+          "tests/destructive/test_expansion_case_preflight.py::test_expansion_case_setup_and_independent_oracle_are_stable[C09]"
+        ],
+        "pytest_outcome": "PASS",
+        "categories": [
+          {
+            "agent_pass": false,
+            "assertion_names": [
+              "exactly_one_added_binding",
+              "existing_effects_and_bindings_unchanged",
+              "new_effect_matches",
+              "new_effect_owned_by_target",
+              "owner_unchanged",
+              "unique_effect_identities"
+            ],
+            "baseline_assertions": {
+              "exactly_one_added_binding": false,
+              "existing_effects_and_bindings_unchanged": true,
+              "new_effect_matches": false,
+              "new_effect_owned_by_target": false,
+              "owner_unchanged": true,
+              "unique_effect_identities": true
+            },
+            "before_sha256": "0c008f8dd476ea3b23fe3b5c50b31956a0c4f64c4a64aeb04f40b70cc6e8ecd2",
+            "business_effect_verified": false,
+            "category": "expansion-preflight-C09",
+            "setup_execute_count": 3,
+            "status": "PASS",
+            "verifier_strength": "fixture_setup_and_repeated_independent_snapshot_only"
+          }
+        ],
+        "full_record_sha256": "93eba1d554e0f0050454bb7b0c025b64ae689c6e45473e69f09c437dc53533a6",
+        "source_guard": {
+          "full_hash_unchanged": true,
+          "project_mtime_unchanged": true,
+          "tree_metadata_unchanged": true
+        },
+        "process_cleanup_proven": true,
+        "sandbox_state": "deleted",
+        "agent_pass": false
+      },
+      {
+        "candidate": "f9966f3f027e4ef81d4059ec00b2dffa35fe1a07",
+        "version": "2022.1",
+        "selected_test_nodeids": [
+          "tests/destructive/test_expansion_case_preflight.py::test_expansion_case_setup_and_independent_oracle_are_stable[M01]"
+        ],
+        "pytest_outcome": "PASS",
+        "categories": [
+          {
+            "agent_pass": false,
+            "assertion_names": [
+              "clip_media_matches_its_source",
+              "each_track_has_one_sequence_and_clip",
+              "exact_segment_track_source_topology",
+              "media_hashes_match_each_requested_track",
+              "only_track_has_requested_volume",
+              "parent_and_protected_sibling_unchanged"
+            ],
+            "baseline_assertions": {
+              "clip_media_matches_its_source": false,
+              "each_track_has_one_sequence_and_clip": false,
+              "exact_segment_track_source_topology": false,
+              "media_hashes_match_each_requested_track": false,
+              "only_track_has_requested_volume": false,
+              "parent_and_protected_sibling_unchanged": true
+            },
+            "before_sha256": "6ccbc949985cac62ac3a6dfb382ecf6061d1caf6c48962d07a87f3abce40fc9f",
+            "business_effect_verified": false,
+            "category": "expansion-preflight-M01",
+            "setup_execute_count": 2,
+            "status": "PASS",
+            "verifier_strength": "fixture_setup_and_repeated_independent_snapshot_only"
+          }
+        ],
+        "full_record_sha256": "2762ae378758b850482a428b89e87732a954a25fc237bf2004bcd86c4b886390",
+        "source_guard": {
+          "full_hash_unchanged": true,
+          "project_mtime_unchanged": true,
+          "tree_metadata_unchanged": true
+        },
+        "process_cleanup_proven": true,
+        "sandbox_state": "deleted",
+        "agent_pass": false
+      },
+      {
+        "candidate": "f9966f3f027e4ef81d4059ec00b2dffa35fe1a07",
+        "version": "2022.1",
+        "selected_test_nodeids": [
+          "tests/destructive/test_expansion_case_preflight.py::test_expansion_case_setup_and_independent_oracle_are_stable[M05]"
+        ],
+        "pytest_outcome": "PASS",
+        "categories": [
+          {
+            "agent_pass": false,
+            "boundary_code": "CAPABILITY_UNAVAILABLE",
+            "business_effect_verified": false,
+            "category": "expansion-preflight-M05",
+            "evidence": {
+              "agent_executed": false,
+              "business_effect_verified": false,
+              "identity_after": {
+                "id": "{B8D45849-AF76-4770-BE7B-5A6553B1337B}",
+                "name": "",
+                "path": "[Stinger : Bonus,Stinger Bonus]",
+                "type": "MusicStinger"
+              },
+              "identity_before": {
+                "id": "{B8D45849-AF76-4770-BE7B-5A6553B1337B}",
+                "name": "",
+                "path": "[Stinger : Bonus,Stinger Bonus]",
+                "type": "MusicStinger"
+              },
+              "public_observation": {
+                "agent_result": {
+                  "metadata_authority": "live-waapi",
+                  "repair": "refine each --include-field meaning until one live field matches",
+                  "unresolved": [
+                    {
+                      "candidate_names": [],
+                      "meaning": "Trigger"
+                    },
+                    {
+                      "candidate_names": [
+                        "NumSegmentAdvance",
+                        "PlaySegmentAt"
+                      ],
+                      "meaning": "Segment"
+                    }
+                  ]
+                },
+                "command": "query-object",
+                "contract": "waapi-skill.gateway-result/v1",
+                "detected_version": "2022.1",
+                "endpoint": {
+                  "host": "127.0.0.1",
+                  "port": 31633,
+                  "url": "ws://127.0.0.1:31633/waapi"
+                },
+                "is_command_line": true,
+                "ok": true,
+                "query_layer": "business-declaration",
+                "session_context": {
+                  "adapter_version": "2022.1",
+                  "adapter_version_source": "live_detection",
+                  "available": true,
+                  "available_project_modification_policies": [
+                    "read_only",
+                    "ask_before_changes",
+                    "allow_changes"
+                  ],
+                  "contract": "waapi-skill.session-context/v2",
+                  "endpoint": {
+                    "host": "127.0.0.1",
+                    "port": 31633,
+                    "url": "ws://127.0.0.1:31633/waapi"
+                  },
+                  "one_time_introduction": {
+                    "atomic": true,
+                    "contract": "waapi-skill.session-introduction/v2",
+                    "emit_condition": "visible_conversation_intro_absent",
+                    "emit_timing": "first_agent_message_after_gateway_result",
+                    "facts": {
+                      "adapter_version": "2022.1",
+                      "available_project_modification_policies": [
+                        "read_only",
+                        "ask_before_changes",
+                        "allow_changes"
+                      ],
+                      "endpoint_url": "ws://127.0.0.1:31633/waapi",
+                      "project_modification_policy": "ask_before_changes",
+                      "skill_name": "waapi-skill"
+                    },
+                    "machine_readable_result_policy": "separate_progress_message",
+                    "style": "natural_prose_in_user_language"
+                  },
+                  "project_modification_policy": "ask_before_changes"
+                },
+                "status": "needs_clarification"
+              },
+              "reason": "matching live metadata does not expose the required Stinger references"
+            },
+            "status": "blocked",
+            "verifier_strength": "affirmatively_observed_version_boundary_no_agent_execution"
+          }
+        ],
+        "full_record_sha256": "b657258262d5939de2ead5abc8ecfb461b245eab81fee7f7cf413c30fdee6044",
+        "source_guard": {
+          "full_hash_unchanged": true,
+          "project_mtime_unchanged": true,
+          "tree_metadata_unchanged": true
+        },
+        "process_cleanup_proven": true,
+        "sandbox_state": "deleted",
+        "agent_pass": false
+      },
+      {
+        "candidate": "2732ac9703814ae78c4d00e888ea392f2b5786cb",
+        "version": "2025.1",
+        "selected_test_nodeids": [
+          "tests/destructive/test_expansion_case_preflight.py::test_expansion_case_setup_and_independent_oracle_are_stable[C01]"
+        ],
+        "pytest_outcome": "PASS",
+        "categories": [
+          {
+            "agent_pass": false,
+            "assertion_names": [
+              "distractor_unchanged",
+              "event_and_action_unchanged",
+              "exact_language_set",
+              "fixture_membership_unchanged",
+              "other_language_unchanged",
+              "requested_language_media_matches",
+              "requested_language_source_identity_preserved",
+              "sound_identity_and_configuration_unchanged",
+              "source_gain_unchanged"
+            ],
+            "baseline_assertions": {
+              "distractor_unchanged": true,
+              "event_and_action_unchanged": true,
+              "exact_language_set": true,
+              "fixture_membership_unchanged": true,
+              "other_language_unchanged": true,
+              "requested_language_media_matches": false,
+              "requested_language_source_identity_preserved": true,
+              "sound_identity_and_configuration_unchanged": true,
+              "source_gain_unchanged": true
+            },
+            "before_sha256": "0cc5c4aaa0e526c127b1277ddb6edaf02aea486c3369a7006fbfffa191a6f380",
+            "business_effect_verified": false,
+            "category": "expansion-preflight-C01",
+            "setup_execute_count": 5,
+            "status": "PASS",
+            "verifier_strength": "fixture_setup_and_repeated_independent_snapshot_only"
+          }
+        ],
+        "full_record_sha256": "133e8593dba940785c4bd9a9c74a9ed48604a2dcfecf3e1883c2033252e95937",
+        "source_guard": {
+          "full_hash_unchanged": true,
+          "project_mtime_unchanged": true,
+          "tree_metadata_unchanged": true
+        },
+        "process_cleanup_proven": true,
+        "sandbox_state": "deleted",
+        "agent_pass": false
+      },
+      {
+        "candidate": "2732ac9703814ae78c4d00e888ea392f2b5786cb",
+        "version": "2025.1",
+        "selected_test_nodeids": [
+          "tests/destructive/test_expansion_case_preflight.py::test_expansion_case_setup_and_independent_oracle_are_stable[C03]"
+        ],
+        "pytest_outcome": "PASS",
+        "categories": [
+          {
+            "agent_pass": false,
+            "assertion_names": [
+              "distractor_unchanged",
+              "exact_media_mapping",
+              "exact_target_set",
+              "fixture_membership_unchanged",
+              "media_destinations_preserved",
+              "sound_identities_and_configuration_preserved",
+              "source_identities_and_configuration_preserved"
+            ],
+            "baseline_assertions": {
+              "distractor_unchanged": true,
+              "exact_media_mapping": false,
+              "exact_target_set": true,
+              "fixture_membership_unchanged": true,
+              "media_destinations_preserved": true,
+              "sound_identities_and_configuration_preserved": true,
+              "source_identities_and_configuration_preserved": true
+            },
+            "before_sha256": "68b543297be794c19bdd3fa28e58df21029704bfa43362afe1c1cdd3a905fd58",
+            "business_effect_verified": false,
+            "category": "expansion-preflight-C03",
+            "setup_execute_count": 4,
+            "status": "PASS",
+            "verifier_strength": "fixture_setup_and_repeated_independent_snapshot_only"
+          }
+        ],
+        "full_record_sha256": "ffa270d6921aaff8728c0723cab2aab962b2e32769f225bd224f3d4724512eb0",
+        "source_guard": {
+          "full_hash_unchanged": true,
+          "project_mtime_unchanged": true,
+          "tree_metadata_unchanged": true
+        },
+        "process_cleanup_proven": true,
+        "sandbox_state": "deleted",
+        "agent_pass": false
+      },
+      {
+        "candidate": "2732ac9703814ae78c4d00e888ea392f2b5786cb",
+        "version": "2025.1",
+        "selected_test_nodeids": [
+          "tests/destructive/test_expansion_case_preflight.py::test_expansion_case_setup_and_independent_oracle_are_stable[C06]"
+        ],
+        "pytest_outcome": "PASS",
+        "categories": [
+          {
+            "agent_pass": false,
+            "assertion_names": [
+              "control_identity_notes_and_parent_unchanged",
+              "media_unchanged",
+              "owner_configuration_unchanged",
+              "rtpc_identity_set_unchanged",
+              "sibling_curves_unchanged",
+              "target_curve_matches",
+              "target_identity_and_binding_unchanged"
+            ],
+            "baseline_assertions": {
+              "control_identity_notes_and_parent_unchanged": true,
+              "media_unchanged": true,
+              "owner_configuration_unchanged": true,
+              "rtpc_identity_set_unchanged": true,
+              "sibling_curves_unchanged": true,
+              "target_curve_matches": false,
+              "target_identity_and_binding_unchanged": true
+            },
+            "before_sha256": "490f1c67941a58e0ea88ac1feee13799d8e4ceab383028cf12198bd64972f26d",
+            "business_effect_verified": false,
+            "category": "expansion-preflight-C06",
+            "setup_execute_count": 3,
+            "status": "PASS",
+            "verifier_strength": "fixture_setup_and_repeated_independent_snapshot_only"
+          }
+        ],
+        "full_record_sha256": "6f1c0b937cea6484909e2df665f5f792fbb0e1b98b800cc525c831f2f5527f1c",
+        "source_guard": {
+          "full_hash_unchanged": true,
+          "project_mtime_unchanged": true,
+          "tree_metadata_unchanged": true
+        },
+        "process_cleanup_proven": true,
+        "sandbox_state": "deleted",
+        "agent_pass": false
+      },
+      {
+        "candidate": "2732ac9703814ae78c4d00e888ea392f2b5786cb",
+        "version": "2025.1",
+        "selected_test_nodeids": [
+          "tests/destructive/test_expansion_case_preflight.py::test_expansion_case_setup_and_independent_oracle_are_stable[C08]"
+        ],
+        "pytest_outcome": "PASS",
+        "categories": [
+          {
+            "agent_pass": false,
+            "assertion_names": [
+              "attenuation_identity_unchanged",
+              "other_curves_unchanged",
+              "requested_curve_matches",
+              "source_attenuation_unchanged",
+              "users_and_references_unchanged"
+            ],
+            "baseline_assertions": {
+              "attenuation_identity_unchanged": true,
+              "other_curves_unchanged": true,
+              "requested_curve_matches": false,
+              "source_attenuation_unchanged": true,
+              "users_and_references_unchanged": true
+            },
+            "before_sha256": "93a8f323cea0b5281c635cbf8625d638422f0c548c4de7946943edc9fb6ead56",
+            "business_effect_verified": false,
+            "category": "expansion-preflight-C08",
+            "setup_execute_count": 4,
+            "status": "PASS",
+            "verifier_strength": "fixture_setup_and_repeated_independent_snapshot_only"
+          }
+        ],
+        "full_record_sha256": "40e207bfe7016635e6e11ebc84e7580688e052b6d651f9cdcec3fdab4962d6a4",
+        "source_guard": {
+          "full_hash_unchanged": true,
+          "project_mtime_unchanged": true,
+          "tree_metadata_unchanged": true
+        },
+        "process_cleanup_proven": true,
+        "sandbox_state": "deleted",
+        "agent_pass": false
+      },
+      {
+        "candidate": "2732ac9703814ae78c4d00e888ea392f2b5786cb",
+        "version": "2025.1",
+        "selected_test_nodeids": [
+          "tests/destructive/test_expansion_case_preflight.py::test_expansion_case_setup_and_independent_oracle_are_stable[C09]"
+        ],
+        "pytest_outcome": "PASS",
+        "categories": [
+          {
+            "agent_pass": false,
+            "assertion_names": [
+              "exactly_one_added_binding",
+              "existing_effects_and_bindings_unchanged",
+              "new_effect_matches",
+              "new_effect_owned_by_target",
+              "owner_unchanged",
+              "unique_effect_identities"
+            ],
+            "baseline_assertions": {
+              "exactly_one_added_binding": false,
+              "existing_effects_and_bindings_unchanged": true,
+              "new_effect_matches": false,
+              "new_effect_owned_by_target": false,
+              "owner_unchanged": true,
+              "unique_effect_identities": true
+            },
+            "before_sha256": "455e9faf08a3496cca0f13f99bf4d50680985d14c3c313fdb7c7f327b42a4634",
+            "business_effect_verified": false,
+            "category": "expansion-preflight-C09",
+            "setup_execute_count": 3,
+            "status": "PASS",
+            "verifier_strength": "fixture_setup_and_repeated_independent_snapshot_only"
+          }
+        ],
+        "full_record_sha256": "5b4744e621dd0d12d61ffc86b9f9e2699c601c29f1e9a55197a20b9d9dde10cc",
+        "source_guard": {
+          "full_hash_unchanged": true,
+          "project_mtime_unchanged": true,
+          "tree_metadata_unchanged": true
+        },
+        "process_cleanup_proven": true,
+        "sandbox_state": "deleted",
+        "agent_pass": false
+      },
+      {
+        "candidate": "2732ac9703814ae78c4d00e888ea392f2b5786cb",
+        "version": "2025.1",
+        "selected_test_nodeids": [
+          "tests/destructive/test_expansion_case_preflight.py::test_expansion_case_setup_and_independent_oracle_are_stable[M01]"
+        ],
+        "pytest_outcome": "PASS",
+        "categories": [
+          {
+            "agent_pass": false,
+            "assertion_names": [
+              "clip_media_matches_its_source",
+              "each_track_has_one_sequence_and_clip",
+              "exact_segment_track_source_topology",
+              "media_hashes_match_each_requested_track",
+              "only_track_has_requested_volume",
+              "parent_and_protected_sibling_unchanged"
+            ],
+            "baseline_assertions": {
+              "clip_media_matches_its_source": false,
+              "each_track_has_one_sequence_and_clip": false,
+              "exact_segment_track_source_topology": false,
+              "media_hashes_match_each_requested_track": false,
+              "only_track_has_requested_volume": false,
+              "parent_and_protected_sibling_unchanged": true
+            },
+            "before_sha256": "e1603e9f6bbb562b8e15fa14dd67fd78266f18ec5f2fa12ec0134f8519c892ca",
+            "business_effect_verified": false,
+            "category": "expansion-preflight-M01",
+            "setup_execute_count": 2,
+            "status": "PASS",
+            "verifier_strength": "fixture_setup_and_repeated_independent_snapshot_only"
+          }
+        ],
+        "full_record_sha256": "38c423fe2f1ebb02de502c63927a9221508dbd6d3234da5f02ddd30ce69fa26c",
+        "source_guard": {
+          "full_hash_unchanged": true,
+          "project_mtime_unchanged": true,
+          "tree_metadata_unchanged": true
+        },
+        "process_cleanup_proven": true,
+        "sandbox_state": "deleted",
+        "agent_pass": false
+      },
+      {
+        "candidate": "2732ac9703814ae78c4d00e888ea392f2b5786cb",
+        "version": "2025.1",
+        "selected_test_nodeids": [
+          "tests/destructive/test_expansion_case_preflight.py::test_expansion_case_setup_and_independent_oracle_are_stable[M05]"
+        ],
+        "pytest_outcome": "PASS",
+        "categories": [
+          {
+            "agent_pass": false,
+            "assertion_names": [
+              "other_stingers_preserved",
+              "owner_unchanged",
+              "requested_trigger_matches",
+              "segment_reference_preserved",
+              "stinger_identity_and_other_configuration_preserved",
+              "target_and_segment_unchanged"
+            ],
+            "baseline_assertions": {
+              "other_stingers_preserved": true,
+              "owner_unchanged": true,
+              "requested_trigger_matches": false,
+              "segment_reference_preserved": true,
+              "stinger_identity_and_other_configuration_preserved": true,
+              "target_and_segment_unchanged": true
+            },
+            "before_sha256": "45c8f4ef07579be5477246b155f728712c1767c626dc03a6e1f932660d893e80",
+            "business_effect_verified": false,
+            "category": "expansion-preflight-M05",
+            "setup_execute_count": 0,
+            "status": "PASS",
+            "verifier_strength": "fixture_setup_and_repeated_independent_snapshot_only"
+          }
+        ],
+        "full_record_sha256": "4349566e033941deb3c7a2b2c4c080bcf5221a17b5afaf02c1fc7287c8be1f89",
+        "source_guard": {
+          "full_hash_unchanged": true,
+          "project_mtime_unchanged": true,
+          "tree_metadata_unchanged": true
+        },
+        "process_cleanup_proven": true,
+        "sandbox_state": "deleted",
+        "agent_pass": false
+      }
+    ],
+    "runs": [
+      {
+        "root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-preflight-20261001-2022-r5-full7",
+        "junit": {
+          "tests": "7",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0",
+          "time": "104.984"
+        },
+        "files_sha256": {
+          "run.log": "58d3bf83c4416e94f2415745f13d513e446bb12f16ac49d98e183323c9ed33be",
+          "junit.xml": "c9e704bc41ca234ff16407a2655a2bb46db900793a515c05b938d806e67c4357"
+        }
+      },
+      {
+        "root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-preflight-20261001-2025-r6-full7",
+        "junit": {
+          "tests": "7",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0",
+          "time": "108.522"
+        },
+        "files_sha256": {
+          "run.log": "9016cbbfd1015cf947790cd87c704208166e61b395143b38d3c63bc4c93606b6",
+          "junit.xml": "83537b64b49439db9aa907e321a4f7099a12a7ba506464421e4acf380466b4a9"
+        }
+      }
+    ]
+  }
 }

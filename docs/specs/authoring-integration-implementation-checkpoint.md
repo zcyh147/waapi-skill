@@ -66,14 +66,23 @@ pilot, and acceptance may proceed after their prerequisite gates.
   Neither that boundary nor a prepared baseline grants Agent business PASS.
 - Original failed roots, source protection, cleanup, and narrow goal results
   are recorded in `../research/integration-expansion-native-followups-2026-10-01.json`.
-  That file presently covers 19 failed-only/native-goal follow-up lifecycle
-  records; complete preparation runs are recorded separately when finished.
+  That file covers 19 failed-only/native-goal follow-up lifecycle records and
+  14 complete-preparation lifecycle records. The 2025 full preparation at
+  `2732ac9` passed all seven nodes. All 14 full-preparation source full hashes,
+  project mtimes, tree metadata, and scoped-process cleanup checks passed;
+  their PASS copies were deleted. This is not a final Fresh campaign.
 - `../research/music-expansion-dispositions-2026-10-01.md` defines three full
   structural oracles, Chinese allow-mode case drafts, version-specific gaps,
   and four minimal follow-up scopes. Scalar maintenance is not full Playlist,
   Transition/fade, or Music Switch acceptance. Those tickets remain open.
-- Complete 2025 preparation, final Non-live regression, the six-task model
-  pilot, final Fresh acceptance, and identical verify-only are still pending.
+- Final Non-live regression, the six-task model pilot, final Fresh acceptance,
+  and identical verify-only are still pending.
+- A final continuation review added complete archive replay before starting
+  the next case, explicit trusted-oracle closure evidence with bounded
+  post-shutdown reaping, and isolation proof for the last case of an abnormal
+  prefix before any pending suffix can resume. The combined focused gate
+  passed **515 tests** after these repairs. Partial archives and unproved
+  cleanup remain systemic stops; ordinary isolated negative results continue.
 
 The remaining sections retain the earlier pause checkpoint as historical context.
 The two review defects listed below are repaired by the resume update; the
