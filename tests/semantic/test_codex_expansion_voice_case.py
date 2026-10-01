@@ -17,6 +17,38 @@ SOUND_PATH = r"\Containers\Default Work Unit\Voice"
 REPLACEMENT = Path("/fixture/replacement/C01_line.wav")
 
 
+def test_voice_fixture_uses_an_event_name_preserved_by_native_import(tmp_path, monkeypatch):
+    from tests.semantic.support import codex_expansion_voice_case as voice
+    project = tmp_path / "Sample.wproj"
+    project.write_text('<Project><LanguageList><Language Name="English(US)"/>'
+                       '<Language Name="Japanese"/></LanguageList></Project>')
+    class ReachedEvent(Exception):
+        pass
+    class FolderDraft:
+        def __init__(self, *_):
+            pass
+        def bind(self, **_):
+            return "folder-parent"
+        def step(self, *_):
+            pass
+        def finish(self):
+            pass
+    def native_event_name(_ctx, **kwargs):
+        # Real 2022/2025 import evidence normalizes '-' to '_' for Events.
+        requested = kwargs["event_name"]
+        assert requested == requested.replace("-", "_")
+        raise ReachedEvent
+    monkeypatch.setattr(voice, "BusinessDraft", FolderDraft)
+    monkeypatch.setattr(voice, "wav_assets", lambda *_: [tmp_path / "a.wav"] * 3)
+    monkeypatch.setattr(voice, "copy_asset", lambda _ctx, _source, directory, name: tmp_path / directory / name)
+    monkeypatch.setattr(voice, "query_path", lambda *_: {"id": "parent"})
+    monkeypatch.setattr(voice, "_create_english_event_voice", native_event_name)
+    ctx = ExpansionCaseContext("2025.1", "PREFLIGHT-2025-1-C01", project,
+        tmp_path / "assets", lambda _: None, lambda *_: [])
+    with pytest.raises(ReachedEvent):
+        prepare_c01(ctx)
+
+
 @pytest.mark.parametrize("cleanup_unproved", (False, True))
 def test_failed_voice_import_only_reads_candidates_and_preserves_failure(tmp_path, monkeypatch, cleanup_unproved):
     from tests.semantic.support import codex_expansion_voice_case as voice

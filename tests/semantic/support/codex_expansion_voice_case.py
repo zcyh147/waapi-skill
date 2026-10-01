@@ -251,7 +251,9 @@ def prepare_c01(ctx: ExpansionCaseContext) -> PreparedExpansionCase:
     folder.finish()
     parent_segments = (*root, folder_name)
     parent_row = query_path(ctx, parent_segments)
-    sound_name, event_name = "Line_01", case_name(ctx, "Play_Line_01")
+    # Events use code identifiers: both native lanes normalize '-' to '_'.
+    # Choose a stable fixture name up front; the exact Event verifier stays strict.
+    sound_name, event_name = "Line_01", case_name(ctx, "Play_Line_01").replace("-", "_")
     sound = _create_english_event_voice(
         ctx, parent=parent_row, parent_segments=parent_segments,
         sound_name=sound_name, event_name=event_name, media=english,
