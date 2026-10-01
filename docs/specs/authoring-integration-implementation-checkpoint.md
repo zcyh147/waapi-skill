@@ -42,6 +42,27 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- Frozen `919043f` passed Program **5888 / skipped 2** and Non-live
+  **12282 / skipped 118 / deselected 27**, both exit zero, then matching
+  2025 smoke in **4.3971 seconds** with clean sandbox deletion. Exact reports
+  and digests are in `../research/integration-expansion-context-copy-gates-2026-10-02.json`.
+  Failed-only reruns completed four units: Sol C01/C06 PASS plus identical
+  `--resume --verify-only`; Luna C06/M01 FAIL. All **520** sealed artifacts
+  were rehashed, sources unchanged, PASS copies deleted and FAIL copies retained,
+  jobs unloaded with no scoped residual process. The initial malformed launcher
+  exited in argument parsing before creating a campaign or starting any task;
+  its logs/plist remain preserved and replacement launchers passed the production
+  parser. This startup fault receives no model or case credit.
+- Remaining #134 work covers the accurately stated scalar midpoint update
+  rather than mandatory repeated property labels/coordinate tuples; its seven
+  independent business assertions passed. #136 clarifies the existing public
+  import declaration's structure-only row exception and earlier-parent IDs.
+  Luna M01 made five successful reads/bindings but stopped before declaration,
+  Preview or execution after interpreting incomplete media-completeness guidance.
+  No separate creation capability is needed. Full model comparison and final
+  acceptance remain pending; no original FAIL is promoted. Exact rerun evidence
+  is `../research/integration-expansion-failed-rerun-919043f-2026-10-02.json`.
+
 - Consolidated #134/#135 passed **709 focused tests / 9 native Windows-only
   skips** in 3.79 seconds, exit zero. Each seam passed independent Spec and
   Standards review after fixing preservation/shape-negation findings.

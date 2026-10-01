@@ -1,0 +1,122 @@
+{
+  "contract": "waapi-skill.integration-expansion-failed-rerun/v1",
+  "candidate": "919043f14d569a739a765aec5cb24573a2e2e37c",
+  "cli_version": "0.159.2",
+  "service_tier": "default",
+  "selected_tasks": 4,
+  "completed_tasks": 4,
+  "model_selected": null,
+  "passing_units": 2,
+  "all_selected_passed": false,
+  "campaigns": [
+    {
+      "model": "gpt-6-luna",
+      "reasoning_effort": "high",
+      "campaign_root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-919043f-luna-high-r2-retry2-cli1592",
+      "attempt_manifest_sha256": "5176f0c9f8e6dc2be5e040ac437dc99d362596d01c80e870584f083bd93df5ae",
+      "sealed_artifacts_rehashed": 357,
+      "consolidated": {
+        "passed_unit_ids": [],
+        "failed_unit_ids": [
+          "EXP25-C06",
+          "EXP25-M01"
+        ],
+        "blocked_unit_ids": [],
+        "pending_unit_ids": []
+      },
+      "units": [
+        {
+          "unit_id": "EXP25-C06",
+          "runner_status": "FAIL",
+          "reason": "V3TaskRunnerError: expansion turn failed: visible_preview_notice",
+          "agent_elapsed_seconds": 117.99329854198731,
+          "source_full_hash_unchanged": true,
+          "source_mtime_unchanged": true,
+          "trusted_oracle_closed": true,
+          "sandbox_retained": true,
+          "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-919043f-luna-high-r2-retry2-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C06/evidence/quarantine.json",
+          "matrix_case_sha256": "3a9b2b5d378233b3b1a4f8b531649e1432af7bed889924f44e9db0fe2948d037"
+        },
+        {
+          "unit_id": "EXP25-M01",
+          "runner_status": "FAIL",
+          "reason": "V3TaskRunnerError: expansion turn failed: policy_checkpoint, visible_preview_notice",
+          "agent_elapsed_seconds": 232.61459229211323,
+          "source_full_hash_unchanged": true,
+          "source_mtime_unchanged": true,
+          "trusted_oracle_closed": true,
+          "sandbox_retained": true,
+          "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-919043f-luna-high-r2-retry2-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP25-M01/evidence/quarantine.json",
+          "matrix_case_sha256": "734fe7a412c4b6617d3718e97ada9b965e5ec18e2d0564b9c9c58d6bd870cf78"
+        }
+      ],
+      "job_unloaded": true,
+      "scoped_processes_remaining": false,
+      "verify_only_performed": false,
+      "verify_only_exit_code": null
+    },
+    {
+      "model": "gpt-6.1-sol",
+      "reasoning_effort": "medium",
+      "campaign_root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-919043f-sol-medium-r2-retry2-cli1592",
+      "attempt_manifest_sha256": "662b520bbe720e2ebaf87303764c30e571bd22b53fe27a73acb3b66e9999e277",
+      "sealed_artifacts_rehashed": 163,
+      "consolidated": {
+        "passed_unit_ids": [
+          "EXP25-C01",
+          "EXP25-C06"
+        ],
+        "failed_unit_ids": [],
+        "blocked_unit_ids": [],
+        "pending_unit_ids": []
+      },
+      "units": [
+        {
+          "unit_id": "EXP25-C01",
+          "runner_status": "PASS",
+          "reason": "",
+          "agent_elapsed_seconds": 164.7835596660152,
+          "source_full_hash_unchanged": true,
+          "source_mtime_unchanged": true,
+          "trusted_oracle_closed": true,
+          "sandbox_retained": false,
+          "quarantine_path": null,
+          "matrix_case_sha256": "c4affc01bb7fe337a2b929930dce3838dc7e45f1fa6cee17d6083564d71a089b"
+        },
+        {
+          "unit_id": "EXP25-C06",
+          "runner_status": "PASS",
+          "reason": "",
+          "agent_elapsed_seconds": 111.09249687497504,
+          "source_full_hash_unchanged": true,
+          "source_mtime_unchanged": true,
+          "trusted_oracle_closed": true,
+          "sandbox_retained": false,
+          "quarantine_path": null,
+          "matrix_case_sha256": "2d6d1c14dbf88e0d025f5da6d3d675f42aac57bebcd271a4f89c1736155bc0d1"
+        }
+      ],
+      "job_unloaded": true,
+      "scoped_processes_remaining": false,
+      "verify_only_performed": true,
+      "verify_only_exit_code": 0
+    }
+  ],
+  "startup_parser_fault": {
+    "first_launcher_exit_code": 2,
+    "formal_tasks_started": 0,
+    "campaign_root_created": false,
+    "old_launcher_preserved": true,
+    "old_job_unloaded": true,
+    "replacement_launchers_validated_by_production_parser": true
+  },
+  "derived_diagnoses": {
+    "Luna_C06": "Accurate scalar midpoint delta with retained endpoints/Linear rejected by tuple/repeated-label grammar; seven independent business assertions true.",
+    "Luna_M01": "No declaration/Preview/Execute; incorrect blanket-media inference encouraged by incomplete public structure-only-row disclosure. Existing same-batch hierarchy seam is supported."
+  },
+  "remaining_repairs": [
+    134,
+    136
+  ],
+  "next": "Fix remaining owned notice/public disclosure defects, review and freeze; affected failed reruns then final full selection. No promotion of these original FAILs."
+}
