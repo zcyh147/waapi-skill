@@ -7,10 +7,34 @@ are not live-Wwise or Fresh Agent evidence.
 
 ## Runner modes and strict real behavior
 
+### 2026-10-01 Fresh workspace repository-boundary repair
+
+Frozen macOS harness candidate `d78be5b` completed Full Non-live:
+**11967 passed, 1 failed, 118 skipped, 27 deselected** (788.75 s), exit one.
+The sole failure was the inventory document's lowercase `full Non-live` label;
+its newest dated evidence did not match the documented count assertion.
+The label is corrected in the documentation-only follow-up. This is **not a
+single all-green full Non-live run**; preserve the failed log and JUnit.
+The focused documentation rerun passed **9 tests**, exit zero. The follow-up
+changes documentation only; the broadly tested harness and Skill bytes remain
+unchanged. No additional passing full-run count is inferred.
+
+The targeted workspace checks passed **18 tests**; the full harness file passed
+**381 tests, 9 native-Windows-only skips**. Independent Spec and Standards
+reviews reported no actionable findings. The minimal valid Git boundary uses
+fixed local metadata, rejects drift and external links, and bounds metadata
+reads without adding a Git executable dependency.
+
+CLI-only startup probes passed with the valid boundary; they grant no Agent
+or Wwise business PASS. The prior Luna pilot retains three pre-exec prompt-audit
+FAILs, with unchanged source hashes/mtimes and quarantined copies. The new
+Luna-high / GPT-6.1-Sol-medium comparison and final macOS acceptance remain
+pending. See [startup diagnostics](../docs/research/integration-expansion-startup-diagnostics-2026-10-01.json).
+
 ### 2026-10-01 Outcome-based integration expansion: development gates
 
 Frozen macOS candidate `9256ae8` passed the fixed five-version Program gate:
-**5886 passed, 2 skipped** (275.05 s), and full Non-live:
+**5886 passed, 2 skipped** (275.05 s), and Full Non-live:
 **11954 passed, 118 skipped, 27 deselected** (809.03 s), both exit zero.
 The two Program skips require native Windows. Earlier interrupted/failed gate
 roots remain retained; failed-only fixture reruns preceded this complete pass.

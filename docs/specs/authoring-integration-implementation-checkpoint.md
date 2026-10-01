@@ -26,7 +26,11 @@ pilot, and acceptance may proceed after their prerequisite gates.
   repository, without a Git CLI dependency. The empty-marker regression failed
   before the repair on both platform contracts; the repaired workspace selection
   passed 18 tests and the full harness test file passed 381 / skipped 9 native
-  Windows checks. Broad Non-live and fresh model pilots remain pending.
+  Windows checks. Full Non-live at `d78be5b` completed with 11967 passed,
+  one inventory-label failure, 118 skipped, and 27 deselected. Its documentation
+  correction passed all nine focused documentation checks; harness and Skill
+  bytes remain unchanged. This is not a single all-green full Non-live run.
+  Fresh model pilots remain pending.
   The exact blocked Git/config filename remains
   unproven; the location-dependent stall and successful boundary replacement are
   established. New candidate gates and new pilot roots are required afterward.
