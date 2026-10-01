@@ -2364,7 +2364,8 @@ def build_heavy_v3_effective_config(
             "matrix_reuse": True,
             "sequential_wwise_lifecycles": True,
             "semantic_fail": "continue_and_preserve_later_case_evidence",
-            "blocked_or_indeterminate": "stop",
+            "blocked_or_indeterminate": ("continue_only_after_proven_isolation"
+                if options.profile == EXPANSION_PROFILE_ID else "stop"),
             "resume": "schedule_pending_and_proven_retryable_units_in_suite_order",
         },
     }
@@ -2838,6 +2839,9 @@ def validate_heavy_v3_child_run(
                 f"untrusted heavy case evidence: {exc}",
             )
             continue
+        if (options.profile == EXPANSION_PROFILE_ID and index < len(attempted_ids)
+                and not matrix.expansion_case_isolated(matrix_case)):
+            raise CampaignEvidenceError("expansion continued after unproved case isolation")
         status = str(matrix_case["status"])
         try:
             retry_category = _heavy_v3_retryable_infrastructure_category(
@@ -2969,7 +2973,8 @@ def _validate_heavy_v3_run_config(
         "fresh_process_thread_and_task_per_scenario": True,
         "sequential_wwise_lifecycles": True,
         "semantic_fail_policy": "continue",
-        "blocked_or_indeterminate_policy": "stop",
+        "blocked_or_indeterminate_policy": ("continue_only_after_proven_isolation"
+            if options.profile == EXPANSION_PROFILE_ID else "stop"),
         "skill_source": str(options.skill_source),
         "suite_path": str(options.suite_path),
         "live_config": str(options.live_config),
@@ -3178,6 +3183,18 @@ def _validate_heavy_v3_summary(
             raise CampaignEvidenceError(
                 "terminal heavy matrix has no passed or blocked live preflight"
             )
+        if expected_profile == EXPANSION_PROFILE_ID:
+            if stop_reason is not None:
+                terminal_status = statuses[-1] if statuses else ""
+                terminal_id = attempted[-1] if attempted else ""
+                if (stop_reason != f"{terminal_status.casefold()}:{terminal_id}"
+                        or not run_errors
+                        or not any(f"heavy-unit:{terminal_id}" in error for error in run_errors)):
+                    raise CampaignEvidenceError("expansion isolation stop lacks its terminal fault")
+            elif (len(attempted) != len(expected_ids) or pending or run_errors
+                    or not any(status in {"FAIL", "BLOCKED", "INDETERMINATE"} for status in statuses)):
+                raise CampaignEvidenceError("expansion negative batch lacks a complete independent selection")
+            return
         blocking_statuses = {"BLOCKED", "INDETERMINATE"}
         if any(status in blocking_statuses for status in statuses):
             terminal_status = statuses[-1] if statuses else ""
@@ -3215,7 +3232,8 @@ def _validate_heavy_v3_summary(
         or not pending
         or stop_reason is not None
         or run_errors
-        or any(status in {"BLOCKED", "INDETERMINATE"} for status in statuses)
+        or (expected_profile != EXPANSION_PROFILE_ID
+            and any(status in {"BLOCKED", "INDETERMINATE"} for status in statuses))
     ):
         raise CampaignEvidenceError(
             "abnormally exited heavy matrix lacks one trustworthy completed prefix "

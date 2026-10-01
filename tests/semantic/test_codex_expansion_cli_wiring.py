@@ -106,9 +106,9 @@ def test_full_matrix_accounts_boundary_separately_from_thirteen_agent_passes(tmp
         called.append(unit.unit_id)
         boundary = unit.evidence_kind == "capability_boundary"
         return ExpansionOutcome(unit.unit_id, unit.version, "BOUNDARY_PROVEN" if boundary else "PASS", "",
-            str(scenario_root), None if boundary else str(scenario_root / "task"),
+            str(scenario_root), None,
             None if boundary else unit.unit_id + "-thread",
-            {"capability_boundary": {"agent_started": False, "business_pass": False}} if boundary else {}, None, "a" * 64)
+            {"capability_boundary": {"agent_started": False, "business_pass": False}} if boundary else {}, _safe_expansion_lifecycle(unit), "a" * 64)
     assert matrix.run_heavy_v3_matrix(options, unit_runner=run, dependency_preflight=lambda: {"ok": True}) == 0
     summary = json.loads((options.iteration_root / "summary.json").read_text())
     assert called[0] == "EXP22-M05"
@@ -255,7 +255,7 @@ def test_boundary_replays_through_real_campaign_seal_and_archive_verifier(tmp_pa
                 "unresolved": [{"meaning": "Trigger", "candidate_names": []},
                                {"meaning": "Segment", "candidate_names": []}]}}}
         lifecycle = {"scenario_id": unit.unit_id, "version": unit.version,
-            "requested_status": "BLOCKED", "final_status": "BLOCKED",
+            "requested_status": "BLOCKED", "final_status": "BLOCKED", "errors": [],
             "source_hash_before": {"sha256": "source"}, "source_hash_after": {"sha256": "source"},
             "source_mtime_before_ns": 1, "source_mtime_after_ns": 1}
         outcome = ExpansionOutcome(unit.unit_id, unit.version, "BOUNDARY_PROVEN", "reviewed unavailable reference",
@@ -287,3 +287,80 @@ def test_boundary_replays_through_real_campaign_seal_and_archive_verifier(tmp_pa
     with pytest.raises(campaign.CampaignEvidenceError):
         campaign.verify_expansion_campaign(options, units=units,
             required_units={"EXP22-M05": ("capability-boundary",)})
+
+
+def _safe_expansion_lifecycle(unit):
+    return {"scenario_id": unit.unit_id, "version": unit.version,
+            "source_hash_before": {"sha256": "source"}, "source_hash_after": {"sha256": "source"},
+            "source_mtime_before_ns": 1, "source_mtime_after_ns": 1, "errors": []}
+
+
+@pytest.mark.parametrize("first_status", ("BLOCKED", "INDETERMINATE"))
+def test_expansion_completes_independent_selection_after_safe_negative(tmp_path, monkeypatch, first_status):
+    from tests.semantic.support.codex_expansion_runtime import ExpansionOutcome
+    options = _options(tmp_path, monkeypatch, "matrix", "--version", "2025.1",
+                       "--case-id", "C01", "--case-id", "C03", "--case-id", "C06")
+    units = matrix.load_heavy_v3_units(options)
+    monkeypatch.setattr(matrix, "prepare_iteration_root", lambda root, **kwargs: root.mkdir())
+    called = []
+    def run(unit, *, scenario_root, options):
+        called.append(unit.unit_id)
+        status = first_status if len(called) == 1 else "PASS"
+        task_root = scenario_root / "task"
+        matrix.write_json(task_root / "expansion-oracle.json", {"reconciliation": {
+            "child_reaped": True, "subprocesses_reaped": True}} if status != "PASS" else {})
+        return ExpansionOutcome(unit.unit_id, unit.version, status, "isolated result", str(scenario_root),
+            str(task_root), unit.unit_id + "-thread", {}, _safe_expansion_lifecycle(unit), "a" * 64)
+    assert matrix.run_heavy_v3_matrix(options, unit_runner=run, dependency_preflight=lambda: {"ok": True}) == 1
+    assert called == [unit.unit_id for unit in units]
+    summary = json.loads((options.iteration_root / "summary.json").read_text())
+    assert summary["stop_reason"] is None and summary["run_errors"] == []
+    campaign._validate_heavy_v3_summary(summary, expected_ids=tuple(called), returncode=1,
+        expected_profile=PROFILE, expected_rows=[campaign.heavy_v3_unit_row(unit, sequence=index)
+                                                for index, unit in enumerate(units, 1)])
+    config = json.loads((options.iteration_root / "run-config.json").read_text())
+    assert config["blocked_or_indeterminate_policy"] == "continue_only_after_proven_isolation"
+
+
+@pytest.mark.parametrize("fault", ("cleanup", "source", "missing", "reap"))
+@pytest.mark.parametrize("first_status", ("FAIL", "BLOCKED", "INDETERMINATE"))
+def test_expansion_stops_when_negative_isolation_is_unproved(tmp_path, monkeypatch, fault, first_status):
+    from tests.semantic.support.codex_expansion_runtime import ExpansionOutcome
+    options = _options(tmp_path, monkeypatch, "matrix", "--version", "2025.1",
+                       "--case-id", "C01", "--case-id", "C03")
+    units = matrix.load_heavy_v3_units(options)
+    monkeypatch.setattr(matrix, "prepare_iteration_root", lambda root, **kwargs: root.mkdir())
+    called = []
+    def run(unit, *, scenario_root, options):
+        called.append(unit.unit_id)
+        lifecycle = _safe_expansion_lifecycle(unit)
+        if fault == "cleanup":
+            lifecycle["errors"] = ["wwise-shutdown:unreaped child"]
+        elif fault == "source":
+            lifecycle["source_hash_after"] = {"sha256": "changed"}
+        elif fault == "missing":
+            lifecycle = None
+        task_root = scenario_root / "task"
+        matrix.write_json(task_root / "expansion-oracle.json", {"reconciliation": {
+            "child_reaped": fault != "reap", "subprocesses_reaped": True}})
+        return ExpansionOutcome(unit.unit_id, unit.version, first_status, "fault", str(scenario_root),
+            str(task_root), unit.unit_id + "-thread", {}, lifecycle, "a" * 64)
+    assert matrix.run_heavy_v3_matrix(options, unit_runner=run, dependency_preflight=lambda: {"ok": True}) == 1
+    assert called == [units[0].unit_id]
+    summary = json.loads((options.iteration_root / "summary.json").read_text())
+    campaign._validate_heavy_v3_summary(summary, expected_ids=tuple(unit.unit_id for unit in units), returncode=1,
+        expected_profile=PROFILE, expected_rows=[campaign.heavy_v3_unit_row(unit, sequence=index)
+                                                for index, unit in enumerate(units, 1)])
+
+
+def test_expansion_abnormal_child_can_preserve_safe_negative_prefix(tmp_path, monkeypatch):
+    options = _options(tmp_path, monkeypatch, "matrix", "--version", "2025.1",
+                       "--case-id", "C01", "--case-id", "C03", "--case-id", "C06")
+    units = matrix.load_heavy_v3_units(options)
+    rows = [matrix._heavy_v3_unit_row(unit, sequence=index) for index, unit in enumerate(units, 1)]
+    records = [{**row, "status": "INDETERMINATE" if index == 0 else "PASS", "reason": "",
+                "scenario_root": str(tmp_path / str(index))} for index, row in enumerate(rows[:2])]
+    summary = matrix._heavy_v3_summary(profile=PROFILE, unit_rows=rows, records=records,
+        run_errors=[], stop_reason="", preflight_state="passed", started_at=matrix.utc_now(), completed_at=None)
+    campaign._validate_heavy_v3_summary(summary, expected_ids=tuple(unit.unit_id for unit in units),
+        returncode=137, expected_profile=PROFILE, expected_rows=rows)

@@ -994,6 +994,44 @@ def load_heavy_v3_units(options: RunnerOptions) -> tuple[Any, ...]:
     return units
 
 
+def expansion_case_isolated(record: Mapping[str, Any]) -> bool:
+    """Prove that this owned attempt cannot invalidate a later expansion unit."""
+    from tests.semantic.support.codex_campaign_runner import load_strict_regular_json, CampaignEvidenceError
+    outcome = record.get("runner_outcome")
+    if not isinstance(outcome, Mapping):
+        return False
+    lifecycle = outcome.get("lifecycle")
+    if not isinstance(lifecycle, Mapping):
+        return False
+    before = lifecycle.get("source_hash_before")
+    errors = lifecycle.get("errors")
+    if (lifecycle.get("scenario_id") != record.get("scenario_id")
+            or lifecycle.get("version") != record.get("version")
+            or not isinstance(before, Mapping) or not before
+            or before != lifecycle.get("source_hash_after")
+            or type(lifecycle.get("source_mtime_before_ns")) is not int
+            or lifecycle.get("source_mtime_before_ns") != lifecycle.get("source_mtime_after_ns")
+            or not isinstance(errors, (list, tuple))
+            or any(not isinstance(error, str) or not error.startswith("scenario:") for error in errors)):
+        return False
+    task_root = outcome.get("task_root")
+    if task_root is not None:
+        try:
+            task_path = Path(task_root).resolve(strict=True)
+            task_path.relative_to(Path(record["scenario_root"]).resolve(strict=True))
+            oracle = load_strict_regular_json(task_path / "expansion-oracle.json")
+            if not isinstance(oracle, Mapping):
+                return False
+            reconciliation = oracle.get("reconciliation")
+            if reconciliation is not None and (not isinstance(reconciliation, Mapping)
+                    or reconciliation.get("child_reaped") is not True
+                    or reconciliation.get("subprocesses_reaped") is not True):
+                return False
+        except (CampaignEvidenceError, OSError, ValueError, TypeError):
+            return False
+    return True
+
+
 def run_heavy_v3_matrix(
     options: RunnerOptions,
     *,
@@ -1006,6 +1044,8 @@ def run_heavy_v3_matrix(
     A semantic ``FAIL`` is retained and the next case runs.  ``BLOCKED``,
     ``INDETERMINATE``, an unavailable closed runner, or any orchestration fault
     seals the current record and stops before another Wwise lifecycle starts.
+    Expansion alone continues negative outcomes after source, evidence and
+    cleanup isolation is proved; any unproved isolation stops that profile.
     The injectable seams are for harness-only tests and are not exposed to the
     evaluated Codex task.
     """
@@ -1177,8 +1217,10 @@ def run_heavy_v3_matrix(
             run_errors.append(format_exception(f"heavy-unit:{scenario_id}", exc))
 
         records.append(record)
+        archive_ok = False
         try:
             write_json(scenario_root / "matrix-case.json", record)
+            archive_ok = True
         except BaseException as exc:  # noqa: BLE001 - missing evidence is systemic
             archive_error = format_exception(
                 f"heavy-unit-archive:{scenario_id}", exc
@@ -1196,7 +1238,10 @@ def run_heavy_v3_matrix(
             f"[{status}] {scenario_id} version={unit_row['version']} "
             f"api={unit_row['api']} reason={reason or '-'}"
         )
-        if status in {"BLOCKED", "INDETERMINATE"}:
+        must_stop = (not archive_ok or not expansion_case_isolated(record)
+                     if options.profile == EXPANSION_PROFILE_ID
+                     else status in {"BLOCKED", "INDETERMINATE"})
+        if must_stop:
             stop_reason = f"{status.lower()}:{scenario_id}"
             if not any(f"heavy-unit:{scenario_id}" in error for error in run_errors):
                 run_errors.append(
@@ -1608,7 +1653,8 @@ def _heavy_v3_run_config(
         "fresh_process_thread_and_task_per_scenario": True,
         "sequential_wwise_lifecycles": True,
         "semantic_fail_policy": "continue",
-        "blocked_or_indeterminate_policy": "stop",
+        "blocked_or_indeterminate_policy": ("continue_only_after_proven_isolation"
+            if options.profile == EXPANSION_PROFILE_ID else "stop"),
         "skill_source": str(options.skill_source),
         "suite_path": str(options.suite_path),
         "live_config": str(options.live_config),
