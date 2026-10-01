@@ -216,6 +216,92 @@ def test_scalar_role_cannot_override_explicit_property_or_control_target(target,
         artifact=case["preview_artifact"], before=case["before_snapshot"]) is expected
 
 
+def _cross_clause_notice_case():
+    return json.loads((Path(__file__).parents[1] / "fixtures/semantic/expansion-context-notice-cf94158.json").read_text())
+
+
+def test_actual_notice_composes_same_target_delta_retention_and_prior_requested_shape():
+    case = _cross_clause_notice_case()
+    assert _notice(case["events"], artifact=case["preview_artifact"], before=case["before_snapshot"])
+
+
+@pytest.mark.parametrize("defect", ["missing_plan", "wrong_plan_count", "wrong_plan_control", "wrong_plan_shape", "wrong_plan_identity",
+    "wrong_value", "wrong_history", "foreign_id", "wrong_property", "wrong_control", "missing_remainder",
+    "wrong_shape_clause", "wrong_shape_later_message", "extra_change", "late", "generic"])
+def test_composed_notice_keeps_context_effect_and_temporal_obligations(defect):
+    case = _cross_clause_notice_case()
+    events = case["events"]
+    earlier, post = events[0]["item"], events[2]["item"]
+    if defect == "missing_plan":
+        events.pop(0)
+    elif defect == "wrong_plan_count":
+        earlier["text"] = earlier["text"].replace("三点线性", "两点线性")
+    elif defect == "wrong_plan_control":
+        earlier["text"] = earlier["text"].replace("Rain_Intensity", "Time")
+    elif defect == "wrong_plan_shape":
+        earlier["text"] = earlier["text"].replace("三点线性", "三点非线性")
+    elif defect == "wrong_plan_identity":
+        earlier["text"] += "目标 {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}。"
+    elif defect in {"wrong_value", "wrong_history", "wrong_property", "wrong_control"}:
+        old, new = {"wrong_value": ("(50,-6)", "(50,-60)"), "wrong_history": ("(50,-12)", "(50,-24)"),
+            "wrong_property": ("Voice Volume", "Voice Pitch"), "wrong_control": ("Rain_Intensity", "Time")}[defect]
+        post["text"] = post["text"].replace(old, new)
+    elif defect == "foreign_id":
+        post["text"] = post["text"].replace("{5435E98C-AC79-495D-9274-9B8332ACE98E}", "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}")
+    elif defect == "missing_remainder":
+        post["text"] = post["text"].replace("曲线其余两点已符合目标", "预览已准备好")
+    elif defect == "wrong_shape_clause":
+        post["text"] += "各段非线性。"
+    elif defect == "wrong_shape_later_message":
+        events.insert(3, _message("各段不保持线性。"))
+    elif defect == "extra_change":
+        post["text"] += "另外将音量曲线的 (100,0) 改为 (100,2)。"
+    elif defect == "late":
+        events[2], events[3] = events[3], events[2]
+    else:
+        post["text"] = "预览已完成，现在执行。"
+    assert not _notice(events, artifact=case["preview_artifact"], before=case["before_snapshot"])
+
+
+@pytest.mark.parametrize("midpoint,expected", [("-6", True), ("-60", False)])
+def test_inherited_shape_plan_explicit_points_must_match_sealed_request(midpoint, expected):
+    case = _cross_clause_notice_case()
+    earlier = case["events"][0]["item"]
+    earlier["text"] = earlier["text"].replace("提交三点线性曲线", f"提交 (0,-48)、(50,{midpoint})、(100,0) 三点线性曲线")
+    assert _notice(case["events"], artifact=case["preview_artifact"], before=case["before_snapshot"]) is expected
+
+
+@pytest.mark.parametrize("later,expected", [
+    ("我将为 Volume/Rain_Intensity 提交三点非线性曲线。", False),
+    ("我将为 Volume/Rain_Intensity 提交三点对数曲线。", False),
+    ("I will submit 3 points with a Logarithmic curve for Volume/Rain_Intensity.", False),
+    ("已完成元数据读取，Volume/Rain_Intensity 尚未执行。", True),
+    ("我将为 Volume/Rain_Intensity 提交 (0,-48)、(50,-60)、(100,0) 三点线性曲线。", False),
+    ("我将为 Volume/Time 提交三点线性曲线。", False),
+    ("我将为 Volume/Rain_Intensity 提交三点线性曲线。", True),
+])
+def test_later_pre_preview_plan_replaces_inherited_shape_authority(later, expected):
+    case = _cross_clause_notice_case()
+    case["events"].insert(1, _message(later))
+    assert _notice(case["events"], artifact=case["preview_artifact"], before=case["before_snapshot"]) is expected
+
+
+def test_other_relationship_retention_cannot_certify_target_remainder():
+    case = _cross_clause_notice_case()
+    post = case["events"][2]["item"]
+    post["text"] = post["text"].replace("曲线其余两点已符合目标", "另一条关系的两端保持不变")
+    assert not _notice(case["events"], artifact=case["preview_artifact"], before=case["before_snapshot"])
+
+
+def test_same_target_notice_can_complete_retention_in_a_separate_visible_message():
+    case = _cross_clause_notice_case()
+    post = case["events"][2]["item"]["text"]
+    first, rest = post.split("；", 1)
+    case["events"][2] = _message(first + "。")
+    case["events"].insert(3, _message(rest))
+    assert _notice(case["events"], artifact=case["preview_artifact"], before=case["before_snapshot"])
+
+
 def test_rtpc_context_accepts_independent_snapshot_row_permutations():
     case = _current_notice_case()
     case["preview_artifact"]["prepared_operation"]["verification_plan"]["before_rows"].reverse()

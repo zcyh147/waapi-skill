@@ -329,6 +329,8 @@ def _rtpc_notice_context(artifact: Mapping[str, Any], before: Mapping[str, Any])
                          for key in ("name", "path") if isinstance(row.get(key), str) and row[key])
     return {"ids": (owner, control, association), "old": old, "new": new, "delta": delta,
             "foreign_names": tuple(sorted(foreign_names)),
+            "control_names": tuple(matched[0][key] for key in ("name", "path")
+                                   if isinstance(matched[0].get(key), str) and matched[0][key]),
             "same_domain": [p[0] for p in old] == [p[0] for p in new]}
 
 
@@ -349,7 +351,25 @@ def _affirmative_linear_interpolation(effect_clause: str) -> bool:
     return bool(mentions)
 
 
-def _rtpc_notice_effect(text: str, context: Mapping[str, Any], *, earlier_points: bool) -> tuple[bool, bool]:
+def _rtpc_visible_shape_plan(text: str, context: Mapping[str, Any]) -> bool | None:
+    """Return the latest relevant plan's validity, or None for unrelated prose."""
+    if not (("curve" in text or "曲线" in text) and ("点" in text or "points" in text)
+            and (any(term in text for term in ("volume", "音量", "增益"))
+                 or any(name.casefold() in text for name in context["control_names"]))):
+        return None
+    number = r"[+-]?\d+(?:\.\d+)?"
+    stated_points = [(float(x), float(y)) for x, y in re.findall(
+        rf"[（(]\s*({number})\s*[,，]\s*({number})\s*[)）]", text.replace("\u2212", "-"))]
+    stated_ids = re.findall(r"\{[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\}", text)
+    return (all(value in {key.casefold() for key in context["ids"]} for value in stated_ids)
+            and len(context["new"]) == 3 and (not stated_points or stated_points == context["new"])
+            and any(term in text for term in ("volume", "音量", "增益"))
+            and any(name.casefold() in text for name in context["control_names"])
+            and re.search(r"三(?:个)?点|(?<!\d)3\s*points|three points", text) is not None
+            and _affirmative_linear_interpolation(text))
+
+
+def _rtpc_notice_effect(text: str, context: Mapping[str, Any], *, earlier_points: bool, earlier_shape: bool = False) -> tuple[bool, bool]:
     """Recognize a full curve or accurate point delta in the attested context."""
     numeric = text.replace("\u2212", "-")
     ids = re.findall(r"\{[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\}", text)
@@ -377,11 +397,31 @@ def _rtpc_notice_effect(text: str, context: Mapping[str, Any], *, earlier_points
             rf"[（(]\s*({number})\s*[,，]\s*({number})\s*[)）]", part)]
     full = False
     effect = False
-    for clause in re.split(r"[。；;\n]", numeric):
+    clauses = re.split(r"[。；;\n]", numeric)
+    whole_target = (context["ids"][2].casefold() in text or
+                    (any(term in text for term in ("volume", "音量", "增益"))
+                     and any(name.casefold() in text for name in context["control_names"])))
+    same_target_clauses = [clause for clause in clauses if not any(
+        re.search(rf"(?<![a-z0-9_]){re.escape(name.casefold())}(?![a-z0-9_])", clause)
+        for name in context["foreign_names"])
+        and not (re.search(r"(?:其他|另一条|other|sibling).*?(?:曲线|curve|关系|association|relationship)", clause)
+                 and not re.search(r"改为|改成|更新为|修改为|设为|设置为|update|replace|change|set", clause))]
+    retention = "\n".join(same_target_clauses)
+    # A remainder already matching the sealed goal implies preservation only
+    # when that exact remainder was unchanged in the approved request.
+    rest_already_matches = (len(context["new"]) == 3 and len(context["delta"]) == 1
+        and context["same_domain"] and re.search(r"其余(?:两|2)点|remaining (?:two|2) points", retention) is not None
+        and any(term in retention for term in ("符合目标", "match the target")))
+    shape_clauses = "\n".join(clause for clause in same_target_clauses if "linear" in clause or "线性" in clause)
+    notice_shape = _affirmative_linear_interpolation(shape_clauses) if shape_clauses else earlier_shape
+    def requested_shape(part: str) -> bool:
+        return notice_shape and (not ("linear" in part or "线性" in part)
+                                 or _affirmative_linear_interpolation(part))
+    for clause in clauses:
         scalar_middles = tuple(re.finditer(
             rf"(?:中点|中间点|midpoint|middle point)\s*(?:改为|改成|设为|设置为|(?:will be )?set to|change to)\s*({number})(?![a-z\d_.])", clause))
         target_clause = (any(term in clause for term in ("volume", "音量", "增益"))
-                         and any(term in clause for term in ("curve", "曲线", "rtpc")))
+                         and any(term in clause for term in ("curve", "曲线", "rtpc"))) or whole_target
         if (target_clause or scalar_middles) and any(term in clause for term in ("现有", "当前", "现状", "existing", "current")):
             # Validate claimed history before either tuple or scalar dispatch.
             previous = pairs(re.split(r"改为|改成|更新为|修改为|设为|设置为|update|replace|change|set", clause)[0])
@@ -419,12 +459,16 @@ def _rtpc_notice_effect(text: str, context: Mapping[str, Any], *, earlier_points
         for action in re.finditer(r"更新为|替换为|修改为|改为|改成|设为|设置为|update|replace|change|set", clause):
             following = clause[action.end():]
             stated = pairs(following)
-            if stated == context["new"] and _affirmative_linear_interpolation(following):
+            if stated and any(re.search(rf"(?<![a-z0-9_]){re.escape(name.casefold())}(?![a-z0-9_])",
+                                       clause[:action.start()]) for name in context["foreign_names"]):
+                return False, False
+            if stated == context["new"] and requested_shape(following):
                 full = effect = True
             elif (stated == context["delta"] and stated and context["same_domain"]
-                  and any(term in following for term in ("两端", "其余点", "endpoints", "other points"))
-                  and any(term in following for term in ("保持", "不变", "unchanged"))
-                  and _affirmative_linear_interpolation(following)):
+                  and (rest_already_matches or
+                       (any(term in retention for term in ("两端", "其余点", "endpoints", "other points"))
+                        and any(term in retention for term in ("保持", "不变", "unchanged"))))
+                  and requested_shape(following)):
                 effect = True
             elif (not stated and earlier_points and any(term in following for term in (
                     "指定", "上述", "前述", "requested", "specified", "above"))
@@ -454,6 +498,8 @@ def expansion_preview_notice(result: Any, command_records: Sequence[Any], *,
     if prepared_rtpc and rtpc_context is None:
         return False
     earlier_points = False
+    earlier_shape = False
+    notice_messages: list[str] = []
     commands = {}
     for record in command_records:
         argv = normalized_gateway_command_argv(record.argv, expected_wwise_version=version)
@@ -482,8 +528,20 @@ def expansion_preview_notice(result: Any, command_records: Sequence[Any], *,
                 return term.casefold() in text
             effect = all(any(mentions(term) for term in group) for group in groups)
             if rtpc_context is not None:
-                effect, full_points = _rtpc_notice_effect(text, rtpc_context, earlier_points=earlier_points)
+                if preview_seen:
+                    notice_messages.append(text)
+                notice_text = "\n".join(notice_messages) if preview_seen else text
+                effect, full_points = _rtpc_notice_effect(notice_text, rtpc_context,
+                    earlier_points=earlier_points, earlier_shape=earlier_shape)
                 earlier_points = earlier_points or full_points
+                if not preview_seen:
+                    shape_plan = _rtpc_visible_shape_plan(text, rtpc_context)
+                    if shape_plan is not None:
+                        earlier_shape = shape_plan
+                if preview_seen:
+                    # Re-evaluate the complete notice so later contradictions
+                    # cannot hide behind an earlier successful fragment.
+                    notice_seen = effect
             reference = rtpc_context is None and earlier_effect and any(term in text for term in (
                 "expected result above", "expected changes above", "changes described above",
                 "result just described", "plan above", "上述预期", "上面的预期", "刚才说明的", "上述变更", "按以上方案"))
