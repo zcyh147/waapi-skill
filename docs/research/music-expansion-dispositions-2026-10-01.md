@@ -17,7 +17,7 @@ The acceptance target is structural configuration, with meaningful order and pre
 | T22 | #124 repair `4231c52ed929c2924c2430f1f27224cbda5f0d7e` / `c08db5a7141a449bd5ea6db883542eee4120adf114261680fb910c1265734c32` | PlaySourcePostExit true→false passed; artifact `8044120b7ce628d492800f7c8dfddb0206f873f0fafbb317b32e1251a2947111`. |
 | T25 | Same repair / `d3f89466954bbc4f8bc4f0a77c75b5dd4f214287c634b61618f1cfa0ab54fdce` | Same boolean edit passed; artifact `de54c011785d012922940d8067471e8971b8d2c0d62449d9dca5244cbe88b929`; the overall invocation still failed its Loop node. |
 
-The records show equal source before/after hashes, project mtimes, and tree metadata, with empty final scoped process lists. Failed invocations retained quarantined sandboxes. A later 2025 finite-loop dependency-read attempt resolved two meanings to the same output field and failed before loop mutation, as recorded in the investigation's executed update; the compact maintenance JSON is not a separate passing record for that attempt. No failed record is regraded here.
+The records show equal project/workunit (`.wproj`/`.wwu`) before/after content hashes, project mtimes, and whole-tree metadata (not full media/source byte hashes), with empty final scoped process lists. Failed invocations retained quarantined sandboxes. A later 2025 finite-loop dependency-read attempt resolved two meanings to the same output field and failed before loop mutation, as recorded in the investigation's executed update; the compact maintenance JSON is not a separate passing record for that attempt. No failed record is regraded here.
 
 ## Per-version disposition
 

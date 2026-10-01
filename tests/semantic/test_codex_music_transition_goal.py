@@ -178,3 +178,52 @@ def test_snapshot_ignores_public_row_order_but_retains_saved_rule_order_and_medi
     assert first == second
     assert first['rule_order'] == [row['id'] for row in witness['transition']['rules']]
     assert first['media']['music.wav']['sha256']
+
+
+@pytest.mark.parametrize('version', ('2022.1', '2025.1'))
+@pytest.mark.parametrize('fails_before_result', (False, True))
+def test_actual_maintenance_node_report_satisfies_real_category_finalizer(tmp_path, monkeypatch, version, fails_before_result):
+    import json
+    from types import SimpleNamespace
+    monkeypatch.setenv('WWISE_LIVE', '1')
+    monkeypatch.setenv('WWISE_DESTRUCTIVE', '1')
+    from tests.maintenance import probe_music_transition_scalar_goal as node
+    from tests.destructive.support.category_evidence import append_category_evidence
+
+    owned = tmp_path / 'project'
+    relative = Path('Interactive Music Hierarchy/Music.wwu' if version == '2022.1' else 'Containers/Music/Music.wwu')
+    path = owned / relative
+    path.parent.mkdir(parents=True)
+    path.write_bytes((ROOT / 'tests/_org' / version / relative).read_bytes())
+    project = owned / 'SampleProject.wproj'
+    project.write_bytes((ROOT / 'tests/_org' / version / 'SampleProject.wproj').read_bytes())
+    runtime = SimpleNamespace(version=version, sandbox=SimpleNamespace(sandbox_path=owned, sandbox_project=project),
+        category_results=[], raw_gateway=lambda argv: (0, {'ok': True, 'transaction_id': argv[1]}))
+    def goal(ctx, _witness, _snapshot):
+        ctx.gateway(['preview-from-draft', 'tx-property'])
+        if fails_before_result:
+            raise RuntimeError('bounded failure before goal result')
+        ctx.gateway(['typed-zero-call', 'tx-save'])
+        return {'status': 'PASS', 'transaction_ids': ['tx-property', 'tx-save'],
+            'scalar_maintenance_verified': True, 'complete_M04_verified': False,
+            'save_verifier_strength': 'result_schema_checked_plus_independent_owned_XML_readback'}
+    monkeypatch.setattr(node, 'run_transition_scalar_goal', goal)
+    if fails_before_result:
+        with pytest.raises(RuntimeError, match='before goal result'):
+            node.test_existing_transition_boolean_preserves_populated_rule_graph(runtime)
+    else:
+        node.test_existing_transition_boolean_preserves_populated_rule_graph(runtime)
+    assert len(runtime.category_results) == 1
+    report = runtime.category_results[0]
+    assert report['status'] == ('FAIL' if fails_before_result else 'PASS')
+    assert report['complete_M04_verified'] is False and report['agent_pass'] is False
+    assert report['transaction_ids'] == (['tx-property'] if fails_before_result else ['tx-property', 'tx-save'])
+    target = tmp_path / 'category.jsonl'
+    monkeypatch.setenv('WWISE_CATEGORY_EVIDENCE_PATH', str(target))
+    append_category_evidence(repo_root=tmp_path, candidate='a' * 40, version=version,
+        host={'display_name': 'fake-only'}, categories=runtime.category_results,
+        source={'hash_before': 'same', 'hash_after': 'same'}, residual_state={'residual_processes': []})
+    sealed = json.loads(target.read_text())['categories'][0]
+    assert 'strong_scalar' in sealed['verifier_strength']
+    assert 'saved_XML_media' in sealed['verifier_strength']
+    assert 'save_result_schema_only' in sealed['verifier_strength']

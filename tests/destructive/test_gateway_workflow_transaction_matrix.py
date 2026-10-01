@@ -6,6 +6,7 @@ import json
 import math
 import os
 import shutil
+import stat
 import struct
 import subprocess
 import sys
@@ -61,6 +62,10 @@ from tests.semantic.support.typed_gateway_input import (  # pyright: ignore[repo
 )
 from tests.support.host_path_relatives import (  # pyright: ignore[reportMissingImports]  # noqa: E402
     relative_host_path,
+)
+from tests.semantic.support.codex_filesystem_security import (  # noqa: E402
+    binary_file_open_flags,
+    path_is_link_or_reparse,
 )
 from tests.semantic.support.codex_project_prelaunch_v3 import (  # pyright: ignore[reportMissingImports]  # noqa: E402
     ProjectPrelaunchRequest,
@@ -758,7 +763,7 @@ def workflow_sandbox_runtime(
         source_hash_before = _hash_mutation_bearing_project_files(sandbox.source_root)
         source_tree_before = _source_tree_inventory(sandbox.source_root)
         source_mtime_before_ns = sandbox.source_project.stat().st_mtime_ns
-        assert source_hash_before[1] > 0, "immutable SampleProject source has no .wproj/.wwu files to hash"
+        assert source_hash_before[1] > 0, "immutable SampleProject source has no regular files to hash"
         extra_languages = getattr(request, "param", ())
         if extra_languages:
             # Fixture setup only, before Wwise starts, on the disposable copy.
@@ -852,6 +857,8 @@ def workflow_sandbox_runtime(
             try:
                 source_hash_after = _hash_mutation_bearing_project_files(sandbox.source_root)
                 source_mtime_after_ns = sandbox.source_project.stat().st_mtime_ns
+                if source_tree_before is not None:
+                    source_tree_after = _source_tree_inventory(sandbox.source_root)
                 if source_hash_after != source_hash_before:
                     raise AssertionError(
                         "immutable SampleProject source hash changed during gateway workflow test: "
@@ -863,7 +870,6 @@ def workflow_sandbox_runtime(
                         f"before={source_mtime_before_ns} after={source_mtime_after_ns}"
                     )
                 if source_tree_before is not None:
-                    source_tree_after = _source_tree_inventory(sandbox.source_root)
                     if source_tree_after != source_tree_before:
                         raise AssertionError(
                             "immutable SampleProject source tree metadata changed during gateway workflow test: "
@@ -902,8 +908,14 @@ def workflow_sandbox_runtime(
                 categories=category_results,
                 source={
                     "project": str(sandbox.source_project),
+                    "hash_scope": "all-source-regular-file-content",
+                    "hash_algorithm": "sha256",
                     "hash_before": source_hash_before[0] if source_hash_before else None,
                     "hash_after": source_hash_after[0] if source_hash_after else None,
+                    "file_count_before": source_hash_before[1] if source_hash_before else None,
+                    "file_count_after": source_hash_after[1] if source_hash_after else None,
+                    "bytes_hashed_before": source_hash_before[2] if source_hash_before else None,
+                    "bytes_hashed_after": source_hash_after[2] if source_hash_after else None,
                     "mtime_before_ns": source_mtime_before_ns,
                     "mtime_after_ns": source_mtime_after_ns,
                     "tree_metadata_before": source_tree_before[0] if source_tree_before else None,
@@ -3579,21 +3591,83 @@ def _safe_lock_root(env: Mapping[str, str]) -> Path:
     return resolved
 
 
+SOURCE_HASH_MAX_FILES = 20_000
+SOURCE_HASH_MAX_ENTRIES = 40_000
+SOURCE_HASH_MAX_BYTES = 512 * 1024 * 1024
+SOURCE_HASH_MAX_DEPTH = 64
+SOURCE_HASH_CHUNK_BYTES = 1024 * 1024
+
+
 def _hash_mutation_bearing_project_files(root: Path) -> tuple[str, int, int]:
+    """Hash every regular source file, including media; retain the legacy helper name.
+
+    Framing matches hash_project(..., preferred_strategy="full"): sorted paths,
+    relative UTF-8 path, NUL, complete file bytes, NUL. Preflight the entire tree
+    before reading content, and reject links/reparse points and bound violations.
+    No large-source fallback may silently narrow this source-protection proof.
+    """
+
+    root_info = root.lstat()
+    if path_is_link_or_reparse(root, metadata=root_info) or not stat.S_ISDIR(root_info.st_mode):
+        raise SandboxFixtureError("source hash root must be a directory, not a link or reparse point")
+    pending = [(root, 0)]
+    files = []
+    entries_seen = total_bytes = 0
+    while pending:
+        directory, depth = pending.pop()
+        with os.scandir(directory) as entries:
+            for entry in entries:
+                entries_seen += 1
+                if entries_seen > SOURCE_HASH_MAX_ENTRIES:
+                    raise SandboxFixtureError("source hash tree-entry bound exceeded")
+                path = Path(entry.path)
+                info = entry.stat(follow_symlinks=False)
+                if path_is_link_or_reparse(path, metadata=info):
+                    raise SandboxFixtureError("source hash rejects links and reparse points")
+                if stat.S_ISDIR(info.st_mode):
+                    if depth + 1 > SOURCE_HASH_MAX_DEPTH:
+                        raise SandboxFixtureError("source hash directory-depth bound exceeded")
+                    pending.append((path, depth + 1))
+                elif stat.S_ISREG(info.st_mode):
+                    files.append((path, info))
+                    total_bytes += info.st_size
+                    if len(files) > SOURCE_HASH_MAX_FILES or total_bytes > SOURCE_HASH_MAX_BYTES:
+                        raise SandboxFixtureError("source hash file-count or byte bound exceeded")
+                else:
+                    raise SandboxFixtureError("source hash requires regular files and directories")
+
+    def snapshot(info):
+        return (info.st_dev, info.st_ino, info.st_mode, info.st_size,
+                info.st_mtime_ns, info.st_ctime_ns)
+
     digest = hashlib.sha256()
     bytes_hashed = 0
-    files = [
-        path
-        for path in sorted(root.rglob("*"))
-        if path.is_file() and path.suffix.lower() in {".wproj", ".wwu"}
-    ]
-    for path in files:
+    for path, info in sorted(files):
         digest.update(path.relative_to(root).as_posix().encode("utf-8"))
         digest.update(b"\0")
-        data = path.read_bytes()
-        digest.update(data)
+        current = path.lstat()
+        if path_is_link_or_reparse(path, metadata=current) or snapshot(current) != snapshot(info):
+            raise SandboxFixtureError("source file changed during hash preflight")
+        descriptor = os.open(path, binary_file_open_flags(os.O_RDONLY, getattr(os, "O_NOFOLLOW", 0)))
+        try:
+            if snapshot(os.fstat(descriptor)) != snapshot(info):
+                raise SandboxFixtureError("source file changed before hashing")
+            file_bytes = 0
+            while chunk := os.read(descriptor, SOURCE_HASH_CHUNK_BYTES):
+                file_bytes += len(chunk)
+                bytes_hashed += len(chunk)
+                if file_bytes > info.st_size or bytes_hashed > SOURCE_HASH_MAX_BYTES:
+                    raise SandboxFixtureError("source hash streaming byte bound exceeded")
+                digest.update(chunk)
+            final = path.lstat()
+            if (file_bytes != info.st_size
+                    or snapshot(os.fstat(descriptor)) != snapshot(info)
+                    or path_is_link_or_reparse(path, metadata=final)
+                    or snapshot(final) != snapshot(info)):
+                raise SandboxFixtureError("source file changed during hashing")
+        finally:
+            os.close(descriptor)
         digest.update(b"\0")
-        bytes_hashed += len(data)
     return digest.hexdigest(), len(files), bytes_hashed
 
 

@@ -13,7 +13,7 @@
       "outcome": "PASS",
       "agent_pass": false,
       "complete_workflow_verified": false,
-      "source_full_hash_unchanged": true,
+      "source_project_workunit_content_hash_unchanged": true,
       "source_mtime_unchanged": true,
       "source_tree_metadata_unchanged": true,
       "process_cleanup": "cleaned",
@@ -73,7 +73,7 @@
       "outcome": "PASS",
       "agent_pass": false,
       "complete_workflow_verified": false,
-      "source_full_hash_unchanged": true,
+      "source_project_workunit_content_hash_unchanged": true,
       "source_mtime_unchanged": true,
       "source_tree_metadata_unchanged": true,
       "process_cleanup": "cleaned",
@@ -349,7 +349,7 @@
       "outcome": "PASS",
       "agent_pass": false,
       "complete_workflow_verified": false,
-      "source_full_hash_unchanged": true,
+      "source_project_workunit_content_hash_unchanged": true,
       "source_mtime_unchanged": true,
       "source_tree_metadata_unchanged": true,
       "process_cleanup": "cleaned",
@@ -394,7 +394,7 @@
       "outcome": "PASS",
       "agent_pass": false,
       "complete_workflow_verified": false,
-      "source_full_hash_unchanged": true,
+      "source_project_workunit_content_hash_unchanged": true,
       "source_mtime_unchanged": true,
       "source_tree_metadata_unchanged": true,
       "process_cleanup": "cleaned",
@@ -460,7 +460,7 @@
       "outcome": "PASS",
       "agent_pass": false,
       "complete_workflow_verified": false,
-      "source_full_hash_unchanged": true,
+      "source_project_workunit_content_hash_unchanged": true,
       "source_mtime_unchanged": true,
       "source_tree_metadata_unchanged": true,
       "process_cleanup": "cleaned",
@@ -736,7 +736,7 @@
       "outcome": "PASS",
       "agent_pass": false,
       "complete_workflow_verified": false,
-      "source_full_hash_unchanged": true,
+      "source_project_workunit_content_hash_unchanged": true,
       "source_mtime_unchanged": true,
       "source_tree_metadata_unchanged": true,
       "process_cleanup": "cleaned",
@@ -1070,7 +1070,7 @@
       "outcome": "FAIL",
       "agent_pass": false,
       "complete_workflow_verified": false,
-      "source_full_hash_unchanged": true,
+      "source_project_workunit_content_hash_unchanged": true,
       "source_mtime_unchanged": true,
       "source_tree_metadata_unchanged": true,
       "process_cleanup": "cleaned",
@@ -1132,5 +1132,12 @@
       "followup": "Diagnose fixture/path; populate only the owned fixture from existing repository WAV media where truly absent. Preserve actual media hash assertions; no XML or source changes."
     }
   ],
-  "attribution": "Platform input rejection repaired; property-state reads now stop at genuine live-name ambiguity. Missing Original WAV fixture blocks 2025 reference probe before any Draft or transaction."
+  "attribution": "Platform input rejection repaired; property-state reads now stop at genuine live-name ambiguity. Missing Original WAV fixture blocks 2025 reference probe before any Draft or transaction.",
+  "historical_native_source_proof_scope": {
+    "native_category_content_hash": "Historical category.source.hash_before/hash_after cover .wproj/.wwu content only.",
+    "native_tree_metadata": "Whole-tree path, mode, size and mtime inventory; not a media-content hash.",
+    "copy_metadata": "Separate bounded-wproj-files copy audit; observed saved audit file_count=1.",
+    "full_source_content_integrity": "Not established by these historical native records; original raw records, digests and outcomes remain unchanged.",
+    "formal_fresh_lifecycle": "Separate full-source SHA-256 evidence remains valid and is not revised here."
+  }
 }

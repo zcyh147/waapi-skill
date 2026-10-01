@@ -42,6 +42,20 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- Candidate `b23011f` completed Program **5888 passed / 2 skipped** and
+  Non-live **12126 passed / 118 skipped / 27 deselected**, both exit zero.
+  Exact logs and digests are recorded in
+  `../research/integration-expansion-compact-catalog-gates-2026-10-01.json`.
+  Its first 2022 native follow-up had three sealed read-investigation PASSs
+  and one Transition CALL pass followed by a sealing error: mandatory
+  `verifier_strength` was absent. That Transition attempt receives no acceptance
+  credit; its log, transactions and copied project remain retained.
+- Repair #129 supplies the precise scalar/XML/media verifier label and the
+  bounded all-source content guard described below. Its combined actual
+  finalizer, category and Transition regression passed **54 tests** (3.90 s).
+  Independent Spec and Standards reviews found no actionable issue. Fresh
+  owned-copy native reruns remain required; no historical outcome is upgraded.
+
 - Candidate `ae3d355` completed Program with **9 failed, 5879 passed,
   2 skipped**. The nine old catalog consumers expected repeated row fields;
   the producer's compact contract and all schema obligations remain unchanged.
@@ -75,8 +89,17 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Music investigation follow-ups
 
+Historical native category records hash `.wproj`/`.wwu` content and separately
+record whole-tree metadata; they do not establish all-source/media byte integrity.
+Saved copy metadata uses `bounded-wproj-files` (one file in the inspected audit),
+which is a separate, narrower proof. Formal Fresh lifecycle full-source hashes
+remain valid. Repair #129 adds bounded all-source content hashes before launch
+and after shutdown, with explicit scope/file/byte counts before final PASS; no
+old raw record, digest, outcome, or failed copy is upgraded or changed.
+
 - Six platform-aware read investigations completed on `4d74ebb`, with source
-  full hash/mtime/tree metadata unchanged and scoped cleanup proven. The two
+  project/workunit content hashes, project mtime, and whole-tree metadata
+  unchanged; scoped cleanup was proven. The two
   fade property-state requests now reach actual live-name ambiguity rather
   than missing-platform input errors; they do not establish enabled state or
   native physical-time units. Complete arrangement/order claims remain blocked.
@@ -129,8 +152,8 @@ pilot, and acceptance may proceed after their prerequisite gates.
 - `cc8707a` completed Full Non-live: **12044 passed, 118 skipped,
   27 deselected**, exit zero (777.20 s). Source was clean and no owned test
   process remained. Exact digests are in the pristine-Draft gate record.
-- Six music read investigations completed with source full hash/mtime/tree and
-  scoped cleanup proven. The 2025 nine-tuple references were readable; 2022's
+- Six music read investigations completed with project/workunit content hashes,
+  project mtime, whole-tree metadata, and scoped cleanup unchanged. The 2025 nine-tuple references were readable; 2022's
   two unknown-property getters remain accessor boundaries. Missing-platform
   property-state requests were input errors; the main-only correction passed
   35 focused tests. Native units and authoritative ordering remain unproven.
@@ -232,7 +255,7 @@ pilot, and acceptance may proceed after their prerequisite gates.
   and Non-live (11766 passed / 117 skipped / 27 deselected).
 - Real preflight at `e8ab17c`: 2025 had two setup/oracle-stability passes and
   five failures; 2022 had three setup passes, three failures, and one observed
-  M05 capability boundary. All 14 final source hash/mtime/tree-metadata guards
+  M05 capability boundary. All 14 final project/workunit-content, project-mtime, and tree-metadata guards
   and scoped-process cleanup checks passed. This is not Agent/business PASS.
   Durable records are summarized in
   `../research/integration-expansion-preflight-2026-10-01.json`.
@@ -278,8 +301,8 @@ pilot, and acceptance may proceed after their prerequisite gates.
   are recorded in `../research/integration-expansion-native-followups-2026-10-01.json`.
   That file covers 19 failed-only/native-goal follow-up lifecycle records and
   14 complete-preparation lifecycle records. The 2025 full preparation at
-  `2732ac9` passed all seven nodes. All 14 full-preparation source full hashes,
-  project mtimes, tree metadata, and scoped-process cleanup checks passed;
+  `2732ac9` passed all seven nodes. All 14 full-preparation project/workunit content hashes,
+  project mtimes, whole-tree metadata, and scoped-process cleanup checks passed;
   their PASS copies were deleted. This is not a final Fresh campaign.
 - `../research/music-expansion-dispositions-2026-10-01.md` defines three full
   structural oracles, Chinese allow-mode case drafts, version-specific gaps,

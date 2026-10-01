@@ -872,5 +872,12 @@
       "agent_started": false,
       "business_pass_credit": false
     }
-  ]
+  ],
+  "historical_native_source_proof_scope": {
+    "native_category_content_hash": "Historical category.source.hash_before/hash_after cover .wproj/.wwu content only.",
+    "native_tree_metadata": "Whole-tree path, mode, size and mtime inventory; not a media-content hash.",
+    "copy_metadata": "Separate bounded-wproj-files copy audit; observed saved audit file_count=1.",
+    "full_source_content_integrity": "Not established by these historical native records; original raw records, digests and outcomes remain unchanged.",
+    "formal_fresh_lifecycle": "Separate full-source SHA-256 evidence remains valid and is not revised here."
+  }
 }

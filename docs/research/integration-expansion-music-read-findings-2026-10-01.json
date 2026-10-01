@@ -62,7 +62,7 @@
               "id": "{898C3D43-E6A9-4327-8029-61E657048399}"
             }
           ],
-          "source_full_hash_mtime_tree_unchanged": true,
+          "source_project_workunit_content_hash_mtime_tree_metadata_unchanged": true,
           "process_cleanup_proven": true,
           "sandbox_deleted": true,
           "record_sha256": "18c95a3a4702bc9f61e508659db84eaf9c179f4b6caa6088cd94a546045a598e",
@@ -257,7 +257,7 @@
               "id": "{0FC1E836-74BB-43AB-B417-6C9D16AE5636}"
             }
           ],
-          "source_full_hash_mtime_tree_unchanged": true,
+          "source_project_workunit_content_hash_mtime_tree_metadata_unchanged": true,
           "process_cleanup_proven": true,
           "sandbox_deleted": true,
           "record_sha256": "da8821e475ac00cfa338aa92c7488db337304b1d0cee411a872533f2decc1fb9",
@@ -585,7 +585,7 @@
               "id": "{A3D67A6B-6B63-4E02-81AF-CF3685ECAF68}"
             }
           ],
-          "source_full_hash_mtime_tree_unchanged": true,
+          "source_project_workunit_content_hash_mtime_tree_metadata_unchanged": true,
           "process_cleanup_proven": true,
           "sandbox_deleted": true,
           "record_sha256": "68eb99814843807e0f015cd279774bb6134e612160e586423022372dd7ccd124",
@@ -647,7 +647,7 @@
               "id": "{898C3D43-E6A9-4327-8029-61E657048399}"
             }
           ],
-          "source_full_hash_mtime_tree_unchanged": true,
+          "source_project_workunit_content_hash_mtime_tree_metadata_unchanged": true,
           "process_cleanup_proven": true,
           "sandbox_deleted": true,
           "record_sha256": "81f945e1031aa0095e302c127f120d00d543216c0430565a71163f96ff80099b",
@@ -842,7 +842,7 @@
               "id": "{0FC1E836-74BB-43AB-B417-6C9D16AE5636}"
             }
           ],
-          "source_full_hash_mtime_tree_unchanged": true,
+          "source_project_workunit_content_hash_mtime_tree_metadata_unchanged": true,
           "process_cleanup_proven": true,
           "sandbox_deleted": true,
           "record_sha256": "3f73c7b6f385a55948f6476d451506f73fcc2513b923caf17cd7a0be4b6e3b74",
@@ -881,7 +881,7 @@
               "id": "{AF599241-DE64-4286-BB8B-B0260EE20B80}"
             }
           ],
-          "source_full_hash_mtime_tree_unchanged": true,
+          "source_project_workunit_content_hash_mtime_tree_metadata_unchanged": true,
           "process_cleanup_proven": true,
           "sandbox_deleted": true,
           "record_sha256": "aa0c11e81dfa40b33001aa583e4a6ce9ab5d2ae3ba1a2cba2670283081670453",
@@ -897,5 +897,12 @@
     "reference-owned Playlist/fade ownership is not proven by a parent hierarchy query",
     "native fade units and full authoring/preservation remain unproven"
   ],
-  "followups": "Reviewed main-only platform fix35 focused pass and existing2025reference goal23 focused pass; no new live execution yet"
+  "followups": "Reviewed main-only platform fix35 focused pass and existing2025reference goal23 focused pass; no new live execution yet",
+  "historical_native_source_proof_scope": {
+    "native_category_content_hash": "Historical category.source.hash_before/hash_after cover .wproj/.wwu content only.",
+    "native_tree_metadata": "Whole-tree path, mode, size and mtime inventory; not a media-content hash.",
+    "copy_metadata": "Separate bounded-wproj-files copy audit; observed saved audit file_count=1.",
+    "full_source_content_integrity": "Not established by these historical native records; original raw records, digests and outcomes remain unchanged.",
+    "formal_fresh_lifecycle": "Separate full-source SHA-256 evidence remains valid and is not revised here."
+  }
 }

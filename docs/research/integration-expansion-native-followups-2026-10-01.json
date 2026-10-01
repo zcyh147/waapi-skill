@@ -25,7 +25,7 @@
       ],
       "full_record_sha256": "b23da6c9c2eda06b67a80fc47da8a5983760f618eb9073ce62a81e91ecbaff80",
       "source_guard": {
-        "full_hash_unchanged": true,
+        "project_workunit_content_hash_unchanged": true,
         "project_mtime_unchanged": true,
         "tree_metadata_unchanged": true
       },
@@ -71,7 +71,7 @@
       ],
       "full_record_sha256": "196da0da9b45eab4c27cc0167e655c9f1c406e4328f5fc41fca83e546c69a831",
       "source_guard": {
-        "full_hash_unchanged": true,
+        "project_workunit_content_hash_unchanged": true,
         "project_mtime_unchanged": true,
         "tree_metadata_unchanged": true
       },
@@ -101,7 +101,7 @@
       ],
       "full_record_sha256": "9139494e977423163a32e3630e013d79bb6cb7d66e3aa03e40c730492911890e",
       "source_guard": {
-        "full_hash_unchanged": true,
+        "project_workunit_content_hash_unchanged": true,
         "project_mtime_unchanged": true,
         "tree_metadata_unchanged": true
       },
@@ -145,7 +145,7 @@
       ],
       "full_record_sha256": "97424c703b309ed9c7ef13976cf015889de07dde90a2aabed1972fa85f4cf6a3",
       "source_guard": {
-        "full_hash_unchanged": true,
+        "project_workunit_content_hash_unchanged": true,
         "project_mtime_unchanged": true,
         "tree_metadata_unchanged": true
       },
@@ -189,7 +189,7 @@
       ],
       "full_record_sha256": "3449bf707202070b6d5c8b13741cdd43c7ac70315ac193066fe29fae53734c43",
       "source_guard": {
-        "full_hash_unchanged": true,
+        "project_workunit_content_hash_unchanged": true,
         "project_mtime_unchanged": true,
         "tree_metadata_unchanged": true
       },
@@ -219,7 +219,7 @@
       ],
       "full_record_sha256": "940ac0bf1913b1e8ac60093b45978248a125df22f6b3074827895324704248c4",
       "source_guard": {
-        "full_hash_unchanged": true,
+        "project_workunit_content_hash_unchanged": true,
         "project_mtime_unchanged": true,
         "tree_metadata_unchanged": true
       },
@@ -265,7 +265,7 @@
       ],
       "full_record_sha256": "2f4d7f1fbc226fd83be2a79554624af0c62b47545187d46eaf4cd4a4349cd1eb",
       "source_guard": {
-        "full_hash_unchanged": true,
+        "project_workunit_content_hash_unchanged": true,
         "project_mtime_unchanged": true,
         "tree_metadata_unchanged": true
       },
@@ -295,7 +295,7 @@
       ],
       "full_record_sha256": "4b7b1a62817593452fd436f365707c2562f153597aeae3d809ed83a2fb2bd691",
       "source_guard": {
-        "full_hash_unchanged": true,
+        "project_workunit_content_hash_unchanged": true,
         "project_mtime_unchanged": true,
         "tree_metadata_unchanged": true
       },
@@ -325,7 +325,7 @@
       ],
       "full_record_sha256": "0df78411280a0cf97744312b6666c540da181c01e60eb68c49a56c49d9e66af4",
       "source_guard": {
-        "full_hash_unchanged": true,
+        "project_workunit_content_hash_unchanged": true,
         "project_mtime_unchanged": true,
         "tree_metadata_unchanged": true
       },
@@ -367,7 +367,7 @@
       ],
       "full_record_sha256": "d7348baf2e1d7aec01ea8b3b4ff3cdeaee49eaf1c905eb1e66ee52bc1f45813c",
       "source_guard": {
-        "full_hash_unchanged": true,
+        "project_workunit_content_hash_unchanged": true,
         "project_mtime_unchanged": true,
         "tree_metadata_unchanged": true
       },
@@ -397,7 +397,7 @@
       ],
       "full_record_sha256": "8216e4811614927b8ba1035845e4f2c0d897579f05024fafd9739eec185906d8",
       "source_guard": {
-        "full_hash_unchanged": true,
+        "project_workunit_content_hash_unchanged": true,
         "project_mtime_unchanged": true,
         "tree_metadata_unchanged": true
       },
@@ -439,7 +439,7 @@
       ],
       "full_record_sha256": "e55121323e6c454aec5ef735beae580a12ba6d649401176077deefa151d8ccea",
       "source_guard": {
-        "full_hash_unchanged": true,
+        "project_workunit_content_hash_unchanged": true,
         "project_mtime_unchanged": true,
         "tree_metadata_unchanged": true
       },
@@ -489,7 +489,7 @@
       ],
       "full_record_sha256": "d1b522ceb6cdcc1998d19e080797f7edf3a59d9ba3c04e80edb8cca694ecfb95",
       "source_guard": {
-        "full_hash_unchanged": true,
+        "project_workunit_content_hash_unchanged": true,
         "project_mtime_unchanged": true,
         "tree_metadata_unchanged": true
       },
@@ -539,7 +539,7 @@
       ],
       "full_record_sha256": "4d83a0af38eb415dfc3225cba9fc2fc454d0f93ded91224edaf313db3822f89e",
       "source_guard": {
-        "full_hash_unchanged": true,
+        "project_workunit_content_hash_unchanged": true,
         "project_mtime_unchanged": true,
         "tree_metadata_unchanged": true
       },
@@ -568,7 +568,7 @@
       ],
       "full_record_sha256": "e05b22d0dcd3ef858ac036c32fc1d2e4941b35ce24973489f45db1d349f584c1",
       "source_guard": {
-        "full_hash_unchanged": true,
+        "project_workunit_content_hash_unchanged": true,
         "project_mtime_unchanged": true,
         "tree_metadata_unchanged": true
       },
@@ -623,7 +623,7 @@
       ],
       "full_record_sha256": "f966eb9513572a57b49c3843fb8b06022e8d6112f2f8096a8f1f7ad8e55a77da",
       "source_guard": {
-        "full_hash_unchanged": true,
+        "project_workunit_content_hash_unchanged": true,
         "project_mtime_unchanged": true,
         "tree_metadata_unchanged": true
       },
@@ -675,7 +675,7 @@
       ],
       "full_record_sha256": "e75178c4880b90582aad10db85c5b797653a4b95477f69a52d57fe35e6beead9",
       "source_guard": {
-        "full_hash_unchanged": true,
+        "project_workunit_content_hash_unchanged": true,
         "project_mtime_unchanged": true,
         "tree_metadata_unchanged": true
       },
@@ -727,7 +727,7 @@
       ],
       "full_record_sha256": "3a21768f2d35d614a4e05961f1b38206801916ca16b946248ce0a940935980c5",
       "source_guard": {
-        "full_hash_unchanged": true,
+        "project_workunit_content_hash_unchanged": true,
         "project_mtime_unchanged": true,
         "tree_metadata_unchanged": true
       },
@@ -782,7 +782,7 @@
       ],
       "full_record_sha256": "595ea159fe77a9438aae88f3710b0ade03d095a5e222faf97736fcfcc66d321d",
       "source_guard": {
-        "full_hash_unchanged": true,
+        "project_workunit_content_hash_unchanged": true,
         "project_mtime_unchanged": true,
         "tree_metadata_unchanged": true
       },
@@ -964,7 +964,7 @@
         ],
         "full_record_sha256": "ffacdbe8288858206979dae9f487f3b80fe22356b44d4d7575ebf3b42e2a4344",
         "source_guard": {
-          "full_hash_unchanged": true,
+          "project_workunit_content_hash_unchanged": true,
           "project_mtime_unchanged": true,
           "tree_metadata_unchanged": true
         },
@@ -1010,7 +1010,7 @@
         ],
         "full_record_sha256": "d0a38ab3cdfa5f07889558733e47ac6f16158b6ec597fa7304191b8798323acc",
         "source_guard": {
-          "full_hash_unchanged": true,
+          "project_workunit_content_hash_unchanged": true,
           "project_mtime_unchanged": true,
           "tree_metadata_unchanged": true
         },
@@ -1056,7 +1056,7 @@
         ],
         "full_record_sha256": "bce7dc7e37f1f07ae8426fb636a83c31940a1ea56b10bc95fc46a5074198b361",
         "source_guard": {
-          "full_hash_unchanged": true,
+          "project_workunit_content_hash_unchanged": true,
           "project_mtime_unchanged": true,
           "tree_metadata_unchanged": true
         },
@@ -1098,7 +1098,7 @@
         ],
         "full_record_sha256": "96e58fbbb6abd8379645780d9f7f4dd007db31d35668d73041bd8a01dd6bbdad",
         "source_guard": {
-          "full_hash_unchanged": true,
+          "project_workunit_content_hash_unchanged": true,
           "project_mtime_unchanged": true,
           "tree_metadata_unchanged": true
         },
@@ -1142,7 +1142,7 @@
         ],
         "full_record_sha256": "93eba1d554e0f0050454bb7b0c025b64ae689c6e45473e69f09c437dc53533a6",
         "source_guard": {
-          "full_hash_unchanged": true,
+          "project_workunit_content_hash_unchanged": true,
           "project_mtime_unchanged": true,
           "tree_metadata_unchanged": true
         },
@@ -1186,7 +1186,7 @@
         ],
         "full_record_sha256": "2762ae378758b850482a428b89e87732a954a25fc237bf2004bcd86c4b886390",
         "source_guard": {
-          "full_hash_unchanged": true,
+          "project_workunit_content_hash_unchanged": true,
           "project_mtime_unchanged": true,
           "tree_metadata_unchanged": true
         },
@@ -1297,7 +1297,7 @@
         ],
         "full_record_sha256": "b657258262d5939de2ead5abc8ecfb461b245eab81fee7f7cf413c30fdee6044",
         "source_guard": {
-          "full_hash_unchanged": true,
+          "project_workunit_content_hash_unchanged": true,
           "project_mtime_unchanged": true,
           "tree_metadata_unchanged": true
         },
@@ -1347,7 +1347,7 @@
         ],
         "full_record_sha256": "133e8593dba940785c4bd9a9c74a9ed48604a2dcfecf3e1883c2033252e95937",
         "source_guard": {
-          "full_hash_unchanged": true,
+          "project_workunit_content_hash_unchanged": true,
           "project_mtime_unchanged": true,
           "tree_metadata_unchanged": true
         },
@@ -1393,7 +1393,7 @@
         ],
         "full_record_sha256": "ffa270d6921aaff8728c0723cab2aab962b2e32769f225bd224f3d4724512eb0",
         "source_guard": {
-          "full_hash_unchanged": true,
+          "project_workunit_content_hash_unchanged": true,
           "project_mtime_unchanged": true,
           "tree_metadata_unchanged": true
         },
@@ -1439,7 +1439,7 @@
         ],
         "full_record_sha256": "6f1c0b937cea6484909e2df665f5f792fbb0e1b98b800cc525c831f2f5527f1c",
         "source_guard": {
-          "full_hash_unchanged": true,
+          "project_workunit_content_hash_unchanged": true,
           "project_mtime_unchanged": true,
           "tree_metadata_unchanged": true
         },
@@ -1481,7 +1481,7 @@
         ],
         "full_record_sha256": "40e207bfe7016635e6e11ebc84e7580688e052b6d651f9cdcec3fdab4962d6a4",
         "source_guard": {
-          "full_hash_unchanged": true,
+          "project_workunit_content_hash_unchanged": true,
           "project_mtime_unchanged": true,
           "tree_metadata_unchanged": true
         },
@@ -1525,7 +1525,7 @@
         ],
         "full_record_sha256": "5b4744e621dd0d12d61ffc86b9f9e2699c601c29f1e9a55197a20b9d9dde10cc",
         "source_guard": {
-          "full_hash_unchanged": true,
+          "project_workunit_content_hash_unchanged": true,
           "project_mtime_unchanged": true,
           "tree_metadata_unchanged": true
         },
@@ -1569,7 +1569,7 @@
         ],
         "full_record_sha256": "38c423fe2f1ebb02de502c63927a9221508dbd6d3234da5f02ddd30ce69fa26c",
         "source_guard": {
-          "full_hash_unchanged": true,
+          "project_workunit_content_hash_unchanged": true,
           "project_mtime_unchanged": true,
           "tree_metadata_unchanged": true
         },
@@ -1613,7 +1613,7 @@
         ],
         "full_record_sha256": "4349566e033941deb3c7a2b2c4c080bcf5221a17b5afaf02c1fc7287c8be1f89",
         "source_guard": {
-          "full_hash_unchanged": true,
+          "project_workunit_content_hash_unchanged": true,
           "project_mtime_unchanged": true,
           "tree_metadata_unchanged": true
         },
@@ -1652,5 +1652,12 @@
         }
       }
     ]
+  },
+  "historical_native_source_proof_scope": {
+    "native_category_content_hash": "Historical category.source.hash_before/hash_after cover .wproj/.wwu content only.",
+    "native_tree_metadata": "Whole-tree path, mode, size and mtime inventory; not a media-content hash.",
+    "copy_metadata": "Separate bounded-wproj-files copy audit; observed saved audit file_count=1.",
+    "full_source_content_integrity": "Not established by these historical native records; original raw records, digests and outcomes remain unchanged.",
+    "formal_fresh_lifecycle": "Separate full-source SHA-256 evidence remains valid and is not revised here."
   }
 }

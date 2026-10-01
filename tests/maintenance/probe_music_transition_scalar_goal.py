@@ -18,6 +18,7 @@ def test_existing_transition_boolean_preserves_populated_rule_graph(expansion_ru
     witness = xml_music_witness(owned, runtime.version)
     receipts = []
     report = {'category': 'music-transition-populated-scalar-goal', 'status': 'FAIL',
+        'verifier_strength': 'strong_scalar_and_independent_saved_XML_media; save_result_schema_only; not_full_M04',
         'scope': 'existing_post_exit_boolean_and_saved_sibling_graph_not_full_M04',
         'agent_pass': False, 'scalar_maintenance_verified': False, 'complete_M04_verified': False,
         'gateway_receipts': receipts, 'transaction_ids': [], 'xml_witness': witness}
