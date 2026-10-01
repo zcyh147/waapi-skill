@@ -302,6 +302,84 @@ def test_same_target_notice_can_complete_retention_in_a_separate_visible_message
     assert _notice(case["events"], artifact=case["preview_artifact"], before=case["before_snapshot"])
 
 
+def _point_notice_case(model):
+    fixture = json.loads((Path(__file__).parents[1] / "fixtures/semantic/expansion-point-notice-86e23cd.json").read_text())
+    return next(case for case in fixture["cases"] if case["model"] == model)
+
+
+@pytest.mark.parametrize("model", ["luna-high", "sol-medium"])
+def test_actual_delta_explanation_and_complete_curve_facts_form_coherent_notice(model):
+    case = _point_notice_case(model)
+    assert _notice(case["events"], artifact=case["preview_artifact"], before=case["before_snapshot"])
+
+
+@pytest.mark.parametrize("model,defect", [
+    ("luna-high", "conflicting_delta"), ("luna-high", "wrong_history"), ("luna-high", "no_middle_role"),
+    ("luna-high", "missing_result_point"), ("luna-high", "extra_result_point"), ("luna-high", "duplicate_authored_point"),
+    ("luna-high", "wrong_result_domain"), ("luna-high", "wrong_shape"), ("luna-high", "foreign_id"),
+    ("sol-medium", "missing_current_point"), ("sol-medium", "duplicate_current_point"),
+    ("sol-medium", "wrong_history"), ("sol-medium", "wrong_delta_domain"), ("sol-medium", "wrong_role"),
+    ("sol-medium", "foreign_history"), ("sol-medium", "extra_change"), ("sol-medium", "wrong_control"),
+    ("sol-medium", "generic"), ("sol-medium", "late"),
+])
+def test_coherent_point_evidence_does_not_hide_incomplete_extra_or_conflicting_claims(model, defect):
+    case = _point_notice_case(model)
+    post = case["events"][1]["item"]
+    text = post["text"]
+    if defect == "conflicting_delta":
+        text = text.replace("(50, -6)", "(50, -60)", 1)
+    elif defect == "wrong_history":
+        text = text.replace("(50, -12)", "(50, -24)") if model == "luna-high" else text.replace("(50,-12)", "(50,-24)")
+    elif defect == "no_middle_role":
+        text = text.replace("中间点", "曲线")
+    elif defect == "missing_result_point":
+        text = text.replace("、(100, 0)", "")
+    elif defect == "extra_result_point":
+        text = text.replace("、(100, 0)", "、(75, -3)、(100, 0)")
+    elif defect == "duplicate_authored_point":
+        text = text.replace("曲线点为 (0, -48)、(50, -6)、(100, 0)", "曲线点为 (0, -48)、(50, -6)、(50, -6)、(100, 0)")
+    elif defect == "wrong_result_domain":
+        text = text.replace("曲线点为 (0, -48)、(50, -6)", "曲线点为 (0, -48)、(60, -6)")
+    elif defect == "wrong_shape":
+        text = text.replace("各段线性", "各段非线性")
+    elif defect == "foreign_id":
+        text += "目标是 {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}。"
+    elif defect == "missing_current_point":
+        text = text.replace("、(100,0)", "")
+    elif defect == "duplicate_current_point":
+        text = text.replace("、(100,0)", "、(100,0)、(100,0)")
+    elif defect == "wrong_delta_domain":
+        text = text.replace("(50,-6)", "(60,-6)")
+    elif defect == "wrong_role":
+        text = text.replace("中间点", "端点")
+    elif defect == "foreign_history":
+        text = text.replace("当前曲线为", "另一条关系的当前曲线为")
+    elif defect == "extra_change":
+        text += "同时将音量曲线的 (100,0) 改为 (100,2)。"
+    elif defect == "wrong_control":
+        text = text.replace("把中间点", "把 Time 控制的中间点")
+    elif defect == "generic":
+        text = "音量关系已核对，现在执行。"
+    else:
+        case["events"][1], case["events"][2] = case["events"][2], case["events"][1]
+    post["text"] = text
+    assert not _notice(case["events"], artifact=case["preview_artifact"], before=case["before_snapshot"])
+
+
+def test_incidental_middle_role_cannot_normalize_four_authored_curve_points():
+    case = _point_notice_case("luna-high")
+    text = "将音量曲线（包括中间点）改为 (50,-6)、(0,-48)、(50,-6)、(100,0)，各段线性。"
+    assert not _notice([PREVIEW, _message(text), EXECUTE],
+        artifact=case["preview_artifact"], before=case["before_snapshot"])
+
+
+def test_incidental_middle_role_cannot_turn_one_point_replacement_into_preserving_edit():
+    case = _point_notice_case("sol-medium")
+    text = "当前音量曲线为 (0,-48)、(50,-12)、(100,0)，各段线性。即将把音量曲线（包括中间点）改为 (50,-6)，保留原控制关系及备注。"
+    assert not _notice([PREVIEW, _message(text), EXECUTE],
+        artifact=case["preview_artifact"], before=case["before_snapshot"])
+
+
 def test_rtpc_context_accepts_independent_snapshot_row_permutations():
     case = _current_notice_case()
     case["preview_artifact"]["prepared_operation"]["verification_plan"]["before_rows"].reverse()

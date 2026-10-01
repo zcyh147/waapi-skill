@@ -400,7 +400,7 @@ def _rtpc_notice_effect(text: str, context: Mapping[str, Any], *, earlier_points
     clauses = re.split(r"[。；;\n]", numeric)
     whole_target = (context["ids"][2].casefold() in text or
                     (any(term in text for term in ("volume", "音量", "增益"))
-                     and any(name.casefold() in text for name in context["control_names"])))
+                     and any(term in text for term in ("curve", "曲线", "关系", "association", "relationship"))))
     same_target_clauses = [clause for clause in clauses if not any(
         re.search(rf"(?<![a-z0-9_]){re.escape(name.casefold())}(?![a-z0-9_])", clause)
         for name in context["foreign_names"])
@@ -417,16 +417,24 @@ def _rtpc_notice_effect(text: str, context: Mapping[str, Any], *, earlier_points
     def requested_shape(part: str) -> bool:
         return notice_shape and (not ("linear" in part or "线性" in part)
                                  or _affirmative_linear_interpolation(part))
+    old, new = context["old"], context["new"]
+    middle_edit = (len(old) == len(new) == 3 and context["same_domain"]
+                   and old[0] == new[0] and old[2] == new[2] and context["delta"] == [new[1]])
+    complete_current_curve = False
     for clause in clauses:
         scalar_middles = tuple(re.finditer(
             rf"(?:中点|中间点|midpoint|middle point)\s*(?:改为|改成|设为|设置为|(?:will be )?set to|change to)\s*({number})(?![a-z\d_.])", clause))
         target_clause = (any(term in clause for term in ("volume", "音量", "增益"))
                          and any(term in clause for term in ("curve", "曲线", "rtpc"))) or whole_target
-        if (target_clause or scalar_middles) and any(term in clause for term in ("现有", "当前", "现状", "existing", "current")):
+        historical = (any(term in clause for term in ("现有", "当前", "现状", "existing", "current"))
+                      or re.search(r"(?:中点|中间点|midpoint|middle point)\s*(?:从|from)", clause) is not None)
+        if (target_clause or scalar_middles) and historical:
             # Validate claimed history before either tuple or scalar dispatch.
             previous = pairs(re.split(r"改为|改成|更新为|修改为|设为|设置为|update|replace|change|set", clause)[0])
             if any(point not in context["old"] for point in previous):
                 return False, False
+            if clause in same_target_clauses and previous == old:
+                complete_current_curve = True
         if scalar_middles:
             if len(context["new"]) != 3:
                 return False, False
@@ -462,10 +470,22 @@ def _rtpc_notice_effect(text: str, context: Mapping[str, Any], *, earlier_points
             if stated and any(re.search(rf"(?<![a-z0-9_]){re.escape(name.casefold())}(?![a-z0-9_])",
                                        clause[:action.start()]) for name in context["foreign_names"]):
                 return False, False
+            # A changed-point explanation followed by the exact full result is
+            # two compatible claims, not four authored curve points. Require
+            # the closed middle-y role and this exact sequence; never dedup.
+            direct_middle_claim = re.search(
+                rf"(?:中点|中间点|midpoint|middle point)\s*(?:(?:从|from)\s*[（(]\s*{number}\s*[,，]\s*{number}\s*[)）])?\s*$",
+                clause[:action.start()]) is not None
+            first_pair = re.search(rf"[（(]\s*{number}\s*[,，]\s*{number}\s*[)）]", following)
+            separate_result = (first_pair is not None and re.match(
+                r"\s*[,，]\s*(?:曲线点(?:为|是)|curve points(?: are| will be)?)\s*[（(]",
+                following[first_pair.end():]) is not None)
+            if middle_edit and direct_middle_claim and separate_result and stated == context["delta"] + new:
+                stated = new
             if stated == context["new"] and requested_shape(following):
                 full = effect = True
             elif (stated == context["delta"] and stated and context["same_domain"]
-                  and (rest_already_matches or
+                  and (rest_already_matches or (middle_edit and direct_middle_claim and complete_current_curve) or
                        (any(term in retention for term in ("两端", "其余点", "endpoints", "other points"))
                         and any(term in retention for term in ("保持", "不变", "unchanged"))))
                   and requested_shape(following)):
